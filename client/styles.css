@@ -3700,7 +3700,39 @@ input[type="text"]:focus {
   gap: 8px;
   margin-bottom: 8px;
 }
+.replay-analysis-drag-handle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  min-height: 26px;
+  margin: -4px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  user-select: none;
+}
+.replay-analysis-drag-handle:hover,
+.replay-analysis-drag-handle:focus-visible,
+.replay-analysis-overlay[data-panel-dragging="true"] .replay-analysis-drag-handle {
+  background: rgba(17, 17, 15, 0.46);
+  outline: none;
+}
+.replay-analysis-overlay[data-panel-dragging="true"] .replay-analysis-drag-handle {
+  cursor: grabbing;
+}
+.replay-analysis-grip {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+}
 .replay-analysis-header h2 {
+  min-width: 0;
+  overflow: hidden;
   margin: 0;
   color: var(--accent);
   font-family: var(--mono);
@@ -3708,6 +3740,8 @@ input[type="text"]:focus {
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .replay-analysis-actions {
   gap: 4px;
@@ -4892,6 +4926,11 @@ input[type="text"]:focus {
   }
 
   .room-time-panel-drag-handle {
+    min-height: 36px;
+    cursor: default;
+  }
+
+  .replay-analysis-drag-handle {
     min-height: 36px;
     cursor: default;
   }

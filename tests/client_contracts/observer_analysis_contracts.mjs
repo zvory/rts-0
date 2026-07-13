@@ -80,6 +80,13 @@ import { textWithin } from "./dom_text.mjs";
   assert(restored.selectedTab === "units-lost", "observer analysis selected tab persists");
   assert(restored.visible === false, "observer analysis visible state persists");
   assert(restored.collapsed === true, "observer analysis collapsed state persists");
+  restored.position = { left: 320, top: 140 };
+  const restoredWithPosition = createObserverAnalysisOverlayPreferences(storage);
+  assert(
+    restoredWithPosition.position?.left === 320 && restoredWithPosition.position?.top === 140,
+    "observer analysis desktop position persists",
+  );
+  restoredWithPosition.clearPosition();
 
   restored.selectedTab = "not-a-tab";
   assert(
@@ -133,6 +140,106 @@ import { textWithin } from "./dom_text.mjs";
     }),
     "observer analysis does not mount from replay identity alone",
   );
+
+  withFakeOverlayDocument(({ FakeElement }) => {
+    const priorWindow = globalThis.window;
+    const windowListeners = {};
+    globalThis.window = {
+      innerWidth: 1000,
+      innerHeight: 800,
+      addEventListener(type, handler) {
+        windowListeners[type] = handler;
+      },
+      removeEventListener(type, handler) {
+        if (windowListeners[type] === handler) delete windowListeners[type];
+      },
+      matchMedia() {
+        return { matches: false };
+      },
+    };
+    try {
+      const root = new FakeElement("section");
+      const draggablePrefs = createObserverAnalysisOverlayPreferences(fakeStorage());
+      const overlay = new ObserverAnalysisOverlay({ root, preferences: draggablePrefs });
+      const overlayRoot = root.children[0];
+      overlayRoot.style = fakeInlineStyle();
+      overlayRoot.getBoundingClientRect = () => ({ left: 672, top: 58, width: 316, height: 260 });
+      const dragHandle = root.querySelector(".replay-analysis-drag-handle");
+      assert(dragHandle, "observer analysis exposes a draggable titlebar handle");
+
+      dragHandle.listeners.pointerdown?.({
+        button: 0,
+        isPrimary: true,
+        pointerId: 7,
+        clientX: 700,
+        clientY: 80,
+        currentTarget: dragHandle,
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      windowListeners.pointermove?.({
+        pointerId: 7,
+        clientX: 640,
+        clientY: 120,
+        preventDefault() {},
+      });
+      windowListeners.pointerup?.({ pointerId: 7 });
+      assert(
+        overlayRoot.style.left === "612px" && overlayRoot.style.top === "98px",
+        "observer analysis drag updates the floating panel position",
+      );
+      assert(
+        draggablePrefs.position?.left === 612 && draggablePrefs.position?.top === 98,
+        "observer analysis drag persists the movable panel position",
+      );
+
+      dragHandle.listeners.keydown?.({ key: "Home", preventDefault() {} });
+      assert(
+        overlayRoot.style.left === "" && overlayRoot.style.top === "" && draggablePrefs.position === null,
+        "observer analysis Home shortcut restores the default placement",
+      );
+
+      dragHandle.listeners.pointerdown?.({
+        button: 0,
+        isPrimary: true,
+        pointerId: 8,
+        clientX: 700,
+        clientY: 80,
+        currentTarget: dragHandle,
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      windowListeners.pointerup?.({ pointerId: 8 });
+      assert(
+        overlayRoot.style.left === "" && overlayRoot.style.top === "" && draggablePrefs.position === null,
+        "observer analysis ignores titlebar clicks that do not move the window",
+      );
+
+      globalThis.window.innerWidth = 390;
+      globalThis.window.innerHeight = 844;
+      globalThis.window.matchMedia = () => ({ matches: true });
+      dragHandle.listeners.pointerdown?.({
+        button: 0,
+        isPrimary: true,
+        pointerId: 9,
+        clientX: 40,
+        clientY: 90,
+        currentTarget: dragHandle,
+        preventDefault() {
+          throw new Error("mobile drag handle should not start a window move");
+        },
+      });
+      assert(
+        overlayRoot.style.left === "" && overlayRoot.style.top === "",
+        "observer analysis leaves the mobile diagnostic layout under stylesheet control",
+      );
+      overlay.destroy();
+      assert(!windowListeners.resize, "observer analysis teardown removes its viewport listener");
+    } finally {
+      if (priorWindow === undefined) delete globalThis.window;
+      else globalThis.window = priorWindow;
+    }
+  });
 
   const aiStorage = fakeStorage();
   const aiPrefs = createAiDiagnosticsPanelPreferences(aiStorage);
@@ -717,4 +824,20 @@ import { textWithin } from "./dom_text.mjs";
     panel.destroy();
     assert(root.children.length === 0, "AI diagnostics panel removes generated DOM on destroy");
   });
+}
+
+function fakeInlineStyle() {
+  return {
+    left: "",
+    top: "",
+    right: "",
+    bottom: "",
+    transform: "",
+    setProperty(name, value) {
+      this[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = String(value);
+    },
+    removeProperty(name) {
+      this[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = "";
+    },
+  };
 }
