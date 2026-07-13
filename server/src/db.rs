@@ -95,6 +95,9 @@ impl MatchReplayRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchSummary {
     pub id: i64,
+    /// One-based position among the visible Recent Matches history, oldest first.
+    #[serde(rename = "replayNumber", skip_serializing_if = "Option::is_none")]
+    pub replay_number: Option<i64>,
     #[serde(rename = "matchRunId", skip_serializing_if = "Option::is_none")]
     pub match_run_id: Option<String>,
     #[serde(rename = "startedAt")]
@@ -239,7 +242,9 @@ impl Db {
         let limit = limit.clamp(1, 100);
         let rows = sqlx::query(
             r#"
+            with visible_matches as (
             select matches.id as id,
+                   row_number() over (order by matches.started_at asc, matches.id asc) as replay_number,
                    matches.match_run_id as match_run_id,
                    matches.started_at as started_at,
                    matches.ended_at as ended_at,
@@ -277,7 +282,10 @@ impl Db {
                   and not (participants @> array['Alpha', 'Bravo']::text[])
                 )
               )
-            order by matches.started_at desc
+            )
+            select *
+            from visible_matches
+            order by started_at desc, id desc
             limit $1
             "#,
         )
@@ -377,6 +385,7 @@ fn row_to_summary(row: PgRow) -> MatchSummary {
         });
     MatchSummary {
         id: row.get("id"),
+        replay_number: row.try_get("replay_number").ok(),
         match_run_id: row.get("match_run_id"),
         started_at: row.get("started_at"),
         ended_at: row.get("ended_at"),
@@ -479,6 +488,7 @@ mod tests {
     fn match_summary_serializes_aborted_outcome() {
         let summary = MatchSummary {
             id: 1,
+            replay_number: Some(42),
             match_run_id: Some("ai-observation-123".to_string()),
             started_at: chrono::Utc::now(),
             ended_at: chrono::Utc::now(),
@@ -500,5 +510,6 @@ mod tests {
         assert_eq!(value["winnerName"], serde_json::Value::Null);
         assert_eq!(value["outcome"], "aborted");
         assert_eq!(value["matchRunId"], "ai-observation-123");
+        assert_eq!(value["replayNumber"], 42);
     }
 }

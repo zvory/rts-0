@@ -111,6 +111,7 @@ withFakeHudDocument(() => {
   const rows = [
     {
       id: 42,
+      replayNumber: 105,
       startedAt: new Date().toISOString(),
       mapName: "Default",
       participants: ["Alice", "Bravo"],
@@ -118,6 +119,7 @@ withFakeHudDocument(() => {
     },
     {
       id: 99,
+      replayNumber: 104,
       startedAt: new Date().toISOString(),
       mapName: "River Crossing",
       participants: ["Casey", "Dana"],
@@ -140,8 +142,8 @@ withFakeHudDocument(() => {
   const replayRows = tbody.children.filter((row) => row.className === "match-history-row");
   assert(thead.innerHTML.includes("Replay #"), "match history labels its replay-number column");
   assert(
-    replayRows.map((row) => row.children[0].textContent).join(",") === "1,2",
-    "match history numbers only its visible rows in appearance order, not by database id",
+    replayRows.map((row) => row.children[0].textContent).join(",") === "105,104",
+    "match history renders the server's global visible-history numbers instead of page-local indexes",
   );
 });
 

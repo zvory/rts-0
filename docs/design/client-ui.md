@@ -1364,10 +1364,11 @@ labelled `Replay`, and joined as spectators without setting `replayOk`, so rooms
 playback still use the normal replay join confirmation. Countdown, stale, and unknown rows remain
 disabled.
 
-`match_history.js` renders the visible Recent Matches rows with a one-based **Replay #** column in
-the API's appearance order (newest first). The number is client-local rather than a match database
-id, so the server-filtered public feed has no gaps from saved debug or solo replays. It launches
-persisted match replays by POSTing `/api/matches/{id}/replay`, then hands the returned
+`match_history.js` renders the API-provided **Replay #** for each visible Recent Matches row. The
+server calculates that one-based sequence across the full filtered history, oldest first, while
+the table remains newest first; therefore the latest visible replay has the highest number. Saved
+debug or solo replays do not consume a number. It launches persisted match replays by POSTing
+`/api/matches/{id}/replay`, then hands the returned
 `__match_replay__:*` room to `App`/`Lobby.joinReplayLobby` instead of redirecting the page into
 replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact playback path;
 `replayRoom` URLs represent replay staging lobbies.
