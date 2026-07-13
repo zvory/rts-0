@@ -1,4 +1,4 @@
-# Phase 3 - Directly Executable TypeScript
+# Phase 3 - Responsive External Adapters
 
 ## Phase Status
 
@@ -6,113 +6,106 @@
 
 ## Objective
 
-Migrate the settled Node-side Lab Interact implementation to strict TypeScript without adding a build
-product or starting another architecture redesign. Execute source directly with Node 22.18 or newer,
-use a no-emit compiler pass for type checking, and keep the browser client/bridge in native
-JavaScript.
+Make long-running external work responsive and cancellable behind the Phase 2 application boundary.
+Extract only the process and private-server ownership needed to keep status, cancellation, and
+shutdown responsive; leave browser/page, capture format, and artifact behavior otherwise intact.
 
-## Runtime Decision
+## Target Dependency Shape
 
-Node 22.18 enabled built-in TypeScript type stripping by default without the former experimental
-warning. Use that runtime support for erasable TypeScript syntax and follow Node's documented
-`nodenext`, `erasableSyntaxOnly`, and `verbatimModuleSyntax` guidance; do not add `tsx`, `ts-node`, a
-transpiler, or a bundler solely for this developer tool.
+```text
+command service + session coordinator
+          |
+driver (browser/page operations) + private server + capture / preview helpers
+          |
+process runner / filesystem / Puppeteer / FFmpeg / Rust server / Tailscale
+```
 
-References:
-
-- [Node.js 22.18.0 release notes](https://nodejs.org/en/blog/release/v22.18.0/)
-- [Node.js TypeScript execution guidance](https://nodejs.org/download/release/v22.16.0/docs/api/typescript.html)
+Adapters own their external resources and never import the command service, coordinator, daemon, or
+CLI. The service owns the abort signal for an in-progress open; the private-server/process adapters
+honor it and deterministically reap their children.
 
 ## Work
 
-### Establish direct TypeScript execution and checking
+### Add a bounded asynchronous process runner
 
-- Require Node 22.18 or newer for Lab Interact and enforce it with a concise preflight. The repository
-  and CI already use Node 22; pin/document the minimum patch level wherever Lab dependencies and
-  checks are installed.
-- Keep a tiny `scripts/lab-interact/cli.mjs` bootstrap so every operator command, help example,
-  recovery string, and skill instruction can continue using the same entry point until the separate
-  deep rename. Its only jobs are the Node version check and importing `cli.ts`.
-- Rename the remaining Node implementation files under `scripts/lab-interact/` from `.mjs` to `.ts`,
-  bottom-up, with explicit `.ts` import specifiers. Spawn the TypeScript daemon using
-  `process.execPath` rather than a shell wrapper.
-- Add a Lab-scoped TypeScript configuration and a repository script such as
-  `check:lab-interact-types` with:
-  - `noEmit: true` and `strict: true`;
-  - `target: "ESNext"`;
-  - `module: "NodeNext"` and `moduleResolution: "NodeNext"`;
-  - `allowImportingTsExtensions: true`;
-  - `erasableSyntaxOnly: true` and `verbatimModuleSyntax: true`;
-  - `skipLibCheck: true`;
-  - the minimum DOM library/ambient page declarations required by Puppeteer evaluation closures.
-- Add TypeScript 5.8 or newer and Node typings to the repository-owned dependency manifest/lock from
-  Phase 2. Do not commit emitted JavaScript, declarations, source maps, or `dist/`.
-- Use only erasable syntax: no runtime enums, namespaces, parameter properties, decorators, or path
-  aliases. Prefer `import type` and small structural browser/page port interfaces over leaking full
-  Puppeteer types into the application layer.
+- Add `process_runner.mjs` around asynchronous `spawn` for finite child processes. It must provide:
+  - bounded stdout/stderr capture;
+  - explicit timeout and `AbortSignal` support;
+  - TERM followed by bounded KILL fallback;
+  - deterministic result/error projection;
+  - direct argv execution with no shell.
+- Keep specialized streaming encoders on direct `spawn` when they need stdin/backpressure and their
+  own finalization. Bounded filesystem operations and pre-request Git inspection may remain
+  synchronous.
 
-### Type the valuable seams, not the universe
+### Extract private-server lifecycle and cold-open cancellation
 
-- Type command registry definitions so each command's scope, lane, timeout class, validator, handler,
-  and help projection remain associated.
-- Type daemon request/response envelopes, normalized errors, session state, service/driver ports,
-  process results, capture/media results, artifacts, and browser/page RPC projections.
-- Treat CLI JSON, IPC JSON, page RPC data, filesystem JSON, and server responses as `unknown` until
-  existing runtime validators narrow them. TypeScript strengthens trusted code after those boundaries;
-  it must not replace exact/bounded validation.
-- Avoid blanket `any`, `@ts-ignore`, or assertion casts that erase a whole boundary. Localized casts
-  at a runtime-validated edge are acceptable when documented and covered by its contract test.
-- Keep `client/src/lab_interact_bridge.js` as native browser JavaScript because the client has no
-  build step. Add small JSDoc or `@ts-check` only if it is nearly free and does not turn this phase
-  into client migration.
+- Add `private_server.mjs` to own loopback URL reuse/validation, ephemeral port allocation, Cargo
+  build, Rust server launch/health polling, server logs, build metadata, and child teardown.
+- Give an in-progress open an application-owned `AbortController`; shutdown must abort cold startup
+  before awaiting it. Keep `ProcessRunner`, `PrivateServer`, and startup abort/reaping tests in the
+  same commit so there is no uncancellable intermediate ownership state.
+- Keep the driver focused on browser/page session ownership and page RPC after delegating private-
+  server lifecycle.
 
-### Update repository policy and callers
+### Convert the high-value blocking paths
 
-- Update Lab contracts/smoke imports, fake-driver injection, direct daemon spawn paths, source-text
-  assertions, help/recovery strings, and documentation source pointers for `.ts` modules.
-- Teach `scripts/check-source-file-sizes.mjs`, the Phase 2 architecture checker, and
-  `tests/select-suites.mjs` to cover `.ts` files.
-- Include the no-emit typecheck in the focused static/Node gate and ensure the dependency install used
-  by CI provides TypeScript, Node types, and the declared browser runtime.
-- Do not rename the product, CLI command vocabulary, socket/runtime directory, environment variables,
-  or artifact namespace in this phase.
+- Move long finite daemon request-path work to the asynchronous runner:
+  - Cargo build;
+  - FFmpeg/ffprobe capability, finite probe, and post-processing stages;
+  - fixed-capture finite post-processing/probe;
+  - Tailnet status resolution.
+- Keep the long-running Rust server on direct `spawn` owned by `private_server.mjs`; its health
+  polling and teardown belong to that adapter rather than the finite-child runner.
+- Make the Puppeteer runtime library an explicit repository-owned dependency and remove daemon-time
+  dependency hydration/`npm ci` behavior. Move the package/lock dependency and update the Lab loader
+  plus browser tests atomically so no caller borrows an implicit test-only installation.
+- Do not decompose every media/capture/artifact module or normalize every external error. Stop once
+  the held-open process tests are responsive and ownership is explicit.
+
+### Extend the architecture ratchet
+
+- Extend `scripts/check-lab-interact-architecture.mjs` with adapter rules:
+  - defined daemon request-path modules contain no `spawnSync`/`execSync`; documented bounded
+    pre-request exceptions live outside that checked path;
+  - process/private-server/media adapters never import application or entry-point modules upward;
+  - only the process/private-server or specialized streaming owner manages each request-path/tool
+    child; `cli.mjs` remains the explicit daemon-bootstrap owner;
+  - driver and adapter size limits are ratcheted from the final split with modest headroom.
+- Document process ownership, cold-open cancellation, dependency installation, and the intentional
+  remaining synchronous exceptions in `docs/lab-interact-cli.md`.
 
 ## Expected Touch Points
 
-- `scripts/lab-interact/cli.mjs` plus new `cli.ts`
-- `scripts/lab-interact/*.mjs -> *.ts`
-- new `scripts/lab-interact/tsconfig.json` or root `tsconfig.lab-interact.json`
-- repository npm manifest/lock
-- `tests/lab_interact_*.mjs`
-- `tests/fixtures/lab_interact_fake_driver.mjs`
+- `scripts/lab-interact/command_service.mjs`
+- `scripts/lab-interact/driver.mjs`
+- new `scripts/lab-interact/process_runner.mjs`
+- new `scripts/lab-interact/private_server.mjs`
+- `scripts/lab-interact/recording.mjs`
+- `scripts/lab-interact/fixed_capture.mjs`
+- `scripts/lab-interact/tailnet_preview.mjs`
+- `scripts/check-lab-interact-architecture.mjs`
+- repository npm manifest/lock and browser dependency loader
+- focused `tests/lab_interact_*.mjs`
 - `tests/run-all.sh`
 - `tests/select-suites.mjs`
-- `scripts/check-source-file-sizes.mjs`
-- `scripts/check-lab-interact-architecture.mjs`
-- `.github/workflows/main-tests.yml` only if the existing dependency-install step cannot run the check
 - `docs/lab-interact-cli.md`
-- relevant context/design source pointers and `.agents/skills/lab-interact/` instructions
 
 ## Implementation Checklist
 
-- [ ] Add Node-version preflight, strict no-emit config, dependencies, and check script.
-- [ ] Convert Node implementation modules bottom-up to `.ts` with erasable syntax.
-- [ ] Keep `cli.mjs` as the only compatibility JavaScript implementation file in the tool directory.
-- [ ] Type command/IPC/session/error/adapter/capture seams.
-- [ ] Preserve runtime validation on all untrusted boundaries.
-- [ ] Update tests, fake-driver injection, source policies, selectors, CI, docs, and skill instructions.
-- [ ] Prove direct execution has no loader warning or build prerequisite.
-- [ ] Confirm no generated output or client build pipeline was added.
+- [ ] Add the bounded/cancellable asynchronous process runner.
+- [ ] Extract private-server startup/lifecycle and make cold open abortable.
+- [ ] Move high-value long finite request-path process work to the runner.
+- [ ] Establish explicit repository ownership for the browser runtime dependency.
+- [ ] Remove runtime dependency installation/hydration.
+- [ ] Add slow-child status, shutdown/reaping, media, and cancellation contracts.
+- [ ] Extend architecture and size ratchets for adapters and blocking process work.
+- [ ] Document process, dependency, cancellation, and remaining synchronous ownership.
 - [ ] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 
-Use the final script names established during implementation; the intended focused checks are:
-
 ```bash
-npm ci
-npm run check:lab-interact-types
-node scripts/lab-interact/cli.mjs help
 node scripts/check-lab-interact-architecture.mjs
 node scripts/check-source-file-sizes.mjs
 node tests/lab_interact_cli_contracts.mjs
@@ -128,41 +121,49 @@ node scripts/check-docs-health.mjs
 git diff --check
 ```
 
-Also run the repository's no-Rust Node/static gate and confirm it includes the Lab typecheck. Verify
-the tool emits no `dist/`, compiled JavaScript, declaration, or source-map files.
+Use controllable fake children to prove:
+
+- status promptly reports `opening: true` while a Cargo build child remains open;
+- shutdown aborts cold open, sends TERM, uses bounded KILL only when required, and reaps the child
+  without waiting for the ordinary startup timeout;
+- daemon status remains responsive while a finite media-tool stage is held open;
+- `capture-cancel` remains responsive during fixed capture; and
+- timeout/abort output is bounded and does not invoke a shell.
 
 ## Acceptance Criteria
 
-- `cli.mjs` is the only compatibility JavaScript implementation file remaining under
-  `scripts/lab-interact/`; Node-side implementation modules are strict `.ts`.
-- The CLI runs source directly on Node 22.18+ with no loader warning, build prerequisite, runtime TS
-  dependency, or emitted code. Below-minimum Node gets a concise version error.
-- The strict no-emit check passes without blanket type escapes.
-- High-value internal seams are typed and untrusted inputs still pass through runtime validators.
-- The Phase 1 live workflow and all focused Lab contracts pass with the TypeScript daemon and fake
-  driver paths.
-- Architecture/source-size/selector policy includes `.ts`, and the ordinary Node gate runs the
-  typecheck.
-- The browser bridge/client remain buildless JavaScript and no rename occurred.
+- Status and allowed cancellation remain responsive during deliberately slow external-process cases.
+- Shutdown aborts and reaps in-progress cold startup deterministically.
+- No long `spawnSync`/`execSync` remains in architecture-checked daemon request paths; documented
+  bounded exceptions remain outside request handling.
+- Private servers remain loopback-only and capability-enabled, and reused non-loopback URLs remain
+  rejected.
+- Runtime dependency installation is gone and Lab/browser tests use one declared repository-owned
+  browser runtime dependency.
+- Adapter import/child ownership/size ratchets pass and select for Lab source changes.
+- Phase 2 lane/registry contracts and the Phase 1 scripted workflow remain green.
 
 ## Manual Test Focus
 
-Run help, open a blank scene, spawn and move one unit, inspect it, capture a PNG, and close/shutdown.
-Confirm the JSON response and Tailnet preview behavior remain recognizable and that no compile step
-was needed before the first command.
+Run the ordinary open/catalog/spawn/inspect/order/time-pause/time-step/camera/screenshot/close/shutdown
+workflow. During a cold open, issue `status` from another terminal, then request shutdown and confirm
+the Cargo/private-server child exits promptly; run one short recording and fixed capture to confirm
+media and preview output remain intact.
 
 ## Non-Goals
 
-- Client-wide TypeScript or bundling, conversion of tests, or generated runtime schemas/codegen.
-- Exhaustive per-command result modeling, declaration emit/publishing, packaging, or a single binary.
-- ESLint/Prettier adoption, stricter optional/index flags unless nearly free, or type perfection in
-  Puppeteer third-party surfaces.
-- Any deep rename or another architecture redesign.
+- TypeScript or the deep rename; TypeScript requires a fresh post-checkpoint plan.
+- A Rust rewrite, new client automation facade, DI framework, generalized artifact store, or full
+  external-error hierarchy.
+- Codec/capture format redesign, decomposition of every helper, async conversion of every bounded
+  filesystem/pre-request operation, or new public commands.
+- Cross-platform IPC, public service exposure, golden images, performance certification, or long
+  media soak testing.
 
 ## Handoff Expectations
 
-Report the Node minimum, dependency/config/check commands, modules converted, remaining JavaScript
-boundary, runtime validators preserved, and any localized type assertions. Provide checkpoint evidence
-for the live semantic smoke, direct no-build startup, architecture ratchets, and manual
-help/open/spawn/order/screenshot/preview/shutdown workflow; recommend rename planning only after those
-results are reviewed.
+Report the final adapter dependency shape, which subprocess paths became asynchronous/cancellable,
+child termination/reaping behavior, dependency ownership, remaining synchronous exceptions, and
+exact adapter ratchets. Provide checkpoint evidence for the ordinary workflow, cold-open
+status/shutdown, cancellation, and short media checks; recommend a fresh one-phase TypeScript plan
+only if these boundaries are stable.
