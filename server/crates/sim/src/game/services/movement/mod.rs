@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
-use crate::game::entity::{EntityKind, WeaponSetup};
 use crate::game::entity::EntityStore;
+use crate::game::entity::{EntityKind, WeaponSetup};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::scout_plane;
@@ -20,6 +20,7 @@ use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
+mod armor_reaction;
 mod collision;
 mod pivot_drive;
 mod scout_car;
@@ -116,6 +117,17 @@ pub(crate) fn movement_system_with_events(
         }
     }
     scout_plane::advance_scout_planes(map, entities);
+    armor_reaction::turn_stationary_units_toward_direct_ap_threats(
+        entities,
+        tick,
+        |owner, kind, x, y, facing| {
+            let out_of_oil = players
+                .iter()
+                .find(|player| player.id == owner)
+                .is_some_and(|player| player.oil == 0);
+            !out_of_oil && standability::unit_static_standable(occ, map, kind, x, y, facing)
+        },
+    );
     waypoints::advance_moving_units(
         map,
         entities,
@@ -141,11 +153,9 @@ fn clamp_meth_machine_gunner_setup(entities: &mut EntityStore, id: u32) {
     };
     let boosted_ticks = config::METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS;
     let boosted_setup = match e.weapon_setup() {
-        WeaponSetup::SettingUp { ticks } if ticks > boosted_ticks => {
-            Some(WeaponSetup::SettingUp {
-                ticks: boosted_ticks,
-            })
-        }
+        WeaponSetup::SettingUp { ticks } if ticks > boosted_ticks => Some(WeaponSetup::SettingUp {
+            ticks: boosted_ticks,
+        }),
         WeaponSetup::TearingDown { ticks } if ticks > boosted_ticks => {
             Some(WeaponSetup::TearingDown {
                 ticks: boosted_ticks,

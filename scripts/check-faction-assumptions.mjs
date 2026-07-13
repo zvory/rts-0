@@ -259,6 +259,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/lab/scenario.rs",
   "server/crates/sim/src/game/mod.rs",
   "server/crates/sim/src/game/mortar.rs",
+  // Delayed Panzerfaust resolution and its inline regression test cover the current Tank target.
+  "server/crates/sim/src/game/panzerfaust_shot.rs",
   "server/crates/sim/src/game/player_state.rs",
   "server/crates/sim/src/game/services/ability_orders.rs",
   "server/crates/sim/src/game/services/combat/acquisition.rs",
@@ -288,6 +290,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/geometry.rs",
   "server/crates/sim/src/game/services/move_coordinator.rs",
   "server/crates/sim/src/game/services/movement/mod.rs",
+  // Armor-reaction runtime eligibility is catalog-routed; focused inline tests use the Tank entry.
+  "server/crates/sim/src/game/services/movement/armor_reaction.rs",
   "server/crates/sim/src/game/services/movement/pivot_drive.rs",
   "server/crates/sim/src/game/services/movement/scout_car.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",

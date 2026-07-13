@@ -8,6 +8,7 @@
 //! increasing id. Ids are never reused, so a stale id (an entity that has died) simply
 //! misses the map — every lookup is fallible and the tick loop tolerates misses (no panics).
 
+mod armor_reaction;
 #[allow(clippy::module_inception)]
 mod entity;
 mod kind;
@@ -39,6 +40,7 @@ pub use order::{
 #[cfg(test)]
 pub use state::EntityStateGroups;
 pub(in crate::game) use state::ScoutPlaneState;
+pub(in crate::game) use state::MAX_INCOMING_DIRECT_AP_THREATS;
 #[allow(unused_imports)]
 pub use state::{
     CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, ProdItem,
