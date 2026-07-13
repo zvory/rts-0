@@ -7,12 +7,12 @@ tool without treating it like production software. The current Node/JavaScript i
 right runtime shape because it coordinates Chrome, page RPC, media tools, Tailnet previews, and a
 private Rust game server; Rust remains authoritative for game state, but moving the orchestrator to
 Rust would add integration cost without fixing its architectural problems. This plan takes the
-high-value 80/20 path: establish a reliable behavioral canary, separate application ownership, then
-make external-process and private-server lifecycle responsive.
+high-value 80/20 path: establish a reliable behavioral canary, separate application ownership, make
+external-process and private-server lifecycle responsive, then translate the settled Node-side tool
+to TypeScript.
 
-The TypeScript migration remains the intended final cleanup operation, followed later by the deep
-product/command rename. It is not bundled into these architecture phases: after the three-phase
-checkpoint, create a fresh one-phase TypeScript plan if the new boundaries have held up.
+The TypeScript migration is the fourth and final phase of this plan, after both architecture splits
+have landed independently. The deep product/command rename remains a separate later task.
 
 ## Current Evidence
 
@@ -34,14 +34,15 @@ checkpoint, create a fresh one-phase TypeScript plan if the new boundaries have 
 
 At the checkpoint, Lab Interact should have one meaningful live smoke workflow, one source of command
 metadata, one owner of semantic command ordering, responsive/cancellable long process work, and
-explicit layer constraints. It should still be a plain repository tool: no packaging, generated
-client, service framework, or deployment surface. The existing authority, validation, artifact
-confinement, and loopback/capability boundaries must remain intact.
+explicit layer constraints, with the Node-side implementation checked as strict TypeScript. It should
+still be a plain repository tool: no packaging, generated client, service framework, or deployment
+surface. The existing authority, validation, artifact confinement, and loopback/capability boundaries
+must remain intact.
 
 ## Overall Constraints
 
-- Keep this to three executable phases before a measured checkpoint. Do not extend the chain during
-  implementation; record newly discovered lower-value work in the deferred backlog.
+- Execute these four phases in order, each as its own merged PR. Let the actual application, adapter,
+  and language boundaries determine phase scope rather than imposing an arbitrary phase-count cap.
 - Preserve the Rust server as the sole game authority and the browser page bridge as a narrow,
   launch-gated automation surface. The Node tool may arrange and observe a Lab but must not duplicate
   simulation rules or bypass server validation.
@@ -53,9 +54,8 @@ confinement, and loopback/capability boundaries must remain intact.
 - Use semantic smoke assertions rather than freezing full JSON envelopes, generated ids/ticks, exact
   pixels, or every error permutation. Breaking internal changes are welcome; public behavior should
   stay recognizable through the cleanup so the canary remains useful.
-- Keep the browser client and Node tool in JavaScript throughout these three phases. TypeScript is a
-  post-checkpoint follow-up so it translates settled seams instead of obscuring architecture changes
-  with file/type churn.
+- Keep the browser client in native JavaScript with no build step. Keep the Node tool in JavaScript
+  through Phases 1-3, then convert only that settled Node-side implementation in Phase 4.
 - Every phase must update `docs/lab-interact-cli.md` and relevant testing/context documentation when
   it changes an operator command, dependency, architecture rule, or verification path.
 - Each phase is implemented on its own `zvorygin/` branch, committed, pushed as an owned PR with
@@ -92,28 +92,30 @@ for the browser runtime dependency and prove status, cancellation, and shutdown 
 while fake Cargo or media children are held open. Extend the Phase 2 architecture ratchet for adapter
 direction and blocking-process rules without redesigning browser, capture, or artifact behavior.
 
+### [Phase 4 - Directly Executable TypeScript](phase-4.md)
+
+Migrate the separated Node-side implementation to strict TypeScript and execute it directly with
+Node's built-in type stripping, retaining only a tiny `cli.mjs` version/bootstrap entry point until
+the later rename. Add a no-emit typecheck and type the high-value command, IPC, session, error, and
+adapter seams while preserving runtime validation at every untrusted boundary. Do not add a
+transpiler, bundler, generated output, client build pipeline, or wholesale test conversion.
+
 ## Checkpoint
 
-After Phase 3, stop and review evidence before planning more work. The checkpoint should consider:
+After Phase 4, stop and review evidence before planning more work. The checkpoint should consider:
 
 - whether the live canary is reliable and fast enough to run for relevant changes;
 - whether cold open, status, cancellation, and shutdown remain responsive during slow subprocesses;
 - whether the command registry and coordinator make ordinary changes local and obvious;
 - whether source-size/import ratchets are helping without creating busywork; and
-- whether the application and adapter seams are stable enough to translate mechanically to
-  TypeScript.
+- whether native TypeScript execution and strict no-emit checking improve maintenance without adding
+  an unwanted build lifecycle.
 
-If the result is sound, create a fresh one-phase TypeScript plan. Keep the previously chosen 80/20
-end state: Node 22.18+ direct type stripping, strict `tsc --noEmit`, a tiny `cli.mjs` version/bootstrap
-entry point until the rename, TypeScript only under `scripts/lab-interact/`, existing runtime
-validation at untrusted boundaries, and no transpiler/bundler/emitted output/client conversion. The
-rename should remain a later fresh task, not be mixed into either architecture or TypeScript work.
+The rename should remain a fresh later task, not be mixed into architecture or TypeScript work.
 
 ## Deferred Backlog
 
 - Deep Lab Interact product, executable, command, socket, documentation, and artifact rename.
-- The post-checkpoint Node-side TypeScript migration described above; it requires a fresh plan rather
-  than automatic execution as a fourth phase.
 - Client-wide TypeScript, a browser bundler, or conversion of the JavaScript page bridge and tests.
 - Generated runtime schemas/types, a command plugin framework, DI container, or full error hierarchy.
 - A new client `LabAutomationFacade` unless future bridge growth demonstrates the need.
@@ -131,4 +133,5 @@ After this plan is approved, run one merged phase at a time:
 scripts/phase-runner.sh --plan labcleanup phase-1 --pr --wait
 scripts/phase-runner.sh --plan labcleanup phase-2 --pr --wait
 scripts/phase-runner.sh --plan labcleanup phase-3 --pr --wait
+scripts/phase-runner.sh --plan labcleanup phase-4 --pr --wait
 ```
