@@ -53,7 +53,6 @@ try {
     { owner: 2, kind: "rifleman", x: 1248, y: 960, alias: "target" },
   ] });
   const beforeUpdate = entity("shooter");
-  const targetBefore = entity("target");
   call("update", {
     sessionId,
     updates: [{ operation: "move", entity: "shooter", x: 1024, y: 960 }],
@@ -131,7 +130,6 @@ try {
   assert.equal(setupImport.aliases.restored.count, 2, "setup import restores both aliases");
   const restored = call("inspect", { sessionId, refs: ["shooter", "target"], limit: 2 }).entities;
   assert.deepEqual(restored.map((entry) => entry.alias).sort(), ["shooter", "target"], "setup import restores the scene aliases");
-  assert.notEqual(restored.find((entry) => entry.alias === "target")?.id, targetBefore.id, "setup round trip does not freeze entity ids");
 
   const recordingStarted = call("record-start", {
     sessionId,

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -14,6 +15,10 @@ export class LabInteractTestArtifacts {
     assert.match(sessionId, /^lab_[a-f0-9]{32}$/, "test-owned Lab session ids stay unguessable");
     this.ownedSessionDirectories.add(path.join(this.root, sessionId));
     return sessionId;
+  }
+
+  createSessionId() {
+    return this.ownSession(`lab_${crypto.randomUUID().replaceAll("-", "")}`);
   }
 
   ownPortableArtifact(result) {
@@ -45,5 +50,9 @@ export class LabInteractTestArtifacts {
 }
 
 function removeIfEmpty(directory) {
-  if (fs.existsSync(directory) && fs.readdirSync(directory).length === 0) fs.rmdirSync(directory);
+  try {
+    fs.rmdirSync(directory);
+  } catch (error) {
+    if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error?.code)) throw error;
+  }
 }
