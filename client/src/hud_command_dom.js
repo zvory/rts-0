@@ -112,11 +112,18 @@ export function createCommandButton(opts) {
   const autobuildIndicatorCount = Number.isInteger(opts.autobuildIndicatorCount)
     ? Math.max(0, opts.autobuildIndicatorCount)
     : 0;
-  const autobuildHtml = Array.from({ length: autobuildIndicatorCount }, (_, index) => {
-    const offsetDeg = (360 * index) / autobuildIndicatorCount;
-    return `<span class="cmd-autobuild-swirl" aria-hidden="true" ` +
-      `style="--autobuild-offset:${offsetDeg.toFixed(3)}deg"></span>`;
-  }).join("");
+  let autobuildHtml = "";
+  if (autobuildIndicatorCount > 0) {
+    const segmentDeg = 360 / autobuildIndicatorCount;
+    // Preserve the original 104-degree trail while indicators fit without overlap. For larger
+    // selections, shrink each trail enough to keep every allocation visually distinct.
+    const fadeDeg = Math.min(104, segmentDeg * 0.9);
+    const peakDeg = fadeDeg / 2;
+    autobuildHtml = `<span class="cmd-autobuild-swirls" aria-hidden="true" ` +
+      `style="--autobuild-segment:${segmentDeg.toFixed(3)}deg;` +
+      `--autobuild-peak:${peakDeg.toFixed(3)}deg;` +
+      `--autobuild-fade:${fadeDeg.toFixed(3)}deg"></span>`;
+  }
 
   btn.innerHTML =
     autobuildHtml +

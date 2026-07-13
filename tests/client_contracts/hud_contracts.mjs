@@ -1005,10 +1005,11 @@ function fakeHudRootWithoutResourceSpans() {
       onClick() {},
     });
     assert(
-      (twoButton.innerHTML.match(/cmd-autobuild-swirl/g) || []).length === 2 &&
-        twoButton.innerHTML.includes("--autobuild-offset:0.000deg") &&
-        twoButton.innerHTML.includes("--autobuild-offset:180.000deg"),
-      "two auto-build allocations render two rotating indicators offset by 180 degrees",
+      (twoButton.innerHTML.match(/cmd-autobuild-swirls/g) || []).length === 1 &&
+        twoButton.innerHTML.includes("--autobuild-segment:180.000deg") &&
+        twoButton.innerHTML.includes("--autobuild-peak:52.000deg") &&
+        twoButton.innerHTML.includes("--autobuild-fade:104.000deg"),
+      "two auto-build allocations share one bounded layer with indicators 180 degrees apart",
     );
     const threeButton = HUD.prototype._cmdButton({
       icon: "RF",
@@ -1018,11 +1019,25 @@ function fakeHudRootWithoutResourceSpans() {
       onClick() {},
     });
     assert(
-      (threeButton.innerHTML.match(/cmd-autobuild-swirl/g) || []).length === 3 &&
-        threeButton.innerHTML.includes("--autobuild-offset:0.000deg") &&
-        threeButton.innerHTML.includes("--autobuild-offset:120.000deg") &&
-        threeButton.innerHTML.includes("--autobuild-offset:240.000deg"),
-      "three auto-build allocations render three rotating indicators offset by 120 degrees",
+      (threeButton.innerHTML.match(/cmd-autobuild-swirls/g) || []).length === 1 &&
+        threeButton.innerHTML.includes("--autobuild-segment:120.000deg") &&
+        threeButton.innerHTML.includes("--autobuild-peak:52.000deg") &&
+        threeButton.innerHTML.includes("--autobuild-fade:104.000deg"),
+      "three auto-build allocations share one bounded layer with indicators 120 degrees apart",
+    );
+    const manyButton = HUD.prototype._cmdButton({
+      icon: "RF",
+      label: "Rifleman",
+      enabled: true,
+      autobuildIndicatorCount: 10,
+      onClick() {},
+    });
+    assert(
+      (manyButton.innerHTML.match(/cmd-autobuild-swirls/g) || []).length === 1 &&
+        manyButton.innerHTML.includes("--autobuild-segment:36.000deg") &&
+        manyButton.innerHTML.includes("--autobuild-peak:16.200deg") &&
+        manyButton.innerHTML.includes("--autobuild-fade:32.400deg"),
+      "large allocation counts keep one animation layer and shrink trails to remain distinct",
     );
   });
 

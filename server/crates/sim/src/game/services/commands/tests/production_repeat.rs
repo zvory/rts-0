@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn repeat_adjustments_spread_across_least_loaded_producers_in_command_order() {
+fn repeat_adjustments_spread_across_least_loaded_producers_with_stable_id_ties() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let mut barracks = Vec::new();
@@ -14,6 +14,7 @@ fn repeat_adjustments_spread_across_least_loaded_producers_in_command_order() {
         );
     }
     let mut players = vec![player_state(1), player_state(2)];
+    let reversed_barracks = barracks.iter().rev().copied().collect::<Vec<_>>();
 
     apply_with_players(
         &map,
@@ -23,7 +24,7 @@ fn repeat_adjustments_spread_across_least_loaded_producers_in_command_order() {
             (
                 1,
                 SimCommand::AdjustProductionRepeat {
-                    buildings: barracks.clone(),
+                    buildings: reversed_barracks.clone(),
                     unit: EntityKind::Rifleman,
                     delta: 1,
                 },
@@ -31,7 +32,7 @@ fn repeat_adjustments_spread_across_least_loaded_producers_in_command_order() {
             (
                 1,
                 SimCommand::AdjustProductionRepeat {
-                    buildings: barracks.clone(),
+                    buildings: reversed_barracks.clone(),
                     unit: EntityKind::Rifleman,
                     delta: 1,
                 },
@@ -39,7 +40,7 @@ fn repeat_adjustments_spread_across_least_loaded_producers_in_command_order() {
             (
                 1,
                 SimCommand::AdjustProductionRepeat {
-                    buildings: barracks.clone(),
+                    buildings: reversed_barracks,
                     unit: EntityKind::MachineGunner,
                     delta: 1,
                 },
