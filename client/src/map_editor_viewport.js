@@ -10,7 +10,7 @@ import {
   MAP_EDITOR_SYMMETRY,
   moveSymmetricDraftLocation,
   protectDraftBaseTerrain,
-  symmetricMapTiles,
+  symmetricTerrainTiles,
 } from "./map_editor_session.js";
 
 const TILE_SIZE = 32;
@@ -284,7 +284,7 @@ export class MapEditorViewport {
   paintTiles(tiles) {
     const size = this.session.draft?.terrain?.length || 0;
     const changes = this.session.paintTerrainTiles(
-      symmetricMapTiles(size, tiles, this.tool?.symmetry),
+      symmetricTerrainTiles(size, tiles, this.tool.terrain, this.tool?.symmetry),
       this.tool.terrain,
     );
     this.renderer.updateStaticTerrainTiles(changes);

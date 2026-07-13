@@ -229,19 +229,20 @@ export class MapEditorSession {
   }
 
   paintTerrainTiles(tiles, terrainCode) {
-    const ch = TERRAIN_TO_CHAR[terrainCode];
-    if (!this.draft || !this.terrainStroke || !ch || !Array.isArray(tiles)) return [];
+    if (!this.draft || !this.terrainStroke || !Array.isArray(tiles)) return [];
     const size = this.draft.terrain.length;
     const byRow = new Map();
     const changed = [];
     for (const tile of tiles) {
       const x = Math.trunc(Number(tile?.x));
       const y = Math.trunc(Number(tile?.y));
+      const code = tile?.paintTerrainCode ?? terrainCode;
+      const ch = TERRAIN_TO_CHAR[code];
       if (
-        x < 0 || y < 0 || x >= size || y >= size
+        !ch || x < 0 || y < 0 || x >= size || y >= size
         || (
-          terrainCode !== TERRAIN.GRASS
-          && !ROAD_TERRAIN_CODES.has(terrainCode)
+          code !== TERRAIN.GRASS
+          && !ROAD_TERRAIN_CODES.has(code)
           && protectedTerrainTile(this.draft, x, y)
         )
       ) continue;
@@ -249,7 +250,7 @@ export class MapEditorSession {
       if (row[x] === ch) continue;
       row[x] = ch;
       byRow.set(y, row);
-      const change = { x, y, code: terrainCode };
+      const change = { x, y, code };
       this.terrainStroke.dirty.set(`${x},${y}`, change);
       changed.push(change);
     }
@@ -346,6 +347,21 @@ export class MapEditorSession {
 }
 
 export function symmetricMapTiles(size, tiles, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  return symmetricTiles(size, tiles, symmetry);
+}
+
+/**
+ * Expand terrain paint across the selected symmetry while keeping marked-road directions
+ * geometrically correct in each reflected or rotated copy.
+ */
+export function symmetricTerrainTiles(size, tiles, terrainCode, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  return symmetricTiles(size, tiles, symmetry, (tile, transform) => ({
+    ...tile,
+    paintTerrainCode: transformTerrainCode(terrainCode, transform),
+  }));
+}
+
+function symmetricTiles(size, tiles, symmetry, decorate = (tile) => tile) {
   const mapSize = positiveInteger(size);
   if (!mapSize || !Array.isArray(tiles)) return [];
   const expanded = [];
@@ -357,7 +373,7 @@ export function symmetricMapTiles(size, tiles, symmetry = MAP_EDITOR_SYMMETRY.NO
       const transformed = transformMapTile(source, mapSize, transform);
       if (!transformed || seen.has(locationKey(transformed))) continue;
       seen.add(locationKey(transformed));
-      expanded.push(transformed);
+      expanded.push(decorate(transformed, transform));
     }
   }
   return expanded;
@@ -648,6 +664,29 @@ function transformMapTile(tile, size, transform) {
   if (transform === "diagonalMain") return { x: tile.y, y: tile.x };
   if (transform === "diagonalAnti") return { x: max - tile.y, y: max - tile.x };
   return copyLocation(tile);
+}
+function transformTerrainCode(code, transform) {
+  if (code === TERRAIN.ROAD_HORIZONTAL) {
+    return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
+      ? TERRAIN.ROAD_VERTICAL
+      : code;
+  }
+  if (code === TERRAIN.ROAD_VERTICAL) {
+    return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
+      ? TERRAIN.ROAD_HORIZONTAL
+      : code;
+  }
+  if (code === TERRAIN.ROAD_DIAGONAL_NW_SE) {
+    return transform === "horizontal" || transform === "vertical" || transform === "rotate90" || transform === "rotate270"
+      ? TERRAIN.ROAD_DIAGONAL_NE_SW
+      : code;
+  }
+  if (code === TERRAIN.ROAD_DIAGONAL_NE_SW) {
+    return transform === "horizontal" || transform === "vertical" || transform === "rotate90" || transform === "rotate270"
+      ? TERRAIN.ROAD_DIAGONAL_NW_SE
+      : code;
+  }
+  return code;
 }
 function normalizeMapEditorSymmetry(value) { return SYMMETRY_TRANSFORMS[value] ? value : MAP_EDITOR_SYMMETRY.NONE; }
 function locationKey(location) { return `${location?.x},${location?.y}`; }
