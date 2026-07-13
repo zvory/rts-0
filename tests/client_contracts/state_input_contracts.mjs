@@ -171,7 +171,7 @@ function buttonByLabel(card, label) {
   assert(state.map.resources.length === 2, "GameState keeps start payload resources");
   assert(state.resourceById.get(200).kind === KIND.STEEL, "GameState indexes resources by id");
   assert(state.resourceById.get(200).remaining === RESOURCE_AMOUNTS[KIND.STEEL], "steel defaults to full known amount");
-  assert(state.resourceById.get(201).remaining === 962, "oil defaults to full known amount");
+  assert(state.resourceById.get(201).remaining === RESOURCE_AMOUNTS[KIND.OIL], "oil defaults to full known amount");
   assert(Array.isArray(state.players), "GameState.players");
   assert(state.playerById(1)?.teamId === 1, "GameState defaults missing teamId to singleton FFA");
   assert(state.teamIdForPlayer(2) === 7, "GameState.teamIdForPlayer returns explicit team");
@@ -272,7 +272,7 @@ function buttonByLabel(card, label) {
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
   assert(state.resourceById.get(200).remaining === 0, "visible resource death tombstones known resource");
   assert(state.entityById(200) === undefined, "depleted resources are not exposed as local entities");
-  assert(state.entityById(201).remaining === 962, "untouched resources keep their last-known amount");
+  assert(state.entityById(201).remaining === RESOURCE_AMOUNTS[KIND.OIL], "untouched resources keep their last-known amount");
   const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryState.applySnapshot({
     tick: 10,
