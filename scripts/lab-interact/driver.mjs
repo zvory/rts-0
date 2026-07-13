@@ -288,15 +288,19 @@ export class LabInteractDriver {
     subjectSummaries = [],
     request = {},
   } = {}) {
-    return this.captureScreenshot({
-      sessionId,
-      name,
-      presentation,
-      viewport,
-      subjectIds,
-      subjectSummaries,
-      request,
-    });
+    try {
+      return await this.captureScreenshot({
+        sessionId,
+        name,
+        presentation,
+        viewport,
+        subjectIds,
+        subjectSummaries,
+        request,
+      });
+    } catch (error) {
+      throw this.decorateError(error);
+    }
   }
 
   recordingStatus() {
@@ -535,18 +539,18 @@ export class LabInteractDriver {
   }
 
   async recordStop(metadata = {}) {
-    const admittedRecording = this.recording;
-    const recording = admittedRecording || this.recording;
-    if (!recording) {
-      throw new LabInteractDriverError(
-        "recordingInactive",
-        "No recording is active for this session. Start one before stopping.",
-      );
+    try {
+      const recording = this.recording;
+      if (!recording) {
+        throw new LabInteractDriverError(
+          "recordingInactive",
+          "No recording is active for this session. Start one before stopping.",
+        );
+      }
+      return await this.finishRecording("explicit", metadata);
+    } catch (error) {
+      throw this.decorateError(error);
     }
-    // Watchdog and lifecycle cleanup may have won after command admission. Observe
-    // that recording's resource-local completion rather than targeting a later one.
-    if (this.recording !== recording) return recording.completion.promise;
-    return this.finishRecording("explicit", metadata);
   }
 
   recordWait() {

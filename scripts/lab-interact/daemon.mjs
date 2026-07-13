@@ -225,6 +225,13 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.once(signal, () => { void shutdown(signal); });
   }
+  process.once("uncaughtException", (error) => {
+    // Preserve normal fatal-exception behavior after the daemon has released the
+    // browser and private server that would otherwise survive an abrupt exit.
+    void shutdown("uncaughtException").catch(() => cleanup()).finally(() => {
+      process.nextTick(() => { throw error; });
+    });
+  });
   process.once("exit", cleanup);
   return { server, service, paths, shutdown };
 }

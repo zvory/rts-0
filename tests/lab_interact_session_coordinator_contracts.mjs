@@ -7,12 +7,14 @@ const timeDefers = [];
 let captureDeferred = null;
 let fixedCaptureActive = false;
 let recordWaitDeferred = null;
+let statusDeferred = null;
 let driverClosed = false;
 
 const driver = {
   workspace: { root: process.cwd(), branch: "fixture", head: "a".repeat(40) },
   async status() {
     calls.push("status");
+    if (statusDeferred) return statusDeferred.promise;
     return { ready: true, snapshotTick: 1, roomTime: { paused: true, speed: 0 } };
   },
   async catalog() {
@@ -106,6 +108,9 @@ try {
   captureDeferred.resolve({ frameSummary: { count: 1 } });
   await capture;
 
+  statusDeferred = deferred();
+  const finalStatus = service.execute("status", { sessionId });
+  await nextTurn();
   const closeBlocker = deferred();
   timeDefers.push(closeBlocker);
   const finalTime = service.execute("time", { sessionId, control: { action: "step", ticks: 1 } });
@@ -114,7 +119,11 @@ try {
   await nextTurn();
   assert.equal(driverClosed, false, "close drains admitted serialized work before closing the driver");
   closeBlocker.resolve({ snapshotTick: 4 });
-  await Promise.all([finalTime, closing]);
+  await finalTime;
+  await nextTurn();
+  assert.equal(driverClosed, false, "close drains admitted observation work before closing the driver");
+  statusDeferred.resolve({ ready: true, snapshotTick: 4, roomTime: { paused: true, speed: 0 } });
+  await Promise.all([finalStatus, closing]);
   assert.equal(driverClosed, true, "close releases the driver after the semantic FIFO drains");
 
   console.log("lab interact session coordinator contracts passed");
