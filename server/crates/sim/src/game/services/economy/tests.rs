@@ -155,6 +155,93 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
 }
 
 #[test]
+fn pump_jack_disappears_with_its_depleted_oil_patch() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let oil = entities
+        .spawn_node(EntityKind::Oil, pump_x, pump_y)
+        .expect("oil node should spawn");
+    let pump = entities
+        .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
+        .expect("pump jack should spawn");
+    let remaining_before_final_load = entities
+        .get(oil)
+        .and_then(|node| node.remaining())
+        .expect("oil node remaining")
+        .saturating_sub(config::OIL_LOAD);
+    entities
+        .get_mut(oil)
+        .expect("oil node should exist")
+        .harvest_resources(remaining_before_final_load);
+
+    for _ in 0..config::HARVEST_TICKS.saturating_sub(1) {
+        assert!(pump_jack::tick(&mut entities).is_empty());
+        assert!(entities.contains(pump));
+    }
+
+    let payouts = pump_jack::tick(&mut entities);
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(payouts[0].oil, config::OIL_LOAD);
+    assert_eq!(entities.get(oil).and_then(|node| node.remaining()), Some(0));
+    assert!(
+        !entities.contains(pump),
+        "Pump Jack should disappear when it extracts the last oil"
+    );
+}
+
+#[test]
+fn pump_jack_does_not_retarget_another_oil_patch_after_depletion() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let depleted_oil = entities
+        .spawn_node(EntityKind::Oil, pump_x, pump_y)
+        .expect("oil node should spawn");
+    let other_oil = entities
+        .spawn_node(
+            EntityKind::Oil,
+            pump_x + config::TILE_SIZE as f32 * 0.25,
+            pump_y,
+        )
+        .expect("second oil node should spawn");
+    let pump = entities
+        .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
+        .expect("pump jack should spawn");
+    let remaining_before_final_load = entities
+        .get(depleted_oil)
+        .and_then(|node| node.remaining())
+        .expect("oil node remaining")
+        .saturating_sub(config::OIL_LOAD);
+    entities
+        .get_mut(depleted_oil)
+        .expect("oil node should exist")
+        .harvest_resources(remaining_before_final_load);
+    let other_oil_before = entities
+        .get(other_oil)
+        .and_then(|node| node.remaining())
+        .expect("second oil node remaining");
+
+    let mut payouts = Vec::new();
+    for _ in 0..config::HARVEST_TICKS {
+        payouts.extend(pump_jack::tick(&mut entities));
+    }
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(payouts[0].oil, config::OIL_LOAD);
+    assert!(
+        !entities.contains(pump),
+        "Pump Jack should disappear when its supporting patch is depleted"
+    );
+    assert_eq!(
+        entities.get(other_oil).and_then(|node| node.remaining()),
+        Some(other_oil_before),
+        "Pump Jack must not retarget another oil patch in its footprint"
+    );
+}
+
+#[test]
 fn pump_jack_mines_only_oil_centered_in_its_footprint() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

@@ -26,12 +26,7 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
             continue;
         };
         let Some(node_id) = pump_jack_oil_node(entities, pump_id) else {
-            if let Some(extractor) = entities
-                .get_mut(pump_id)
-                .and_then(|pump| pump.resource_extractor.as_mut())
-            {
-                extractor.progress = 0;
-            }
+            let _ = entities.remove(pump_id);
             continue;
         };
 
@@ -49,10 +44,13 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
             continue;
         }
 
-        let taken = entities
-            .get_mut(node_id)
-            .map(|node| node.harvest_resources(config::OIL_LOAD))
-            .unwrap_or(0);
+        let Some((taken, depleted)) = entities.get_mut(node_id).map(|node| {
+            let taken = node.harvest_resources(config::OIL_LOAD);
+            (taken, node.remaining().unwrap_or(0) == 0)
+        }) else {
+            let _ = entities.remove(pump_id);
+            continue;
+        };
         if let Some(extractor) = entities
             .get_mut(pump_id)
             .and_then(|pump| pump.resource_extractor.as_mut())
@@ -61,6 +59,12 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
         }
         if taken > 0 {
             payouts.push(PumpJackPayout { owner, oil: taken });
+        }
+        // A Pump Jack is bound to the oil patch it just extracted from. Remove it in the same
+        // tick as the final payout so it cannot retarget another patch in its footprint and both
+        // the Pump Jack and depleted patch disappear from the following snapshot.
+        if depleted {
+            let _ = entities.remove(pump_id);
         }
     }
 
