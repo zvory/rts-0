@@ -399,7 +399,11 @@ fn command_car_passive_aura_is_half_speed_and_has_no_smoke_bonus() {
         entity.mark_in_smoke_for_breakthrough(crate::config::BREAKTHROUGH_RECENT_SMOKE_TICKS);
     }
 
-    for (unit, goal) in [(near, goal_near), (smoky_near, goal_smoky_near), (far, goal_far)] {
+    for (unit, goal) in [
+        (near, goal_near),
+        (smoky_near, goal_smoky_near),
+        (far, goal_far),
+    ] {
         game.enqueue(
             1,
             Command::Move {
