@@ -4,10 +4,11 @@
 
 Deliver the first high-value audio cleanup without redesigning combat cadence, adding gameplay
 notifications, or building a general-purpose sound framework. The selected work is limited to
-making existing spoken notices own the mix briefly, preventing combat from consuming the whole
-voice pool, reducing the reach of ordinary combat audio, and giving existing server notices one
-small match-owned presentation policy. The result should remain busy and warlike at the camera while
-leaving enough perceptual room for current information-bearing voice lines.
+making existing spoken notices own the mix briefly, reducing the reach of ordinary combat audio,
+and giving existing server notices one small match-owned presentation policy. The result should
+remain busy and warlike at the camera while leaving enough perceptual room for current
+information-bearing voice lines. Combat-pool budgets remain deferred until the listening checkpoint
+shows that the cheaper mix and distance changes are insufficient.
 
 ## Overall Constraints
 
@@ -16,9 +17,6 @@ leaving enough perceptual room for current information-bearing voice lines.
 - Preserve the current attack-event cadence and sample-start behavior. In particular, do not add
   rapid-fire cooldowns, controlled MG loops, retrigger suppression, per-emitter cadence changes, or
   early voice stops based on assumed silent tails.
-- Use deliberately permissive combat voice ceilings because decoded buffer lifetime includes quiet
-  or silent asset tails. The ceilings are guardrails against pathological stacking, not a target for
-  making ordinary fights sparse.
 - Route only existing `Notice` events through the new match-owned notice presenter. Do not create
   resource-exhaustion, idle-economy, advisory, production, supply-warning, or other new notices.
 - Preserve current replay/spectator notice-audio suppression, under-attack viewport suppression,
@@ -32,7 +30,7 @@ leaving enough perceptual room for current information-bearing voice lines.
 - Update `docs/design/client-ui.md` alongside implementation behavior in each phase. No protocol
   design document should change because this plan does not alter the wire contract.
 - Treat automated checks as contract coverage, not proof that the mix sounds good. Each handoff must
-  name its focused manual listening check, and phase 3 ends by preparing an integrated player
+  name its focused manual listening check, and phase 2 ends by preparing an integrated player
   checkpoint rather than claiming subjective mix quality automatically.
 - Each implementation phase must land on its own `zvorygin/` branch, be pushed as an owned PR with
   auto-merge armed, and wait for a definite merge with the phase head reachable from `origin/main`
@@ -51,27 +49,19 @@ notice request a fast, deeper mix duck, then restore combat gradually after the 
 ends. Move the existing under-attack incident policy into that presenter so one match-scoped
 admission decision prevents repeated hits from spamming toast, minimap, or voice together.
 
-### [Phase 2 - Permissive Combat Voice Guardrails](phase-2.md)
-
-Keep the global 48-voice pool while adding a deliberately high combined combat ceiling and three
-coarse combat-family ceilings. Tag existing combat sound specifications explicitly and reuse the
-current priority, distance, ownership, and age score when a constrained combat voice must be
-replaced. Do not change how often attack events request sounds, where clips start, how long they
-play, or how machine-gunner keys are stopped.
-
-### [Phase 3 - Combat Audibility Envelope and Listening Checkpoint](phase-3.md)
+### [Phase 2 - Combat Audibility Envelope and Listening Checkpoint](phase-2.md)
 
 Give combat categories a tighter radial profile based on the existing camera listener reference
 distance while leaving non-combat spatial behavior unchanged. Keep nearby fighting present, make
 edge and offscreen combat recede strongly, and retain current panning, low-pass filtering, and
 smooth updates when the camera moves. Finish with an integrated dense-battle listening checkpoint
-covering combat texture, existing notices, camera movement, and the permissive voice limits.
+covering combat texture, existing notices, and camera movement before deciding whether any combat
+voice budget is justified.
 
 ## Phase Index
 
 1. [Phase 1 - Existing Notice Policy and Mix Ducking](phase-1.md)
-2. [Phase 2 - Permissive Combat Voice Guardrails](phase-2.md)
-3. [Phase 3 - Combat Audibility Envelope and Listening Checkpoint](phase-3.md)
+2. [Phase 2 - Combat Audibility Envelope and Listening Checkpoint](phase-2.md)
 
 ## Non-Goals
 
@@ -85,6 +75,8 @@ covering combat texture, existing notices, camera movement, and the permissive v
   audio setting.
 - No generalized notification registry, application-wide event bus, or migration of countdown,
   victory/defeat, unit barks, lobby sounds, or unrelated UI to the notice presenter.
+- No combined combat ceiling, per-family voice budgets, combat-family metadata, or second admission
+  scheduler before the listening checkpoint demonstrates a remaining pool-saturation problem.
 - No exact viewport geometry in the audio engine and no renderer/camera import added to `audio.js`.
 - No deployment or beta rollout in this plan; the final deliverable is a locally validated first
   pass ready for an ordinary later rollout decision.
@@ -95,8 +87,6 @@ covering combat texture, existing notices, camera movement, and the permissive v
   while it speaks, and the normal mix returns smoothly rather than snapping back.
 - Repeated under-attack events in one match-scoped incident do not continually overwrite the toast
   and restamp minimap pings, while a distinct location still presents normally.
-- A dense mixed fight remains audibly busy but cannot consume more than the documented permissive
-  combat total/family guardrails or block higher-priority alert/UI voices.
 - Combat near the listener remains satisfying, combat near and beyond the visible edge recedes, and
   far routine combat is dropped without audible popping during camera motion.
 - The result does not alter attack cadence, simulation outcomes, notice vocabulary, protocol data,
@@ -124,7 +114,6 @@ executor passes after this plan is approved, use:
 ```bash
 scripts/phase-runner.sh --plan audio-v2.0 phase-1 --pr --wait
 scripts/phase-runner.sh --plan audio-v2.0 phase-2 --pr --wait
-scripts/phase-runner.sh --plan audio-v2.0 phase-3 --pr --wait
 ```
 
 After every phase, the implementing agent must provide a handoff message describing the landed
@@ -134,7 +123,10 @@ than producing an exhaustive device or browser matrix.
 
 ## Deferred Backlog
 
-Only revisit asset-tail trimming, loudness normalization, limiting/compression, per-weapon spatial
-profiles, or combat-event aggregation if the phase 3 listening checkpoint produces evidence that
-the first-pass policy cannot solve the remaining problem. These are not approved executable phases
-of this plan.
+Only revisit combat-pool limits, asset-tail trimming, loudness normalization,
+limiting/compression, per-weapon spatial profiles, or combat-event aggregation if the phase 2
+listening checkpoint produces evidence that the first-pass policy cannot solve the remaining
+problem. If combat still saturates the global 48-voice pool, try one combined combat ceiling before
+introducing family metadata or separate rifle/automatic/heavy limits; add a family limit only when
+the checkpoint demonstrates that one family is starving another. These are not approved executable
+phases of this plan.
