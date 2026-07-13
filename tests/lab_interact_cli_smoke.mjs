@@ -72,7 +72,7 @@ try {
   });
   const orderOutcome = ordered.result?.result?.outcome;
   assert.equal(orderOutcome?.accepted, true, "authoritative server accepts the move order");
-  const stepped = call("time", { sessionId, control: { action: "step", ticks: 30 } });
+  const stepped = call("time", { sessionId, control: { action: "step", ticks: 2 } });
   assert.ok(stepped.result.snapshotTick > orderOutcome.queuedAtTick, "time steps beyond command admission");
   const afterOrder = entity("shooter");
   assert.ok(afterOrder.y > afterUpdate.y, "authoritative ticks make observable progress on the move order");
@@ -160,12 +160,25 @@ try {
   assert.ok(recordingManifest.operations.some((entry) => entry.command === "camera"), "recording wait leaves camera interaction available");
   assert.deepEqual(recordingManifest.errors.page, [], "recording manifest reports no page errors");
 
-  const reset = call("reset", { sessionId });
-  assert.ok(reset.result, "live session resets through the authoritative bridge");
   const closedSessionId = sessionId;
   call("close", { sessionId });
   sessionId = null;
   assert.equal(callFailure("inspect", { sessionId: closedSessionId }).code, "unknownSession", "closed session ids are rejected as stale");
+  const reopened = call("open", {
+    renderer,
+    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+  });
+  sessionId = testArtifacts.ownSession(reopened.sessionId);
+  assert.notEqual(sessionId, closedSessionId, "reopening after close creates a fresh session");
+  call("time", { sessionId, control: { action: "pause" } });
+  call("spawn", {
+    sessionId,
+    spawns: [{ owner: 1, kind: "rifleman", x: 960, y: 960, alias: "resetSubject" }],
+  });
+  const reset = call("reset", { sessionId });
+  assert.ok(reset.result, "a fresh live session resets through the authoritative bridge");
+  call("close", { sessionId });
+  sessionId = null;
   assert.equal(call("shutdown").shuttingDown, true, "live smoke explicitly requests daemon teardown");
   await waitFor(() => !fs.existsSync(paths.directory), 5_000, "explicit shutdown removes the isolated runtime");
   await waitFor(() => !processAlive(daemonPid), 5_000, "explicit shutdown exits the child daemon");
