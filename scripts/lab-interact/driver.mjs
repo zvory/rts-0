@@ -96,14 +96,12 @@ export class LabInteractDriver {
     this.pageConsoleErrors = [];
     this.pageErrors = [];
     this.requestFailures = [];
-    this.operationTail = Promise.resolve();
     this.closePromise = null;
     this.recording = null;
     this.lastRecording = null;
     this.lastRecordingCompletion = null;
     this.fixedCapture = null;
     this.lastFixedCapture = null;
-    this.signalHandlers = [];
     this.openStarted = false;
     const configuredArtifactCapability = process.env.RTS_LAB_INTERACT_ARTIFACT_CAPABILITY || "";
     this.artifactCapability = /^[a-f0-9]{64}$/.test(configuredArtifactCapability)
@@ -119,7 +117,6 @@ export class LabInteractDriver {
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot);
     this.sessionDir = createSessionDirectory(this.workspace.root, this.options.map);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
-    this.installCleanupHandlers();
     this.server = await startOrReusePrivateServer({
       workspace: this.workspace,
       sessionDir: this.sessionDir,
@@ -291,15 +288,19 @@ export class LabInteractDriver {
     subjectSummaries = [],
     request = {},
   } = {}) {
-    return this.enqueue(() => this.captureScreenshot({
-      sessionId,
-      name,
-      presentation,
-      viewport,
-      subjectIds,
-      subjectSummaries,
-      request,
-    }));
+    try {
+      return await this.captureScreenshot({
+        sessionId,
+        name,
+        presentation,
+        viewport,
+        subjectIds,
+        subjectSummaries,
+        request,
+      });
+    } catch (error) {
+      throw this.decorateError(error);
+    }
   }
 
   recordingStatus() {
@@ -325,7 +326,7 @@ export class LabInteractDriver {
     scale = 1,
     resumeSpeed = null,
   } = {}) {
-    return this.enqueue(async () => {
+    try {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
       const tools = checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
@@ -393,11 +394,13 @@ export class LabInteractDriver {
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});
         throw error;
       }
-    });
+    } catch (error) {
+      throw this.decorateError(error);
+    }
   }
 
   async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, viewport = null, sceneIdentity = null, sceneRevision = 0, aliases = [] } = {}) {
-    return this.enqueue(async () => {
+    try {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "Fixed capture is unavailable while real-time recording is active.");
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const artifactName = safeArtifactName(name, "fixed");
@@ -509,7 +512,9 @@ export class LabInteractDriver {
         if (originalViewport) await this.page?.setViewport(originalViewport).catch(() => {});
         this.fixedCapture = null;
       }
-    });
+    } catch (error) {
+      throw this.decorateError(error);
+    }
   }
 
   fixedCaptureStatus() {
@@ -533,26 +538,19 @@ export class LabInteractDriver {
     return true;
   }
 
-  recordStop(metadata = {}) {
-    const admittedRecording = this.recording;
-    return this.enqueue(() => {
-      // A start already ahead of this stop in the driver queue may not have
-      // installed its recording yet. Resolve that case at execution time while
-      // still binding an admitted active recording so a watchdog cannot make
-      // this stop drift onto a later recording.
-      const recording = admittedRecording || this.recording;
+  async recordStop(metadata = {}) {
+    try {
+      const recording = this.recording;
       if (!recording) {
         throw new LabInteractDriverError(
           "recordingInactive",
           "No recording is active for this session. Start one before stopping.",
         );
       }
-      // The watchdog and lifecycle cleanup intentionally finalize outside the
-      // driver queue. If either wins while this stop is queued, observe that
-      // recording's shared completion instead of failing or targeting a newer one.
-      if (this.recording !== recording) return recording.completion.promise;
-      return this.finishRecording("explicit", metadata);
-    });
+      return await this.finishRecording("explicit", metadata);
+    } catch (error) {
+      throw this.decorateError(error);
+    }
   }
 
   recordWait() {
@@ -649,8 +647,8 @@ export class LabInteractDriver {
         const failure = error instanceof LabInteractRecordingError
           ? new LabInteractDriverError(error.code, error.message, error.details)
           : error;
-        // finishRecording is also called outside enqueue() by watchdog and
-        // lifecycle settlement. Decorate here so every observer of the shared
+        // finishRecording is also called by watchdog and lifecycle settlement.
+        // Decorate here so every observer of the shared
         // completion receives the same normalized failure object.
         throw this.decorateError(failure);
       } finally {
@@ -677,7 +675,11 @@ export class LabInteractDriver {
   }
 
   async call(method, input) {
-    return this.enqueue(() => this.callBridge(method, input));
+    try {
+      return await this.callBridge(method, input);
+    } catch (error) {
+      throw this.decorateError(error);
+    }
   }
 
   async callBridge(method, input) {
@@ -829,12 +831,6 @@ export class LabInteractDriver {
     throw new LabInteractDriverError("captureTimeout", captureReadinessMessage(last, this.diagnostics()));
   }
 
-  enqueue(operation) {
-    const run = this.operationTail.then(operation, operation);
-    this.operationTail = run.catch(() => {});
-    return run.catch((error) => { throw this.decorateError(error); });
-  }
-
   launchUrl() {
     const url = new URL("/lab", this.server.baseUrl);
     url.searchParams.set("room", generatedRoomId(this.workspace.head));
@@ -862,33 +858,10 @@ export class LabInteractDriver {
     });
   }
 
-  installCleanupHandlers() {
-    const closeOnSignal = () => { void this.close(); };
-    for (const signal of ["SIGINT", "SIGTERM"]) {
-      process.once(signal, closeOnSignal);
-      this.signalHandlers.push([signal, closeOnSignal]);
-    }
-    const closeOnException = (error) => {
-      // `uncaughtExceptionMonitor` cannot wait for async teardown. Hold the fatal exception
-      // until the browser and private server have stopped, then restore normal process failure.
-      void this.close().finally(() => {
-        process.nextTick(() => { throw error; });
-      });
-    };
-    process.once("uncaughtException", closeOnException);
-    this.signalHandlers.push(["uncaughtException", closeOnException]);
-  }
-
-  removeCleanupHandlers() {
-    for (const [event, handler] of this.signalHandlers) process.removeListener(event, handler);
-    this.signalHandlers = [];
-  }
-
   async close() {
     if (this.closePromise) return this.closePromise;
     this.closePromise = (async () => {
       if (this.state === DRIVER_STATES.CLOSED) return;
-      this.removeCleanupHandlers();
       if (this.recording) {
         await this.settleRecording("sessionClose")?.catch(() => {
           removePartialRecording([this.recording?.recordingDir]);

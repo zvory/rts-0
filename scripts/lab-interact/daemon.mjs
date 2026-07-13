@@ -6,12 +6,12 @@ import { pathToFileURL } from "node:url";
 
 import {
   LabInteractError, LabInteractService, conciseError, loadDriverFactory, normalizeError,
-  validateCommandInput,
 } from "./command_service.mjs";
+import { requestTimeoutMs, validateCommandInput } from "./command_registry.mjs";
 import {
   IPC_VERSION, MAX_REQUEST_BYTES, claimStartupLock, cleanupOwnedRuntime,
   checkoutCommit, configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
-  requestTimeoutMs, writeStartupError,
+  writeStartupError,
 } from "./runtime.mjs";
 import { LabInteractTailnetPreview } from "./tailnet_preview.mjs";
 
@@ -225,6 +225,13 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.once(signal, () => { void shutdown(signal); });
   }
+  process.once("uncaughtException", (error) => {
+    // Preserve normal fatal-exception behavior after the daemon has released the
+    // browser and private server that would otherwise survive an abrupt exit.
+    void shutdown("uncaughtException").catch(() => cleanup()).finally(() => {
+      process.nextTick(() => { throw error; });
+    });
+  });
   process.once("exit", cleanup);
   return { server, service, paths, shutdown };
 }

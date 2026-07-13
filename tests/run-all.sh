@@ -692,6 +692,8 @@ else
 fi
 
 if [ "$RUN_STATIC_JS" = "1" ]; then
+  run_suite_bg "Architecture: Lab Interact application" \
+    node "$REPO_ROOT/scripts/check-lab-interact-architecture.mjs"
   run_suite_bg "JS protocol contracts" \
     node "$SCRIPT_DIR/protocol_parity.mjs"
   run_suite_bg "JS client contracts" \
@@ -710,6 +712,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/lab_interact_recording_contracts.mjs"
   run_suite_bg "Lab Interact fixed-capture contracts" \
     node "$SCRIPT_DIR/lab_interact_fixed_capture_contracts.mjs"
+  run_suite_bg "Lab Interact session coordinator contracts" \
+    node "$SCRIPT_DIR/lab_interact_session_coordinator_contracts.mjs"
   run_suite_bg "JS HUD command card" \
     node "$SCRIPT_DIR/hud_command_card.mjs"
   run_suite_bg "Utility: tailnet preview" \

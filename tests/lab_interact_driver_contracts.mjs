@@ -59,6 +59,16 @@ assert.equal(
   boundedLogLine,
   "captured browser diagnostics apply the same per-entry size bound as server-log tails",
 );
+await assert.rejects(
+  diagnosticDriver.screenshot({ sessionId: "invalid" }),
+  (error) => error?.code === "invalidSession" && Boolean(error?.details?.diagnostics),
+  "screenshot failures retain driver diagnostics without a driver-level command queue",
+);
+await assert.rejects(
+  diagnosticDriver.recordStop(),
+  (error) => error?.code === "recordingInactive" && Boolean(error?.details?.diagnostics),
+  "record-stop admission failures retain driver diagnostics without a driver-level command queue",
+);
 
 const babylonDriver = new LabInteractDriver({ workspaceRoot: root, renderer: "babylon" });
 babylonDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
