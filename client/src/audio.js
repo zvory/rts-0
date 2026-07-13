@@ -63,6 +63,7 @@ const STICKY_BONUS = Object.freeze({
   ui: 10,
 });
 const SPOKEN_CATEGORIES = new Set(["alert", "ui", "unit_voice"]);
+const COMBAT_CATEGORIES = new Set(["combat_self", "combat_other"]);
 
 /** Multiple of `refDist` beyond which a spatial sound is dropped entirely. */
 const MAX_DIST_MULT = 3;
@@ -74,6 +75,14 @@ const LP_NEAR_HZ = 20000;
 const LP_FAR_HZ = 1200;
 /** Fallback refDist (world px) used until main.js sets one. */
 const DEFAULT_REF_DIST = 1920;
+/** Combat stays full-volume only in the close camera-centered region. */
+const COMBAT_NEAR_MULT = 0.4;
+/** Combat beyond this listener-relative radius is not allocated. */
+const COMBAT_MAX_DIST_MULT = 1.2;
+/** Extra combat distance outside the near region is scaled before attenuation. */
+const COMBAT_DISTANCE_EFFECT_MULT = 4;
+/** Maximum score penalty for combat at the hard-drop boundary. */
+const COMBAT_MAX_DISTANCE_PENALTY = 30;
 
 export { CATEGORIES };
 
@@ -261,11 +270,12 @@ export class Audio {
     const priorityBonus = typeof opts.priority === "number" ? opts.priority : 0;
 
     // Spatial gate: if a position is supplied, compute attenuation/pan/lpHz from
-    // the current listener. Beyond MAX_DIST_MULT * refDist the sound is dropped
-    // before we even allocate a voice — the biggest perf win in a 200-unit fight.
+    // the current listener and the category's explicit spatial profile. Distant
+    // sounds are dropped before voice allocation — the biggest perf win in a
+    // 200-unit fight.
     let spatial = null;
     if (typeof opts.x === "number" && typeof opts.y === "number") {
-      spatial = this._computeSpatial(opts.x, opts.y);
+      spatial = this._computeSpatial(opts.x, opts.y, category);
       if (!spatial) return false;
     }
 
@@ -311,7 +321,7 @@ export class Audio {
       distGain.connect(gainNode);
       gainNode.connect(bus);
       trail.push(panner, lp, distGain, gainNode);
-      spatialNodes = { panner, lp, distGain, x: opts.x, y: opts.y };
+      spatialNodes = { panner, lp, distGain, x: opts.x, y: opts.y, category };
     } else {
       src.connect(gainNode);
       gainNode.connect(bus);
@@ -408,7 +418,7 @@ export class Audio {
     for (const voice of this.voices) {
       const s = voice.spatial;
       if (!s) continue;
-      const next = this._computeSpatial(s.x, s.y);
+      const next = this._computeSpatial(s.x, s.y, s.category);
       if (!next) {
         // Beyond max distance — fade to zero quickly; let the voice finish naturally.
         s.distGain.gain.cancelScheduledValues(t);
@@ -547,22 +557,38 @@ export class Audio {
   }
 
   /**
-   * Compute the Phase 2 spatial parameters for an emitter, or null if it is
-   * beyond max distance and should be dropped before voice allocation.
+   * Compute spatial parameters for an emitter, or null if it is beyond the
+   * selected profile's max distance and should be dropped before allocation.
+   * Combat has a tight listener-relative envelope; all other categories retain
+   * the original default profile.
    * @param {number} x emitter world x
    * @param {number} y emitter world y
+   * @param {string} [category] voice category
    * @returns {{gain:number, pan:number, lpHz:number,distance:number,distancePenalty:number}|null}
    */
-  _computeSpatial(x, y) {
+  _computeSpatial(x, y, category) {
     const refDist = Math.max(1, this.listener.refDist || DEFAULT_REF_DIST);
     const dx = x - this.listener.x;
     const dy = y - this.listener.y;
     const d = Math.sqrt(dx * dx + dy * dy);
+    const pan = Math.max(-1, Math.min(1, dx / refDist));
+
+    if (COMBAT_CATEGORIES.has(category)) {
+      const near = COMBAT_NEAR_MULT * refDist;
+      const maxDist = COMBAT_MAX_DIST_MULT * refDist;
+      if (d > maxDist) return null;
+      const effectiveD = near + Math.max(0, d - near) * COMBAT_DISTANCE_EFFECT_MULT;
+      const gain = clamp01(near / Math.max(effectiveD, near));
+      const farT = clamp01((d - near) / (maxDist - near));
+      const lpHz = LP_NEAR_HZ + (LP_FAR_HZ - LP_NEAR_HZ) * farT;
+      const distancePenalty = COMBAT_MAX_DISTANCE_PENALTY * farT;
+      return { gain, pan, lpHz, distance: d, distancePenalty };
+    }
+
     const maxDist = MAX_DIST_MULT * refDist;
     if (d > maxDist) return null;
     const effectiveD = refDist + Math.max(0, d - refDist) * FAR_DISTANCE_EFFECT_MULT;
     const gain = clamp01(refDist / Math.max(effectiveD, refDist));
-    const pan = Math.max(-1, Math.min(1, dx / refDist));
     const farT = clamp01(effectiveD / maxDist);
     const lpHz = LP_NEAR_HZ + (LP_FAR_HZ - LP_NEAR_HZ) * farT;
     const distancePenalty = Math.min(30, (effectiveD / refDist) * 10);

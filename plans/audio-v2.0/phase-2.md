@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -62,16 +62,16 @@ clearly too aggressive or too weak.
 
 ## Implementation Checklist
 
-- [ ] Add a combat-only spatial profile selected without camera/renderer coupling.
-- [ ] Apply the exact near, attenuation, low-pass, hard-drop, and priority equations.
-- [ ] Keep default non-combat spatial behavior unchanged.
-- [ ] Recompute in-flight combat voices with the same profile after listener movement.
-- [ ] Keep the global pool unchanged and add no combat-family budget system.
-- [ ] Add focused near/edge/drop, low-pass, priority, and listener-refresh contracts.
-- [ ] Prepare a runnable integrated dense-battle listening checkpoint and focused checklist for the
+- [x] Add a combat-only spatial profile selected without camera/renderer coupling.
+- [x] Apply the exact near, attenuation, low-pass, hard-drop, and priority equations.
+- [x] Keep default non-combat spatial behavior unchanged.
+- [x] Recompute in-flight combat voices with the same profile after listener movement.
+- [x] Keep the global pool unchanged and add no combat-family budget system.
+- [x] Add focused near/edge/drop, low-pass, priority, and listener-refresh contracts.
+- [x] Prepare a runnable integrated dense-battle listening checkpoint and focused checklist for the
       user/manual tester.
-- [ ] Update the client UI design document.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Update the client UI design document.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 
@@ -102,6 +102,28 @@ Record concrete observations about notice intelligibility, perceived combat dens
 important heavy cues, edge/offscreen noise, and camera-transition artifacts before proposing any
 follow-up. If the battle remains overloaded, record whether it is general voice-pool saturation or
 one sound family drowning out another; do not automatically add limits without that evidence.
+
+### Prepared local checkpoint
+
+Start the normal authoritative server in release mode from the repository root:
+
+```bash
+cd server
+RTS_ADDR=0.0.0.0:8080 cargo run --release
+```
+
+Then open this ordinary spectator AI-vs-AI launch URL:
+
+```text
+http://localhost:8080/?rtsLaunch=match&rtsRoom=audio-v2-checkpoint-20260713&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1
+```
+
+Use one dense mixed fight and listen with the camera centered on it, near its visible edge, just
+offscreen, and far away. Pan normally and use a minimap jump while combat voices are active; listen
+for pops, abrupt brightening, or other discontinuities. During the same fight, trigger an existing
+under-attack or local command-feedback voice and record notice intelligibility, perceived nearby
+combat density, any missing important heavy cue, edge/offscreen noise, and camera-transition
+artifacts. Subjective conclusions and any follow-up remain pending this checkpoint.
 
 ## Handoff Expectations
 
