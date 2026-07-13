@@ -551,11 +551,19 @@ export function _refreshAntiTankGunSetupPreview() {
 }
 
 function setupPreviewGroundAtScreen(input, screen) {
-  const projection = input?.camera?.projectionSnapshot?.();
+  let projection;
+  try {
+    projection = input?.camera?.projectionSnapshot?.();
+  } catch {
+    return input._groundAtScreen(screen.x, screen.y);
+  }
   const groundAtScreen = projection?.groundAtScreen;
   if (typeof groundAtScreen === "function") {
     try {
       const point = groundAtScreen({ x: screen.x, y: screen.y });
+      // A valid current projection returning no hit must clear the preview,
+      // rather than resurrecting a position from a stale SelectionScene.
+      if (point == null) return null;
       const clamped = clampSetupPreviewPoint(point, input?.state?.map);
       if (clamped) return clamped;
     } catch {
