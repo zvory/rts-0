@@ -22,6 +22,7 @@ import {
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
   _drawAttackTargetPreview,
+  _drawBreakthroughAuras,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
   _drawMortarImpacts,
@@ -109,6 +110,41 @@ function nearPoint(call, point, epsilon = 0.001) {
     performance.now = priorNow;
     restorePixi();
   }
+}
+
+{
+  const auraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: auraGfx, _map: { tileSize: 32 } },
+    { playerId: 1 },
+    [
+      { id: 1, owner: 2, kind: KIND.COMMAND_CAR, x: 160, y: 192, abilities: [] },
+      {
+        id: 2,
+        owner: 1,
+        kind: KIND.COMMAND_CAR,
+        x: 256,
+        y: 192,
+        abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 12 }],
+      },
+      { id: 3, owner: 2, kind: KIND.RIFLEMAN, x: 224, y: 224 },
+    ],
+  );
+
+  const rings = auraGfx.calls.filter((call) => call[0] === "drawCircle");
+  assert(rings.length === 2, "every visible Command Car draws its passive aura, including enemies");
+  assert(
+    rings.some((call) => call[1] === 160 && call[2] === 192 && call[3] === 288),
+    "the visible enemy Command Car draws its nine-tile passive aura",
+  );
+  assert(
+    auraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.32),
+    "inactive Command Cars draw a faint passive aura",
+  );
+  assert(
+    auraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78),
+    "active Breakthrough Command Cars brighten their aura",
+  );
 }
 
 {
