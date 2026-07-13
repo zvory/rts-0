@@ -232,7 +232,13 @@ tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks
 movement path while firing on either `Move` or `AttackMove` orders and keep their base 5-tile
 weapon range while moving. After a tank has spent three seconds (90 ticks) without path-driven
 translation or hull rotation, its range has linearly expanded to 14 tiles; any later path-driven
-movement or hull rotation resets it to the base range. Riflemen upgraded with Methamphetamines gain
+movement or hull rotation resets it to the base range. A stationary Tank that survives enemy direct
+AP damage autonomously turns its hull toward the damage source without changing its order, target,
+path, turret aim, or stationary range. It remembers distinct Tank cannon, Anti-Tank Gun, and
+Panzerfaust attackers for three seconds and turns toward their pre-facing-damage-weighted direction
+average; near-opposite threats cancel instead of making the hull oscillate. Active movement paths
+and zero oil prevent this response, while Hold Position explicitly allows it. Riflemen upgraded with
+Methamphetamines gain
 permanent moving fire, keep advancing while firing with normal accuracy, and move at tank speed.
 Panzerfausts upgraded with Methamphetamines also move at tank speed and receive the Panzerfaust windup/recovery boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
@@ -351,8 +357,8 @@ folded into default targeting.
   instantly from the owned completed City Centre nearest the clicked point, and admits at most one
   active Scout Plane per player.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
-  `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; turret aiming,
-  collision shoves, and external pulls do not.
+  `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; autonomous armor
+  reaction, turret aiming, collision shoves, and external pulls do not.
 - Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 24` command
   supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each
   selected/commanded Command Car. Units use their mirrored supply as command weight, so current Tanks

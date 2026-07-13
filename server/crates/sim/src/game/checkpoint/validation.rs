@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::commands::PendingCommand;
-use crate::game::entity::{Entity, MAX_QUEUED_ORDERS};
+use crate::game::entity::{Entity, MAX_INCOMING_DIRECT_AP_THREATS, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
@@ -94,6 +94,7 @@ pub(super) fn validate_entities(
     entities: &EntityStoreV1,
     player_ids: &BTreeSet<u32>,
     map: &Map,
+    tick: u32,
 ) -> Result<BTreeSet<u32>, CheckpointPayloadError> {
     if entities.next_id == 0 {
         return Err(CheckpointPayloadError::InvalidValue {
@@ -103,7 +104,7 @@ pub(super) fn validate_entities(
     let mut ids = BTreeSet::new();
     let world = map.world_size_px();
     for entity in &entities.entities {
-        validate_entity(entity, entities.next_id, player_ids, world, &mut ids)?;
+        validate_entity(entity, entities.next_id, player_ids, world, tick, &mut ids)?;
     }
     Ok(ids)
 }
@@ -158,6 +159,7 @@ fn validate_entity(
     next_id: u32,
     player_ids: &BTreeSet<u32>,
     world: f32,
+    tick: u32,
     ids: &mut BTreeSet<u32>,
 ) -> Result<(), CheckpointPayloadError> {
     if entity.id == 0 || !ids.insert(entity.id) {
@@ -193,6 +195,52 @@ fn validate_entity(
             count: entity.queued_orders().len(),
             max: MAX_QUEUED_ORDERS,
         });
+    }
+    validate_armor_reaction_threats(entity, next_id, world, tick)?;
+    Ok(())
+}
+
+fn validate_armor_reaction_threats(
+    entity: &Entity,
+    next_id: u32,
+    world: f32,
+    tick: u32,
+) -> Result<(), CheckpointPayloadError> {
+    let Some(combat) = entity.combat.as_ref() else {
+        return Ok(());
+    };
+    validate_count(
+        "entities.combat.incomingDirectApThreats",
+        combat.incoming_direct_ap_threats.len(),
+        MAX_INCOMING_DIRECT_AP_THREATS,
+    )?;
+    if !combat.incoming_direct_ap_threats.is_empty()
+        && (!rules::combat::unit_reacts_to_direct_ap(entity.kind) || entity.hp == 0)
+    {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.combat.incomingDirectApThreats",
+        });
+    }
+    for (&attacker, threat) in &combat.incoming_direct_ap_threats {
+        validate_allocated_entity_ref(
+            "entities.combat.incomingDirectApThreats.attacker",
+            attacker,
+            next_id,
+        )?;
+        if !in_world(threat.source_x, threat.source_y, world) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "entities.combat.incomingDirectApThreats.source",
+            });
+        }
+        if threat.damage_weight == 0
+            || threat.last_hit_tick > tick
+            || tick.saturating_sub(threat.last_hit_tick)
+                > rules::combat::DIRECT_AP_ARMOR_REACTION_MEMORY_TICKS
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "entities.combat.incomingDirectApThreats.value",
+            });
+        }
     }
     Ok(())
 }

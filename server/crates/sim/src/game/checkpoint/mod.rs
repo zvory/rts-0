@@ -302,7 +302,7 @@ impl GameCheckpointV1 {
         )?;
 
         let player_ids = validate_players(&self.players, self.tick)?;
-        let entity_ids = validate_entities(&self.entities, &player_ids, map)?;
+        let entity_ids = validate_entities(&self.entities, &player_ids, map, self.tick)?;
         validate_player_supply(&self.players, &self.entities)?;
         validate_fog(&self.fog, &player_ids, map)?;
         validate_building_memory(&self.building_memory, &player_ids)?;

@@ -12,6 +12,9 @@ const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.5;
 const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.7;
 const NO_ARMOR_PENETRATION: f32 = 0.0;
 const FULL_ARMOR_PENETRATION: f32 = 1.0;
+/// How long a reacting unit remembers each distinct direct-AP attacker.
+pub const DIRECT_AP_ARMOR_REACTION_MEMORY_TICKS: u32 = crate::balance::TICK_HZ * 3;
+
 /// Attack profile for a combat-capable unit or building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AttackProfile {
@@ -102,6 +105,8 @@ pub struct WeaponProfile {
     pub cooldown: u32,
     pub weapon_class: WeaponClass,
     pub armor_penetration: f32,
+    /// Whether a successful hit should refresh a capable victim's direct-AP armor reaction.
+    pub triggers_armor_reaction: bool,
     pub miss_policy: MissPolicy,
     pub facing_damage_policy: FacingDamagePolicy,
     pub overpenetration: OverpenetrationPolicy,
@@ -125,6 +130,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 24,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -136,6 +142,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 24,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -147,6 +154,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 16,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -158,6 +166,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -169,6 +178,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -180,6 +190,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 72,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
+        triggers_armor_reaction: true,
         miss_policy: MissPolicy::AntiTankGunVsInfantry,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.50 },
@@ -191,6 +202,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 0,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: crate::balance::PANZERFAUST_ARMOR_PENETRATION,
+        triggers_armor_reaction: true,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::None,
@@ -202,6 +214,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 60,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::None,
@@ -213,6 +226,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: crate::balance::ARTILLERY_RELOAD_TICKS,
         weapon_class: WeaponClass::None,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::None,
@@ -224,6 +238,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 72,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
+        triggers_armor_reaction: true,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -235,6 +250,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
+        triggers_armor_reaction: false,
         miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
@@ -360,6 +376,16 @@ pub fn is_ap(kind: EntityKind) -> bool {
 
 pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
     profile.armor_penetration > 0.0
+}
+
+/// Whether a successful hit should refresh a capable victim's direct-AP armor reaction.
+pub fn weapon_triggers_armor_reaction(profile: &WeaponProfile) -> bool {
+    profile.triggers_armor_reaction && weapon_is_ap(profile)
+}
+
+/// Whether this unit has an autonomous hull-facing response to direct AP damage.
+pub fn unit_reacts_to_direct_ap(kind: EntityKind) -> bool {
+    defs::unit_def(kind).is_some_and(|def| def.reacts_to_direct_ap)
 }
 
 /// Rules-owned armor classification for target ranking and damage policy.
@@ -688,6 +714,28 @@ fn normalized_angle_delta(from: f32, to: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tank_armor_reaction_sources_are_explicit_direct_ap_weapons() {
+        let triggering_weapons = WEAPON_PROFILES
+            .iter()
+            .filter(|profile| weapon_triggers_armor_reaction(profile))
+            .map(|profile| profile.id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            triggering_weapons,
+            vec![
+                WeaponKind::AntiTankGun,
+                WeaponKind::PanzerfaustLoadedShot,
+                WeaponKind::TankCannon,
+            ]
+        );
+        assert!(WEAPON_PROFILES
+            .iter()
+            .filter(|profile| profile.triggers_armor_reaction)
+            .all(weapon_is_ap));
+    }
 
     fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
         if kind == EntityKind::Panzerfaust {
