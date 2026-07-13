@@ -28,6 +28,9 @@ src/
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
+  auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
+  auto_spectator_settings.js # persisted opt-in preference for automatic spectator framing
+  match_auto_spectator.js # Match availability, camera-limit, and director-construction wiring
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
   renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
@@ -1071,6 +1074,27 @@ export class Camera {
 }
 ```
 
+`auto_spectator.js`
+```js
+export class AutoSpectatorDirector {
+  constructor({camera, state, enabled?})
+  setEnabled(enabled)
+  observeSnapshot(snapshot)              // ingest positioned combat activity and decide at most once per simulated second
+  update(dt)                             // advance an active one-second camera pan
+  diagnostics(), destroy()
+}
+```
+
+Replay viewers and ordinary live spectators receive a dedicated **Replay Controls** settings tab
+with one persisted, default-off `Enable Auto Spectator` switch. Lab sessions do not mount the
+director. While enabled, the director retains three simulated seconds of attack, death, and
+positioned-impact activity, groups samples within ten tiles, and frames the highest-weight group;
+deaths count as four attacks, impacts as two, and the current fight receives a small stickiness
+bonus. Decisions occur no more than once every 30 simulation ticks. Nearby reframes pan and zoom
+with a one-second smooth transition, distant reframes cut immediately, and expired combat activity
+returns the camera to a whole-map view. Backward replay seeks clear future activity before the
+rebuilt timeline is evaluated.
+
 `renderer/index.js`
 ```js
 export class Renderer {
@@ -1720,7 +1744,9 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_combat_audio.js`,
-  `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`, `match_settings_toggles.js`, `client_perf_report.js`, `match_health.js`,
+  `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
+  `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,
+  `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
   `observer_analysis_preferences.js`, `observer_analysis_rows.js`, `observer_analysis_signatures.js`,
@@ -1746,6 +1772,7 @@ Current areas:
 - `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
   route detection, direct launch URL parsing for scenario/map/seed and sanitized lab visual profile
   ids, audio, combat audio, alerts, fog, camera, prediction settings, unit range settings,
+  auto spectator settings,
   `report_window_aggregate.js`.
 
 Import rules:

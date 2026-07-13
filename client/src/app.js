@@ -31,6 +31,7 @@ import {
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
 import { applyMatchUnitRanges } from "./match_settings_toggles.js";
+import { readAutoSpectatorEnabled, writeAutoSpectatorEnabled } from "./auto_spectator_settings.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
@@ -159,6 +160,7 @@ export class App {
     this.pendingCameraView = null;
     this.predictionEnabled = readPredictionEnabled();
     this.unitRangesEnabled = readUnitRangesEnabled();
+    this.autoSpectatorEnabled = readAutoSpectatorEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
     this.matchLaunchDone = false;
@@ -525,8 +527,10 @@ export class App {
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
+        autoSpectatorEnabled: this.autoSpectatorEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
+        onAutoSpectatorEnabledChange: (enabled) => this.setAutoSpectatorEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
         aiDiagnosticsPanelPreferences: this.aiDiagnosticsPanelPreferences,
         capabilities,
@@ -862,6 +866,17 @@ export class App {
         this.mountLobbySettings();
         this.settings.open({ focus: false });
       }
+    }
+  }
+
+  setAutoSpectatorEnabled(enabled) {
+    this.autoSpectatorEnabled = !!enabled;
+    writeAutoSpectatorEnabled(this.autoSpectatorEnabled);
+    if (this.match?.autoSpectator?.enabled !== this.autoSpectatorEnabled) {
+      this.match?.setAutoSpectatorEnabled?.(this.autoSpectatorEnabled);
+    }
+    if (this.settings?.isOpen() && this.match?.mountSettings) {
+      this.match.mountSettings({ keepOpen: true });
     }
   }
 

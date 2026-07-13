@@ -1,6 +1,33 @@
 import { buildBackToLobbyAction, buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
 import { MOVEMENT_PATH_DIAGNOSTICS } from "./protocol.js";
 
+export function buildMatchSettingsContextForMatch(match) {
+  return buildMatchSettingsContext({
+    replayViewer: match.replayViewer,
+    labMetadata: match.labMetadata,
+    state: match.state,
+    capabilities: match.capabilities,
+    livePauseState: match.livePauseState,
+    giveUpSent: match.giveUpSent,
+    audio: match.audio,
+    hotkeyProfiles: match.hotkeyProfiles,
+    prediction: match.prediction,
+    predictionAdapter: match.predictionAdapter,
+    input: match.input,
+    onPauseGame: match.onPauseGame,
+    onGiveUpOpen: match.onGiveUpOpen,
+    onBackToLobby: match.onBackToLobby,
+    onPredictionEnabledChange: match.onPredictionEnabledChange,
+    onPointerLockToggle: match.onPointerLockToggle,
+    onDebugPathToggle: match.onDebugPathToggle,
+    onUnitRangeToggle: match.onUnitRangeToggle,
+    autoSpectator: match.autoSpectator,
+    onAutoSpectatorToggle: () => match.setAutoSpectatorEnabled(!match.autoSpectator?.enabled),
+    livePauseActionLabel: () => match.livePauseActionLabel(),
+    livePauseActionTitle: () => match.livePauseActionTitle(),
+  });
+}
+
 export function buildMatchSettingsContext({
   replayViewer,
   labMetadata,
@@ -20,6 +47,8 @@ export function buildMatchSettingsContext({
   onPointerLockToggle,
   onDebugPathToggle,
   onUnitRangeToggle,
+  autoSpectator,
+  onAutoSpectatorToggle,
   livePauseActionLabel,
   livePauseActionTitle,
 }) {
@@ -92,6 +121,13 @@ export function buildMatchSettingsContext({
         }),
         onToggle: onDebugPathToggle,
       },
+      replayControls: !lab && spectator && autoSpectator ? {
+        state: () => ({
+          available: !!autoSpectator,
+          enabled: !!autoSpectator?.enabled,
+        }),
+        onToggle: onAutoSpectatorToggle,
+      } : null,
     }),
   };
 }

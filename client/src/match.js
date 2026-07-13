@@ -1,5 +1,6 @@
 import { Audio, noticeSoundId } from "./audio.js";
 import { restoreInitialCameraView } from "./camera_view_selection.js";
+import { autoSpectatorCameraMinZoom, createMatchAutoSpectator } from "./match_auto_spectator.js";
 import {
   createSnapshotProcessingReport,
   recordSnapshotProcessing,
@@ -49,7 +50,7 @@ import {
   suspendPredictionVisuals as suspendPredictionVisualsModel,
 } from "./match_live_pause.js";
 import { MatchNetReporter, predictionReportFields as buildPredictionReportFields } from "./match_net_reporter.js";
-import { buildMatchSettingsContext } from "./match_settings_context.js";
+import { buildMatchSettingsContextForMatch } from "./match_settings_context.js";
 import {
   applyInitialUnitRanges,
   toggleDebugPaths,
@@ -207,8 +208,13 @@ export class Match {
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
     this.rendererBackendBundle = options.rendererBackendBundle || createPixiBackendBundle();
     this.camera = this._timeInit("match.camera", () => this.rendererBackendBundle.createCamera({
+      minZoom: autoSpectatorCameraMinZoom(this, payload),
       maxZoom: options.cameraMaxZoom,
     }));
+    this.autoSpectator = this._timeInit(
+      "match.autoSpectator",
+      () => createMatchAutoSpectator(this, payload, options),
+    );
     this.renderer = this._timeInit("match.renderer", () => this.rendererBackendBundle.createRenderer(dom.viewport, {
       renderClock: this.renderClock,
       state: () => this.state,
@@ -313,6 +319,7 @@ export class Match {
       this.roomTimeControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
       this.stopInactiveMachineGunSounds();
+      this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
     };
     this.onCommandReceipt = (m) => this.handleCommandReceipt(m);
@@ -967,28 +974,7 @@ export class Match {
   mountSettings({ keepOpen = false } = {}) {
     if (!this.settings) return;
     const wasOpen = keepOpen && this.settings.isOpen();
-    this.settings.setContext(buildMatchSettingsContext({
-      replayViewer: this.replayViewer,
-      labMetadata: this.labMetadata,
-      state: this.state,
-      capabilities: this.capabilities,
-      livePauseState: this.livePauseState,
-      giveUpSent: this.giveUpSent,
-      audio: this.audio,
-      hotkeyProfiles: this.hotkeyProfiles,
-      prediction: this.prediction,
-      predictionAdapter: this.predictionAdapter,
-      input: this.input,
-      onPauseGame: this.onPauseGame,
-      onGiveUpOpen: this.onGiveUpOpen,
-      onBackToLobby: this.onBackToLobby,
-      onPredictionEnabledChange: this.onPredictionEnabledChange,
-      onPointerLockToggle: this.onPointerLockToggle,
-      onDebugPathToggle: this.onDebugPathToggle,
-      onUnitRangeToggle: this.onUnitRangeToggle,
-      livePauseActionLabel: () => this.livePauseActionLabel(),
-      livePauseActionTitle: () => this.livePauseActionTitle(),
-    }));
+    this.settings.setContext(buildMatchSettingsContextForMatch(this));
     if (wasOpen) this.settings.open({ focus: false });
   }
 
@@ -998,6 +984,12 @@ export class Match {
 
   livePauseActionTitle() {
     return livePauseActionTitleModel(this);
+  }
+
+  setAutoSpectatorEnabled(enabled) {
+    if (!this.autoSpectator) return;
+    this.autoSpectator.setEnabled(enabled);
+    this.syncSettingsToggleUi();
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
@@ -1233,6 +1225,7 @@ export class Match {
     this.roomTimeControls?.destroy();
     this.observerDiagnostics?.destroy();
     this.livePauseOverlay?.destroy();
+    this.autoSpectator?.destroy();
     this.cancelLabTool("freeze");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
@@ -1242,6 +1235,7 @@ export class Match {
     this.roomTimeControls = null;
     this.observerDiagnostics = null;
     this.livePauseOverlay = null;
+    this.autoSpectator = null;
     if (this.input && typeof this.input.destroy === "function") {
       this.input.destroy();
       this.input = null;
@@ -1280,12 +1274,14 @@ export class Match {
     this.roomTimeControls?.destroy();
     this.observerDiagnostics?.destroy();
     this.livePauseOverlay?.destroy();
+    this.autoSpectator?.destroy();
     this.cancelLabTool("destroy");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.roomTimeControls = null;
     this.observerDiagnostics = null;
     this.livePauseOverlay = null;
+    this.autoSpectator = null;
     if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterDomInputZone) {
