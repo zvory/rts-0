@@ -29,6 +29,8 @@ mod steering;
 mod waypoints;
 
 #[cfg(test)]
+mod road_tests;
+#[cfg(test)]
 mod tests;
 
 /// World pixels at which a unit is considered "arrived" at a waypoint / target point.
