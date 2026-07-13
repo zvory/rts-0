@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -93,15 +93,15 @@ honor it and deterministically reap their children.
 
 ## Implementation Checklist
 
-- [ ] Add the bounded/cancellable asynchronous process runner.
-- [ ] Extract private-server startup/lifecycle and make cold open abortable.
-- [ ] Move high-value long finite request-path process work to the runner.
-- [ ] Establish explicit repository ownership for the browser runtime dependency.
-- [ ] Remove runtime dependency installation/hydration.
-- [ ] Add slow-child status, shutdown/reaping, media, and cancellation contracts.
-- [ ] Extend architecture and size ratchets for adapters and blocking process work.
-- [ ] Document process, dependency, cancellation, and remaining synchronous ownership.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Add the bounded/cancellable asynchronous process runner.
+- [x] Extract private-server startup/lifecycle and make cold open abortable.
+- [x] Move high-value long finite request-path process work to the runner.
+- [x] Establish explicit repository ownership for the browser runtime dependency.
+- [x] Remove runtime dependency installation/hydration.
+- [x] Add slow-child status, shutdown/reaping, media, and cancellation contracts.
+- [x] Extend architecture and size ratchets for adapters and blocking process work.
+- [x] Document process, dependency, cancellation, and remaining synchronous ownership.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 

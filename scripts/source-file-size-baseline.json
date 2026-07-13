@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "scripts/client-perf-harness.mjs",
-      "lines": 1916,
+      "lines": 1888,
       "reason": "Replay workload cleanup lowered the existing oversized harness; keep ratcheting until browser harness reporting is split."
     },
     {

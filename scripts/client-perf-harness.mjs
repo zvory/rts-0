@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   decodeMessagePack,
@@ -16,7 +14,6 @@ import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
 const SERVER_DIR = path.join(REPO_ROOT, "server");
-const TESTS_DIR = path.join(REPO_ROOT, "tests");
 const DEFAULT_OUTPUT_ROOT = path.join(REPO_ROOT, "target", "client-perf");
 const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900 });
@@ -1621,33 +1618,11 @@ function normalizeCapturedSnapshotCodecFrames(frames) {
 }
 
 async function loadPuppeteer() {
-  ensureTestNodeModules();
-  const requireFromTests = createRequire(path.join(TESTS_DIR, "package.json"));
-  const resolved = requireFromTests.resolve("puppeteer-core");
-  const imported = await import(pathToFileURL(resolved).href);
-  return imported.default || imported;
-}
-
-function ensureTestNodeModules() {
-  const packageLock = path.join(TESTS_DIR, "package-lock.json");
-  const packageJson = path.join(TESTS_DIR, "package.json");
-  const localNodeModules = path.join(TESTS_DIR, "node_modules");
-  const localPuppeteer = path.join(localNodeModules, "puppeteer-core");
-  if (fs.existsSync(localPuppeteer)) return;
-  const cacheRoot = process.env.RTS_NODE_DEPS_CACHE_DIR || "/tmp/rts-node-deps";
-  const hash = crypto.createHash("sha256").update(fs.readFileSync(packageLock)).digest("hex");
-  const cacheNodeModules = path.join(cacheRoot, hash, "node_modules");
-  if (fs.existsSync(path.join(cacheNodeModules, "puppeteer-core"))) {
-    if (fs.existsSync(localNodeModules)) fs.rmSync(localNodeModules, { recursive: true, force: true });
-    fs.symlinkSync(cacheNodeModules, localNodeModules, "dir");
-    return;
-  }
-  runOrThrow("npm", ["ci", "--ignore-scripts", "--no-audit", "--fund=false"], {
-    cwd: TESTS_DIR,
-    stdio: "inherit",
-  });
-  if (!fs.existsSync(localPuppeteer)) {
-    throw new Error(`puppeteer-core was not installed from ${packageJson}`);
+  try {
+    const imported = await import("puppeteer-core");
+    return imported.default || imported;
+  } catch (error) {
+    throw new Error(`puppeteer-core is not installed from the repository package lock; run npm ci at the repository root (${String(error?.code || "import failed")})`);
   }
 }
 

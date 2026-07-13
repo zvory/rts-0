@@ -3,7 +3,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { once } from "node:events";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+
+import { ProcessRunner } from "./process_runner.mjs";
 
 export const RECORDING_LIMITS = Object.freeze({
   fps: 30,
@@ -53,17 +55,27 @@ export class LabInteractRecordingError extends Error {
   }
 }
 
-export function checkMediaCapabilities({
+export async function checkMediaCapabilities({
   ffmpeg = process.env.RTS_LAB_INTERACT_FFMPEG || "ffmpeg",
   ffprobe = process.env.RTS_LAB_INTERACT_FFPROBE || "ffprobe",
   requireH264 = true,
+  processRunner = new ProcessRunner(),
+  signal,
 } = {}) {
-  const encoderCheck = spawnSync(ffmpeg, ["-hide_banner", "-encoders"], { encoding: "utf8", timeout: 5_000 });
-  if (encoderCheck.error?.code === "ENOENT") throw new LabInteractRecordingError("ffmpegUnavailable", `FFmpeg was not found at ${JSON.stringify(ffmpeg)}. Install FFmpeg or set RTS_LAB_INTERACT_FFMPEG.`);
+  let encoderCheck;
+  try {
+    encoderCheck = await processRunner.run(ffmpeg, ["-hide_banner", "-encoders"], { timeoutMs: 5_000, signal });
+  } catch (error) {
+    throw new LabInteractRecordingError("ffmpegUnavailable", `FFmpeg was not available at ${JSON.stringify(ffmpeg)}: ${conciseProcessError(error)}`);
+  }
   if (encoderCheck.status !== 0) throw new LabInteractRecordingError("ffmpegUnavailable", conciseToolFailure("FFmpeg capability check failed", encoderCheck));
   if (requireH264 && !/\blibx264\b/.test(encoderCheck.stdout || "")) throw new LabInteractRecordingError("h264Unavailable", "FFmpeg does not provide the libx264 encoder required for mobile-compatible MP4 output.");
-  const probeCheck = spawnSync(ffprobe, ["-version"], { encoding: "utf8", timeout: 5_000 });
-  if (probeCheck.error?.code === "ENOENT") throw new LabInteractRecordingError("ffprobeUnavailable", `ffprobe was not found at ${JSON.stringify(ffprobe)}. Install FFmpeg or set RTS_LAB_INTERACT_FFPROBE.`);
+  let probeCheck;
+  try {
+    probeCheck = await processRunner.run(ffprobe, ["-version"], { timeoutMs: 5_000, signal });
+  } catch (error) {
+    throw new LabInteractRecordingError("ffprobeUnavailable", `ffprobe was not available at ${JSON.stringify(ffprobe)}: ${conciseProcessError(error)}`);
+  }
   if (probeCheck.status !== 0) throw new LabInteractRecordingError("ffprobeUnavailable", conciseToolFailure("ffprobe capability check failed", probeCheck));
   return {
     ffmpeg,
@@ -282,14 +294,17 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
   function spawnError() { return spawnFailure; }
 }
 
-export function finalizeMp4Artifacts({ mp4Path, framesDir, contactSheetPath, targetDurationMs, tools, frameDiagnostics }) {
+export async function finalizeMp4Artifacts({
+  mp4Path, framesDir, contactSheetPath, targetDurationMs, tools, frameDiagnostics,
+  processRunner = new ProcessRunner(), signal,
+}) {
   const stat = safeStat(mp4Path);
   if (!stat || stat.size === 0) throw new LabInteractRecordingError("recordingEmpty", "FFmpeg produced no MP4 recording bytes.");
   if (stat.size > RECORDING_LIMITS.maxBytes) {
     fs.rmSync(mp4Path, { force: true });
     throw new LabInteractRecordingError("recordingTooLarge", `Final MP4 exceeded the ${RECORDING_LIMITS.maxBytes} byte limit and was deleted.`);
   }
-  const probe = probeMedia(mp4Path, tools.ffprobe, "h264", "final MP4");
+  const probe = await probeMedia(mp4Path, tools.ffprobe, "h264", "final MP4", processRunner, signal);
   const fastStart = hasFastStart(mp4Path);
   if (probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.pixelFormat !== "yuv420p" || probe.codecTag !== "avc1" || !fastStart) {
     throw new LabInteractRecordingError("mediaProbeFailed", "Final MP4 is missing its mobile-compatible container, yuv420p/avc1 video, or fast-start metadata.");
@@ -300,18 +315,18 @@ export function finalizeMp4Artifacts({ mp4Path, framesDir, contactSheetPath, tar
   fs.mkdirSync(framesDir, { recursive: true });
   const representativeIndices = representativeFrameIndices(probe.frameCount);
   const selection = [...representativeIndices].map((index) => `eq(n\\,${index})`).join("+");
-  runTool(tools.ffmpeg, [
+  await runTool(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-i", mp4Path,
     "-vf", `select='${selection}'`, "-fps_mode", "vfr",
     "-frames:v", String(representativeIndices.size), path.join(framesDir, "frame-%02d.png"),
-  ], "representative frame extraction", mediaAuxiliaryTimeoutMs(targetDurationMs));
+  ], "representative frame extraction", mediaAuxiliaryTimeoutMs(targetDurationMs), processRunner, signal);
   const framePaths = representativeFrameNames(framesDir).map((name) => path.join(framesDir, name));
   if (framePaths.length === 0) throw new LabInteractRecordingError("frameExtractionFailed", "FFmpeg produced no representative PNG frames.");
-  runTool(tools.ffmpeg, [
+  await runTool(tools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y", "-framerate", "1", "-i", path.join(framesDir, "frame-%02d.png"),
     "-vf", "scale=480:300:force_original_aspect_ratio=decrease,pad=480:300:(ow-iw)/2:(oh-ih)/2:black,tile=3x2:padding=4:margin=4",
     "-frames:v", "1", contactSheetPath,
-  ], "contact sheet generation", mediaAuxiliaryTimeoutMs(targetDurationMs));
+  ], "contact sheet generation", mediaAuxiliaryTimeoutMs(targetDurationMs), processRunner, signal);
   const contact = readPngDimensions(fs.readFileSync(contactSheetPath));
   return {
     bytes: stat.size,
@@ -331,12 +346,17 @@ export function removePartialRecording(paths) {
   for (const value of paths || []) if (value) fs.rmSync(value, { recursive: true, force: true });
 }
 
-function probeMedia(file, ffprobe, expectedCodec, label) {
-  const result = spawnSync(ffprobe, [
+async function probeMedia(file, ffprobe, expectedCodec, label, processRunner, signal) {
+  let result;
+  try {
+    result = await processRunner.run(ffprobe, [
     "-v", "error", "-select_streams", "v:0", "-count_frames",
     "-show_entries", "stream=codec_name,codec_tag_string,pix_fmt,width,height,r_frame_rate,nb_read_frames:format=format_name,duration,size",
     "-of", "json", file,
-  ], { encoding: "utf8", timeout: 10_000 });
+    ], { timeoutMs: 10_000, signal });
+  } catch (error) {
+    throw new LabInteractRecordingError("mediaProbeFailed", `ffprobe could not inspect the ${label}: ${conciseProcessError(error)}`);
+  }
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProbeFailed", conciseToolFailure(`ffprobe rejected the ${label}`, result));
   let parsed;
   try { parsed = JSON.parse(result.stdout); } catch { throw new LabInteractRecordingError("mediaProbeFailed", "ffprobe returned invalid JSON."); }
@@ -356,8 +376,13 @@ function probeMedia(file, ffprobe, expectedCodec, label) {
   };
 }
 
-function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaStageTimeoutMs) {
-  const result = spawnSync(command, args, { encoding: "utf8", timeout: timeoutMs });
+async function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaStageTimeoutMs, processRunner = new ProcessRunner(), signal) {
+  let result;
+  try {
+    result = await processRunner.run(command, args, { timeoutMs, signal });
+  } catch (error) {
+    throw new LabInteractRecordingError("mediaProcessingFailed", `${label} failed: ${conciseProcessError(error)}`);
+  }
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", conciseToolFailure(`${label} failed`, result));
 }
 
@@ -440,6 +465,10 @@ function derivedTimeout(targetDurationMs, minimumMs, maximumMs, durationScale) {
 function conciseToolFailure(prefix, result) {
   const detail = String(result.error?.message || result.stderr || result.stdout || "unknown failure").trim().split("\n").slice(-4).join("; ").slice(0, 800);
   return `${prefix}: ${detail}`;
+}
+function conciseProcessError(error) {
+  const result = error?.result;
+  return String(result?.stderr || result?.stdout || error?.message || "unknown failure").trim().split("\n").slice(-4).join("; ").slice(0, 800);
 }
 function firstLine(value) { return String(value || "").split("\n").find(Boolean) || ""; }
 function safeStat(file) { try { return fs.statSync(file); } catch { return null; } }

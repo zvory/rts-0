@@ -447,15 +447,15 @@ hash_file() {
 }
 
 hydrate_client_deps() {
-  local package_json="$SCRIPT_DIR/package.json"
-  local package_lock="$SCRIPT_DIR/package-lock.json"
-  local local_node_modules="$SCRIPT_DIR/node_modules"
+  local package_json="$REPO_ROOT/package.json"
+  local package_lock="$REPO_ROOT/package-lock.json"
+  local local_node_modules="$REPO_ROOT/node_modules"
   local hash cache_dir cache_node_modules ready lock_dir tmp_dir logf
   local start deadline
   local lock_acquired=0
 
   if [ ! -f "$package_json" ] || [ ! -f "$package_lock" ]; then
-    warn "client smoke dependencies cannot be hydrated: tests/package.json or tests/package-lock.json is missing"
+    warn "browser dependencies cannot be hydrated: repository package.json or package-lock.json is missing"
     return 1
   fi
   if ! command -v npm >/dev/null 2>&1; then
@@ -708,6 +708,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/lab_interact_artifact_contracts.mjs"
   run_suite_bg "Lab Interact bulk contracts" \
     node "$SCRIPT_DIR/lab_interact_bulk_contracts.mjs"
+  run_suite_bg "Lab Interact adapter contracts" \
+    node "$SCRIPT_DIR/lab_interact_adapter_contracts.mjs"
   run_suite_bg "Lab Interact recording contracts" \
     node "$SCRIPT_DIR/lab_interact_recording_contracts.mjs"
   run_suite_bg "Lab Interact fixed-capture contracts" \

@@ -1,11 +1,11 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { spawnSync } from "node:child_process";
 
 import {
   checkMediaCapabilities, createPngMp4Encoder, LabInteractRecordingError,
   representativeFrameIndices,
 } from "./recording.mjs";
+import { ProcessRunner } from "./process_runner.mjs";
 
 export const FIXED_CAPTURE_LIMITS = Object.freeze({
   minFps: 10,
@@ -24,8 +24,11 @@ export function fixedRepresentativeIndices(frameCount, limit = FIXED_CAPTURE_LIM
   return representativeFrameIndices(frameCount, limit);
 }
 
-export function createFixedCaptureEncoder({ outputPath, contactSheetPath, fps, frameCount }) {
-  const tools = checkMediaCapabilities();
+export async function createFixedCaptureEncoder({
+  outputPath, contactSheetPath, fps, frameCount,
+  processRunner = new ProcessRunner(), signal,
+}) {
+  const tools = await checkMediaCapabilities({ processRunner, signal });
   const encoder = createPngMp4Encoder({ outputPath, fps, tools });
   return {
     write(buffer) { return encoder.write(buffer); },
@@ -35,18 +38,23 @@ export function createFixedCaptureEncoder({ outputPath, contactSheetPath, fps, f
       const selection = [...fixedRepresentativeIndices(frameCount)]
         .map((index) => `eq(n\\,${index})`)
         .join("+");
-      run(tools.ffmpeg, [
+      await run(tools.ffmpeg, [
         "-hide_banner", "-loglevel", "error", "-y", "-i", outputPath,
         "-vf", `select='${selection}',scale=480:300:force_original_aspect_ratio=decrease,pad=480:300:(ow-iw)/2:(oh-ih)/2:black,tile=3x2:padding=4:margin=4`,
         "-frames:v", "1", contactSheetPath,
-      ], "fixed capture contact sheet");
+      ], "fixed capture contact sheet", processRunner, signal);
       const stat = fs.statSync(outputPath);
       if (stat.size > FIXED_CAPTURE_LIMITS.maxBytes) throw new LabInteractRecordingError("captureTooLarge", "Fixed capture exceeded the 64 MiB bound.");
-      const probeResult = spawnSync(tools.ffprobe, [
+      let probeResult;
+      try {
+        probeResult = await processRunner.run(tools.ffprobe, [
         "-v", "error", "-select_streams", "v:0", "-count_frames",
         "-show_entries", "stream=codec_name,codec_tag_string,pix_fmt,width,height,r_frame_rate,nb_read_frames:format=format_name,duration",
         "-of", "json", outputPath,
-      ], { encoding: "utf8", timeout: 15_000 });
+        ], { timeoutMs: 15_000, signal });
+      } catch (error) {
+        throw new LabInteractRecordingError("mediaProbeFailed", `fixed capture probe failed: ${processFailure(error)}`);
+      }
       if (probeResult.status !== 0) throw new LabInteractRecordingError("mediaProbeFailed", `fixed capture probe failed: ${String(probeResult.stderr || probeResult.error?.message || "unknown failure").slice(-800)}`);
       const parsed = JSON.parse(probeResult.stdout);
       const stream = parsed.streams?.[0] || {};
@@ -71,9 +79,18 @@ export function hashFrame(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
-function run(command, args, label) {
-  const result = spawnSync(command, args, { encoding: "utf8", timeout: 30_000 });
+async function run(command, args, label, processRunner, signal) {
+  let result;
+  try {
+    result = await processRunner.run(command, args, { timeoutMs: 30_000, signal });
+  } catch (error) {
+    throw new LabInteractRecordingError("mediaProcessingFailed", `${label} failed: ${processFailure(error)}`);
+  }
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", `${label} failed: ${String(result.stderr || result.error?.message || "unknown failure").slice(-800)}`);
+}
+
+function processFailure(error) {
+  return String(error?.result?.stderr || error?.result?.stdout || error?.message || "unknown failure").slice(-800);
 }
 
 function hasFastStart(file) {

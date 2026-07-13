@@ -2,5 +2,8 @@
   "name": "rts-agent-tools",
   "private": true,
   "type": "module",
-  "description": "Repo-local agent orchestration tools for RTS development workflows."
+  "description": "Repository-owned Node dependencies for RTS development tools and browser tests.",
+  "devDependencies": {
+    "puppeteer-core": "^23"
+  }
 }

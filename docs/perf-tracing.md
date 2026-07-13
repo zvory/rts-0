@@ -240,8 +240,8 @@ node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --secon
 ```
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
-points at an already-healthy server. It drives headless Chrome with the existing
-`tests/package.json` `puppeteer-core` dependency path and writes one `summary.json` per workload
+points at an already-healthy server. It drives headless Chrome with the repository-root
+`package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
 under `target/client-perf/<workload>/<timestamp>/`. The current checked-in workload set uses
 dev-scenario URLs only: `vehicle-wall-stress` and `selected-unit-hud-stress`. Preserved schema 2
 incident replays are analysis evidence only and are not replay-harness workloads. The

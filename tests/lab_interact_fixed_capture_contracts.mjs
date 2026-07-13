@@ -56,12 +56,12 @@ try {
   await assert.rejects(service.execute("capture-cancel", { sessionId: opened.sessionId }), (error) => error?.code === "captureInactive", "cancel reports an actionable error when no fixed capture is active");
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-fixed-contract-"));
   try {
-    const tools = checkMediaCapabilities();
+    const tools = await checkMediaCapabilities();
     const generated = spawnSync(tools.ffmpeg, ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=63x63:rate=30:duration=0.1", "-frames:v", "3", "-f", "image2pipe", "-c:v", "png", "pipe:1"], { encoding: null, timeout: 15_000 });
     assert.equal(generated.status, 0, String(generated.stderr));
     const outputPath = path.join(tmp, "fixed.mp4");
     const contactSheetPath = path.join(tmp, "contact.png");
-    const encoder = createFixedCaptureEncoder({ outputPath, contactSheetPath, fps: 30, frameCount: 3 });
+    const encoder = await createFixedCaptureEncoder({ outputPath, contactSheetPath, fps: 30, frameCount: 3 });
     encoder.write(generated.stdout);
     const media = await encoder.finish();
     assert.ok(media.bytes > 0, "fixed frame sequence encodes to non-empty H.264 MP4 media");

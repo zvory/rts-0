@@ -64,7 +64,7 @@ use nextest's slow-test output and the JUnit summary to narrow test runtime.
 
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the
-SHA-256 hash of `tests/package-lock.json`, then links this worktree's ignored `tests/node_modules`
+SHA-256 hash of the repository `package-lock.json`, then links this worktree's ignored root `node_modules`
 to the matching cache entry. Hydration uses `npm ci`, so a lockfile/package mismatch fails the
 gate instead of silently reusing the wrong dependency tree.
 
@@ -201,12 +201,12 @@ cargo run --bin ai-matchup -- --list-profiles
 Loads the real client in headless Chrome and asserts it renders the PixiJS scene and that
 the full UI command loop works: box-select → build placement (which round-trips through the
 server and shows the new building) → train-card rendering. Fails on **any** console or page
-error. Needs a local Chrome binary; `run-all.sh` installs/reuses `puppeteer-core` through the
+error. Needs a local Chrome binary; `run-all.sh` installs/reuses the repository-owned `puppeteer-core` through the
 shared lockfile-keyed cache.
 
 ```bash
 tests/run-all.sh --no-rust
-# or, after run-all has hydrated tests/node_modules:
+# or, after run-all has hydrated the root node_modules:
 node tests/client_smoke.mjs
 # env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```

@@ -6,9 +6,6 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
 
 import {
   checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, LabInteractRecordingError,
@@ -18,6 +15,10 @@ import {
   createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame,
 } from "./fixed_capture.mjs";
 import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "./manifest_summary.mjs";
+import { PrivateServer } from "./private_server.mjs";
+import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.mjs";
+
+export { validateWorkspaceRoot } from "./workspace_inspection.mjs";
 
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -71,6 +72,7 @@ export class LabInteractDriver {
     startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
     chrome = process.env.CHROME || "",
     baseUrl = "",
+    signal = null,
   } = {}) {
     this.options = {
       workspaceRoot,
@@ -83,6 +85,7 @@ export class LabInteractDriver {
       startupTimeoutMs: boundedTimeout(startupTimeoutMs, "startupTimeoutMs", MAX_STARTUP_TIMEOUT_MS),
       chrome,
       baseUrl,
+      signal,
     };
     this.state = DRIVER_STATES.OPENING;
     this.workspace = null;
@@ -117,17 +120,17 @@ export class LabInteractDriver {
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot);
     this.sessionDir = createSessionDirectory(this.workspace.root, this.options.map);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
-    this.server = await startOrReusePrivateServer({
+    this.server = await PrivateServer.open({
       workspace: this.workspace,
       sessionDir: this.sessionDir,
       startupTimeoutMs: this.options.startupTimeoutMs,
       baseUrl: this.options.baseUrl,
-      isOpening: () => this.state === DRIVER_STATES.OPENING,
       artifactCapability: this.artifactCapability,
+      signal: this.options.signal,
     });
     this.serverLogPath = this.server.logPath || "";
 
-    const puppeteer = await loadPuppeteer(this.workspace.root);
+    const puppeteer = await loadPuppeteer();
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during browser startup.");
     }
@@ -328,7 +331,7 @@ export class LabInteractDriver {
   } = {}) {
     try {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
-      const tools = checkMediaCapabilities();
+      const tools = await checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
       const originalViewport = this.page.viewport?.() || null;
@@ -421,14 +424,23 @@ export class LabInteractDriver {
           return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
         });
         if (!validClip(clip)) throw new LabInteractDriverError("viewportUnavailable", "The Pixi viewport is not available for fixed capture.");
-        this.fixedCapture = { active: true, cancelled: false, name: artifactName, fps, frameCount, frameIndex: 0, startStatus: status };
+        this.fixedCapture = {
+          active: true, cancelled: false, name: artifactName, fps, frameCount, frameIndex: 0,
+          startStatus: status, abortController: new AbortController(),
+        };
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
         captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
         const framesDir = path.join(captureDir, "frames");
         fs.mkdirSync(framesDir, { recursive: true });
         const videoPath = path.join(captureDir, `${artifactName}.mp4`);
         const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
-        encoder = createFixedCaptureEncoder({ outputPath: videoPath, contactSheetPath, fps, frameCount });
+        encoder = await createFixedCaptureEncoder({
+          outputPath: videoPath,
+          contactSheetPath,
+          fps,
+          frameCount,
+          signal: this.fixedCapture.abortController.signal,
+        });
         const representativeIndices = fixedRepresentativeIndices(frameCount);
         const entered = await this.callBridge("captureFixedEnter", {});
         captureEntered = true;
@@ -504,6 +516,9 @@ export class LabInteractDriver {
       } catch (error) {
         if (encoder) await encoder.abort().catch(() => {});
         removePartialRecording([captureDir]);
+        if (this.fixedCapture?.cancelled) {
+          throw new LabInteractDriverError("captureCancelled", "Fixed capture was cancelled and its partial artifacts were removed.");
+        }
         if (error instanceof LabInteractRecordingError) throw new LabInteractDriverError(error.code, error.message);
         throw error;
       } finally {
@@ -526,6 +541,7 @@ export class LabInteractDriver {
   cancelFixedCapture() {
     if (!this.fixedCapture) throw new LabInteractDriverError("captureInactive", "No fixed capture is active.");
     this.fixedCapture.cancelled = true;
+    this.fixedCapture.abortController?.abort();
     return { cancelling: true };
   }
 
@@ -583,7 +599,7 @@ export class LabInteractDriver {
         // Reuse that exact duration for probing and the manifest so wall-clock
         // rounding cannot disagree with the encoded frame count.
         const { wallDurationMs, diagnostics: frameDiagnostics } = await recording.recorder.stop();
-        const media = finalizeMp4Artifacts({
+        const media = await finalizeMp4Artifacts({
           mp4Path: recording.mp4Path, framesDir: recording.framesDir,
           contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs,
           tools: recording.tools, frameDiagnostics,
@@ -950,32 +966,6 @@ function recordingCompletion() {
   };
 }
 
-export function validateWorkspaceRoot(workspaceRoot) {
-  if (!workspaceRoot) throw new LabInteractDriverError("workspaceRequired", "workspaceRoot is required.");
-  let root;
-  try {
-    root = fs.realpathSync(workspaceRoot);
-  } catch {
-    throw new LabInteractDriverError("invalidWorkspace", `Workspace does not exist: ${workspaceRoot}`);
-  }
-  if (!fs.existsSync(path.join(root, "server", "Cargo.toml")) || !fs.existsSync(path.join(root, "client", "src", "main.js"))) {
-    throw new LabInteractDriverError("invalidWorkspace", "workspaceRoot is not a Bewegungskrieg checkout.");
-  }
-  const topLevel = git(root, ["rev-parse", "--show-toplevel"]);
-  if (!topLevel || fs.realpathSync(topLevel) !== root) {
-    throw new LabInteractDriverError("invalidWorkspace", "workspaceRoot must be the Git checkout top level.");
-  }
-  const head = git(root, ["rev-parse", "HEAD"]);
-  if (!/^[0-9a-f]{40}$/i.test(head || "")) {
-    throw new LabInteractDriverError("invalidWorkspace", "workspaceRoot has no valid Git HEAD.");
-  }
-  return {
-    root,
-    branch: git(root, ["branch", "--show-current"]) || "HEAD",
-    head,
-  };
-}
-
 export function safeToken(value, fallback = "session", maxLength = 64) {
   const token = String(value || "").trim();
   return /^[A-Za-z0-9_-]+$/.test(token) && token.length <= maxLength ? token : fallback;
@@ -1111,82 +1101,6 @@ function createSessionDirectory(workspaceRoot, map) {
   return directory;
 }
 
-async function startOrReusePrivateServer({ workspace, sessionDir, startupTimeoutMs, baseUrl, isOpening, artifactCapability }) {
-  if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
-  if (baseUrl) {
-    const normalized = privateLoopbackUrl(baseUrl);
-    if (await isHealthy(normalized)) {
-      if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
-      return {
-        baseUrl: normalized,
-        reused: true,
-        logPath: "",
-        build: { reused: true, binary: null, head: workspace.head },
-        close: async () => {},
-      };
-    }
-    throw new LabInteractDriverError("unhealthyServer", `Requested private server is not healthy: ${normalized}`);
-  }
-  const port = await allocatePort();
-  if (!isOpening()) throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
-  const targetDir = path.join(workspace.root, LAB_INTERACT_ROOT, "cargo");
-  const binary = path.join(targetDir, "debug", "rts-server");
-  // The target directory is only a build cache. Always let Cargo check the selected worktree so
-  // a prior Lab Interact session cannot silently serve an old server binary.
-  runOrThrow("cargo", ["build", "--manifest-path", path.join(workspace.root, "server", "Cargo.toml")], {
-    cwd: workspace.root,
-    env: { ...process.env, CARGO_TARGET_DIR: targetDir },
-    stdio: "inherit",
-  });
-  if (!fs.existsSync(binary)) throw new LabInteractDriverError("serverBuild", "Lab Interact server binary was not produced.");
-
-  const logPath = path.join(sessionDir, "server.log");
-  const log = fs.openSync(logPath, "w");
-  const child = spawn(binary, [], {
-    cwd: path.join(workspace.root, "server"),
-    env: {
-      ...process.env,
-      RTS_ADDR: `127.0.0.1:${port}`,
-      RTS_MATCH_SEED: process.env.RTS_MATCH_SEED || "1",
-      RTS_LAB_INTERACT_ARTIFACT_CAPABILITY: artifactCapability,
-    },
-    stdio: ["ignore", log, log],
-  });
-  child.once("exit", () => fs.closeSync(log));
-  const url = `http://127.0.0.1:${port}/`;
-  const deadline = Date.now() + startupTimeoutMs;
-  while (Date.now() < deadline) {
-    if (!isOpening()) {
-      await stopChild(child);
-      throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
-    }
-    if (child.exitCode != null) {
-      throw new LabInteractDriverError("serverExited", `Private server exited during startup; see ${logPath}`);
-    }
-    if (await isHealthy(url)) {
-      if (!isOpening()) {
-        await stopChild(child);
-        throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during server startup.");
-      }
-      return {
-        baseUrl: url,
-        reused: false,
-        logPath,
-        build: {
-          reused: false,
-          binary,
-          head: workspace.head,
-          modifiedAt: fs.statSync(binary).mtime.toISOString(),
-        },
-        close: async () => stopChild(child),
-      };
-    }
-    await sleep(150);
-  }
-  await stopChild(child);
-  throw new LabInteractDriverError("serverTimeout", `Private server did not become healthy; see ${logPath}`);
-}
-
 async function artifactHttpError(response, fallback) {
   let message = fallback;
   try { message = (await response.json())?.error || message; } catch {}
@@ -1211,105 +1125,17 @@ function boundedTimeout(value, label, maximum) {
   return timeoutMs;
 }
 
-async function loadPuppeteer(workspaceRoot) {
-  const testsDir = path.join(workspaceRoot, "tests");
-  ensureTestNodeModules(testsDir);
-  const requireFromTests = createRequire(path.join(testsDir, "package.json"));
-  const resolved = requireFromTests.resolve("puppeteer-core");
-  const imported = await import(pathToFileURL(resolved).href);
+async function loadPuppeteer() {
+  let imported;
+  try {
+    imported = await import("puppeteer-core");
+  } catch (error) {
+    throw new LabInteractDriverError(
+      "puppeteerUnavailable",
+      `puppeteer-core is not installed from the repository package lock; run npm ci at the repository root (${String(error?.code || "import failed")}).`,
+    );
+  }
   return imported.default || imported;
-}
-
-export function ensureTestNodeModules(testsDir, requiredPackage = "puppeteer-core") {
-  const packageLock = path.join(testsDir, "package-lock.json");
-  const localNodeModules = path.join(testsDir, "node_modules");
-  const packagePath = path.join(...String(requiredPackage).split("/"));
-  if (fs.existsSync(path.join(localNodeModules, packagePath))) return;
-  const cacheRoot = process.env.RTS_NODE_DEPS_CACHE_DIR || "/tmp/rts-node-deps";
-  const hash = crypto.createHash("sha256").update(fs.readFileSync(packageLock)).digest("hex");
-  const cacheNodeModules = path.join(cacheRoot, hash, "node_modules");
-  if (fs.existsSync(path.join(cacheNodeModules, packagePath))) {
-    if (fs.existsSync(localNodeModules)) fs.rmSync(localNodeModules, { recursive: true, force: true });
-    fs.symlinkSync(cacheNodeModules, localNodeModules, "dir");
-    return;
-  }
-  runOrThrow("npm", ["ci", "--ignore-scripts", "--no-audit", "--fund=false"], { cwd: testsDir, stdio: "inherit" });
-}
-
-function findChrome(explicit) {
-  const candidates = [
-    explicit,
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-    which("google-chrome-stable"),
-    which("google-chrome"),
-    which("chromium-browser"),
-    which("chromium"),
-  ].filter(Boolean);
-  const chrome = candidates.find((candidate) => fs.existsSync(candidate));
-  if (!chrome) throw new LabInteractDriverError("chromeUnavailable", "Chrome/Chromium not found; set CHROME=/path/to/chrome.");
-  return chrome;
-}
-
-function privateLoopbackUrl(value) {
-  let url;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new LabInteractDriverError("invalidServerUrl", "baseUrl must be a valid loopback URL.");
-  }
-  if (!new Set(["127.0.0.1", "::1", "localhost"]).has(url.hostname) || !["http:", "https:"].includes(url.protocol)) {
-    throw new LabInteractDriverError("invalidServerUrl", "Lab Interact may reuse only a private loopback server.");
-  }
-  url.pathname = url.pathname.endsWith("/") ? url.pathname : `${url.pathname}/`;
-  return url.href;
-}
-
-function git(cwd, args) {
-  const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
-  return result.status === 0 ? result.stdout.trim() : "";
-}
-
-async function allocatePort() {
-  const net = await import("node:net");
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-async function isHealthy(baseUrl) {
-  try {
-    const response = await fetch(baseUrl, { signal: AbortSignal.timeout(1500) });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-function runOrThrow(command, args, options = {}) {
-  const result = spawnSync(command, args, { encoding: "utf8", ...options });
-  if (result.status !== 0) throw new LabInteractDriverError("processFailed", `${command} ${args.join(" ")} failed with exit ${result.status}.`);
-  return result;
-}
-
-function which(command) {
-  const result = spawnSync("which", [command], { encoding: "utf8" });
-  return result.status === 0 ? result.stdout.trim() : "";
-}
-
-async function stopChild(child) {
-  if (!child || child.exitCode != null) return;
-  child.kill("SIGTERM");
-  const exited = await Promise.race([
-    new Promise((resolve) => child.once("exit", () => resolve(true))),
-    sleep(3_000).then(() => false),
-  ]);
-  if (!exited && child.exitCode == null) child.kill("SIGKILL");
 }
 
 function readTail(file, maxLines) {

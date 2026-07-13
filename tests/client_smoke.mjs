@@ -4,8 +4,8 @@
 // slot empty) -> train-card rendering.
 // Fails on ANY console/page error.
 //
-// Requires a local Chrome. `tests/run-all.sh` hydrates puppeteer-core through the shared
-// lockfile-keyed cache before running this script:
+// Requires a local Chrome. `tests/run-all.sh` installs the repository-owned puppeteer-core
+// dependency through the shared lockfile-keyed cache before running this script:
 //   tests/run-all.sh --no-rust
 //   node tests/client_smoke.mjs        (server must be running on :8081)
 // Env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to a Chrome/Chromium binary).

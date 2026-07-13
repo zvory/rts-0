@@ -6,8 +6,5 @@
   "scripts": {
     "test:server": "node server_integration.mjs",
     "test:client": "node client_smoke.mjs"
-  },
-  "devDependencies": {
-    "puppeteer-core": "^23"
   }
 }
