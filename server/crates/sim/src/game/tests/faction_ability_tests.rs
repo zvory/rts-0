@@ -361,3 +361,78 @@ fn breakthrough_smoke_synergy_speeds_units_more() {
         "unit in smoke should receive the stronger Breakthrough multiplier ({smoke_dx} <= {plain_dx})"
     );
 }
+
+#[test]
+fn command_car_passive_aura_is_half_speed_and_has_no_smoke_bonus() {
+    let (mut game, _scout, _target, _) = smoke_command_fixture();
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
+    }
+
+    let car_pos = game.state.map.tile_center(8, 8);
+    let near_pos = game.state.map.tile_center(10, 6);
+    let smoky_near_pos = game.state.map.tile_center(10, 10);
+    let far_pos = game.state.map.tile_center(20, 8);
+    let goal_near = game.state.map.tile_center(30, 6);
+    let goal_smoky_near = game.state.map.tile_center(30, 10);
+    let goal_far = game.state.map.tile_center(40, 8);
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::CommandCar, car_pos.0, car_pos.1)
+        .expect("command car should spawn");
+    let near = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, near_pos.0, near_pos.1)
+        .expect("nearby rifle should spawn");
+    let smoky_near = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, smoky_near_pos.0, smoky_near_pos.1)
+        .expect("nearby smoky rifle should spawn");
+    let far = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, far_pos.0, far_pos.1)
+        .expect("far rifle should spawn");
+    if let Some(entity) = game.state.entities.get_mut(smoky_near) {
+        entity.mark_in_smoke_for_breakthrough(crate::config::BREAKTHROUGH_RECENT_SMOKE_TICKS);
+    }
+
+    for (unit, goal) in [(near, goal_near), (smoky_near, goal_smoky_near), (far, goal_far)] {
+        game.enqueue(
+            1,
+            Command::Move {
+                units: vec![unit],
+                x: goal.0,
+                y: goal.1,
+                queued: false,
+            },
+        );
+    }
+    for _ in 0..10 {
+        game.tick();
+    }
+
+    let near_dx = game.state.entities.get(near).expect("nearby rifle").pos_x - near_pos.0;
+    let smoky_near_dx = game
+        .state
+        .entities
+        .get(smoky_near)
+        .expect("nearby smoky rifle")
+        .pos_x
+        - smoky_near_pos.0;
+    let far_dx = game.state.entities.get(far).expect("far rifle").pos_x - far_pos.0;
+    assert!(
+        near_dx > far_dx,
+        "the nearby permanent aura should increase movement ({near_dx} <= {far_dx})"
+    );
+    assert!(
+        (near_dx - smoky_near_dx).abs() < 0.001,
+        "the passive aura must not gain Breakthrough's smoke speed bonus ({near_dx} != {smoky_near_dx})"
+    );
+    assert!(
+        (near_dx / far_dx - crate::config::COMMAND_CAR_AURA_SPEED_MULTIPLIER).abs() < 0.001,
+        "the permanent aura should be the configured half-strength multiplier"
+    );
+}

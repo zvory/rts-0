@@ -291,7 +291,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         label: "Breakthrough!",
         icon: "BRK",
         hotkey: Some("E"),
-        title: "Speed up nearby owned units; stronger in smoke",
+        title: "Nearby owned units are always faster; activate full speed (stronger in smoke)",
         carriers: &[EntityKind::CommandCar],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,

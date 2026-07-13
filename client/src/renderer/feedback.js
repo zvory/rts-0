@@ -37,7 +37,7 @@ import {
   isArtilleryFirePreview,
 } from "./artillery_fire_preview.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
-import { feedbackOwner, ownOrAllyOwner } from "./feedback_ownership.js";
+import { feedbackOwner } from "./feedback_ownership.js";
 import {
   attackFeedbackKindForWeapon,
   attackFeedbackOriginForWeapon,
@@ -384,9 +384,9 @@ export function _drawBreakthroughAuras(state, entities = []) {
   if (radiusPx <= 0) return;
 
   for (const e of entities) {
-    if (e.kind !== KIND.COMMAND_CAR || !(breakthroughAuraExpiresIn(e) > 0)) continue;
-    if (!ownOrAllyOwner(state, e.owner)) continue;
-    drawBreakthroughAura(g, e.x, e.y, radiusPx, 0.78);
+    if (e.kind !== KIND.COMMAND_CAR) continue;
+    const active = breakthroughAuraExpiresIn(e) > 0;
+    drawBreakthroughAura(g, e.x, e.y, radiusPx, active ? 0.78 : 0.32);
   }
 }
 

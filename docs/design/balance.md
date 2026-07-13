@@ -450,14 +450,18 @@ folded into default targeting.
   inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
   visible to the player occupying it.
   Finite uses are the per-car limit, so each Scout Car can create exactly two smoke clouds total.
-- **Command Car Breakthrough!** (hotkey `E`): Command Cars have a self-targeted instant area speed
-  boost. It affects owned units within 9 tiles of the Command Car, lasts 180 ticks (~6s), has a
-  750-tick (~25s) per-caster cooldown, has no resource cost, can be queued, and can be cast while
-  the Command Car is moving. Affected units move at 1.4x speed, or 1.8x speed while inside smoke or
-  during the 60-tick (~2s) recent-smoke grace window after leaving smoke. Multiple Breakthrough
-  effects do not stack; a shorter refresh cannot reduce an active buff. Enemies see the status only
-  when the affected unit is otherwise visible through authoritative fog. Fake Army and allied-unit
-  support are deferred.
+- **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
+  owned units within 9 tiles a 1.2x speed multiplier. This passive aura has no smoke interaction,
+  and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active
+  version: it applies the full 1.4x speed status to owned units currently within that same radius
+  for 180 ticks (~6s), with a 750-tick (~25s) per-caster cooldown, no resource cost, queueability,
+  and movement during casting. The active status uses the 1.8x multiplier while the affected unit
+  is inside smoke or during the 60-tick (~2s) recent-smoke grace window after leaving it; it
+  overrides the passive aura. Multiple active Breakthrough effects do not stack; a shorter refresh
+  cannot reduce an active buff. Enemies see the active status only when the affected unit is
+  otherwise visible through authoritative fog. The client draws the permanent radius faintly for
+  each visible Command Car and brightens it while the active aura is running. Fake Army and
+  allied-unit support are deferred.
 - Map: `TILE_SIZE = 32` px. New normal lobbies default to the imported 126×126 two-player map
   at `server/assets/maps/1v1.json` (ten permanent resource base locations), served for tooling
   at `/maps/1v1.json`. The four-start `Default` map remains the hardcoded asset at

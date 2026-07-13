@@ -61,7 +61,7 @@ pub(super) fn advance_moving_units(
 ) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
-        let (kind, mut speed, mut x, mut y, can_local_steer, movement_target) = {
+        let (kind, owner, breakthrough_ticks, recent_smoke_ticks, has_meth, mut x, mut y, can_local_steer, movement_target) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
@@ -75,27 +75,12 @@ pub(super) fn advance_moving_units(
             let has_meth = players
                 .iter()
                 .any(|p| p.id == e.owner && p.has_upgrade(UpgradeKind::Methamphetamines));
-            let speed_multiplier = if matches!(e.kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
-                && has_meth
-            {
-                config::METHAMPHETAMINES_SPEED_MULTIPLIER
-            } else if e.breakthrough_ticks() > 0 {
-                if e.recent_smoke_ticks() > 0 {
-                    config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER
-                } else {
-                    config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
-                }
-            } else if e.kind == EntityKind::MachineGunner && has_meth {
-                config::METHAMPHETAMINES_SPEED_MULTIPLIER
-            } else {
-                1.0
-            };
-            let speed = config::unit_stats(e.kind)
-                .map(|s| s.speed * speed_multiplier)
-                .unwrap_or(0.0);
             (
                 e.kind,
-                speed,
+                e.owner,
+                e.breakthrough_ticks(),
+                e.recent_smoke_ticks(),
+                has_meth,
                 e.pos_x,
                 e.pos_y,
                 !uses_oriented_vehicle_body(e.kind)
@@ -104,6 +89,29 @@ pub(super) fn advance_moving_units(
                 e.next_waypoint(),
             )
         };
+        let breakthrough_multiplier = breakthrough_speed_multiplier(
+            entities,
+            spatial,
+            owner,
+            x,
+            y,
+            breakthrough_ticks,
+            recent_smoke_ticks,
+        );
+        let speed_multiplier = if matches!(kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
+            && has_meth
+        {
+            config::METHAMPHETAMINES_SPEED_MULTIPLIER
+        } else if breakthrough_multiplier > 1.0 {
+            breakthrough_multiplier
+        } else if kind == EntityKind::MachineGunner && has_meth {
+            config::METHAMPHETAMINES_SPEED_MULTIPLIER
+        } else {
+            1.0
+        };
+        let mut speed = config::unit_stats(kind)
+            .map(|s| s.speed * speed_multiplier)
+            .unwrap_or(0.0);
         if let Some((wx, wy)) = movement_target {
             speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);
         }
@@ -585,6 +593,51 @@ pub(super) fn advance_moving_units(
                 }
             }
         }
+    }
+}
+
+/// Return the strongest current Command Car speed effect for an owned unit.
+///
+/// A timed Breakthrough status preserves its existing full-speed/smoke behavior. Otherwise an
+/// owned, completed Command Car continuously supplies the smaller passive aura while in range.
+fn breakthrough_speed_multiplier(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    owner: u32,
+    x: f32,
+    y: f32,
+    breakthrough_ticks: u16,
+    recent_smoke_ticks: u16,
+) -> f32 {
+    if breakthrough_ticks > 0 {
+        return if recent_smoke_ticks > 0 {
+            config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER
+        } else {
+            config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
+        };
+    }
+
+    let radius_px = config::BREAKTHROUGH_RADIUS_TILES * config::TILE_SIZE as f32;
+    let radius2 = radius_px * radius_px;
+    let has_owned_command_car = spatial.ids_in_circle_bbox(x, y, radius_px).any(|candidate| {
+        let Some(car) = entities.get(candidate) else {
+            return false;
+        };
+        if car.kind != EntityKind::CommandCar
+            || car.owner != owner
+            || car.hp == 0
+            || car.under_construction()
+        {
+            return false;
+        }
+        let dx = car.pos_x - x;
+        let dy = car.pos_y - y;
+        dx * dx + dy * dy <= radius2
+    });
+    if has_owned_command_car {
+        config::COMMAND_CAR_AURA_SPEED_MULTIPLIER
+    } else {
+        1.0
     }
 }
 
