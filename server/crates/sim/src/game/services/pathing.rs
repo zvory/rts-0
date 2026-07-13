@@ -50,7 +50,6 @@ impl PathRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RouteShape {
     Normal,
-    DirectIfClear,
     #[cfg(test)]
     PreferFewerTurns,
     VehicleClearance,
@@ -59,7 +58,7 @@ pub enum RouteShape {
 impl RouteShape {
     fn turn_penalty(self) -> u32 {
         match self {
-            RouteShape::Normal | RouteShape::DirectIfClear => 0,
+            RouteShape::Normal => 0,
             #[cfg(test)]
             RouteShape::PreferFewerTurns => 3,
             RouteShape::VehicleClearance => VEHICLE_ROUTE_TURN_PENALTY,
@@ -190,6 +189,7 @@ struct CacheEntry {
 pub(super) enum PathCacheStatus {
     Hit,
     Miss,
+    Bypassed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,6 +198,14 @@ pub(super) struct PathingRequestDiagnostics {
     pub expanded_nodes: usize,
     pub budget_exhausted: bool,
     pub tile_path_len: usize,
+}
+
+pub(super) enum PathingRequestOutcome<T> {
+    Resolved {
+        path: T,
+        diagnostics: PathingRequestDiagnostics,
+    },
+    Deferred,
 }
 
 /// The authoritative pathfinding boundary.
@@ -229,121 +237,6 @@ impl PathingService {
     /// Advance the internal tick counter. Call once per simulation tick.
     pub fn advance_tick(&mut self, tick: u32) {
         self.tick = tick;
-    }
-
-    /// Request a path. Returns world-pixel waypoints in reverse order (next waypoint = pop).
-    #[allow(dead_code)]
-    pub fn request(
-        &mut self,
-        map: &Map,
-        occupancy: &Occupancy,
-        req: PathRequest,
-    ) -> Vec<(f32, f32)> {
-        self.request_with_diagnostics(map, occupancy, req).0
-    }
-
-    pub(super) fn request_with_diagnostics(
-        &mut self,
-        map: &Map,
-        occupancy: &Occupancy,
-        req: PathRequest,
-    ) -> (Vec<(f32, f32)>, PathingRequestDiagnostics) {
-        let start = req.start;
-        let kind = req.kind;
-        let relation = req.relation();
-        let (tile_path, diagnostics) = self.request_tile_path_with_diagnostics(map, occupancy, req);
-        if uses_pivot_vehicle_movement(kind) {
-            let pass = TerrainPassability {
-                map,
-                occupancy,
-                relation,
-                kind,
-                radius_tiles: 0,
-                route_shape: RouteShape::VehicleClearance,
-                avoid_diagonal_pinch: true,
-            };
-            let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
-            return (pathfinding::to_world_waypoints(&tile_path), diagnostics);
-        }
-        (pathfinding::to_world_waypoints(&tile_path), diagnostics)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn request_tile_path(
-        &mut self,
-        map: &Map,
-        occupancy: &Occupancy,
-        req: PathRequest,
-    ) -> Vec<(i32, i32)> {
-        self.request_tile_path_with_diagnostics(map, occupancy, req)
-            .0
-    }
-
-    pub(super) fn request_tile_path_with_diagnostics(
-        &mut self,
-        map: &Map,
-        occupancy: &Occupancy,
-        req: PathRequest,
-    ) -> (Vec<(i32, i32)>, PathingRequestDiagnostics) {
-        let pass = TerrainPassability {
-            map,
-            occupancy,
-            relation: req.relation(),
-            kind: req.kind,
-            radius_tiles: req.radius_tiles,
-            route_shape: req.route_shape,
-            avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
-        };
-
-        let static_fingerprint =
-            occupancy.static_fingerprint_for_kind_and_relation(req.kind, &req.relation);
-        if let Some(tile_path) = self.cache_lookup(&req, &pass, static_fingerprint) {
-            let diagnostics = PathingRequestDiagnostics {
-                cache_status: PathCacheStatus::Hit,
-                expanded_nodes: 0,
-                budget_exhausted: false,
-                tile_path_len: tile_path.len(),
-            };
-            return (tile_path, diagnostics);
-        }
-
-        if req.route_shape == RouteShape::DirectIfClear
-            && req.start != req.goal
-            && pass.passable(req.goal.0, req.goal.1)
-            && direct_segment_standable(map, occupancy, &req)
-        {
-            let tile_path = vec![req.goal];
-            self.cache_insert(&req, static_fingerprint, tile_path.clone());
-            let diagnostics = PathingRequestDiagnostics {
-                cache_status: PathCacheStatus::Miss,
-                expanded_nodes: 0,
-                budget_exhausted: false,
-                tile_path_len: tile_path.len(),
-            };
-            return (tile_path, diagnostics);
-        }
-
-        let budget = req.budget.unwrap_or(self.default_budget);
-        let (tile_path, expanded_nodes, budget_exhausted) =
-            pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
-                &pass,
-                req.start,
-                req.goal,
-                budget,
-                req.route_shape.turn_penalty(),
-                &mut self.search_scratch,
-            );
-
-        if !tile_path.is_empty() {
-            self.cache_insert(&req, static_fingerprint, tile_path.clone());
-        }
-        let diagnostics = PathingRequestDiagnostics {
-            cache_status: PathCacheStatus::Miss,
-            expanded_nodes,
-            budget_exhausted,
-            tile_path_len: tile_path.len(),
-        };
-        (tile_path, diagnostics)
     }
 
     fn cache_lookup<P: Passability>(
@@ -413,15 +306,6 @@ impl PathingService {
     pub(in crate::game) fn config(&self) -> (usize, usize) {
         (self.default_budget, self.cache_cap)
     }
-}
-
-fn direct_segment_standable(map: &Map, occupancy: &Occupancy, req: &PathRequest) -> bool {
-    if !map.in_bounds(req.start.0, req.start.1) || !map.in_bounds(req.goal.0, req.goal.1) {
-        return false;
-    }
-    let start = map.tile_center(req.start.0 as u32, req.start.1 as u32);
-    let goal = map.tile_center(req.goal.0 as u32, req.goal.1 as u32);
-    standability::unit_static_segment_standable(map, occupancy, req.kind, start, goal)
 }
 
 fn expand_vehicle_diagonal_steps_to_l_waypoints<P: Passability>(
@@ -574,6 +458,7 @@ impl PathingService {
     }
 }
 
+mod request;
 #[cfg(test)]
 mod request_tests;
 #[cfg(test)]

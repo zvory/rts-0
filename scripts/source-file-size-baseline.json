@@ -40,7 +40,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 2231,
+      "lines": 1998,
       "reason": "Formation extraction lowered the existing oversized movement coordinator; keep ratcheting until coordinator policy is split."
     },
     {
@@ -55,7 +55,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
-      "lines": 2075,
+      "lines": 1960,
       "reason": "Game-state Phase 2 routes pathing through the DerivedState shell and exposes internal config preservation for reset; keep ratcheting until pathing diagnostics are split."
     },
     {
