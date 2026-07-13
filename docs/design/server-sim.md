@@ -1166,7 +1166,7 @@ queued promotion, or the owning tick system.
 Live pathfinding and dev scenarios share a 32,768-node expansion budget per path miss. Requests
 that exhaust the budget return a best-effort path. Cache entries include the effective search
 budget, so an identical bounded request can reuse its deterministic best-effort result while a
-larger-budget request still searches afresh. The movement coordinator services at most four
+larger-budget request still searches afresh. The movement coordinator services at most eight
 search-backed tile-path requests per tick; cache hits consume the same scheduling allowance as
 misses so clearing the rebuildable cache cannot change simulation timing. Same-tile, zero-search,
 and proven-clear direct routes remain free. A cached result retains its original search-work

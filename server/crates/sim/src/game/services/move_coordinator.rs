@@ -53,7 +53,7 @@ mod rally;
 use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
 
 /// Tile-path requests per tick; hits count so rebuildable-cache state cannot alter scheduling.
-const MAX_REQUESTS_PER_TICK: usize = 4;
+const MAX_REQUESTS_PER_TICK: usize = 8;
 
 /// A completed search at or above this deterministic work threshold consumes the rest of the
 /// tick's request allowance. The search itself still receives the full per-route expansion budget;
@@ -1591,7 +1591,6 @@ mod tests {
             .finish_pathing_diagnostics(&entities)
             .expect("diagnostics should be enabled");
 
-        // Count how many moved from AwaitingPath to Moving/PathFailed.
         let mut processed = 0;
         let mut still_waiting = 0;
         for &id in &ids {
@@ -1607,15 +1606,16 @@ mod tests {
             processed, MAX_REQUESTS_PER_TICK,
             "only the tick-scoped path allowance should be processed"
         );
+        let expected_waiting = ids.len() - MAX_REQUESTS_PER_TICK;
         assert_eq!(
-            still_waiting, 6,
+            still_waiting, expected_waiting,
             "remaining units should still be awaiting path"
         );
         assert_eq!(diagnostics.pass, "awaiting_paths");
         assert_eq!(diagnostics.awaiting_start, 10);
         assert_eq!(diagnostics.requests_processed, MAX_REQUESTS_PER_TICK);
-        assert_eq!(diagnostics.still_awaiting, 6);
-        assert_eq!(diagnostics.requests_deferred, 6);
+        assert_eq!(diagnostics.still_awaiting, expected_waiting);
+        assert_eq!(diagnostics.requests_deferred, expected_waiting);
         assert!(diagnostics.coordinator_budget_exhausted);
         assert_eq!(diagnostics.queued_for_path, 10);
         assert_eq!(diagnostics.queued_source_counts.move_orders, 10);

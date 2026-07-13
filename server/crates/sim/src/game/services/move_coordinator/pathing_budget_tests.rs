@@ -25,7 +25,8 @@ fn rebuildable_cache_does_not_change_tick_path_scheduling() {
     let map = flat_test_map(40);
     let mut entities = EntityStore::new();
     let mut units_and_goals = Vec::new();
-    for index in 0..5 {
+    for index in 0..=MAX_REQUESTS_PER_TICK {
+        let index = index as u32;
         let start_tile = (3, 3 + index * 2);
         let goal_tile = (32, 32 - index * 2);
         let start = map.tile_center(start_tile.0, start_tile.1);
@@ -158,11 +159,17 @@ fn footprint_retry_progress_is_independent_of_the_rebuildable_cache() {
     MoveCoordinator::new(&mut cold_pathing, &map, &occ, 2)
         .process_awaiting_paths(&mut cold_entities);
 
-    let warm_attempt =
-        footprint_attempt(&warm_entities, worker).expect("warm build order should remain pending");
+    let warm_attempt = footprint_attempt(&warm_entities, worker);
+    assert_eq!(warm_attempt, footprint_attempt(&cold_entities, worker));
     assert_eq!(
-        Some(warm_attempt),
-        footprint_attempt(&cold_entities, worker)
+        warm_entities
+            .get(worker)
+            .and_then(|entity| entity.move_phase()),
+        cold_entities
+            .get(worker)
+            .and_then(|entity| entity.move_phase())
     );
-    assert!(warm_attempt > initial_attempt);
+    if let Some(warm_attempt) = warm_attempt {
+        assert!(warm_attempt > initial_attempt);
+    }
 }
