@@ -1,4 +1,4 @@
-# Phase 2 - Permissive Combat Voice Guardrails
+# Phase 2 - Combat Audibility Envelope and Listening Checkpoint
 
 ## Phase Status
 
@@ -6,99 +6,109 @@
 
 ## Objective
 
-Prevent combat from occupying the entire global voice pool while keeping large fights intentionally
-dense. Add simple combined and family-level guardrails that tolerate long decoded clip lifetimes and
-quiet asset tails without changing attack cadence or clip playback behavior.
+Reduce irrelevant edge and offscreen combat noise with one tighter combat-only radial profile, then
+prepare a real-match checkpoint where the user/manual tester can evaluate both phases together.
+Keep the implementation tied to the existing renderer-neutral listener reference distance rather
+than introducing exact viewport geometry, combat-family budgets, or new camera dependencies.
 
-## Starting Limits
+## Initial Tuning Profile
 
-Keep the existing global 48-voice cap and begin with these deliberately high combat ceilings:
+Use one shared profile for both `combat_self` and `combat_other`. Let `r` be
+`referenceDistancePx`, `d` be radial listener-to-emitter distance, `near = 0.4 * r`, and
+`maxDistance = 1.2 * r`:
 
-- 36 active combat voices total across `combat_self` and `combat_other`
-- 16 active rifle-family voices
-- 16 active automatic-weapon voices
-- 12 active heavy/ordnance voices
+- hard drop the request when `d > maxDistance`
+- otherwise compute `effective = near + max(0, d - near) * 4.0`
+- compute linear distance gain as `near / max(effective, near)`
+- keep gain at `1.0` through `0.4 * r`; the equation yields `0.5` gain at `0.5 * r` and about
+  `0.143` gain at `1.0 * r`
+- keep the existing left/right pan based on the listener reference distance
+- interpolate low-pass cutoff from the existing near cutoff to the existing far cutoff using
+  `t = clamp((d - near) / (maxDistance - near), 0, 1)`, so it reaches the far cutoff at the `1.2 * r`
+  hard-drop boundary rather than substantially earlier
+- use the same `t` for a simple distance priority penalty of `30 * t`, keeping voices inside the
+  full-gain region equal and making otherwise equivalent voices lose priority monotonically as they
+  approach the hard-drop boundary
 
-Family limits intentionally sum above the combined total. These are permissive safety rails selected
-because an active Web Audio source may remain alive through a quiet tail; they are not a request to
-detect silence or shorten the source.
+These are initial listening values, not a permanent acoustic standard. Keep them as a few named
+constants so one manual adjustment is easy if the integrated checkpoint finds the edge transition
+clearly too aggressive or too weak.
 
 ## Work
 
-- Add the smallest audio-engine admission seam that supports:
-  - one combined combat-category ceiling across self/other buses
-  - one explicit coarse budget group per combat voice
-  - active counts that clear automatically when a voice naturally ends or is stopped
-- Do not parse sound ids to infer families. Tag the current specifications in
-  `MatchCombatAudio` explicitly using three coarse groups:
-  - `rifle`: Rifleman-style rifle feedback and current rifle fallbacks
-  - `automatic`: Machine Gunner, Scout Car, and tank-coax machine-gun feedback
-  - `heavy`: Tank/anti-tank cannon, Panzerfaust, mortar, artillery fire, and artillery landing
-- Apply the same family tag to self and other combat categories so the family ceiling is truly
-  combined rather than doubled by ownership.
-- When the combined or family ceiling is full, reuse the existing age, distance, ownership/category,
-  and caller priority score:
-  - replace the worst lower-scored combat voice inside the constrained scope when the incoming voice
-    is more important
-  - otherwise drop the incoming combat request
-  - never evict alert/UI voices merely to admit another constrained combat voice
-- Keep global priority eviction as the final backstop. Spoken notices and UI should retain the
-  remaining global headroom and their existing ability to outrank combat.
-- Preserve all current machine-gunner voice keys and stop behavior. The budget must count the actual
-  active one-shots; it must not convert them into a loop, replace them by emitter, or infer firing
-  state beyond the current key lifecycle.
-- Preserve the existing default 60 ms combat dedup, every caller-specific cooldown override, pitch
-  variance, variants, per-sound gain, point-fire scheduling, artillery landing timer, and
-  attack/weapon mapping.
-- Do not add duration-aware limits, waveform analysis, silent-tail metadata, per-emitter caps,
-  per-weapon settings, adaptive ceilings, or diagnostics upload.
-- Update `docs/design/client-ui.md` with the combined/family ceilings, coarse family mapping, and
-  score-based constrained replacement behavior.
+- Select spatial parameters from the voice category or a similarly small explicit profile marker.
+  Apply the new envelope only to `combat_self` and `combat_other`.
+- Preserve the current default spatial profile for any non-combat spatial caller. Although current
+  positioned callers are combat, do not silently redefine future notification, voice, ambient, or
+  UI positioning behavior.
+- Implement the exact initial gain, low-pass, hard-drop, and distance-priority equations above.
+  Do not substitute another curve during implementation; tune only from the listening checkpoint.
+- Ensure active spatial voices remember enough category/profile information for
+  `setListener()` camera updates to recompute the same combat envelope. Preserve the current smooth
+  ramp so camera pans and minimap jumps do not create zipper noise or sudden full-volume pops.
+- Do not import camera, renderer, viewport, DOM, or Pixi modules into `audio.js`. Do not add
+  rectangular viewport tests, screen-edge raycasts, per-weapon distances, combat-family metadata,
+  or offscreen notice synthesis.
+- Preserve Phase 1 notice audio as centered/non-spatial, along with its explicit duck behavior.
+- Keep the global 48-voice pool and existing score-based global eviction unchanged. Do not add a
+  combined combat ceiling or rifle/automatic/heavy limits in this phase.
+- Update `docs/design/client-ui.md` with the combat-only profile and integrated first-pass behavior.
 
 ## Expected Touch Points
 
 - `client/src/audio.js`
-- `client/src/match_combat_audio.js`
 - `docs/design/client-ui.md`
 - `tests/client_contracts/audio_contracts.mjs`
-- `tests/client_contracts/match_shell_contracts.mjs`
 
 ## Implementation Checklist
 
-- [ ] Add combined combat active-count admission below the global 48-voice cap.
-- [ ] Add one explicit coarse budget-group field for combat voices.
-- [ ] Tag every currently audible combat and positional-event specification.
-- [ ] Reuse the current score for constrained replacement without creating a second scheduler.
-- [ ] Prove alert/UI voices remain outside combat-family counts and retain headroom.
-- [ ] Preserve cadence, variants, gains, timers, keys, and natural clip duration.
-- [ ] Add focused total/family saturation and replacement tests.
+- [ ] Add a combat-only spatial profile selected without camera/renderer coupling.
+- [ ] Apply the exact near, attenuation, low-pass, hard-drop, and priority equations.
+- [ ] Keep default non-combat spatial behavior unchanged.
+- [ ] Recompute in-flight combat voices with the same profile after listener movement.
+- [ ] Keep the global pool unchanged and add no combat-family budget system.
+- [ ] Add focused near/edge/drop, low-pass, priority, and listener-refresh contracts.
+- [ ] Prepare a runnable integrated dense-battle listening checkpoint and focused checklist for the
+      user/manual tester.
 - [ ] Update the client UI design document.
 - [ ] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 
 - `node tests/client_contracts/audio_contracts.mjs`
-- `node tests/client_contracts/match_shell_contracts.mjs`
 - `node tests/client_contracts.mjs`
 - `node scripts/check-client-architecture.mjs`
+- `node tests/select-suites.mjs --verify`
 - `git diff --check`
 
-Focused contracts should demonstrate the 36-voice combined ceiling, each family ceiling, replacement
-by a better-scored combat voice, rejection of a worse incoming voice, cleanup on natural/forced end,
-and protection of alert/UI voices. They should also assert that every existing combat mapping passes
-the intended family without changing scheduling or keys.
+Focused contracts should cover full combat gain through `0.4 * r`, `0.5` gain at `0.5 * r`, about
+`0.143` gain at `1.0 * r`, and hard drop beyond `1.2 * r`. They must assert that low-pass reaches
+its far cutoff at the hard-drop boundary rather than earlier, default non-combat spatial behavior is
+unchanged, active voices recompute consistently after listener movement, and the distance penalty
+is zero through the near region and rises monotonically to 30 at the boundary.
 
 ## Manual Test Focus
 
-Run a large close-range mixed Rifleman, Machine Gunner, Scout Car, Tank, anti-tank, mortar, and
-artillery fight. Confirm the result remains busy rather than sparse, automatic weapons and rifles
-retain texture, heavy weapons remain recognizable, and an existing spoken notice still plays and
-ducks the saturated battle. Listen specifically for an accidental cadence or lifecycle change;
-there should be none.
+Provide a runnable local release match or deterministic setup, plus the command or Tailnet link and
+the short checklist below, so the user/manual tester can listen on their actual device. Do not use a
+Lab screenshot or capture as audio evidence. The tester should use the same dense mixed fight at
+camera center, near the visible edge, just offscreen, and far offscreen; check that close combat
+remains satisfying, edge combat recedes, far routine fighting drops out, and camera pans/minimap
+jumps do not pop or abruptly brighten active sounds. During the same fight, trigger an existing
+under-attack or command-feedback voice and check that Phase 1 ducking remains clear and gradual.
+
+This user/manual listening pass is the plan's measured checkpoint, not an automated merge gate.
+Record concrete observations about notice intelligibility, perceived combat density, missing
+important heavy cues, edge/offscreen noise, and camera-transition artifacts before proposing any
+follow-up. If the battle remains overloaded, record whether it is general voice-pool saturation or
+one sound family drowning out another; do not automatically add limits without that evidence.
 
 ## Handoff Expectations
 
-Report the landed combined and family ceilings, exact family membership, constrained replacement
-rule, and tests proving alert/UI headroom. Call out whether manual testing exposed obvious starvation
-caused by silent tails; do not change the user's approved high-limit policy in the handoff. Tell
-phase 3 which category/group metadata is available when selecting the combat spatial profile.
+Report the final combat profile constants, automated checks, and the exact local setup/link and
+checklist prepared for the user. Leave subjective mix conclusions pending until the user/manual
+tester reports whether the first pass achieved understandable existing notices, busy nearby combat,
+and a useful edge/offscreen falloff. List only follow-up candidates backed by that checkpoint; a
+single combined combat ceiling is the first pool-control candidate, while family budgets, asset-tail
+work, normalization, limiting, and combat-event aggregation remain deferred until evidence justifies
+them and the user chooses a new plan.

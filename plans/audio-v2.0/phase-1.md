@@ -33,14 +33,18 @@ under-attack hits from independently driving toast and minimap spam.
 - Make `Match.handleSnapshotEvents()` delegate current `EVENT.NOTICE` handling to that presenter.
   Keep `Match.handleNotice()` as a thin compatibility delegation only if existing callers or tests
   benefit from it.
-- Move notice text-to-sound selection out of `audio.js` and beside the notice presentation helpers
-  in `alerts.js` or the new presenter. `Audio` should render requested sounds rather than interpret
-  notice message text.
+- Keep notice text-to-sound selection with notice presentation policy if that falls out naturally
+  from the extraction, but do not create another abstraction or make helper relocation a condition
+  of shipping the behavior fixes.
 - Keep ordinary command/info notices deliverable on each player action. Apply incident dedup only to
   `UNDER_ATTACK_ID`; do not generalize it to other `alert:` ids or build a scheduler for all
   messages.
 - Move under-attack bucket/cooldown ownership to the match-scoped presenter so incident state cannot
   leak across rematches. Start from the existing 960 px bucket and 10-second cooldown.
+- Make that presenter the sole under-attack cooldown owner. Remove the persistent `Audio` engine's
+  special under-attack bucket/cooldown behavior, and schedule each presenter-admitted under-attack
+  voice with no second generic spoken cooldown (`cooldownMs: 0` or an equivalent explicit bypass).
+  Do not leave a second audio-engine gate that can suppress a distinct accepted location.
 - Use one match-scoped admission decision for the existing under-attack surfaces:
   - the first accepted incident toasts and pings, and speaks only when it is outside the viewport
   - repeats in the same bucket and cooldown suppress toast, ping, and voice together
@@ -67,7 +71,7 @@ under-attack hits from independently driving toast and minimap spam.
 
 - `client/src/match_notice_presenter.js` or an equivalently focused match-owned module
 - `client/src/match.js`
-- `client/src/alerts.js`
+- `client/src/alerts.js` only if notice helpers move naturally with the presenter
 - `client/src/audio.js`
 - `docs/design/client-ui.md`
 - `tests/client_contracts/audio_contracts.mjs`
@@ -79,8 +83,9 @@ under-attack hits from independently driving toast and minimap spam.
 ## Implementation Checklist
 
 - [ ] Extract existing server-notice presentation from `Match` without adding notice types.
-- [ ] Move text-to-sound interpretation out of the generic audio engine.
 - [ ] Add one match-scoped under-attack admission decision shared by toast, minimap, and voice.
+- [ ] Remove the audio engine's persistent under-attack cooldown and bypass generic spoken cooldown
+      for presenter-admitted under-attack voices.
 - [ ] Make duck intent explicit while preserving existing `alert` callers.
 - [ ] Apply the deeper combat duck and two-second release.
 - [ ] Preserve replay, spectator, viewport, toast, minimap, and ordinary info-notice behavior.
@@ -99,8 +104,10 @@ under-attack hits from independently driving toast and minimap spam.
 - `git diff --check`
 
 The presenter coverage must directly assert shared toast/ping/voice incident dedup, an accepted
-in-view incident that stays silent and consumes the shared cooldown, acceptance of a separate
-position bucket, and replay/spectator silence.
+in-view incident that stays silent and consumes the shared cooldown, and replay/spectator silence.
+It must also schedule two different location buckets less than 1.5 seconds apart and prove that both
+voices play, demonstrating that no persistent or generic audio-engine cooldown overrides the
+presenter's decision.
 
 ## Manual Test Focus
 
@@ -116,4 +123,4 @@ notice audio remains suppressed.
 Report the new presenter boundary, which existing messages it owns, the incident bucket/cooldown
 and shared-admission semantics, and the final duck constants. State whether any compatibility
 delegation remains in `Match`, list the focused tests, and tell phase 2 to preserve the notice
-headroom and explicit duck behavior when adding combat admission limits.
+headroom and explicit duck behavior while tightening the combat distance profile.
