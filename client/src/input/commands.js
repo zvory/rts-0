@@ -422,15 +422,18 @@ export function _refreshAbilityTargetPreview() {
     intent?.updateAbilityTargetPreview?.(null);
     return;
   }
-  const tileSize = this.state.map?.tileSize || 32;
+  const tileSize = this.state.map?.tileSize || DEFAULT_TILE_SIZE;
   const rangePx = definition.rangeTiles * tileSize;
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
-  const world = this._groundAtScreen(this.mouse.x, this.mouse.y);
+  const locksRangeBand = isArtilleryFireAbility(target.ability);
+  // Cursor feedback is rendered after this frame's camera update. Map its
+  // hover target through that same current projection so it does not trail a
+  // panning camera. Ground-command clicks still use SelectionScene geometry.
+  const world = cursorPreviewGroundAtScreen(this, this.mouse);
   if (!world) {
     intent?.updateAbilityTargetPreview?.(null);
     return;
   }
-  const locksRangeBand = isArtilleryFireAbility(target.ability);
   let hoverInRange = false;
   let hoverInsideMinRange = false;
   let artilleryLocks = [];
@@ -538,7 +541,7 @@ export function _refreshAntiTankGunSetupPreview() {
   // The cursor cone is rendered after this frame's camera update.  Map its
   // target through that same current projection instead of the prior presented
   // SelectionScene, otherwise it visibly trails the cursor while panning.
-  const world = setupPreviewGroundAtScreen(this, this.mouse);
+  const world = cursorPreviewGroundAtScreen(this, this.mouse);
   if (!world) {
     intent?.updateAntiTankGunSetupPreview?.(null);
     return;
@@ -546,7 +549,7 @@ export function _refreshAntiTankGunSetupPreview() {
   intent?.updateAntiTankGunSetupPreview?.({ mouseX: world.x, mouseY: world.y, guns });
 }
 
-function setupPreviewGroundAtScreen(input, screen) {
+function cursorPreviewGroundAtScreen(input, screen) {
   let projection;
   try {
     projection = input?.camera?.projectionSnapshot?.();
@@ -560,7 +563,7 @@ function setupPreviewGroundAtScreen(input, screen) {
       // A valid current projection returning no hit must clear the preview,
       // rather than resurrecting a position from a stale SelectionScene.
       if (point == null) return null;
-      const clamped = clampSetupPreviewPoint(point, input?.state?.map);
+      const clamped = clampCursorPreviewPoint(point, input?.state?.map);
       if (clamped) return clamped;
     } catch {
       // A malformed fresh projection must not break the existing input path.
@@ -569,7 +572,7 @@ function setupPreviewGroundAtScreen(input, screen) {
   return input._groundAtScreen(screen.x, screen.y);
 }
 
-function clampSetupPreviewPoint(point, map) {
+function clampCursorPreviewPoint(point, map) {
   if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
   const mapWidthPx = Number(map?.width) * Number(map?.tileSize);
   const mapHeightPx = Number(map?.height) * Number(map?.tileSize);
