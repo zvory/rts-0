@@ -571,7 +571,7 @@ fn validate_command(
                 return Err(invalid("command build tile coordinates are out of range"));
             }
         }
-        Command::SetProductionRepeat { buildings, .. } => {
+        Command::AdjustProductionRepeat { buildings, .. } => {
             validate_unit_list(buildings, unit_cap, "command.buildings", state)?;
         }
         Command::Train { building, .. }

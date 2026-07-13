@@ -18,6 +18,7 @@ mod build;
 mod command_budget;
 mod orders;
 mod production;
+mod production_repeat;
 mod rally;
 mod scout_plane_production;
 mod support_weapons;

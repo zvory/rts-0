@@ -449,6 +449,7 @@ export function buildTrainCard(ctx, building) {
       .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
     const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
+    const repeatHelp = "Alt-click or Alt+hotkey adds one auto-build; hold Shift to remove one";
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
@@ -460,15 +461,16 @@ export function buildTrainCard(ctx, building) {
       cost: st.cost,
       enabled: availability === "ready" || availability === "active",
       unaffordable: availability === "unaffordable",
-      title: disabledReason || "Alt-click or Alt+hotkey to repeat whenever the queue empties",
+      title: disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp,
       tooltipKind: unit,
       repeatable: availability === "ready",
-      cls: repeatingIds.length > 0 ? "autocast-enabled" : "",
+      countBadge: `${repeatingIds.length}/${producerIds.length}`,
+      autobuildIndicatorCount: repeatingIds.length,
+      cls: repeatingIds.length > 0 ? "autocast-enabled production-repeat-enabled" : "",
       contextIntent: {
-        type: "setProductionRepeat",
+        type: "adjustProductionRepeat",
         buildingIds: producerIds,
         unit,
-        enabled: repeatingIds.length === 0,
       },
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };

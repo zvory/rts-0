@@ -43,8 +43,8 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {string} [opts.cls] extra class (e.g. "cancel").
  * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
  * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
+ * @param {number} [opts.autobuildIndicatorCount] evenly-spaced rotating auto-build indicators.
  * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
- * @param {boolean} [opts.autocastToggle] whether Alt+hotkey should invoke the autocast toggle.
  * @param {() => void} [opts.onMouseEnter] hover handler.
  * @param {() => void} [opts.onMouseLeave] hover-exit handler.
  * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
@@ -76,7 +76,6 @@ export function createCommandButton(opts) {
   if (Number.isInteger(opts.slotIndex)) btn.dataset.slotIndex = String(opts.slotIndex);
   if (opts.ability) btn.dataset.ability = opts.ability;
   if (opts.repeatable) btn.dataset.repeatable = "true";
-  if (opts.autocastToggle) btn.dataset.autocastToggle = "true";
   if (typeof opts.onMouseEnter === "function") {
     btn.addEventListener("mouseenter", opts.onMouseEnter);
     btn.addEventListener("focus", opts.onMouseEnter);
@@ -86,6 +85,7 @@ export function createCommandButton(opts) {
     btn.addEventListener("blur", opts.onMouseLeave);
   }
   if (typeof opts.onContextMenu === "function") {
+    btn.dataset.contextAction = "true";
     btn.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       opts.onContextMenu(ev);
@@ -109,8 +109,24 @@ export function createCommandButton(opts) {
         `</span>` +
       `</span>`
     : "";
+  const autobuildIndicatorCount = Number.isInteger(opts.autobuildIndicatorCount)
+    ? Math.max(0, opts.autobuildIndicatorCount)
+    : 0;
+  let autobuildHtml = "";
+  if (autobuildIndicatorCount > 0) {
+    const segmentDeg = 360 / autobuildIndicatorCount;
+    // Preserve the original 104-degree trail while indicators fit without overlap. For larger
+    // selections, shrink each trail enough to keep every allocation visually distinct.
+    const fadeDeg = Math.min(104, segmentDeg * 0.9);
+    const peakDeg = fadeDeg / 2;
+    autobuildHtml = `<span class="cmd-autobuild-swirls" aria-hidden="true" ` +
+      `style="--autobuild-segment:${segmentDeg.toFixed(3)}deg;` +
+      `--autobuild-peak:${peakDeg.toFixed(3)}deg;` +
+      `--autobuild-fade:${fadeDeg.toFixed(3)}deg"></span>`;
+  }
 
   btn.innerHTML =
+    autobuildHtml +
     `<span class="cmd-icon">${opts.icon || ""}</span>` +
     `<span class="cmd-label">${opts.label || ""}</span>` +
     (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +

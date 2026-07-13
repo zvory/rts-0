@@ -467,18 +467,18 @@ pub(in crate::game) fn apply_commands(
             SimCommand::Train { building, unit } => {
                 order_train(entities, players, player, building, unit, events);
             }
-            SimCommand::SetProductionRepeat {
+            SimCommand::AdjustProductionRepeat {
                 buildings,
                 unit,
-                enabled,
+                delta,
             } => {
-                production_repeat::set(
+                production_repeat::adjust(
                     entities,
                     &faction_id,
                     player,
                     buildings,
                     unit,
-                    enabled,
+                    delta,
                     command_admission.max_units_per_command,
                 );
             }

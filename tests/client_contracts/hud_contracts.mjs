@@ -163,6 +163,27 @@ function fakeHudRootWithoutResourceSpans() {
 }
 
 {
+  const issued = [];
+  const hud = {
+    _issueCommand(command) {
+      issued.push(command);
+    },
+  };
+  const intent = {
+    type: "adjustProductionRepeat",
+    buildingIds: [20, 21, 22],
+    unit: KIND.RIFLEMAN,
+  };
+  HUD.prototype._dispatchCommandIntent.call(hud, intent, { shiftKey: false });
+  HUD.prototype._dispatchCommandIntent.call(hud, intent, { shiftKey: true });
+  assert(
+    issued[0]?.c === "adjustProductionRepeat" && issued[0]?.delta === 1 &&
+      issued[1]?.c === "adjustProductionRepeat" && issued[1]?.delta === -1,
+    "Alt production-repeat actions add one allocation while Shift removes one",
+  );
+}
+
+{
   assert(formatGameTime(null) === "00:00", "HUD game timer treats missing ticks as match start");
   assert(formatGameTime(-90) === "00:00", "HUD game timer clamps negative ticks");
   assert(formatGameTime(TICK_HZ - 1) === "00:00", "HUD game timer floors partial seconds");
@@ -663,11 +684,14 @@ function fakeHudRootWithoutResourceSpans() {
   assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
   assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");
   assert(
-    trainCard.slots[0].contextIntent.type === "setProductionRepeat" &&
+    trainCard.slots[0].contextIntent.type === "adjustProductionRepeat" &&
       trainCard.slots[0].contextIntent.buildingIds.join(",") === "20,21" &&
-      trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN &&
-      trainCard.slots[0].contextIntent.enabled,
-    "train buttons should enable repeat production across selected compatible producers",
+      trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN,
+    "train buttons should adjust repeat production across selected compatible producers",
+  );
+  assert(
+    trainCard.slots[0].countBadge === "0/2" && trainCard.slots[0].autobuildIndicatorCount === 0,
+    "train buttons should show the selected producer allocation count",
   );
   assert(trainCard.slots[8].label === "Cancel", "production cancel should stay in C slot");
   assert(trainCard.slots[8].hotkey === "C", "cancel hotkey should stay C");
@@ -675,12 +699,19 @@ function fakeHudRootWithoutResourceSpans() {
   assert(trainCard.slots[8].commandId === `production.cancel.${KIND.BARRACKS}`, "cancel button should expose stable production cancel identity");
   assert(trainCard.slots[1].label === "Machine Gunner", "Barracks second train slot should be Machine Gunner");
   assert(!trainCard.slots[1].enabled, "requirement-gated train button should be disabled");
-  assert(trainCard.slots[1].title === "Requires Training Centre", "train locked tooltip should name requirement");
+  assert(
+    trainCard.slots[1].title.startsWith("Requires Training Centre") &&
+      trainCard.slots[1].title.includes("hold Shift to remove one"),
+    "train locked tooltip should name its requirement and allocation controls",
+  );
   assert(trainCard.slots[2].label === "Panzerfaust", "Barracks third train slot should be Panzerfaust");
   assert(trainCard.slots[2].commandId === defaultFactionCommandId("train", KIND.PANZERFAUST), "Panzerfaust train button should expose stable train identity");
   assert(trainCard.slots[2].hotkey === "E", "Panzerfaust train button should use E in the third Barracks slot");
   assert(!trainCard.slots[2].enabled, "Panzerfaust train button should be locked before Training Centre");
-  assert(trainCard.slots[2].title === "Requires Training Centre", "Panzerfaust locked tooltip should name Training Centre");
+  assert(
+    trainCard.slots[2].title.startsWith("Requires Training Centre"),
+    "Panzerfaust locked tooltip should name Training Centre",
+  );
 
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
@@ -690,8 +721,9 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   assert(
     repeatingTrainCard.slots[0].cls.includes("autocast-enabled") &&
-      !repeatingTrainCard.slots[0].contextIntent.enabled,
-    "authoritative repeat production should show the swirl and make the next toggle disable it",
+      repeatingTrainCard.slots[0].countBadge === "1/2" &&
+      repeatingTrainCard.slots[0].autobuildIndicatorCount === 1,
+    "authoritative repeat production should show one swirl and its partial allocation count",
   );
   delete producingBarracks.prodRepeatKinds;
 
@@ -716,7 +748,7 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   assert(!oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when oil is short");
   assert(oilBlockedPanzerfaustCard.slots[2].unaffordable, "resource-blocked Panzerfaust should stay clickable for feedback");
-  assert(oilBlockedPanzerfaustCard.slots[2].title === "Not enough resources", "Panzerfaust resource-blocked tooltip should name resources");
+  assert(oilBlockedPanzerfaustCard.slots[2].title.startsWith("Not enough resources"), "Panzerfaust resource-blocked tooltip should name resources");
 
   const supplyBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks],
@@ -724,7 +756,7 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 60, oil: 15, supplyUsed: 10, supplyCap: 10 },
   }));
   assert(!supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when supply is capped");
-  assert(supplyBlockedPanzerfaustCard.slots[2].title === "Not enough supply", "Panzerfaust supply-blocked tooltip should name supply");
+  assert(supplyBlockedPanzerfaustCard.slots[2].title.startsWith("Not enough supply"), "Panzerfaust supply-blocked tooltip should name supply");
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [cityCentre],
@@ -734,7 +766,7 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   assert(!supplyReservedTrainCard.slots[0].enabled, "pending train optimism should reserve supply for train buttons");
   assert(supplyReservedTrainCard.slots[0].unaffordable, "supply-blocked train button should stay clickable for feedback");
-  assert(supplyReservedTrainCard.slots[0].title === "Not enough supply", "supply-blocked train tooltip should name supply");
+  assert(supplyReservedTrainCard.slots[0].title.startsWith("Not enough supply"), "supply-blocked train tooltip should name supply");
   assert(
     supplyReservedTrainCard.slots[0].onUnavailableIntent.supply === STATS[KIND.WORKER].supply,
     "supply-blocked train button should carry supply for unavailable feedback",
@@ -747,7 +779,7 @@ function fakeHudRootWithoutResourceSpans() {
     optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
   assert(!steelReservedTrainCard.slots[0].enabled, "pending train optimism should reserve steel for train buttons");
-  assert(steelReservedTrainCard.slots[0].title === "Not enough resources", "resource-blocked train tooltip should name resources");
+  assert(steelReservedTrainCard.slots[0].title.startsWith("Not enough resources"), "resource-blocked train tooltip should name resources");
 
   const scoutPlaneCityCentre = { id: 70, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
   const cityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
@@ -894,7 +926,7 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
   assert(antiTankGun && !antiTankGun.enabled, "upgrade-gated unit should be disabled before research");
-  assert(antiTankGun.title === "Requires research in R&D Complex", "upgrade-gated unit tooltip should name R&D research");
+  assert(antiTankGun.title.startsWith("Requires research in R&D Complex"), "upgrade-gated unit tooltip should name R&D research");
   assert(!buttonByLabel(upgradeCard, "Medium Guns"), "Gun Works should not expose R&D research");
   assert(!buttonByLabel(upgradeCard, "Heavy Guns"), "Gun Works should not expose R&D research");
 
@@ -962,6 +994,51 @@ function fakeHudRootWithoutResourceSpans() {
     assert(button.innerHTML.includes("cmd-tooltip"), "command button should render rich tooltip span");
     button.listeners.click({ preventDefault() {} });
     assert(clicked, "enabled command button click should dispatch handler");
+  });
+
+  withFakeDocument(() => {
+    const twoButton = HUD.prototype._cmdButton({
+      icon: "RF",
+      label: "Rifleman",
+      enabled: true,
+      autobuildIndicatorCount: 2,
+      onClick() {},
+    });
+    assert(
+      (twoButton.innerHTML.match(/cmd-autobuild-swirls/g) || []).length === 1 &&
+        twoButton.innerHTML.includes("--autobuild-segment:180.000deg") &&
+        twoButton.innerHTML.includes("--autobuild-peak:52.000deg") &&
+        twoButton.innerHTML.includes("--autobuild-fade:104.000deg"),
+      "two auto-build allocations share one bounded layer with indicators 180 degrees apart",
+    );
+    const threeButton = HUD.prototype._cmdButton({
+      icon: "RF",
+      label: "Rifleman",
+      enabled: true,
+      autobuildIndicatorCount: 3,
+      onClick() {},
+    });
+    assert(
+      (threeButton.innerHTML.match(/cmd-autobuild-swirls/g) || []).length === 1 &&
+        threeButton.innerHTML.includes("--autobuild-segment:120.000deg") &&
+        threeButton.innerHTML.includes("--autobuild-peak:52.000deg") &&
+        threeButton.innerHTML.includes("--autobuild-fade:104.000deg"),
+      "three auto-build allocations share one bounded layer with indicators 120 degrees apart",
+    );
+    const manyButton = HUD.prototype._cmdButton({
+      icon: "RF",
+      label: "Rifleman",
+      enabled: true,
+      autobuildIndicatorCount: 10,
+      onClick() {},
+    });
+    assert(
+      (manyButton.innerHTML.match(/cmd-autobuild-swirls/g) || []).length === 1 &&
+        manyButton.innerHTML.includes("--autobuild-segment:36.000deg") &&
+        manyButton.innerHTML.includes("--autobuild-peak:16.200deg") &&
+        manyButton.innerHTML.includes("--autobuild-fade:32.400deg"),
+      "large allocation counts keep one animation layer and shrink trails to remain distinct",
+    );
   });
 
   withFakeDocument(() => {

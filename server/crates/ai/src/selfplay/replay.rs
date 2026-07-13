@@ -574,7 +574,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::Build { .. }
             | WireCommand::Deconstruct { .. }
             | WireCommand::Train { .. }
-            | WireCommand::SetProductionRepeat { .. }
+            | WireCommand::AdjustProductionRepeat { .. }
             | WireCommand::Research { .. }
             | WireCommand::Cancel { .. }
             | WireCommand::Stop { .. }
@@ -732,7 +732,7 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         rts_sim::game::command::SimCommand::Build { units, .. }
         | rts_sim::game::command::SimCommand::Deconstruct { units, .. } => Some(units),
         rts_sim::game::command::SimCommand::Train { .. }
-        | rts_sim::game::command::SimCommand::SetProductionRepeat { .. }
+        | rts_sim::game::command::SimCommand::AdjustProductionRepeat { .. }
         | rts_sim::game::command::SimCommand::Research { .. }
         | rts_sim::game::command::SimCommand::Cancel { .. }
         | rts_sim::game::command::SimCommand::SetRally { .. }

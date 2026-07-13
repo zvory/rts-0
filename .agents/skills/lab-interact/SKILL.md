@@ -21,8 +21,9 @@ uncertain; command help never starts or inspects the daemon.
    operations accept up to 400 inputs/references; aliases, inspection, focus, and screenshot
    subjects use the same large-scene bound. During autonomous combat, use `activity`, `targetId`,
    and HP changes rather than treating `state: "idle"` or an empty explicit `orderPlan` as proof
-   that no engagement occurred. Toggle producer auto-build with one normal `order` command shaped
-   as `{c:"setProductionRepeat",buildings:[...],unit:"<kind>",enabled:true|false}`.
+   that no engagement occurred. Adjust producer auto-build with one normal `order` command shaped
+   as `{c:"adjustProductionRepeat",buildings:[...],unit:"<kind>",delta:1|-1}`; each command adds
+   or removes one allocation across the resolved producer set.
 3. Use `time` to pause or step authoritative state. Position the view with `camera`. Single-unit
    focus without padding uses the intentionally close 32-world-pixel default.
 4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700 at DPR 1, and any subject

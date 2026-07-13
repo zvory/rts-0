@@ -21,7 +21,7 @@ node scripts/lab-interact/cli.mjs camera '{"sessionId":"<id>","camera":{"action"
 node scripts/lab-interact/cli.mjs screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
 node scripts/lab-interact/cli.mjs record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000,"resumeSpeed":1}'
 node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"move","units":["subject"],"x":1100,"y":960}}'
-node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"setProductionRepeat","buildings":["barracks-a","barracks-b"],"unit":"rifleman","enabled":true}}'
+node scripts/lab-interact/cli.mjs order '{"sessionId":"<id>","playerId":1,"command":{"c":"adjustProductionRepeat","buildings":["barracks-a","barracks-b"],"unit":"rifleman","delta":1}}'
 node scripts/lab-interact/cli.mjs record-wait '{"sessionId":"<id>"}'
 node scripts/lab-interact/cli.mjs capture-fixed '{"sessionId":"<id>","name":"motion-fixed","fps":30,"frameCount":60}'
 node scripts/lab-interact/cli.mjs capture-cancel '{"sessionId":"<id>"}'
@@ -133,10 +133,11 @@ Paused setup mutations fan out their accepted authoritative state without advanc
 paused `order` still advances one bounded tick so the queued command can be consumed; use explicit
 `time step` for any additional simulation progress.
 
-Repeat production uses the normal authoritative `setProductionRepeat` game command. Its
-`buildings` field accepts 1–100 aliases or ids, resolves the entire producer set before enqueue,
-and toggles the requested `unit` with `enabled:true|false` in one command. The producer ownership,
-production compatibility, resources, supply, and retry behavior remain ordinary simulation rules.
+Repeat production uses the normal authoritative `adjustProductionRepeat` game command. Its
+`buildings` field accepts 1–100 aliases or ids and resolves the entire producer set before enqueue.
+`delta:1` adds the requested `unit` to one eligible producer; `delta:-1` removes it from one
+producer. Producer ownership, compatibility, allocation policy, resources, supply, and retry
+behavior remain ordinary simulation rules.
 
 Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. The
 daemon starts an artifact-only HTTP listener on this machine's Tailnet IP on first visual capture.

@@ -741,8 +741,8 @@ export function _activateCommandHotkey(ev) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
     if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
-    const autocastToggle = ev.altKey && btn.dataset.autocastToggle === "true";
-    if (autocastToggle) {
+    const contextAction = ev.altKey && btn.dataset.contextAction === "true";
+    if (contextAction) {
       dispatchCommandButtonMouseEvent(btn, "contextmenu", ev);
     } else if (!btn.disabled) {
       dispatchCommandButtonMouseEvent(btn, "click", ev);
@@ -752,7 +752,7 @@ export function _activateCommandHotkey(ev) {
       commandId: btn.dataset.commandId || null,
       hotkey: btn.dataset.hotkey || null,
       slotIndex: btn.dataset.slotIndex != null ? Number(btn.dataset.slotIndex) : null,
-      autocastToggle,
+      contextAction,
       armed: clientIntent(this)?.lastCommandTargetArm || null,
     };
   }

@@ -789,7 +789,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       "selected Mortar Team should render an ability command button",
     );
     const coolingMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
-    assert(coolingMortarButton?.dataset.autocastToggle === "true", "Mortar Fire button exposes the autocast toggle hotkey action");
+    assert(coolingMortarButton?.dataset.contextAction === "true", "Mortar Fire button exposes its context hotkey action");
     assert(!coolingMortarButton?.disabled, "cooling-down Mortar Fire remains armable for queued manual fire");
     const coolingMortarCard = buildCommandCardDescriptors({
       playerId,
@@ -826,7 +826,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     input.state = mortarHud.state;
     const disableAutocastResult = input._activateCommandHotkey(disableAutocastEv);
     const disableAutocastCommand = sent[sent.length - 1];
-    assert(disableAutocastResult?.autocastToggle === true, "Alt+Mortar Fire hotkey should take the autocast path");
+    assert(disableAutocastResult?.contextAction === true, "Alt+Mortar Fire hotkey should take the context-action path");
     assert(disableAutocastEv.prevented, "Alt+Mortar Fire hotkey should prevent browser handling");
     assert(
       disableAutocastCommand?.c === "setAutocast" &&
@@ -1027,7 +1027,34 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
     assert(
       commandCarButton && !commandCarButton.disabled && commandCarButton.className.includes("primary-disabled"),
-      "Command Car training should keep its primary action disabled while allowing the repeat toggle before unlock",
+      "Command Car training should keep its primary action disabled while allowing auto-build allocation before unlock",
+    );
+    assert(
+      commandCarButton?.dataset.contextAction === "true",
+      "production buttons expose their allocation context action to the hotkey layer",
+    );
+    globalThis.document.getElementById = () => ({
+      querySelectorAll() {
+        return [commandCarButton];
+      },
+    });
+    input.state = factoryHud.state;
+    const removeAutoBuildEv = {
+      code: "KeyE",
+      altKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: true,
+      repeat: false,
+      preventDefault() { this.prevented = true; },
+    };
+    const removeAutoBuildResult = input._activateCommandHotkey(removeAutoBuildEv);
+    const removeAutoBuildCommand = sent[sent.length - 1];
+    assert(
+      removeAutoBuildResult?.contextAction === true && removeAutoBuildEv.prevented &&
+        removeAutoBuildCommand?.c === "adjustProductionRepeat" &&
+        removeAutoBuildCommand.delta === -1 && removeAutoBuildCommand.buildings[0] === selectedFactory.id,
+      "Alt+Shift production hotkeys dispatch one signed removal through the generic context-action path",
     );
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 

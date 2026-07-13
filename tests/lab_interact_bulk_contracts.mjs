@@ -45,19 +45,19 @@ const repeat = await service.execute("order", {
   sessionId,
   playerId: 1,
   command: {
-    c: "setProductionRepeat",
+    c: "adjustProductionRepeat",
     buildings: ["repeat_a", "repeat_b"],
     unit: "rifleman",
-    enabled: true,
+    delta: 1,
   },
 });
 assert.deepEqual(
   repeat.command,
   {
-    c: "setProductionRepeat",
+    c: "adjustProductionRepeat",
     buildings: repeatProducers.spawned.details.map((entry) => entry.id),
     unit: "rifleman",
-    enabled: true,
+    delta: 1,
   },
   "repeat-production orders resolve every producer alias into one authoritative command",
 );
@@ -221,20 +221,20 @@ assert.doesNotThrow(() => validateCommandInput("order", {
   sessionId,
   playerId: 1,
   command: {
-    c: "setProductionRepeat",
+    c: "adjustProductionRepeat",
     buildings: Array.from({ length: 100 }, (_, index) => index + 1),
     unit: "rifleman",
-    enabled: false,
+    delta: -1,
   },
 }));
 assert.throws(() => validateCommandInput("order", {
   sessionId,
   playerId: 1,
   command: {
-    c: "setProductionRepeat",
+    c: "adjustProductionRepeat",
     buildings: Array.from({ length: 101 }, (_, index) => index + 1),
     unit: "rifleman",
-    enabled: true,
+    delta: 1,
   },
 }), /1-100/, "repeat production retains the bounded command-reference limit");
 
