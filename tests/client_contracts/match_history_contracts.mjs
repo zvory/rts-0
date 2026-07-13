@@ -107,6 +107,44 @@ withFakeHudDocument(() => {
   assert(launchedId === row.id, "aborted replay button launches the aborted match replay");
 });
 
+withFakeHudDocument(() => {
+  const rows = [
+    {
+      id: 42,
+      startedAt: new Date().toISOString(),
+      mapName: "Default",
+      participants: ["Alice", "Bravo"],
+      durationMs: 12_000,
+    },
+    {
+      id: 99,
+      startedAt: new Date().toISOString(),
+      mapName: "River Crossing",
+      participants: ["Casey", "Dana"],
+      durationMs: 20_000,
+    },
+  ];
+  const history = Object.assign(Object.create(MatchHistory.prototype), {
+    _tableHost: document.createElement("div"),
+    _rows: rows,
+    _expandedId: null,
+    _launchingId: null,
+    _launchErrors: new Map(),
+    _toggleRow() {},
+  });
+
+  history._renderRows();
+
+  const table = history._tableHost.children[0];
+  const [thead, tbody] = table.children;
+  const replayRows = tbody.children.filter((row) => row.className === "match-history-row");
+  assert(thead.innerHTML.includes("Replay #"), "match history labels its replay-number column");
+  assert(
+    replayRows.map((row) => row.children[0].textContent).join(",") === "1,2",
+    "match history numbers only its visible rows in appearance order, not by database id",
+  );
+});
+
 function collectText(node, out = []) {
   if (typeof node?.textContent === "string" && node.textContent.length > 0) {
     out.push(node.textContent);

@@ -106,6 +106,7 @@ export class MatchHistory {
     const thead = document.createElement("thead");
     thead.innerHTML = `
       <tr>
+        <th scope="col">Replay #</th>
         <th scope="col">When</th>
         <th scope="col">Map</th>
         <th scope="col">Players</th>
@@ -115,13 +116,14 @@ export class MatchHistory {
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
-    for (const row of this._rows) {
+    for (const [index, row] of this._rows.entries()) {
       const tr = document.createElement("tr");
       tr.className = "match-history-row";
       tr.dataset.id = String(row.id);
       tr.tabIndex = 0;
       tr.setAttribute("role", "button");
       tr.setAttribute("aria-expanded", this._expandedId === row.id ? "true" : "false");
+      tr.appendChild(td(String(index + 1)));
       tr.appendChild(td(formatRelative(row.startedAt)));
       tr.appendChild(td(row.mapName || "—"));
       tr.appendChild(td((row.participants || []).join(", ")));
@@ -140,7 +142,7 @@ export class MatchHistory {
         const detailTr = document.createElement("tr");
         detailTr.className = "match-history-detail";
         const detailTd = document.createElement("td");
-        detailTd.colSpan = 5;
+        detailTd.colSpan = 6;
         detailTd.appendChild(this._renderDetail(row));
         detailTr.appendChild(detailTd);
         tbody.appendChild(detailTr);
