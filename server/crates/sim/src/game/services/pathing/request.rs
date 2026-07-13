@@ -131,7 +131,11 @@ impl PathingService {
                 &mut self.search_scratch,
             );
 
-        if !tile_path.is_empty() {
+        // A completed empty search is a definitive result for this static-occupancy fingerprint.
+        // Cache it so deferred interaction routing can try alternate goals on the next pass instead
+        // of repeating the same impossible search forever. A budget-exhausted empty result is not
+        // definitive and must remain uncached.
+        if !tile_path.is_empty() || !budget_exhausted {
             self.cache_insert(&req, static_fingerprint, tile_path.clone());
         }
         let diagnostics = PathingRequestDiagnostics {

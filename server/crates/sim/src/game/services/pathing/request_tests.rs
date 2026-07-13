@@ -181,3 +181,40 @@ fn search_permission_defers_misses_but_not_cache_hits() {
     assert_eq!(cached_path, path);
     assert_eq!(cached.cache_status, PathCacheStatus::Hit);
 }
+
+#[test]
+fn completed_no_route_result_is_reused_without_another_search() {
+    let mut map = flat_test_map(32);
+    for ty in 3..=5 {
+        for tx in 2..=4 {
+            if (tx, ty) != (3, 4) {
+                let index = map.index(tx, ty);
+                map.terrain[index] = terrain::ROCK;
+            }
+        }
+    }
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let req = PathRequest {
+        relation: StaticPathingRelation::single_owner(1),
+        kind: EntityKind::Worker,
+        start: (3, 4),
+        goal: (25, 19),
+        radius_tiles: 0,
+        route_shape: RouteShape::Normal,
+        budget: None,
+    };
+
+    let (path, first) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
+    assert!(path.is_empty());
+    assert!(first.expanded_nodes > 0);
+    assert!(!first.budget_exhausted);
+
+    let (cached_path, cached) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, false));
+    assert!(cached_path.is_empty());
+    assert_eq!(cached.cache_status, PathCacheStatus::Hit);
+    assert_eq!(cached.expanded_nodes, 0);
+}
