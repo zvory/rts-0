@@ -89,6 +89,24 @@ await assert.rejects(
   (error) => error?.code === "timeout",
   "driver normalizes timeouts",
 );
+const openAbortController = new AbortController();
+let resolveLateBrowser;
+let disposedLateBrowser = null;
+const abortableDriver = new LabInteractDriver({ workspaceRoot: root, signal: openAbortController.signal });
+const heldBrowserStartup = abortableDriver.openStep(
+  new Promise((resolve) => { resolveLateBrowser = resolve; }),
+  "browser startup",
+  async (browser) => { disposedLateBrowser = browser; },
+);
+openAbortController.abort();
+await assert.rejects(
+  heldBrowserStartup,
+  (error) => error?.code === "sessionClosed",
+  "driver aborts browser startup without waiting for the underlying browser operation",
+);
+resolveLateBrowser("late-browser");
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(disposedLateBrowser, "late-browser", "driver disposes a browser that finishes launching after startup cancellation");
 assert.throws(
   () => new LabInteractDriver({ workspaceRoot: root, timeoutMs: 60_001 }),
   (error) => error?.code === "invalidTimeout",

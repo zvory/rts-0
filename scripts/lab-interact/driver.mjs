@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { withAbortSignal as abortable } from "./abort_signal.mjs";
 import {
   checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, LabInteractRecordingError,
   RECORDING_LIMITS, removePartialRecording,
@@ -130,40 +131,50 @@ export class LabInteractDriver {
     });
     this.serverLogPath = this.server.logPath || "";
 
-    const puppeteer = await loadPuppeteer();
+    const puppeteer = await this.openStep(loadPuppeteer(), "Puppeteer loading");
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during browser startup.");
     }
     const chrome = findChrome(this.options.chrome);
     this.profileDir = fs.mkdtempSync(path.join(this.sessionDir, "chrome-profile-"));
-    const browser = await puppeteer.launch({
-      executablePath: chrome,
-      headless: "new",
-      defaultViewport: normalizeViewport(this.options.viewport),
-      args: [
-        "--no-sandbox",
-        "--disable-features=PointerLockOptions",
-        `--window-size=${this.options.viewport.width},${this.options.viewport.height}`,
-        `--user-data-dir=${this.profileDir}`,
-      ],
-    });
+    const browser = await this.openStep(
+      puppeteer.launch({
+        executablePath: chrome,
+        headless: "new",
+        defaultViewport: normalizeViewport(this.options.viewport),
+        args: [
+          "--no-sandbox",
+          "--disable-features=PointerLockOptions",
+          `--window-size=${this.options.viewport.width},${this.options.viewport.height}`,
+          `--user-data-dir=${this.profileDir}`,
+        ],
+      }),
+      "browser startup",
+      (lateBrowser) => lateBrowser.close(),
+    );
     if (this.state !== DRIVER_STATES.OPENING) {
       await browser.close().catch(() => {});
       throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during browser startup.");
     }
     this.browser = browser;
-    this.browserVersion = await browser.version().catch(() => "");
-    const page = await browser.newPage();
+    this.browserVersion = await this.openStep(browser.version().catch(() => ""), "browser version inspection");
+    const page = await this.openStep(browser.newPage(), "page startup");
     if (this.state !== DRIVER_STATES.OPENING) {
       await page.close().catch(() => {});
       throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during page startup.");
     }
     this.page = page;
     this.attachPageDiagnostics();
-    await this.page.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs });
-    await this.page.waitForFunction(
-      () => window.__rtsLabInteract?.status?.().ready === true,
-      { timeout: this.options.startupTimeoutMs },
+    await this.openStep(
+      this.page.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
+      "page navigation",
+    );
+    await this.openStep(
+      this.page.waitForFunction(
+        () => window.__rtsLabInteract?.status?.().ready === true,
+        { timeout: this.options.startupTimeoutMs },
+      ),
+      "page readiness",
     );
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new LabInteractDriverError("sessionClosed", "Lab Interact driver was closed during page startup.");
@@ -172,12 +183,13 @@ export class LabInteractDriver {
       throw new LabInteractDriverError("pageError", "Lab Interact page reported an error before readiness.");
     }
     this.transition("opened");
+    const ready = await this.openStep(this.status(), "session verification");
     this.writeManifest({
       status: this.state,
       baseUrl: this.server.baseUrl,
       reusedServer: this.server.reused,
       browser: { chrome, viewport: normalizeViewport(this.options.viewport) },
-      ready: await this.status(),
+      ready,
     });
   }
 
@@ -186,6 +198,15 @@ export class LabInteractDriver {
     return this.pageErrors.length === 0
       ? status
       : { ...status, ready: false, reason: "pageError" };
+  }
+
+  openStep(promise, detail, disposeLateValue = null) {
+    return abortable(
+      promise,
+      this.options.signal,
+      () => new LabInteractDriverError("sessionClosed", `Lab Interact driver was closed during ${detail}.`),
+      disposeLateValue,
+    );
   }
 
   async catalog(query = {}) {

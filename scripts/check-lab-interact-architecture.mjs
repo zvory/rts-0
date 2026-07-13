@@ -94,7 +94,7 @@ function checkImports() {
   const imports = new Map([...sources].map(([name, source]) => [name, relativeImports(source)]));
   forbidImports(imports, "driver.mjs", ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "cli.mjs", "daemon.mjs"]);
   forbidImports(imports, "runtime.mjs", ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "cli.mjs", "daemon.mjs"]);
-  for (const name of ["process_runner.mjs", "private_server.mjs", "recording.mjs", "fixed_capture.mjs", "tailnet_preview.mjs", "workspace_inspection.mjs"]) {
+  for (const name of ["abort_signal.mjs", "process_runner.mjs", "private_server.mjs", "recording.mjs", "fixed_capture.mjs", "tailnet_preview.mjs", "workspace_inspection.mjs"]) {
     forbidImports(imports, name, ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "driver.mjs", "cli.mjs", "daemon.mjs"]);
   }
   for (const name of ["command_inputs.mjs", "command_registry.mjs", "command_help.mjs", "session_coordinator.mjs"]) {
@@ -220,6 +220,7 @@ function checkSizeRatchets() {
   for (const [name, maximum] of [
     ["command_service.mjs", 925],
     ["driver.mjs", 1_200],
+    ["abort_signal.mjs", 60],
     ["process_runner.mjs", 190],
     ["private_server.mjs", 275],
     ["recording.mjs", 525],
