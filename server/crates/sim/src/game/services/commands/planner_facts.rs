@@ -6,11 +6,42 @@ use crate::game::services::order_planner as planner;
 use crate::rules;
 
 use super::guards::{dedupe_cap_units, unit_can_accept_ground_command};
+use super::{ability_from_planner, build_kind_from_code};
 
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
     planner::PlannerConfig {
         max_units_per_command,
         max_queue_len: MAX_QUEUED_ORDERS,
+    }
+}
+
+pub(super) fn entity_order_intent_from_planner(
+    intent: planner::OrderIntent,
+) -> Option<OrderIntent> {
+    match intent {
+        planner::OrderIntent::Move(point) => Some(OrderIntent::move_to(point.x, point.y)),
+        planner::OrderIntent::AttackMove(point) => {
+            Some(OrderIntent::attack_move_to(point.x, point.y))
+        }
+        planner::OrderIntent::HoldPosition => Some(OrderIntent::hold_position()),
+        planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
+        planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
+        planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),
+        planner::OrderIntent::Build {
+            kind,
+            tile_x,
+            tile_y,
+        } => {
+            build_kind_from_code(kind).map(|building| OrderIntent::build(building, tile_x, tile_y))
+        }
+        planner::OrderIntent::WorldAbility { ability, target } => ability_from_planner(ability)
+            .map(|ability| OrderIntent::ability(ability, target.x, target.y)),
+        planner::OrderIntent::SelfAbility { ability } => {
+            ability_from_planner(ability).map(OrderIntent::self_ability)
+        }
+        planner::OrderIntent::SetupAntiTankGuns { face_toward } => Some(
+            OrderIntent::setup_anti_tank_guns(face_toward.x, face_toward.y),
+        ),
     }
 }
 

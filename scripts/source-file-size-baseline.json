@@ -25,8 +25,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1715,
-      "reason": "Production command DTO coverage remains in the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1696,
+      "reason": "Command-envelope tests were split from the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -35,8 +35,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1933,
-      "reason": "Repeat production adds one dispatch arm while its validation and mutation live in a dedicated command submodule; keep ratcheting until more command families are extracted."
+      "lines": 1918,
+      "reason": "Planner-intent conversion was split from the existing oversized command dispatcher; keep ratcheting until more command families are extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
@@ -50,8 +50,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1524,
-      "reason": "Panzerfaust reload extracted queued attack promotion helpers from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
+      "lines": 1514,
+      "reason": "Ready-order and hold-position promotion tests were split from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",

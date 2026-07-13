@@ -487,7 +487,9 @@ impl EntityState {
                 x: marker.x,
                 y: marker.y,
             };
-            if active_order.is_none() {
+            // Authoritative active HoldPosition is intentionally absent from orderPlan, so every
+            // hold marker arriving in a baseline is a queued terminal stage.
+            if active_order.is_none() && order.kind != MoveOrderKind::HoldPosition {
                 active_order = Some(order);
             } else {
                 queued_orders.push_back(order);
@@ -514,11 +516,19 @@ impl EntityState {
 
     fn advance_one_tick(&mut self) {
         let Some(order) = self.active_order else {
-            self.state = "idle".to_string();
+            if self.queued_orders.is_empty() {
+                self.state = "idle".to_string();
+            } else {
+                self.finish_order();
+            }
             return;
         };
         if order.kind == MoveOrderKind::HoldPosition {
-            self.state = "idle".to_string();
+            if self.queued_orders.is_empty() {
+                self.state = "idle".to_string();
+            } else {
+                self.finish_order();
+            }
             return;
         }
         let dx = order.x - self.x;
@@ -579,10 +589,7 @@ impl EntityState {
             x: self.x,
             y: self.y,
             state: self.state.clone(),
-            order_plan: self
-                .active_order
-                .map(|order| vec![order.to_marker()])
-                .unwrap_or_default(),
+            order_plan: self.active_order_marker().into_iter().collect(),
             queued_order_stages: self
                 .queued_orders
                 .iter()
@@ -592,11 +599,16 @@ impl EntityState {
     }
 
     fn order_plan(&self) -> Vec<OrderPlanMarker> {
-        self.active_order
-            .iter()
-            .chain(self.queued_orders.iter())
-            .map(|order| order.to_marker())
+        self.active_order_marker()
+            .into_iter()
+            .chain(self.queued_orders.iter().map(|order| order.to_marker()))
             .collect()
+    }
+
+    fn active_order_marker(&self) -> Option<OrderPlanMarker> {
+        self.active_order
+            .filter(|order| order.kind != MoveOrderKind::HoldPosition)
+            .map(MoveOrder::to_marker)
     }
 
     fn queue_has_terminal_hold(&self) -> bool {
@@ -744,7 +756,7 @@ fn correction_magnitude(
 fn owner_safe_order_plan(markers: &[OrderPlanMarker]) -> Vec<OrderPlanMarker> {
     markers
         .iter()
-        .filter(|marker| matches!(marker.kind.as_str(), "move" | "attackMove"))
+        .filter(|marker| matches!(marker.kind.as_str(), "move" | "attackMove" | "holdPosition"))
         .cloned()
         .collect()
 }
@@ -1088,6 +1100,82 @@ mod tests {
         assert_eq!(entity.x, 110.0);
         assert_eq!(entity.y, 100.0);
         assert_eq!(entity.state, "idle");
+    }
+
+    #[test]
+    fn authoritative_baseline_preserves_terminal_hold_position() {
+        let mut authoritative = snapshot();
+        authoritative.entities[0].order_plan = vec![
+            OrderPlanMarker {
+                kind: "move".to_string(),
+                x: 110.0,
+                y: 100.0,
+            },
+            OrderPlanMarker {
+                kind: "holdPosition".to_string(),
+                x: 110.0,
+                y: 100.0,
+            },
+        ];
+        let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+        assert_eq!(baseline.owned_entities[0].order_plan.len(), 2);
+
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor.import_baseline(baseline).unwrap();
+        predictor.enqueue_command(
+            3,
+            Command::Move {
+                units: vec![101],
+                x: 120.0,
+                y: 100.0,
+                queued: true,
+            },
+        );
+
+        let summary = predictor.local_lane_summary();
+        assert_eq!(summary.owned_entities[0].order_plan[0].kind, "move");
+        assert_eq!(summary.owned_entities[0].queued_order_stages.len(), 1);
+        assert_eq!(
+            summary.owned_entities[0].queued_order_stages[0].kind,
+            "holdPosition"
+        );
+    }
+
+    #[test]
+    fn held_unit_promotes_a_later_queued_move() {
+        let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor.import_baseline(baseline).unwrap();
+        predictor.enqueue_command(
+            1,
+            Command::HoldPosition {
+                units: vec![101],
+                queued: false,
+            },
+        );
+        let held = &predictor.render_snapshot().entities[0];
+        assert_eq!(held.state, "idle");
+        assert!(held.order_plan.is_empty());
+
+        predictor.enqueue_command(
+            2,
+            Command::Move {
+                units: vec![101],
+                x: 110.0,
+                y: 100.0,
+                queued: true,
+            },
+        );
+
+        let queued = &predictor.render_snapshot().entities[0];
+        assert_eq!(queued.state, "idle");
+        assert_eq!(queued.order_plan.len(), 1);
+        assert_eq!(queued.order_plan[0].kind, "move");
+
+        predictor.advance_ticks(2);
+        let moving = &predictor.render_snapshot().entities[0];
+        assert!(moving.x > 100.0);
+        assert_eq!(moving.state, "move");
     }
 
     #[test]

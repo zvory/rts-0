@@ -593,43 +593,6 @@ function buttonByLabel(card, label) {
   assert(controlGroupCommands.length === 1, "legal recalled control-group command is sent through the budget guard");
   assert(controlGroupToasts.length === 1, "over-budget command restored from stale group data is blocked before send");
 
-  // Shift-held Hold Position is a terminal local order stage after queued movement.
-  const queuedHoldIntent = new ClientIntent();
-  const queuedHoldUnit = { id: 76, x: 64, y: 96, orderPlan: [] };
-  queuedHoldIntent.recordPlannedCommand(
-    cmd.move([queuedHoldUnit.id], 320, 288, false),
-    [queuedHoldUnit],
-    { sent: true, clientSeq: 70 },
-  );
-  queuedHoldIntent.recordPlannedCommand(
-    cmd.holdPosition([queuedHoldUnit.id], true),
-    [queuedHoldUnit],
-    { sent: true, clientSeq: 71 },
-  );
-  queuedHoldIntent.recordPlannedCommand(
-    cmd.move([queuedHoldUnit.id], 448, 288, true),
-    [queuedHoldUnit],
-    { sent: true, clientSeq: 72 },
-  );
-  assertDeepEqual(
-    queuedHoldIntent.plannedOrderPlanForEntity(queuedHoldUnit),
-    [
-      { kind: "move", x: 320, y: 288 },
-      { kind: "holdPosition" },
-    ],
-    "Shift-held Hold Position remains after queued movement and stops later queued commands",
-  );
-  queuedHoldIntent.recordPlannedCommand(
-    cmd.holdPosition([queuedHoldUnit.id]),
-    [queuedHoldUnit],
-    { sent: true, clientSeq: 73 },
-  );
-  assertDeepEqual(
-    queuedHoldIntent.plannedOrderPlanForEntity(queuedHoldUnit),
-    [],
-    "an immediate Hold Position still replaces a locally queued plan",
-  );
-
   // Command-card submenu is local-only and is closed by mode-changing intent actions.
   const commandCardIntent = new ClientIntent();
   commandCardIntent.openWorkerBuildMenu();
