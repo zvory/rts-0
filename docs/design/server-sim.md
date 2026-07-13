@@ -1367,10 +1367,13 @@ Allocation rules:
   arrives and the patch is already occupied, the economy service redirects it to the nearest
   unoccupied same-resource node within ten tiles, or moves it to nearby open grass if none exists.
   Build and Tank Trap deconstruct orders allocate one compatible selected worker per click after the
-  target has passed issue-time validation: immediate orders prefer idle workers and then closest
-  worker to the footprint/target center; queued orders prefer the lowest work assignment load, then
-  closest worker. Work assignment load is the worker's current queued-order count plus one when its
-  active order is already a build or deconstruct intent. Deconstruct targets must be completed Tank
+  target has passed issue-time validation. Immediate orders prefer interruptible idle workers, then
+  workers not already assigned to build/deconstruct work, then interruptible workers already assigned
+  to build/deconstruct work; distance to the footprint/target center breaks ties within each tier.
+  Workers actively constructing a building are not immediate candidates, but may still receive
+  queued handoff work. Queued orders prefer the lowest work assignment load, then closest worker.
+  Work assignment load is the worker's current queued-order count plus one when its active order is
+  already a build or deconstruct intent. Deconstruct targets must be completed Tank
   Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
   must be visible when accepted or promoted. Deconstruction takes half of the Tank Trap's build
   time, is not accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap

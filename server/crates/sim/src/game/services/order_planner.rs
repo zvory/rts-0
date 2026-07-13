@@ -46,6 +46,9 @@ pub struct UnitFacts {
     pub id: UnitId,
     pub pos: Point,
     pub can_receive_orders: bool,
+    /// Immediate orders may replace this unit's current activity. Queued handoffs only require
+    /// `can_receive_orders`, so an active constructor can accept future work without being pulled.
+    pub can_replace_active: bool,
     pub queue_len: usize,
     pub active_build: bool,
     pub activity: UnitActivity,
@@ -65,6 +68,7 @@ impl UnitFacts {
             id,
             pos: Point::new(0.0, 0.0),
             can_receive_orders: true,
+            can_replace_active: true,
             queue_len: 0,
             active_build: false,
             activity: UnitActivity::Idle,
@@ -391,17 +395,12 @@ fn plan_build(
 
     match mode {
         IssueMode::Immediate => {
-            let idle: Vec<&UnitFacts> = builders
+            let candidates: Vec<&UnitFacts> = builders
                 .iter()
                 .copied()
-                .filter(|u| matches!(u.activity, UnitActivity::Idle))
+                .filter(|u| u.can_replace_active)
                 .collect();
-            let candidates = if idle.is_empty() {
-                builders.as_slice()
-            } else {
-                idle.as_slice()
-            };
-            if let Some(unit) = closest_unit(candidates, target) {
+            if let Some(unit) = choose_immediate_work_worker(&candidates, target) {
                 out.actions.push(PlannedAction::ReplaceActive {
                     unit: unit.id,
                     intent,
@@ -438,17 +437,12 @@ fn plan_deconstruct(
 
     match mode {
         IssueMode::Immediate => {
-            let idle: Vec<&UnitFacts> = builders
+            let candidates: Vec<&UnitFacts> = builders
                 .iter()
                 .copied()
-                .filter(|u| matches!(u.activity, UnitActivity::Idle))
+                .filter(|u| u.can_replace_active)
                 .collect();
-            let candidates = if idle.is_empty() {
-                builders.as_slice()
-            } else {
-                idle.as_slice()
-            };
-            if let Some(unit) = closest_unit(candidates, target_point) {
+            if let Some(unit) = choose_immediate_work_worker(&candidates, target_point) {
                 out.actions.push(PlannedAction::ReplaceActive {
                     unit: unit.id,
                     intent,
@@ -613,12 +607,26 @@ fn choose_queued_build_worker<'a>(
         })
 }
 
-fn closest_unit<'a>(units: &'a [&'a UnitFacts], target: Point) -> Option<&'a UnitFacts> {
+fn choose_immediate_work_worker<'a>(
+    units: &'a [&'a UnitFacts],
+    target: Point,
+) -> Option<&'a UnitFacts> {
     units.iter().copied().min_by(|a, b| {
-        distance2(a.pos, target)
-            .total_cmp(&distance2(b.pos, target))
+        immediate_work_priority(a)
+            .cmp(&immediate_work_priority(b))
+            .then_with(|| distance2(a.pos, target).total_cmp(&distance2(b.pos, target)))
             .then_with(|| a.id.cmp(&b.id))
     })
+}
+
+fn immediate_work_priority(unit: &UnitFacts) -> u8 {
+    if matches!(unit.activity, UnitActivity::Idle) {
+        0
+    } else if !unit.active_build {
+        1
+    } else {
+        2
+    }
 }
 
 fn distance2(a: Point, b: Point) -> f32 {
@@ -697,6 +705,20 @@ mod tests {
                 target,
                 target_point: Point::new(x, 100.0),
                 target_valid: true,
+            },
+        }
+    }
+
+    fn build(units: &[UnitId], mode: IssueMode, x: f32) -> OrderRequest {
+        OrderRequest {
+            units: units.to_vec(),
+            mode,
+            order: RequestedOrder::Build {
+                kind: 1,
+                tile_x: 4,
+                tile_y: 4,
+                target: Point::new(x, 100.0),
+                placement_valid: true,
             },
         }
     }
@@ -1083,6 +1105,58 @@ mod tests {
                 intent: OrderIntent::Deconstruct(99),
             }]
         );
+    }
+
+    #[test]
+    fn immediate_deconstruct_prefers_busy_non_builder_over_active_builder() {
+        let config = PlannerConfig::default();
+        let mut active_builder = unit(1);
+        active_builder.can_build = true;
+        active_builder.activity = UnitActivity::Busy;
+        active_builder.active_build = true;
+        active_builder.pos = Point::new(100.0, 100.0);
+        let mut gatherer = unit(2);
+        gatherer.can_build = true;
+        gatherer.activity = UnitActivity::Busy;
+        gatherer.pos = Point::new(300.0, 100.0);
+
+        let out = plan_order(
+            config,
+            &[active_builder, gatherer],
+            &deconstruct(&[1, 2], IssueMode::Immediate, 99, 96.0),
+        );
+
+        assert_eq!(
+            out.actions,
+            vec![PlannedAction::ReplaceActive {
+                unit: 2,
+                intent: OrderIntent::Deconstruct(99),
+            }]
+        );
+    }
+
+    #[test]
+    fn nonreplaceable_builder_can_receive_queued_handoff_but_not_immediate_work() {
+        let config = PlannerConfig::default();
+        let mut constructing = unit(1);
+        constructing.can_build = true;
+        constructing.can_replace_active = false;
+        constructing.active_build = true;
+        constructing.activity = UnitActivity::Busy;
+
+        let immediate = plan_order(
+            config,
+            &[constructing.clone()],
+            &build(&[1], IssueMode::Immediate, 100.0),
+        );
+        let queued = plan_order(
+            config,
+            &[constructing],
+            &build(&[1], IssueMode::Queue, 100.0),
+        );
+
+        assert!(immediate.actions.is_empty());
+        assert_eq!(queued_units(&queued), vec![1]);
     }
 
     #[test]
