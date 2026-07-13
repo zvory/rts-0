@@ -154,6 +154,56 @@ fn build_order_does_not_pull_worker_off_active_construction() {
 }
 
 #[test]
+fn gather_order_does_not_pull_worker_off_active_construction() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+        .expect("worker should spawn");
+    let site = entities
+        .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
+        .expect("scaffold should spawn");
+    let node = entities
+        .spawn_node(EntityKind::Steel, site_x + 96.0, site_y)
+        .expect("steel node should spawn");
+    let worker_entity = entities.get_mut(worker).expect("worker should exist");
+    worker_entity.set_order(Order::build(EntityKind::CityCentre, 4, 4));
+    worker_entity.mark_build_phase(BuildPhase::Constructing { site });
+    worker_entity.set_target_id(Some(site));
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Gather {
+                units: vec![worker],
+                node,
+                queued: false,
+            },
+        )],
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert_eq!(
+        worker.build_phase(),
+        Some(BuildPhase::Constructing { site }),
+        "gather must not unlatch the worker from active construction"
+    );
+    assert_eq!(
+        worker.order().build_intent_tile(),
+        Some((EntityKind::CityCentre, 4, 4)),
+        "gather must not replace the active construction intent"
+    );
+    assert_eq!(
+        worker.target_id(),
+        Some(site),
+        "worker should keep targeting its scaffold"
+    );
+}
+
+#[test]
 fn immediate_build_skips_active_constructor_for_busy_worker() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

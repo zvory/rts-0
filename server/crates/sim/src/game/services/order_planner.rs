@@ -347,10 +347,14 @@ fn plan_filtered_units(
     let mut out = PlannerOutput::default();
     for unit in units.iter().copied().filter(|u| predicate(u)) {
         match mode {
-            IssueMode::Immediate => out.actions.push(PlannedAction::ReplaceActive {
-                unit: unit.id,
-                intent,
-            }),
+            IssueMode::Immediate => {
+                if unit.can_replace_active {
+                    out.actions.push(PlannedAction::ReplaceActive {
+                        unit: unit.id,
+                        intent,
+                    });
+                }
+            }
             IssueMode::Queue => append_or_notice(config, &mut out, unit, intent),
         }
     }
@@ -569,13 +573,13 @@ fn choose_immediate_world_ability_unit<'a>(
             units
                 .iter()
                 .copied()
-                .find(|u| matches!(u.activity, UnitActivity::Idle))
+                .find(|u| u.can_replace_active && matches!(u.activity, UnitActivity::Idle))
         })
         .or_else(|| {
             units
                 .iter()
                 .copied()
-                .find(|u| u.can_interrupt_with_ability(ability))
+                .find(|u| u.can_replace_active && u.can_interrupt_with_ability(ability))
         })
 }
 
@@ -1198,6 +1202,23 @@ mod tests {
 
         assert_eq!(replace_units(&out), vec![1, 2]);
         assert!(out.notices.is_empty());
+    }
+
+    #[test]
+    fn nonreplaceable_unit_can_queue_attack_move_but_not_replace_active_order() {
+        let config = PlannerConfig::default();
+        let mut locked = unit(1);
+        locked.can_replace_active = false;
+
+        let immediate = plan_order(
+            config,
+            &[locked.clone()],
+            &attack_move(&[1], IssueMode::Immediate),
+        );
+        let queued = plan_order(config, &[locked], &attack_move(&[1], IssueMode::Queue));
+
+        assert!(immediate.actions.is_empty());
+        assert_eq!(queued_units(&queued), vec![1]);
     }
 
     #[test]

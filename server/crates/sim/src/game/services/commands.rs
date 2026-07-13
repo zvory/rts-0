@@ -744,7 +744,9 @@ mod planned_actions {
                         }
                     }
                     planner::OrderIntent::Gather(node) => {
-                        if gather_unit_can_use_node(entities, players, player, unit, node) {
+                        if immediate_unit_can_replace(entities, player, unit)
+                            && gather_unit_can_use_node(entities, players, player, unit, node)
+                        {
                             if let Some(e) = entities.get_mut(unit) {
                                 e.clear_queued_orders();
                             }
