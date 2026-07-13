@@ -1134,7 +1134,7 @@ impl Entity {
     }
 
     /// Clear a resource target from every rally stage while retaining each stage's point rally.
-    pub(super) fn clear_rally_resource_target(&mut self, resource_node: u32) {
+    pub(in crate::game) fn clear_rally_resource_target(&mut self, resource_node: u32) {
         let Some(production) = self.production.as_mut() else {
             return;
         };
