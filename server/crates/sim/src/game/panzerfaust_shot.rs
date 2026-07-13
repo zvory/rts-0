@@ -187,12 +187,24 @@ fn resolve(
             .get(shot.attacker)
             .map(|attacker| (attacker.pos_x, attacker.pos_y))
             .unwrap_or((shot.source_x, shot.source_y));
-        let attribution = teams
-            .is_enemy_owner(shot.owner, victim_owner)
-            .then_some((shot.owner, attacker_pos, tick));
-        let damaged = entities
-            .get_mut(shot.target)
-            .is_some_and(|target| target.apply_damage(damage, attribution));
+        let attribution = teams.is_enemy_owner(shot.owner, victim_owner).then_some((
+            shot.owner,
+            attacker_pos,
+            tick,
+        ));
+        let enemy_hit = attribution.is_some();
+        let damaged = entities.get_mut(shot.target).is_some_and(|target| {
+            let damaged = target.apply_damage(damage, attribution);
+            if damaged && enemy_hit {
+                target.record_incoming_direct_ap_threat(
+                    shot.attacker,
+                    attacker_pos,
+                    config::PANZERFAUST_DAMAGE,
+                    tick,
+                );
+            }
+            damaged
+        });
         if damaged {
             push_under_attack_notice(events, teams, victim_owner, shot.owner, victim_pos);
         }
@@ -239,4 +251,43 @@ fn push_under_attack_notice(
         y: Some(victim_pos.1),
         severity: NoticeSeverity::Alert,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enemy_panzerfaust_impact_records_direct_ap_threat_on_surviving_tank() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Panzerfaust, 100.0, 100.0)
+            .expect("Panzerfaust should spawn");
+        let tank = entities
+            .spawn_unit(2, EntityKind::Tank, 140.0, 100.0)
+            .expect("Tank should spawn");
+        let mut shots = PanzerfaustShotStore::default();
+        shots.schedule(1, attacker, tank, (100.0, 100.0), (140.0, 100.0), 0);
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+        let fog = Fog::new(24);
+        let smokes = SmokeCloudStore::new();
+        let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+
+        shots.resolve_due(
+            &mut entities,
+            &teams,
+            &fog,
+            &smokes,
+            &mut events,
+            config::PANZERFAUST_TRAVEL_TICKS,
+        );
+
+        let threat = entities
+            .get(tank)
+            .and_then(|tank| tank.combat.as_ref())
+            .and_then(|combat| combat.incoming_direct_ap_threats.get(&attacker))
+            .expect("Panzerfaust impact should record its direct AP source");
+        assert_eq!((threat.source_x, threat.source_y), (100.0, 100.0));
+        assert_eq!(threat.damage_weight, config::PANZERFAUST_DAMAGE);
+    }
 }

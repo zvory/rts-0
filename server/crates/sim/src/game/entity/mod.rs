@@ -38,6 +38,7 @@ pub use order::{
 };
 #[cfg(test)]
 pub use state::EntityStateGroups;
+pub(in crate::game) use state::IncomingDirectApThreat;
 pub(in crate::game) use state::ScoutPlaneState;
 #[allow(unused_imports)]
 pub use state::{

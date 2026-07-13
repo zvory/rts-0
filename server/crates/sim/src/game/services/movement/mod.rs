@@ -20,6 +20,7 @@ use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
+mod armor_reaction;
 mod collision;
 mod pivot_drive;
 mod scout_car;
@@ -116,6 +117,17 @@ pub(crate) fn movement_system_with_events(
         }
     }
     scout_plane::advance_scout_planes(map, entities);
+    armor_reaction::turn_stationary_tanks_toward_direct_ap_threats(
+        entities,
+        tick,
+        |owner, kind, x, y, facing| {
+            let out_of_oil = players
+                .iter()
+                .find(|player| player.id == owner)
+                .is_some_and(|player| player.oil == 0);
+            !out_of_oil && standability::unit_static_standable(occ, map, kind, x, y, facing)
+        },
+    );
     waypoints::advance_moving_units(
         map,
         entities,

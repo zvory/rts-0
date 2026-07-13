@@ -182,6 +182,15 @@ impl Default for MovementState {
 }
 
 /// Weapon and active target state. Present on combat-capable entities.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub(in crate::game) struct IncomingDirectApThreat {
+    pub(in crate::game) source_x: f32,
+    pub(in crate::game) source_y: f32,
+    /// Pre-facing damage weight, so turning does not itself change the threat average.
+    pub(in crate::game) damage_weight: u32,
+    pub(in crate::game) last_hit_tick: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     /// Ticks until each weapon may attack again (missing or 0 = ready).
@@ -216,6 +225,10 @@ pub struct CombatState {
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
+    /// Recent direct AP attackers considered by the tank's autonomous hull-facing response.
+    /// Keyed by attacker id so repeated shots refresh one threat instead of overweighting it.
+    #[serde(default)]
+    pub(in crate::game) incoming_direct_ap_threats: BTreeMap<u32, IncomingDirectApThreat>,
     /// Panzerfaust loaded-shot runtime. Only Panzerfaust entities carry this; the projectile is
     /// hidden while in flight or reloading, then restored when the state returns to Loaded.
     pub panzerfaust: Option<PanzerfaustState>,
@@ -238,6 +251,7 @@ impl Default for CombatState {
             autocast_enabled: true,
             tank_stationary_range_ticks: 0,
             tank_stationary_range_reset_this_tick: false,
+            incoming_direct_ap_threats: BTreeMap::new(),
             panzerfaust: None,
         }
     }

@@ -362,6 +362,16 @@ pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
     profile.armor_penetration > 0.0
 }
 
+/// Whether a successful hit from this weapon should make a tank turn its hull toward the source.
+/// Keep this opt-in so future indirect AP weapons do not accidentally drive armor reactions.
+pub fn weapon_triggers_tank_armor_reaction(profile: &WeaponProfile) -> bool {
+    weapon_is_ap(profile)
+        && matches!(
+            profile.id,
+            WeaponKind::AntiTankGun | WeaponKind::PanzerfaustLoadedShot | WeaponKind::TankCannon
+        )
+}
+
 /// Rules-owned armor classification for target ranking and damage policy.
 pub fn armor_class(kind: EntityKind) -> Option<ArmorClass> {
     defs::unit_def(kind)
@@ -688,6 +698,27 @@ fn normalized_angle_delta(from: f32, to: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tank_armor_reaction_sources_are_explicit_direct_ap_weapons() {
+        for kind in [
+            WeaponKind::AntiTankGun,
+            WeaponKind::PanzerfaustLoadedShot,
+            WeaponKind::TankCannon,
+        ] {
+            let profile = weapon_profile(kind).expect("weapon profile should exist");
+            assert!(weapon_triggers_tank_armor_reaction(profile), "{kind:?}");
+        }
+        for kind in [
+            WeaponKind::TankCoax,
+            WeaponKind::MortarTeamMortar,
+            WeaponKind::ArtilleryGun,
+            WeaponKind::MachineGunnerMg,
+        ] {
+            let profile = weapon_profile(kind).expect("weapon profile should exist");
+            assert!(!weapon_triggers_tank_armor_reaction(profile), "{kind:?}");
+        }
+    }
 
     fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
         if kind == EntityKind::Panzerfaust {

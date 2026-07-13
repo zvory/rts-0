@@ -78,6 +78,13 @@ fn tank_default_cannon_direct_hit_uses_ap_damage() {
         60,
         "Tank default cannon damage should remain AP against armored targets"
     );
+    let threat = entities
+        .get(victim)
+        .and_then(|victim| victim.combat.as_ref())
+        .and_then(|combat| combat.incoming_direct_ap_threats.get(&attacker))
+        .expect("successful enemy Tank cannon hit should record a direct AP threat");
+    assert_eq!((threat.source_x, threat.source_y), (100.0, 100.0));
+    assert_eq!(threat.damage_weight, 60);
 }
 
 #[test]
@@ -114,6 +121,49 @@ fn machine_gunner_default_hit_remains_small_arms_against_armor() {
         before - entities.get(victim).expect("victim tank should exist").hp,
         10,
         "Machine Gunner default damage should stay armor-reduced small arms"
+    );
+    assert!(
+        entities
+            .get(victim)
+            .and_then(|victim| victim.combat.as_ref())
+            .is_some_and(|combat| combat.incoming_direct_ap_threats.is_empty()),
+        "non-AP direct fire must not trigger a tank hull response"
+    );
+}
+
+#[test]
+fn allied_tank_cannon_damage_does_not_record_armor_reaction_threat() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("attacker tank should spawn");
+    let victim = entities
+        .spawn_unit(2, EntityKind::Tank, 140.0, 100.0)
+        .expect("victim tank should spawn");
+    let teams = team_relations(&[(1, 7), (2, 7)]);
+    let mut events: HashMap<u32, Vec<Event>> = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+
+    apply_test_damage_with_teams(
+        &mut entities,
+        &teams,
+        &mut events,
+        attacker,
+        victim,
+        60,
+        1,
+        100.0,
+        100.0,
+        140.0,
+        100.0,
+        128.0,
+    );
+
+    assert!(
+        entities
+            .get(victim)
+            .and_then(|victim| victim.combat.as_ref())
+            .is_some_and(|combat| combat.incoming_direct_ap_threats.is_empty()),
+        "allied AP damage must not steer the victim tank"
     );
 }
 
