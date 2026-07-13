@@ -791,7 +791,7 @@ range remains the fallback for render-only range overlays.
 trench. It names the neutral trench terrain id already projected through `trenches`; it is omitted
 while the unit is digging in, slotting is unavailable, merely near a trench, or moving out.
 `panzerfaustLoaded` is present for visible Panzerfaust units. It is `false` while the fired
-projectile is in flight or the unit is reloading, so the client can hide the warhead from unit art;
+projectile is in flight or the spent launcher is being discarded before Rifleman conversion, so the client can hide the warhead from unit art;
 omitted values should be treated as loaded for older data and non-Panzerfaust entities.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center; enemy projections that can see the plane omit this state. Scout Plane
@@ -892,7 +892,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
-  panzerfaustLoaded?: bool,       // Panzerfaust only; false while projectile is missing/reloading
+  panzerfaustLoaded?: bool,       // Panzerfaust only; false after its disposable shot is launched
   scoutPlane?: {                 // owner/full-world diagnostics only; enemies omit this private state
     orbitCenter?: [f32, f32]
   },
@@ -1020,16 +1020,16 @@ recipients whose team currently sees the impact point; they do not reveal terrai
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
-Panzerfaust launch events are emitted by the reloadable anti-tank runtime. They carry the firing
+Panzerfaust launch events are emitted by the one-shot anti-tank runtime. They carry the firing
 unit id, launch point, intended visual endpoint, and travel delay, but never carry the target entity id.
 Launch events are sent to the firing team and to enemy recipients whose
 team-current fog can see the shooter or launch point; the endpoint must be withheld unless it is
 visible to that recipient or otherwise already safe through the recipient's projection. Panzerfaust
 impact events carry only the impact point and are sent to the firing team and to enemy recipients
 whose team-current fog can see that point; they do not imply damage, target identity, terrain
-reveal, or exploration. Panzerfaust conversion events are legacy replay data from the previous
-one-shot implementation; current gameplay keeps the same Panzerfaust entity and uses
-`panzerfaustLoaded` plus the launch/impact events to show reload state.
+reveal, or exploration. Panzerfaust conversion events report the same-id transition to Rifleman
+after the spent launcher's recovery presentation; `panzerfaustLoaded` plus launch/impact events
+show the one-shot lifecycle before that conversion.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 #### 2.5.1 Projection contract summary

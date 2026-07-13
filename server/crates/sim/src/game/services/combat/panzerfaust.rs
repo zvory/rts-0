@@ -1,5 +1,8 @@
 use crate::config;
-use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, PanzerfaustState};
+use crate::game::entity::{
+    convert_panzerfaust_to_rifleman as convert_panzerfaust_entity, AttackPhase, Entity, EntityKind,
+    EntityStore, Order, PanzerfaustState,
+};
 use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
@@ -33,25 +36,26 @@ pub(super) fn handle_combat_if_panzerfaust(
     smokes: &SmokeCloudStore,
     id: u32,
 ) -> bool {
-    if !matches!(
-        entities.get(id).map(|entity| entity.kind),
-        Some(EntityKind::Panzerfaust)
-    ) {
-        return false;
+    match entities.get(id).and_then(|entity| {
+        (entity.kind == EntityKind::Panzerfaust)
+            .then(|| entity.combat.as_ref().and_then(|combat| combat.panzerfaust))
+            .flatten()
+    }) {
+        Some(PanzerfaustState::Windup { .. }) => true,
+        Some(PanzerfaustState::Loaded) => handle_loaded_combat(
+            map,
+            entities,
+            teams,
+            methamphetamines_researched,
+            occ,
+            spatial,
+            coordinator,
+            fog,
+            smokes,
+            id,
+        ),
+        Some(PanzerfaustState::InFlight { .. } | PanzerfaustState::Recovery { .. }) | None => false,
     }
-    handle_loaded_combat(
-        map,
-        entities,
-        teams,
-        methamphetamines_researched,
-        occ,
-        spatial,
-        coordinator,
-        fog,
-        smokes,
-        id,
-    );
-    true
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -66,17 +70,17 @@ fn handle_loaded_combat(
     fog: &Fog,
     smokes: &SmokeCloudStore,
     id: u32,
-) {
+) -> bool {
     if entities.get(id).and_then(panzerfaust_state) != Some(PanzerfaustState::Loaded) {
-        return;
+        return false;
     }
     let Some((owner, px, py, range_px, acquire_px, mode)) =
         panzerfaust_combat_context(entities, id)
     else {
-        return;
+        return false;
     };
     if mode == CombatMode::Passive {
-        return;
+        return false;
     }
 
     let los = LineOfSight::with_smoke(map, smokes);
@@ -84,19 +88,18 @@ fn handle_loaded_combat(
         map, entities, teams, occ, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
     );
     let Some(target) = target else {
-        handle_no_target(entities, coordinator, id, mode);
-        return;
+        return false;
     };
     let Some((tx, ty, target_owner)) = entities
         .get(target)
         .map(|target| (target.pos_x, target.pos_y, target.owner))
     else {
-        return;
+        return false;
     };
     if !(teams.is_enemy_owner(owner, target_owner)
         || mode == CombatMode::Ordered && target_owner == owner)
     {
-        return;
+        return false;
     }
 
     let distance = dist2(px, py, tx, ty).sqrt();
@@ -120,7 +123,7 @@ fn handle_loaded_combat(
                 },
             );
         }
-        return;
+        return true;
     }
 
     if mode != CombatMode::Opportunistic {
@@ -143,6 +146,7 @@ fn handle_loaded_combat(
             coordinator.request_chase_path(entities, id, chase_goal);
         }
     }
+    true
 }
 
 fn panzerfaust_combat_context(
@@ -226,43 +230,6 @@ fn resolve_panzerfaust_target(
     )
 }
 
-fn handle_no_target(
-    entities: &mut EntityStore,
-    coordinator: &mut MoveCoordinator<'_>,
-    id: u32,
-    mode: CombatMode,
-) {
-    if let Some(attacker) = entities.get_mut(id) {
-        if matches!(
-            attacker.order(),
-            Order::Attack(_) | Order::AttackMove(_) | Order::Idle | Order::HoldPosition
-        ) {
-            attacker.set_target_id(None);
-        }
-    }
-    if mode != CombatMode::Aggressive {
-        return;
-    }
-    let Some(goal) = entities.get(id).and_then(|e| e.move_intent()) else {
-        return;
-    };
-    let needs_resume = entities
-        .get(id)
-        .map(|e| {
-            let stale_goal = e.path_goal().is_none_or(|path_goal| {
-                (path_goal.0 - goal.0).abs() > f32::EPSILON
-                    || (path_goal.1 - goal.1).abs() > f32::EPSILON
-            });
-            let interrupted_before_arrival = e.path_is_empty()
-                && e.move_phase() != Some(crate::game::entity::MovePhase::Arrived);
-            stale_goal || interrupted_before_arrival
-        })
-        .unwrap_or(true);
-    if needs_resume {
-        coordinator.request_chase_path(entities, id, goal);
-    }
-}
-
 fn panzerfaust_target_valid(
     entities: &EntityStore,
     teams: &TeamRelations,
@@ -291,6 +258,10 @@ fn set_panzerfaust_state(entity: &mut Entity, state: PanzerfaustState) {
     if let Some(combat) = entity.combat.as_mut() {
         combat.panzerfaust = Some(state);
     }
+}
+
+fn convert_panzerfaust_to_rifleman(entity: &mut Entity) -> bool {
+    convert_panzerfaust_entity(entity)
 }
 
 fn panzerfaust_range_tiles(attacker: &Entity) -> f32 {

@@ -268,11 +268,11 @@ fn overpenetration_depth_comes_from_weapon_profile() {
         .spawn_unit(2, EntityKind::ScoutCar, 140.0, 100.0)
         .expect("primary scout car should spawn");
     let secondary = entities
-        .spawn_unit(2, EntityKind::Worker, 195.0, 100.0)
-        .expect("secondary worker should spawn");
+        .spawn_unit(2, EntityKind::ScoutCar, 195.0, 100.0)
+        .expect("secondary scout car should spawn");
     let secondary_before = entities
         .get(secondary)
-        .expect("secondary worker should exist")
+        .expect("secondary scout car should exist")
         .hp;
     let weapon = combat_rules::weapon_profile(combat_rules::WeaponKind::AntiTankGun)
         .expect("anti-tank profile should exist");
@@ -297,7 +297,7 @@ fn overpenetration_depth_comes_from_weapon_profile() {
     assert!(
         entities
             .get(secondary)
-            .expect("secondary worker should exist")
+            .expect("secondary scout car should exist")
             .hp
             < secondary_before,
         "anti-tank weapon profile should keep its longer overpenetration depth independent of attacker kind"

@@ -80,11 +80,11 @@ const start = {
     events: [],
   });
 
-  assert(state.selection.has(41), "Panzerfaust reload preserves client selection");
-  assert(state.selectedEntities()[0]?.kind === KIND.PANZERFAUST, "reloading Panzerfaust keeps its unit kind");
-  assert(state.selectedEntities()[0]?.panzerfaustLoaded === false, "reloading Panzerfaust keeps projectile-loaded state");
-  assert(state.controlGroups[0].join(",") === "41", "Panzerfaust reload preserves local control groups");
-  assert(state.controlGroupEntities(0)[0]?.kind === KIND.PANZERFAUST, "control-group recall resolves the reloading Panzerfaust in place");
+  assert(state.selection.has(41), "spent Panzerfaust recovery preserves client selection");
+  assert(state.selectedEntities()[0]?.kind === KIND.PANZERFAUST, "recovering Panzerfaust keeps its unit kind until conversion");
+  assert(state.selectedEntities()[0]?.panzerfaustLoaded === false, "spent Panzerfaust reports its launcher as unloaded");
+  assert(state.controlGroups[0].join(",") === "41", "spent Panzerfaust recovery preserves local control groups");
+  assert(state.controlGroupEntities(0)[0]?.kind === KIND.PANZERFAUST, "control-group recall resolves the recovering Panzerfaust in place");
 }
 
 {
@@ -106,5 +106,5 @@ const start = {
   const unloaded = sampleRigAnimation(definition, unloadedEntity, createRigRenderContext(unloadedEntity));
 
   assert(loaded.parts["part.pzf.warhead"].visible === true, "loaded Panzerfaust rig shows the warhead");
-  assert(unloaded.parts["part.pzf.warhead"].visible === false, "reloading Panzerfaust rig hides the warhead");
+  assert(unloaded.parts["part.pzf.warhead"].visible === false, "spent Panzerfaust rig hides the warhead");
 }
