@@ -422,16 +422,14 @@ export function _refreshAbilityTargetPreview() {
     intent?.updateAbilityTargetPreview?.(null);
     return;
   }
-  const tileSize = this.state.map?.tileSize || 32;
+  const tileSize = this.state.map?.tileSize || DEFAULT_TILE_SIZE;
   const rangePx = definition.rangeTiles * tileSize;
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const locksRangeBand = isArtilleryFireAbility(target.ability);
-  // Artillery cones are rendered after this frame's camera update. Map their
-  // hover target through that same current projection so they do not trail a
+  // Cursor feedback is rendered after this frame's camera update. Map its
+  // hover target through that same current projection so it does not trail a
   // panning camera. Ground-command clicks still use SelectionScene geometry.
-  const world = locksRangeBand
-    ? cursorPreviewGroundAtScreen(this, this.mouse)
-    : this._groundAtScreen(this.mouse.x, this.mouse.y);
+  const world = cursorPreviewGroundAtScreen(this, this.mouse);
   if (!world) {
     intent?.updateAbilityTargetPreview?.(null);
     return;
@@ -565,7 +563,7 @@ function cursorPreviewGroundAtScreen(input, screen) {
       // A valid current projection returning no hit must clear the preview,
       // rather than resurrecting a position from a stale SelectionScene.
       if (point == null) return null;
-      const clamped = clampSetupPreviewPoint(point, input?.state?.map);
+      const clamped = clampCursorPreviewPoint(point, input?.state?.map);
       if (clamped) return clamped;
     } catch {
       // A malformed fresh projection must not break the existing input path.
@@ -574,7 +572,7 @@ function cursorPreviewGroundAtScreen(input, screen) {
   return input._groundAtScreen(screen.x, screen.y);
 }
 
-function clampSetupPreviewPoint(point, map) {
+function clampCursorPreviewPoint(point, map) {
   if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
   const mapWidthPx = Number(map?.width) * Number(map?.tileSize);
   const mapHeightPx = Number(map?.height) * Number(map?.tileSize);

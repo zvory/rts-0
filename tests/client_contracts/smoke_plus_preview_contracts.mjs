@@ -34,12 +34,22 @@ import { Input } from "../../client/src/input/index.js";
   };
   smokeInput.clientIntent = new ClientIntent();
   smokeInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.SMOKE });
-  smokeInput._groundAtScreen = (x, y) => ({ x, y });
+  smokeInput.camera = {
+    projectionSnapshot: () => ({
+      groundAtScreen: ({ x, y }) => ({ x: x + 36, y: y + 40 }),
+    }),
+  };
+  smokeInput._groundAtScreen = () => ({ x: 0, y: 0 });
   smokeInput._refreshAbilityTargetPreview();
   const upgradedRadiusTiles = ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles;
   assert(
     smokeInput.clientIntent.abilityTargetPreview?.radiusPx === upgradedRadiusTiles * 32 &&
       upgradedRadiusTiles === SMOKE_CLOUD_RADIUS_TILES * 1.5,
     "Smoke Plus targeting preview uses the command owner's upgraded cloud radius",
+  );
+  assert(
+    smokeInput.clientIntent.abilityTargetPreview?.rawMouseX === 200 &&
+      smokeInput.clientIntent.abilityTargetPreview?.rawMouseY === 140,
+    "world-point ability previews follow the current renderer projection",
   );
 }
