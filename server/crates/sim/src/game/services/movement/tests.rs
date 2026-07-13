@@ -118,14 +118,7 @@ fn road_tile_applies_authoritative_movement_speed_multiplier() {
     let occ = Occupancy::build(&map, &entities);
     let spatial = SpatialIndex::build(&entities, map.size);
     let mut players = vec![player_with_oil(1, 1_000)];
-    movement_system(
-        &map,
-        &mut entities,
-        &mut players,
-        &occ,
-        &spatial,
-        1,
-    );
+    movement_system(&map, &mut entities, &mut players, &occ, &spatial, 1);
 
     let grass_moved = moved_distance(grass_start, pos(&entities, grass));
     let road_moved = moved_distance(road_start, pos(&entities, road));
@@ -134,9 +127,7 @@ fn road_tile_applies_authoritative_movement_speed_multiplier() {
         .speed;
     assert!((grass_moved - expected_grass).abs() <= 0.001);
     assert!(
-        (road_moved
-            - expected_grass * crate::rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER)
-            .abs()
+        (road_moved - expected_grass * crate::rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER).abs()
             <= 0.001,
         "road moved {road_moved}px while grass moved {grass_moved}px"
     );

@@ -537,23 +537,19 @@ impl Game {
                 ),
             });
         }
-        if draft
-            .terrain
-            .iter()
-            .any(|tile| {
-                !matches!(
-                    *tile,
-                    terrain::GRASS
-                        | terrain::ROCK
-                        | terrain::WATER
-                        | terrain::ROAD_BARE
-                        | terrain::ROAD_HORIZONTAL
-                        | terrain::ROAD_VERTICAL
-                        | terrain::ROAD_DIAGONAL_NW_SE
-                        | terrain::ROAD_DIAGONAL_NE_SW
-                )
-            })
-        {
+        if draft.terrain.iter().any(|tile| {
+            !matches!(
+                *tile,
+                terrain::GRASS
+                    | terrain::ROCK
+                    | terrain::WATER
+                    | terrain::ROAD_BARE
+                    | terrain::ROAD_HORIZONTAL
+                    | terrain::ROAD_VERTICAL
+                    | terrain::ROAD_DIAGONAL_NW_SE
+                    | terrain::ROAD_DIAGONAL_NE_SW
+            )
+        }) {
             return Err(LabError::InvalidMap {
                 name: name.to_string(),
                 reason: "terrain contains an unknown code".to_string(),

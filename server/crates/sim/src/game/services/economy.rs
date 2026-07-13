@@ -25,12 +25,10 @@ pub(crate) fn gather_system(
 ) {
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.hp > 0 && is_gatherer_kind(e.kind) => {
-                match e.order().gather_node() {
-                    Some(node) => node,
-                    None => continue,
-                }
-            }
+            Some(e) if e.hp > 0 && is_gatherer_kind(e.kind) => match e.order().gather_node() {
+                Some(node) => node,
+                None => continue,
+            },
             _ => continue,
         };
 
@@ -42,15 +40,9 @@ pub(crate) fn gather_system(
             GatherPhase::ToNode | GatherPhase::ToHome => {
                 gather_to_node(map, entities, occ, coordinator, id, node)
             }
-            GatherPhase::Harvesting => gather_harvesting(
-                map,
-                entities,
-                players,
-                coordinator,
-                id,
-                node,
-                tick,
-            ),
+            GatherPhase::Harvesting => {
+                gather_harvesting(map, entities, players, coordinator, id, node, tick)
+            }
         }
     }
     for payout in pump_jack::tick(entities) {
@@ -167,11 +159,8 @@ fn closest_unoccupied_same_resource_node(
             (d2 <= range2).then_some((candidate.id, d2))
         })
         .collect();
-    candidates.sort_by(|(a_id, a_d2), (b_id, b_d2)| {
-        a_d2
-            .total_cmp(b_d2)
-            .then_with(|| a_id.cmp(b_id))
-    });
+    candidates
+        .sort_by(|(a_id, a_d2), (b_id, b_d2)| a_d2.total_cmp(b_d2).then_with(|| a_id.cmp(b_id)));
     candidates.first().map(|(id, _)| *id)
 }
 
