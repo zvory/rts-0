@@ -1284,9 +1284,9 @@ General rules:
   Gun, and Panzerfaust threats. Active movement paths and zero oil take precedence; Idle, Hold
   Position, in-range Attack, and arrived Attack Move may react without changing their order, path,
   target, or independent turret aim. Low-coherence opposite threats produce no turn, and static
-  standability may block a rotation but never translate the Tank to make room. Because stationary
-  range is position-based, this in-place reaction preserves the range ramp; path translation still
-  resets it.
+  standability may block a rotation but never translate the Tank to make room. This autonomous
+  rotation preserves the stationary range ramp; path translation and path-driven hull rotation
+  still reset it.
   Direct-fire legality is centralized in `services::combat::acquisition::direct_fire_target_legal`:
   default auto-acquisition/firing uses the current resolved-target mode that rejects friendly hard
   blockers but may resolve to an intervening enemy hard blocker, while ordered/intended-target uses

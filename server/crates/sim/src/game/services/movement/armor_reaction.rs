@@ -1,9 +1,7 @@
-use crate::config;
 use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order};
 
 use super::pivot_drive::{angle_delta, rotate_toward, TANK_BODY_TURN_RATE_RAD_PER_TICK};
 
-const DIRECT_AP_THREAT_MEMORY_TICKS: u32 = config::TICK_HZ * 3;
 const MIN_DIRECTION_COHERENCE: f32 = 0.2;
 const FACING_EPS_RAD: f32 = 1.0e-4;
 
@@ -20,7 +18,8 @@ pub(super) fn turn_stationary_tanks_toward_direct_ap_threats<F>(
                 continue;
             };
             combat.incoming_direct_ap_threats.retain(|_, threat| {
-                tick.saturating_sub(threat.last_hit_tick) <= DIRECT_AP_THREAT_MEMORY_TICKS
+                tick.saturating_sub(threat.last_hit_tick)
+                    <= crate::rules::combat::TANK_ARMOR_REACTION_MEMORY_TICKS
             });
         }
 
@@ -96,6 +95,7 @@ fn desired_threat_facing(tank: &Entity) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config;
     use crate::game::entity::EntityStore;
 
     fn turn_once(entities: &mut EntityStore, tick: u32) {
@@ -217,7 +217,10 @@ mod tests {
                 <= 0.0001
         );
 
-        turn_once(&mut entities, 10 + DIRECT_AP_THREAT_MEMORY_TICKS + 1);
+        turn_once(
+            &mut entities,
+            10 + crate::rules::combat::TANK_ARMOR_REACTION_MEMORY_TICKS + 1,
+        );
         assert!(entities
             .get(tank_id)
             .expect("tank should exist")

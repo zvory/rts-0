@@ -307,7 +307,7 @@ fn tank_path_translation_resets_stationary_range_to_base() {
 }
 
 #[test]
-fn tank_path_pivot_without_translation_preserves_stationary_range() {
+fn tank_path_pivot_without_translation_resets_stationary_range_to_base() {
     let mut entities = EntityStore::new();
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -330,7 +330,10 @@ fn tank_path_pivot_without_translation_preserves_stationary_range() {
         (0.0, 0.0),
         "high-error tank pivot should not translate on the reset tick"
     );
-    assert_range_near(tank_range_tiles(&entities, tank_id), 14.0);
+    assert_range_near(
+        tank_range_tiles(&entities, tank_id),
+        combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32,
+    );
 }
 
 #[test]

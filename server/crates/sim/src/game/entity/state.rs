@@ -191,6 +191,9 @@ pub(in crate::game) struct IncomingDirectApThreat {
     pub(in crate::game) last_hit_tick: u32,
 }
 
+/// Defensive ceiling for imported state; ordinary matches cannot approach this in three seconds.
+pub(in crate::game) const MAX_INCOMING_DIRECT_AP_THREATS: usize = 4_096;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     /// Ticks until each weapon may attack again (missing or 0 = ready).
@@ -269,6 +272,8 @@ impl CombatState {
             || damage_weight == 0
             || !attacker_pos.0.is_finite()
             || !attacker_pos.1.is_finite()
+            || (self.incoming_direct_ap_threats.len() >= MAX_INCOMING_DIRECT_AP_THREATS
+                && !self.incoming_direct_ap_threats.contains_key(&attacker_id))
         {
             return;
         }

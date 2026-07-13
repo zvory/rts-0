@@ -40,6 +40,7 @@ pub use order::{
 #[cfg(test)]
 pub use state::EntityStateGroups;
 pub(in crate::game) use state::ScoutPlaneState;
+pub(in crate::game) use state::MAX_INCOMING_DIRECT_AP_THREATS;
 #[allow(unused_imports)]
 pub use state::{
     CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, ProdItem,

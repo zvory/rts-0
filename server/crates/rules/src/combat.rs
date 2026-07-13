@@ -12,6 +12,9 @@ const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.5;
 const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.7;
 const NO_ARMOR_PENETRATION: f32 = 0.0;
 const FULL_ARMOR_PENETRATION: f32 = 1.0;
+/// How long a tank remembers each distinct direct-AP attacker.
+pub const TANK_ARMOR_REACTION_MEMORY_TICKS: u32 = crate::balance::TICK_HZ * 3;
+
 /// Attack profile for a combat-capable unit or building.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AttackProfile {
