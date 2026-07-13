@@ -488,7 +488,7 @@ export class HUD {
         this._intent()?.endCommandTarget?.();
         return;
       case "holdPosition":
-        this._issueCommand(cmd.holdPosition(intent.unitIds || []));
+        this._issueCommand(cmd.holdPosition(intent.unitIds || [], !!ev.shiftKey));
         this._intent()?.endCommandTarget?.();
         return;
       case "train":

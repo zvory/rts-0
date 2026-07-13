@@ -728,7 +728,7 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         | rts_sim::game::command::SimCommand::SetAutocast { units, .. }
         | rts_sim::game::command::SimCommand::Gather { units, .. }
         | rts_sim::game::command::SimCommand::Stop { units }
-        | rts_sim::game::command::SimCommand::HoldPosition { units } => Some(units),
+        | rts_sim::game::command::SimCommand::HoldPosition { units, .. } => Some(units),
         rts_sim::game::command::SimCommand::Build { units, .. }
         | rts_sim::game::command::SimCommand::Deconstruct { units, .. } => Some(units),
         rts_sim::game::command::SimCommand::Train { .. }

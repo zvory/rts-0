@@ -528,18 +528,17 @@ fn order_plan(
     smokes: Option<&SmokeCloudStore>,
 ) -> Vec<OrderPlanMarker> {
     let mut plan = Vec::new();
+    let mut stage_position = (entity.pos_x, entity.pos_y);
     if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog, smokes) {
+        stage_position = (marker.x, marker.y);
         plan.push(marker);
     }
     plan.extend(entity.queued_orders().iter().filter_map(|intent| {
-        intent_plan_marker(
-            intent,
-            (entity.pos_x, entity.pos_y),
-            entities,
-            viewer,
-            fog,
-            smokes,
-        )
+        let marker = intent_plan_marker(intent, stage_position, entities, viewer, fog, smokes);
+        if let Some(marker) = marker.as_ref() {
+            stage_position = (marker.x, marker.y);
+        }
+        marker
     }));
     plan
 }
@@ -596,7 +595,7 @@ fn active_order_plan_marker(
 
 fn intent_plan_marker(
     intent: &OrderIntent,
-    self_position: (f32, f32),
+    stage_position: (f32, f32),
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
@@ -605,6 +604,9 @@ fn intent_plan_marker(
     match intent {
         OrderIntent::Move(point) => point_marker("move", point.x, point.y),
         OrderIntent::AttackMove(point) => point_marker("attackMove", point.x, point.y),
+        OrderIntent::HoldPosition => {
+            point_marker("holdPosition", stage_position.0, stage_position.1)
+        }
         OrderIntent::Attack(attack) => {
             target_marker("attack", attack.target, entities, viewer, fog, smokes)
         }
@@ -624,8 +626,8 @@ fn intent_plan_marker(
         }
         OrderIntent::SelfAbility(ability) => point_marker(
             ability.ability.to_protocol_str(),
-            self_position.0,
-            self_position.1,
+            stage_position.0,
+            stage_position.1,
         ),
         OrderIntent::SetupAntiTankGuns(point) => {
             point_marker("setupAntiTankGuns", point.x, point.y)
@@ -1197,6 +1199,53 @@ mod tests {
         let enemy_view = project_for_test(2, worker, &fog, false, &entities, None, false)
             .expect("full view should include worker");
         assert!(enemy_view.order_plan.is_empty());
+    }
+
+    #[test]
+    fn queued_hold_position_projects_at_the_preceding_stage_destination() {
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        {
+            let unit = entities.get_mut(unit_id).expect("unit should exist");
+            unit.set_order(Order::move_to(120.0, 130.0));
+            unit.append_queued_order(OrderIntent::move_to(180.0, 200.0));
+            unit.append_queued_order(OrderIntent::hold_position());
+        }
+
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1)],
+            base_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities, &map);
+        let unit = entities.get(unit_id).expect("unit should exist");
+
+        let owner_view = project_for_test(1, unit, &fog, true, &entities, None, false)
+            .expect("owner should see own unit");
+        assert_eq!(
+            owner_view.order_plan,
+            vec![
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 120.0,
+                    y: 130.0,
+                },
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 180.0,
+                    y: 200.0,
+                },
+                OrderPlanMarker {
+                    kind: "holdPosition".to_string(),
+                    x: 180.0,
+                    y: 200.0,
+                },
+            ]
+        );
     }
 
     #[test]

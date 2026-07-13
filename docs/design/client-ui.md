@@ -1167,7 +1167,9 @@ while command emission stays gated by local-owner checks.
 
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
 gather, build/resume, Tank Trap deconstruct, and placement build commands set `queued: true` and
-rely on the server snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
+rely on the server snapshot's owner-only `orderPlan` for accepted markers. Shift-clicking or
+Shift-hotkeying Hold Position appends its terminal hold stance instead of replacing those queued
+orders. Production-building-only right-clicks set
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Resource
 patches suppress rally command emission. The minimap applies the same resource-target
 classification against known live map resources. Attack

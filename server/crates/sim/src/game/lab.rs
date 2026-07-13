@@ -1308,7 +1308,7 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         | Command::Deconstruct { units, .. }
         | Command::Build { units, .. }
         | Command::Stop { units }
-        | Command::HoldPosition { units } => units.clone(),
+        | Command::HoldPosition { units, .. } => units.clone(),
         Command::SetProductionRepeat { buildings, .. } => buildings.clone(),
         Command::Train { building, .. }
         | Command::Research { building, .. }

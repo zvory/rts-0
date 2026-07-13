@@ -1226,9 +1226,11 @@ General rules:
   cooldown expiry, future tech, or future affordability.
 - Same-tile movement goals count as arrived rather than path-failed. Plain move orders clear back to
   idle on arrival; attack-move orders keep their aggressive stance.
-- `HoldPosition` clears each selected unit's active order and queued intents, then marks the unit as
-  held. Held units do not voluntarily move or chase targets, but they keep normal collision behavior
-  and may fire at enemies already inside current weapon range.
+- Non-queued `HoldPosition` clears each selected unit's active order and queued intents, then marks
+  the unit as held. Queued `HoldPosition` appends a terminal intent, so the unit finishes earlier
+  queued stages before entering that same held stance. Held units do not voluntarily move or chase
+  targets, but they keep normal collision behavior and may fire at enemies already inside current
+  weapon range.
 - Scout Plane entities are non-combat aerial units. Normal selection and command surfaces filter
   them out; direct move, attack, attack-move, hold-position, gather/build/repair/setup, rally,
   train, and research semantics are ignored for planes.

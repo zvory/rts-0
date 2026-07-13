@@ -287,7 +287,7 @@ fn command_trace_label(command: &Command) -> String {
         }
         Command::Cancel { building } => format!("cancel building={}", building),
         Command::Stop { units } => format!("stop units={}", id_list(units)),
-        Command::HoldPosition { units } => format!("hold_position units={}", id_list(units)),
+        Command::HoldPosition { units, .. } => format!("hold_position units={}", id_list(units)),
         Command::SetRally {
             building,
             x,
@@ -815,6 +815,7 @@ pub(crate) fn hold_position_units(
     }
     ctx.emit_command(Command::HoldPosition {
         units: units.clone(),
+        queued: false,
     });
     Some(units)
 }

@@ -263,6 +263,8 @@ pub enum Command {
     },
     HoldPosition {
         units: Vec<u32>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage
     /// on the wire; production applies plain rally stages as attack-move for non-workers.
@@ -701,6 +703,9 @@ pub fn serialize_messagepack_compact_snapshot(
 ) -> Result<Vec<u8>, SnapshotEncodeError> {
     compact_snapshot::serialize_messagepack_compact_snapshot(snapshot)
 }
+
+#[cfg(test)]
+mod command_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1448,27 +1453,6 @@ mod tests {
                 last_sim_consumed_client_tick: Some(42),
             },
         }
-    }
-
-    #[test]
-    fn command_messages_require_client_sequence_envelope() {
-        let msg: ClientMessage = serde_json::from_str(
-            r#"{"t":"command","clientSeq":7,"cmd":{"c":"move","units":[1,2],"x":10.0,"y":20.0}}"#,
-        )
-        .expect("sequenced command should deserialize");
-
-        match msg {
-            ClientMessage::Command { client_seq, cmd } => {
-                assert_eq!(client_seq, 7);
-                assert!(matches!(cmd, Command::Move { units, .. } if units == vec![1, 2]));
-            }
-            other => panic!("unexpected message: {other:?}"),
-        }
-
-        let missing_seq = serde_json::from_str::<ClientMessage>(
-            r#"{"t":"command","cmd":{"c":"move","units":[1],"x":10.0,"y":20.0}}"#,
-        );
-        assert!(missing_seq.is_err());
     }
 
     #[test]

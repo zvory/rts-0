@@ -321,6 +321,10 @@ assert(
   JSON.stringify(msg.command(cmd.holdPosition([1]), 10)) === JSON.stringify({ t: "command", clientSeq: 10, cmd: { c: "holdPosition", units: [1] } }),
   "holdPosition command builder must emit clientSeq envelope",
 );
+assert(
+  JSON.stringify(msg.command(cmd.holdPosition([1], true), 11)) === JSON.stringify({ t: "command", clientSeq: 11, cmd: { c: "holdPosition", units: [1], queued: true } }),
+  "queued holdPosition command builder must emit clientSeq envelope",
+);
 assert(S.COMMAND_RECEIPT === "commandReceipt", "command receipt server tag must be mirrored");
 assert(
   rust.includes("CommandReceipt") && protocolDoc.includes("commandReceipt"),

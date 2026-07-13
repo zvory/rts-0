@@ -531,7 +531,13 @@ fn stop_clears_orders_and_hold_position_enters_hold_stance() {
     apply(
         &map,
         &mut entities,
-        vec![(1, SimCommand::HoldPosition { units: vec![unit] })],
+        vec![(
+            1,
+            SimCommand::HoldPosition {
+                units: vec![unit],
+                queued: false,
+            },
+        )],
     );
 
     let entity = entities.get(unit).expect("unit should exist");
@@ -539,6 +545,51 @@ fn stop_clears_orders_and_hold_position_enters_hold_stance() {
     assert!(entity.queued_orders().is_empty());
     assert_eq!(entity.target_id(), None);
     assert!(entity.path_is_empty());
+}
+
+#[test]
+fn queued_hold_position_appends_a_terminal_stance() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let unit = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![
+            (
+                1,
+                SimCommand::Move {
+                    units: vec![unit],
+                    x: 200.0,
+                    y: 100.0,
+                    queued: false,
+                },
+            ),
+            (
+                1,
+                SimCommand::HoldPosition {
+                    units: vec![unit],
+                    queued: true,
+                },
+            ),
+            (
+                1,
+                SimCommand::Move {
+                    units: vec![unit],
+                    x: 300.0,
+                    y: 100.0,
+                    queued: true,
+                },
+            ),
+        ],
+    );
+
+    let entity = entities.get(unit).expect("unit should exist");
+    assert!(matches!(entity.order(), Order::Move(_)));
+    assert_eq!(entity.queued_orders(), &[OrderIntent::HoldPosition]);
 }
 
 #[test]

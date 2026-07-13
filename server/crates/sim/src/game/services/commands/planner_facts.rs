@@ -5,12 +5,43 @@ use crate::game::services::ability_orders;
 use crate::game::services::order_planner as planner;
 use crate::rules;
 
-use super::guards::dedupe_cap_units;
+use super::guards::{dedupe_cap_units, unit_can_accept_ground_command};
+use super::{ability_from_planner, build_kind_from_code};
 
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
     planner::PlannerConfig {
         max_units_per_command,
         max_queue_len: MAX_QUEUED_ORDERS,
+    }
+}
+
+pub(super) fn entity_order_intent_from_planner(
+    intent: planner::OrderIntent,
+) -> Option<OrderIntent> {
+    match intent {
+        planner::OrderIntent::Move(point) => Some(OrderIntent::move_to(point.x, point.y)),
+        planner::OrderIntent::AttackMove(point) => {
+            Some(OrderIntent::attack_move_to(point.x, point.y))
+        }
+        planner::OrderIntent::HoldPosition => Some(OrderIntent::hold_position()),
+        planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
+        planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
+        planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),
+        planner::OrderIntent::Build {
+            kind,
+            tile_x,
+            tile_y,
+        } => {
+            build_kind_from_code(kind).map(|building| OrderIntent::build(building, tile_x, tile_y))
+        }
+        planner::OrderIntent::WorldAbility { ability, target } => ability_from_planner(ability)
+            .map(|ability| OrderIntent::ability(ability, target.x, target.y)),
+        planner::OrderIntent::SelfAbility { ability } => {
+            ability_from_planner(ability).map(OrderIntent::self_ability)
+        }
+        planner::OrderIntent::SetupAntiTankGuns { face_toward } => Some(
+            OrderIntent::setup_anti_tank_guns(face_toward.x, face_toward.y),
+        ),
     }
 }
 
@@ -38,7 +69,9 @@ pub(super) fn planner_facts(
             ) || e.queued_orders().iter().any(|intent| {
                 matches!(
                     intent,
-                    OrderIntent::PointFire(_) | OrderIntent::BlanketFire(_)
+                    OrderIntent::PointFire(_)
+                        | OrderIntent::BlanketFire(_)
+                        | OrderIntent::HoldPosition
                 )
             });
             facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
@@ -51,6 +84,7 @@ pub(super) fn planner_facts(
             };
             facts.can_attack_move = e.kind != EntityKind::ScoutPlane;
             facts.can_attack = e.can_attack();
+            facts.can_hold_position = unit_can_accept_ground_command(entities, player, id);
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)
                 .is_some_and(|catalog| catalog.builders.contains(&e.kind));

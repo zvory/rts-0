@@ -366,6 +366,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::BLANKET_FIRE, 17),
     (abilities::DISMISS_SCOUT_PLANE, 18),
     (abilities::SCOUT_PLANE, 19),
+    ("holdPosition", 20),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -693,6 +694,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("MOVE", "move"),
         ("ATTACK_MOVE", "attackMove"),
+        ("HOLD_POSITION", "holdPosition"),
         ("ATTACK", "attack"),
         ("DECONSTRUCT", "deconstruct"),
         ("GATHER", "gather"),
