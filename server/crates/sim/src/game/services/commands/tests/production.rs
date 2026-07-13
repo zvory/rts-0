@@ -676,3 +676,107 @@ fn cancel_train_removes_latest_queued_unit_without_resetting_active_progress() {
         supply_after_queue - rules::economy::supply_cost(EntityKind::MachineGunner)
     );
 }
+
+#[test]
+fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+    let barracks = entities
+        .spawn_building(1, EntityKind::Barracks, bx, by, true)
+        .expect("barracks should spawn");
+    let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 10, 6);
+    entities
+        .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+        .expect("training centre should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::SetProductionRepeat {
+                buildings: vec![barracks],
+                unit: EntityKind::Rifleman,
+                enabled: true,
+            },
+        )],
+    );
+    entities
+        .get_mut(barracks)
+        .expect("barracks")
+        .push_production(ProdItem {
+            unit: EntityKind::Rifleman,
+            progress: 7,
+            total: 100,
+        });
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Train {
+                building: barracks,
+                unit: EntityKind::MachineGunner,
+            },
+        )],
+    );
+
+    let producer = entities.get(barracks).expect("barracks");
+    assert_eq!(producer.repeat_production(), Some(EntityKind::Rifleman));
+    assert_eq!(producer.prod_queue().len(), 2);
+    assert_eq!(producer.prod_queue()[0].unit, EntityKind::Rifleman);
+    assert_eq!(producer.prod_queue()[0].progress, 7);
+    assert_eq!(producer.prod_queue()[1].unit, EntityKind::MachineGunner);
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, SimCommand::Cancel { building: barracks })],
+    );
+    let producer = entities.get(barracks).expect("barracks");
+    assert_eq!(producer.repeat_production(), None);
+    assert_eq!(producer.prod_queue().len(), 1);
+    assert_eq!(producer.prod_queue()[0].unit, EntityKind::Rifleman);
+}
+
+#[test]
+fn repeat_toggle_can_clear_stale_incompatible_intent() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+    let barracks = entities
+        .spawn_building(1, EntityKind::Barracks, bx, by, true)
+        .expect("barracks should spawn");
+    entities
+        .get_mut(barracks)
+        .expect("barracks")
+        .set_repeat_production(Some(EntityKind::Tank));
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::SetProductionRepeat {
+                buildings: vec![barracks],
+                unit: EntityKind::Tank,
+                enabled: false,
+            },
+        )],
+    );
+
+    assert_eq!(
+        entities
+            .get(barracks)
+            .expect("barracks")
+            .repeat_production(),
+        None
+    );
+}

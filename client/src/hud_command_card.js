@@ -425,8 +425,13 @@ export function buildTrainCard(ctx, building) {
   const signature =
     `train|${building.id}|` +
     trains.map((unit) => {
-      const producerIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf).map((e) => e.id).join(".");
-      return `${unit}:${trainAvailability(ctx, unit, resources, isOwn)}:${trainLimitSignature(ctx, unit, isOwn)}:${producerIds}`;
+      const producers = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf);
+      const producerIds = producers.map((e) => e.id).join(".");
+      const repeatingIds = producers
+        .filter((producer) => producer.prodRepeatKind === unit)
+        .map((producer) => producer.id)
+        .join(".");
+      return `${unit}:${trainAvailability(ctx, unit, resources, isOwn)}:${trainLimitSignature(ctx, unit, isOwn)}:${producerIds}:repeat:${repeatingIds}`;
     }).join(",") +
     `|research:` +
     researches.map((upgrade) => `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}`).join(",") +
@@ -439,6 +444,12 @@ export function buildTrainCard(ctx, building) {
     const slot = firstOpenCommandSlot(slots, trainSlotForUnit(building.kind, unit, trains), cancelSlot);
     if (slot < 0) continue;
     const availability = trainAvailability(ctx, unit, resources, isOwn);
+    const producerIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
+      .map((producer) => producer.id);
+    const repeatingIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
+      .filter((producer) => producer.prodRepeatKind === unit)
+      .map((producer) => producer.id);
+    const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
@@ -450,9 +461,16 @@ export function buildTrainCard(ctx, building) {
       cost: st.cost,
       enabled: availability === "ready" || availability === "active",
       unaffordable: availability === "unaffordable",
-      title: trainDisabledReason(ctx, unit, resources, isOwn),
+      title: disabledReason || "Alt-click or Alt+hotkey to repeat whenever the queue empties",
       tooltipKind: unit,
       repeatable: availability === "ready",
+      cls: repeatingIds.length > 0 ? "autocast-enabled" : "",
+      contextIntent: {
+        type: "setProductionRepeat",
+        buildingIds: producerIds,
+        unit,
+        enabled: repeatingIds.length === 0,
+      },
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }

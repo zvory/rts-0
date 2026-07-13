@@ -149,6 +149,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         null,
         null,
         true,
+        null,
+        KIND_CODE[KIND.WORKER],
       ],
       [
         4,
@@ -290,6 +292,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
   assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
   assert(decoded.entities[2].prodScoutPlaneQueued === true, "entity Scout Plane queue flag decodes");
+  assert(decoded.entities[2].prodRepeatKind === KIND.WORKER, "entity repeat production kind decodes");
   assert(decoded.entities[2].buildActive === true, "entity construction activity flag decodes");
   assert(
     decoded.entities[2].orderPlan === undefined,

@@ -1257,7 +1257,12 @@ The train command card is driven by the first selected production building type,
 are issued to the selected completed compatible production buildings in round-robin order so a
 multi-building selection spreads queued units across its producers. Train and production-cancel
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
-only those repeatable command-card buttons. Research buttons that unlock production appear directly
+only those repeatable command-card buttons. Alt-clicking a train button or pressing Alt with its
+resolved hotkey toggles that unit as the standing repeat fallback on all selected compatible
+producers; a gold autocast swirl reflects the authoritative `prodRepeatKind` projection. A repeated
+unit already inserted in the FIFO stays ahead of later manual clicks, and any Cancel clears the
+affected producer's repeat state.
+Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. The Scout Plane affordance
 is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It costs 50 steel
@@ -1563,9 +1568,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   status uses the shared HP bar layer.
 - Units: SVG-authored rig parts rendered into Pixi containers, with fully covered routes optionally
   rendered from a PNG atlas. Rifleman and Machine Gunner PNG movement frames advance only when
-  a fresh authoritative movement sample arrives or their rendered position changes; a held snapshot
-  is consumed once so paused or otherwise stationary units return to idle art while firing recoil frames
-  remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
+  a fresh authoritative movement sample arrives or their rendered position changes. Observed movement
+  remains latched for 100 ms so 60 FPS rendering does not alternate movement and idle art between
+  30 Hz snapshots; paused, blocked, or otherwise stationary units then return to idle art while firing
+  recoil frames remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
   anchor source. It uses toned-down team tinting, with most firing recoil on the barrel assembly
   and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi

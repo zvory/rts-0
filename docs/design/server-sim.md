@@ -860,6 +860,14 @@ policy is centralized instead of scattered through services.
 - `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
   projection support, and event visibility predicates.
 
+Production buildings may carry one server-authoritative `repeat_unit` fallback. The production
+system silently retries the fallback only while the unit queue is empty, using the same economy,
+supply, tech, and producer predicates as direct training. Once admitted, a repeated unit is an
+ordinary FIFO entry, so later manual train commands append behind it.
+Enabling another unit replaces the fallback, while any production cancel clears it before removing
+the latest queued item. The fallback is durable entity state, so checkpoints, replay branches, and
+Lab rewinds preserve it without recording synthetic train commands on every retry.
+
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
 `rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the
@@ -1111,7 +1119,7 @@ Entrenchment research takes 30 seconds.
 
 Deployed anti-tank guns rank in-field automatic target candidates ahead of out-of-arc candidates. If no in-field candidate exists, acquisition retains the out-of-arc target so the weapon clamps toward the fixed field edge without firing.
 
-Aggressive automatic acquisition applies the existing priority ranking to currently fireable enemy candidates first and considers enemy chase candidates only when no candidate can be fired on immediately. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. Opportunistic moving-fire acquisition considers only fireable enemy candidates. Chasing units refresh paths whose goals are materially wrong, including direct attacks and attack-moves without moving fire.
+Aggressive automatic acquisition applies the existing priority ranking to currently fireable enemy candidates first and considers enemy chase candidates only when no candidate can be fired on immediately. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. Opportunistic moving-fire acquisition for a plain Move considers only fireable enemy candidates. Chasing units refresh paths whose goals are materially wrong, including direct attacks and all attack-moves.
 
 Command Cars activate Scout Plane on the C grid slot for 50 Steel and 50 Oil. Activation launches immediately from the owned completed City Centre nearest the target, permits one active Scout Plane per player, and starts a 30-second player-global cooldown. Activation does not replace or clear the selected Command Car's active or queued orders. The plane flies to the target, orbits for 10 seconds after arrival, then returns to its launch City Centre or despawns if that anchor is gone. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, or dismissal commands.
 
@@ -1237,14 +1245,15 @@ General rules:
   fireable. Setup weapons that stopped to engage during an unfinished attack-move keep their
   emplacement for a one-second no-target grace period; if the attack-move order still exists after
   that grace, they tear down and continue toward the original attack-move destination.
-- Active moving-fire `Move` and `AttackMove` orders preserve the player-issued destination while
-  they are still in `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is
-  opportunistic: it may retain, aim at, expose, and fire on targets that are currently inside
-  weapon range and pass hostile, visibility, smoke, terrain line-of-sight, and blocker checks, but
-  it must not request chase paths, vehicle standoff paths, or enemy-directed replacements for
-  `path_goal`.
-  Once an `AttackMove` reaches `MovePhase::Arrived`, its existing aggressive post-arrival behavior
-  applies. Direct `Attack` orders and idle-aggressive behavior remain separate and may still pursue.
+- Active moving-fire `Move` orders preserve the player-issued destination while they are still in
+  `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is opportunistic:
+  it may retain, aim at, expose, and fire on targets that are currently inside weapon range and
+  pass hostile, visibility, smoke, terrain line-of-sight, and blocker checks, but it must not
+  request chase paths, vehicle standoff paths, or enemy-directed replacements for `path_goal`.
+  Moving-fire `AttackMove` orders instead use the ordinary aggressive acquisition and chase policy:
+  once they reach a fireable enemy, they clear their movement path and stop to engage; after combat
+  clears before arrival, they resume the original player-issued destination. Direct `Attack` orders
+  and idle-aggressive behavior remain separate and may still pursue.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local
   `services::combat::priority` ranker. Candidate construction stores a `rules::target::TargetFacts`

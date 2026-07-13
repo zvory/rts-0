@@ -49,6 +49,7 @@ const MAX_RALLY_STAGES: usize = 4;
 mod artillery_scatter;
 mod guards;
 mod planner_facts;
+mod production_repeat;
 mod scout_plane_ability;
 #[cfg(test)]
 use self::artillery_scatter::artillery_error_tiles;
@@ -463,6 +464,21 @@ pub(in crate::game) fn apply_commands(
             }
             SimCommand::Train { building, unit } => {
                 order_train(entities, players, player, building, unit, events);
+            }
+            SimCommand::SetProductionRepeat {
+                buildings,
+                unit,
+                enabled,
+            } => {
+                production_repeat::set(
+                    entities,
+                    &faction_id,
+                    player,
+                    buildings,
+                    unit,
+                    enabled,
+                    command_admission.max_units_per_command,
+                );
             }
             SimCommand::Research { building, upgrade } => {
                 let definition = upgrade::definition(upgrade);
@@ -1856,15 +1872,10 @@ fn order_cancel(
 
     let cancelled = {
         let b = match entities.get_mut(building) {
-            Some(b)
-                if b.owner == player
-                    && b.is_building()
-                    && (!b.prod_queue().is_empty() || !b.research_queue().is_empty()) =>
-            {
-                b
-            }
+            Some(b) if b.owner == player && b.is_building() => b,
             _ => return,
         };
+        b.set_repeat_production(None);
         if let Some(item) = b.pop_last_research() {
             Cancelled::Upgrade(item.upgrade)
         } else if let Some(item) = b.pop_last_production() {

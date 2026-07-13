@@ -346,6 +346,10 @@ pub struct ProductionState {
     pub queue: Vec<ProdItem>,
     /// FIFO research queue (front = item being researched).
     pub research_queue: Vec<ResearchItem>,
+    /// Unit to enqueue whenever this producer's ordinary unit queue becomes empty. Once inserted,
+    /// the repeated unit is an ordinary FIFO item and later manual production queues behind it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_unit: Option<EntityKind>,
     /// Optional first rally stage (world pixels). When set, freshly produced units receive this
     /// order and the producer prefers the spawn exit closest to it.
     pub rally_point: Option<RallyIntent>,

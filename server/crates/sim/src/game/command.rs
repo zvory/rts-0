@@ -77,6 +77,11 @@ pub enum SimCommand {
         building: u32,
         unit: EntityKind,
     },
+    SetProductionRepeat {
+        buildings: Vec<u32>,
+        unit: EntityKind,
+        enabled: bool,
+    },
     Research {
         building: u32,
         upgrade: UpgradeKind,
@@ -267,6 +272,20 @@ impl SimCommand {
                     reason: CommandRejection::Unit,
                 },
             },
+            protocol::Command::SetProductionRepeat {
+                buildings,
+                unit,
+                enabled,
+            } => match unit.parse::<EntityKind>() {
+                Ok(unit) if unit.is_unit() => SimCommand::SetProductionRepeat {
+                    buildings,
+                    unit,
+                    enabled,
+                },
+                _ => SimCommand::Rejected {
+                    reason: CommandRejection::Unit,
+                },
+            },
             protocol::Command::Research { building, upgrade } => {
                 match upgrade.parse::<UpgradeKind>() {
                     Ok(upgrade) => SimCommand::Research { building, upgrade },
@@ -415,6 +434,15 @@ impl SimCommand {
             SimCommand::Train { building, unit } => protocol::Command::Train {
                 building: *building,
                 unit: protocol::kind_to_wire(*unit).to_string(),
+            },
+            SimCommand::SetProductionRepeat {
+                buildings,
+                unit,
+                enabled,
+            } => protocol::Command::SetProductionRepeat {
+                buildings: buildings.clone(),
+                unit: protocol::kind_to_wire(*unit).to_string(),
+                enabled: *enabled,
             },
             SimCommand::Research { building, upgrade } => protocol::Command::Research {
                 building: *building,

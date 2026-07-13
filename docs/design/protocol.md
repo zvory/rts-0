@@ -114,6 +114,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send gather-capable units to harvest a direct-mineable resource node. Oil nodes are not direct-mineable; workers extract oil by building Pump Jacks with the `build` command. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
+| `setProductionRepeat` | `buildings: u32[]`, `unit: string`, `enabled: bool` | Toggle one server-authoritative standing production fallback on owned compatible producers. When a producer's ordinary unit queue is empty, it silently retries enqueueing `unit`. Once inserted, that unit is an ordinary FIFO item, so later manual production queues behind it. Enabling a different unit replaces the previous fallback. Disabling affects producers repeating that unit, and any production cancel clears the producer's fallback. |
 | `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Current Kriegsia upgrade ids: `methamphetamines` and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `command_car_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `command_car_unlock` requires completed `tank_unlock`. `smoke_plus` doubles Scout Car Smoke radius and duration. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
@@ -872,6 +873,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   prodUpgrade?: string,          // upgrade currently being researched
   prodProgress?: f32,            // 0..1
   prodQueue?: u32,               // queued count (including the in-progress one)
+  prodRepeatKind?: string,       // owner/allied; standing unit fallback for an empty queue
   prodScoutPlaneQueued?: bool,   // owner/allied; true if any queued item is a Scout Plane
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
