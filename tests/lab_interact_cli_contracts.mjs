@@ -57,6 +57,10 @@ assert.deepEqual(
   ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI", "response.preview.url is the user-delivery URL; local capture paths are withheld"],
   "screenshot help explains presentation modes and the required Tailnet delivery URL",
 );
+assert.ok(
+  LAB_INTERACT_COMMAND_HELP.order.variants.some((variant) => variant.includes("setProductionRepeat")),
+  "order help exposes the repeat-production command and its multi-building shape",
+);
 for (const command of LAB_INTERACT_COMMANDS) {
   for (const args of [["help", command], [command, "--help"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {

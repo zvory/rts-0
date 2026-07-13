@@ -19,7 +19,7 @@ const CATALOG = Object.freeze({
   supportedCommandKinds: [
     "move", "attackMove", "attack", "deconstruct", "setupAntiTankGuns", "tearDownAntiTankGuns",
     "charge", "useAbility", "recastAbility", "setAutocast", "gather", "build", "train",
-    "research", "cancel", "stop", "holdPosition", "setRally",
+    "setProductionRepeat", "research", "cancel", "stop", "holdPosition", "setRally",
   ],
   abilities: ["charge", "smoke"],
 });

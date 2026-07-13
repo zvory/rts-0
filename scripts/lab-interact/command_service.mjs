@@ -58,6 +58,7 @@ const COMMAND_FIELDS = Object.freeze({
   gather: ["c", "units", "node", "queued"],
   build: ["c", "units", "building", "tileX", "tileY", "queued"],
   train: ["c", "building", "unit"],
+  setProductionRepeat: ["c", "buildings", "unit", "enabled"],
   research: ["c", "building", "upgrade"],
   cancel: ["c", "building"],
   stop: ["c", "units"],
@@ -970,6 +971,7 @@ function validateCommand(value) {
   record(value, "order.command");
   const allowed = COMMAND_FIELDS[value.c]; if (!allowed) invalid("order.command.c", "is unsupported"); exact(value, allowed, "order.command");
   if (allowed.includes("units")) refs(value.units, "order.command.units", 1, LAB_INTERACT_LIMITS.maxCommandUnits);
+  if (allowed.includes("buildings")) refs(value.buildings, "order.command.buildings", 1, LAB_INTERACT_LIMITS.maxCommandUnits);
   for (const field of ["x", "y"]) {
     if (allowed.includes(field) && (value.c !== "useAbility" || value[field] != null)) finite(value[field], `order.command.${field}`);
   }
@@ -1027,7 +1029,12 @@ function validateCommandCatalog(command, catalog) {
 
 async function resolveCommand(session, command) {
   const wire = { ...command }; const resolved = {};
-  if (Array.isArray(command.units)) { const units = await resolveEntityReferences(session, command.units); wire.units = units.map((entry) => entry.id); resolved.units = units; }
+  for (const field of ["units", "buildings"]) {
+    if (!Array.isArray(command[field])) continue;
+    const entries = await resolveEntityReferences(session, command[field]);
+    wire[field] = entries.map((entry) => entry.id);
+    resolved[field] = entries;
+  }
   for (const field of ["target", "node", "building"]) {
     if (command[field] == null || (field === "building" && command.c === "build")) continue;
     const entry = await resolveEntityReference(session, command[field]); wire[field] = entry.id; resolved[field] = entry;
