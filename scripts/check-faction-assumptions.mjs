@@ -244,7 +244,12 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/ability_projectile.rs",
   "server/crates/sim/src/game/artillery.rs",
   "server/crates/sim/src/game/building_memory.rs",
+  // Checkpoint validation rejects malformed Tank-only armor-reaction state; the durable state is
+  // intentionally current-roster-specific until catalogs expose an armor-reaction capability.
+  "server/crates/sim/src/game/checkpoint/validation.rs",
   "server/crates/sim/src/game/command.rs",
+  // Tank armor reaction is an explicit Tank-only gameplay capability for this first feature pass.
+  "server/crates/sim/src/game/entity/armor_reaction.rs",
   // Panzerfaust conversion is a phase-scoped special case: the one-shot unit downgrades in place
   // to a Rifleman after firing and remains intentionally outside normal production catalog flow.
   "server/crates/sim/src/game/entity/mod.rs",
@@ -259,6 +264,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/lab/scenario.rs",
   "server/crates/sim/src/game/mod.rs",
   "server/crates/sim/src/game/mortar.rs",
+  // Delayed Panzerfaust resolution and its inline regression test cover the current Tank target.
+  "server/crates/sim/src/game/panzerfaust_shot.rs",
   "server/crates/sim/src/game/player_state.rs",
   "server/crates/sim/src/game/services/ability_orders.rs",
   "server/crates/sim/src/game/services/combat/acquisition.rs",
@@ -288,6 +295,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/geometry.rs",
   "server/crates/sim/src/game/services/move_coordinator.rs",
   "server/crates/sim/src/game/services/movement/mod.rs",
+  // Autonomous direct-AP hull facing is intentionally Tank-only until catalogs express the
+  // capability; this module owns both the runtime gate and focused inline tests.
+  "server/crates/sim/src/game/services/movement/armor_reaction.rs",
   "server/crates/sim/src/game/services/movement/pivot_drive.rs",
   "server/crates/sim/src/game/services/movement/scout_car.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",
