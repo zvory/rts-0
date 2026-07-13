@@ -539,12 +539,49 @@ export function _refreshAntiTankGunSetupPreview() {
     intent?.updateAntiTankGunSetupPreview?.(null);
     return;
   }
-  const world = this._groundAtScreen(this.mouse.x, this.mouse.y);
+  // The cursor cone is rendered after this frame's camera update.  Map its
+  // target through that same current projection instead of the prior presented
+  // SelectionScene, otherwise it visibly trails the cursor while panning.
+  const world = setupPreviewGroundAtScreen(this, this.mouse);
   if (!world) {
     intent?.updateAntiTankGunSetupPreview?.(null);
     return;
   }
   intent?.updateAntiTankGunSetupPreview?.({ mouseX: world.x, mouseY: world.y, guns });
+}
+
+function setupPreviewGroundAtScreen(input, screen) {
+  let projection;
+  try {
+    projection = input?.camera?.projectionSnapshot?.();
+  } catch {
+    return input._groundAtScreen(screen.x, screen.y);
+  }
+  const groundAtScreen = projection?.groundAtScreen;
+  if (typeof groundAtScreen === "function") {
+    try {
+      const point = groundAtScreen({ x: screen.x, y: screen.y });
+      // A valid current projection returning no hit must clear the preview,
+      // rather than resurrecting a position from a stale SelectionScene.
+      if (point == null) return null;
+      const clamped = clampSetupPreviewPoint(point, input?.state?.map);
+      if (clamped) return clamped;
+    } catch {
+      // A malformed fresh projection must not break the existing input path.
+    }
+  }
+  return input._groundAtScreen(screen.x, screen.y);
+}
+
+function clampSetupPreviewPoint(point, map) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
+  const mapWidthPx = Number(map?.width) * Number(map?.tileSize);
+  const mapHeightPx = Number(map?.height) * Number(map?.tileSize);
+  if (!(mapWidthPx > 0) || !(mapHeightPx > 0)) return { x: point.x, y: point.y };
+  return {
+    x: Math.max(0, Math.min(mapWidthPx - 1, point.x)),
+    y: Math.max(0, Math.min(mapHeightPx - 1, point.y)),
+  };
 }
 
 function setupPreviewQueued(input, intent) {

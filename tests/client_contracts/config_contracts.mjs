@@ -1297,6 +1297,39 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       "unqueued support setup preview keeps the current gun position",
     );
 
+    previewInput.camera = {
+      projectionSnapshot: () => ({
+        groundAtScreen: ({ x, y }) => ({ x: x + 96, y: y - 64 }),
+      }),
+    };
+    previewInput._groundAtScreen = () => ({ x: 0, y: 0 });
+    previewInput._shiftKeyDown = false;
+    previewInput._refreshAntiTankGunSetupPreview();
+    assert(
+      previewInput.clientIntent.antiTankGunSetupPreview?.mouseX === 596 &&
+        previewInput.clientIntent.antiTankGunSetupPreview?.mouseY === 236,
+      "support setup preview follows the current renderer projection instead of a stale selection scene",
+    );
+
+    let staleGroundReads = 0;
+    previewInput.camera = {
+      projectionSnapshot: () => ({ groundAtScreen: () => null }),
+    };
+    previewInput._groundAtScreen = () => {
+      staleGroundReads += 1;
+      return { x: 0, y: 0 };
+    };
+    previewInput._refreshAntiTankGunSetupPreview();
+    assert(
+      previewInput.clientIntent.antiTankGunSetupPreview === null && staleGroundReads === 0,
+      "support setup preview clears for a current no-ground-hit instead of reusing stale selection geometry",
+    );
+
+    previewInput.camera = {
+      projectionSnapshot: () => ({
+        groundAtScreen: ({ x, y }) => ({ x: x + 96, y: y - 64 }),
+      }),
+    };
     previewInput._shiftKeyDown = true;
     previewInput._refreshAntiTankGunSetupPreview();
     const previewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];

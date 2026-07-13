@@ -486,6 +486,11 @@ function nearPoint(call, point, epsilon = 0.001) {
     },
   );
   assert(setupGfx.calls.some((call) => call[0] === "arc"), "lab P2 support weapons still draw setup-preview wedges");
+  const setupArc = setupGfx.calls.find((call) => call[0] === "arc");
+  assert(
+    Math.abs((setupArc[4] + setupArc[5]) / 2) < 0.0001,
+    "support setup wedge bisects the cursor direction",
+  );
 
   const orderGfx = new RecordingGraphics();
   _drawOrderPlan.call({ _feedbackGfx: orderGfx }, feedbackView);
