@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -74,15 +74,15 @@ freezing the entire pre-alpha interface or turning into a slow exhaustive suite.
 
 ## Implementation Checklist
 
-- [ ] Reshape the existing smoke into the small semantic workflow above.
-- [ ] Prove update/remove/setup round-trip behavior without exact response snapshots.
-- [ ] Preserve valid PNG preview and short recording assertions.
-- [ ] Move the large-unit stress assertion to focused contract coverage.
-- [ ] Track fixed-capture contract failure in the aggregate runner.
-- [ ] Make artifact/setup/replay cleanup test-owned and failure-safe.
-- [ ] Add Lab-specific suite selections and selector self-tests.
-- [ ] Update the testing runbook and CLI documentation.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Reshape the existing smoke into the small semantic workflow above.
+- [x] Prove update/remove/setup round-trip behavior without exact response snapshots.
+- [x] Preserve valid PNG preview and short recording assertions.
+- [x] Move the large-unit stress assertion to focused contract coverage.
+- [x] Track fixed-capture contract failure in the aggregate runner.
+- [x] Make artifact/setup/replay cleanup test-owned and failure-safe.
+- [x] Add Lab-specific suite selections and selector self-tests.
+- [x] Update the testing runbook and CLI documentation.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 

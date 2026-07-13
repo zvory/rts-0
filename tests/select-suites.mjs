@@ -27,6 +27,7 @@ const suiteOrder = [
   "node-ai-integration",
   "node-team-integration",
   "node-minimap-input-contracts",
+  "lab-interact-contracts",
   "client-smoke",
   "full-ai",
   "docs-only",
@@ -128,6 +129,20 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "tests/archive_completed_plans.mjs" ||
     pathname === "tests/adversarial_quality_pass.mjs" ||
     pathname === "tests/run-all.sh"
+  );
+}
+
+function isLabInteractPath(pathname) {
+  return (
+    pathname.startsWith("scripts/lab-interact/") ||
+    pathname === "client/src/lab_interact_bridge.js" ||
+    pathname === "server/src/lab_interact_artifacts.rs" ||
+    pathname.startsWith("tests/lab_interact_") ||
+    pathname.startsWith("tests/fixtures/lab_interact_") ||
+    pathname === "docs/lab-interact-cli.md" ||
+    pathname === "docs/context/testing.md" ||
+    pathname === "docs/design/testing.md" ||
+    pathname.startsWith(".agents/skills/lab-interact/")
   );
 }
 
@@ -296,6 +311,10 @@ export function selectSuites(files) {
       suites.add("source-file-sizes");
     }
 
+    if (isLabInteractPath(normalized)) {
+      addAll(suites, ["lab-interact-contracts", "client-smoke"]);
+    }
+
     if (rustCode || normalized.startsWith("server/Cargo.")) {
       addAll(suites, ["crate-boundaries", "cargo-fmt", "cargo-clippy"]);
     }
@@ -455,6 +474,12 @@ function verify() {
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
+    [["scripts/lab-interact/driver.mjs"], ["lab-interact-contracts", "client-smoke"]],
+    [["scripts/lab-interact/command_service.mjs"], ["lab-interact-contracts", "client-smoke"]],
+    [["client/src/lab_interact_bridge.js"], ["lab-interact-contracts", "client-smoke"]],
+    [["server/src/lab_interact_artifacts.rs"], ["lab-interact-contracts", "client-smoke"]],
+    [["docs/lab-interact-cli.md"], ["lab-interact-contracts", "client-smoke"]],
+    [[".agents/skills/lab-interact/SKILL.md"], ["lab-interact-contracts", "client-smoke"]],
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["plans/teams/phase-1.md"], ["node-team-integration"]],
     [["tests/team_harness.mjs"], ["node-server-integration", "node-regression", "node-ai-integration", "node-team-integration"]],
