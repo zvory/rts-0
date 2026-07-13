@@ -414,7 +414,7 @@ harvesting, refunds, and cancelled queues.
 
 `ai_diagnostics_panel.js`
 ```js
-shouldMountAiDiagnosticsPanel({ capabilities })
+shouldMountAiDiagnosticsPanel({ capabilities, players })
 createAiDiagnosticsPanelPreferences(storage?)
 export class AiDiagnosticsPanel {
   constructor({ root, preferences, getPlayers, onMapLayerVisibilityChange })
@@ -423,8 +423,9 @@ export class AiDiagnosticsPanel {
   destroy()
 }
 ```
-`Match` mounts the AI diagnostics panel beside the observer analysis overlay when the room advertises
-observer-analysis diagnostics. The panel consumes the same server-authored `observerAnalysis`
+`Match` mounts the AI diagnostics panel beside the observer analysis overlay only when the room
+advertises observer-analysis diagnostics and the start roster contains at least one `isAi`
+participant. The panel consumes the same server-authored `observerAnalysis`
 payload, but normalizes and renders `aiDiagnostics` separately so high-churn AI trace lines do not
 dirty-update the general replay/spectator analysis tabs. It owns its generated DOM, persists
 visible/collapsed/selected-AI state plus map-analysis layer toggles under

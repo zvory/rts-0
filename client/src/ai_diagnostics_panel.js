@@ -12,8 +12,9 @@ const DEFAULT_MAP_LAYER_VISIBILITY = Object.freeze({
   [MAP_LABELS_LAYER_ID]: true,
 });
 
-export function shouldMountAiDiagnosticsPanel({ capabilities } = {}) {
-  return capabilities?.diagnostics?.observerAnalysis === true;
+export function shouldMountAiDiagnosticsPanel({ capabilities, players = [] } = {}) {
+  return capabilities?.diagnostics?.observerAnalysis === true
+    && players.some((player) => player?.isAi === true || player?.is_ai === true);
 }
 
 export function createAiDiagnosticsPanelPreferences(storage = safeLocalStorage()) {

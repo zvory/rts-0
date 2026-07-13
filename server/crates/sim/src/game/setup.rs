@@ -390,6 +390,7 @@ impl Game {
                 faction_id: p.faction_id.clone(),
                 name: p.name.clone(),
                 color: p.color.clone(),
+                is_ai: p.is_ai,
                 start_tile_x: p.start_tile.0,
                 start_tile_y: p.start_tile.1,
             })

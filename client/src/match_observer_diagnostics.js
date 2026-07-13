@@ -22,7 +22,10 @@ export class MatchObserverDiagnostics {
         getPlayers,
       })
       : null;
-    this.aiDiagnosticsPanel = shouldMountAiDiagnosticsPanel({ capabilities })
+    this.aiDiagnosticsPanel = shouldMountAiDiagnosticsPanel({
+      capabilities,
+      players: getPlayers(),
+    })
       ? new AiDiagnosticsPanel({
         root,
         preferences: aiDiagnosticsPanelPreferences || undefined,

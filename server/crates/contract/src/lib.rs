@@ -277,6 +277,8 @@ pub struct PlayerStart {
     pub faction_id: String,
     pub name: String,
     pub color: String,
+    #[serde(default)]
+    pub is_ai: bool,
     pub start_tile_x: u32,
     pub start_tile_y: u32,
 }

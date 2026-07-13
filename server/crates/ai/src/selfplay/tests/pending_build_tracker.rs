@@ -33,6 +33,7 @@ fn pending_tracker_start_payload() -> StartPayload {
             faction_id: "kriegsia".to_string(),
             name: "Alpha".into(),
             color: "#4cc9f0".into(),
+            is_ai: true,
             start_tile_x: 10,
             start_tile_y: 85,
         }],

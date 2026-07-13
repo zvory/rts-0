@@ -426,6 +426,7 @@ mod tests {
                     faction_id: "kriegsia".to_string(),
                     name: "Bravo".into(),
                     color: "#222".into(),
+                    is_ai: true,
                     start_tile_x: 48,
                     start_tile_y: 48,
                 },
@@ -435,6 +436,7 @@ mod tests {
                     faction_id: "kriegsia".to_string(),
                     name: "Alpha".into(),
                     color: "#111".into(),
+                    is_ai: true,
                     start_tile_x: 8,
                     start_tile_y: 8,
                 },
@@ -526,6 +528,7 @@ mod tests {
             faction_id: "kriegsia".to_string(),
             name: "Charlie".into(),
             color: "#333".into(),
+            is_ai: true,
             start_tile_x: 10,
             start_tile_y: 10,
         });

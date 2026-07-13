@@ -185,14 +185,25 @@ import { textWithin } from "./dom_text.mjs";
       capabilities: createRoomCapabilities({
         startPayload: { spectator: true, diagnostics: { observerAnalysis: true } },
       }),
+      players: [{ id: 1, isAi: true }],
     }),
-    "AI diagnostics panel mounts from observer-analysis diagnostic capability",
+    "AI diagnostics panel mounts when observer analysis is available and the roster includes AI",
+  );
+  assert(
+    !shouldMountAiDiagnosticsPanel({
+      capabilities: createRoomCapabilities({
+        startPayload: { replay: {}, spectator: true, diagnostics: { observerAnalysis: true } },
+      }),
+      players: [{ id: 1, isAi: false }, { id: 2, isAi: false }],
+    }),
+    "AI diagnostics panel stays hidden for human-only replays",
   );
   assert(
     !shouldMountAiDiagnosticsPanel({
       capabilities: createRoomCapabilities({
         startPayload: { spectator: true, diagnostics: { observerAnalysis: false } },
       }),
+      players: [{ id: 1, isAi: true }],
     }),
     "AI diagnostics panel stays hidden without observer-analysis diagnostic capability",
   );

@@ -352,8 +352,10 @@ assert(
   // not part of this phase's structured protocol export.
     rustContract.includes("prediction_build_id") &&
     rustContract.includes("prediction_version") &&
-    rustContract.includes("match_run_id"),
-  "start payload must expose prediction compatibility metadata",
+    rustContract.includes("match_run_id") &&
+    rustContract.includes("pub is_ai: bool") &&
+    protocolDoc.includes("isAi, startTileX"),
+  "start payload must expose prediction compatibility and AI participant metadata",
 );
 assert(
   S.OBSERVATION_READY === "observationReady" &&
