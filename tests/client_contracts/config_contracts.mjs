@@ -1338,6 +1338,37 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       "support setup preview follows the current renderer projection instead of a stale selection scene",
     );
 
+    const artilleryPreviewInput = Object.create(Input.prototype);
+    artilleryPreviewInput.mouse = { x: 500, y: 300 };
+    artilleryPreviewInput.state = {
+      playerId,
+      map: { width: 64, height: 64, tileSize: 32 },
+      selectedEntities: () => [{
+        id: 91,
+        owner: playerId,
+        kind: KIND.ARTILLERY,
+        x: 200,
+        y: 200,
+        facing: 0,
+        setupState: SETUP.DEPLOYED,
+      }],
+    };
+    artilleryPreviewInput.clientIntent = new ClientIntent();
+    artilleryPreviewInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+    artilleryPreviewInput.camera = {
+      projectionSnapshot: () => ({
+        groundAtScreen: ({ x, y }) => ({ x: x + 100, y: y - 100 }),
+      }),
+    };
+    artilleryPreviewInput._groundAtScreen = () => ({ x: 200, y: 600 });
+    artilleryPreviewInput._refreshAbilityTargetPreview();
+    const artilleryPreview = artilleryPreviewInput.clientIntent.abilityTargetPreview;
+    assert(
+      artilleryPreview?.rawMouseX === 600 && artilleryPreview?.rawMouseY === 200 &&
+        Math.abs(artilleryPreview.artilleryLocks?.[0]?.facing) < 0.001,
+      "artillery fire preview follows the current renderer projection instead of a stale selection scene",
+    );
+
     let staleGroundReads = 0;
     previewInput.camera = {
       projectionSnapshot: () => ({ groundAtScreen: () => null }),
