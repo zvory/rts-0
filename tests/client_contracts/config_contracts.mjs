@@ -1297,6 +1297,20 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       "unqueued support setup preview keeps the current gun position",
     );
 
+    previewInput.camera = {
+      projectionSnapshot: () => ({
+        groundAtScreen: ({ x, y }) => ({ x: x + 96, y: y - 64 }),
+      }),
+    };
+    previewInput._groundAtScreen = () => ({ x: 0, y: 0 });
+    previewInput._shiftKeyDown = false;
+    previewInput._refreshAntiTankGunSetupPreview();
+    assert(
+      previewInput.clientIntent.antiTankGunSetupPreview?.mouseX === 596 &&
+        previewInput.clientIntent.antiTankGunSetupPreview?.mouseY === 236,
+      "support setup preview follows the current renderer projection instead of a stale selection scene",
+    );
+
     previewInput._shiftKeyDown = true;
     previewInput._refreshAntiTankGunSetupPreview();
     const previewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];

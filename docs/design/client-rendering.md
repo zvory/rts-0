@@ -110,6 +110,10 @@ semantic stats and authoritative building footprints, never asset geometry. Clic
 entity-target commands, ctrl-in-viewport, control groups, marquee, and Lab entity tools use
 projected proxies. Ground commands/tools alone use nullable `groundAtScreen`.
 
+Read-only cursor previews may sample the current semantic projection after camera movement so a
+visual target remains beneath the cursor. They never issue a command or replace the last
+successfully presented `SelectionSceneV1` used by ground-command input.
+
 The marquee is the actual CSS-pixel screen rectangle. A render failure leaves the previous
 successfully presented selection scene active. Selection never uses mesh picking, GPU ids, asset
 bounds, shadow proxies, or fresh mutable state.
