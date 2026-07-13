@@ -736,6 +736,10 @@ single-diagonal symmetry; grass is the erase material. Symmetry expands every te
 painted, moves matching start locations, removes matching neutral base locations when moving a selected base,
 and adds all symmetric locations. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
+Grass, bare road, and the four marked road orientations are passable paint materials; roads may
+cross protected start/base areas while rock and water remain rejected there. Authored map rows
+encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
+roads with `=`, `-`, `|`, `\`, and `/`, respectively.
 Editor status stays above the scrolling controls; failures use a high-contrast alert treatment.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
@@ -1670,8 +1674,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
   `1px` clearance), matching the authoritative oriented vehicle body used for collision and
   click targeting.
-- Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
-  so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
+- Terrain: muted grass/field/mud, rock, water, and dark charcoal-brown road tiles with deterministic
+  coarse dithering so movement is readable and the map has a PlayStation 1-era low-resolution
+  texture feel. Road uses one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW
+  diagonal tiles with a simple yellow center-line segment. Authors intersperse marked tiles among
+  bare centerline tiles to form dashed markings while bare road tiles fill the surrounding surface.
 - Local lab visual profiles may pass renderer-only static samples to `Renderer.render`. Static
   trench samples draw on the local visual-samples layer, labels draw as world-anchored Pixi text
   above the fog overlay, and neither path writes to `GameState`, snapshots, fog-source entity lists,

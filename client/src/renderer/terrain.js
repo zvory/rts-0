@@ -1,12 +1,14 @@
+import { COLORS } from "../config.js";
+import { hash2 } from "./shared.js";
 import {
-  hash2,
   isImpassableAt,
   isImpassableTerrain,
+  roadMarkingOrientation,
   terrainColor,
   terrainOverlayColor,
-} from "./shared.js";
+} from "./terrain_palette.js";
 
-const TERRAIN_TEXTURE_DOWNSAMPLE = 8;
+const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -49,13 +51,33 @@ function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
       ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
     }
   }
+  drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+}
+
+function drawRoadMarking(ctx, code, x, y, size) {
+  const orientation = roadMarkingOrientation(code);
+  if (!orientation) return;
+  const line = Math.max(1, Math.floor(size * 0.16));
+  const middle = Math.floor((size - line) * 0.5);
+  ctx.fillStyle = colorCss(COLORS.roadLine);
+  if (orientation === "horizontal") {
+    ctx.fillRect(x, y + middle, size, line);
+  } else if (orientation === "vertical") {
+    ctx.fillRect(x + middle, y, line, size);
+  } else {
+    const steps = Math.max(1, size - line);
+    for (let offset = 0; offset <= steps; offset++) {
+      const diagonalY = orientation === "diagonalNwSe" ? offset : steps - offset;
+      ctx.fillRect(x + offset, y + diagonalY, line, line);
+    }
+  }
 }
 
 /** Create a small DOM canvas using the same tile painter as the game map. */
 export function createTerrainPreviewCanvas(code) {
   const tiles = 3;
-  const textureTileSize = 4;
+  const textureTileSize = 8;
   const canvas = document.createElement("canvas");
   canvas.width = tiles * textureTileSize;
   canvas.height = tiles * textureTileSize;

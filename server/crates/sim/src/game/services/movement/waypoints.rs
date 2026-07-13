@@ -16,6 +16,7 @@ use crate::game::services::standability as static_standability;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
+use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 
 use super::pivot_drive::{
     angle_delta, distance_between, normalize_angle, pivot_drive_intent, pivot_drive_speed_scale,
@@ -118,8 +119,14 @@ pub(super) fn advance_moving_units(
             } else {
                 1.0
             };
+        let terrain_speed_multiplier = {
+            let (tx, ty) = map.tile_of(x, y);
+            TerrainKind::from_map_code(map.terrain_at(tx, ty))
+                .map(|terrain| movement_speed_multiplier(kind, terrain))
+                .unwrap_or(1.0)
+        };
         let mut speed = config::unit_stats(kind)
-            .map(|s| s.speed * speed_multiplier)
+            .map(|s| s.speed * speed_multiplier * terrain_speed_multiplier)
             .unwrap_or(0.0);
         if let Some((wx, wy)) = movement_target {
             speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);

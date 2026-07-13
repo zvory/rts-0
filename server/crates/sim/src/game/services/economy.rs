@@ -7,7 +7,6 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
-use crate::protocol::terrain;
 
 mod pump_jack;
 
@@ -191,7 +190,7 @@ fn move_gatherer_to_nearby_open_grass(
         .get(node)
         .map(|e| (e.pos_x, e.pos_y))
         .unwrap_or((wx, wy));
-    let Some(goal) = nearest_open_non_resource_grass_tile(map, entities, occ, anchor) else {
+    let Some(goal) = nearest_open_non_resource_passable_tile(map, entities, occ, anchor) else {
         idle_gatherer(entities, id);
         return;
     };
@@ -201,7 +200,7 @@ fn move_gatherer_to_nearby_open_grass(
     coordinator.order_group_move(entities, owner, &[id], goal, false);
 }
 
-fn nearest_open_non_resource_grass_tile(
+fn nearest_open_non_resource_passable_tile(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy,
@@ -225,7 +224,7 @@ fn nearest_open_non_resource_grass_tile(
                 let tx = ax as i32 + dx;
                 let ty = ay as i32 + dy;
                 if !map.in_bounds(tx, ty)
-                    || map.terrain_at(tx as u32, ty as u32) != terrain::GRASS
+                    || !map.is_passable(tx, ty)
                     || occ.building_blocked_at_tile(tx, ty)
                     || resource_tiles.contains(&(tx as u32, ty as u32))
                 {

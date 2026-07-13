@@ -25,5 +25,25 @@ mod tests {
         assert_eq!(terrain::GRASS, rts_rules::terrain::MAP_TERRAIN_GRASS);
         assert_eq!(terrain::ROCK, rts_rules::terrain::MAP_TERRAIN_ROCK);
         assert_eq!(terrain::WATER, rts_rules::terrain::MAP_TERRAIN_WATER);
+        assert_eq!(
+            terrain::ROAD_BARE,
+            rts_rules::terrain::MAP_TERRAIN_ROAD_BARE
+        );
+        assert_eq!(
+            terrain::ROAD_HORIZONTAL,
+            rts_rules::terrain::MAP_TERRAIN_ROAD_HORIZONTAL
+        );
+        assert_eq!(
+            terrain::ROAD_VERTICAL,
+            rts_rules::terrain::MAP_TERRAIN_ROAD_VERTICAL
+        );
+        assert_eq!(
+            terrain::ROAD_DIAGONAL_NW_SE,
+            rts_rules::terrain::MAP_TERRAIN_ROAD_DIAGONAL_NW_SE
+        );
+        assert_eq!(
+            terrain::ROAD_DIAGONAL_NE_SW,
+            rts_rules::terrain::MAP_TERRAIN_ROAD_DIAGONAL_NE_SW
+        );
     }
 }

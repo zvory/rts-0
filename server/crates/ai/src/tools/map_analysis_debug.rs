@@ -12,7 +12,7 @@ use std::process;
 use rts_protocol::{ObserverMapAnalysisLayer, ObserverMapAnalysisPrimitive};
 use rts_sim::game::map::{Map, CURRENT_MAP_VERSION};
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
-use rts_sim::protocol::{terrain, MapInfo, StartPayload};
+use rts_sim::protocol::{MapInfo, StartPayload};
 
 use crate::ai_core::map_analysis::{AiMapAnalysis, AiMapAnalysisDebugSnapshot};
 
@@ -284,7 +284,12 @@ fn render_terrain(out: &mut String, map: &MapInfo, tile_px: u32, show_grid: bool
             let idx = (y as usize)
                 .saturating_mul(map.width as usize)
                 .saturating_add(x as usize);
-            if map.terrain.get(idx).copied() == Some(terrain::GRASS) {
+            if map
+                .terrain
+                .get(idx)
+                .copied()
+                .is_some_and(rts_rules::terrain::is_passable_map_code)
+            {
                 continue;
             }
             writeln!(

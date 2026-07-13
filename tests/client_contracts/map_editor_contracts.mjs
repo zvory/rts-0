@@ -255,6 +255,35 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const start = session.draft.startLocations[0];
+  const roadTiles = [
+    { x: start.x - MAP_EDITOR_MAIN_CLEARANCE_TILES, y: start.y, code: TERRAIN.ROAD_BARE },
+    { x: start.x + MAP_EDITOR_MAIN_CLEARANCE_TILES, y: start.y, code: TERRAIN.ROAD_HORIZONTAL },
+    { x: start.x, y: start.y + MAP_EDITOR_MAIN_CLEARANCE_TILES, code: TERRAIN.ROAD_VERTICAL },
+    { x: start.x + 6, y: start.y + 6, code: TERRAIN.ROAD_DIAGONAL_NW_SE },
+    { x: start.x + 6, y: start.y - 6, code: TERRAIN.ROAD_DIAGONAL_NE_SW },
+  ];
+  session.beginTerrainStroke();
+  for (const tile of roadTiles) {
+    assert.deepEqual(session.paintTerrainTiles([tile], tile.code), [tile]);
+  }
+  assert.equal(session.commitTerrainStroke(), true);
+  for (const tile of roadTiles) {
+    assert.equal(session.materialized().terrain[tile.y * 32 + tile.x], tile.code);
+  }
+  session.beginTerrainStroke();
+  for (const tile of roadTiles) {
+    assert.deepEqual(
+      session.paintTerrainTiles([tile], TERRAIN.GRASS),
+      [{ x: tile.x, y: tile.y, code: TERRAIN.GRASS }],
+    );
+  }
+  assert.equal(session.commitTerrainStroke(), true);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 16, playerCount: 4 });
   for (const start of session.draft.startLocations) {
     assert(start.x >= MAP_EDITOR_MAIN_CLEARANCE_TILES && start.x < 16 - MAP_EDITOR_MAIN_CLEARANCE_TILES);

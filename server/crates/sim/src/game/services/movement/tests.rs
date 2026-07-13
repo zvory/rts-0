@@ -96,6 +96,52 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
         ability_cooldowns: Default::default(),
     }
 }
+
+#[test]
+fn road_tile_applies_authoritative_movement_speed_multiplier() {
+    let mut map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let grass_start = map.tile_center(20, 20);
+    let road_start = map.tile_center(20, 30);
+    let road_index = map.index(20, 30);
+    map.terrain[road_index] = crate::protocol::terrain::ROAD_HORIZONTAL;
+
+    let grass = entities
+        .spawn_unit(1, EntityKind::Rifleman, grass_start.0, grass_start.1)
+        .expect("grass rifleman");
+    let road = entities
+        .spawn_unit(1, EntityKind::Rifleman, road_start.0, road_start.1)
+        .expect("road rifleman");
+    mark_moving(&mut entities, grass, (grass_start.0 + 64.0, grass_start.1));
+    mark_moving(&mut entities, road, (road_start.0 + 64.0, road_start.1));
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let mut players = vec![player_with_oil(1, 1_000)];
+    movement_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &spatial,
+        1,
+    );
+
+    let grass_moved = moved_distance(grass_start, pos(&entities, grass));
+    let road_moved = moved_distance(road_start, pos(&entities, road));
+    let expected_grass = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .speed;
+    assert!((grass_moved - expected_grass).abs() <= 0.001);
+    assert!(
+        (road_moved
+            - expected_grass * crate::rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER)
+            .abs()
+            <= 0.001,
+        "road moved {road_moved}px while grass moved {grass_moved}px"
+    );
+}
+
 #[derive(Debug, Clone, Copy)]
 struct TankMovementBaseline {
     travel_ticks: u32,

@@ -20,8 +20,30 @@ const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
   [TERRAIN.ROCK]: "#",
   [TERRAIN.WATER]: "~",
+  [TERRAIN.ROAD_BARE]: "=",
+  [TERRAIN.ROAD_HORIZONTAL]: "-",
+  [TERRAIN.ROAD_VERTICAL]: "|",
+  [TERRAIN.ROAD_DIAGONAL_NW_SE]: "\\",
+  [TERRAIN.ROAD_DIAGONAL_NE_SW]: "/",
 });
-const CHAR_TO_TERRAIN = Object.freeze({ ".": TERRAIN.GRASS, "#": TERRAIN.ROCK, "~": TERRAIN.WATER });
+const CHAR_TO_TERRAIN = Object.freeze({
+  ".": TERRAIN.GRASS,
+  "#": TERRAIN.ROCK,
+  "~": TERRAIN.WATER,
+  "=": TERRAIN.ROAD_BARE,
+  "-": TERRAIN.ROAD_HORIZONTAL,
+  "|": TERRAIN.ROAD_VERTICAL,
+  "\\": TERRAIN.ROAD_DIAGONAL_NW_SE,
+  "/": TERRAIN.ROAD_DIAGONAL_NE_SW,
+});
+const ROAD_TERRAIN_CODES = new Set([
+  TERRAIN.ROAD_BARE,
+  TERRAIN.ROAD_HORIZONTAL,
+  TERRAIN.ROAD_VERTICAL,
+  TERRAIN.ROAD_DIAGONAL_NW_SE,
+  TERRAIN.ROAD_DIAGONAL_NE_SW,
+]);
+const ROAD_TERRAIN_CHARS = new Set([...ROAD_TERRAIN_CODES].map((code) => TERRAIN_TO_CHAR[code]));
 const SYMMETRY_TRANSFORMS = Object.freeze({
   [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
   [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
@@ -215,7 +237,14 @@ export class MapEditorSession {
     for (const tile of tiles) {
       const x = Math.trunc(Number(tile?.x));
       const y = Math.trunc(Number(tile?.y));
-      if (x < 0 || y < 0 || x >= size || y >= size || protectedTerrainTile(this.draft, x, y)) continue;
+      if (
+        x < 0 || y < 0 || x >= size || y >= size
+        || (
+          terrainCode !== TERRAIN.GRASS
+          && !ROAD_TERRAIN_CODES.has(terrainCode)
+          && protectedTerrainTile(this.draft, x, y)
+        )
+      ) continue;
       const row = byRow.get(y) || [...this.draft.terrain[y]];
       if (row[x] === ch) continue;
       row[x] = ch;
@@ -488,7 +517,14 @@ export function protectDraftBaseTerrain(draft) {
   const starts = new Set((draft.startLocations || []).map(locationKey));
   for (const site of draft.baseSites || []) {
     const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES;
-    paintDraftRect(draft, { x0: site.x - radius, y0: site.y - radius, x1: site.x + radius, y1: site.y + radius }, TERRAIN.GRASS);
+    const size = draft.terrain.length;
+    for (let y = clampTile(site.y - radius, size); y <= clampTile(site.y + radius, size); y++) {
+      const chars = [...draft.terrain[y]];
+      for (let x = clampTile(site.x - radius, size); x <= clampTile(site.x + radius, size); x++) {
+        if (!ROAD_TERRAIN_CHARS.has(chars[x])) chars[x] = TERRAIN_TO_CHAR[TERRAIN.GRASS];
+      }
+      draft.terrain[y] = chars.join("");
+    }
   }
 }
 

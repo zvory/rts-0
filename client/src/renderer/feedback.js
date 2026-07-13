@@ -51,7 +51,6 @@ import {
   drawAntiTankGun,
   drawFacingWedge,
   drawFreeRotatedRect,
-  drawImpassableEdge,
   drawInfantryBase,
   drawInfantryMachineGun,
   drawInfantryRifle,
@@ -61,7 +60,6 @@ import {
   drawTankTracks,
   finiteNumber,
   hash2,
-  isImpassableAt,
   normRect,
   polar,
   recoilVector,
@@ -71,6 +69,7 @@ import {
   tankBodyVisual,
   weaponRecoilOffset,
 } from "./shared.js";
+import { drawImpassableEdge, isImpassableAt } from "./terrain_palette.js";
 
 const MORTAR_WARNING_COLOR = 0x9f1f1f;
 const FIELD_OF_FIRE_COLOR = 0x4aa3ff;

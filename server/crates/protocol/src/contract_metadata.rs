@@ -15,6 +15,11 @@ pub mod terrain {
     pub const GRASS: u8 = 0; // passable
     pub const ROCK: u8 = 1; // impassable
     pub const WATER: u8 = 2; // impassable
+    pub const ROAD_BARE: u8 = 3; // passable, 1.4x movement speed
+    pub const ROAD_HORIZONTAL: u8 = 4; // passable, 1.4x movement speed
+    pub const ROAD_VERTICAL: u8 = 5; // passable, 1.4x movement speed
+    pub const ROAD_DIAGONAL_NW_SE: u8 = 6; // passable, 1.4x movement speed
+    pub const ROAD_DIAGONAL_NE_SW: u8 = 7; // passable, 1.4x movement speed
 }
 
 /// `EntityView.kind` values.
@@ -563,6 +568,11 @@ fn terrain_codes() -> BTreeMap<&'static str, u8> {
         ("GRASS", terrain::GRASS),
         ("ROCK", terrain::ROCK),
         ("WATER", terrain::WATER),
+        ("ROAD_BARE", terrain::ROAD_BARE),
+        ("ROAD_HORIZONTAL", terrain::ROAD_HORIZONTAL),
+        ("ROAD_VERTICAL", terrain::ROAD_VERTICAL),
+        ("ROAD_DIAGONAL_NW_SE", terrain::ROAD_DIAGONAL_NW_SE),
+        ("ROAD_DIAGONAL_NE_SW", terrain::ROAD_DIAGONAL_NE_SW),
     ])
 }
 

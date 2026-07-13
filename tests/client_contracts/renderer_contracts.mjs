@@ -4,10 +4,15 @@
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
-import { KIND } from "../../client/src/protocol.js";
+import { KIND, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
+import {
+  isImpassableTerrain,
+  roadMarkingOrientation,
+  terrainColor,
+} from "../../client/src/renderer/terrain_palette.js";
 import { loadFrameStripTexture } from "../../client/src/renderer/rigs/frame_strip_routing.js";
 import { loadPngRigAtlasTexture } from "../../client/src/renderer/rigs/png_routing.js";
 import {
@@ -21,6 +26,32 @@ import {
 } from "../../client/src/renderer/feedback.js";
 
 import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
+
+{
+  const bareRoad = terrainColor(TERRAIN.ROAD_BARE, 2, 3);
+  assert(
+    bareRoad === COLORS.road || bareRoad === COLORS.roadAlt,
+    "bare road uses the dedicated dark surface palette",
+  );
+  assert(!isImpassableTerrain(TERRAIN.ROAD_BARE), "bare road renders as passable terrain");
+  assert(roadMarkingOrientation(TERRAIN.ROAD_BARE) === null, "bare road has no center marking");
+  const roadVariants = [
+    [TERRAIN.ROAD_HORIZONTAL, "horizontal"],
+    [TERRAIN.ROAD_VERTICAL, "vertical"],
+    [TERRAIN.ROAD_DIAGONAL_NW_SE, "diagonalNwSe"],
+    [TERRAIN.ROAD_DIAGONAL_NE_SW, "diagonalNeSw"],
+  ];
+  for (const [code, orientation] of roadVariants) {
+    const road = terrainColor(code, 2, 3);
+    assert(
+      road === COLORS.road || road === COLORS.roadAlt,
+      `${orientation} road uses the dedicated dark surface palette`,
+    );
+    assert(road !== terrainColor(TERRAIN.GRASS, 2, 3), `${orientation} road reads distinctly from grass`);
+    assert(!isImpassableTerrain(code), `${orientation} road renders as passable terrain`);
+    assert(roadMarkingOrientation(code) === orientation, `${orientation} road keeps its yellow-line direction`);
+  }
+}
 
 {
   const priorDocument = globalThis.document;

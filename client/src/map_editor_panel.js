@@ -133,6 +133,11 @@ export class MapEditorPanel {
       [TERRAIN.GRASS, "Grass / erase"],
       [TERRAIN.ROCK, "Stone"],
       [TERRAIN.WATER, "Water"],
+      [TERRAIN.ROAD_BARE, "Road — bare"],
+      [TERRAIN.ROAD_HORIZONTAL, "Road — horizontal"],
+      [TERRAIN.ROAD_VERTICAL, "Road — vertical"],
+      [TERRAIN.ROAD_DIAGONAL_NW_SE, "Road — diagonal ↘"],
+      [TERRAIN.ROAD_DIAGONAL_NE_SW, "Road — diagonal ↙"],
     ]) {
       const control = button(label, () => {
         this.selectedTerrain = code;
@@ -475,6 +480,11 @@ function readout(text, error = false) {
 function terrainName(code) {
   if (code === TERRAIN.ROCK) return "stone";
   if (code === TERRAIN.WATER) return "water";
+  if (code === TERRAIN.ROAD_BARE) return "road-bare";
+  if (code === TERRAIN.ROAD_HORIZONTAL) return "road-horizontal";
+  if (code === TERRAIN.ROAD_VERTICAL) return "road-vertical";
+  if (code === TERRAIN.ROAD_DIAGONAL_NW_SE) return "road-diagonal-nw-se";
+  if (code === TERRAIN.ROAD_DIAGONAL_NE_SW) return "road-diagonal-ne-sw";
   return "grass";
 }
 

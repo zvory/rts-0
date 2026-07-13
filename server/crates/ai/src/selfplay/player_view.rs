@@ -5,7 +5,7 @@ use crate::ai_shared;
 use crate::config;
 use rts_rules;
 use rts_sim::game::entity::EntityKind;
-use rts_sim::protocol::{kinds, terrain, EntityView, MapInfo, Snapshot, StartPayload};
+use rts_sim::protocol::{kinds, EntityView, MapInfo, Snapshot, StartPayload};
 
 pub(super) fn kind_of(e: &EntityView) -> Option<EntityKind> {
     e.kind.parse().ok()
@@ -145,7 +145,12 @@ pub(crate) fn footprint_placeable_from_snapshot(
                 return false;
             }
             let idx = (ty * map.width + tx) as usize;
-            if map.terrain.get(idx).copied() != Some(terrain::GRASS) {
+            if !map
+                .terrain
+                .get(idx)
+                .copied()
+                .is_some_and(rts_rules::terrain::is_passable_map_code)
+            {
                 return false;
             }
             if occupied.contains(&(tx, ty)) {
@@ -162,7 +167,12 @@ pub(crate) fn footprint_placeable_from_snapshot(
             return false;
         }
         let spawn_idx = (spawn_y * map.width + spawn_x) as usize;
-        if map.terrain.get(spawn_idx).copied() != Some(terrain::GRASS) {
+        if !map
+            .terrain
+            .get(spawn_idx)
+            .copied()
+            .is_some_and(rts_rules::terrain::is_passable_map_code)
+        {
             return false;
         }
         if occupied.contains(&(spawn_x, spawn_y)) {

@@ -33,6 +33,7 @@ import {
   SETUP_CODE,
   STATE,
   STATE_CODE,
+  PASSABLE,
   TERRAIN,
   UPGRADE,
   UPGRADE_CODE,
@@ -226,6 +227,18 @@ assertSameMap("weapon kind vocabulary", protocolContract.vocabularies.weaponKind
 assertSameMap("notice severity vocabulary", protocolContract.vocabularies.noticeSeverities, NOTICE_SEVERITY);
 assertSameMap("order stage vocabulary", protocolContract.vocabularies.orderStages, ORDER_STAGE);
 assertSameMap("terrain", protocolContract.compactCodes.terrain, TERRAIN);
+assert(PASSABLE[TERRAIN.GRASS] === true, "grass must remain passable");
+assert(PASSABLE[TERRAIN.ROCK] === false, "rock must remain impassable");
+assert(PASSABLE[TERRAIN.WATER] === false, "water must remain impassable");
+for (const road of [
+  TERRAIN.ROAD_BARE,
+  TERRAIN.ROAD_HORIZONTAL,
+  TERRAIN.ROAD_VERTICAL,
+  TERRAIN.ROAD_DIAGONAL_NW_SE,
+  TERRAIN.ROAD_DIAGONAL_NE_SW,
+]) {
+  assert(PASSABLE[road] === true, `road terrain ${road} must be passable`);
+}
 assertSameCodes("entity kind", protocolContract.compactCodes.kind, KIND_CODE);
 assertSameCodes("entity state", protocolContract.compactCodes.state, STATE_CODE);
 assertSameCodes("setup state", protocolContract.compactCodes.setupState, SETUP_CODE);

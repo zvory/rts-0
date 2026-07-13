@@ -762,50 +762,6 @@ export function hash2(x, y) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
 
-/** Base color for a terrain tile code. Codes match server terrain constants. */
-export function terrainColor(code, tx, ty) {
-  if (code === 1) return COLORS.rock;
-  if (code === 2) return COLORS.water;
-  const n = hash2(tx, ty);
-  if (n > 0.78) return COLORS.field;
-  if (n < 0.18) return COLORS.mud;
-  return (tx + ty) % 2 === 0 ? COLORS.grass : COLORS.grassAlt;
-}
-
-/** Muted overlay tint for blocky terrain texture. */
-export function terrainOverlayColor(code, n) {
-  if (code === 1) return n > 0.74 ? 0x8a8777 : 0x4f4c43;
-  if (code === 2) return n > 0.74 ? 0x527482 : 0x1d3d48;
-  if (code === 3) return n > 0.74 ? 0x4a5a3e : 0x2a3a1e;
-  return n > 0.74 ? 0x817555 : 0x343127;
-}
-
-/** Draw dark perimeter strips only where impassable terrain borders passable ground. */
-export function drawImpassableEdge(g, map, tx, ty, code, ts) {
-  if (!isImpassableTerrain(code)) return;
-
-  const edge = Math.max(3, Math.floor(ts * 0.16));
-  const color = code === 2 ? 0x0c2028 : 0x24231f;
-  const x = tx * ts;
-  const y = ty * ts;
-
-  g.beginFill(color, 0.72);
-  if (!isImpassableAt(map, tx, ty - 1)) g.drawRect(x, y, ts, edge);
-  if (!isImpassableAt(map, tx, ty + 1)) g.drawRect(x, y + ts - edge, ts, edge);
-  if (!isImpassableAt(map, tx - 1, ty)) g.drawRect(x, y, edge, ts);
-  if (!isImpassableAt(map, tx + 1, ty)) g.drawRect(x + ts - edge, y, edge, ts);
-  g.endFill();
-}
-
-export function isImpassableAt(map, tx, ty) {
-  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return false;
-  return isImpassableTerrain(map.terrain[ty * map.width + tx]);
-}
-
-export function isImpassableTerrain(code) {
-  return code === 1 || code === 2 || code === 3;
-}
-
 /**
  * Parse a CSS color string ("#rrggbb" or "#rgb") to a 0xRRGGBB int. Already-numeric
  * inputs pass through. Falls back to a neutral grey on anything unexpected.

@@ -540,7 +540,19 @@ impl Game {
         if draft
             .terrain
             .iter()
-            .any(|tile| !matches!(*tile, terrain::GRASS | terrain::ROCK | terrain::WATER))
+            .any(|tile| {
+                !matches!(
+                    *tile,
+                    terrain::GRASS
+                        | terrain::ROCK
+                        | terrain::WATER
+                        | terrain::ROAD_BARE
+                        | terrain::ROAD_HORIZONTAL
+                        | terrain::ROAD_VERTICAL
+                        | terrain::ROAD_DIAGONAL_NW_SE
+                        | terrain::ROAD_DIAGONAL_NE_SW
+                )
+            })
         {
             return Err(LabError::InvalidMap {
                 name: name.to_string(),
@@ -1228,6 +1240,11 @@ fn terrain_name(tile: u8) -> &'static str {
         terrain::GRASS => "grass",
         terrain::ROCK => "rock",
         terrain::WATER => "water",
+        terrain::ROAD_BARE => "road-bare",
+        terrain::ROAD_HORIZONTAL => "road-horizontal",
+        terrain::ROAD_VERTICAL => "road-vertical",
+        terrain::ROAD_DIAGONAL_NW_SE => "road-diagonal-nw-se",
+        terrain::ROAD_DIAGONAL_NE_SW => "road-diagonal-ne-sw",
         _ => "unknown",
     }
 }
@@ -1280,11 +1297,15 @@ fn validate_lab_map_site(
                 });
             }
             let index = ty as usize * size as usize + tx as usize;
-            if terrain_grid.get(index).copied() != Some(terrain::GRASS) {
+            if !terrain_grid
+                .get(index)
+                .copied()
+                .is_some_and(crate::rules::terrain::is_passable_map_code)
+            {
                 return Err(LabError::InvalidMap {
                     name: name.to_string(),
                     reason: format!(
-                        "base site ({x},{y}) needs grass throughout its protected area"
+                        "base site ({x},{y}) needs passable terrain throughout its protected area"
                     ),
                 });
             }

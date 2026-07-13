@@ -155,7 +155,17 @@ impl LabCheckpointScenarioMap {
             });
         }
         for &tile in &self.data.terrain {
-            if !matches!(tile, terrain::GRASS | terrain::ROCK | terrain::WATER) {
+            if !matches!(
+                tile,
+                terrain::GRASS
+                    | terrain::ROCK
+                    | terrain::WATER
+                    | terrain::ROAD_BARE
+                    | terrain::ROAD_HORIZONTAL
+                    | terrain::ROAD_VERTICAL
+                    | terrain::ROAD_DIAGONAL_NW_SE
+                    | terrain::ROAD_DIAGONAL_NE_SW
+            ) {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),
                     reason: "checkpoint scenario map contains an unknown terrain code".to_string(),

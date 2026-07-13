@@ -2,7 +2,9 @@
 Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; faction availability,
 buildables, trainables, upgrade ids, and ability carriers live in
 `server/crates/rules/src/faction.rs`; terrain movement/cover/concealment hooks live in
-`server/crates/rules/src/terrain.rs` and currently return the all-open-ground defaults.
+`server/crates/rules/src/terrain.rs`. Grass, bare road, and all four marked road tiles share open-ground
+passability, cover, concealment, and line-of-sight behavior; road applies a 1.4x movement-speed
+multiplier.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
@@ -284,6 +286,10 @@ attacks need separate attack profiles and explicit activation/autocast policy in
 folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
+- `ROAD_MOVEMENT_SPEED_MULTIPLIER = 1.4`. Bare road plus horizontal, vertical, NW-SE diagonal, and
+  NE-SW diagonal marked road tiles share this rule. A moving unit samples the terrain under its
+  center at the start of each authoritative movement tick; roads otherwise behave like grass,
+  including passability, construction, cover, concealment, and line of sight.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 20`,
