@@ -61,6 +61,7 @@ viewportGroundPolygon() -> WorldPoint[]
 viewportGroundBounds() -> WorldBounds | null
 containsProjected(point, marginCssPx = 0) -> boolean
 focusAt(point) -> void
+framingForWorldPoints(points, { paddingCssPx = 0 } = {}) -> CameraSnapshotV1 | null
 fitWorldPoints(points, { paddingCssPx = 0 } = {}) -> boolean
 panByScreenDelta(delta) -> void
 dollyBy(factor, anchorScreen?) -> void

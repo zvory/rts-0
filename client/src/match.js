@@ -1021,6 +1021,7 @@ export class Match {
     const h = dom.viewport.clientHeight;
     this.renderer.resize(w, h);
     this.applyBounds();
+    this.autoSpectator?.handleViewportChange();
     this.input?.configureNativeCursorBounds?.();
   }
 

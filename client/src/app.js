@@ -875,9 +875,6 @@ export class App {
     if (this.match?.autoSpectator?.enabled !== this.autoSpectatorEnabled) {
       this.match?.setAutoSpectatorEnabled?.(this.autoSpectatorEnabled);
     }
-    if (this.settings?.isOpen() && this.match?.mountSettings) {
-      this.match.mountSettings({ keepOpen: true });
-    }
   }
 
   onBeforeUnload(ev) {

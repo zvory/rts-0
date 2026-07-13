@@ -116,6 +116,10 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
   const fitCamera = new FixedPerspectiveCamera(1920, 1080, { minZoom: 0.1, maxZoom: 4 });
   fitCamera.setMapBounds(4096, 4096);
   const fitPoints = [{ x: 1000, y: 1000 }, { x: 3000, y: 3000 }];
+  const beforeFit = fitCamera.snapshot();
+  const framing = fitCamera.framingForWorldPoints(fitPoints, { paddingCssPx: 64 });
+  assert.ok(framing, "perspective camera calculates a semantic fitted view");
+  assert.deepEqual(fitCamera.snapshot(), beforeFit, "perspective framing calculation is non-mutating");
   assert.equal(fitCamera.fitWorldPoints(fitPoints, { paddingCssPx: 64 }), true);
   for (const point of fitPoints) {
     const fitted = fitCamera.project({ ...point, heightPx: 0 });

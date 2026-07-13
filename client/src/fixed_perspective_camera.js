@@ -260,14 +260,14 @@ export class FixedPerspectiveCamera {
     this._mutate(() => { this.focusX = x; this.focusY = y; });
   }
 
-  fitWorldPoints(points, { paddingCssPx = 0 } = {}) {
+  framingForWorldPoints(points, { paddingCssPx = 0 } = {}) {
     if (!Array.isArray(points)) throw new TypeError("fit points must be an array");
     const padding = nonNegative(paddingCssPx, "fit padding");
     const accepted = points.filter((point) => finite(point?.x) != null && finite(point?.y) != null);
-    if (!accepted.length) return false;
+    if (!accepted.length) return null;
     const availableWidth = this.viewportWidthCssPx - padding * 2;
     const availableHeight = this.viewportHeightCssPx - padding * 2;
-    if (availableWidth <= 0 || availableHeight <= 0) return false;
+    if (availableWidth <= 0 || availableHeight <= 0) return null;
     const xs = accepted.map((point) => point.x);
     const ys = accepted.map((point) => point.y);
     const focusX = (Math.min(...xs) + Math.max(...xs)) / 2;
@@ -295,11 +295,14 @@ export class FixedPerspectiveCamera {
       }
       fittedScale = lower;
     }
-    this._mutate(() => {
-      this.framingScale = fittedScale;
-      this.focusX = focusX;
-      this.focusY = focusY;
-    });
+    const fitted = candidateState(fittedScale);
+    return cameraSnapshot({ x: fitted.focusX, y: fitted.focusY }, fittedScale);
+  }
+
+  fitWorldPoints(points, options = {}) {
+    const framing = this.framingForWorldPoints(points, options);
+    if (!framing) return false;
+    this.restore(framing);
     return true;
   }
 

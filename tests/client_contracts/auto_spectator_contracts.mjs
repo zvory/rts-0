@@ -68,8 +68,28 @@ function createHarness({ enabled = false } = {}) {
   director.update(0.5);
   assert(Math.abs(camera.snapshot().focus.x - 800) < 0.001, "pan reaches its target after one second");
 
+  director.moveTo([{ x: 860, y: 460 }, { x: 940, y: 540 }], 96);
+  director.update(0.25);
+  director.moveTo([{ x: 960, y: 460 }, { x: 1040, y: 540 }], 96);
+  director.update(0.75);
+  assert(!director.diagnostics().transitioning, "repeated decisions cannot extend a pan past one second");
+  assert(Math.abs(camera.snapshot().focus.x - 1000) < 0.001, "a retargeted pan reaches the latest framing");
+
   director.moveTo([{ x: 3300, y: 2400 }, { x: 3500, y: 2600 }], 96);
   assert.equal(director.diagnostics().moveKind, "cut", "distant reframes cut immediately");
+}
+
+{
+  const { camera, director } = createHarness({ enabled: true });
+  director.decide(0);
+  const beforeResizeScale = camera.snapshot().framingScale;
+  camera.resize(600, 400);
+  director.handleViewportChange();
+  assert(
+    camera.snapshot().framingScale < beforeResizeScale,
+    "viewport changes immediately recompute whole-map framing",
+  );
+  assert(!director.diagnostics().transitioning, "viewport reframing does not leave a stale transition");
 }
 
 {

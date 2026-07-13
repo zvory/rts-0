@@ -120,39 +120,6 @@ function selectFight(clusters, currentCenter, radius) {
   return best;
 }
 
-function framingForPoints(camera, points, paddingCssPx) {
-  const projection = camera?.projectionSnapshot?.();
-  const before = camera?.snapshot?.();
-  const width = projection?.viewport?.widthCssPx;
-  const height = projection?.viewport?.heightCssPx;
-  const finite = points.map(finitePoint).filter(Boolean);
-  if (!before || finite.length === 0 || !Number.isFinite(width) || !Number.isFinite(height)) return null;
-  const availableWidth = width - paddingCssPx * 2;
-  const availableHeight = height - paddingCssPx * 2;
-  if (availableWidth <= 0 || availableHeight <= 0) return null;
-
-  const xs = finite.map((point) => point.x);
-  const ys = finite.map((point) => point.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const worldWidth = maxX - minX;
-  const worldHeight = maxY - minY;
-  const widthScale = worldWidth > 0 ? availableWidth / worldWidth : Number.POSITIVE_INFINITY;
-  const heightScale = worldHeight > 0 ? availableHeight / worldHeight : Number.POSITIVE_INFINITY;
-  const unclamped = Number.isFinite(Math.min(widthScale, heightScale))
-    ? Math.min(widthScale, heightScale)
-    : camera.maxZoom;
-  const scale = Math.max(camera.minZoom, Math.min(camera.maxZoom, unclamped));
-  return {
-    version: 1,
-    focus: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-    framingScale: scale,
-    boundsPolicy: "mapOverscroll",
-  };
-}
-
 function mapCorners(state) {
   const tileSize = Number(state?.map?.tileSize);
   const width = Number(state?.map?.width) * tileSize;
@@ -228,25 +195,32 @@ export class AutoSpectatorDirector {
     if (progress >= 1) this.transition = null;
   }
 
-  decide(tick = this.latestTick) {
+  decide(tick = this.latestTick, { immediate = false } = {}) {
     if (!this.enabled) return;
     if (Number.isFinite(tick)) this.pruneSamples(tick);
     const radius = Math.max(1, Number(this.state?.map?.tileSize) || 32) * CLUSTER_RADIUS_TILES;
     const fight = selectFight(clusterSamples(this.samples, radius), this.currentFightCenter, radius);
     if (fight) {
       this.currentFightCenter = { x: fight.x, y: fight.y };
-      this.moveTo(fight.points, BATTLE_PADDING_CSS_PX);
+      this.moveTo(fight.points, BATTLE_PADDING_CSS_PX, { immediate });
       return;
     }
     this.currentFightCenter = null;
-    this.moveTo(mapCorners(this.state), MAP_PADDING_CSS_PX);
+    this.moveTo(mapCorners(this.state), MAP_PADDING_CSS_PX, { immediate });
   }
 
-  moveTo(points, paddingCssPx) {
+  moveTo(points, paddingCssPx, { immediate = false } = {}) {
     const from = this.camera?.snapshot?.();
-    const to = framingForPoints(this.camera, points, paddingCssPx);
+    const to = this.camera?.framingForWorldPoints?.(points, { paddingCssPx });
     const projection = this.camera?.projectionSnapshot?.();
     if (!from || !to || !projection?.viewport) return;
+
+    if (immediate) {
+      this.camera.restore(to);
+      this.transition = null;
+      this.lastMoveKind = "cut";
+      return;
+    }
 
     const distanceCss = distance(from.focus, to.focus) * from.framingScale;
     const scaleRatio = to.framingScale / from.framingScale;
@@ -269,13 +243,21 @@ export class AutoSpectatorDirector {
       return;
     }
 
+    const remainingDuration = this.transition
+      ? Math.max(0, this.transition.duration - this.transition.elapsed)
+      : PAN_DURATION_SECONDS;
     this.transition = {
       from,
       to,
       elapsed: 0,
-      duration: PAN_DURATION_SECONDS,
+      duration: remainingDuration,
     };
     this.lastMoveKind = "pan";
+  }
+
+  handleViewportChange() {
+    if (!this.enabled) return;
+    this.decide(this.latestTick, { immediate: true });
   }
 
   pruneSamples(tick) {

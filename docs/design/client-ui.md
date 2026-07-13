@@ -1058,7 +1058,7 @@ export class Camera {
   viewportGroundPolygon() -> [{x,y}, ...]
   viewportGroundBounds() -> {minX,minY,maxX,maxY}|null
   containsProjected(point, marginCssPx?) -> boolean
-  focusAt(point), fitWorldPoints(points, options?)
+  focusAt(point), framingForWorldPoints(points, options?), fitWorldPoints(points, options?)
   panByScreenDelta(delta), dollyBy(factor, anchorScreen?)
   resize(viewW, viewH), setMapBounds(worldW, worldH)
   snapshot(), restore(snapshotOrLegacy), projectionSnapshot()
