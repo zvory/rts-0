@@ -203,8 +203,7 @@ pub(crate) fn production_system(
                         spawned,
                         (first.point.x, first.point.y),
                         rally_stage_attacks(unit_can_gather, first),
-                        fog,
-                        smokes,
+                        (fog, smokes),
                     );
                     if let Some(e) = entities.get_mut(spawned) {
                         for stage in rally_plan.iter().skip(1).copied() {
