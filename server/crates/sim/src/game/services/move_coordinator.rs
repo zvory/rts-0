@@ -45,6 +45,7 @@ use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSo
 use crate::rules::projection;
 
 mod formation;
+mod rally;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -293,6 +294,61 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
+    }
+
+    /// Issue a newly produced unit's first rally order using the closest unoccupied, body-standable
+    /// tile. The caller retains the original rally coordinate for its marker and future production.
+    pub(in crate::game) fn order_rally_move(
+        &mut self,
+        entities: &mut EntityStore,
+        player: u32,
+        unit_id: u32,
+        rally: (f32, f32),
+        attack_move: bool,
+        visibility: (&Fog, &SmokeCloudStore),
+    ) {
+        if !entities
+            .get(unit_id)
+            .is_some_and(|unit| unit.is_unit() && unit.owner == player)
+        {
+            return;
+        }
+        let goal = rally::nearest_free_goal(
+            self.map,
+            self.occ,
+            entities,
+            &self.teams,
+            player,
+            unit_id,
+            rally,
+            visibility.0,
+            visibility.1,
+        )
+        .unwrap_or(rally);
+        self.record_group_queued_for_path(
+            if attack_move {
+                PathingRequestSource::AttackMove
+            } else {
+                PathingRequestSource::Move
+            },
+            1,
+        );
+        entities.release_miner(unit_id);
+        let Some(unit) = entities.get_mut(unit_id) else {
+            return;
+        };
+        let order = if attack_move {
+            Order::attack_move_to(goal.0, goal.1)
+        } else {
+            Order::move_to(goal.0, goal.1)
+        };
+        unit.replace_active_order(order);
+        unit.set_path_goal(Some(goal));
+        unit.mark_move_phase(MovePhase::AwaitingPath);
+        unit.reset_gather_state();
+        begin_deployed_weapon_teardown(unit);
+        let (px, py) = (unit.pos_x, unit.pos_y);
+        unit.reset_stuck(px, py);
     }
 
     fn known_trenches_for_player(&self, player: u32) -> &[formation::KnownTrench] {

@@ -321,7 +321,15 @@ pub(crate) fn run_tick(
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "production", || {
-        services::production::production_system(map, entities, players, &mut coordinator, events);
+        services::production::production_system(
+            map,
+            entities,
+            players,
+            &mut coordinator,
+            fog,
+            smokes,
+            events,
+        );
     });
     crate::perf::timed(perf.as_deref_mut(), "player_ability_cooldowns", || {
         for player in players.iter_mut() {
