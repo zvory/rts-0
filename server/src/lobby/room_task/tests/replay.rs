@@ -42,32 +42,91 @@ fn delete_replay_test_entity(game: &mut Game, entity_id: u32) {
     }
 }
 
+fn spawn_hidden_replay_depot_and_scout_position(
+    game: &mut Game,
+    viewers: [u32; 2],
+) -> (u32, (f32, f32)) {
+    let current_view = game.snapshot_for_spectator(&viewers);
+    let map_size = (current_view.visible_tiles.len() as f64).sqrt() as u32;
+    for tile_y in 0..map_size {
+        for tile_x in 0..map_size {
+            let depot_pos = tile_center(tile_x, tile_y);
+            let tile_index = (tile_y * map_size + tile_x) as usize;
+            if current_view.visible_tiles.get(tile_index).copied() != Some(0) {
+                continue;
+            }
+            let Ok(LabOpOutcome::Spawned { entity_id: depot }) =
+                game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                    owner: 3,
+                    kind: EntityKind::Depot,
+                    x: depot_pos.0,
+                    y: depot_pos.1,
+                    completed: true,
+                }))
+            else {
+                continue;
+            };
+
+            for offset_y in -2_i32..=2 {
+                for offset_x in -2_i32..=2 {
+                    if offset_x == 0 && offset_y == 0 {
+                        continue;
+                    }
+                    let scout_x = tile_x as i32 + offset_x;
+                    let scout_y = tile_y as i32 + offset_y;
+                    if scout_x < 0
+                        || scout_y < 0
+                        || scout_x >= map_size as i32
+                        || scout_y >= map_size as i32
+                    {
+                        continue;
+                    }
+                    let scout_pos = tile_center(scout_x as u32, scout_y as u32);
+                    let Ok(LabOpOutcome::Spawned { entity_id: scout }) =
+                        game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                            owner: viewers[0],
+                            kind: EntityKind::Rifleman,
+                            x: scout_pos.0,
+                            y: scout_pos.1,
+                            completed: true,
+                        }))
+                    else {
+                        continue;
+                    };
+                    delete_replay_test_entity(game, scout);
+                    return (depot, scout_pos);
+                }
+            }
+            delete_replay_test_entity(game, depot);
+        }
+    }
+    panic!("default replay map should contain a hidden depot position with a scout approach");
+}
+
 fn replay_game_with_split_building_memory(players: &[PlayerInit]) -> (Game, u32) {
     let mut game = replay_test_game(players, 0x5150_5505);
-    let p1_scout_pos = tile_center(20, 20);
-    let p2_scout_pos = tile_center(24, 20);
-    let depot_pos = tile_center(22, 20);
+    let viewers = [players[0].id, players[1].id];
+    let (depot, scout_pos) = spawn_hidden_replay_depot_and_scout_position(&mut game, viewers);
 
-    let depot = spawn_replay_test_entity(&mut game, 3, EntityKind::Depot, depot_pos);
-    let p1_scout = spawn_replay_test_entity(&mut game, 1, EntityKind::Rifleman, p1_scout_pos);
+    let p1_scout = spawn_replay_test_entity(&mut game, viewers[0], EntityKind::Rifleman, scout_pos);
     game.tick();
 
     delete_replay_test_entity(&mut game, p1_scout);
-    let p2_scout = spawn_replay_test_entity(&mut game, 2, EntityKind::Rifleman, p2_scout_pos);
+    let p2_scout = spawn_replay_test_entity(&mut game, viewers[1], EntityKind::Rifleman, scout_pos);
     game.tick();
 
     delete_replay_test_entity(&mut game, p2_scout);
     game.tick();
 
     assert!(
-        game.snapshot_for_spectator(&[1])
+        game.snapshot_for_spectator(&[viewers[0]])
             .remembered_buildings
             .iter()
             .any(|building| building.id == depot),
         "test setup should give P1 stale memory"
     );
     assert!(
-        game.snapshot_for_spectator(&[2])
+        game.snapshot_for_spectator(&[viewers[1]])
             .remembered_buildings
             .iter()
             .any(|building| building.id == depot),
