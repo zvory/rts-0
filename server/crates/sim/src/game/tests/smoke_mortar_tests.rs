@@ -531,6 +531,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
     );
 }
 
+#[test]
 fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     let players = [
         PlayerInit {
