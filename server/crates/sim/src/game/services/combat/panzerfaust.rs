@@ -239,7 +239,9 @@ fn panzerfaust_target_valid(
     attacker: u32,
     target: u32,
 ) -> bool {
-    world_query::unit_explicit_attack_target_valid(
+    entities.get(target).is_some_and(|target_entity| {
+        crate::rules::combat::is_panzerfaust_loaded_shot_target(target_entity.kind)
+    }) && world_query::unit_explicit_attack_target_valid(
         entities,
         teams,
         fog,
