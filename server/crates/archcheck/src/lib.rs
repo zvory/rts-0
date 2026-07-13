@@ -91,7 +91,10 @@ const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
 const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
-    ("ability_orders", &["commands", "move_coordinator", "world_query"]),
+    (
+        "ability_orders",
+        &["commands", "move_coordinator", "world_query"],
+    ),
     (
         "combat",
         &[
@@ -164,7 +167,17 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("pathing", &["occupancy", "standability"]),
-    ("production", &["move_coordinator", "occupancy", "pathing", "scout_plane", "standability"]),
+    (
+        "production",
+        &[
+            "move_coordinator",
+            "occupancy",
+            "pathing",
+            "scout_plane",
+            "standability",
+            "world_query",
+        ],
+    ),
     ("standability", &["geometry", "occupancy", "spatial"]),
     ("world_query", &["spatial"]),
 ];

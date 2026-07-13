@@ -101,6 +101,19 @@ pub(crate) fn resource_has_completed_mining_cc(
         .unwrap_or(false)
 }
 
+/// Whether `node` is a live steel patch that `player` can currently mine through a completed
+/// home-base mining anchor. Direct gather commands, queued gather promotion, and production
+/// gather rallies share this policy so they cannot disagree about an actionable target.
+pub(crate) fn steel_node_is_mineable_by_player(
+    entities: &EntityStore,
+    player: u32,
+    node: u32,
+) -> bool {
+    matches!(entities.get(node), Some(resource)
+        if resource.kind == EntityKind::Steel && resource.remaining().unwrap_or(0) > 0)
+        && resource_has_completed_mining_cc(entities, player, node)
+}
+
 fn nearest_completed_mining_anchor(
     entities: &EntityStore,
     player: u32,
@@ -166,7 +179,8 @@ pub(crate) fn is_explicit_attack_targetable(
 ) -> bool {
     candidate.id != attacker_id
         && candidate.owner != NEUTRAL
-        && (candidate.owner == attacker_owner || teams.is_enemy_owner(attacker_owner, candidate.owner))
+        && (candidate.owner == attacker_owner
+            || teams.is_enemy_owner(attacker_owner, candidate.owner))
         && candidate.is_targetable()
         && candidate.hp > 0
 }

@@ -20,13 +20,13 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2459,
-      "reason": "Checkpoint Phase 7 expands the existing oversized architecture checker with state-owner checkpoint policy/evidence enforcement; keep ratcheting until archcheck scanners and tests are split into modules."
+      "lines": 2472,
+      "reason": "Steel rally production reuses the authoritative mining query through an explicit architecture edge; keep ratcheting until archcheck scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1712,
-      "reason": "Repeat production adds its authoritative command DTO and compact-slot regression coverage to the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1716,
+      "reason": "Repeat production and steel rally resource targeting add command DTO coverage to the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -50,7 +50,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1529,
+      "lines": 1524,
       "reason": "Panzerfaust reload extracted queued attack promotion helpers from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
     },
     {
@@ -65,8 +65,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1890,
-      "reason": "Lab tool pointer contracts were extracted beside their setup-tool behavior; keep ratcheting until remaining state/input fixtures are split."
+      "lines": 1921,
+      "reason": "Steel rally input coverage extends the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
 }

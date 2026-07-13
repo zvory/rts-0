@@ -1253,11 +1253,15 @@ export class Minimap {
         .filter((e) => ownOwner(this.state, e.owner) && isProducerBuilding(e.kind))
         .map((e) => e.id);
       if (producers.length === 0) return;
+      const resource = resourceRallyTargetAt(this.state.map, wx, wy);
+      if (resource?.kind === KIND.OIL) return;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+      const rallyPoint = resource?.kind === KIND.STEEL ? resource : { x: wx, y: wy };
+      const node = resource?.kind === KIND.STEEL ? resource.id : null;
       for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, wx, wy, queued, kind));
+        this._issueCommand(cmd.setRally(building, rallyPoint.x, rallyPoint.y, queued, kind, node));
       }
-      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", rallyPoint.x, rallyPoint.y, queued);
       return;
     }
     if (commandTarget === "attack") {
@@ -1308,6 +1312,25 @@ export class Minimap {
     this._issueCommand(cmd.move(landUnitIds, wx, wy, queued));
     this._addCommandFeedback("move", wx, wy, queued);
   }
+}
+
+function resourceRallyTargetAt(map, x, y) {
+  const radius = Math.max(0, Number(map?.tileSize) || 0) * 0.5;
+  const radius2 = radius * radius;
+  let best = null;
+  let bestDist2 = Infinity;
+  for (const node of map?.resources || []) {
+    if (node?.remaining === 0 || !isResource(node?.kind)) continue;
+    const dx = Number(node.x) - x;
+    const dy = Number(node.y) - y;
+    const dist2 = dx * dx + dy * dy;
+    if (!Number.isFinite(dist2) || dist2 > radius2) continue;
+    if (dist2 < bestDist2 || (dist2 === bestDist2 && node.id < best?.id)) {
+      best = node;
+      bestDist2 = dist2;
+    }
+  }
+  return best;
 }
 
 function supportWeaponSetupPreviewEntity(entity) {

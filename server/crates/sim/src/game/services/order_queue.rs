@@ -629,12 +629,7 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
     if !is_gatherer {
         return false;
     }
-    let node_ok = matches!(entities.get(node), Some(n)
-        if n.is_node() && n.kind != EntityKind::Oil && n.remaining().unwrap_or(0) > 0);
-    if !node_ok {
-        return false;
-    }
-    if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
+    if !world_query::steel_node_is_mineable_by_player(entities, owner, node) {
         return false;
     }
     if matches!(entities.node_slot_holder(node), Some(holder) if holder != worker) {

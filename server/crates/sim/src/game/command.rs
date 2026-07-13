@@ -99,6 +99,7 @@ pub enum SimCommand {
         building: u32,
         x: f32,
         y: f32,
+        node: Option<u32>,
         kind: RallyKind,
         queued: bool,
     },
@@ -300,6 +301,7 @@ impl SimCommand {
                 building,
                 x,
                 y,
+                node,
                 kind,
                 queued,
             } => match RallyKind::from_protocol_str(kind.as_deref()) {
@@ -307,6 +309,7 @@ impl SimCommand {
                     building,
                     x,
                     y,
+                    node,
                     kind,
                     queued,
                 },
@@ -458,12 +461,14 @@ impl SimCommand {
                 building,
                 x,
                 y,
+                node,
                 kind,
                 queued,
             } => protocol::Command::SetRally {
                 building: *building,
                 x: *x,
                 y: *y,
+                node: *node,
                 kind: Some(kind.to_protocol_str().to_string()),
                 queued: *queued,
             },
@@ -546,6 +551,38 @@ mod tests {
                 queued: true,
             }
         );
+    }
+
+    #[test]
+    fn protocol_rally_resource_node_is_optional_and_round_trips() {
+        let legacy: protocol::Command = serde_json::from_str(
+            r#"{"c":"setRally","building":3,"x":10.0,"y":20.0,"kind":"move"}"#,
+        )
+        .expect("an omitted rally node should deserialize");
+        assert_eq!(
+            SimCommand::from_protocol(legacy),
+            SimCommand::SetRally {
+                building: 3,
+                x: 10.0,
+                y: 20.0,
+                node: None,
+                kind: RallyKind::Move,
+                queued: false,
+            }
+        );
+
+        let command = SimCommand::SetRally {
+            building: 3,
+            x: 10.0,
+            y: 20.0,
+            node: Some(42),
+            kind: RallyKind::Move,
+            queued: false,
+        };
+        let protocol = command.to_protocol().expect("rally should encode");
+        let encoded = serde_json::to_string(&protocol).expect("rally should serialize");
+        assert!(encoded.contains(r#""node":42"#));
+        assert_eq!(SimCommand::from_protocol(protocol), command);
     }
 
     #[test]

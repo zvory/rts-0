@@ -271,6 +271,10 @@ pub enum Command {
         building: u32,
         x: f32,
         y: f32,
+        /// Optional authoritative resource-node target. Steel nodes turn the rally into a gather
+        /// order for newly trained gatherers; oil nodes are rejected by the simulation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node: Option<u32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         kind: Option<String>,
         #[serde(default, skip_serializing_if = "is_false")]

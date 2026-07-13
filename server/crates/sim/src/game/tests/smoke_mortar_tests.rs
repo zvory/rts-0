@@ -817,6 +817,10 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     let target = game.state.entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
+    game.state.entities
+        .get_mut(target)
+        .expect("target should exist")
+        .hold_position();
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
@@ -846,9 +850,12 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         mortar_entity.facing()
     );
 
+    let mut impact_pos = None;
     for _ in 0..2 {
-        game.tick();
+        let events = game.tick();
+        impact_pos = impact_pos.or_else(|| mortar_launch_impact(&events, 1, mortar));
     }
+    let impact_pos = impact_pos.expect("owner should receive mortar launch impact");
     let mortar_entity = game.state.entities.get(mortar).expect("mortar should exist");
     assert!(
         mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0,
@@ -864,6 +871,10 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         .get(target)
         .expect("target should still exist")
         .hp;
+    game.state.entities
+        .get_mut(target)
+        .expect("target should still exist")
+        .set_position(impact_pos.0, impact_pos.1);
 
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
@@ -988,6 +999,10 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
     let outer_target = game.state.entities
         .spawn_unit(1, EntityKind::MachineGunner, outer_pos.0, outer_pos.1)
         .expect("outer target should spawn");
+    game.state.entities
+        .get_mut(outer_target)
+        .expect("outer target should exist")
+        .hold_position();
     let armored_hp_before = game.state.entities
         .get(armored_inner)
         .expect("armored target exists")
@@ -1021,7 +1036,10 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
     game.state.entities
         .get_mut(outer_target)
         .expect("outer target should exist")
-        .set_position(impact_pos.0 + config::TILE_SIZE as f32, impact_pos.1);
+        .set_position(
+            impact_pos.0,
+            impact_pos.1 + config::TILE_SIZE as f32 * 1.25,
+        );
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }

@@ -465,7 +465,7 @@ folded into default targeting.
   compatibility; it is the original 96×96 handcrafted map padded with 15 passable grass tiles on
   every edge. Both map JSON assets use row strings (`.` grass, `#` rock, `~` water), flat
   `startLocations`, and flat `baseSites`.
-- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
+- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 6`,
   one City Centre at the player's start tile, 12 steel patches with 1,250 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 3,333 oil
   each nearby.
@@ -491,6 +491,9 @@ folded into default targeting.
   does not reserve it. Extra gatherers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded gatherer is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
+- Steel patches are valid production rally targets. A newly trained Worker or Golem from that
+  producer starts with a gather order for the authoritative steel node; other unit kinds retain
+  their normal move/attack-move rally behavior. Oil patches are not valid rally targets.
 - Starting and expansion resources: every authored base site gets 12 steel patches and 3 oil
   patches. Map schema v3 stores flat `startLocations` and `baseSites`: the number of start
   locations limits player count, while every base site remains present in every match. A player
