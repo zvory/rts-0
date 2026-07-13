@@ -8,7 +8,17 @@
 // non-square maps stay centered and undistorted.
 
 import { cmd } from "./protocol.js";
-import { ABILITY, KIND, ORDER_STAGE, PASSABLE, TERRAIN, UPGRADE, isResource, isUnit } from "./protocol.js";
+import {
+  ABILITY,
+  KIND,
+  ORDER_STAGE,
+  PASSABLE,
+  TERRAIN,
+  UPGRADE,
+  isResource,
+  isRoadTerrain,
+  isUnit,
+} from "./protocol.js";
 import {
   ABILITIES,
   COLORS,
@@ -132,7 +142,7 @@ const signatureReasonForKey = (key) => {
 const terrainFill = (code, tx, ty) => {
   if (code === TERRAIN.ROCK) return hex(COLORS.rock);
   if (code === TERRAIN.WATER) return hex(COLORS.water);
-  if (PASSABLE[code] === true && code !== TERRAIN.GRASS) {
+  if (isRoadTerrain(code)) {
     return hex(hash2(tx, ty) > 0.6 ? COLORS.roadAlt : COLORS.road);
   }
   const n = hash2(tx, ty);

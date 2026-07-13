@@ -1,4 +1,4 @@
-import { TERRAIN } from "./protocol.js";
+import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
@@ -36,14 +36,7 @@ const CHAR_TO_TERRAIN = Object.freeze({
   "\\": TERRAIN.ROAD_DIAGONAL_NW_SE,
   "/": TERRAIN.ROAD_DIAGONAL_NE_SW,
 });
-const ROAD_TERRAIN_CODES = new Set([
-  TERRAIN.ROAD_BARE,
-  TERRAIN.ROAD_HORIZONTAL,
-  TERRAIN.ROAD_VERTICAL,
-  TERRAIN.ROAD_DIAGONAL_NW_SE,
-  TERRAIN.ROAD_DIAGONAL_NE_SW,
-]);
-const ROAD_TERRAIN_CHARS = new Set([...ROAD_TERRAIN_CODES].map((code) => TERRAIN_TO_CHAR[code]));
+const ROAD_TERRAIN_CHARS = new Set(ROAD_TERRAIN_CODES.map((code) => TERRAIN_TO_CHAR[code]));
 const SYMMETRY_TRANSFORMS = Object.freeze({
   [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
   [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
@@ -242,7 +235,7 @@ export class MapEditorSession {
         !ch || x < 0 || y < 0 || x >= size || y >= size
         || (
           code !== TERRAIN.GRASS
-          && !ROAD_TERRAIN_CODES.has(code)
+          && !isRoadTerrain(code)
           && protectedTerrainTile(this.draft, x, y)
         )
       ) continue;

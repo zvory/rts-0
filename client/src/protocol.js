@@ -29,6 +29,7 @@ import {
   ORDER_STAGE,
   ORDER_STAGE_CODE,
   PASSABLE,
+  ROAD_TERRAIN_CODES,
   PREDICTION_PROTOCOL_VERSION,
   VISION_SELECTION,
   WEAPON_KIND,
@@ -47,6 +48,7 @@ import {
   UPGRADE,
   UPGRADE_CODE,
   isBuilding,
+  isRoadTerrain,
   isResource,
   isUnit
 } from "./protocol_constants.js";
@@ -76,6 +78,7 @@ export {
   ORDER_STAGE,
   ORDER_STAGE_CODE,
   PASSABLE,
+  ROAD_TERRAIN_CODES,
   PREDICTION_PROTOCOL_VERSION,
   VISION_SELECTION,
   WEAPON_KIND,
@@ -94,6 +97,7 @@ export {
   UPGRADE,
   UPGRADE_CODE,
   isBuilding,
+  isRoadTerrain,
   isResource,
   isUnit
 } from "./protocol_constants.js";

@@ -1,5 +1,5 @@
 import { COLORS } from "../config.js";
-import { TERRAIN } from "../protocol.js";
+import { PASSABLE, TERRAIN, isRoadTerrain } from "../protocol.js";
 import { hash2 } from "./shared.js";
 
 /** Base color for a terrain tile code. Codes match server terrain constants. */
@@ -44,15 +44,7 @@ export function isImpassableAt(map, tx, ty) {
 }
 
 export function isImpassableTerrain(code) {
-  return code !== TERRAIN.GRASS && !isRoadTerrain(code);
-}
-
-export function isRoadTerrain(code) {
-  return code === TERRAIN.ROAD_BARE
-    || code === TERRAIN.ROAD_HORIZONTAL
-    || code === TERRAIN.ROAD_VERTICAL
-    || code === TERRAIN.ROAD_DIAGONAL_NW_SE
-    || code === TERRAIN.ROAD_DIAGONAL_NE_SW;
+  return PASSABLE[code] !== true;
 }
 
 export function roadMarkingOrientation(code) {
