@@ -431,6 +431,11 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
             execution: BuildExecution {
                 phase: BuildPhase::ToSite,
                 unit_blocked_ticks: 0,
+                routing: FootprintRouting {
+                    attempt: 0,
+                    static_fingerprint: None,
+                    start_tile: None,
+                },
             },
             ..
         })
@@ -443,6 +448,11 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
             execution: BuildExecution {
                 phase: BuildPhase::Constructing { site: 7 },
                 unit_blocked_ticks: 0,
+                routing: FootprintRouting {
+                    attempt: 0,
+                    static_fingerprint: None,
+                    start_tile: None,
+                },
             },
             ..
         })

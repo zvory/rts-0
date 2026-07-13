@@ -1164,8 +1164,27 @@ new validation policy or tick orchestration; those responsibilities remain with 
 queued promotion, or the owning tick system.
 
 Live pathfinding and dev scenarios share a 32,768-node expansion budget per path miss. Requests
-that exhaust the budget return a best-effort path. Pump Jack standability permits a Pump Jack to
-coexist with its oil node, and simulation invariant checks use that same Pump Jack policy.
+that exhaust the budget return a best-effort path. Cache entries include the effective search
+budget, so an identical bounded request can reuse its deterministic best-effort result while a
+larger-budget request still searches afresh. The movement coordinator services at most eight
+search-backed tile-path requests per tick; cache hits consume the same scheduling allowance as
+misses so clearing the rebuildable cache cannot change simulation timing. Same-tile, zero-search,
+and proven-clear direct routes remain free. A cached result retains its original search-work
+classification; after any result representing at least 4,096 expanded nodes, the coordinator
+preserves that result but defers all later tile-path requests to the next tick. Deferred movement
+orders remain
+`AwaitingPath`; build and deconstruction orders retain their interaction intent for a later routing
+pass. Their serialized execution state advances a staging-candidate cursor after bounded failures
+and resets it when the static blocker fingerprint or worker start tile changes, so retry progress
+does not depend on rebuildable cache residency. This tick-level scheduling does not lower the
+per-route search allowance. Ordinary
+non-vehicle move formations bypass A* only when the existing body standability check proves the
+exact world-space segment clear; interaction routes and blocked direct segments retain the full
+tile-guided search. Direct results are not stored in the tile-keyed cache. `PathingService` reuses
+cleared A* working containers between sequential room requests; that scratch state remains derived
+and is never serialized. Pump Jack standability
+permits a Pump Jack to coexist with its oil node, and simulation invariant checks use that same
+Pump Jack policy.
 
 Eligible infantry move and attack-move formation slots bias toward nearby known, unoccupied trench
 terrain within a two-tile footprint band around the normal formation goal. A trench occupant counts

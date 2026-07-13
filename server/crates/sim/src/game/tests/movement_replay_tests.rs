@@ -985,7 +985,10 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
             queued: false,
         },
     );
-    game.tick();
+    // The pathing work fuse may deliberately spread obstructed vehicle searches across ticks.
+    for _ in 0..command_units.len() {
+        game.tick();
+    }
     let debug_options = SnapshotOptions {
         include_movement_paths: true,
         movement_paths_for_all_projected: false,

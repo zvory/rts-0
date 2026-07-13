@@ -400,10 +400,19 @@ impl BuildOrder {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct FootprintRouting {
+    pub(crate) attempt: u32,
+    pub(crate) static_fingerprint: Option<u64>,
+    pub(crate) start_tile: Option<(u32, u32)>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildExecution {
     pub phase: BuildPhase,
     pub unit_blocked_ticks: u32,
+    #[serde(default)]
+    pub(crate) routing: FootprintRouting,
 }
 
 impl BuildExecution {
@@ -411,6 +420,7 @@ impl BuildExecution {
         BuildExecution {
             phase: BuildPhase::ToSite,
             unit_blocked_ticks: 0,
+            routing: FootprintRouting::default(),
         }
     }
 }
@@ -441,6 +451,7 @@ impl DeconstructOrder {
             execution: DeconstructExecution {
                 phase: DeconstructPhase::ToTarget,
                 progress: 0,
+                routing: FootprintRouting::default(),
             },
         }
     }
@@ -450,6 +461,8 @@ impl DeconstructOrder {
 pub struct DeconstructExecution {
     pub phase: DeconstructPhase,
     pub progress: u32,
+    #[serde(default)]
+    pub(crate) routing: FootprintRouting,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
