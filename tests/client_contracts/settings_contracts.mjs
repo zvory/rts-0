@@ -28,6 +28,10 @@ import {
   writeUnitRangesEnabled,
 } from "../../client/src/unit_range_settings.js";
 import {
+  readAutoSpectatorEnabled,
+  writeAutoSpectatorEnabled,
+} from "../../client/src/auto_spectator_settings.js";
+import {
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
   HotkeyProfileService,
@@ -82,6 +86,29 @@ function hotkeyService() {
     debug: { available: true },
   }).filter((tab) => tab.visible !== false);
   assert(debugTabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio,debug", "settings: debug tab is conditional");
+
+  withFakeSettingsDocument(() => {
+    let enabled = false;
+    const tabs = buildSettingsTabs({
+      audio: {},
+      game: { kind: "replay" },
+      replayControls: {
+        state: () => ({ available: true, enabled }),
+        onToggle: () => { enabled = !enabled; },
+      },
+    }).filter((tab) => tab.visible !== false);
+    assert(
+      tabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio,replay-controls",
+      "settings: spectator and replay contexts expose a dedicated Replay Controls tab",
+    );
+    const root = document.createElement("div");
+    tabs.find((tab) => tab.id === "replay-controls").render(root);
+    const toggle = root.children[0];
+    assert(toggle.textContent === "Enable Auto Spectator: off", "settings: auto spectator defaults off");
+    toggle.listeners.click();
+    assert(toggle.textContent === "Enable Auto Spectator: on", "settings: Replay Controls toggles auto spectator");
+    assert(toggle.getAttribute("aria-checked") === "true", "settings: auto spectator exposes switch state");
+  });
 
   withFakeSettingsDocument(() => {
     let giveUpOpened = false;
@@ -173,6 +200,11 @@ function hotkeyService() {
     assert(!readUnitRangesEnabled(storage), "unit range setting persists disabled state");
     writeUnitRangesEnabled(true, storage);
     assert(readUnitRangesEnabled(storage), "unit range setting clears override when re-enabled");
+    assert(!readAutoSpectatorEnabled(storage), "auto spectator defaults off");
+    writeAutoSpectatorEnabled(true, storage);
+    assert(readAutoSpectatorEnabled(storage), "auto spectator persists enabled state");
+    writeAutoSpectatorEnabled(false, storage);
+    assert(!readAutoSpectatorEnabled(storage), "auto spectator clears its enabled override");
   }
 
   withFakeSettingsDocument(() => {

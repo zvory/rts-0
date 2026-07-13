@@ -294,19 +294,19 @@ export class Camera {
   }
 
   /**
-   * Fit finite world points within viewport-local CSS padding.
-   * Invalid points are ignored; no finite points leave the view unchanged.
+   * Return the semantic view that fits finite world points within viewport-local CSS padding.
+   * Invalid points are ignored; no finite points return null.
    */
-  fitWorldPoints(points, { paddingCssPx = 0 } = {}) {
+  framingForWorldPoints(points, { paddingCssPx = 0 } = {}) {
     if (!Array.isArray(points)) throw new TypeError("fit points must be an array");
     const padding = requireNonNegative(paddingCssPx, "fit padding");
     const finite = points
       .map((point) => ({ x: finiteNumber(point?.x), y: finiteNumber(point?.y) }))
       .filter((point) => point.x != null && point.y != null);
-    if (finite.length === 0) return false;
+    if (finite.length === 0) return null;
     const availableWidth = this.viewW - padding * 2;
     const availableHeight = this.viewH - padding * 2;
-    if (availableWidth <= 0 || availableHeight <= 0) return false;
+    if (availableWidth <= 0 || availableHeight <= 0) return null;
 
     const xs = finite.map((point) => point.x);
     const ys = finite.map((point) => point.y);
@@ -321,10 +321,23 @@ export class Camera {
     const targetScale = Number.isFinite(Math.min(widthScale, heightScale))
       ? Math.min(widthScale, heightScale)
       : this.maxZoom;
-    const before = this._rawView();
-    this.zoom = clampZoom(targetScale, this.minZoom, this.maxZoom);
-    this._centerOn((minX + maxX) / 2, (minY + maxY) / 2);
-    this._emitIfChanged(before);
+    const framingScale = clampZoom(targetScale, this.minZoom, this.maxZoom);
+    const focus = this._clampedFocus(
+      (minX + maxX) / 2,
+      (minY + maxY) / 2,
+      framingScale,
+    );
+    return createCameraSnapshot(focus.x, focus.y, framingScale);
+  }
+
+  /**
+   * Fit finite world points within viewport-local CSS padding.
+   * Invalid points are ignored; no finite points leave the view unchanged.
+   */
+  fitWorldPoints(points, options = {}) {
+    const framing = this.framingForWorldPoints(points, options);
+    if (!framing) return false;
+    this.restore(framing);
     return true;
   }
 
@@ -504,9 +517,20 @@ export class Camera {
 
   /** @private */
   _centerOn(x, y) {
-    this.x = x - this.viewW / (2 * this.zoom);
-    this.y = y - this.viewH / (2 * this.zoom);
+    const focus = this._clampedFocus(x, y, this.zoom);
+    this.x = focus.x - this.viewW / (2 * this.zoom);
+    this.y = focus.y - this.viewH / (2 * this.zoom);
     this._clamp();
+  }
+
+  /** @private */
+  _clampedFocus(x, y, zoom) {
+    if (this.worldW <= 0 || this.worldH <= 0) return { x, y };
+    const visW = this.viewW / zoom;
+    const visH = this.viewH / zoom;
+    const left = Math.max(-visW / 4, Math.min(this.worldW - visW * 3 / 4, x - visW / 2));
+    const top = Math.max(-visH / 4, Math.min(this.worldH - visH * 3 / 4, y - visH / 2));
+    return { x: left + visW / 2, y: top + visH / 2 };
   }
 
   /** @private */

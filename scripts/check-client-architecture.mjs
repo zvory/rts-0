@@ -18,6 +18,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "match_observer_diagnostics.js": "app-shell",
   "match_settings_context.js": "app-shell",
   "match_settings_toggles.js": "app-shell",
+  "match_auto_spectator.js": "app-shell",
+  "auto_spectator.js": "app-shell",
   "match_health.js": "app-shell",
   "frame_profiler.js": "app-shell",
   "frame_recovery.js": "app-shell",
@@ -59,6 +61,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "sim_wasm_adapter.js": "model",
   "prediction_settings.js": "platform",
   "unit_range_settings.js": "platform",
+  "auto_spectator_settings.js": "platform",
 
   "net.js": "transport",
   "protocol.js": "transport",

@@ -10,6 +10,8 @@ export class ReplayViewer extends Match {
       onBackToLobby: options.onBackToLobby,
       unitRangesEnabled: options.unitRangesEnabled,
       onUnitRangesEnabledChange: options.onUnitRangesEnabledChange,
+      autoSpectatorEnabled: options.autoSpectatorEnabled,
+      onAutoSpectatorEnabledChange: options.onAutoSpectatorEnabledChange,
       capabilities: options.capabilities,
       cameraMaxZoom: options.cameraMaxZoom,
       observerAnalysisOverlayPreferences: options.observerAnalysisOverlayPreferences,

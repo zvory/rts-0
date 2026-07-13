@@ -87,6 +87,7 @@ class FakePerspectiveProjection {
     "viewportGroundBounds",
     "containsProjected",
     "focusAt",
+    "framingForWorldPoints",
     "fitWorldPoints",
     "panByScreenDelta",
     "dollyBy",
@@ -238,6 +239,16 @@ class FakePerspectiveProjection {
   assertApprox(afterPan.x, beforePan.x - 20, 1e-9, "semantic screen pan preserves legacy x direction");
   assertApprox(afterPan.y, beforePan.y + 10, 1e-9, "semantic screen pan preserves legacy y direction");
 
+  const beforeFit = camera.snapshot();
+  const framing = camera.framingForWorldPoints([
+    { x: 1000, y: 1000 },
+    { x: 1400, y: 1200 },
+    { x: Number.NaN, y: 0 },
+  ], { paddingCssPx: 100 });
+  assert(framing, "framing succeeds with finite world points");
+  assertApprox(framing.framingScale, 1.5, 1e-9, "framing selects limiting CSS-pixel scale");
+  assertDeepEqual(framing.focus, { x: 1200, y: 1100 }, "framing focuses finite point bounds");
+  assertDeepEqual(camera.snapshot(), beforeFit, "framing calculation does not mutate the camera");
   assert(camera.fitWorldPoints([
     { x: 1000, y: 1000 },
     { x: 1400, y: 1200 },

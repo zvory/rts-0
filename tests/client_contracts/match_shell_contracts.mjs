@@ -422,6 +422,8 @@ withFakeSettingsDocument(() => {
 
 withFakeSettingsDocument(() => {
   let pauseSent = 0;
+  let autoSpectatorToggled = 0;
+  const autoSpectator = { enabled: false };
   const context = buildMatchSettingsContext({
     replayViewer: false,
     state: { spectator: true },
@@ -435,6 +437,11 @@ withFakeSettingsDocument(() => {
     hotkeyProfiles: null,
     prediction: { enabled: false },
     input: null,
+    autoSpectator,
+    onAutoSpectatorToggle: () => {
+      autoSpectator.enabled = !autoSpectator.enabled;
+      autoSpectatorToggled += 1;
+    },
     onPauseGame: () => { pauseSent += 1; },
     livePauseActionLabel: () => "Pause (2)",
   });
@@ -446,6 +453,12 @@ withFakeSettingsDocument(() => {
   assert(giveUpAction.render() === null, "match settings context still hides give-up for spectators");
   pauseButton.listeners.click();
   assert(pauseSent === 1, "match settings context wires spectator pause callback");
+  const replayControlsTab = context.tabs.find((tab) => tab.id === "replay-controls");
+  assert(replayControlsTab?.label === "Replay Controls", "live spectators receive the Replay Controls settings tab");
+  const replayControlsRoot = document.createElement("div");
+  replayControlsTab.render(replayControlsRoot, context);
+  replayControlsRoot.children[0].listeners.click();
+  assert(autoSpectatorToggled === 1, "live spectator Replay Controls wires the auto spectator toggle");
 });
 
 withFakeSettingsDocument(() => {
