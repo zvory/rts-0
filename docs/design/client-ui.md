@@ -1095,8 +1095,9 @@ bonus. When combat activity expires, the director prefers a likely contact betwe
 units: units already within 28 tiles qualify, as do movement tracks whose inferred closest approach
 comes within eight tiles over the next six simulated seconds. Nearby members of both formations are
 included in the shot, same-team pairs and scout planes are ignored, and worker-only contacts receive
-a ranking penalty. If no contact is plausible, the camera preserves its focus and widens by 6%
-over four seconds, finishing each small widening before beginning another. The local overview never
+a ranking penalty. Combat and likely-contact shots reserve 50% more screen-space context than the
+initial director tuning. If no contact is plausible, the camera preserves its focus and widens by 6%
+per second, finishing each small widening before beginning another. The local overview never
 reveals more than 70% of either map dimension, so a large display cannot turn it into a whole-map shot.
 Decisions occur no more than once every 30 simulation ticks. Nearby reframes pan and zoom with a
 one-second smooth transition, distant combat/contact reframes cut immediately, and backward replay

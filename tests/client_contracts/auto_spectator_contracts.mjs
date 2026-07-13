@@ -38,15 +38,15 @@ function createHarness({ enabled = false, players = null } = {}) {
   assert.equal(director.diagnostics().mode, "overview", "quiet scenes use gradual overview mode");
   assert.equal(director.diagnostics().moveKind, "zoom", "quiet scenes begin a smooth zoom");
   assert.equal(camera.snapshot().framingScale, 1, "quiet scenes never jump directly to a full-map view");
-  director.update(1);
+  director.update(0.5);
   assert(camera.snapshot().framingScale < 1, "quiet overview widens during its transition");
-  assert(camera.snapshot().framingScale > 0.94, "quiet overview takes more than one second to widen");
+  assert(camera.snapshot().framingScale > 0.94, "quiet overview takes the full second to widen");
   director.decide(30);
-  director.update(3);
+  director.update(0.5);
   assert(Math.abs(camera.snapshot().framingScale - 0.94) < 0.001,
     "frequent decisions do not compound an in-progress overview zoom");
   director.decide(60);
-  director.update(4);
+  director.update(1);
   assert(camera.snapshot().framingScale > 0.85,
     "successive quiet shots widen in small steps instead of revealing the full map");
 }
@@ -84,6 +84,7 @@ function createHarness({ enabled = false, players = null } = {}) {
   director.update(1);
   assert(Math.abs(camera.snapshot().focus.x - 900) < 0.001, "likely contact frames both sides");
   assert(camera.snapshot().framingScale > 0.25, "likely contact remains a local shot");
+  assert(camera.snapshot().framingScale < 1.7, "likely contact reserves fifty percent more context padding");
 }
 
 {
