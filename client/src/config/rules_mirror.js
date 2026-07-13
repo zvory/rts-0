@@ -448,8 +448,8 @@ export const isProducerBuilding = (kind) =>
   Array.isArray(STATS[kind]?.trains) && STATS[kind].trains.length > 0;
 
 export const RESOURCE_AMOUNTS = Object.freeze({
-  [KIND.STEEL]: 1250,
-  [KIND.OIL]: 3333,
+  [KIND.STEEL]: 625,
+  [KIND.OIL]: 1666,
 });
 
 // What a worker can build (command card when a worker is selected).

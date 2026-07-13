@@ -13,8 +13,9 @@ pub const STARTING_WORKERS: u32 = 6;
 pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
-pub const STEEL_PATCH_AMOUNT: u32 = 1250;
-pub const OIL_GEYSER_AMOUNT: u32 = 3333;
+pub const STEEL_PATCH_AMOUNT: u32 = 625;
+// Resource nodes hold whole units, so halve the former 3,333 amount by rounding down.
+pub const OIL_GEYSER_AMOUNT: u32 = 1666;
 pub const STEEL_PATCHES_PER_BASE: u32 = 12;
 pub const OIL_PATCHES_PER_BASE: u32 = 3;
 
