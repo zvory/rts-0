@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::commands::PendingCommand;
-use crate::game::entity::{Entity, EntityKind, MAX_QUEUED_ORDERS};
+use crate::game::entity::{Entity, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
@@ -211,7 +211,7 @@ fn validate_tank_armor_reaction_lock(
     let Some(lock) = combat.tank_armor_reaction_lock else {
         return Ok(());
     };
-    if entity.kind != EntityKind::Tank || entity.hp == 0 {
+    if !rules::combat::unit_uses_tank_armor_reaction(entity.kind) || entity.hp == 0 {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.combat.tankArmorReactionLock",
         });

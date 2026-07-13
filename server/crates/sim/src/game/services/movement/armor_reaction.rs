@@ -51,7 +51,10 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
 }
 
 fn tank_can_react(tank: &Entity) -> bool {
-    if tank.kind != EntityKind::Tank || tank.hp == 0 || !tank.path_is_empty() {
+    if !crate::rules::combat::unit_uses_tank_armor_reaction(tank.kind)
+        || tank.hp == 0
+        || !tank.path_is_empty()
+    {
         return false;
     }
     match tank.order() {

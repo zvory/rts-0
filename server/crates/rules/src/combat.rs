@@ -367,10 +367,16 @@ pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
 
 /// The current direct-fire AP weapons that make a Tank commit its hull to their source.
 pub fn weapon_triggers_tank_armor_reaction(profile: &WeaponProfile) -> bool {
-    matches!(
-        profile.id,
-        WeaponKind::AntiTankGun | WeaponKind::PanzerfaustLoadedShot | WeaponKind::TankCannon
-    )
+    weapon_is_ap(profile)
+        && matches!(
+            profile.id,
+            WeaponKind::AntiTankGun | WeaponKind::PanzerfaustLoadedShot | WeaponKind::TankCannon
+        )
+}
+
+/// Whether this unit uses the autonomous first-hit armor-reaction lock.
+pub fn unit_uses_tank_armor_reaction(kind: EntityKind) -> bool {
+    kind == EntityKind::Tank
 }
 
 /// Rules-owned armor classification for target ranking and damage policy.
@@ -699,6 +705,33 @@ fn normalized_angle_delta(from: f32, to: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tank_armor_reaction_policy_has_one_unit_and_three_ap_weapons() {
+        let reacting_units = EntityKind::ALL
+            .into_iter()
+            .filter(|kind| unit_uses_tank_armor_reaction(*kind))
+            .collect::<Vec<_>>();
+        assert_eq!(reacting_units, vec![EntityKind::Tank]);
+
+        let triggering_weapons = WEAPON_PROFILES
+            .iter()
+            .filter(|profile| weapon_triggers_tank_armor_reaction(profile))
+            .map(|profile| profile.id)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            triggering_weapons,
+            vec![
+                WeaponKind::AntiTankGun,
+                WeaponKind::PanzerfaustLoadedShot,
+                WeaponKind::TankCannon,
+            ]
+        );
+        assert!(WEAPON_PROFILES
+            .iter()
+            .filter(|profile| weapon_triggers_tank_armor_reaction(profile))
+            .all(weapon_is_ap));
+    }
 
     fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
         if kind == EntityKind::Panzerfaust {
