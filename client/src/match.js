@@ -1,4 +1,3 @@
-import { Audio, noticeSoundId } from "./audio.js";
 import { restoreInitialCameraView } from "./camera_view_selection.js";
 import { autoSpectatorCameraMinZoom, createMatchAutoSpectator } from "./match_auto_spectator.js";
 import {
@@ -27,16 +26,11 @@ import { GameState } from "./state.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture, renderFixedCaptureFrame } from "./match_fixed_capture.js";
 import { ClientIntent } from "./client_intent.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, NOTICE_SEVERITY, S } from "./protocol.js";
-import {
-  UNDER_ATTACK_ID,
-  VIEWPORT_ALERT_MARGIN_PX,
-  noticeAlertId,
-  noticeDisplayText,
-} from "./alerts.js";
+import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 import { MatchCombatAudio } from "./match_combat_audio.js";
+import { MatchNoticePresenter } from "./match_notice_presenter.js";
 import {
   applyLivePauseState as applyLivePauseStateModel,
   clearPredictedMovementOverlay,
@@ -255,6 +249,17 @@ export class Match {
         commandsEnabled: !!this.capabilities.commands.gameplay,
         clientIntent: this.clientIntent,
         artilleryIconSvg: ARTILLERY_RIG_SVG,
+      }),
+    );
+    this.noticePresenter = this._timeInit(
+      "match.noticePresenter",
+      () => new MatchNoticePresenter({
+        toast: this.toast,
+        minimap: this.minimap,
+        audio: this.audio,
+        isReplay: () => this.replayViewer,
+        isSpectator: () => !!this.state?.spectator,
+        pointInViewport: (x, y, marginPx) => this.pointInViewport(x, y, marginPx),
       }),
     );
     this.input = this._timeInit(
@@ -1111,32 +1116,7 @@ export class Match {
   }
 
   handleNotice(ev) {
-    const alertId = noticeAlertId(ev.msg);
-    const severity = ev.severity || (alertId ? NOTICE_SEVERITY.ALERT : NOTICE_SEVERITY.INFO);
-    this.toast(noticeDisplayText(ev.msg));
-
-    const hasPos = Number.isFinite(ev.x) && Number.isFinite(ev.y);
-    const isAlert = severity === NOTICE_SEVERITY.ALERT || !!alertId;
-    if (isAlert) {
-      if (hasPos) this.minimap?.ping(ev.x, ev.y, severity);
-      else this.minimap?.pulseBorder();
-    }
-
-    if (this.replayViewer || this.state?.spectator || !this.audio) return;
-    if (alertId === UNDER_ATTACK_ID && hasPos && this.pointInViewport(ev.x, ev.y, VIEWPORT_ALERT_MARGIN_PX)) {
-      return;
-    }
-    const opts = {
-      category: isAlert ? "alert" : "ui",
-      priority: isAlert ? 3 : 1,
-      alertId,
-    };
-    if (hasPos) {
-      opts.alertX = ev.x;
-      opts.alertY = ev.y;
-    }
-    const soundId = noticeSoundId(ev.msg);
-    if (soundId) this.audio.play(soundId, opts);
+    return this.noticePresenter?.present(ev) ?? false;
   }
 
   pointInViewport(x, y, marginPx = 0) {
@@ -1217,6 +1197,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.combatAudio?.destroy();
     this.combatAudio = null;
+    this.noticePresenter = null;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
@@ -1261,6 +1242,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.combatAudio?.destroy();
     this.combatAudio = null;
+    this.noticePresenter = null;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);

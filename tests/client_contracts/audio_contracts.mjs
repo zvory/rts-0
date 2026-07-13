@@ -33,9 +33,13 @@ import {
 function fakeAudioParam(value = 1) {
   return {
     value,
+    ramps: [],
     cancelScheduledValues() {},
     setValueAtTime(v) { this.value = v; },
-    linearRampToValueAtTime(v) { this.value = v; },
+    linearRampToValueAtTime(v, time) {
+      this.value = v;
+      this.ramps.push({ value: v, time });
+    },
   };
 }
 
@@ -217,26 +221,22 @@ assert(
       alertId: "under_attack",
       alertX: 100,
       alertY: 100,
+      cooldownMs: 0,
+      duck: true,
     }),
     "first under-attack alert plays",
   );
-  assert(
-    !audio.play("notice_under_attack", {
-      category: "alert",
-      alertId: "under_attack",
-      alertX: 120,
-      alertY: 140,
-    }),
-    "under-attack alert dedups within the same spatial bucket",
-  );
+  now += 1000;
   assert(
     audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 2000,
       alertY: 100,
+      cooldownMs: 0,
+      duck: true,
     }),
-    "under-attack alert plays in a different spatial bucket",
+    "presenter-admitted under-attack voices bypass generic spoken cooldown",
   );
 
   audio.voices.slice().forEach((v) => v.node.stop());
@@ -249,16 +249,65 @@ assert(
   assert(audio.play("notice_supply", { category: "alert" }), "spoken alert plays after buffer-duration cooldown");
 
   audio.voices.slice().forEach((v) => v.node.stop());
+  audio.buffers.set("duck_notice_a", { duration: 0.1 });
+  audio.buffers.set("duck_notice_b", { duration: 0.1 });
   audio.buffers.set("duck_alert", { duration: 0.1 });
   now = 40_000;
   const ambientBefore = audio.gains.ambient.gain.value;
   const combatBefore = audio.gains.combat_self.gain.value;
-  assert(audio.play("duck_alert", { category: "alert" }), "ducking alert plays");
-  assert(audio.gains.ambient.gain.value < ambientBefore, "alert ducks ambient bus");
-  assert(audio.gains.combat_self.gain.value < combatBefore, "alert ducks combat bus");
-  audio.voices.slice().forEach((v) => v.node.stop());
+  assert(audio.play("duck_notice_a", { category: "ui", duck: true }), "explicit ducking notice plays");
+  assertApprox(
+    audio.gains.ambient.gain.value,
+    ambientBefore * Math.pow(10, -12 / 20),
+    0.0001,
+    "ducking voice lowers ambient by 12 dB",
+  );
+  assertApprox(
+    audio.gains.combat_self.gain.value,
+    combatBefore * Math.pow(10, -10 / 20),
+    0.0001,
+    "ducking voice lowers combat by 10 dB",
+  );
+  assertApprox(
+    audio.gains.combat_self.gain.ramps.at(-1).time,
+    0.08,
+    0.0001,
+    "combat duck attacks over 80 milliseconds",
+  );
+  audio.setCategoryVolume("ambient", 0.6);
+  audio.setCategoryVolume("combat_self", 0.7);
+  assertApprox(
+    audio.gains.ambient.gain.value,
+    0.6 * Math.pow(10, -12 / 20),
+    0.0001,
+    "ambient slider changes preserve an active duck",
+  );
+  assertApprox(
+    audio.gains.combat_self.gain.value,
+    0.7 * Math.pow(10, -10 / 20),
+    0.0001,
+    "combat slider changes preserve an active duck",
+  );
+  assert(audio.play("duck_notice_b", { category: "ui", duck: true }), "overlapping ducking notice plays");
+  assert(audio.alertDuckDepth === 2, "overlapping ducking voices increment duck depth");
+  const firstDuck = audio.voices.find((voice) => voice.id === "duck_notice_a");
+  const secondDuck = audio.voices.find((voice) => voice.id === "duck_notice_b");
+  firstDuck.node.stop();
+  assert(audio.alertDuckDepth === 1, "first completed voice does not restore buses early");
+  audio.ctx.currentTime = 4;
+  secondDuck.node.stop();
+  assert(audio.alertDuckDepth === 0, "last completed voice releases duck depth");
   assertApprox(audio.gains.ambient.gain.value, audio.getCategoryVolume("ambient"), 0.0001, "ambient bus restores");
   assertApprox(audio.gains.combat_self.gain.value, audio.getCategoryVolume("combat_self"), 0.0001, "combat bus restores");
+  assertApprox(
+    audio.gains.combat_self.gain.ramps.at(-1).time,
+    6,
+    0.0001,
+    "combat bus restores over two seconds",
+  );
+  assert(audio.play("duck_alert", { category: "alert" }), "alert category still ducks by default");
+  assert(audio.alertDuckDepth === 1, "default alert duck participates in depth tracking");
+  audio.voices.slice().forEach((v) => v.node.stop());
 
   audio.destroy();
   globalThis.window = priorWindow;

@@ -26,6 +26,7 @@ await import("./client_contracts/input_contracts.mjs");
 await import("./client_contracts/ability_hotkey_targeting_contracts.mjs");
 await import("./client_contracts/artillery_targeting_contracts.mjs");
 await import("./client_contracts/match_shell_contracts.mjs");
+await import("./client_contracts/match_notice_presenter_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");
 await import("./client_contracts/room_time_controls_contracts.mjs");
 await import("./client_contracts/room_time_panel_contracts.mjs");

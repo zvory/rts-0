@@ -70,6 +70,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     createElement() { return { classList: { add() {} }, appendChild() {}, style: {} }; },
   };
   const { Match } = await import("../../client/src/match.js");
+  const { MatchNoticePresenter } = await import("../../client/src/match_notice_presenter.js");
   const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
   const { ReplayControls, RoomTimeControls } = await import("../../client/src/replay_controls.js");
   const { applyMatchUnitRanges } = await import("../../client/src/match_settings_toggles.js");
@@ -469,6 +470,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     },
   };
   noticeAudioMatch.state = { spectator: false };
+  noticeAudioMatch.noticePresenter = new MatchNoticePresenter({
+    toast: noticeAudioMatch.toast,
+    minimap: noticeAudioMatch.minimap,
+    audio: noticeAudioMatch.audio,
+    isReplay: () => noticeAudioMatch.replayViewer,
+    isSpectator: () => !!noticeAudioMatch.state?.spectator,
+    pointInViewport: (x, y, margin) => noticeAudioMatch.pointInViewport(x, y, margin),
+  });
   noticeAudioMatch.replayViewer = true;
   noticeAudioMatch.handleNotice({
     e: EVENT.NOTICE,
@@ -485,7 +494,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     e: EVENT.NOTICE,
     msg: "alert:under_attack",
     severity: NOTICE_SEVERITY.ALERT,
-    x: 512,
+    x: 1600,
     y: 768,
   });
   assert(playedNotices.length === 0, "live spectator notice alerts do not play audio");
@@ -495,7 +504,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     e: EVENT.NOTICE,
     msg: "alert:under_attack",
     severity: NOTICE_SEVERITY.ALERT,
-    x: 512,
+    x: 2700,
     y: 768,
   });
   assert(

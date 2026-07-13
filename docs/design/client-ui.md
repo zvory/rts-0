@@ -96,6 +96,7 @@ src/
   map_editor_viewport.js # Pixi renderer/camera composition plus editor-only pointer/keyboard input
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
+  match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
   match_live_pause.js # live pause state actions and prediction visual suspension
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
@@ -1265,7 +1266,7 @@ export class Audio {
                                           // create/resume AudioContext from a user gesture
   isUnlocked() -> boolean                 // true when the AudioContext is running
   onUnlockChange(fn) -> unsubscribe       // notify settings UI after first successful unlock
-  play(id, {x?, y?, priority?, category?, pitchVariance?, gain?})
+  play(id, {x?, y?, priority?, category?, pitchVariance?, gain?, duck?})
                                            // x/y present -> StereoPanner + lowpass + distance gain
   playUI(id, opts)                        // non-spatial ui category convenience
   stopByKey(key) -> number                // stop tagged active voices, for sustained/abortable cues
@@ -1278,6 +1279,28 @@ export class Audio {
 export const SOUND_MANIFEST
 export function noticeSoundId(msg)
 ```
+
+`match_notice_presenter.js`
+```js
+export class MatchNoticePresenter {
+  constructor({toast, minimap, audio, isReplay, isSpectator, pointInViewport, now?})
+  present(event) -> boolean              // fan out one existing server Notice when admitted
+}
+```
+`Match` owns one presenter per match and injects the toast, minimap, persistent audio engine, and
+dynamic viewer/viewport predicates. The presenter owns only existing server `Notice` events; it
+does not create advisory or economy notices. Under-attack incidents use 960 px map buckets and a
+10-second match-scoped cooldown, with one admission decision gating toast, minimap, and voice
+together. An admitted in-viewport incident still toasts and pings but stays silent and consumes the
+same cooldown; a distinct bucket remains immediately eligible. Replay viewers and live spectators
+still receive admitted toast/minimap presentation but never player notice audio.
+
+Every existing notice voice selected by the presenter passes `duck: true`, including informational
+voices that retain the `ui` category and informational visual severity. The audio engine also keeps
+`alert` as a backward-compatible default ducking category. Duck depth is counted per active ducking
+voice; ambient drops by 12 dB and combat drops by 10 dB over 0.08 seconds, then both restore over
+2.0 seconds only after the last ducking voice ends. Presenter-admitted under-attack voices bypass
+the generic spoken cooldown because the presenter is the sole owner of their incident admission.
 
 `hud.js`
 ```js
@@ -1410,7 +1433,7 @@ controls and must not infer playable seats from replay lobby occupants or hidden
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds
 `GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,
-`Input`, starts the rAF loop
+`MatchNoticePresenter`, `Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,
 `audio.setListener`, `input.update`, `buildFrameEntityViews`, `fog.update`, `renderer.render`,
 `hud.update`, `minimap.render`); on each snapshot it applies state and triggers transient event
@@ -1422,8 +1445,10 @@ give-up action, computes local fog from the server-filtered union snapshot, and 
 renderer/minimap/HUD pointed at snapshots with `playerResources`. Lab operators are the exception:
 their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSurface(state)` keeps
 the selected-unit panel and real command card visible while prediction stays disabled and issue-as
-remains the command authority. Spectators still receive notice toasts and minimap alert pings, but
-`match.js` suppresses notice alert audio so observers do not hear player alert callouts.
+remains the command authority. Spectators still receive admitted notice toasts and minimap alert
+pings, but the match-owned notice presenter suppresses notice audio so observers do not hear player
+callouts. Repeated under-attack events in one match-scoped incident are admitted once across toast,
+minimap, and audio together.
 `artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
 the artillery rig icon above fog for every recipient without using it as entity visibility.
 
@@ -1599,6 +1624,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   buckets; generic Panzerfaust attack events, projectile travel, reload, and legacy conversion
   events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
   fights.
+  Existing spoken server notices explicitly duck ambient and combat buses while they play; nested
+  notice voices hold the duck until the final voice ends, then release over two seconds.
   Tank coax `weaponKind` feedback uses machine-gun burst audio instead of Tank cannon audio, and it
   does not register as a sustained Machine Gunner loop. Tank coax tracers use a bright machine-gun
   line with a hot core, smaller muzzle flash, and tail styling. The coax barrel is a short separated
@@ -1744,6 +1771,7 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_combat_audio.js`,
+  `match_notice_presenter.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,
   `client_perf_report.js`, `match_health.js`,

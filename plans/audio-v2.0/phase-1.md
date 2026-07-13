@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -82,16 +82,16 @@ under-attack hits from independently driving toast and minimap spam.
 
 ## Implementation Checklist
 
-- [ ] Extract existing server-notice presentation from `Match` without adding notice types.
-- [ ] Add one match-scoped under-attack admission decision shared by toast, minimap, and voice.
-- [ ] Remove the audio engine's persistent under-attack cooldown and bypass generic spoken cooldown
+- [x] Extract existing server-notice presentation from `Match` without adding notice types.
+- [x] Add one match-scoped under-attack admission decision shared by toast, minimap, and voice.
+- [x] Remove the audio engine's persistent under-attack cooldown and bypass generic spoken cooldown
       for presenter-admitted under-attack voices.
-- [ ] Make duck intent explicit while preserving existing `alert` callers.
-- [ ] Apply the deeper combat duck and two-second release.
-- [ ] Preserve replay, spectator, viewport, toast, minimap, and ordinary info-notice behavior.
-- [ ] Add focused contracts for presenter routing, incident dedup, and nested duck restoration.
-- [ ] Update the client UI design document.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Make duck intent explicit while preserving existing `alert` callers.
+- [x] Apply the deeper combat duck and two-second release.
+- [x] Preserve replay, spectator, viewport, toast, minimap, and ordinary info-notice behavior.
+- [x] Add focused contracts for presenter routing, incident dedup, and nested duck restoration.
+- [x] Update the client UI design document.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 

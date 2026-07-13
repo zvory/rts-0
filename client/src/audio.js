@@ -37,10 +37,6 @@ const VOICE_CAP = 48;
 const DEDUP_MS = 60;
 /** Spoken feedback should never stack faster than the line itself. */
 const SPOKEN_MIN_COOLDOWN_MS = 1500;
-/** Spatial bucket used by under-attack voice dedup (30 tiles at 32 px). */
-const UNDER_ATTACK_BUCKET_PX = 960;
-/** Under-attack voice line cooldown per map bucket. */
-const UNDER_ATTACK_COOLDOWN_MS = 10000;
 /** Pitch jitter (±fraction) applied via playbackRate when caller does not override. */
 const PITCH_VARIANCE = 0.06;
 /** Master gain ramp time on tab show/hide (s). */
@@ -50,9 +46,9 @@ const VISIBILITY_RAMP_S = 0.1;
 const SPATIAL_REFRESH_RAMP_S = 0.03;
 /** Alert ducking ramps in fast and releases slower so spoken lines cut through battles. */
 const DUCK_IN_S = 0.08;
-const DUCK_OUT_S = 0.4;
+const DUCK_OUT_S = 2.0;
 const DB_ALERT_AMBIENT = -12;
-const DB_ALERT_COMBAT = -4;
+const DB_ALERT_COMBAT = -10;
 
 const BASE_PRIORITY = Object.freeze({
   alert: 100,
@@ -251,6 +247,7 @@ export class Audio {
    * @param {string} [opts.key] caller-owned voice key for early stopping
    * @param {string} [opts.dedupKey] override per-sound dedup bucket
    * @param {number} [opts.cooldownMs] override dedup cooldown
+   * @param {boolean} [opts.duck] explicitly duck combat and ambient buses for this voice
    * @returns {boolean} true if scheduled, false if dropped
    */
   play(id, opts) {
@@ -326,6 +323,7 @@ export class Audio {
       return false;
     }
     const key = typeof opts.key === "string" && opts.key ? opts.key : null;
+    const ducking = opts.duck === true || category === "alert";
     const voice = {
       node: src,
       priorityBonus,
@@ -336,11 +334,12 @@ export class Audio {
       trail,
       distancePenalty,
       spatial: spatialNodes,
+      ducking,
     };
     this.voices.push(voice);
     src.onended = () => this._finishVoice(voice);
     this.lastPlay.set(dedupKey, now);
-    if (category === "alert") this._beginAlertDuck();
+    if (ducking) this._beginAlertDuck();
     return true;
   }
 
@@ -451,7 +450,7 @@ export class Audio {
     if (g && this.ctx) {
       const now = this.ctx.currentTime;
       g.gain.cancelScheduledValues(now);
-      g.gain.setValueAtTime(v, now);
+      g.gain.setValueAtTime(this._categoryGainTarget(cat, this.alertDuckDepth > 0), now);
     }
   }
 
@@ -572,13 +571,6 @@ export class Audio {
 
   _dedupKey(id, category, opts, spatial) {
     if (typeof opts.dedupKey === "string" && opts.dedupKey) return `${id}:${opts.dedupKey}`;
-    if (id === "notice_under_attack" && opts.alertId === "under_attack") {
-      const x = Number(opts.alertX);
-      const y = Number(opts.alertY);
-      if (isFinite(x) && isFinite(y)) {
-        return `${id}:under_attack:${Math.floor(x / UNDER_ATTACK_BUCKET_PX)}:${Math.floor(y / UNDER_ATTACK_BUCKET_PX)}`;
-      }
-    }
     if (category === "combat_self" || category === "combat_other") {
       const refDist = Math.max(1, this.listener.refDist || DEFAULT_REF_DIST);
       const bucketPx = Math.max(160, refDist / 3);
@@ -590,9 +582,6 @@ export class Audio {
 
   _cooldownMs(id, category, opts, buf) {
     if (typeof opts.cooldownMs === "number" && opts.cooldownMs >= 0) return opts.cooldownMs;
-    if (id === "notice_under_attack" && opts.alertId === "under_attack") {
-      return UNDER_ATTACK_COOLDOWN_MS;
-    }
     if (SPOKEN_CATEGORIES.has(category)) {
       return Math.max(buf.duration * 1000 || 0, SPOKEN_MIN_COOLDOWN_MS);
     }
@@ -654,7 +643,7 @@ export class Audio {
     for (const n of voice.trail || []) {
       try { n.disconnect(); } catch { /* already disconnected */ }
     }
-    if (voice.category === "alert") this._releaseAlertDuck();
+    if (voice.ducking) this._releaseAlertDuck();
   }
 
   /**
@@ -716,9 +705,9 @@ export class Audio {
     const now = this.ctx.currentTime;
     const ramp = duck ? DUCK_IN_S : DUCK_OUT_S;
     const targets = {
-      ambient: duck ? this.volume.ambient * dbToGain(DB_ALERT_AMBIENT) : this.volume.ambient,
-      combat_self: duck ? this.volume.combat_self * dbToGain(DB_ALERT_COMBAT) : this.volume.combat_self,
-      combat_other: duck ? this.volume.combat_other * dbToGain(DB_ALERT_COMBAT) : this.volume.combat_other,
+      ambient: this._categoryGainTarget("ambient", duck),
+      combat_self: this._categoryGainTarget("combat_self", duck),
+      combat_other: this._categoryGainTarget("combat_other", duck),
     };
     for (const [cat, target] of Object.entries(targets)) {
       const g = this.gains[cat];
@@ -727,6 +716,16 @@ export class Audio {
       g.gain.setValueAtTime(g.gain.value, now);
       g.gain.linearRampToValueAtTime(target, now + ramp);
     }
+  }
+
+  _categoryGainTarget(cat, duck) {
+    const base = this.volume[cat];
+    if (!duck) return base;
+    if (cat === "ambient") return base * dbToGain(DB_ALERT_AMBIENT);
+    if (cat === "combat_self" || cat === "combat_other") {
+      return base * dbToGain(DB_ALERT_COMBAT);
+    }
+    return base;
   }
 }
 

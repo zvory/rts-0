@@ -338,7 +338,7 @@ export class Minimap {
   }
 
   /**
-   * Add a transient world-position ping. Audio cooldown/suppression never gates this.
+   * Add an admitted transient world-position ping. Audio playback failure never gates this.
    * @param {number} x world px
    * @param {number} y world px
    * @param {"info"|"warn"|"alert"} [severity]
