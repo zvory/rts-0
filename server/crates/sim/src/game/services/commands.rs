@@ -744,9 +744,7 @@ mod planned_actions {
                         }
                     }
                     planner::OrderIntent::Gather(node) => {
-                        if immediate_unit_can_replace(entities, player, unit)
-                            && gather_unit_can_use_node(entities, players, player, unit, node)
-                        {
+                        if gather_unit_can_use_node(entities, players, player, unit, node) {
                             if let Some(e) = entities.get_mut(unit) {
                                 e.clear_queued_orders();
                             }
@@ -1087,7 +1085,7 @@ fn gather_unit_can_use_node(
         players.iter().map(|p| (p.id, p.faction_id.as_str())),
         player,
     );
-    owns_unit(entities, player, unit)
+    immediate_unit_can_replace(entities, player, unit)
         && matches!(entities.get(unit), Some(e) if rules::economy::can_gather_for_faction(&faction_id, e.kind))
         && gather_node_valid(entities, player, node)
 }
