@@ -27,6 +27,8 @@ pub struct UnitDef {
     pub stats: balance::UnitStats,
     pub armor_class: ArmorClass,
     pub weapon: WeaponClass,
+    /// Whether this unit autonomously turns its hull toward recent direct-AP damage sources.
+    pub reacts_to_direct_ap: bool,
     pub trained_at: Option<EntityKind>,
     pub train_requirement: TechRequirement,
 }
@@ -107,6 +109,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::CityCentre),
         train_requirement: TechRequirement::All(&[]),
     },
@@ -127,6 +130,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Zamok),
         train_requirement: TechRequirement::All(&[]),
     },
@@ -147,6 +151,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Barracks),
         train_requirement: TechRequirement::All(&[]),
     },
@@ -167,6 +172,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Barracks),
         train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
     },
@@ -187,6 +193,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Barracks),
         train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
     },
@@ -207,6 +214,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Steelworks),
         train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
     },
@@ -227,6 +235,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Steelworks),
         train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
     },
@@ -247,6 +256,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Hard,
         weapon: WeaponClass::None,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Steelworks),
         train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
     },
@@ -267,6 +277,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::AntiTank,
+        reacts_to_direct_ap: true,
         trained_at: Some(EntityKind::Factory),
         train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
     },
@@ -287,6 +298,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Factory),
         train_requirement: TechRequirement::All(&[]),
     },
@@ -307,6 +319,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
+        reacts_to_direct_ap: false,
         trained_at: None,
         train_requirement: TechRequirement::All(&[]),
     },
@@ -327,6 +340,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
+        reacts_to_direct_ap: false,
         trained_at: Some(EntityKind::Factory),
         train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
     },
@@ -347,6 +361,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
+        reacts_to_direct_ap: false,
         trained_at: None,
         train_requirement: TechRequirement::All(&[]),
     },
@@ -595,6 +610,17 @@ mod tests {
             .count();
             assert_eq!(def_count, 1, "{kind} should resolve to exactly one def");
         }
+    }
+
+    #[test]
+    fn tank_is_the_only_current_unit_with_direct_ap_armor_reaction() {
+        let reacting_kinds = UNITS
+            .iter()
+            .filter(|def| def.reacts_to_direct_ap)
+            .map(|def| def.kind)
+            .collect::<Vec<_>>();
+
+        assert_eq!(reacting_kinds, vec![EntityKind::Tank]);
     }
 
     #[test]

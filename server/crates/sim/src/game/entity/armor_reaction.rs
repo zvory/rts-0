@@ -1,4 +1,4 @@
-use super::{Entity, EntityKind};
+use super::Entity;
 
 impl Entity {
     pub(in crate::game) fn record_incoming_direct_ap_threat(
@@ -8,7 +8,7 @@ impl Entity {
         damage_weight: u32,
         tick: u32,
     ) {
-        if self.kind != EntityKind::Tank || self.hp == 0 {
+        if !crate::rules::combat::unit_reacts_to_direct_ap(self.kind) || self.hp == 0 {
             return;
         }
         if let Some(combat) = self.combat.as_mut() {

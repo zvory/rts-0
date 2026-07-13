@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::commands::PendingCommand;
-use crate::game::entity::{Entity, EntityKind, MAX_INCOMING_DIRECT_AP_THREATS, MAX_QUEUED_ORDERS};
+use crate::game::entity::{Entity, MAX_INCOMING_DIRECT_AP_THREATS, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
@@ -215,7 +215,7 @@ fn validate_armor_reaction_threats(
         MAX_INCOMING_DIRECT_AP_THREATS,
     )?;
     if !combat.incoming_direct_ap_threats.is_empty()
-        && (entity.kind != EntityKind::Tank || entity.hp == 0)
+        && (!rules::combat::unit_reacts_to_direct_ap(entity.kind) || entity.hp == 0)
     {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.combat.incomingDirectApThreats",
@@ -235,7 +235,7 @@ fn validate_armor_reaction_threats(
         if threat.damage_weight == 0
             || threat.last_hit_tick > tick
             || tick.saturating_sub(threat.last_hit_tick)
-                > rules::combat::TANK_ARMOR_REACTION_MEMORY_TICKS
+                > rules::combat::DIRECT_AP_ARMOR_REACTION_MEMORY_TICKS
         {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "entities.combat.incomingDirectApThreats.value",

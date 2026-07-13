@@ -228,7 +228,7 @@ pub struct CombatState {
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
-    /// Recent direct AP attackers considered by the tank's autonomous hull-facing response.
+    /// Recent direct AP attackers considered by this unit's autonomous hull-facing response.
     /// Keyed by attacker id so repeated shots refresh one threat instead of overweighting it.
     #[serde(default)]
     pub(in crate::game) incoming_direct_ap_threats: BTreeMap<u32, IncomingDirectApThreat>,

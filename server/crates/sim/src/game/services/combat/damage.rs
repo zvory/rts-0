@@ -126,7 +126,7 @@ pub(super) fn apply_damage(
     };
     if damaged {
         if teams.is_enemy_owner(attacker_owner, victim_owner)
-            && combat_rules::weapon_triggers_tank_armor_reaction(weapon_profile)
+            && combat_rules::weapon_triggers_armor_reaction(weapon_profile)
         {
             if let Some(victim) = entities.get_mut(shot_victim) {
                 victim.record_incoming_direct_ap_threat(attacker, (ax, ay), dmg, tick);
@@ -294,7 +294,7 @@ fn apply_overpenetration(
             .unwrap_or(false);
         if let Some(v) = entities.get_mut(id) {
             if v.apply_damage(effective_dmg, Some((attacker_owner, (ax, ay), tick)))
-                && combat_rules::weapon_triggers_tank_armor_reaction(weapon_profile)
+                && combat_rules::weapon_triggers_armor_reaction(weapon_profile)
             {
                 v.record_incoming_direct_ap_threat(attacker, (ax, ay), splash_dmg, tick);
             }

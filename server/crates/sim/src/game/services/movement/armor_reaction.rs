@@ -1,11 +1,11 @@
 use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order};
 
-use super::pivot_drive::{angle_delta, rotate_toward, TANK_BODY_TURN_RATE_RAD_PER_TICK};
+use super::pivot_drive::{angle_delta, rotate_toward, vehicle_body_turn_rate};
 
 const MIN_DIRECTION_COHERENCE: f32 = 0.2;
 const FACING_EPS_RAD: f32 = 1.0e-4;
 
-pub(super) fn turn_stationary_tanks_toward_direct_ap_threats<F>(
+pub(super) fn turn_stationary_units_toward_direct_ap_threats<F>(
     entities: &mut EntityStore,
     tick: u32,
     mut turn_is_allowed: F,
@@ -13,48 +13,51 @@ pub(super) fn turn_stationary_tanks_toward_direct_ap_threats<F>(
     F: FnMut(u32, EntityKind, f32, f32, f32) -> bool,
 {
     for id in entities.ids() {
-        if let Some(tank) = entities.get_mut(id) {
-            let Some(combat) = tank.combat.as_mut() else {
+        if let Some(unit) = entities.get_mut(id) {
+            let Some(combat) = unit.combat.as_mut() else {
                 continue;
             };
             combat.incoming_direct_ap_threats.retain(|_, threat| {
                 tick.saturating_sub(threat.last_hit_tick)
-                    <= crate::rules::combat::TANK_ARMOR_REACTION_MEMORY_TICKS
+                    <= crate::rules::combat::DIRECT_AP_ARMOR_REACTION_MEMORY_TICKS
             });
         }
 
-        let Some((owner, desired)) = entities.get(id).and_then(|tank| {
-            tank_can_react(tank)
-                .then(|| desired_threat_facing(tank).map(|desired| (tank.owner, desired)))?
+        let Some((owner, desired)) = entities.get(id).and_then(|unit| {
+            unit_can_react(unit)
+                .then(|| desired_threat_facing(unit).map(|desired| (unit.owner, desired)))?
         }) else {
             continue;
         };
         let Some((kind, x, y, current)) = entities
             .get(id)
-            .map(|tank| (tank.kind, tank.pos_x, tank.pos_y, tank.facing()))
+            .map(|unit| (unit.kind, unit.pos_x, unit.pos_y, unit.facing()))
         else {
             continue;
         };
-        let rotated = rotate_toward(current, desired, TANK_BODY_TURN_RATE_RAD_PER_TICK);
+        let rotated = rotate_toward(current, desired, vehicle_body_turn_rate(kind));
         if angle_delta(current, rotated).abs() <= FACING_EPS_RAD
             || !turn_is_allowed(owner, kind, x, y, rotated)
         {
             continue;
         }
-        if let Some(tank) = entities.get_mut(id) {
-            tank.set_facing(rotated);
+        if let Some(unit) = entities.get_mut(id) {
+            unit.set_facing(rotated);
         }
     }
 }
 
-fn tank_can_react(tank: &Entity) -> bool {
-    if tank.kind != EntityKind::Tank || tank.hp == 0 || !tank.path_is_empty() {
+fn unit_can_react(unit: &Entity) -> bool {
+    if !crate::rules::combat::unit_reacts_to_direct_ap(unit.kind)
+        || unit.hp == 0
+        || !unit.path_is_empty()
+    {
         return false;
     }
-    match tank.order() {
+    match unit.order() {
         Order::Idle | Order::HoldPosition => true,
         Order::Attack(order) => order.execution.phase == AttackPhase::Firing,
-        Order::AttackMove(_) => tank.move_phase() == Some(MovePhase::Arrived),
+        Order::AttackMove(_) => unit.move_phase() == Some(MovePhase::Arrived),
         Order::Move(_)
         | Order::Gather(_)
         | Order::Build(_)
@@ -65,14 +68,14 @@ fn tank_can_react(tank: &Entity) -> bool {
     }
 }
 
-fn desired_threat_facing(tank: &Entity) -> Option<f32> {
-    let combat = tank.combat.as_ref()?;
+fn desired_threat_facing(unit: &Entity) -> Option<f32> {
+    let combat = unit.combat.as_ref()?;
     let mut weighted_x = 0.0_f32;
     let mut weighted_y = 0.0_f32;
     let mut total_weight = 0.0_f32;
     for threat in combat.incoming_direct_ap_threats.values() {
-        let dx = threat.source_x - tank.pos_x;
-        let dy = threat.source_y - tank.pos_y;
+        let dx = threat.source_x - unit.pos_x;
+        let dy = threat.source_y - unit.pos_y;
         let distance = (dx * dx + dy * dy).sqrt();
         let weight = threat.damage_weight as f32;
         if !distance.is_finite() || distance <= f32::EPSILON || weight <= 0.0 {
@@ -99,7 +102,7 @@ mod tests {
     use crate::game::entity::EntityStore;
 
     fn turn_once(entities: &mut EntityStore, tick: u32) {
-        turn_stationary_tanks_toward_direct_ap_threats(entities, tick, |_, _, _, _, _| true);
+        turn_stationary_units_toward_direct_ap_threats(entities, tick, |_, _, _, _, _| true);
     }
 
     #[test]
@@ -134,7 +137,7 @@ mod tests {
         assert_eq!(tank.target_id(), Some(99));
         assert_eq!(tank.weapon_facing(), Some(-0.5));
         assert!(
-            (tank.facing() - TANK_BODY_TURN_RATE_RAD_PER_TICK).abs() <= 0.0001,
+            (tank.facing() - vehicle_body_turn_rate(EntityKind::Tank)).abs() <= 0.0001,
             "tank should begin turning toward the 45-degree source average"
         );
         assert_eq!(
@@ -162,8 +165,9 @@ mod tests {
 
         let tank = entities.get(tank_id).expect("tank should exist");
         assert!(
-            (tank.facing() - (std::f32::consts::FRAC_PI_4 + TANK_BODY_TURN_RATE_RAD_PER_TICK))
-                .abs()
+            (tank.facing()
+                - (std::f32::consts::FRAC_PI_4 + vehicle_body_turn_rate(EntityKind::Tank)))
+            .abs()
                 <= 0.0001,
             "the refreshed source should point north, not average with its stale position"
         );
@@ -219,7 +223,7 @@ mod tests {
 
         turn_once(
             &mut entities,
-            10 + crate::rules::combat::TANK_ARMOR_REACTION_MEMORY_TICKS + 1,
+            10 + crate::rules::combat::DIRECT_AP_ARMOR_REACTION_MEMORY_TICKS + 1,
         );
         assert!(entities
             .get(tank_id)
@@ -243,7 +247,7 @@ mod tests {
         let before = (tank.pos_x, tank.pos_y, tank.facing());
 
         let mut checked_legality = false;
-        turn_stationary_tanks_toward_direct_ap_threats(
+        turn_stationary_units_toward_direct_ap_threats(
             &mut entities,
             11,
             |owner, kind, x, y, _| {

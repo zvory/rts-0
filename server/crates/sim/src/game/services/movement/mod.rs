@@ -117,7 +117,7 @@ pub(crate) fn movement_system_with_events(
         }
     }
     scout_plane::advance_scout_planes(map, entities);
-    armor_reaction::turn_stationary_tanks_toward_direct_ap_threats(
+    armor_reaction::turn_stationary_units_toward_direct_ap_threats(
         entities,
         tick,
         |owner, kind, x, y, facing| {
