@@ -487,8 +487,9 @@ folded into default targeting.
 - Oil extraction: workers do not directly mine oil. A worker right-click or contextual build on a
   live oil patch issues a Pump Jack build at that patch. Completed Pump Jacks mine
   `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
-  underlying oil node. Pump Jack placement requires overlap with a live oil node, but has no tech or
-  mining-anchor requirement.
+  underlying oil node. When that final load empties the patch, its Pump Jack disappears with it.
+  Pump Jack placement requires overlap with a live oil node, but has no tech or mining-anchor
+  requirement.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch

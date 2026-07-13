@@ -26,12 +26,7 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
             continue;
         };
         let Some(node_id) = pump_jack_oil_node(entities, pump_id) else {
-            if let Some(extractor) = entities
-                .get_mut(pump_id)
-                .and_then(|pump| pump.resource_extractor.as_mut())
-            {
-                extractor.progress = 0;
-            }
+            let _ = entities.remove(pump_id);
             continue;
         };
 
@@ -61,6 +56,11 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
         }
         if taken > 0 {
             payouts.push(PumpJackPayout { owner, oil: taken });
+        }
+        // A Pump Jack has no purpose once its supporting oil patch is gone. Remove it in
+        // the same tick as the final payout so both disappear from the following snapshot.
+        if pump_jack_oil_node(entities, pump_id).is_none() {
+            let _ = entities.remove(pump_id);
         }
     }
 
