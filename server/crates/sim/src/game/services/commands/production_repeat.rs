@@ -3,28 +3,53 @@ use crate::rules;
 
 use super::guards::dedupe_cap_units;
 
-pub(super) fn set(
+pub(super) fn adjust(
     entities: &mut EntityStore,
     faction_id: &str,
     player: u32,
     buildings: Vec<u32>,
     unit: EntityKind,
-    enabled: bool,
+    delta: i8,
     max_buildings: usize,
 ) {
-    for building in dedupe_cap_units(buildings, max_buildings) {
-        let eligible = matches!(entities.get(building), Some(producer)
-            if producer.owner == player
-                && producer.is_building()
-                && !producer.under_construction()
-                && (!enabled
-                    || rules::economy::trainable_units_for_faction(faction_id, producer.kind)
-                        .contains(&unit)));
-        if !eligible {
-            continue;
-        }
-        if let Some(producer) = entities.get_mut(building) {
-            producer.set_repeat_production(Some(unit), enabled);
-        }
+    if !matches!(delta, -1 | 1) {
+        return;
+    }
+
+    let candidate = dedupe_cap_units(buildings, max_buildings)
+        .into_iter()
+        .filter_map(|building| {
+            let producer = entities.get(building)?;
+            if producer.owner != player || !producer.is_building() || producer.under_construction()
+            {
+                return None;
+            }
+            let repeat_units = &producer.production.as_ref()?.repeat_units;
+            let repeats_unit = repeat_units.contains(&unit);
+            if delta > 0 {
+                let compatible =
+                    rules::economy::trainable_units_for_faction(faction_id, producer.kind)
+                        .contains(&unit);
+                if !compatible || repeats_unit {
+                    return None;
+                }
+            } else if !repeats_unit {
+                return None;
+            }
+            Some((repeat_units.len(), building))
+        });
+
+    // Additions spread standing orders across the least-loaded compatible producers. Removals
+    // peel from the most-loaded producer so it keeps another standing order whenever possible.
+    // Opposite id tie-breaks make repeated additions followed by removals naturally reversible.
+    let building = if delta > 0 {
+        candidate.min_by_key(|&(repeat_count, building)| (repeat_count, building))
+    } else {
+        candidate.max_by_key(|&(repeat_count, building)| (repeat_count, building))
+    }
+    .map(|(_, building)| building);
+
+    if let Some(producer) = building.and_then(|building| entities.get_mut(building)) {
+        producer.set_repeat_production(Some(unit), delta > 0);
     }
 }

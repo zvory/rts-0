@@ -77,10 +77,10 @@ pub enum SimCommand {
         building: u32,
         unit: EntityKind,
     },
-    SetProductionRepeat {
+    AdjustProductionRepeat {
         buildings: Vec<u32>,
         unit: EntityKind,
-        enabled: bool,
+        delta: i8,
     },
     Research {
         building: u32,
@@ -272,15 +272,15 @@ impl SimCommand {
                     reason: CommandRejection::Unit,
                 },
             },
-            protocol::Command::SetProductionRepeat {
+            protocol::Command::AdjustProductionRepeat {
                 buildings,
                 unit,
-                enabled,
+                delta,
             } => match unit.parse::<EntityKind>() {
-                Ok(unit) if unit.is_unit() => SimCommand::SetProductionRepeat {
+                Ok(unit) if unit.is_unit() => SimCommand::AdjustProductionRepeat {
                     buildings,
                     unit,
-                    enabled,
+                    delta,
                 },
                 _ => SimCommand::Rejected {
                     reason: CommandRejection::Unit,
@@ -435,14 +435,14 @@ impl SimCommand {
                 building: *building,
                 unit: protocol::kind_to_wire(*unit).to_string(),
             },
-            SimCommand::SetProductionRepeat {
+            SimCommand::AdjustProductionRepeat {
                 buildings,
                 unit,
-                enabled,
-            } => protocol::Command::SetProductionRepeat {
+                delta,
+            } => protocol::Command::AdjustProductionRepeat {
                 buildings: buildings.clone(),
                 unit: protocol::kind_to_wire(*unit).to_string(),
-                enabled: *enabled,
+                delta: *delta,
             },
             SimCommand::Research { building, upgrade } => protocol::Command::Research {
                 building: *building,
@@ -595,6 +595,24 @@ mod tests {
                 reason: CommandRejection::Unit,
             }
         );
+    }
+
+    #[test]
+    fn protocol_production_repeat_adjustment_round_trips() {
+        let command = SimCommand::AdjustProductionRepeat {
+            buildings: vec![3, 5, 7],
+            unit: EntityKind::ScoutCar,
+            delta: -1,
+        };
+        let protocol = command
+            .to_protocol()
+            .expect("production repeat adjustment should encode");
+        let encoded = serde_json::to_string(&protocol).expect("command should serialize");
+        assert_eq!(
+            encoded,
+            r#"{"c":"adjustProductionRepeat","buildings":[3,5,7],"unit":"scout_car","delta":-1}"#
+        );
+        assert_eq!(SimCommand::from_protocol(protocol), command);
     }
 
     #[test]

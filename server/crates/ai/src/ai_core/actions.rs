@@ -272,15 +272,15 @@ fn command_trace_label(command: &Command) -> String {
         Command::Train { building, unit } => {
             format!("train building={} unit={:?}", building, unit)
         }
-        Command::SetProductionRepeat {
+        Command::AdjustProductionRepeat {
             buildings,
             unit,
-            enabled,
+            delta,
         } => format!(
-            "set_production_repeat buildings={} unit={:?} enabled={}",
+            "adjust_production_repeat buildings={} unit={:?} delta={}",
             id_list(buildings),
             unit,
-            enabled
+            delta
         ),
         Command::Research { building, upgrade } => {
             format!("research building={} upgrade={:?}", building, upgrade)

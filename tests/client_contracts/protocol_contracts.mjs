@@ -590,6 +590,19 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
 }
 
 {
+  const repeatCommand = cmd.adjustProductionRepeat([20, 21, 22], KIND.RIFLEMAN, -1);
+  assert(
+    JSON.stringify(repeatCommand) === JSON.stringify({
+      c: "adjustProductionRepeat",
+      buildings: [20, 21, 22],
+      unit: KIND.RIFLEMAN,
+      delta: -1,
+    }),
+    "production repeat adjustment command carries the selected producers and signed delta",
+  );
+}
+
+{
   assert(
     JSON.stringify(cmd.setupAntiTankGuns([1, 2], 100, 200)) ===
       JSON.stringify({ c: "setupAntiTankGuns", units: [1, 2], x: 100, y: 200 }),

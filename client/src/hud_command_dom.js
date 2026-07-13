@@ -43,6 +43,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {string} [opts.cls] extra class (e.g. "cancel").
  * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
  * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
+ * @param {number} [opts.autobuildIndicatorCount] evenly-spaced rotating auto-build indicators.
  * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
  * @param {boolean} [opts.autocastToggle] whether Alt+hotkey should invoke the autocast toggle.
  * @param {() => void} [opts.onMouseEnter] hover handler.
@@ -109,8 +110,17 @@ export function createCommandButton(opts) {
         `</span>` +
       `</span>`
     : "";
+  const autobuildIndicatorCount = Number.isInteger(opts.autobuildIndicatorCount)
+    ? Math.max(0, opts.autobuildIndicatorCount)
+    : 0;
+  const autobuildHtml = Array.from({ length: autobuildIndicatorCount }, (_, index) => {
+    const offsetDeg = (360 * index) / autobuildIndicatorCount;
+    return `<span class="cmd-autobuild-swirl" aria-hidden="true" ` +
+      `style="--autobuild-offset:${offsetDeg.toFixed(3)}deg"></span>`;
+  }).join("");
 
   btn.innerHTML =
+    autobuildHtml +
     `<span class="cmd-icon">${opts.icon || ""}</span>` +
     `<span class="cmd-label">${opts.label || ""}</span>` +
     (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +

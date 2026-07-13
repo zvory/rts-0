@@ -251,10 +251,9 @@ function buttonSlots(card) {
   });
   const panzerfaustCommandId = kriegsiaCommandId("train", KIND.PANZERFAUST);
   assert.deepEqual(panzerfaustCard.slots[0].contextIntent, {
-    type: "setProductionRepeat",
+    type: "adjustProductionRepeat",
     buildingIds: [barracks.id],
     unit: KIND.RIFLEMAN,
-    enabled: true,
   });
   assert.deepEqual(buttonSlots(panzerfaustCard).slice(0, 3), [
     { commandId: kriegsiaCommandId("train", KIND.RIFLEMAN), slotIndex: 0, hotkey: "Q" },

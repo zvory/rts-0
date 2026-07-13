@@ -3319,7 +3319,8 @@ input[type="text"]:focus {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 2px var(--accent), 0 0 10px var(--panel-glow);
 }
-.cmd-btn.autocast-enabled::after {
+.cmd-btn.autocast-enabled:not(.production-repeat-enabled)::after,
+.cmd-btn .cmd-autobuild-swirl {
   content: "";
   position: absolute;
   inset: 5px;
@@ -3334,6 +3335,10 @@ input[type="text"]:focus {
   mask: radial-gradient(circle, transparent 52%, #000 55%, #000 65%, transparent 68%);
   opacity: 0.82;
   animation: cmd-autocast-swirl 1.25s linear infinite;
+}
+.cmd-btn .cmd-autobuild-swirl {
+  transform: rotate(var(--autobuild-offset, 0deg));
+  animation-name: cmd-autobuild-swirl;
 }
 .cmd-btn:active:not(:disabled):not(.primary-disabled) {
   transform: translateY(1px);
@@ -3438,6 +3443,14 @@ input[type="text"]:focus {
 @keyframes cmd-autocast-swirl {
   to {
     transform: rotate(360deg);
+  }
+}
+@keyframes cmd-autobuild-swirl {
+  from {
+    transform: rotate(var(--autobuild-offset, 0deg));
+  }
+  to {
+    transform: rotate(calc(var(--autobuild-offset, 0deg) + 360deg));
   }
 }
 /* Cost badge, bottom edge. Steel / oil costs colored to match the world. */

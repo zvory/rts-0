@@ -246,10 +246,10 @@ pub enum Command {
         building: u32,
         unit: String,
     },
-    SetProductionRepeat {
+    AdjustProductionRepeat {
         buildings: Vec<u32>,
         unit: String,
-        enabled: bool,
+        delta: i8,
     },
     Research {
         building: u32,

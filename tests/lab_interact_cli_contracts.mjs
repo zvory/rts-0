@@ -58,8 +58,8 @@ assert.deepEqual(
   "screenshot help explains presentation modes and the required Tailnet delivery URL",
 );
 assert.ok(
-  LAB_INTERACT_COMMAND_HELP.order.variants.some((variant) => variant.includes("setProductionRepeat")),
-  "order help exposes the repeat-production command and its multi-building shape",
+  LAB_INTERACT_COMMAND_HELP.order.variants.some((variant) => variant.includes("adjustProductionRepeat")),
+  "order help exposes signed repeat-production adjustments and their multi-building shape",
 );
 for (const command of LAB_INTERACT_COMMANDS) {
   for (const args of [["help", command], [command, "--help"]]) {
@@ -236,9 +236,28 @@ assert.notEqual(sessionId, firstSessionId, "close followed by open creates a fre
 call("spawn", { sessionId, spawns: [
   { owner: 1, kind: "rifleman", x: 960, y: 960, alias: "shooter" },
   { owner: 2, kind: "rifleman", x: 1248, y: 960, alias: "target" },
+  { owner: 1, kind: "factory", x: 960, y: 1248, alias: "factory_a" },
+  { owner: 1, kind: "factory", x: 1248, y: 1248, alias: "factory_b" },
 ] });
 const inspected = call("inspect", { sessionId, refs: ["shooter", "target"], limit: 2 });
 assert.deepEqual(inspected.result.entities.map((entity) => entity.alias).sort(), ["shooter", "target"], "aliases persist across CLI invocations");
+assert.equal(
+  callFailure("order", {
+    sessionId,
+    playerId: 1,
+    command: { c: "adjustProductionRepeat", buildings: ["factory_a", "factory_b"], unit: "tank", delta: 0 },
+  }).error.code,
+  "invalidInput",
+  "production repeat adjustments reject deltas outside -1 or 1",
+);
+const repeatAdjustment = call("order", {
+  sessionId,
+  playerId: 1,
+  command: { c: "adjustProductionRepeat", buildings: ["factory_a", "factory_b"], unit: "tank", delta: 1 },
+});
+assert.deepEqual(repeatAdjustment.result.command.buildings, [102, 103], "production repeat orders resolve building aliases");
+assert.equal(repeatAdjustment.result.command.delta, 1, "production repeat orders preserve the signed delta");
+call("remove", { sessionId, refs: ["factory_a", "factory_b"] });
 const screenshot = call("screenshot", {
   sessionId,
   name: "cli-contract",

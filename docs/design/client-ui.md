@@ -1260,11 +1260,16 @@ are issued to the selected completed compatible production buildings in round-ro
 multi-building selection spreads queued units across its producers. Train and production-cancel
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
 only those repeatable command-card buttons. Alt-clicking a train button or pressing Alt with its
-resolved hotkey toggles that unit in the ordered standing repeat list on all selected compatible
-producers; a gold autocast swirl reflects membership in the authoritative `prodRepeatKinds`
-projection. When more than one unit is active, the building cycles through the list after each
-successful automatic enqueue. A repeated unit already inserted in the FIFO stays ahead of later
-manual clicks, and any Cancel clears the affected producer's repeat state.
+resolved hotkey adds that unit to one selected compatible producer's ordered standing repeat list;
+holding Shift with the same gesture removes it from one producer. The server applies each signed
+adjustment atomically so rapid inputs allocate distinct producers from current authoritative state.
+Each train button shows the authoritative active/compatible producer count (for example `2/3`) and
+renders one gold rotating autocast swirl per active producer, evenly phase-offset around the ring.
+The server spreads additions toward the least-loaded producer and removes from the most-loaded one,
+which balances mixed unit ratios while preserving another automatic order when possible. When more
+than one unit is active on a building, it cycles through that list after each successful automatic
+enqueue. A repeated unit already inserted in the FIFO stays ahead of later manual clicks, and any
+Cancel clears the affected producer's repeat state.
 Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. The Scout Plane affordance

@@ -58,7 +58,7 @@ const COMMAND_FIELDS = Object.freeze({
   gather: ["c", "units", "node", "queued"],
   build: ["c", "units", "building", "tileX", "tileY", "queued"],
   train: ["c", "building", "unit"],
-  setProductionRepeat: ["c", "buildings", "unit", "enabled"],
+  adjustProductionRepeat: ["c", "buildings", "unit", "delta"],
   research: ["c", "building", "upgrade"],
   cancel: ["c", "building"],
   stop: ["c", "units"],
@@ -979,6 +979,7 @@ function validateCommand(value) {
   for (const field of ["ability", "unit", "upgrade"]) if (allowed.includes(field)) token(value[field], `order.command.${field}`);
   if (value.c === "build") { token(value.building, "order.command.building"); integer(value.tileX, "order.command.tileX", 0, U32_MAX); integer(value.tileY, "order.command.tileY", 0, U32_MAX); }
   if (value.targetObjectId != null) u32(value.targetObjectId, "order.command.targetObjectId");
+  if (allowed.includes("delta") && value.delta !== -1 && value.delta !== 1) invalid("order.command.delta", "must be -1 or 1");
   if (value.kind != null && !["move", "attackMove", "attack", "gather", "build"].includes(value.kind)) invalid("order.command.kind", "is unsupported");
   optionalBoolean(value.queued, "order.command.queued");
   if (allowed.includes("enabled")) optionalBoolean(value.enabled, "order.command.enabled", false);

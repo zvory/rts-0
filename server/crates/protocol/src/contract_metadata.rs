@@ -506,7 +506,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ("GATHER", "gather"),
             ("BUILD", "build"),
             ("TRAIN", "train"),
-            ("SET_PRODUCTION_REPEAT", "setProductionRepeat"),
+            ("ADJUST_PRODUCTION_REPEAT", "adjustProductionRepeat"),
             ("RESEARCH", "research"),
             ("CANCEL", "cancel"),
             ("STOP", "stop"),
