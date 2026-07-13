@@ -223,10 +223,13 @@ fn pump_jack_does_not_retarget_another_oil_patch_after_depletion() {
         .and_then(|node| node.remaining())
         .expect("second oil node remaining");
 
+    let mut payouts = Vec::new();
     for _ in 0..config::HARVEST_TICKS {
-        pump_jack::tick(&mut entities);
+        payouts.extend(pump_jack::tick(&mut entities));
     }
 
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(payouts[0].oil, config::OIL_LOAD);
     assert!(
         !entities.contains(pump),
         "Pump Jack should disappear when its supporting patch is depleted"
