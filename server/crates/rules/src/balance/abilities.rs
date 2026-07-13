@@ -5,6 +5,10 @@ use super::TICK_HZ;
 pub const BREAKTHROUGH_RADIUS_TILES: f32 = 9.0;
 pub const BREAKTHROUGH_DURATION_TICKS: u16 = (TICK_HZ as u16) * 6;
 pub const BREAKTHROUGH_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 25;
+/// Permanent nearby-owned-unit movement multiplier from each Command Car.
+///
+/// This is half of Breakthrough's active base speed increase: +20% rather than +40%.
+pub const COMMAND_CAR_AURA_SPEED_MULTIPLIER: f32 = 1.2;
 pub const BREAKTHROUGH_BASE_SPEED_MULTIPLIER: f32 = 1.4;
 pub const BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER: f32 = 1.8;
 pub const BREAKTHROUGH_RECENT_SMOKE_TICKS: u16 = (TICK_HZ as u16) * 2;

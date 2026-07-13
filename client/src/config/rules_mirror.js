@@ -268,7 +268,7 @@ export const ABILITIES = Object.freeze({
     label: "Breakthrough!",
     icon: "BRK",
     hotkey: "E",
-    title: "Speed up nearby owned units; stronger in smoke",
+    title: "Nearby owned units are always faster; activate full speed (stronger in smoke)",
     carriers: Object.freeze([KIND.COMMAND_CAR]),
     targetMode: "self",
     rangeTiles: null,
