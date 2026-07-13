@@ -4,7 +4,7 @@ import { AUTO_SPECTATOR_MIN_ZOOM, AutoSpectatorDirector } from "../../client/src
 import { Camera } from "../../client/src/camera.js";
 import { EVENT, KIND } from "../../client/src/protocol.js";
 
-function createHarness({ enabled = false, players = null } = {}) {
+function createHarness({ enabled = false, players = null, viewport = null } = {}) {
   const entities = new Map();
   const normalizedPlayers = players || [
     { id: 1, teamId: 1 },
@@ -17,12 +17,29 @@ function createHarness({ enabled = false, players = null } = {}) {
     entitiesInterpolated: () => [...entities.values()],
     teamIdForPlayer: (id) => normalizedPlayers.find((player) => player.id === id)?.teamId ?? null,
   };
-  const camera = new Camera(1000, 700, { minZoom: AUTO_SPECTATOR_MIN_ZOOM, maxZoom: 2 });
+  const camera = new Camera(
+    viewport?.width ?? 1000,
+    viewport?.height ?? 700,
+    { minZoom: AUTO_SPECTATOR_MIN_ZOOM, maxZoom: 2 },
+  );
   camera.setMapBounds(4000, 3008);
   camera.focusAt({ x: 500, y: 500 });
   camera.setZoom(1);
   const director = new AutoSpectatorDirector({ camera, state, enabled });
   return { camera, director, entities };
+}
+
+{
+  const { camera, director, entities } = createHarness({
+    enabled: true,
+    viewport: { width: 320, height: 240 },
+  });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 1200, y: 900 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 1400, y: 900 });
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().mode, "contact", "small viewports still select likely contact");
+  assert(Math.abs(camera.snapshot().focus.x - 1300) < 0.001,
+    "context padding is capped so small viewports can frame the selected contact");
 }
 
 {
@@ -49,6 +66,36 @@ function createHarness({ enabled = false, players = null } = {}) {
   director.update(1);
   assert(camera.snapshot().framingScale > 0.85,
     "successive quiet shots widen in small steps instead of revealing the full map");
+
+  camera.restore({
+    version: 1,
+    focus: { x: 2016, y: 2016 },
+    framingScale: 0.3,
+    boundsPolicy: "mapOverscroll",
+  });
+  director.decide(90);
+  director.update(1);
+  assert.equal(camera.snapshot().framingScale, 0.3,
+    "quiet overview never zooms in from an already wider camera view");
+}
+
+{
+  const state = {
+    map: { width: 126, height: 126, tileSize: 32 },
+    entityById: () => null,
+    entitiesInterpolated: () => [],
+  };
+  const camera = new Camera(3840, 2160, { minZoom: AUTO_SPECTATOR_MIN_ZOOM, maxZoom: 2 });
+  camera.setMapBounds(4032, 4032);
+  camera.setZoom(2);
+  const director = new AutoSpectatorDirector({ camera, state, enabled: true });
+  for (let decision = 0; decision < 20; decision += 1) {
+    director.decide(decision * 30);
+    director.update(1);
+  }
+  const minimumWidthScale = 3840 / (4032 * 0.7);
+  assert(camera.snapshot().framingScale >= minimumWidthScale - 0.001,
+    "wide viewports stop widening before exposing over seventy percent of the map width");
 }
 
 {
@@ -100,6 +147,50 @@ function createHarness({ enabled = false, players = null } = {}) {
   assert.equal(director.diagnostics().mode, "contact", "intersecting movement vectors predict contact");
   assert(contact.predictedDistanceTiles < 1, "predicted contact uses closest future separation");
   assert(contact.etaTicks > 0 && contact.etaTicks <= 180, "predicted contact stays inside the six-second horizon");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 600,
+    y: 600,
+    visionOnly: true,
+  });
+  entities.set(2, {
+    id: 2,
+    owner: 2,
+    kind: KIND.RIFLEMAN,
+    x: 700,
+    y: 600,
+    shotReveal: true,
+  });
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().mode, "overview",
+    "render-only entity projections do not create likely contacts");
+  assert.equal(director.diagnostics().trackedUnitCount, 0,
+    "render-only entity projections are excluded from motion tracks");
+}
+
+{
+  const { director, entities } = createHarness();
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 600, y: 600 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 700, y: 600 });
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().trackedUnitCount, 0,
+    "disabled auto spectator does not maintain unused motion tracks");
+  director.setEnabled(true);
+  assert.equal(director.diagnostics().trackedUnitCount, 2,
+    "enabling auto spectator initializes current unit tracks immediately");
+  assert.equal(director.diagnostics().mode, "contact",
+    "enabling auto spectator can immediately select a nearby contact");
+  director.setEnabled(false);
+  assert.equal(director.diagnostics().trackedUnitCount, 0,
+    "disabling auto spectator releases its motion tracks");
+  assert.equal(director.diagnostics().mode, null,
+    "disabling auto spectator clears stale shot selection state");
 }
 
 {

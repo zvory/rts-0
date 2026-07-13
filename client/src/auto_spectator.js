@@ -15,6 +15,7 @@ const OVERVIEW_DURATION_SECONDS = 1;
 const PAN_DEAD_ZONE_CSS_PX = 40;
 const ZOOM_DEAD_ZONE_RATIO = 0.05;
 const CUT_DISTANCE_VIEWPORTS = 1;
+const MAX_PADDING_VIEWPORT_FRACTION = 0.4;
 const MAX_ACTIVITY_SAMPLES = 900;
 const CONTACT_DISTANCE_TILES = 28;
 const CONTACT_CLUSTER_RADIUS_TILES = 7;
@@ -144,7 +145,9 @@ function teamIdForOwner(state, owner) {
 
 function currentUnitViews(state) {
   const views = state?.entitiesInterpolated?.(1, { includePrediction: false });
-  return Array.isArray(views) ? views : [];
+  return Array.isArray(views)
+    ? views.filter((entity) => !entity?.shotReveal && !entity?.visionOnly)
+    : [];
 }
 
 function closestApproach(a, b) {
@@ -215,20 +218,26 @@ function selectLikelyContact(units, tileSize, currentCenter) {
       if (score >= bestScore) continue;
       bestScore = score;
       best = {
+        a,
+        b,
         center,
         currentDistance,
         predictedDistance: approach.distance,
         etaTicks: approach.tick,
-        points: contactPoints(
-          units,
-          a,
-          b,
-          CONTACT_CLUSTER_RADIUS_TILES * tileSize,
-        ),
       };
     }
   }
-  return best;
+  if (!best) return null;
+  const { a, b, ...contact } = best;
+  return {
+    ...contact,
+    points: contactPoints(
+      units,
+      a,
+      b,
+      CONTACT_CLUSTER_RADIUS_TILES * tileSize,
+    ),
+  };
 }
 
 function overviewMinimumScale(camera, state) {
@@ -242,12 +251,14 @@ function overviewMinimumScale(camera, state) {
   const heightScale = Number.isFinite(viewport?.heightCssPx) && mapHeight > 0
     ? viewport.heightCssPx / (mapHeight * OVERVIEW_MAX_MAP_FRACTION)
     : 0;
-  return Math.max(
-    camera?.minZoom || 0,
+  const minimum = Math.max(
+    Number(camera?.minZoom) || 0,
     OVERVIEW_MIN_SCALE,
     widthScale,
     heightScale,
   );
+  const maximum = Number(camera?.maxZoom);
+  return Number.isFinite(maximum) ? Math.min(minimum, maximum) : minimum;
 }
 
 function interpolateView(from, to, progress) {
@@ -289,7 +300,15 @@ export class AutoSpectatorDirector {
     this.enabled = next;
     this.transition = null;
     this.onEnabledChange?.(next);
-    if (!next) return;
+    if (!next) {
+      this.unitTracks.clear();
+      this.currentFightCenter = null;
+      this.currentContactCenter = null;
+      this.contactDiagnostics = null;
+      this.mode = null;
+      return;
+    }
+    this.updateUnitTracks(this.latestTick);
     this.lastDecisionTick = this.latestTick;
     this.decide(this.latestTick);
   }
@@ -299,7 +318,7 @@ export class AutoSpectatorDirector {
     if (!Number.isFinite(tick)) return;
     if (this.latestTick != null && tick < this.latestTick) this.resetForSeek();
     this.latestTick = tick;
-    this.updateUnitTracks(tick);
+    if (this.enabled) this.updateUnitTracks(tick);
     for (const event of snapshot?.events || []) {
       const sample = eventSample(event, this.state, tick);
       if (sample) this.samples.push(sample);
@@ -365,9 +384,19 @@ export class AutoSpectatorDirector {
     { immediate = false, allowCut = true, duration = PAN_DURATION_SECONDS } = {},
   ) {
     const from = this.camera?.snapshot?.();
-    const to = this.camera?.framingForWorldPoints?.(points, { paddingCssPx });
     const projection = this.camera?.projectionSnapshot?.();
-    if (!from || !to || !projection?.viewport) return;
+    if (!from || !projection?.viewport) return;
+    const viewportMinSpan = Math.min(
+      Number(projection.viewport.widthCssPx),
+      Number(projection.viewport.heightCssPx),
+    );
+    const effectivePadding = Number.isFinite(viewportMinSpan) && viewportMinSpan > 0
+      ? Math.min(paddingCssPx, viewportMinSpan * MAX_PADDING_VIEWPORT_FRACTION)
+      : paddingCssPx;
+    const to = this.camera?.framingForWorldPoints?.(points, {
+      paddingCssPx: effectivePadding,
+    });
+    if (!to) return;
 
     if (immediate) {
       this.camera.restore(to);
@@ -412,7 +441,8 @@ export class AutoSpectatorDirector {
   widenView({ immediate = false } = {}) {
     const from = this.camera?.snapshot?.();
     if (!from) return;
-    if (immediate) {
+    const minimumScale = overviewMinimumScale(this.camera, this.state);
+    if (immediate || from.framingScale <= minimumScale) {
       this.transition = null;
       this.lastMoveKind = "hold";
       return;
@@ -421,7 +451,6 @@ export class AutoSpectatorDirector {
       this.lastMoveKind = this.transition.kind || "zoom";
       return;
     }
-    const minimumScale = overviewMinimumScale(this.camera, this.state);
     const targetScale = Math.max(minimumScale, from.framingScale * OVERVIEW_ZOOM_STEP);
     if (Math.abs(Math.log(targetScale / from.framingScale)) <= ZOOM_DEAD_ZONE_RATIO) {
       this.transition = null;
