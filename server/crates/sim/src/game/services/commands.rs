@@ -1085,7 +1085,7 @@ fn gather_unit_can_use_node(
         players.iter().map(|p| (p.id, p.faction_id.as_str())),
         player,
     );
-    owns_unit(entities, player, unit)
+    immediate_unit_can_replace(entities, player, unit)
         && matches!(entities.get(unit), Some(e) if rules::economy::can_gather_for_faction(&faction_id, e.kind))
         && gather_node_valid(entities, player, node)
 }

@@ -5,7 +5,9 @@ use crate::game::services::ability_orders;
 use crate::game::services::order_planner as planner;
 use crate::rules;
 
-use super::guards::{dedupe_cap_units, unit_can_accept_ground_command};
+use super::guards::{
+    dedupe_cap_units, unit_can_accept_ground_command, unit_can_accept_player_command,
+};
 use super::{ability_from_planner, build_kind_from_code};
 
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
@@ -62,6 +64,7 @@ pub(super) fn planner_facts(
             }
             let mut facts = planner::UnitFacts::new(id);
             facts.pos = planner::Point::new(e.pos_x, e.pos_y);
+            facts.can_replace_active = unit_can_accept_player_command(entities, player, id);
             facts.queue_len = e.queued_orders().len();
             facts.queue_terminal = matches!(
                 e.order(),
