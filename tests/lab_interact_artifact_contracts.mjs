@@ -116,7 +116,7 @@ try {
     (error) => error.code === "unsafeArtifactPath",
   );
 
-    console.log("lab interact artifact contracts passed");
+  console.log("lab interact artifact contracts passed");
 } finally {
   await service?.shutdown("test");
   testArtifacts.cleanup();

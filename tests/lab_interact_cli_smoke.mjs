@@ -176,7 +176,12 @@ try {
     spawns: [{ owner: 1, kind: "rifleman", x: 960, y: 960, alias: "resetSubject" }],
   });
   const reset = call("reset", { sessionId });
-  assert.ok(reset.result, "a fresh live session resets through the authoritative bridge");
+  assert.deepEqual(reset.clearedAliases, ["resetSubject"], "reset invalidates the authored alias after rewinding the scene");
+  assert.equal(
+    callFailure("inspect", { sessionId, refs: ["resetSubject"] }).code,
+    "unknownAlias",
+    "reset removes the rewound entity from authoritative inspection",
+  );
   call("close", { sessionId });
   sessionId = null;
   assert.equal(call("shutdown").shuttingDown, true, "live smoke explicitly requests daemon teardown");

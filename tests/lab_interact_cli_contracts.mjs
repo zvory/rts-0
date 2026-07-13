@@ -478,9 +478,9 @@ try {
   await waitFor(() => !processAlive(idlePid), 2000, "idle daemon exits after closing owned resources");
 
   console.log("✅ lab_interact_cli_contracts.mjs: CLI, daemon, validation, aliases, races, stale recovery, idle cleanup, and shutdown passed");
-  } finally {
-    shutdown(baseEnv);
-    await stopOwnedDaemon();
+} finally {
+  shutdown(baseEnv);
+  await stopOwnedDaemon();
   testArtifacts.cleanup();
   testArtifacts.assertClean();
   restoreTmp();
