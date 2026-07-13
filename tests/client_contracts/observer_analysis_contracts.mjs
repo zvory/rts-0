@@ -199,13 +199,29 @@ import { textWithin } from "./dom_text.mjs";
         "observer analysis Home shortcut restores the default placement",
       );
 
+      dragHandle.listeners.pointerdown?.({
+        button: 0,
+        isPrimary: true,
+        pointerId: 8,
+        clientX: 700,
+        clientY: 80,
+        currentTarget: dragHandle,
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      windowListeners.pointerup?.({ pointerId: 8 });
+      assert(
+        overlayRoot.style.left === "" && overlayRoot.style.top === "" && draggablePrefs.position === null,
+        "observer analysis ignores titlebar clicks that do not move the window",
+      );
+
       globalThis.window.innerWidth = 390;
       globalThis.window.innerHeight = 844;
       globalThis.window.matchMedia = () => ({ matches: true });
       dragHandle.listeners.pointerdown?.({
         button: 0,
         isPrimary: true,
-        pointerId: 8,
+        pointerId: 9,
         clientX: 40,
         clientY: 90,
         currentTarget: dragHandle,

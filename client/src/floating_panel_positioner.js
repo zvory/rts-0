@@ -65,13 +65,12 @@ export class FloatingPanelPositioner {
       event.currentTarget?.setPointerCapture?.(event.pointerId);
     } catch {}
 
-    const rect = this.currentRect();
-    this.applyPosition(rect);
     this.drag = {
       pointerId: event.pointerId,
       startX: point.x,
       startY: point.y,
-      rect,
+      rect: this.currentRect(),
+      moved: false,
     };
     if (this.root.dataset) this.root.dataset.panelDragging = "true";
 
@@ -86,10 +85,14 @@ export class FloatingPanelPositioner {
     const point = eventPoint(event);
     if (!point) return;
     event.preventDefault?.();
+    const deltaX = point.x - this.drag.startX;
+    const deltaY = point.y - this.drag.startY;
+    if (deltaX === 0 && deltaY === 0) return;
+    this.drag.moved = true;
     this.applyPosition({
       ...this.drag.rect,
-      left: this.drag.rect.left + point.x - this.drag.startX,
-      top: this.drag.rect.top + point.y - this.drag.startY,
+      left: this.drag.rect.left + deltaX,
+      top: this.drag.rect.top + deltaY,
     });
   }
 
@@ -100,7 +103,7 @@ export class FloatingPanelPositioner {
 
   finishDrag(save) {
     this.clearActiveListeners();
-    if (save && this.drag) this.savePosition(this.currentRect());
+    if (save && this.drag?.moved) this.savePosition(this.currentRect());
     this.drag = null;
     if (this.root?.dataset) delete this.root.dataset.panelDragging;
   }
