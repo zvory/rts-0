@@ -62,7 +62,9 @@ cli.mjs / daemon.mjs
         |
 command registry + command service + session coordinator
         |
-driver + recording / fixed capture / Tailnet / runtime helpers
+driver + private server + recording / fixed capture / Tailnet / runtime helpers
+        |
+process runner / filesystem / Puppeteer / FFmpeg / Rust server / Tailscale
 ```
 
 `session_coordinator.mjs` owns the only generic semantic FIFO. Commands use four explicit lanes:
@@ -77,8 +79,34 @@ driver + recording / fixed capture / Tailnet / runtime helpers
 Resource-local recording completion, encoder backpressure, capture finalization, and watchdogs
 remain with their driver/media owner; they are not a second command queue. The daemon alone
 installs `SIGINT`, `SIGTERM`, and `SIGHUP` handlers and drives service/driver teardown. The driver
-owns browser/page and external-resource operations, but no process-signal or generic semantic
-queue policy.
+owns browser/page operations, but no process-signal, private-server, finite-child, or generic
+semantic queue policy.
+
+## External process and dependency ownership
+
+`process_runner.mjs` owns finite request-path children. It invokes direct argv without a shell,
+caps stdout and stderr, accepts a timeout and `AbortSignal`, sends TERM before a bounded KILL
+fallback, and resolves or rejects only after the child is reaped. Cargo builds, FFmpeg/ffprobe
+capability checks and finite post-processing/probes, and `tailscale status --json` use this runner.
+The streaming H.264 encoder remains a direct `spawn` owned by `recording.mjs` because it requires
+stdin backpressure and explicit finalization.
+
+`private_server.mjs` owns loopback URL validation/reuse, ephemeral port selection, Cargo build,
+the long-running Rust server child, health polling, bounded log ownership, build metadata, and
+TERM/KILL teardown. The command service owns the `AbortController` for a cold `open`; shutdown
+aborts it before awaiting the open promise, so held Cargo startup cannot block daemon teardown.
+The private server remains loopback-only and retains the artifact-transfer capability boundary.
+
+`puppeteer-core` is a repository-root development dependency in `package.json` and
+`package-lock.json`. Lab Interact and the browser/performance tests import that declared dependency
+directly; daemon requests never install or hydrate packages. Run `npm ci` at the repository root,
+or use `tests/run-all.sh`, whose pre-suite cache setup installs the root lock into the shared
+lockfile-keyed cache and links the ignored root `node_modules`.
+
+Intentional synchronous exceptions are bounded filesystem work and Git checkout inspection in
+`workspace_inspection.mjs`, daemon checkout identity in `runtime.mjs`, and CLI bootstrap/worktree
+inspection in `cli.mjs`. They run before long external request work; architecture-checked daemon
+paths contain no `spawnSync` or `execSync`.
 
 `open` returns the `sessionId` required by session commands. It is idempotent: repeated or
 concurrent calls return the one active session instead of starting another browser. Run `close`
@@ -102,7 +130,9 @@ outcome. This does not reduce or truncate rejection diagnostics.
 A cold first `open` may spend tens of seconds building the selected worktree's Rust server before
 it writes its single JSON response. Keep that CLI process attached until it exits. A concurrent
 `status` reports `opening: true` while startup is still in progress, and an idempotent `open` retry
-recovers the same completed session if the original caller was interrupted. `--help`, `-h`, and
+recovers the same completed session if the original caller was interrupted. Daemon `shutdown`
+aborts and reaps an in-progress Cargo/private-server startup instead of waiting for its normal
+startup deadline. `--help`, `-h`, and
 `help` return the bounded command catalog without requiring a Git worktree or starting a daemon.
 
 ## Automatic daemon lifecycle
@@ -310,6 +340,8 @@ with H.264 support are required by the recording and fixed-capture contracts:
 
 ```bash
 node scripts/check-lab-interact-architecture.mjs
+node scripts/check-source-file-sizes.mjs
+node tests/lab_interact_adapter_contracts.mjs
 node tests/lab_interact_cli_contracts.mjs
 node tests/lab_interact_artifact_contracts.mjs
 node tests/lab_interact_tailnet_preview_contracts.mjs

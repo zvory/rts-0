@@ -73,7 +73,7 @@ try {
     "recording IPC deadline covers the bounded wait, media stages, probes, flush, and browser cleanup headroom",
   );
 
-  const tools = checkMediaCapabilities();
+  const tools = await checkMediaCapabilities();
   const mediaTmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-recording-contract-"));
   try {
     const png = spawnSync(tools.ffmpeg, [
@@ -89,7 +89,7 @@ try {
       expectedAt30Fps: 15, encoded: 15, rawScreencastEvents: 5,
       sourceFramesUsed: 5, reusedSourceFrameSlots: 10, sourceCoverage: 1 / 3, deficient: true,
     };
-    const media = finalizeMp4Artifacts({
+    const media = await finalizeMp4Artifacts({
       mp4Path,
       framesDir: path.join(mediaTmp, "frames"),
       contactSheetPath: path.join(mediaTmp, "contact.png"),
@@ -260,8 +260,8 @@ try {
     (error) => error?.code === "invalidInput",
     "record-start rejects unusable crops",
   );
-  assert.throws(
-    () => checkMediaCapabilities({ ffmpeg: "/definitely/missing/ffmpeg", ffprobe: "/definitely/missing/ffprobe" }),
+  await assert.rejects(
+    checkMediaCapabilities({ ffmpeg: "/definitely/missing/ffmpeg", ffprobe: "/definitely/missing/ffprobe" }),
     (error) => error instanceof LabInteractRecordingError && error.code === "ffmpegUnavailable",
     "missing FFmpeg returns an actionable capability error before recording",
   );

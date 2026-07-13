@@ -41,6 +41,7 @@ export class LabInteractService {
     this.sessions = new Map();
     this.coordinator = new SessionCoordinator();
     this.openPromise = null;
+    this.openAbortController = null;
     this.closePromise = null;
     this.closed = false;
   }
@@ -97,6 +98,8 @@ export class LabInteractService {
     existing = this.sessions.values().next().value;
     if (existing) return this.describeSession(existing);
     if (this.openPromise) return this.openPromise;
+    const openAbortController = new AbortController();
+    this.openAbortController = openAbortController;
     this.openPromise = (async () => {
       const driver = await this.driverFactory({
         workspaceRoot,
@@ -106,6 +109,7 @@ export class LabInteractService {
         renderer: input.renderer || "pixi",
         viewport: input.viewport,
         baseUrl: process.env.RTS_LAB_INTERACT_BASE_URL || "",
+        signal: openAbortController.signal,
       });
       if (this.closed) {
         await driver.close().catch(() => {});
@@ -128,7 +132,10 @@ export class LabInteractService {
         throw error;
       }
     })();
-    try { return await this.openPromise; } finally { this.openPromise = null; }
+    try { return await this.openPromise; } finally {
+      this.openPromise = null;
+      if (this.openAbortController === openAbortController) this.openAbortController = null;
+    }
   }
 
   async describeSession(session) {
@@ -179,6 +186,7 @@ export class LabInteractService {
   async shutdown(reason = "shutdown") {
     if (this.closed) return;
     this.closed = true;
+    this.openAbortController?.abort();
     await this.openPromise?.catch(() => {});
     await this.closePromise?.catch(() => {});
     await Promise.all([...this.sessions.keys()].map((sessionId) => this.close(sessionId, reason)));

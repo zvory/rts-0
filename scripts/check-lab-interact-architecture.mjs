@@ -22,6 +22,9 @@ checkServiceRouting();
 checkImports();
 checkQueueOwnership();
 checkSignalOwnership();
+checkAdapterOwnership();
+checkBlockingProcesses();
+checkDependencyOwnership();
 checkSizeRatchets();
 
 if (failures.length) {
@@ -30,7 +33,7 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Lab Interact architecture check passed (${LAB_INTERACT_COMMANDS.length} registry commands; command_service<=925, driver<=1400)`);
+console.log(`Lab Interact architecture check passed (${LAB_INTERACT_COMMANDS.length} registry commands; responsive adapter and size ratchets passed)`);
 
 function checkRegistry() {
   const names = Object.keys(LAB_INTERACT_COMMAND_REGISTRY);
@@ -91,6 +94,9 @@ function checkImports() {
   const imports = new Map([...sources].map(([name, source]) => [name, relativeImports(source)]));
   forbidImports(imports, "driver.mjs", ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "cli.mjs", "daemon.mjs"]);
   forbidImports(imports, "runtime.mjs", ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "cli.mjs", "daemon.mjs"]);
+  for (const name of ["abort_signal.mjs", "process_runner.mjs", "private_server.mjs", "recording.mjs", "fixed_capture.mjs", "tailnet_preview.mjs", "workspace_inspection.mjs"]) {
+    forbidImports(imports, name, ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "driver.mjs", "cli.mjs", "daemon.mjs"]);
+  }
   for (const name of ["command_inputs.mjs", "command_registry.mjs", "command_help.mjs", "session_coordinator.mjs"]) {
     forbidImports(imports, name, ["command_service.mjs", "driver.mjs", "cli.mjs", "daemon.mjs"]);
   }
@@ -101,6 +107,77 @@ function checkImports() {
       !imports.get("command_service.mjs")?.includes("driver.mjs")) {
     failures.push("command_service.mjs must connect the registry/coordinator application layer to the driver adapter");
   }
+}
+
+function checkAdapterOwnership() {
+  const driverImports = relativeImports(sources.get("driver.mjs") || "");
+  if (!driverImports.includes("private_server.mjs")) failures.push("driver.mjs must delegate private-server lifecycle to private_server.mjs");
+  if (!driverImports.includes("workspace_inspection.mjs")) failures.push("driver.mjs must keep bounded pre-request workspace inspection outside the request-path process check");
+  const privateServerImports = relativeImports(sources.get("private_server.mjs") || "");
+  if (!privateServerImports.includes("process_runner.mjs")) failures.push("private_server.mjs must use process_runner.mjs for finite Cargo builds");
+
+  const allowedChildOwners = new Set([
+    "cli.mjs", "process_runner.mjs", "private_server.mjs", "recording.mjs",
+    "runtime.mjs", "workspace_inspection.mjs",
+  ]);
+  for (const [name, source] of sources) {
+    if (/from\s+["']node:child_process["']/.test(source) && !allowedChildOwners.has(name)) {
+      failures.push(`${name} imports child_process without owning an approved child lifecycle`);
+    }
+  }
+  for (const owner of ["process_runner.mjs", "private_server.mjs", "recording.mjs"]) {
+    if (!/from\s+["']node:child_process["']/.test(sources.get(owner) || "")) {
+      failures.push(`${owner} must remain an explicit request-path/tool child owner`);
+    }
+  }
+  const cli = sources.get("cli.mjs") || "";
+  if (!/spawn\(process\.execPath,\s*\[path\.join\(scriptDir,\s*["']daemon\.mjs["']\)/.test(cli)) {
+    failures.push("cli.mjs must remain the explicit daemon bootstrap child owner");
+  }
+}
+
+function checkBlockingProcesses() {
+  const requestPath = [
+    "command_service.mjs", "driver.mjs", "private_server.mjs", "process_runner.mjs",
+    "recording.mjs", "fixed_capture.mjs", "tailnet_preview.mjs", "daemon.mjs",
+  ];
+  for (const name of requestPath) {
+    if (/\b(?:spawnSync|execSync|execFileSync)\b/.test(sources.get(name) || "")) {
+      failures.push(`${name} contains a blocking child process in the daemon request path`);
+    }
+  }
+  const workspaceInspection = sources.get("workspace_inspection.mjs") || "";
+  if (!/spawnSync\("git"/.test(workspaceInspection) || !/timeout:\s*2_000/.test(workspaceInspection)) {
+    failures.push("workspace_inspection.mjs must keep its documented synchronous Git exception explicitly bounded");
+  }
+  const labRuntimeSources = [...sources]
+    .filter(([name]) => name !== "cli.mjs")
+    .map(([, source]) => source)
+    .join("\n");
+  if (/(?:runOrThrow|\.run)\s*\(\s*["']npm["']|spawn\s*\(\s*["']npm["']/.test(labRuntimeSources)) {
+    failures.push("Lab daemon/runtime modules may not install Node dependencies at request time");
+  }
+}
+
+function checkDependencyOwnership() {
+  const rootPackage = readJson(path.join(repoRoot, "package.json"));
+  const rootLock = readJson(path.join(repoRoot, "package-lock.json"));
+  const testPackage = readJson(path.join(repoRoot, "tests", "package.json"));
+  if (rootPackage?.devDependencies?.["puppeteer-core"] !== "^23" ||
+      rootLock?.packages?.[""]?.devDependencies?.["puppeteer-core"] !== "^23") {
+    failures.push("repository package and lock must own the puppeteer-core runtime dependency");
+  }
+  if (testPackage?.devDependencies?.["puppeteer-core"] != null) {
+    failures.push("tests/package.json may not retain a test-only puppeteer-core dependency");
+  }
+  const driver = sources.get("driver.mjs") || "";
+  if (!/import\(["']puppeteer-core["']\)/.test(driver) || /testsDir|ensureTestNodeModules|createRequire/.test(driver)) {
+    failures.push("driver.mjs must import repository-owned puppeteer-core without runtime hydration");
+  }
+}
+
+function readJson(file) {
+  try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; }
 }
 
 function relativeImports(source) {
@@ -140,9 +217,18 @@ function checkSignalOwnership() {
 }
 
 function checkSizeRatchets() {
-  for (const [name, maximum] of [["command_service.mjs", 925], ["driver.mjs", 1_400]]) {
+  for (const [name, maximum] of [
+    ["command_service.mjs", 925],
+    ["driver.mjs", 1_200],
+    ["abort_signal.mjs", 60],
+    ["process_runner.mjs", 190],
+    ["private_server.mjs", 275],
+    ["recording.mjs", 525],
+    ["fixed_capture.mjs", 125],
+    ["tailnet_preview.mjs", 375],
+  ]) {
     const lines = countLines(sources.get(name) || "");
-    if (lines > maximum) failures.push(`${name} is ${lines} lines; Phase 2 ratchet is ${maximum}`);
+    if (lines > maximum) failures.push(`${name} is ${lines} lines; responsive-adapter ratchet is ${maximum}`);
   }
 }
 

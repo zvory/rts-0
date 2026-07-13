@@ -82,13 +82,13 @@ assert.equal(isTailnetIpv4("100.64.0.1"), true, "the lower Tailscale IPv4 bound 
 assert.equal(isTailnetIpv4("100.127.255.255"), true, "the upper Tailscale IPv4 bound is accepted");
 assert.equal(isTailnetIpv4("100.128.0.1"), false, "non-Tailscale CGNAT-adjacent addresses are rejected");
 assert.equal(tailnetHostFromStatus({ TailscaleIPs: ["fd7a::1"], Self: { TailscaleIPs: ["100.119.17.21"] } }), "100.119.17.21", "status resolves a usable IPv4 Tailnet listener");
-assert.equal(resolveTailnetHost({ env: { RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1" } }), "127.0.0.1", "test-only loopback override avoids external Tailscale dependencies");
-assert.equal(resolveTailnetHost({
+assert.equal(await resolveTailnetHost({ env: { RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1" } }), "127.0.0.1", "test-only loopback override avoids external Tailscale dependencies");
+assert.equal(await resolveTailnetHost({
   env: {},
   readStatus: () => ({ TailscaleIPs: ["100.119.17.21"] }),
 }), "100.119.17.21", "normal resolution reads the active Tailnet IP from status");
-assert.throws(
-  () => resolveTailnetHost({ env: {}, readStatus: () => ({ TailscaleIPs: [] }) }),
+await assert.rejects(
+  resolveTailnetHost({ env: {}, readStatus: () => ({ TailscaleIPs: [] }) }),
   (error) => error?.code === "tailnetUnavailable",
   "a missing Tailscale address has an actionable preview failure",
 );

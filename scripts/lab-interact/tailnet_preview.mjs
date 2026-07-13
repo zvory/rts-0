@@ -9,7 +9,8 @@ import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+
+import { ProcessRunner } from "./process_runner.mjs";
 
 export const LAB_INTERACT_PREVIEW_ROUTE = "/lab-interact-preview/";
 export const MAX_TAILNET_PREVIEW_ARTIFACT_BYTES = 64 * 1024 * 1024;
@@ -108,7 +109,7 @@ export class LabInteractTailnetPreview {
   }
 
   async startServer() {
-    const host = this.host || this.resolveHost();
+    const host = this.host || await this.resolveHost();
     if (!validPreviewHost(host)) {
       throw new LabInteractTailnetPreviewError("invalidTailnetHost", "Tailnet preview requires a valid Tailnet IP address.");
     }
@@ -208,7 +209,7 @@ export class LabInteractTailnetPreview {
   }
 }
 
-export function resolveTailnetHost({ env = process.env, readStatus = readTailnetStatus } = {}) {
+export async function resolveTailnetHost({ env = process.env, readStatus = readTailnetStatus } = {}) {
   const testHost = String(env.RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST || "").trim();
   if (testHost) {
     if (!["127.0.0.1", "::1"].includes(testHost)) {
@@ -225,7 +226,7 @@ export function resolveTailnetHost({ env = process.env, readStatus = readTailnet
   }
   let status;
   try {
-    status = readStatus();
+    status = await readStatus();
   } catch {
     throw new LabInteractTailnetPreviewError("tailnetUnavailable", "Tailnet preview requires Tailscale to be installed and running.");
   }
@@ -250,13 +251,10 @@ export function isTailnetIpv4(value) {
   return value.startsWith("100.") && second >= 64 && second <= 127;
 }
 
-function readTailnetStatus() {
-  const result = spawnSync("tailscale", ["status", "--json"], {
-    encoding: "utf8",
-    timeout: 2_000,
-    maxBuffer: 1024 * 1024,
-  });
-  if (result.error || result.status !== 0) throw result.error || new Error("tailscale status failed");
+async function readTailnetStatus() {
+  const result = await new ProcessRunner({ maxOutputBytes: 1024 * 1024 })
+    .run("tailscale", ["status", "--json"], { timeoutMs: 2_000 });
+  if (result.status !== 0) throw new Error("tailscale status failed");
   return JSON.parse(String(result.stdout || ""));
 }
 
