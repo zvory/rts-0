@@ -1,12 +1,16 @@
 import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
+import {
+  createObserverAnalysisOverlayPreferences,
+  isObserverAnalysisTabId,
+  OBSERVER_ANALYSIS_TABS,
+} from "./observer_analysis_preferences.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
 import { normalizeResourceWindows, renderResourcesMetric } from "./observer_analysis_resources.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
+import { ObserverAnalysisWindow } from "./observer_analysis_window.js";
 import { resourceValueElement } from "./resource_icons.js";
 
-const STORAGE_KEY = "rts.observerAnalysisOverlay";
-const LEGACY_STORAGE_KEY = "rts.replayAnalysisOverlay";
 const ARMY_VALUE_TAB_ID = "army-value";
 const PRODUCTION_TAB_ID = "production";
 const UNITS_TAB_ID = "units";
@@ -14,54 +18,10 @@ const RESOURCES_TAB_ID = "resources";
 const UNITS_LOST_TAB_ID = "units-lost";
 const RESOURCES_LOST_TAB_ID = "resources-lost";
 
-export const OBSERVER_ANALYSIS_TABS = Object.freeze([
-  { id: ARMY_VALUE_TAB_ID, label: "Army value" },
-  { id: "production", label: "Production" },
-  { id: "units", label: "Units" },
-  { id: "resources", label: "Resources" },
-  { id: "units-lost", label: "Units lost" },
-  { id: "resources-lost", label: "Resources lost" },
-]);
+export { createObserverAnalysisOverlayPreferences, OBSERVER_ANALYSIS_TABS };
 
 export function shouldMountObserverAnalysisOverlay({ capabilities } = {}) {
   return capabilities?.diagnostics?.observerAnalysis === true;
-}
-
-export function createObserverAnalysisOverlayPreferences(storage = safeLocalStorage()) {
-  const fallback = {
-    selectedTab: OBSERVER_ANALYSIS_TABS[0].id,
-    visible: true,
-    collapsed: false,
-  };
-  const state = { ...fallback, ...readStoredPreferences(storage) };
-  normalizePreferences(state, fallback);
-
-  return {
-    get selectedTab() {
-      return state.selectedTab;
-    },
-    set selectedTab(value) {
-      state.selectedTab = validTabId(value) ? value : fallback.selectedTab;
-      writeStoredPreferences(storage, state);
-    },
-    get visible() {
-      return state.visible;
-    },
-    set visible(value) {
-      state.visible = value !== false;
-      writeStoredPreferences(storage, state);
-    },
-    get collapsed() {
-      return state.collapsed;
-    },
-    set collapsed(value) {
-      state.collapsed = value === true;
-      writeStoredPreferences(storage, state);
-    },
-    snapshot() {
-      return { ...state };
-    },
-  };
 }
 
 export class ObserverAnalysisOverlay {
@@ -84,6 +44,7 @@ export class ObserverAnalysisOverlay {
     this.tabsEl = null;
     this.bodyEl = null;
     this.showButton = null;
+    this.window = null;
     this.analysis = null;
     this.onClick = (ev) => this.handleClick(ev);
     this.onKeyDown = (ev) => this.handleKeyDown(ev);
@@ -105,9 +66,23 @@ export class ObserverAnalysisOverlay {
     const header = document.createElement("div");
     header.className = "replay-analysis-header";
 
+    const dragHandle = document.createElement("div");
+    dragHandle.className = "replay-analysis-drag-handle";
+    dragHandle.tabIndex = 0;
+    dragHandle.setAttribute("role", "button");
+    dragHandle.setAttribute("aria-label", "Move observer analysis");
+    dragHandle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight Home");
+    dragHandle.title = "Drag to move. Arrow keys nudge. Home resets.";
+
+    const grip = document.createElement("span");
+    grip.className = "replay-analysis-grip";
+    grip.setAttribute("aria-hidden", "true");
+    grip.textContent = "::::";
+
     const title = document.createElement("h2");
     title.textContent = "Analysis";
-    header.appendChild(title);
+    dragHandle.append(grip, title);
+    header.appendChild(dragHandle);
 
     const actions = document.createElement("div");
     actions.className = "replay-analysis-actions";
@@ -145,6 +120,8 @@ export class ObserverAnalysisOverlay {
     this.showButton = this.buildIconButton("Show observer analysis", "replay-analysis-show", "▣", { show: "1" });
     this.el.appendChild(this.showButton);
     this.root.appendChild(this.el);
+    this.window = new ObserverAnalysisWindow({ root: this.el, preferences: this.preferences });
+    this.window.mount(dragHandle);
     this.render();
   }
 
@@ -212,7 +189,7 @@ export class ObserverAnalysisOverlay {
 
   render() {
     if (!this.el || !this.panel || !this.tabsEl || !this.bodyEl || !this.showButton) return;
-    const selectedTab = validTabId(this.preferences.selectedTab)
+    const selectedTab = isObserverAnalysisTabId(this.preferences.selectedTab)
       ? this.preferences.selectedTab
       : OBSERVER_ANALYSIS_TABS[0].id;
     const visible = this.preferences.visible !== false;
@@ -253,7 +230,7 @@ export class ObserverAnalysisOverlay {
   applyObserverAnalysis(payload) {
     this.analysis = normalizeObserverAnalysisPayload(payload);
     if (!this.bodyEl || this.bodyEl.hidden) return;
-    const selected = validTabId(this.preferences.selectedTab)
+    const selected = isObserverAnalysisTabId(this.preferences.selectedTab)
       ? this.preferences.selectedTab
       : OBSERVER_ANALYSIS_TABS[0].id;
     if (
@@ -548,6 +525,7 @@ export class ObserverAnalysisOverlay {
   }
 
   destroy() {
+    this.window?.destroy();
     if (this.el) {
       this.el.removeEventListener("click", this.onClick);
       this.el.removeEventListener("keydown", this.onKeyDown);
@@ -558,6 +536,7 @@ export class ObserverAnalysisOverlay {
     this.tabsEl = null;
     this.bodyEl = null;
     this.showButton = null;
+    this.window = null;
   }
 }
 
@@ -786,41 +765,4 @@ function clamp01(value) {
 
 function safeCssColor(color) {
   return typeof color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : "#e7dfc5";
-}
-
-function validTabId(id) {
-  return OBSERVER_ANALYSIS_TABS.some((tab) => tab.id === id);
-}
-
-function normalizePreferences(state, fallback) {
-  if (!validTabId(state.selectedTab)) state.selectedTab = fallback.selectedTab;
-  state.visible = state.visible !== false;
-  state.collapsed = state.collapsed === true;
-}
-
-function safeLocalStorage() {
-  try {
-    return typeof window !== "undefined" ? window.localStorage : null;
-  } catch {
-    return null;
-  }
-}
-
-function readStoredPreferences(storage) {
-  if (!storage) return {};
-  try {
-    const raw = storage.getItem(STORAGE_KEY) || storage.getItem(LEGACY_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeStoredPreferences(storage, state) {
-  if (!storage) return;
-  try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Storage failures should not break observer viewing.
-  }
 }

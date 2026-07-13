@@ -57,8 +57,10 @@ src/
   status_badge.js # Build/network/frame status badge with copyable diagnostics
   ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
   observer_analysis_overlay.js # replay/live spectator analysis overlay
+  observer_analysis_preferences.js # persisted observer analysis tab/visibility/window preferences
   observer_analysis_resources.js # resources tab renderer and wire normalization for observer analysis
   observer_analysis_rows.js # observer analysis player row metadata joiner
+  observer_analysis_window.js # observer analysis draggable titlebar and clamped local placement
   observer_analysis_signatures.js # dirty-body signatures for observer analysis DOM updates
   match_observer_diagnostics.js # Match-owned observer/AI diagnostics surface composer
   client_perf_report.js # bounded client frame-profiler upload field shaping
@@ -406,7 +408,9 @@ export class ObserverAnalysisOverlay {
 `Match` rebuilds so selected tab, visible state, and collapsed state survive replay
 seek-triggered `start` messages and spectator rematches. Preferences are stored under
 `rts.observerAnalysisOverlay`; clients still read the old `rts.replayAnalysisOverlay` key for
-compatibility. The overlay owns its generated DOM and is read-only. The Army Value tab is
+compatibility. Its titlebar is draggable, keyboard-nudgeable, viewport-clamped, and retains its
+desktop placement through replay seeks and spectator rematches; `Home` restores the default
+placement. The overlay owns its generated DOM and is read-only. The Army Value tab is
 client-side and viewport-specific; Production, Units, Units Lost, and Resources Lost render the
 latest server-authored `observerAnalysis` payload. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
@@ -1711,7 +1715,8 @@ Current areas:
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`, `match_settings_toggles.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
-  `observer_analysis_rows.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
+  `observer_analysis_preferences.js`, `observer_analysis_rows.js`, `observer_analysis_signatures.js`,
+  `observer_analysis_window.js`, `replay_controls.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
