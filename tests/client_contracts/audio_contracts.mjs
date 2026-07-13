@@ -160,6 +160,48 @@ assert(
   assertApprox(far.lpHz, 1200, 0.001, "Audio spatial lowpass reaches far cutoff");
   assert(audio._computeSpatial(1301, 100) === null, "Audio drops sounds beyond maxDist");
 
+  const combatNear = audio._computeSpatial(260, 100, "combat_self");
+  assert(combatNear !== null, "combat emitter at near boundary should play");
+  assertApprox(combatNear.gain, 1, 0.001, "combat stays full gain through 0.4 reference distance");
+  assertApprox(combatNear.lpHz, 20000, 0.001, "combat near region keeps the near lowpass cutoff");
+  assertApprox(combatNear.distancePenalty, 0, 0.001, "combat near region has no distance priority penalty");
+
+  const combatHalf = audio._computeSpatial(300, 100, "combat_other");
+  assert(combatHalf !== null, "combat emitter at half reference distance should play");
+  assertApprox(combatHalf.gain, 0.5, 0.001, "combat gain is 0.5 at half reference distance");
+
+  const combatOneRef = audio._computeSpatial(500, 100, "combat_self");
+  assert(combatOneRef !== null, "combat emitter at one reference distance should play");
+  assertApprox(combatOneRef.gain, 1 / 7, 0.001, "combat gain is about 0.143 at one reference distance");
+  assert(
+    combatOneRef.lpHz > 1200,
+    "combat lowpass remains above its far cutoff before the hard-drop boundary",
+  );
+
+  const combatEdge = audio._computeSpatial(580, 100, "combat_other");
+  assert(combatEdge !== null, "combat emitter at hard-drop boundary should play");
+  assertApprox(combatEdge.lpHz, 1200, 0.001, "combat lowpass reaches far cutoff at hard-drop boundary");
+  assertApprox(combatEdge.distancePenalty, 30, 0.001, "combat priority penalty reaches 30 at boundary");
+  assert(
+    combatHalf.distancePenalty > combatNear.distancePenalty &&
+      combatOneRef.distancePenalty > combatHalf.distancePenalty &&
+      combatEdge.distancePenalty > combatOneRef.distancePenalty,
+    "combat distance priority penalty rises monotonically outside the near region",
+  );
+  assert(
+    audio._computeSpatial(581, 100, "combat_self") === null,
+    "Audio drops combat beyond 1.2 reference distances",
+  );
+
+  const defaultAtCombatDrop = audio._computeSpatial(581, 100, "ambient");
+  assert(defaultAtCombatDrop !== null, "default non-combat spatial profile keeps its original reach");
+  assertApprox(
+    defaultAtCombatDrop.gain,
+    400 / (400 + 81 * 4),
+    0.001,
+    "default non-combat attenuation remains unchanged",
+  );
+
   const priorPerformance = globalThis.performance;
   let now = 0;
   globalThis.performance = { now: () => now };
@@ -197,6 +239,47 @@ assert(
   for (const [cat, gain] of Object.entries(audio.gains)) {
     gain.gain.value = audio.getCategoryVolume(cat);
   }
+
+  audio.buffers.set("moving_combat", { duration: 0.1 });
+  audio.setListener({ x: 100, y: 100, referenceDistancePx: 400 });
+  assert(
+    audio.play("moving_combat", {
+      x: 300,
+      y: 100,
+      category: "combat_self",
+      pitchVariance: 0,
+    }),
+    "active combat voice starts with the combat spatial profile",
+  );
+  const movingCombat = audio.voices.find((voice) => voice.id === "moving_combat");
+  assert(movingCombat?.category === "combat_self", "active voice remembers its combat category");
+  assertApprox(
+    movingCombat.spatial.distGain.gain.value,
+    0.5,
+    0.001,
+    "new combat voices start with the combat spatial profile",
+  );
+  audio.setListener({ x: 140, y: 100, referenceDistancePx: 400 });
+  assertApprox(
+    movingCombat.spatial.distGain.gain.ramps.at(-1).value,
+    1,
+    0.001,
+    "listener refresh recomputes the combat near-region gain",
+  );
+  assertApprox(
+    movingCombat.spatial.lp.frequency.ramps.at(-1).value,
+    20000,
+    0.001,
+    "listener refresh recomputes the combat lowpass with the same profile",
+  );
+  assertApprox(movingCombat.distancePenalty, 0, 0.001, "listener refresh recomputes combat priority");
+  assertApprox(
+    movingCombat.spatial.distGain.gain.ramps.at(-1).time,
+    0.03,
+    0.001,
+    "listener refresh preserves the smooth spatial ramp",
+  );
+  movingCombat.node.stop();
 
   for (let i = 0; i < 200; i++) audio.buffers.set(`pool_${i}`, { duration: 0.1 });
   for (let i = 0; i < 120; i++) {

@@ -1302,6 +1302,15 @@ voice; ambient drops by 12 dB and combat drops by 10 dB over 0.08 seconds, then 
 2.0 seconds only after the last ducking voice ends. Presenter-admitted under-attack voices bypass
 the generic spoken cooldown because the presenter is the sole owner of their incident admission.
 
+Spatial voices in `combat_self` and `combat_other` share a combat-only radial profile based on the
+renderer-neutral listener reference distance `r`. Gain stays at 1.0 through `0.4r`; beyond that,
+effective distance grows four times as fast, yielding 0.5 gain at `0.5r` and about 0.143 at `1.0r`.
+Combat requests beyond `1.2r` are dropped before allocation. Low-pass interpolation and a 0-to-30
+voice-priority penalty both advance from `0.4r` to the `1.2r` boundary. Active voices retain their
+category so camera updates recompute the same profile with the existing 30 ms parameter ramps.
+Panning still uses the listener reference distance, and non-combat spatial voices retain the
+original default envelope.
+
 `hud.js`
 ```js
 export class HUD {
@@ -1618,8 +1627,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   upward drift so they remain closer to the receiving unit. Selected unit range rings,
   minimum-range rings, and support-weapon field-of-fire overlays use higher-opacity rendering for
   readability.
-- Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
-  listener reference distance for distant emitters, and keeps the same hard drop distance.
+- Spatial combat audio keeps full volume through 0.4 listener reference distances, attenuates and
+  muffles more strongly toward a combat-only hard drop at 1.2 reference distances, and receives a
+  monotonic distance-priority penalty outside the near region. Non-combat spatial behavior and the
+  global 48-voice pool remain unchanged.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
   buckets; generic Panzerfaust attack events, projectile travel, reload, and legacy conversion
   events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
