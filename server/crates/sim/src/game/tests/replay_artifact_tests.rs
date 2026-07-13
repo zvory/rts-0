@@ -226,12 +226,12 @@ fn replay_artifact_schema_two_is_intentionally_rejected() {
 
     assert!(matches!(
         artifact.validate_against("sha-a", game.map_metadata()),
-        Err(ReplayValidationError::UnsupportedArtifactSchema { found: 2, .. })
+        Err(ReplayValidationError::UnsupportedArtifactSchema {
+            found: 2,
+            ..
+        })
     ));
-    assert!(serde_json::to_value(&artifact)
-        .unwrap()
-        .get("startState")
-        .is_none());
+    assert!(serde_json::to_value(&artifact).unwrap().get("startState").is_none());
 }
 
 #[test]

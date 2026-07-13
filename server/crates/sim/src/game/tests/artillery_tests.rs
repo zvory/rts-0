@@ -7,9 +7,7 @@ fn artillery_point_fire_queue_is_terminal() {
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
@@ -35,11 +33,7 @@ fn artillery_point_fire_queue_is_terminal() {
     );
     game.tick();
 
-    let entity = game
-        .state
-        .entities
-        .get(artillery)
-        .expect("artillery exists");
+    let entity = game.state.entities.get(artillery).expect("artillery exists");
     assert!(matches!(entity.order(), Order::ArtilleryPointFire(_)));
     assert!(
         entity.queued_orders().is_empty(),
@@ -80,27 +74,20 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
     let target = game.state.map.tile_center(47, 20);
     let counter_pos = game.state.map.tile_center(4, 4);
     let observer_pos = game.state.map.tile_center(4, 12);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
-    let counter = game
-        .state
-        .entities
+    let counter = game.state.entities
         .spawn_unit(2, EntityKind::Tank, counter_pos.0, counter_pos.1)
         .expect("counter tank should spawn");
-    game.state
-        .entities
+    game.state.entities
         .spawn_unit(3, EntityKind::Worker, observer_pos.0, observer_pos.1)
         .expect("observer worker should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 
     for viewer in [2, 3] {
         assert!(
@@ -145,8 +132,7 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
     game.tick();
 
     assert_eq!(
-        game.state
-            .entities
+        game.state.entities
             .get(counter)
             .expect("counter should exist")
             .order()
@@ -163,14 +149,10 @@ fn artillery_firing_reveal_does_not_override_smoke_concealment() {
     let pos = game.state.map.tile_center(20, 20);
     let target = game.state.map.tile_center(47, 20);
     let counter_pos = game.state.map.tile_center(4, 4);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
-    let counter = game
-        .state
-        .entities
+    let counter = game.state.entities
         .spawn_unit(2, EntityKind::Tank, counter_pos.0, counter_pos.1)
         .expect("counter tank should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
@@ -225,8 +207,7 @@ fn artillery_firing_reveal_does_not_override_smoke_concealment() {
     game.tick();
 
     assert_ne!(
-        game.state
-            .entities
+        game.state.entities
             .get(counter)
             .expect("counter should exist")
             .order()
@@ -243,13 +224,10 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let initial_steel = game.state.players[0].steel;
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
-    game.state
-        .entities
+    game.state.entities
         .spawn_unit(
             2,
             EntityKind::Worker,
@@ -257,16 +235,13 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
             pos.1,
         )
         .expect("enemy gun spotter should spawn");
-    game.state
-        .entities
+    game.state.entities
         .spawn_unit(2, EntityKind::Worker, target.0, target.1)
         .expect("enemy impact spotter should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
     deploy_artillery_toward(&mut game, artillery, target);
 
     game.enqueue(
@@ -333,9 +308,7 @@ fn packed_artillery_point_fire_auto_sets_up_before_firing() {
     let initial_steel = game.state.players[0].steel;
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
 
@@ -351,11 +324,7 @@ fn packed_artillery_point_fire_auto_sets_up_before_firing() {
     );
     let events = game.tick();
 
-    let entity = game
-        .state
-        .entities
-        .get(artillery)
-        .expect("artillery exists");
+    let entity = game.state.entities.get(artillery).expect("artillery exists");
     assert!(matches!(
         entity.weapon_setup(),
         WeaponSetup::Packed | WeaponSetup::SettingUp { .. }
@@ -394,9 +363,7 @@ fn manually_deployed_artillery_can_point_fire() {
     let pos = game.state.map.tile_center(10, 10);
     let setup_target = game.state.map.tile_center(18, 10);
     let fire_target = game.state.map.tile_center(38, 10);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
 
@@ -413,8 +380,7 @@ fn manually_deployed_artillery_can_point_fire() {
         game.tick();
     }
     assert!(matches!(
-        game.state
-            .entities
+        game.state.entities
             .get(artillery)
             .expect("artillery exists")
             .weapon_setup(),
@@ -456,9 +422,7 @@ fn artillery_point_fire_inside_minimum_range_locks_to_range_floor() {
     let pos = game.state.map.tile_center(10, 10);
     let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let too_close = (pos.0 + min_px - 8.0, pos.1);
-    let artillery = game
-        .state
-        .entities
+    let artillery = game.state.entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
     deploy_artillery_toward(&mut game, artillery, too_close);
@@ -479,11 +443,7 @@ fn artillery_point_fire_inside_minimum_range_locks_to_range_floor() {
         game.state.players[0].steel,
         initial_steel - config::ARTILLERY_AMMO_COST_STEEL
     );
-    let entity = game
-        .state
-        .entities
-        .get(artillery)
-        .expect("artillery exists");
+    let entity = game.state.entities.get(artillery).expect("artillery exists");
     let Order::ArtilleryPointFire(order) = entity.order() else {
         panic!("minimum-range click should be accepted as point fire");
     };
@@ -501,9 +461,7 @@ fn artillery_point_fire_inside_minimum_range_locks_to_range_floor() {
 fn artillery_shell_inside_building_footprint_deals_full_inner_ap_damage() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
-    let depot = game
-        .state
-        .entities
+    let depot = game.state.entities
         .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
         .expect("depot should spawn");
     let before = game.state.entities.get(depot).expect("depot exists").hp;
@@ -524,9 +482,7 @@ fn artillery_shell_inside_building_footprint_deals_full_inner_ap_damage() {
 fn artillery_shell_outside_building_uses_footprint_distance_falloff() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
-    let depot = game
-        .state
-        .entities
+    let depot = game.state.entities
         .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
         .expect("depot should spawn");
     let stats = config::building_stats(EntityKind::Depot).expect("depot stats");
@@ -577,9 +533,7 @@ fn artillery_shell_damages_allied_entities_without_last_damage_attribution() {
         },
     ];
     let mut game = empty_flat_game(&players);
-    let depot = game
-        .state
-        .entities
+    let depot = game.state.entities
         .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
         .expect("allied depot should spawn");
     let before = game.state.entities.get(depot).expect("depot exists").hp;
@@ -600,14 +554,11 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
     let mut events = HashMap::new();
     events.insert(1, Vec::new());
     let teams = teams::TeamRelations::from_player_teams(
-        game.state
-            .players
+        game.state.players
             .iter()
             .map(|player| (player.id, player.team_id)),
     );
-    game.state
-        .artillery_shells
-        .schedule(1, 1, x, y, game.state.tick);
+    game.state.artillery_shells.schedule(1, 1, x, y, game.state.tick);
     game.state.artillery_shells.resolve_due(
         &mut game.state.entities,
         &teams,
@@ -618,9 +569,7 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
 }
 
 fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) {
-    let entity = game
-        .state
-        .entities
+    let entity = game.state.entities
         .get_mut(artillery)
         .expect("artillery should exist");
     let facing = (target.1 - entity.pos_y).atan2(target.0 - entity.pos_x);
