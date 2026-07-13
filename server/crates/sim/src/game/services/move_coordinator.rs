@@ -304,6 +304,8 @@ impl<'a> MoveCoordinator<'a> {
         unit_id: u32,
         rally: (f32, f32),
         attack_move: bool,
+        fog: &Fog,
+        smokes: &SmokeCloudStore,
     ) {
         if !entities
             .get(unit_id)
@@ -312,7 +314,7 @@ impl<'a> MoveCoordinator<'a> {
             return;
         }
         let goal = self
-            .nearest_free_rally_goal(entities, unit_id, rally)
+            .nearest_free_rally_goal(entities, player, unit_id, rally, fog, smokes)
             .unwrap_or(rally);
         self.record_group_queued_for_path(
             if attack_move {
@@ -346,8 +348,11 @@ impl<'a> MoveCoordinator<'a> {
     fn nearest_free_rally_goal(
         &self,
         entities: &EntityStore,
+        player: u32,
         unit_id: u32,
         rally: (f32, f32),
+        fog: &Fog,
+        smokes: &SmokeCloudStore,
     ) -> Option<(f32, f32)> {
         if !rally.0.is_finite() || !rally.1.is_finite() {
             return None;
@@ -361,11 +366,50 @@ impl<'a> MoveCoordinator<'a> {
             kind: unit.kind,
             pos: (unit.pos_x, unit.pos_y),
         };
-        let occupied_unit_bodies = entities
-            .iter()
-            .filter(|other| other.id != unit_id && other.hp > 0 && other.is_unit())
-            .filter_map(unit_body_for_entity)
-            .collect::<Vec<_>>();
+        let mut occupied_unit_bodies = Vec::new();
+        let mut rally_viewers = self.teams.same_team_player_ids(player);
+        if !rally_viewers.contains(&player) {
+            rally_viewers.push(player);
+        }
+        for other in entities.iter() {
+            if other.id == unit_id || other.hp == 0 || !other.is_unit() {
+                continue;
+            }
+            let friendly = self
+                .teams
+                .same_team_or_same_owner(player, other.owner);
+            if !friendly
+                && !rally_blocker_visible_to_team(other, &rally_viewers, fog, smokes)
+            {
+                continue;
+            }
+            if let Some(body) = unit_body_for_entity(other) {
+                occupied_unit_bodies.push(body);
+            }
+            if !friendly
+                || !matches!(
+                other.move_phase(),
+                Some(MovePhase::AwaitingPath | MovePhase::Moving)
+            )
+            {
+                continue;
+            }
+            let Some(goal) = other.path_goal() else {
+                continue;
+            };
+            let other_unit = formation::FormationUnit {
+                id: other.id,
+                kind: other.kind,
+                pos: (other.pos_x, other.pos_y),
+            };
+            let facing = formation::formation_goal_facing(&other_unit, goal);
+            if let Some(body) = unit_body_with_facing(other.kind, goal.0, goal.1, facing) {
+                occupied_unit_bodies.push(body);
+            }
+        }
+        let relation = StaticPathingRelation::for_player(player, &self.teams);
+        let mut reachability =
+            formation::FormationReachability::new(self.map, self.occ, relation);
         let max_tile = self.map.size.checked_sub(1)?;
         let anchor = self.map.tile_of(rally.0, rally.1);
         let max_radius = anchor
@@ -402,6 +446,9 @@ impl<'a> MoveCoordinator<'a> {
                         .copied()
                         .any(|body| unit_bodies_intersect(candidate_body, body));
                     if blocked_by_unit {
+                        continue;
+                    }
+                    if !reachability.can_reach(&formation_unit, (tx, ty)) {
                         continue;
                     }
 
@@ -1206,6 +1253,18 @@ fn visible_occupied_trench_ids_for_player(
         .filter(|entity| projection::entity_visible_to_with_smoke(player, entity, fog, smokes))
         .filter_map(active_trench_occupation)
         .collect()
+}
+
+fn rally_blocker_visible_to_team(
+    entity: &crate::game::entity::Entity,
+    viewers: &[u32],
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+) -> bool {
+    viewers
+        .iter()
+        .copied()
+        .any(|viewer| projection::entity_visible_to_with_smoke(viewer, entity, fog, smokes))
 }
 
 fn occupied_trench_ids_for_units(

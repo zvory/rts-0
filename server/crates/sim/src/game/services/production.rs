@@ -1,7 +1,9 @@
 use crate::config;
 use crate::game::entity::{EntityStore, OrderIntent, ProdItem, RallyIntent, RallyKind};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::game::{ability::AbilityKind, entity::EntityKind};
@@ -15,6 +17,8 @@ pub(crate) fn production_system(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     coordinator: &mut MoveCoordinator<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
 ) {
     let mut completed_buildings_by_owner = None;
@@ -199,6 +203,8 @@ pub(crate) fn production_system(
                         spawned,
                         (first.point.x, first.point.y),
                         rally_stage_attacks(unit_can_gather, first),
+                        fog,
+                        smokes,
                     );
                     if let Some(e) = entities.get_mut(spawned) {
                         for stage in rally_plan.iter().skip(1).copied() {
@@ -597,6 +603,8 @@ mod tests {
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let fog = Fog::new(map.size);
+        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         production_system(
@@ -604,6 +612,8 @@ mod tests {
             &mut entities,
             &mut players,
             &mut coordinator,
+            &fog,
+            &smokes,
             &mut events,
         );
         coordinator.process_awaiting_paths(&mut entities);
@@ -804,12 +814,31 @@ mod tests {
     }
 
     fn tick_production(map: &Map, entities: &mut EntityStore, players: &mut [PlayerState]) {
+        let fog = Fog::new(map.size);
+        tick_production_with_fog(map, entities, players, &fog);
+    }
+
+    fn tick_production_with_fog(
+        map: &Map,
+        entities: &mut EntityStore,
+        players: &mut [PlayerState],
+        fog: &Fog,
+    ) {
         let occ = Occupancy::build(map, entities);
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
+        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
-        production_system(map, entities, players, &mut coordinator, &mut events);
+        production_system(
+            map,
+            entities,
+            players,
+            &mut coordinator,
+            fog,
+            &smokes,
+            &mut events,
+        );
     }
 
     fn current_spawn_point(map: &Map, entities: &EntityStore, factory: u32) -> Option<(f32, f32)> {
