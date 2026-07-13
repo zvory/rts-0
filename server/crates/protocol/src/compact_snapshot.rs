@@ -628,7 +628,7 @@ impl Serialize for CompactEntity<'_> {
         if entity.panzerfaust_loaded.is_some() {
             len = 36;
         }
-        if entity.prod_repeat_kind.is_some() {
+        if !entity.prod_repeat_kinds.is_empty() {
             len = 37;
         }
 
@@ -744,7 +744,13 @@ impl Serialize for CompactEntity<'_> {
             seq.serialize_element(&entity.panzerfaust_loaded)?;
         }
         if len > 36 {
-            seq.serialize_element(&entity.prod_repeat_kind.as_deref().map(kind_code))?;
+            seq.serialize_element(
+                &entity
+                    .prod_repeat_kinds
+                    .iter()
+                    .map(|kind| kind_code(kind))
+                    .collect::<Vec<_>>(),
+            )?;
         }
         seq.end()
     }

@@ -860,13 +860,15 @@ policy is centralized instead of scattered through services.
 - `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
   projection support, and event visibility predicates.
 
-Production buildings may carry one server-authoritative `repeat_unit` fallback. The production
-system silently retries the fallback only while the unit queue is empty, using the same economy,
-supply, tech, and producer predicates as direct training. Once admitted, a repeated unit is an
-ordinary FIFO entry, so later manual train commands append behind it.
-Enabling another unit replaces the fallback, while any production cancel clears it before removing
-the latest queued item. The fallback is durable entity state, so checkpoints, replay branches, and
-Lab rewinds preserve it without recording synthetic train commands on every retry.
+Production buildings may carry an ordered server-authoritative `repeat_units` list. The production
+system silently retries the current list entry only while the unit queue is empty, using the same
+economy, supply, tech, and producer predicates as direct training. It advances to the next entry
+only after a repeated unit is admitted, so two active units produce in stable A/B/A/B order. Once
+admitted, a repeated unit is an ordinary FIFO entry, so later manual train commands append behind
+it. Enabling a unit appends it to the list if absent, disabling it removes only that unit, and any
+production cancel clears the whole list before removing the latest queued item. The list and its
+next-unit cursor are durable entity state, so checkpoints, replay branches, and Lab rewinds
+preserve them without recording synthetic train commands on every retry.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 

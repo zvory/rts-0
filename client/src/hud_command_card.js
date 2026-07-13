@@ -427,7 +427,7 @@ export function buildTrainCard(ctx, building) {
       const producers = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf);
       const producerIds = producers.map((e) => e.id).join(".");
       const repeatingIds = producers
-        .filter((producer) => producer.prodRepeatKind === unit)
+        .filter((producer) => producer.prodRepeatKinds?.includes(unit))
         .map((producer) => producer.id)
         .join(".");
       return `${unit}:${trainAvailability(ctx, unit, resources, isOwn)}:${trainLimitSignature(ctx, unit, isOwn)}:${producerIds}:repeat:${repeatingIds}`;
@@ -446,7 +446,7 @@ export function buildTrainCard(ctx, building) {
     const producerIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
       .map((producer) => producer.id);
     const repeatingIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
-      .filter((producer) => producer.prodRepeatKind === unit)
+      .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
     const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
     slots[slot] = {

@@ -350,9 +350,17 @@ pub fn project_entity(
         }
     }
     if owner_or_ally {
-        view.prod_repeat_kind = entity
-            .repeat_production()
-            .map(|unit| protocol::kind_to_wire(unit).to_string());
+        view.prod_repeat_kinds = entity
+            .production
+            .as_ref()
+            .map(|production| {
+                production
+                    .repeat_units
+                    .iter()
+                    .map(|&unit| protocol::kind_to_wire(unit).to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
     }
 
     // Rally/order/ability details are private in normal projections. Full-world diagnostic

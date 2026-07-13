@@ -1,7 +1,6 @@
 //! Wire protocol (JSON + binary snapshots over WebSocket). See `docs/design/protocol.md`.
 //!
-//! This file is the authoritative Rust side of the contract. `client/src/protocol.js`
-//! is its JavaScript mirror — change both together.
+//! Rust is authoritative; update its JavaScript mirror (`client/src/protocol.js`) together.
 //!
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
@@ -737,7 +736,7 @@ mod tests {
             serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
         );
         let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
-        assert_eq!(entity_schema.last().unwrap()["name"], "prodRepeatKind");
+        assert_eq!(entity_schema.last().unwrap()["name"], "prodRepeatKinds");
     }
 
     #[test]
@@ -1295,7 +1294,7 @@ mod tests {
         center.prod_kind = Some(kinds::WORKER.to_string());
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
-        center.prod_repeat_kind = Some(kinds::WORKER.to_string());
+        center.prod_repeat_kinds = vec![kinds::WORKER.to_string(), kinds::SCOUT_CAR.to_string()];
         center.prod_scout_plane_queued = true;
         center.build_progress = Some(0.75);
         center.build_active = true;
@@ -1516,10 +1515,8 @@ mod tests {
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
         assert_eq!(value["e"][2][34], serde_json::json!(true));
-        assert_eq!(
-            value["e"][2][36],
-            serde_json::json!(kind_code(kinds::WORKER))
-        );
+        let repeat_codes = [kind_code(kinds::WORKER), kind_code(kinds::SCOUT_CAR)];
+        assert_eq!(value["e"][2][36], serde_json::json!(repeat_codes));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
             value["sm"],

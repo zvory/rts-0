@@ -24,11 +24,7 @@ pub(super) fn set(
             continue;
         }
         if let Some(producer) = entities.get_mut(building) {
-            if enabled {
-                producer.set_repeat_production(Some(unit));
-            } else if producer.repeat_production() == Some(unit) {
-                producer.set_repeat_production(None);
-            }
+            producer.set_repeat_production(Some(unit), enabled);
         }
     }
 }
