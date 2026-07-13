@@ -186,13 +186,10 @@ fn resolve(
             config::PANZERFAUST_DAMAGE,
             Some(TerrainKind::Open),
         );
-        let attacker_pos = entities
-            .get(shot.attacker)
-            .map(|attacker| (attacker.pos_x, attacker.pos_y))
-            .unwrap_or((shot.source_x, shot.source_y));
+        let source_pos = (shot.source_x, shot.source_y);
         let attribution = teams.is_enemy_owner(shot.owner, victim_owner).then_some((
             shot.owner,
-            attacker_pos,
+            source_pos,
             tick,
         ));
         let enemy_hit = attribution.is_some();
@@ -201,7 +198,7 @@ fn resolve(
             if damaged && enemy_hit && triggers_tank_armor_reaction {
                 target.record_incoming_direct_ap_threat(
                     shot.attacker,
-                    attacker_pos,
+                    source_pos,
                     config::PANZERFAUST_DAMAGE,
                     tick,
                 );
@@ -261,7 +258,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn enemy_panzerfaust_impact_records_direct_ap_threat_on_surviving_tank() {
+    fn enemy_panzerfaust_impact_records_launch_origin_after_attacker_displacement() {
         let mut entities = EntityStore::new();
         let attacker = entities
             .spawn_unit(1, EntityKind::Panzerfaust, 100.0, 100.0)
@@ -271,6 +268,10 @@ mod tests {
             .expect("Tank should spawn");
         let mut shots = PanzerfaustShotStore::default();
         shots.schedule(1, attacker, tank, (100.0, 100.0), (140.0, 100.0), 0);
+        entities
+            .get_mut(attacker)
+            .expect("Panzerfaust should still exist")
+            .set_position(220.0, 100.0);
         let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
         let fog = Fog::new(24);
         let smokes = SmokeCloudStore::new();
@@ -292,5 +293,12 @@ mod tests {
             .expect("Panzerfaust impact should record its direct AP source");
         assert_eq!((threat.source_x, threat.source_y), (100.0, 100.0));
         assert_eq!(threat.damage_weight, config::PANZERFAUST_DAMAGE);
+        assert_eq!(
+            entities
+                .get(tank)
+                .and_then(|tank| tank.last_damage_pos()),
+            Some((100.0, 100.0)),
+            "damage attribution should use the same immutable launch origin"
+        );
     }
 }
