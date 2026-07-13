@@ -65,6 +65,7 @@ impl PointPromotionKey {
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
     PointMove(PointPromotionKey),
+    HoldPosition,
     Attack {
         target: u32,
     },
@@ -190,6 +191,13 @@ pub(crate) fn promote_ready_orders(
         match promoted {
             PromotedIntent::PointMove(key) => {
                 groups.entry(key).or_default().push(id);
+            }
+            PromotedIntent::HoldPosition => {
+                entities.release_miner(id);
+                if let Some(entity) = entities.get_mut(id) {
+                    entity.hold_position();
+                    entity.clear_worker_carry();
+                }
             }
             PromotedIntent::Attack { target } => {
                 coordinator.order_attack(entities, id, target);
@@ -339,6 +347,7 @@ fn pop_next_valid_intent(
                     return Some(PromotedIntent::PointMove(key));
                 }
             }
+            OrderIntent::HoldPosition => return Some(PromotedIntent::HoldPosition),
             OrderIntent::AttackMove(point) => {
                 if let Some(key) = PointPromotionKey::new(owner, true, point.x, point.y) {
                     return Some(PromotedIntent::PointMove(key));
@@ -833,6 +842,28 @@ mod tests {
         assert!(matches!(entity.order(), Order::Move(_)));
         assert_eq!(entity.move_phase(), Some(MovePhase::AwaitingPath));
         assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_hold_position_promotes_after_the_active_move() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        {
+            let entity = entities.get_mut(unit).expect("unit should exist");
+            entity.set_order(Order::move_to(200.0, 100.0));
+            entity.mark_move_phase(MovePhase::Arrived);
+            entity.append_queued_order(OrderIntent::hold_position());
+        }
+
+        promote(&map, &mut entities);
+
+        let entity = entities.get(unit).expect("unit should exist");
+        assert!(matches!(entity.order(), Order::HoldPosition));
+        assert!(entity.queued_orders().is_empty());
+        assert!(entity.path_is_empty());
     }
 
     #[test]

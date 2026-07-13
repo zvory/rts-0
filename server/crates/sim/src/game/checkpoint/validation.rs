@@ -407,7 +407,7 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
         | SimCommand::Gather { units, .. }
         | SimCommand::Build { units, .. }
         | SimCommand::Stop { units }
-        | SimCommand::HoldPosition { units } => Some(units),
+        | SimCommand::HoldPosition { units, .. } => Some(units),
         SimCommand::SetProductionRepeat { buildings, .. } => Some(buildings),
         SimCommand::Train { .. }
         | SimCommand::Research { .. }

@@ -118,7 +118,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Current Kriegsia upgrade ids: `methamphetamines` and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
-| `holdPosition` | `units: u32[]` | Clear active and queued unit orders, then stand ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
+| `holdPosition` | `units: u32[]`, `queued?: bool` | Stand ground. Without `queued`, clear active and queued unit orders immediately. With `queued: true`, append a terminal hold-position intent so units complete earlier queued stages before standing ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"` on the wire. Freshly produced units receive the building's rally plan as active + queued orders; plain move rally stages become attack-move orders for ordinary combat units, while faction gatherers keep plain move orders. The building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
 
 Servers MUST ignore commands referencing commanded units/buildings the player does not own, unknown
@@ -127,7 +127,8 @@ target ids are separately validated by explicit attack-target rules.
 For appendable unit commands, omitted `queued` is equivalent to `false`. Unit order queues are
 capped at 8 intents per unit. Queued intents are lightweight future intent only; active `Order`
 remains the per-tick execution state. Non-queued unit orders replace the active order and clear
-future unit intents; `stop` and `holdPosition` clear both active and queued unit orders.
+future unit intents; `stop` and non-queued `holdPosition` clear both active and queued unit orders.
+Queued `holdPosition` is terminal, so later queued unit orders are not appended after it.
 Production building rally plans are capped at four total stages. A non-queued rally replaces the
 whole plan; a queued rally appends if space remains and establishes the first stage when the plan is
 empty.
@@ -711,7 +712,7 @@ Compact numeric codes:
 | `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane` |
+| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus` |
@@ -901,7 +902,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
   setupFacing?: f32,             // anti_tank_gun/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
   orderPlan?: [                  // current + queued order stages; owner-private except full-world diagnostics
-    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
+    { kind: "move"|"attackMove"|"holdPosition"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data

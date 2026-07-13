@@ -543,7 +543,7 @@ fn validate_command(
         Command::TearDownAntiTankGuns { units }
         | Command::Charge { units }
         | Command::Stop { units }
-        | Command::HoldPosition { units }
+        | Command::HoldPosition { units, .. }
         | Command::SetAutocast { units, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
         }

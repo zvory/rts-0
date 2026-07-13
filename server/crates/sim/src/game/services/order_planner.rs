@@ -51,6 +51,7 @@ pub struct UnitFacts {
     pub activity: UnitActivity,
     pub can_attack_move: bool,
     pub can_attack: bool,
+    pub can_hold_position: bool,
     pub can_gather: bool,
     pub can_build: bool,
     pub can_setup_anti_tank_gun: bool,
@@ -69,6 +70,7 @@ impl UnitFacts {
             activity: UnitActivity::Idle,
             can_attack_move: true,
             can_attack: false,
+            can_hold_position: false,
             can_gather: false,
             can_build: false,
             can_setup_anti_tank_gun: false,
@@ -129,6 +131,7 @@ pub enum RequestedOrder {
     AttackMove {
         to: Point,
     },
+    HoldPosition,
     AttackTarget {
         target: EntityId,
         target_valid: bool,
@@ -184,6 +187,7 @@ impl Default for PlannerConfig {
 pub enum OrderIntent {
     Move(Point),
     AttackMove(Point),
+    HoldPosition,
     AttackTarget(EntityId),
     Gather(EntityId),
     Build {
@@ -254,6 +258,13 @@ pub fn plan_order(
             &ordered_facts,
             |u| u.can_attack_move,
             OrderIntent::AttackMove(to),
+        ),
+        RequestedOrder::HoldPosition => plan_filtered_units(
+            config,
+            request.mode,
+            &ordered_facts,
+            |u| u.can_hold_position,
+            OrderIntent::HoldPosition,
         ),
         RequestedOrder::AttackTarget {
             target,

@@ -468,6 +468,11 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       JSON.stringify({ t: "command", clientSeq: 4, cmd: { c: "holdPosition", units: [7] } }),
     "holdPosition command builder emits the hold-position wire shape",
   );
+  assert(
+    JSON.stringify(msg.command(cmd.holdPosition([7], true), 5)) ===
+      JSON.stringify({ t: "command", clientSeq: 5, cmd: { c: "holdPosition", units: [7], queued: true } }),
+    "queued holdPosition command builder preserves the queue flag",
+  );
   const pointFireCommand = cmd.pointFire([11, 12], 512, 640, true);
   assert(
     pointFireCommand.c === "useAbility" &&

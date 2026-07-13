@@ -378,6 +378,7 @@ export const EVENT_CODE = Object.freeze({
 export const ORDER_STAGE = Object.freeze({
   MOVE: "move",
   ATTACK_MOVE: "attackMove",
+  HOLD_POSITION: "holdPosition",
   ATTACK: "attack",
   DECONSTRUCT: "deconstruct",
   GATHER: "gather",
@@ -417,6 +418,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.BLANKET_FIRE]: 17,
   [ORDER_STAGE.DISMISS_SCOUT_PLANE]: 18,
   [ORDER_STAGE.SCOUT_PLANE]: 19,
+  [ORDER_STAGE.HOLD_POSITION]: 20,
 });
 
 export const ABILITY_CODE = Object.freeze({

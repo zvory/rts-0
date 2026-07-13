@@ -147,6 +147,8 @@ impl Order {
 pub enum OrderIntent {
     Move(PointIntent),
     AttackMove(PointIntent),
+    /// Terminal future stance: clear the active order and stand ground when promoted.
+    HoldPosition,
     Attack(TargetIntent),
     Gather(GatherIntent),
     Build(BuildIntent),
@@ -165,6 +167,10 @@ impl OrderIntent {
 
     pub fn attack_move_to(x: f32, y: f32) -> Self {
         OrderIntent::AttackMove(PointIntent { x, y })
+    }
+
+    pub fn hold_position() -> Self {
+        OrderIntent::HoldPosition
     }
 
     pub fn attack(target: u32) -> Self {

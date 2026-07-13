@@ -314,7 +314,7 @@ impl AiController {
                         });
                     }
                 }
-                SimCommand::HoldPosition { units } if command_stages_units(&units) => {
+                SimCommand::HoldPosition { units, queued } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.active_attack_units.contains_key(id))
@@ -323,7 +323,10 @@ impl AiController {
                     self.staged_units.extend(fresh.iter().copied());
                     self.held_stage_units.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
-                        filtered.push(SimCommand::HoldPosition { units: fresh });
+                        filtered.push(SimCommand::HoldPosition {
+                            units: fresh,
+                            queued,
+                        });
                     }
                 }
                 SimCommand::SetupAntiTankGuns {
@@ -488,12 +491,21 @@ mod tests {
     fn live_stage_filter_sends_hold_position_once_per_staged_unit() {
         let mut ai = AiController::new(1);
         let intents = [crate::ai_core::decision::AiIntent::Stage { units: vec![42] }];
-        let hold = SimCommand::HoldPosition { units: vec![42] };
+        let hold = SimCommand::HoldPosition {
+            units: vec![42],
+            queued: false,
+        };
 
         let first = ai.filter_repeated_stage_commands(10, &intents, vec![hold.clone()]);
         let second = ai.filter_repeated_stage_commands(16, &intents, vec![hold]);
 
-        assert_eq!(first, vec![SimCommand::HoldPosition { units: vec![42] }]);
+        assert_eq!(
+            first,
+            vec![SimCommand::HoldPosition {
+                units: vec![42],
+                queued: false,
+            }]
+        );
         assert!(second.is_empty());
     }
 

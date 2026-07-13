@@ -142,6 +142,27 @@ function fakeHudRootWithoutResourceSpans() {
 // HUD game timer
 // ---------------------------------------------------------------------------
 {
+  const issued = [];
+  const hud = {
+    _issueCommand(command) {
+      issued.push(command);
+    },
+    _intent() {
+      return { endCommandTarget() {} };
+    },
+  };
+  HUD.prototype._dispatchCommandIntent.call(
+    hud,
+    { type: "holdPosition", unitIds: [7] },
+    { shiftKey: true },
+  );
+  assert(
+    issued.length === 1 && issued[0].c === "holdPosition" && issued[0].queued === true,
+    "Shift-held Hold Position appends a queued hold command",
+  );
+}
+
+{
   assert(formatGameTime(null) === "00:00", "HUD game timer treats missing ticks as match start");
   assert(formatGameTime(-90) === "00:00", "HUD game timer clamps negative ticks");
   assert(formatGameTime(TICK_HZ - 1) === "00:00", "HUD game timer floors partial seconds");

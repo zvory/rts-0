@@ -571,21 +571,23 @@ pub(in crate::game) fn apply_commands(
                     }
                 }
             }
-            SimCommand::HoldPosition { units } => {
+            SimCommand::HoldPosition { units, queued } => {
                 let Some(units) =
                     validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
-                for id in units {
-                    if unit_can_accept_ground_command(entities, player, id) {
-                        entities.release_miner(id);
-                        if let Some(e) = entities.get_mut(id) {
-                            e.hold_position();
-                            e.clear_worker_carry();
-                        }
-                    }
-                }
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::HoldPosition,
+                };
+                apply_planned!(
+                    player,
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
+                );
             }
             SimCommand::SetRally {
                 building,
@@ -708,6 +710,15 @@ mod planned_actions {
                         if immediate_unit_can_replace(entities, player, unit) {
                             attack_move_goal = Some((point.x, point.y));
                             attack_move_units.push(unit);
+                        }
+                    }
+                    planner::OrderIntent::HoldPosition => {
+                        if unit_can_accept_ground_command(entities, player, unit) {
+                            entities.release_miner(unit);
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.hold_position();
+                                e.clear_worker_carry();
+                            }
                         }
                     }
                     planner::OrderIntent::AttackTarget(target) => {
@@ -1083,6 +1094,7 @@ fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<Orde
         planner::OrderIntent::AttackMove(point) => {
             Some(OrderIntent::attack_move_to(point.x, point.y))
         }
+        planner::OrderIntent::HoldPosition => Some(OrderIntent::hold_position()),
         planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
         planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
         planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),

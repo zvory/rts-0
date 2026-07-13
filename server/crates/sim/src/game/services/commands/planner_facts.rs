@@ -5,7 +5,7 @@ use crate::game::services::ability_orders;
 use crate::game::services::order_planner as planner;
 use crate::rules;
 
-use super::guards::dedupe_cap_units;
+use super::guards::{dedupe_cap_units, unit_can_accept_ground_command};
 
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
     planner::PlannerConfig {
@@ -38,7 +38,9 @@ pub(super) fn planner_facts(
             ) || e.queued_orders().iter().any(|intent| {
                 matches!(
                     intent,
-                    OrderIntent::PointFire(_) | OrderIntent::BlanketFire(_)
+                    OrderIntent::PointFire(_)
+                        | OrderIntent::BlanketFire(_)
+                        | OrderIntent::HoldPosition
                 )
             });
             facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
@@ -51,6 +53,7 @@ pub(super) fn planner_facts(
             };
             facts.can_attack_move = e.kind != EntityKind::ScoutPlane;
             facts.can_attack = e.can_attack();
+            facts.can_hold_position = unit_can_accept_ground_command(entities, player, id);
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)
                 .is_some_and(|catalog| catalog.builders.contains(&e.kind));

@@ -274,7 +274,7 @@ impl ProfileBackedScript {
                         });
                     }
                 }
-                Command::HoldPosition { units } if command_stages_units(&units) => {
+                Command::HoldPosition { units, queued } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.active_attack_units.contains_key(id))
@@ -283,7 +283,10 @@ impl ProfileBackedScript {
                     self.staged_units.extend(fresh.iter().copied());
                     self.held_stage_units.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
-                        filtered.push(Command::HoldPosition { units: fresh });
+                        filtered.push(Command::HoldPosition {
+                            units: fresh,
+                            queued,
+                        });
                     }
                 }
                 Command::SetupAntiTankGuns {
@@ -490,12 +493,21 @@ mod tests {
     fn profile_stage_filter_sends_hold_position_once_per_staged_unit() {
         let mut script = ProfileBackedScript::new(1, AI_2_1_ID);
         let intents = [AiIntent::Stage { units: vec![42] }];
-        let hold = Command::HoldPosition { units: vec![42] };
+        let hold = Command::HoldPosition {
+            units: vec![42],
+            queued: false,
+        };
 
         let first = script.filter_repeated_stage_commands(10, &intents, vec![hold.clone()]);
         let second = script.filter_repeated_stage_commands(16, &intents, vec![hold]);
 
-        assert_eq!(first, vec![Command::HoldPosition { units: vec![42] }]);
+        assert_eq!(
+            first,
+            vec![Command::HoldPosition {
+                units: vec![42],
+                queued: false,
+            }]
+        );
         assert!(second.is_empty());
     }
 }

@@ -5,6 +5,10 @@ const ARTILLERY_TERMINAL_STAGES = new Set([
   ORDER_STAGE.POINT_FIRE,
   ORDER_STAGE.BLANKET_FIRE,
 ]);
+const QUEUE_TERMINAL_STAGES = new Set([
+  ...ARTILLERY_TERMINAL_STAGES,
+  ORDER_STAGE.HOLD_POSITION,
+]);
 const PLAN_XY_EPSILON = 0.5;
 
 /**
@@ -280,7 +284,7 @@ export class ClientIntent {
     const merged = [];
     for (const stage of base.concat(local)) {
       merged.push(publicOrderStage(stage));
-      if (ARTILLERY_TERMINAL_STAGES.has(stage.kind)) break;
+      if (QUEUE_TERMINAL_STAGES.has(stage.kind)) break;
     }
     return merged;
   }
@@ -446,6 +450,8 @@ function commandOrderStage(command, clientSeq, createdAt) {
       return finitePointStage(ORDER_STAGE.ATTACK_MOVE, command, base);
     case CMD.SETUP_ANTI_TANK_GUNS:
       return finitePointStage(ORDER_STAGE.SETUP_ANTI_TANK_GUNS, command, base);
+    case CMD.HOLD_POSITION:
+      return command.queued ? { kind: ORDER_STAGE.HOLD_POSITION, ...base } : null;
     case CMD.USE_ABILITY:
       if (command.ability === ABILITY.POINT_FIRE) {
         return finitePointStage(ORDER_STAGE.POINT_FIRE, command, base);
@@ -466,7 +472,6 @@ function finitePointStage(kind, command, base) {
 
 function clearsPlannedStages(commandKind) {
   return commandKind === CMD.STOP ||
-    commandKind === CMD.HOLD_POSITION ||
     commandKind === CMD.ATTACK ||
     commandKind === CMD.GATHER ||
     commandKind === CMD.BUILD ||
@@ -491,7 +496,7 @@ function replaceContradictoryLocalStages(stages, nextStage) {
 }
 
 function planHasTerminal(plan) {
-  return Array.isArray(plan) && plan.some((stage) => ARTILLERY_TERMINAL_STAGES.has(stage?.kind));
+  return Array.isArray(plan) && plan.some((stage) => QUEUE_TERMINAL_STAGES.has(stage?.kind));
 }
 
 function stageConfirmedByAuthority(stage, authorityPlan) {

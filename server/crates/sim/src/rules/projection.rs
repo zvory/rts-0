@@ -528,18 +528,24 @@ fn order_plan(
     smokes: Option<&SmokeCloudStore>,
 ) -> Vec<OrderPlanMarker> {
     let mut plan = Vec::new();
+    let mut stage_position = (entity.pos_x, entity.pos_y);
     if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog, smokes) {
+        stage_position = (marker.x, marker.y);
         plan.push(marker);
     }
     plan.extend(entity.queued_orders().iter().filter_map(|intent| {
-        intent_plan_marker(
+        let marker = intent_plan_marker(
             intent,
-            (entity.pos_x, entity.pos_y),
+            stage_position,
             entities,
             viewer,
             fog,
             smokes,
-        )
+        );
+        if let Some(marker) = marker.as_ref() {
+            stage_position = (marker.x, marker.y);
+        }
+        marker
     }));
     plan
 }
@@ -596,7 +602,7 @@ fn active_order_plan_marker(
 
 fn intent_plan_marker(
     intent: &OrderIntent,
-    self_position: (f32, f32),
+    stage_position: (f32, f32),
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
@@ -605,6 +611,7 @@ fn intent_plan_marker(
     match intent {
         OrderIntent::Move(point) => point_marker("move", point.x, point.y),
         OrderIntent::AttackMove(point) => point_marker("attackMove", point.x, point.y),
+        OrderIntent::HoldPosition => point_marker("holdPosition", stage_position.0, stage_position.1),
         OrderIntent::Attack(attack) => {
             target_marker("attack", attack.target, entities, viewer, fog, smokes)
         }
@@ -624,8 +631,8 @@ fn intent_plan_marker(
         }
         OrderIntent::SelfAbility(ability) => point_marker(
             ability.ability.to_protocol_str(),
-            self_position.0,
-            self_position.1,
+            stage_position.0,
+            stage_position.1,
         ),
         OrderIntent::SetupAntiTankGuns(point) => {
             point_marker("setupAntiTankGuns", point.x, point.y)
