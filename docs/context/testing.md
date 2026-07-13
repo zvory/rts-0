@@ -16,6 +16,8 @@ Use for tests, CI/hooks, or focused verification.
 - `node tests/ai_integration.mjs` — dep-free AI opponent lobby flow; needs a running server.
 - `node tests/lab_mortar_regression.mjs` — mortar event regression; needs a server.
 - `node tests/minimap_input_contracts.mjs` — minimap/router pointer-lock contracts.
+- Lab Interact contract/canary commands, dependencies, and server ownership modes are documented in
+  `docs/lab-interact-cli.md`.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
 - `tests/run-all.sh --only-rust-checks` — policy plus lint, without nextest.
 - `RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest` — one CI partition.
@@ -32,8 +34,6 @@ Use for tests, CI/hooks, or focused verification.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
 - `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
-- Lab Interact media contracts/smokes need FFmpeg/ffprobe with VP9 and H.264 encoders; recording
-  smoke uses `record-wait` rather than polling.
 - `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line source cap.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —

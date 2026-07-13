@@ -10,9 +10,15 @@ import {
 } from "../scripts/lab-interact/fixed_capture.mjs";
 import { checkMediaCapabilities } from "../scripts/lab-interact/recording.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
+import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
 
 const sessionId = `lab_${"a".repeat(32)}`;
+const root = process.cwd();
+const testArtifacts = new LabInteractTestArtifacts(root);
+let service;
+
+try {
 const driverSource = fs.readFileSync(new URL("../scripts/lab-interact/driver.mjs", import.meta.url), "utf8");
 assert.match(
   driverSource,
@@ -34,8 +40,9 @@ assert.deepEqual(
   "fixed-capture manifest summaries preserve total/truncated metadata without 400 detailed rows",
 );
 
-const service = new LabInteractService({ workspaceRoot: process.cwd(), driverFactory: openLabInteractDriver });
+service = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
 const opened = await service.execute("open", {});
+testArtifacts.ownSession(opened.sessionId);
 await service.execute("spawn", { sessionId: opened.sessionId, spawns: [{ owner: 1, kind: "tank", x: 800, y: 800, alias: "subject" }] });
 const result = await service.execute("capture-fixed", { sessionId: opened.sessionId, name: "contract", fps: 60, frameCount: 4 });
 assert.deepEqual(
@@ -47,8 +54,6 @@ assert.deepEqual(result.authoritative, { startTick: 1, endTick: 2 }, "service pr
 assert.equal(result.fixtureMetadata.sceneRevision, 1, "manifest input identifies mutations after the launch scene");
 assert.deepEqual(result.fixtureMetadata.aliases, [{ alias: "subject", id: 100 }], "manifest input retains bounded alias identity");
 await assert.rejects(service.execute("capture-cancel", { sessionId: opened.sessionId }), (error) => error?.code === "captureInactive", "cancel reports an actionable error when no fixed capture is active");
-await service.shutdown();
-
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-fixed-contract-"));
 try {
   const tools = checkMediaCapabilities();
@@ -74,3 +79,8 @@ try {
 }
 
 console.log("✅ lab_interact_fixed_capture_contracts.mjs: bounds, tick mapping, service, and media passed");
+} finally {
+  await service?.shutdown();
+  testArtifacts.cleanup();
+  testArtifacts.assertClean();
+}

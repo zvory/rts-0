@@ -272,13 +272,27 @@ fixed visual-time contract.
 
 ## Focused verification
 
+The fast contract set uses the fake driver and needs no Chrome or Rust server. FFmpeg and ffprobe
+with H.264 support are required by the recording and fixed-capture contracts:
+
 ```bash
 node tests/lab_interact_cli_contracts.mjs
+node tests/lab_interact_artifact_contracts.mjs
 node tests/lab_interact_tailnet_preview_contracts.mjs
 node tests/lab_interact_driver_contracts.mjs
 node tests/lab_interact_bulk_contracts.mjs
 node tests/lab_interact_recording_contracts.mjs
+node tests/lab_interact_fixed_capture_contracts.mjs
+```
+
+The live browser canary needs Chrome/Chromium plus FFmpeg/ffprobe. Standalone mode starts and owns a
+private Rust server; the browser smoke shard reuses its already-running loopback server. Both modes
+run the same two-entity semantic workflow and clean their daemon runtime, UUID-owned session output,
+and exact setup/alias-sidecar files on success or failure:
+
+```bash
 node tests/lab_interact_cli_smoke.mjs
+tests/run-all.sh --only-browser-scenarios=smoke
 RTS_LAB_INTERACT_RECORDING_CANARY_MS=60000 node tests/lab_interact_cli_smoke.mjs
 node tests/lab_interact_driver_smoke.mjs
 ```

@@ -20,11 +20,17 @@ import {
 import { DRIVER_STATES, LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
 import { LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
+import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const service = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
+const testArtifacts = new LabInteractTestArtifacts(root);
+let service;
+let shutdownService;
+
+try {
+service = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
 const opened = await service.execute("open", {});
-const sessionId = opened.sessionId;
+const sessionId = testArtifacts.ownSession(opened.sessionId);
 
 assert.equal(RECORDING_LIMITS.defaultDurationMs, 10_000, "recordings default to a short review clip");
 assert.equal(RECORDING_LIMITS.maxDurationMs, 60_000, "recordings support a hard one-minute duration ceiling");
@@ -316,14 +322,26 @@ assert.equal((await closeWait).stoppedBy, "sessionClose", "session close settles
 assert.equal((await service.status()).sessions.length, 0, "close removes the recording session");
 await service.shutdown();
 
-const shutdownService = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
+shutdownService = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
 const shutdownSession = await shutdownService.execute("open", {});
+testArtifacts.ownSession(shutdownSession.sessionId);
 await shutdownService.execute("record-start", { sessionId: shutdownSession.sessionId, name: "shutdown-cleanup" });
 const shutdownWait = shutdownService.execute("record-wait", { sessionId: shutdownSession.sessionId });
 assert.deepEqual(await shutdownService.execute("shutdown", {}), { shuttingDown: true }, "service shutdown waits for recorder settlement");
 assert.equal((await shutdownWait).stoppedBy, "sessionClose", "shutdown settles active recording waiters exactly once");
 
 console.log("✅ lab_interact_recording_contracts.mjs: bounds, state, operation metadata, errors, and close cleanup passed");
+} finally {
+  await service?.shutdown();
+  await shutdownService?.shutdown();
+  testArtifacts.cleanup();
+  testArtifacts.assertClean();
+  for (const marker of ["7", "9", "a", "b", "c", "d", "e", "f"]) {
+    removeIfEmpty(path.join(root, "target", "lab-interact", `lab_${marker.repeat(32)}`, "recordings"));
+    removeIfEmpty(path.join(root, "target", "lab-interact", `lab_${marker.repeat(32)}`));
+  }
+  removeIfEmpty(path.join(root, "target", "lab-interact"));
+}
 
 function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = false, failStartStatus = false, failRecorderStop = false, recorderStopDelayMs = 0 } = {}) {
   const driver = new LabInteractDriver({ workspaceRoot, viewport: { width: 640, height: 480, deviceScaleFactor: 1 } });
@@ -384,6 +402,10 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   };
   Object.defineProperty(driver, "fixtureRecorderStops", { get: () => recorderStops });
   return driver;
+}
+
+function removeIfEmpty(directory) {
+  if (fs.existsSync(directory) && fs.readdirSync(directory).length === 0) fs.rmdirSync(directory);
 }
 
 async function withDeadline(promise, timeoutMs) {

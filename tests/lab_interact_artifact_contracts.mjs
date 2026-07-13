@@ -5,18 +5,25 @@ import { fileURLToPath } from "node:url";
 
 import { LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
+import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const service = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
-const opened = await service.execute("open", {});
-const sessionId = opened.sessionId;
+const testArtifacts = new LabInteractTestArtifacts(root);
+let service;
 
-await service.execute("spawn", { sessionId, spawns: [
+try {
+  service = new LabInteractService({ workspaceRoot: root, driverFactory: openLabInteractDriver });
+  const opened = await service.execute("open", {});
+  const sessionId = testArtifacts.ownSession(opened.sessionId);
+
+  await service.execute("spawn", { sessionId, spawns: [
   { owner: 1, kind: "rifleman", x: 100, y: 100, alias: "shooter" },
   { owner: 2, kind: "rifleman", x: 200, y: 100, alias: "target" },
 ] });
 
-const setup = await service.execute("export", { sessionId, kind: "setup", name: "Portable setup", reproduction: true });
+const setup = testArtifacts.ownPortableArtifact(
+  await service.execute("export", { sessionId, kind: "setup", name: "Portable setup", reproduction: true }),
+);
 assert.match(setup.artifactId, /^artifact_[a-f0-9]{32}$/);
 assert.equal(setup.entityCount, 2);
 assert.equal(setup.aliasCount, 2);
@@ -90,7 +97,9 @@ assert.deepEqual(detailedImport.aliases.stale, [], "details=true returns every s
 assert.equal(detailedImport.aliases.restored.length, 2, "details=true returns every restored alias row");
 assert.equal(detailedImport.result.entityIdMap.length, 2, "details=true preserves the raw authoritative import result");
 
-const replay = await service.execute("export", { sessionId, kind: "replay", name: "Portable replay" });
+const replay = testArtifacts.ownPortableArtifact(
+  await service.execute("export", { sessionId, kind: "replay", name: "Portable replay" }),
+);
 assert.equal(replay.operationCount, 0);
 assert.equal((await service.execute("import", { sessionId, kind: "replay", artifactId: replay.artifactId })).validation.ok, true);
 
@@ -107,6 +116,9 @@ await assert.rejects(
   (error) => error.code === "unsafeArtifactPath",
 );
 
-await service.shutdown("test");
-fs.rmSync(path.dirname(setup.path), { recursive: true, force: true });
-console.log("lab interact artifact contracts passed");
+  console.log("lab interact artifact contracts passed");
+} finally {
+  await service?.shutdown("test");
+  testArtifacts.cleanup();
+  testArtifacts.assertClean();
+}

@@ -13,11 +13,13 @@ import {
 } from "../scripts/lab-interact/runtime.mjs";
 import { LAB_INTERACT_COMMANDS } from "../scripts/lab-interact/command_service.mjs";
 import { LAB_INTERACT_COMMAND_HELP } from "../scripts/lab-interact/command_help.mjs";
+import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-contracts-"));
+const testArtifacts = new LabInteractTestArtifacts(root);
 const originalTmp = process.env.TMPDIR;
 process.env.TMPDIR = isolatedTmp;
 process.once("exit", restoreTmp);
@@ -30,6 +32,7 @@ const baseEnv = {
   RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1",
 };
 
+try {
 assert.equal(configuredIdleMs({}), DEFAULT_IDLE_MS, "the production idle default is exactly 30 minutes");
 assert.equal(DEFAULT_IDLE_MS, 30 * 60_000, "idle default remains explicit and reviewable");
 assert.equal(configuredIdleMs({ RTS_LAB_INTERACT_IDLE_MS: "25" }), 25, "tests may override the idle deadline");
@@ -231,6 +234,7 @@ const concurrentIds = concurrentOpen.map(({ stdout, stderr }) => {
 });
 assert.equal(new Set(concurrentIds).size, 1, "concurrent opens coalesce on one driver and session");
 const sessionId = concurrentIds[0];
+testArtifacts.ownSession(sessionId);
 assert.notEqual(sessionId, firstSessionId, "close followed by open creates a fresh session id");
 
 call("spawn", { sessionId, spawns: [
@@ -472,8 +476,15 @@ const idlePid = JSON.parse(fs.readFileSync(paths.state, "utf8")).pid;
 await waitFor(() => !fs.existsSync(paths.directory), 2000, "idle daemon deletes its runtime directory");
 await waitFor(() => !processAlive(idlePid), 2000, "idle daemon exits after closing owned resources");
 
-restoreTmp();
 console.log("✅ lab_interact_cli_contracts.mjs: CLI, daemon, validation, aliases, races, stale recovery, idle cleanup, and shutdown passed");
+} finally {
+  const cleanupPid = readState(paths)?.pid;
+  shutdown(baseEnv);
+  if (cleanupPid) await waitFor(() => !processAlive(cleanupPid), 5_000, "contract cleanup exits the daemon");
+  testArtifacts.cleanup();
+  testArtifacts.assertClean();
+  restoreTmp();
+}
 
 function call(command, input = {}, env = baseEnv) {
   const result = spawnSync(process.execPath, [cli, command, JSON.stringify(input)], { cwd: root, env, encoding: "utf8" });
@@ -483,6 +494,8 @@ function call(command, input = {}, env = baseEnv) {
   assert.equal(lines.length, 1, `${command} writes exactly one JSON value to stdout`);
   const response = JSON.parse(lines[0]);
   assert.equal(response.ok, true, `${command} returns a successful envelope`);
+  if (command === "open") testArtifacts.ownSession(response.result.sessionId);
+  if (command === "export") testArtifacts.ownPortableArtifact(response.result);
   return response;
 }
 

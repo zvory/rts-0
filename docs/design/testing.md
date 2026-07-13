@@ -205,6 +205,14 @@ filters fail closed so invalid bounds cannot broaden a query. The driver evaluat
 current frame so transient startup work does not block a later clean capture, and clamps seeks to
 the supported range.
 
+Lab Interact source, page-bridge, Rust artifact-bridge, focused-test, CLI-documentation, and local
+skill changes select `lab-interact-contracts` plus the browser `client-smoke` shard. The fast
+contracts use the fake driver and isolate UUID-named session and portable artifacts, while the one
+live canary exercises open, spawn, update, order/step, screenshot/PNG preview, setup round trip,
+short H.264 recording, reset, close, stale-session rejection, and daemon shutdown. Standalone live
+canary runs own a private server; the browser shard passes its existing loopback server through
+`RTS_LAB_INTERACT_BASE_URL` so CI does not build or start a second one.
+
 - Phase runner plan/path handling: run `node tests/phase_runner_agents.mjs` when changing
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
   names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`

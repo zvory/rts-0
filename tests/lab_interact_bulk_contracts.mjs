@@ -9,10 +9,15 @@ import {
 } from "../scripts/lab-interact/command_service.mjs";
 import { LabInteractDriverError } from "../scripts/lab-interact/driver.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
+import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const testArtifacts = new LabInteractTestArtifacts(root);
 const calls = { spawn: 0, update: 0, remove: 0, inspectSizes: [] };
-const service = new LabInteractService({
+let service;
+
+try {
+service = new LabInteractService({
   workspaceRoot: root,
   driverFactory: async (options) => {
     const driver = await openLabInteractDriver(options);
@@ -32,7 +37,7 @@ const service = new LabInteractService({
   },
 });
 const opened = await service.open({});
-const sessionId = opened.sessionId;
+const sessionId = testArtifacts.ownSession(opened.sessionId);
 
 const repeatProducers = await service.execute("spawn", {
   sessionId,
@@ -246,5 +251,9 @@ const normalized = normalizeError(new LabInteractDriverError("labRejected", "blo
 assert.equal(normalized.details.failedIndex, 3, "driver failures retain the failed batch index");
 assert.equal(normalized.details.suggestions[0].x, 42, "driver failures retain placement suggestions");
 
-await service.shutdown("test");
 console.log("✅ lab_interact_bulk_contracts.mjs: bulk command service contracts passed");
+} finally {
+  await service?.shutdown("test");
+  testArtifacts.cleanup();
+  testArtifacts.assertClean();
+}
