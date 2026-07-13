@@ -5,10 +5,13 @@ import {
   isObserverAnalysisTabId,
   OBSERVER_ANALYSIS_TABS,
 } from "./observer_analysis_preferences.js";
+import {
+  FloatingPanelPositioner,
+  isMobileDebugPanelViewport,
+} from "./floating_panel_positioner.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
 import { normalizeResourceWindows, renderResourcesMetric } from "./observer_analysis_resources.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
-import { ObserverAnalysisWindow } from "./observer_analysis_window.js";
 import { resourceValueElement } from "./resource_icons.js";
 
 const ARMY_VALUE_TAB_ID = "army-value";
@@ -44,7 +47,7 @@ export class ObserverAnalysisOverlay {
     this.tabsEl = null;
     this.bodyEl = null;
     this.showButton = null;
-    this.window = null;
+    this.positioner = null;
     this.analysis = null;
     this.onClick = (ev) => this.handleClick(ev);
     this.onKeyDown = (ev) => this.handleKeyDown(ev);
@@ -120,8 +123,18 @@ export class ObserverAnalysisOverlay {
     this.showButton = this.buildIconButton("Show observer analysis", "replay-analysis-show", "▣", { show: "1" });
     this.el.appendChild(this.showButton);
     this.root.appendChild(this.el);
-    this.window = new ObserverAnalysisWindow({ root: this.el, preferences: this.preferences });
-    this.window.mount(dragHandle);
+    this.positioner = new FloatingPanelPositioner({
+      root: this.el,
+      defaultPosition: { left: 12, top: 58 },
+      defaultSize: { width: 316, height: 260 },
+      readPosition: () => this.preferences?.position,
+      savePosition: (position) => {
+        if (this.preferences) this.preferences.position = position;
+      },
+      clearPosition: () => this.preferences?.clearPosition?.(),
+      isMobileViewport: isMobileDebugPanelViewport,
+    });
+    this.positioner.mount(dragHandle);
     this.render();
   }
 
@@ -525,7 +538,7 @@ export class ObserverAnalysisOverlay {
   }
 
   destroy() {
-    this.window?.destroy();
+    this.positioner?.destroy();
     if (this.el) {
       this.el.removeEventListener("click", this.onClick);
       this.el.removeEventListener("keydown", this.onKeyDown);
@@ -536,7 +549,7 @@ export class ObserverAnalysisOverlay {
     this.tabsEl = null;
     this.bodyEl = null;
     this.showButton = null;
-    this.window = null;
+    this.positioner = null;
   }
 }
 

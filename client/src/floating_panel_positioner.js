@@ -1,31 +1,50 @@
-import { isMobileDebugPanelViewport } from "./room_time_panel.js";
-
 const PANEL_MARGIN = 12;
-const DEFAULT_LEFT = 12;
-const DEFAULT_TOP = 58;
-const DEFAULT_WIDTH = 316;
-const DEFAULT_HEIGHT = 260;
 const KEY_STEP = 24;
 const KEY_STEP_LARGE = 72;
+const MOBILE_DEBUG_MAX_VIEWPORT_WIDTH = 1024;
+const MOBILE_DEBUG_MAX_VIEWPORT_HEIGHT = 1024;
 
-// Owns only the local placement interaction for the observer analysis surface.
-// Content, visibility, and collapse state remain owned by ObserverAnalysisOverlay.
-export class ObserverAnalysisWindow {
-  constructor({ root, preferences }) {
+// Shared move-only window behavior for app-shell panels. Callers retain ownership
+// of their content, visibility, and persistence format.
+export class FloatingPanelPositioner {
+  constructor({
+    root,
+    defaultPosition,
+    defaultSize,
+    readPosition = () => null,
+    savePosition = () => {},
+    clearPosition = () => {},
+    isMobileViewport = () => false,
+    canConstrain = () => true,
+    onReset = () => {},
+  }) {
     this.root = root;
-    this.preferences = preferences;
+    this.defaultPosition = {
+      left: finiteNumber(defaultPosition?.left) ?? PANEL_MARGIN,
+      top: finiteNumber(defaultPosition?.top) ?? PANEL_MARGIN,
+    };
+    this.defaultSize = {
+      width: finitePositive(defaultSize?.width) || 320,
+      height: finitePositive(defaultSize?.height) || 240,
+    };
+    this.readPosition = readPosition;
+    this.saveStoredPosition = savePosition;
+    this.clearStoredPosition = clearPosition;
+    this.isMobileViewport = isMobileViewport;
+    this.canConstrain = canConstrain;
+    this.onReset = onReset;
     this.renderListeners = [];
     this.windowListeners = [];
     this.activeListeners = [];
     this.drag = null;
   }
 
-  mount(dragHandle) {
+  mount(dragHandle, { restore = true } = {}) {
     if (!this.root || !dragHandle) return;
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginDrag(event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleKeyDown(event));
     this.listenWindow("resize", () => this.constrainToViewport());
-    this.restorePosition();
+    if (restore) this.restorePosition();
   }
 
   destroy() {
@@ -35,7 +54,7 @@ export class ObserverAnalysisWindow {
   }
 
   beginDrag(event) {
-    if (!isPrimaryPointer(event)) return;
+    if (this.isMobileViewport() || !isPrimaryPointer(event)) return;
     const point = eventPoint(event);
     if (!point) return;
 
@@ -87,6 +106,7 @@ export class ObserverAnalysisWindow {
   }
 
   handleKeyDown(event) {
+    if (this.isMobileViewport()) return;
     if (event?.key === "Home") {
       event.preventDefault?.();
       this.resetPosition();
@@ -105,47 +125,51 @@ export class ObserverAnalysisWindow {
   }
 
   restorePosition() {
-    if (isMobileDebugPanelViewport()) {
+    if (this.isMobileViewport()) {
       this.clearPositionStyles();
       return;
     }
-    if (this.preferences?.position) this.applyPosition(this.preferences.position);
+    const position = this.readPosition();
+    if (position) this.applyPosition(position);
+  }
+
+  resetPosition() {
+    this.clearStoredPosition();
+    this.clearPositionStyles();
+    this.onReset();
   }
 
   constrainToViewport() {
-    if (isMobileDebugPanelViewport()) {
+    if (!this.root || !this.canConstrain()) return;
+    if (this.isMobileViewport()) {
+      this.finishDrag(false);
       this.clearPositionStyles();
       return;
     }
-    const position = this.hasPositionStyles() ? this.currentRect() : this.preferences?.position;
+    const position = this.hasPositionStyles() ? this.currentRect() : this.readPosition();
     if (!position) return;
     this.applyPosition(position);
     this.savePosition(this.currentRect());
   }
 
-  resetPosition() {
-    this.preferences?.clearPosition?.();
-    this.clearPositionStyles();
-  }
-
   currentRect() {
     const rect = this.root?.getBoundingClientRect?.();
-    const width = finitePositive(rect?.width) || parsePixels(this.root?.style?.width) || DEFAULT_WIDTH;
-    const height = finitePositive(rect?.height) || parsePixels(this.root?.style?.height) || DEFAULT_HEIGHT;
-    const left = parsePixels(this.root?.style?.left) ?? finiteNumber(rect?.left) ?? DEFAULT_LEFT;
-    const top = parsePixels(this.root?.style?.top) ?? finiteNumber(rect?.top) ?? DEFAULT_TOP;
+    const width = finitePositive(rect?.width) || parsePixels(this.root?.style?.width) || this.defaultSize.width;
+    const height = finitePositive(rect?.height) || parsePixels(this.root?.style?.height) || this.defaultSize.height;
+    const left = parsePixels(this.root?.style?.left) ?? finiteNumber(rect?.left) ?? this.defaultPosition.left;
+    const top = parsePixels(this.root?.style?.top) ?? finiteNumber(rect?.top) ?? this.defaultPosition.top;
     return this.constrainPosition({ left, top, width, height });
   }
 
   constrainPosition(position) {
     const viewport = panelViewport();
-    const width = finitePositive(position?.width) || DEFAULT_WIDTH;
-    const height = finitePositive(position?.height) || DEFAULT_HEIGHT;
+    const width = finitePositive(position?.width) || this.defaultSize.width;
+    const height = finitePositive(position?.height) || this.defaultSize.height;
     const maxLeft = Math.max(PANEL_MARGIN, viewport.width - width - PANEL_MARGIN);
     const maxTop = Math.max(PANEL_MARGIN, viewport.height - height - PANEL_MARGIN);
     return {
-      left: Math.round(clamp(finiteNumber(position?.left) ?? DEFAULT_LEFT, PANEL_MARGIN, maxLeft)),
-      top: Math.round(clamp(finiteNumber(position?.top) ?? DEFAULT_TOP, PANEL_MARGIN, maxTop)),
+      left: Math.round(clamp(finiteNumber(position?.left) ?? this.defaultPosition.left, PANEL_MARGIN, maxLeft)),
+      top: Math.round(clamp(finiteNumber(position?.top) ?? this.defaultPosition.top, PANEL_MARGIN, maxTop)),
       width,
       height,
     };
@@ -175,9 +199,9 @@ export class ObserverAnalysisWindow {
   }
 
   savePosition(position) {
-    if (isMobileDebugPanelViewport()) return;
+    if (this.isMobileViewport()) return;
     const next = this.constrainPosition(position);
-    this.preferences.position = { left: next.left, top: next.top };
+    this.saveStoredPosition({ left: next.left, top: next.top });
   }
 
   listenRender(target, type, handler) {
@@ -221,7 +245,7 @@ export class ObserverAnalysisWindow {
   }
 }
 
-function panelViewport() {
+export function panelViewport() {
   const documentElement = globalThis.document?.documentElement;
   return {
     width: finitePositive(globalThis.window?.innerWidth) ||
@@ -231,6 +255,21 @@ function panelViewport() {
       finitePositive(documentElement?.clientHeight) ||
       900,
   };
+}
+
+export function isMobileDebugPanelViewport() {
+  const viewport = panelViewport();
+  return hasCoarsePrimaryPointer()
+    && viewport.width <= MOBILE_DEBUG_MAX_VIEWPORT_WIDTH
+    && viewport.height <= MOBILE_DEBUG_MAX_VIEWPORT_HEIGHT;
+}
+
+function hasCoarsePrimaryPointer() {
+  try {
+    return globalThis.window?.matchMedia?.("(pointer: coarse)")?.matches === true;
+  } catch {
+    return false;
+  }
 }
 
 function arrowDelta(event) {

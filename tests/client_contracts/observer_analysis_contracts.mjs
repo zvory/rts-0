@@ -198,6 +198,25 @@ import { textWithin } from "./dom_text.mjs";
         overlayRoot.style.left === "" && overlayRoot.style.top === "" && draggablePrefs.position === null,
         "observer analysis Home shortcut restores the default placement",
       );
+
+      globalThis.window.innerWidth = 390;
+      globalThis.window.innerHeight = 844;
+      globalThis.window.matchMedia = () => ({ matches: true });
+      dragHandle.listeners.pointerdown?.({
+        button: 0,
+        isPrimary: true,
+        pointerId: 8,
+        clientX: 40,
+        clientY: 90,
+        currentTarget: dragHandle,
+        preventDefault() {
+          throw new Error("mobile drag handle should not start a window move");
+        },
+      });
+      assert(
+        overlayRoot.style.left === "" && overlayRoot.style.top === "",
+        "observer analysis leaves the mobile diagnostic layout under stylesheet control",
+      );
       overlay.destroy();
       assert(!windowListeners.resize, "observer analysis teardown removes its viewport listener");
     } finally {
