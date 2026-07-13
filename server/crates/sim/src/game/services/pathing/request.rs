@@ -2,7 +2,7 @@ use super::*;
 
 impl PathingService {
     /// Request a path. Returns world-pixel waypoints in reverse order (next waypoint = pop).
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn request(
         &mut self,
         map: &Map,
@@ -72,7 +72,7 @@ impl PathingService {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn request_tile_path(
         &mut self,
         map: &Map,
