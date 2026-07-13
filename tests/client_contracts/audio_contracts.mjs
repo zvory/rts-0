@@ -252,7 +252,13 @@ assert(
     "active combat voice starts with the combat spatial profile",
   );
   const movingCombat = audio.voices.find((voice) => voice.id === "moving_combat");
-  assert(movingCombat?.spatial?.category === "combat_self", "active voice remembers its combat category");
+  assert(movingCombat?.category === "combat_self", "active voice remembers its combat category");
+  assertApprox(
+    movingCombat.spatial.distGain.gain.value,
+    0.5,
+    0.001,
+    "new combat voices start with the combat spatial profile",
+  );
   audio.setListener({ x: 140, y: 100, referenceDistancePx: 400 });
   assertApprox(
     movingCombat.spatial.distGain.gain.ramps.at(-1).value,

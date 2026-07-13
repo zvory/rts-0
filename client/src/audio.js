@@ -321,7 +321,7 @@ export class Audio {
       distGain.connect(gainNode);
       gainNode.connect(bus);
       trail.push(panner, lp, distGain, gainNode);
-      spatialNodes = { panner, lp, distGain, x: opts.x, y: opts.y, category };
+      spatialNodes = { panner, lp, distGain, x: opts.x, y: opts.y };
     } else {
       src.connect(gainNode);
       gainNode.connect(bus);
@@ -418,7 +418,7 @@ export class Audio {
     for (const voice of this.voices) {
       const s = voice.spatial;
       if (!s) continue;
-      const next = this._computeSpatial(s.x, s.y, s.category);
+      const next = this._computeSpatial(s.x, s.y, voice.category);
       if (!next) {
         // Beyond max distance — fade to zero quickly; let the voice finish naturally.
         s.distGain.gain.cancelScheduledValues(t);
