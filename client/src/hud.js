@@ -448,8 +448,6 @@ export class HUD {
       cooldownClocks: descriptor.cooldownClocks,
       autobuildIndicatorCount: descriptor.autobuildIndicatorCount,
       repeatable: descriptor.repeatable,
-      autocastToggle: descriptor.contextIntent?.type === "setAutocast" ||
-        descriptor.contextIntent?.type === "adjustProductionRepeat",
       onMouseEnter: descriptor.intent?.type === "ability"
         ? () => this._showAbilityHoverPreview(descriptor.intent.ability, descriptor.intent.readyIds || [])
         : null,

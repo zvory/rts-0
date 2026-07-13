@@ -45,7 +45,6 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
  * @param {number} [opts.autobuildIndicatorCount] evenly-spaced rotating auto-build indicators.
  * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
- * @param {boolean} [opts.autocastToggle] whether Alt+hotkey should invoke the autocast toggle.
  * @param {() => void} [opts.onMouseEnter] hover handler.
  * @param {() => void} [opts.onMouseLeave] hover-exit handler.
  * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
@@ -77,7 +76,6 @@ export function createCommandButton(opts) {
   if (Number.isInteger(opts.slotIndex)) btn.dataset.slotIndex = String(opts.slotIndex);
   if (opts.ability) btn.dataset.ability = opts.ability;
   if (opts.repeatable) btn.dataset.repeatable = "true";
-  if (opts.autocastToggle) btn.dataset.autocastToggle = "true";
   if (typeof opts.onMouseEnter === "function") {
     btn.addEventListener("mouseenter", opts.onMouseEnter);
     btn.addEventListener("focus", opts.onMouseEnter);
@@ -87,6 +85,7 @@ export function createCommandButton(opts) {
     btn.addEventListener("blur", opts.onMouseLeave);
   }
   if (typeof opts.onContextMenu === "function") {
+    btn.dataset.contextAction = "true";
     btn.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       opts.onContextMenu(ev);
