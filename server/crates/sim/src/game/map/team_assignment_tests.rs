@@ -74,7 +74,7 @@ fn one_vs_three_is_deterministic_on_four_start_map() {
 }
 
 #[test]
-fn start_payload_reports_team_id_with_assigned_start_tile() {
+fn start_payload_reports_team_and_ai_identity_with_assigned_start_tile() {
     let players = vec![
         crate::game::PlayerInit {
             id: 10,
@@ -108,6 +108,7 @@ fn start_payload_reports_team_id_with_assigned_start_tile() {
         let payload = &start.players[index];
         assert_eq!(payload.id, player.id);
         assert_eq!(payload.team_id, player.team_id);
+        assert_eq!(payload.is_ai, player.is_ai);
         assert_eq!(
             (payload.start_tile_x, payload.start_tile_y),
             game.state.map.starts[index]

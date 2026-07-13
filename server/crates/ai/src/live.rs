@@ -421,6 +421,7 @@ mod tests {
                 faction_id: "kriegsia".to_string(),
                 name: "P1".to_string(),
                 color: "#111".to_string(),
+                is_ai: true,
                 start_tile_x: 1,
                 start_tile_y: 1,
             }],

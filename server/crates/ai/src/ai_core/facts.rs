@@ -437,6 +437,7 @@ mod tests {
                 faction_id: "kriegsia".to_string(),
                 name: "Alpha".into(),
                 color: "#111".into(),
+                is_ai: true,
                 start_tile_x: 10,
                 start_tile_y: 20,
             }],

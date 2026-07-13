@@ -67,7 +67,7 @@ export class GameState extends VisualEffectBackedState {
     /** @type {Map<number, object>} id -> resource node state. */
     this.resourceById = new Map();
     for (const node of this.map.resources) this.resourceById.set(node.id, node);
-    /** @type {Array<{id:number,teamId:number,factionId:string,name:string,color:string,startTileX:number,startTileY:number}>} */
+    /** @type {Array<{id:number,teamId:number,factionId:string,name:string,color:string,isAi:boolean,startTileX:number,startTileY:number}>} */
     this.players = (startInfo.players || []).map((player) => normalizePlayer(player));
 
     // --- snapshot buffering for interpolation ---

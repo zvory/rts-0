@@ -466,7 +466,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
   },
-  players: [ { id, teamId, factionId, name, color, startTileX, startTileY } ], // active match players only
+  players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including the player's own starting
@@ -474,7 +474,9 @@ loadout from the validated faction catalog. Normal live starts may skip countdow
 one or zero active human seats, including one-human-vs-AI and AI-only rooms, but they still use
 ordinary starting resources and ordinary faction loadouts. Dev scenario start payloads may
 advertise `diagnostics.movementPaths: "all"` because those rooms
-intentionally use full-world diagnostic projection. Replay viewers and live spectators receive
+intentionally use full-world diagnostic projection. `players[].isAi` identifies computer-controlled
+seats in live matches and remains preserved in replay start payloads so client diagnostics can
+require an actual AI participant. Replay viewers and live spectators receive
 `diagnostics.observerAnalysis: true` only
 when room projection policy will send observer-analysis payloads to that recipient.
 `capabilities` is the neutral control/affordance contract. Live active players receive
