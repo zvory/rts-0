@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -99,15 +99,15 @@ settled and protected.
 
 ## Implementation Checklist
 
-- [ ] Establish the static command registry and focused input validators.
-- [ ] Derive recognition, routing, lanes, timeouts, and help from the registry.
-- [ ] Move semantic ordering to the session coordinator and remove the driver queue atomically.
-- [ ] Make daemon the sole signal owner.
-- [ ] Add lane tests using controllable fake driver promises.
-- [ ] Add and wire the application architecture checker.
-- [ ] Document the final registry, lane, queue, and import ownership model.
-- [ ] Leave external-process, private-server, dependency, and media behavior for Phase 3.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Establish the static command registry and focused input validators.
+- [x] Derive recognition, routing, lanes, timeouts, and help from the registry.
+- [x] Move semantic ordering to the session coordinator and remove the driver queue atomically.
+- [x] Make daemon the sole signal owner.
+- [x] Add lane tests using controllable fake driver promises.
+- [x] Add and wire the application architecture checker.
+- [x] Document the final registry, lane, queue, and import ownership model.
+- [x] Leave external-process, private-server, dependency, and media behavior for Phase 3.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 

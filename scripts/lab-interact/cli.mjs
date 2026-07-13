@@ -7,11 +7,11 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { LAB_INTERACT_COMMANDS } from "./command_service.mjs";
+import { LAB_INTERACT_COMMANDS, requestTimeoutMs } from "./command_registry.mjs";
 import { commandHelp, helpCatalog } from "./command_help.mjs";
 import {
   IPC_VERSION, checkoutCommit, configuredIdleMs, prepareRuntime, processAlive,
-  readStartupError, readState, reclaimStaleStartupLock, removeOwnedStartupLock, requestTimeoutMs,
+  readStartupError, readState, reclaimStaleStartupLock, removeOwnedStartupLock,
   runtimePaths, sleep,
 } from "./runtime.mjs";
 

@@ -14,12 +14,6 @@ export const REQUEST_TIMEOUT_MS = 120_000;
 export const RECORDING_REQUEST_TIMEOUT_MS = 420_000;
 export const STARTUP_GRACE_MS = 15_000;
 
-export function requestTimeoutMs(command) {
-  return ["record-stop", "record-wait", "capture-fixed", "close", "shutdown"].includes(command)
-    ? RECORDING_REQUEST_TIMEOUT_MS
-    : REQUEST_TIMEOUT_MS;
-}
-
 export function checkoutCommit(workspaceRoot) {
   const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot, encoding: "utf8" });
   const commit = String(result.stdout || "").trim().toLowerCase();

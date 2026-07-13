@@ -47,6 +47,39 @@ command's exact accepted shape and variants, defaults, bounds, and one JSON exam
 forms work outside a Git checkout and never inspect or start a daemon; descriptor coverage is
 checked against the public command catalog.
 
+## Application ownership
+
+`scripts/lab-interact/command_registry.mjs` is the single public-command definition source. Each
+entry contains its daemon/session scope, execution lane, ordinary or lifecycle/media timeout
+class, runtime validator, service handler key, and help descriptor. CLI recognition and help,
+daemon request deadlines, validation, service dispatch, and semantic ordering all project from
+that registry; `command_inputs.mjs` owns the exact bounded parsers used by its entries.
+
+The application dependency direction is intentionally small:
+
+```text
+cli.mjs / daemon.mjs
+        |
+command registry + command service + session coordinator
+        |
+driver + recording / fixed capture / Tailnet / runtime helpers
+```
+
+`session_coordinator.mjs` owns the only generic semantic FIFO. Commands use four explicit lanes:
+
+| Lane | Commands | Ordering contract |
+| --- | --- | --- |
+| `serialized` | reset, catalog, mutations, order/time/camera, screenshot, artifact transfer, recording start/stop, fixed capture | Run in admission order for the session. |
+| `observation` | status, record-wait | Observe safe current/resource-local state without waiting behind the FIFO. |
+| `cancellation` | capture-cancel | Reach active fixed capture promptly. |
+| `lifecycle` | open, close, shutdown | Own application lifecycle; close rejects new session admission and drains work already admitted. |
+
+Resource-local recording completion, encoder backpressure, capture finalization, and watchdogs
+remain with their driver/media owner; they are not a second command queue. The daemon alone
+installs `SIGINT`, `SIGTERM`, and `SIGHUP` handlers and drives service/driver teardown. The driver
+owns browser/page and external-resource operations, but no process-signal or generic semantic
+queue policy.
+
 `open` returns the `sessionId` required by session commands. It is idempotent: repeated or
 concurrent calls return the one active session instead of starting another browser. Run `close`
 before `open` when a fresh session or different launch options are required. Optional aliases match
@@ -276,6 +309,7 @@ The fast contract set uses the fake driver and needs no Chrome or Rust server. F
 with H.264 support are required by the recording and fixed-capture contracts:
 
 ```bash
+node scripts/check-lab-interact-architecture.mjs
 node tests/lab_interact_cli_contracts.mjs
 node tests/lab_interact_artifact_contracts.mjs
 node tests/lab_interact_tailnet_preview_contracts.mjs
@@ -283,6 +317,7 @@ node tests/lab_interact_driver_contracts.mjs
 node tests/lab_interact_bulk_contracts.mjs
 node tests/lab_interact_recording_contracts.mjs
 node tests/lab_interact_fixed_capture_contracts.mjs
+node tests/lab_interact_session_coordinator_contracts.mjs
 ```
 
 The live browser canary needs Chrome/Chromium plus FFmpeg/ffprobe. Standalone mode starts and owns a

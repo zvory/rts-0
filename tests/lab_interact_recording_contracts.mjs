@@ -15,8 +15,9 @@ import {
   representativeFrameIndices,
 } from "../scripts/lab-interact/recording.mjs";
 import {
-  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, requestTimeoutMs,
+  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS,
 } from "../scripts/lab-interact/runtime.mjs";
+import { requestTimeoutMs } from "../scripts/lab-interact/command_registry.mjs";
 import { DRIVER_STATES, LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
 import { LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
@@ -178,28 +179,6 @@ try {
     "a late watchdog caps cumulative wall slots at the requested duration instead of drifting past it",
   );
   fs.rmSync(path.dirname(lateWatchdogResult.videoPath), { recursive: true, force: true });
-
-  const queuedStopDriver = fixtureRecordingDriver(root, tools);
-  await queuedStopDriver.recordStart({ sessionId: fixtureSessionId(), name: "queued-stop", maxDurationMs: 25 });
-  const blockingOperation = queuedStopDriver.enqueue(() => new Promise((resolve) => setTimeout(resolve, 80)));
-  const queuedStop = queuedStopDriver.recordStop();
-  await blockingOperation;
-  const queuedStopResult = await withDeadline(queuedStop, 5_000);
-  assert.equal(queuedStopResult.stoppedBy, "watchdog", "a queued stop observes watchdog finalization of the recording it targeted");
-  assert.deepEqual(await queuedStopDriver.recordWait(), queuedStopResult, "queued stop and wait retain one completion result");
-  fs.rmSync(path.dirname(queuedStopResult.videoPath), { recursive: true, force: true });
-
-  const queuedStartStopDriver = fixtureRecordingDriver(root, tools);
-  const queuedStartBlocker = queuedStartStopDriver.enqueue(() => new Promise((resolve) => setTimeout(resolve, 20)));
-  const queuedStart = queuedStartStopDriver.recordStart({
-    sessionId: fixtureSessionId(), name: "queued-start-stop", maxDurationMs: 5_000,
-  });
-  const stopAfterQueuedStart = queuedStartStopDriver.recordStop();
-  await queuedStartBlocker;
-  await queuedStart;
-  const queuedStartStopResult = await withDeadline(stopAfterQueuedStart, 5_000);
-  assert.equal(queuedStartStopResult.stoppedBy, "explicit", "a stop queued after start targets the recording established ahead of it");
-  fs.rmSync(path.dirname(queuedStartStopResult.videoPath), { recursive: true, force: true });
 
   const closeDriver = fixtureRecordingDriver(root, tools);
   const closeSessionId = fixtureSessionId();

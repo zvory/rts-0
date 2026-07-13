@@ -6,12 +6,12 @@ import { pathToFileURL } from "node:url";
 
 import {
   LabInteractError, LabInteractService, conciseError, loadDriverFactory, normalizeError,
-  validateCommandInput,
 } from "./command_service.mjs";
+import { requestTimeoutMs, validateCommandInput } from "./command_registry.mjs";
 import {
   IPC_VERSION, MAX_REQUEST_BYTES, claimStartupLock, cleanupOwnedRuntime,
   checkoutCommit, configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
-  requestTimeoutMs, writeStartupError,
+  writeStartupError,
 } from "./runtime.mjs";
 import { LabInteractTailnetPreview } from "./tailnet_preview.mjs";
 

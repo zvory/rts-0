@@ -135,6 +135,7 @@ function isQualityPassWorkflowPath(pathname) {
 function isLabInteractPath(pathname) {
   return (
     pathname.startsWith("scripts/lab-interact/") ||
+    pathname === "scripts/check-lab-interact-architecture.mjs" ||
     pathname === "client/src/lab_interact_bridge.js" ||
     pathname === "server/src/lab_interact_artifacts.rs" ||
     pathname.startsWith("tests/lab_interact_") ||
@@ -476,6 +477,7 @@ function verify() {
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
     [["scripts/lab-interact/driver.mjs"], ["lab-interact-contracts", "client-smoke"]],
     [["scripts/lab-interact/command_service.mjs"], ["lab-interact-contracts", "client-smoke"]],
+    [["scripts/check-lab-interact-architecture.mjs"], ["lab-interact-contracts", "client-smoke"]],
     [["client/src/lab_interact_bridge.js"], ["lab-interact-contracts", "client-smoke"]],
     [["server/src/lab_interact_artifacts.rs"], ["lab-interact-contracts", "client-smoke"]],
     [["docs/lab-interact-cli.md"], ["lab-interact-contracts", "client-smoke"]],
