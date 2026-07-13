@@ -161,6 +161,11 @@ fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
                 '.' => terrain::GRASS,
                 '#' => terrain::ROCK,
                 '~' => terrain::WATER,
+                '=' => terrain::ROAD_BARE,
+                '-' => terrain::ROAD_HORIZONTAL,
+                '|' => terrain::ROAD_VERTICAL,
+                '\\' => terrain::ROAD_DIAGONAL_NW_SE,
+                '/' => terrain::ROAD_DIAGONAL_NE_SW,
                 _ => {
                     return Err(format!(
                         "unknown terrain character '{ch}' at tile ({x},{y})"
@@ -222,7 +227,7 @@ fn validate_base_clearance(
                     ));
                 }
                 let idx = (ty as u32 * size + tx as u32) as usize;
-                if terrain_grid[idx] != terrain::GRASS {
+                if !crate::rules::terrain::is_passable_map_code(terrain_grid[idx]) {
                     return Err(format!(
                         "base site ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})"
                     ));

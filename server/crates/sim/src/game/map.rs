@@ -17,6 +17,7 @@ mod team_assignment_tests;
 
 use crate::config;
 use crate::protocol::terrain;
+use crate::rules::terrain as terrain_rules;
 use serde::{Deserialize, Serialize};
 
 pub use rts_protocol::AvailableMap;
@@ -260,14 +261,14 @@ impl Map {
         }
     }
 
-    /// Whether a tile is passable terrain (GRASS). Out-of-bounds is impassable. This does NOT
+    /// Whether a tile is passable terrain. Out-of-bounds is impassable. This does NOT
     /// account for building footprints — callers combine this with the dynamic occupancy grid.
     #[inline]
     pub fn is_passable(&self, x: i32, y: i32) -> bool {
         if !self.in_bounds(x, y) {
             return false;
         }
-        self.terrain_at(x as u32, y as u32) == terrain::GRASS
+        terrain_rules::is_passable_map_code(self.terrain_at(x as u32, y as u32))
     }
 
     /// World-pixel center of a tile.
@@ -607,5 +608,27 @@ mod tests {
             .expect_err("blocked base protection area should be rejected");
 
         assert!(err.contains("impassable terrain"));
+    }
+
+    #[test]
+    fn authored_map_accepts_roads_as_passable_base_terrain() {
+        let mut rows = vec![".".repeat(32); 32];
+        rows[8].replace_range(8..9, "=");
+        let json = format!(
+            r#"{{
+              "version": 3,
+              "name": "road-base",
+              "description": "road through a base",
+              "_design": "n/a",
+              "terrain": {},
+              "startLocations": [{{"x": 8, "y": 8}}],
+              "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
+            }}"#,
+            serde_json::to_string(&rows).unwrap()
+        );
+
+        let map = Map::from_authored_json(1, &json, 0).expect("road should be passable");
+        assert_eq!(map.terrain_at(8, 8), terrain::ROAD_BARE);
+        assert!(map.is_passable(8, 8));
     }
 }

@@ -7,7 +7,6 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
-use crate::protocol::terrain;
 
 mod pump_jack;
 
@@ -26,12 +25,10 @@ pub(crate) fn gather_system(
 ) {
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.hp > 0 && is_gatherer_kind(e.kind) => {
-                match e.order().gather_node() {
-                    Some(node) => node,
-                    None => continue,
-                }
-            }
+            Some(e) if e.hp > 0 && is_gatherer_kind(e.kind) => match e.order().gather_node() {
+                Some(node) => node,
+                None => continue,
+            },
             _ => continue,
         };
 
@@ -43,15 +40,9 @@ pub(crate) fn gather_system(
             GatherPhase::ToNode | GatherPhase::ToHome => {
                 gather_to_node(map, entities, occ, coordinator, id, node)
             }
-            GatherPhase::Harvesting => gather_harvesting(
-                map,
-                entities,
-                players,
-                coordinator,
-                id,
-                node,
-                tick,
-            ),
+            GatherPhase::Harvesting => {
+                gather_harvesting(map, entities, players, coordinator, id, node, tick)
+            }
         }
     }
     for payout in pump_jack::tick(entities) {
@@ -168,11 +159,8 @@ fn closest_unoccupied_same_resource_node(
             (d2 <= range2).then_some((candidate.id, d2))
         })
         .collect();
-    candidates.sort_by(|(a_id, a_d2), (b_id, b_d2)| {
-        a_d2
-            .total_cmp(b_d2)
-            .then_with(|| a_id.cmp(b_id))
-    });
+    candidates
+        .sort_by(|(a_id, a_d2), (b_id, b_d2)| a_d2.total_cmp(b_d2).then_with(|| a_id.cmp(b_id)));
     candidates.first().map(|(id, _)| *id)
 }
 
@@ -191,7 +179,7 @@ fn move_gatherer_to_nearby_open_grass(
         .get(node)
         .map(|e| (e.pos_x, e.pos_y))
         .unwrap_or((wx, wy));
-    let Some(goal) = nearest_open_non_resource_grass_tile(map, entities, occ, anchor) else {
+    let Some(goal) = nearest_open_non_resource_passable_tile(map, entities, occ, anchor) else {
         idle_gatherer(entities, id);
         return;
     };
@@ -201,7 +189,7 @@ fn move_gatherer_to_nearby_open_grass(
     coordinator.order_group_move(entities, owner, &[id], goal, false);
 }
 
-fn nearest_open_non_resource_grass_tile(
+fn nearest_open_non_resource_passable_tile(
     map: &Map,
     entities: &EntityStore,
     occ: &Occupancy,
@@ -225,7 +213,7 @@ fn nearest_open_non_resource_grass_tile(
                 let tx = ax as i32 + dx;
                 let ty = ay as i32 + dy;
                 if !map.in_bounds(tx, ty)
-                    || map.terrain_at(tx as u32, ty as u32) != terrain::GRASS
+                    || !map.is_passable(tx, ty)
                     || occ.building_blocked_at_tile(tx, ty)
                     || resource_tiles.contains(&(tx as u32, ty as u32))
                 {

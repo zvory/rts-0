@@ -1,4 +1,4 @@
-import { TERRAIN } from "./protocol.js";
+import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
@@ -20,8 +20,23 @@ const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
   [TERRAIN.ROCK]: "#",
   [TERRAIN.WATER]: "~",
+  [TERRAIN.ROAD_BARE]: "=",
+  [TERRAIN.ROAD_HORIZONTAL]: "-",
+  [TERRAIN.ROAD_VERTICAL]: "|",
+  [TERRAIN.ROAD_DIAGONAL_NW_SE]: "\\",
+  [TERRAIN.ROAD_DIAGONAL_NE_SW]: "/",
 });
-const CHAR_TO_TERRAIN = Object.freeze({ ".": TERRAIN.GRASS, "#": TERRAIN.ROCK, "~": TERRAIN.WATER });
+const CHAR_TO_TERRAIN = Object.freeze({
+  ".": TERRAIN.GRASS,
+  "#": TERRAIN.ROCK,
+  "~": TERRAIN.WATER,
+  "=": TERRAIN.ROAD_BARE,
+  "-": TERRAIN.ROAD_HORIZONTAL,
+  "|": TERRAIN.ROAD_VERTICAL,
+  "\\": TERRAIN.ROAD_DIAGONAL_NW_SE,
+  "/": TERRAIN.ROAD_DIAGONAL_NE_SW,
+});
+const ROAD_TERRAIN_CHARS = new Set(ROAD_TERRAIN_CODES.map((code) => TERRAIN_TO_CHAR[code]));
 const SYMMETRY_TRANSFORMS = Object.freeze({
   [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
   [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
@@ -207,20 +222,28 @@ export class MapEditorSession {
   }
 
   paintTerrainTiles(tiles, terrainCode) {
-    const ch = TERRAIN_TO_CHAR[terrainCode];
-    if (!this.draft || !this.terrainStroke || !ch || !Array.isArray(tiles)) return [];
+    if (!this.draft || !this.terrainStroke || !Array.isArray(tiles)) return [];
     const size = this.draft.terrain.length;
     const byRow = new Map();
     const changed = [];
     for (const tile of tiles) {
       const x = Math.trunc(Number(tile?.x));
       const y = Math.trunc(Number(tile?.y));
-      if (x < 0 || y < 0 || x >= size || y >= size || protectedTerrainTile(this.draft, x, y)) continue;
+      const code = tile?.paintTerrainCode ?? terrainCode;
+      const ch = TERRAIN_TO_CHAR[code];
+      if (
+        !ch || x < 0 || y < 0 || x >= size || y >= size
+        || (
+          code !== TERRAIN.GRASS
+          && !isRoadTerrain(code)
+          && protectedTerrainTile(this.draft, x, y)
+        )
+      ) continue;
       const row = byRow.get(y) || [...this.draft.terrain[y]];
       if (row[x] === ch) continue;
       row[x] = ch;
       byRow.set(y, row);
-      const change = { x, y, code: terrainCode };
+      const change = { x, y, code };
       this.terrainStroke.dirty.set(`${x},${y}`, change);
       changed.push(change);
     }
@@ -317,6 +340,21 @@ export class MapEditorSession {
 }
 
 export function symmetricMapTiles(size, tiles, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  return symmetricTiles(size, tiles, symmetry);
+}
+
+/**
+ * Expand terrain paint across the selected symmetry while keeping marked-road directions
+ * geometrically correct in each reflected or rotated copy.
+ */
+export function symmetricTerrainTiles(size, tiles, terrainCode, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  return symmetricTiles(size, tiles, symmetry, (tile, transform) => ({
+    ...tile,
+    paintTerrainCode: transformTerrainCode(terrainCode, transform),
+  }));
+}
+
+function symmetricTiles(size, tiles, symmetry, decorate = (tile) => tile) {
   const mapSize = positiveInteger(size);
   if (!mapSize || !Array.isArray(tiles)) return [];
   const expanded = [];
@@ -328,7 +366,7 @@ export function symmetricMapTiles(size, tiles, symmetry = MAP_EDITOR_SYMMETRY.NO
       const transformed = transformMapTile(source, mapSize, transform);
       if (!transformed || seen.has(locationKey(transformed))) continue;
       seen.add(locationKey(transformed));
-      expanded.push(transformed);
+      expanded.push(decorate(transformed, transform));
     }
   }
   return expanded;
@@ -488,7 +526,14 @@ export function protectDraftBaseTerrain(draft) {
   const starts = new Set((draft.startLocations || []).map(locationKey));
   for (const site of draft.baseSites || []) {
     const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES;
-    paintDraftRect(draft, { x0: site.x - radius, y0: site.y - radius, x1: site.x + radius, y1: site.y + radius }, TERRAIN.GRASS);
+    const size = draft.terrain.length;
+    for (let y = clampTile(site.y - radius, size); y <= clampTile(site.y + radius, size); y++) {
+      const chars = [...draft.terrain[y]];
+      for (let x = clampTile(site.x - radius, size); x <= clampTile(site.x + radius, size); x++) {
+        if (!ROAD_TERRAIN_CHARS.has(chars[x])) chars[x] = TERRAIN_TO_CHAR[TERRAIN.GRASS];
+      }
+      draft.terrain[y] = chars.join("");
+    }
   }
 }
 
@@ -612,6 +657,29 @@ function transformMapTile(tile, size, transform) {
   if (transform === "diagonalMain") return { x: tile.y, y: tile.x };
   if (transform === "diagonalAnti") return { x: max - tile.y, y: max - tile.x };
   return copyLocation(tile);
+}
+function transformTerrainCode(code, transform) {
+  if (code === TERRAIN.ROAD_HORIZONTAL) {
+    return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
+      ? TERRAIN.ROAD_VERTICAL
+      : code;
+  }
+  if (code === TERRAIN.ROAD_VERTICAL) {
+    return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
+      ? TERRAIN.ROAD_HORIZONTAL
+      : code;
+  }
+  if (code === TERRAIN.ROAD_DIAGONAL_NW_SE) {
+    return transform === "horizontal" || transform === "vertical" || transform === "rotate90" || transform === "rotate270"
+      ? TERRAIN.ROAD_DIAGONAL_NE_SW
+      : code;
+  }
+  if (code === TERRAIN.ROAD_DIAGONAL_NE_SW) {
+    return transform === "horizontal" || transform === "vertical" || transform === "rotate90" || transform === "rotate270"
+      ? TERRAIN.ROAD_DIAGONAL_NW_SE
+      : code;
+  }
+  return code;
 }
 function normalizeMapEditorSymmetry(value) { return SYMMETRY_TRANSFORMS[value] ? value : MAP_EDITOR_SYMMETRY.NONE; }
 function locationKey(location) { return `${location?.x},${location?.y}`; }

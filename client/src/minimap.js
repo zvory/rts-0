@@ -8,7 +8,17 @@
 // non-square maps stay centered and undistorted.
 
 import { cmd } from "./protocol.js";
-import { ABILITY, KIND, ORDER_STAGE, TERRAIN, UPGRADE, isResource, isUnit } from "./protocol.js";
+import {
+  ABILITY,
+  KIND,
+  ORDER_STAGE,
+  PASSABLE,
+  TERRAIN,
+  UPGRADE,
+  isResource,
+  isRoadTerrain,
+  isUnit,
+} from "./protocol.js";
 import {
   ABILITIES,
   COLORS,
@@ -21,7 +31,7 @@ import {
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
 
-const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
+const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
 const PING_MS = 900;
 const BORDER_PULSE_MS = 700;
@@ -48,6 +58,8 @@ const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 const terrainStyleSignature = () => [
   COLORS.rock,
   COLORS.water,
+  COLORS.road,
+  COLORS.roadAlt,
   COLORS.field,
   COLORS.mud,
   COLORS.grass,
@@ -130,6 +142,9 @@ const signatureReasonForKey = (key) => {
 const terrainFill = (code, tx, ty) => {
   if (code === TERRAIN.ROCK) return hex(COLORS.rock);
   if (code === TERRAIN.WATER) return hex(COLORS.water);
+  if (isRoadTerrain(code)) {
+    return hex(hash2(tx, ty) > 0.6 ? COLORS.roadAlt : COLORS.road);
+  }
   const n = hash2(tx, ty);
   if (n > 0.78) return hex(COLORS.field);
   if (n < 0.18) return hex(COLORS.mud);

@@ -9,7 +9,7 @@ use crate::config;
 use rts_protocol::{
     ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer, ObserverMapAnalysisPrimitive,
 };
-use rts_sim::protocol::{kinds, terrain, MapInfo, PlayerStart, ResourceNode, StartPayload};
+use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
 mod chokes;
 mod regions;
@@ -703,7 +703,12 @@ fn build_passability(map: &MapInfo) -> Vec<bool> {
         return Vec::new();
     };
     (0..tile_count)
-        .map(|idx| map.terrain.get(idx).copied() == Some(terrain::GRASS))
+        .map(|idx| {
+            map.terrain
+                .get(idx)
+                .copied()
+                .is_some_and(rts_rules::terrain::is_passable_map_code)
+        })
         .collect()
 }
 

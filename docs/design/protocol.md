@@ -460,7 +460,10 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
   map: {
     width: u32, height: u32,     // in tiles
     tileSize: u32,               // world px per tile
-    // terrain: row-major array length width*height, each a TerrainKind code (u8).
+    // terrain: row-major array length width*height. Codes: 0 grass, 1 rock,
+    // 2 water, 3 bare road, 4 horizontal-marked road, 5 vertical-marked road,
+    // 6 NW-SE diagonal-marked road, 7 NE-SW diagonal-marked road.
+    // Grass/all roads are passable; rock/water are impassable.
     terrain: number[],
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.

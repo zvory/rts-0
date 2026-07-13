@@ -138,6 +138,11 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(terrain::GRASS, 0);
     assert_eq!(terrain::ROCK, 1);
     assert_eq!(terrain::WATER, 2);
+    assert_eq!(terrain::ROAD_BARE, 3);
+    assert_eq!(terrain::ROAD_HORIZONTAL, 4);
+    assert_eq!(terrain::ROAD_VERTICAL, 5);
+    assert_eq!(terrain::ROAD_DIAGONAL_NW_SE, 6);
+    assert_eq!(terrain::ROAD_DIAGONAL_NE_SW, 7);
     assert_eq!(kinds::WORKER, "worker");
     assert_eq!(kinds::SCOUT_PLANE, "scout_plane");
     assert_eq!(kinds::CITY_CENTRE, "city_centre");

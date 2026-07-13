@@ -24,6 +24,7 @@ import {
   moveSymmetricDraftLocation,
   removeDraftLocation,
   symmetricMapTiles,
+  symmetricTerrainTiles,
 } from "../../client/src/map_editor_session.js";
 
 const repoRoot = new URL("../../", import.meta.url);
@@ -255,6 +256,35 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const start = session.draft.startLocations[0];
+  const roadTiles = [
+    { x: start.x - MAP_EDITOR_MAIN_CLEARANCE_TILES, y: start.y, code: TERRAIN.ROAD_BARE },
+    { x: start.x + MAP_EDITOR_MAIN_CLEARANCE_TILES, y: start.y, code: TERRAIN.ROAD_HORIZONTAL },
+    { x: start.x, y: start.y + MAP_EDITOR_MAIN_CLEARANCE_TILES, code: TERRAIN.ROAD_VERTICAL },
+    { x: start.x + 6, y: start.y + 6, code: TERRAIN.ROAD_DIAGONAL_NW_SE },
+    { x: start.x + 6, y: start.y - 6, code: TERRAIN.ROAD_DIAGONAL_NE_SW },
+  ];
+  session.beginTerrainStroke();
+  for (const tile of roadTiles) {
+    assert.deepEqual(session.paintTerrainTiles([tile], tile.code), [tile]);
+  }
+  assert.equal(session.commitTerrainStroke(), true);
+  for (const tile of roadTiles) {
+    assert.equal(session.materialized().terrain[tile.y * 32 + tile.x], tile.code);
+  }
+  session.beginTerrainStroke();
+  for (const tile of roadTiles) {
+    assert.deepEqual(
+      session.paintTerrainTiles([tile], TERRAIN.GRASS),
+      [{ x: tile.x, y: tile.y, code: TERRAIN.GRASS }],
+    );
+  }
+  assert.equal(session.commitTerrainStroke(), true);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 16, playerCount: 4 });
   for (const start of session.draft.startLocations) {
     assert(start.x >= MAP_EDITOR_MAIN_CLEARANCE_TILES && start.x < 16 - MAP_EDITOR_MAIN_CLEARANCE_TILES);
@@ -302,6 +332,45 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.deepEqual(mapEditorRectTiles({ x: 1, y: 1 }, { x: 2, y: 3 }, 8), [
     { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 1, y: 3 }, { x: 2, y: 3 },
   ]);
+}
+
+{
+  assert.deepEqual(
+    symmetricTerrainTiles(8, [{ x: 1, y: 2 }], TERRAIN.ROAD_DIAGONAL_NW_SE, MAP_EDITOR_SYMMETRY.HORIZONTAL),
+    [
+      { x: 1, y: 2, paintTerrainCode: TERRAIN.ROAD_DIAGONAL_NW_SE },
+      { x: 1, y: 5, paintTerrainCode: TERRAIN.ROAD_DIAGONAL_NE_SW },
+    ],
+    "reflected diagonal roads swap their marking orientation",
+  );
+  assert.deepEqual(
+    symmetricTerrainTiles(8, [{ x: 1, y: 2 }], TERRAIN.ROAD_HORIZONTAL, MAP_EDITOR_SYMMETRY.RADIAL),
+    [
+      { x: 1, y: 2, paintTerrainCode: TERRAIN.ROAD_HORIZONTAL },
+      { x: 5, y: 1, paintTerrainCode: TERRAIN.ROAD_VERTICAL },
+      { x: 6, y: 5, paintTerrainCode: TERRAIN.ROAD_HORIZONTAL },
+      { x: 2, y: 6, paintTerrainCode: TERRAIN.ROAD_VERTICAL },
+    ],
+    "quarter-turn symmetry rotates horizontal road markings vertically",
+  );
+
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const painted = symmetricTerrainTiles(
+    32,
+    [{ x: 10, y: 12 }],
+    TERRAIN.ROAD_DIAGONAL_NW_SE,
+    MAP_EDITOR_SYMMETRY.HORIZONTAL,
+  );
+  session.beginTerrainStroke();
+  assert.deepEqual(session.paintTerrainTiles(painted, TERRAIN.ROAD_DIAGONAL_NW_SE), [
+    { x: 10, y: 12, code: TERRAIN.ROAD_DIAGONAL_NW_SE },
+    { x: 10, y: 19, code: TERRAIN.ROAD_DIAGONAL_NE_SW },
+  ]);
+  assert.equal(session.commitTerrainStroke(), true);
+  const map = session.materialized();
+  assert.equal(map.terrain[12 * 32 + 10], TERRAIN.ROAD_DIAGONAL_NW_SE);
+  assert.equal(map.terrain[19 * 32 + 10], TERRAIN.ROAD_DIAGONAL_NE_SW);
 }
 
 {

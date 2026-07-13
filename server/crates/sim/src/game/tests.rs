@@ -32,6 +32,7 @@ mod panzerfaust_targeting_tests;
 mod primary_base_tests;
 mod replay_artifact_tests;
 mod repeat_production_tests;
+mod road_terrain_tests;
 mod resources_mining_tests;
 mod scoring_projection_tests;
 mod smoke_mortar_tests;

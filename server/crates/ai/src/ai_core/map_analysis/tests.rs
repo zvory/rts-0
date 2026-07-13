@@ -1,6 +1,7 @@
 use super::*;
 use rts_sim::game::map::Map;
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
+use rts_sim::protocol::terrain;
 use std::collections::{BTreeSet, VecDeque};
 
 const FIXTURE_SEED: u32 = 0x1234_5678;

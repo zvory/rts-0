@@ -22,7 +22,6 @@ import {
   dashedLine,
   drawAntiTankGun,
   drawFacingWedge,
-  drawImpassableEdge,
   drawInfantryBase,
   drawInfantryMachineGun,
   drawInfantryRifle,
@@ -33,7 +32,6 @@ import {
   drawTankTracks,
   finiteNumber,
   hexToInt,
-  isImpassableAt,
   isVehicleBodyKind,
   muzzleFlashRadius,
   normRect,
@@ -42,10 +40,14 @@ import {
   rectEdgePointTowardCenter,
   smoothstep01,
   tankBodyVisual,
-  terrainColor,
-  terrainOverlayColor,
   weaponRecoilOffset,
 } from "./shared.js";
+import {
+  drawImpassableEdge,
+  isImpassableAt,
+  terrainColor,
+  terrainOverlayColor,
+} from "./terrain_palette.js";
 
 export function _drawFog(fog) {
   const g = this._fogGfx;

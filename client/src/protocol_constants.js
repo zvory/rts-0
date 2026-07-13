@@ -100,8 +100,35 @@ export const CMD = Object.freeze({
 });
 
 // --- Terrain codes (must match protocol::terrain) ---
-export const TERRAIN = Object.freeze({ GRASS: 0, ROCK: 1, WATER: 2 });
-export const PASSABLE = Object.freeze({ 0: true, 1: false, 2: false });
+export const TERRAIN = Object.freeze({
+  GRASS: 0,
+  ROCK: 1,
+  WATER: 2,
+  ROAD_BARE: 3,
+  ROAD_HORIZONTAL: 4,
+  ROAD_VERTICAL: 5,
+  ROAD_DIAGONAL_NW_SE: 6,
+  ROAD_DIAGONAL_NE_SW: 7,
+});
+export const ROAD_TERRAIN_CODES = Object.freeze([
+  TERRAIN.ROAD_BARE,
+  TERRAIN.ROAD_HORIZONTAL,
+  TERRAIN.ROAD_VERTICAL,
+  TERRAIN.ROAD_DIAGONAL_NW_SE,
+  TERRAIN.ROAD_DIAGONAL_NE_SW,
+]);
+export const PASSABLE = Object.freeze({
+  0: true,
+  1: false,
+  2: false,
+  3: true,
+  4: true,
+  5: true,
+  6: true,
+  7: true,
+});
+const ROAD_TERRAIN_CODE_SET = new Set(ROAD_TERRAIN_CODES);
+export function isRoadTerrain(code) { return ROAD_TERRAIN_CODE_SET.has(code); }
 
 // --- Entity kinds (must match protocol::kinds) ---
 export const KIND = Object.freeze({
