@@ -172,7 +172,6 @@ export function buildCommandCardContextCatalog() {
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
-      UPGRADE.COMMAND_CAR_UNLOCK,
     ],
     groupCooldownClocks: () => [],
     playerHasCompleteKind: (kind) => allEntities.some((e) =>

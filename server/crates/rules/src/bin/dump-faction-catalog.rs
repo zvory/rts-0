@@ -548,15 +548,6 @@ fn print_upgrades(indent: &str) {
     );
     print_upgrade(
         indent,
-        faction::COMMAND_CAR_UNLOCK_UPGRADE,
-        balance::COMMAND_CAR_UNLOCK_COST_STEEL,
-        balance::COMMAND_CAR_UNLOCK_COST_OIL,
-        balance::COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
-        Some(faction::TANK_UNLOCK_UPGRADE),
-        true,
-    );
-    print_upgrade(
-        indent,
         faction::MORTAR_AUTOCAST_UPGRADE,
         balance::MORTAR_AUTOCAST_COST_STEEL,
         balance::MORTAR_AUTOCAST_COST_OIL,

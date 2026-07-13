@@ -101,7 +101,7 @@ fn smoke_plus_increases_scout_car_smoke_radius_by_half_and_doubles_duration() {
 }
 
 #[test]
-fn command_car_requires_rd_unlock_then_trains_at_factory() {
+fn command_car_requires_tank_production_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -116,7 +116,6 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
         game.state.entities.remove(id);
     }
     let city_centre_pos = game.state.map.tile_center(8, 12);
-    let research_pos = game.state.map.tile_center(8, 8);
     let factory_pos = game.state.map.tile_center(12, 8);
     game.state
         .entities
@@ -128,17 +127,6 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
             true,
         )
         .expect("city centre should spawn");
-    let research_complex = game
-        .state
-        .entities
-        .spawn_building(
-            1,
-            EntityKind::ResearchComplex,
-            research_pos.0,
-            research_pos.1,
-            true,
-        )
-        .expect("research complex should spawn");
     let factory = game
         .state
         .entities
@@ -147,39 +135,25 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
 
     game.enqueue(
         1,
-        Command::Research {
-            building: research_complex,
-            upgrade: crate::game::upgrade::UpgradeKind::CommandCarUnlock,
+        Command::Train {
+            building: factory,
+            unit: EntityKind::CommandCar,
         },
     );
     game.tick();
     assert!(
         game.state
             .entities
-            .get(research_complex)
-            .expect("research complex")
-            .research_queue()
+            .get(factory)
+            .expect("factory")
+            .prod_queue()
             .is_empty(),
-        "Command Car research should require Tank Production first"
+        "Command Cars should require Tank Production first"
     );
 
     game.state.players[0]
         .upgrades
         .insert(crate::game::upgrade::UpgradeKind::TankUnlock);
-    game.enqueue(
-        1,
-        Command::Research {
-            building: research_complex,
-            upgrade: crate::game::upgrade::UpgradeKind::CommandCarUnlock,
-        },
-    );
-    for _ in 0..=crate::config::COMMAND_CAR_UNLOCK_RESEARCH_TICKS {
-        game.tick();
-    }
-    assert!(game.state.players[0]
-        .upgrades
-        .contains(&crate::game::upgrade::UpgradeKind::CommandCarUnlock));
-
     game.enqueue(
         1,
         Command::Train {
@@ -196,7 +170,7 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
             .entities
             .iter()
             .any(|e| e.owner == 1 && e.kind == EntityKind::CommandCar),
-        "Vehicle Works should train Command Cars after R&D unlock"
+        "Vehicle Works should train Command Cars after Tank Production"
     );
 }
 

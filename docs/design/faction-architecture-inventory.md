@@ -114,17 +114,17 @@ live oil patches with no tech requirement. Barracks requires a completed City Ce
 Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and Gun Works require a
 completed City Centre and Training Centre; Tank Trap requires a completed Training Centre. City
 Centre trains Workers. Barracks trains Riflemen immediately and Machine
-Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately, Tanks
-after Tank Production research, and Command Cars after Command Car research. Gun Works trains
+Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately, then
+Tanks and Command Cars after Tank Production research. Gun Works trains
 Mortar Teams immediately, Anti-Tank Guns after Medium Guns research, and Artillery after Heavy
 Guns research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
-Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Command Car, Mortar Autocast,
-and Smoke Plus; Heavy Guns requires completed Medium Guns research, Artillery Fire Control
-requires completed Heavy Guns research, and Command Car requires completed Tank Production
-research. The current Ekat tech tree starts with Zamok training Golems;
+Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Mortar Autocast,
+and Smoke Plus; Heavy Guns requires completed Medium Guns research, and Artillery Fire Control
+requires completed Heavy Guns research. Tank Production unlocks both Tanks and Command Cars. The
+current Ekat tech tree starts with Zamok training Golems;
 Golem-converted tech buildings are still planned work.
 
 ## Current Ability Surface
