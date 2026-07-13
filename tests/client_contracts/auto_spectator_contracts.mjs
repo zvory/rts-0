@@ -2,13 +2,20 @@ import { strict as assert } from "node:assert";
 
 import { AUTO_SPECTATOR_MIN_ZOOM, AutoSpectatorDirector } from "../../client/src/auto_spectator.js";
 import { Camera } from "../../client/src/camera.js";
-import { EVENT } from "../../client/src/protocol.js";
+import { EVENT, KIND } from "../../client/src/protocol.js";
 
-function createHarness({ enabled = false } = {}) {
+function createHarness({ enabled = false, players = null } = {}) {
   const entities = new Map();
+  const normalizedPlayers = players || [
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 2 },
+  ];
   const state = {
     map: { width: 125, height: 94, tileSize: 32 },
+    players: normalizedPlayers,
     entityById: (id) => entities.get(id),
+    entitiesInterpolated: () => [...entities.values()],
+    teamIdForPlayer: (id) => normalizedPlayers.find((player) => player.id === id)?.teamId ?? null,
   };
   const camera = new Camera(1000, 700, { minZoom: AUTO_SPECTATOR_MIN_ZOOM, maxZoom: 2 });
   camera.setMapBounds(4000, 3008);
@@ -22,21 +29,32 @@ function createHarness({ enabled = false } = {}) {
   const state = {
     map: { width: 126, height: 126, tileSize: 32 },
     entityById: () => null,
+    entitiesInterpolated: () => [],
   };
   const camera = new Camera(320, 240, { minZoom: AUTO_SPECTATOR_MIN_ZOOM, maxZoom: 2 });
   camera.setMapBounds(4032, 4032);
   const director = new AutoSpectatorDirector({ camera, state, enabled: true });
   director.decide(0);
-  assert(
-    camera.snapshot().framingScale <= (240 - 32) / 4032,
-    "quiet auto spectator can fit the full standard map on the minimum supported viewport",
-  );
+  assert.equal(director.diagnostics().mode, "overview", "quiet scenes use gradual overview mode");
+  assert.equal(director.diagnostics().moveKind, "zoom", "quiet scenes begin a smooth zoom");
+  assert.equal(camera.snapshot().framingScale, 1, "quiet scenes never jump directly to a full-map view");
+  director.update(1);
+  assert(camera.snapshot().framingScale < 1, "quiet overview widens during its transition");
+  assert(camera.snapshot().framingScale > 0.94, "quiet overview takes more than one second to widen");
+  director.decide(30);
+  director.update(3);
+  assert(Math.abs(camera.snapshot().framingScale - 0.94) < 0.001,
+    "frequent decisions do not compound an in-progress overview zoom");
+  director.decide(60);
+  director.update(4);
+  assert(camera.snapshot().framingScale > 0.85,
+    "successive quiet shots widen in small steps instead of revealing the full map");
 }
 
 {
   const { camera, director, entities } = createHarness();
-  entities.set(1, { id: 1, x: 2800, y: 2100 });
-  entities.set(2, { id: 2, x: 3000, y: 2200 });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 2800, y: 2100 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 3000, y: 2200 });
   director.observeSnapshot({ tick: 1, events: [{ e: EVENT.ATTACK, from: 1, to: 2 }] });
   assert.equal(director.diagnostics().sampleCount, 1, "auto spectator records combat while disabled");
   director.setEnabled(true);
@@ -51,10 +69,51 @@ function createHarness({ enabled = false } = {}) {
   assert.deepEqual(camera.snapshot().focus, focusBeforeInterval, "director does not reframe inside one decision second");
 
   director.observeSnapshot({ tick: 121, events: [] });
-  const wholeMap = camera.snapshot();
-  assert(Math.abs(wholeMap.focus.x - 2000) < 0.001, "quiet camera centers the full map horizontally");
-  assert(Math.abs(wholeMap.focus.y - 1504) < 0.001, "quiet camera centers the full map vertically");
-  assert(wholeMap.framingScale < 0.25, "quiet camera zooms out far enough to frame the whole map");
+  const standoff = camera.snapshot();
+  assert.equal(director.diagnostics().mode, "contact", "expired combat falls back to nearby enemies");
+  assert(Math.abs(standoff.focus.x - 2900) < 0.001, "camera stays on the opposing units after fire stops");
+  assert(standoff.framingScale > 0.25, "a standoff never triggers a full-map zoom");
+}
+
+{
+  const { camera, director, entities } = createHarness({ enabled: true });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 700, y: 900 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.TANK, x: 1100, y: 900 });
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().mode, "contact", "nearby opposing units form a likely contact");
+  director.update(1);
+  assert(Math.abs(camera.snapshot().focus.x - 900) < 0.001, "likely contact frames both sides");
+  assert(camera.snapshot().framingScale > 0.25, "likely contact remains a local shot");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 400, y: 1000 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 1600, y: 1000 });
+  director.observeSnapshot({ tick: 0, events: [] });
+  assert.equal(director.diagnostics().mode, "overview", "distant stationary enemies do not create an empty shot");
+  entities.get(1).x = 500;
+  entities.get(2).x = 1500;
+  director.observeSnapshot({ tick: 30, events: [] });
+  const contact = director.diagnostics().contact;
+  assert.equal(director.diagnostics().mode, "contact", "intersecting movement vectors predict contact");
+  assert(contact.predictedDistanceTiles < 1, "predicted contact uses closest future separation");
+  assert(contact.etaTicks > 0 && contact.etaTicks <= 180, "predicted contact stays inside the six-second horizon");
+}
+
+{
+  const players = [
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 1 },
+    { id: 3, teamId: 2 },
+  ];
+  const { camera, director, entities } = createHarness({ enabled: true, players });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 600, y: 600 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 620, y: 600 });
+  entities.set(3, { id: 3, owner: 3, kind: KIND.RIFLEMAN, x: 900, y: 600 });
+  director.observeSnapshot({ tick: 1, events: [] });
+  director.update(1);
+  assert(camera.snapshot().focus.x > 700, "same-team neighbors are ignored when choosing contact");
 }
 
 {
@@ -85,22 +144,20 @@ function createHarness({ enabled = false } = {}) {
   const beforeResizeScale = camera.snapshot().framingScale;
   camera.resize(600, 400);
   director.handleViewportChange();
-  assert(
-    camera.snapshot().framingScale < beforeResizeScale,
-    "viewport changes immediately recompute whole-map framing",
-  );
+  assert.equal(camera.snapshot().framingScale, beforeResizeScale, "viewport changes do not force an overview jump");
   assert(!director.diagnostics().transitioning, "viewport reframing does not leave a stale transition");
 }
 
 {
   const { director, entities } = createHarness({ enabled: true });
-  entities.set(1, { id: 1, x: 600, y: 600 });
-  entities.set(2, { id: 2, x: 700, y: 600 });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 600, y: 600 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 700, y: 600 });
   director.observeSnapshot({ tick: 90, events: [{ e: EVENT.ATTACK, from: 1, to: 2 }] });
   director.observeSnapshot({ tick: 20, events: [] });
   const afterSeek = director.diagnostics();
   assert.equal(afterSeek.sampleCount, 0, "backward replay seeks discard future combat samples");
   assert.equal(afterSeek.latestTick, 20, "backward replay seeks adopt the rebuilt snapshot tick");
+  assert.equal(afterSeek.trackedUnitCount, 2, "backward replay seeks rebuild motion tracking from the new tick");
 }
 
 console.log("  ✓ auto spectator contracts");
