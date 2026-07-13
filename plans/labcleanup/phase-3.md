@@ -152,7 +152,7 @@ media and preview output remain intact.
 
 ## Non-Goals
 
-- TypeScript or the deep rename; TypeScript requires a fresh post-checkpoint plan.
+- TypeScript or the deep rename; TypeScript is Phase 4 after this adapter boundary lands.
 - A Rust rewrite, new client automation facade, DI framework, generalized artifact store, or full
   external-error hierarchy.
 - Codec/capture format redesign, decomposition of every helper, async conversion of every bounded
@@ -164,6 +164,6 @@ media and preview output remain intact.
 
 Report the final adapter dependency shape, which subprocess paths became asynchronous/cancellable,
 child termination/reaping behavior, dependency ownership, remaining synchronous exceptions, and
-exact adapter ratchets. Provide checkpoint evidence for the ordinary workflow, cold-open
-status/shutdown, cancellation, and short media checks; recommend a fresh one-phase TypeScript plan
-only if these boundaries are stable.
+exact adapter ratchets. Provide handoff evidence for the ordinary workflow, cold-open
+status/shutdown, cancellation, and short media checks. Tell the Phase 4 agent to translate the
+settled modules and ports rather than redesigning them.
