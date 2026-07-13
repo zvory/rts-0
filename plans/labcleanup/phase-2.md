@@ -1,4 +1,4 @@
-# Phase 2 - Explicit Boundaries and Responsive Operations
+# Phase 2 - Application Ownership
 
 ## Phase Status
 
@@ -6,10 +6,10 @@
 
 ## Objective
 
-Turn the two proof-of-concept hotspot modules into a small layered application without redesigning
-the entire tool. Establish a single source for command definitions, a single owner of semantic
-ordering, and responsive/cancellable ownership of long-running child processes while preserving the
-Phase 1 behavior and all authority/security constraints.
+Give commands and session semantics one explicit application-layer owner without also changing
+subprocess, dependency, private-server, or media behavior. This phase should make an ordinary command
+change local and obvious while keeping failures attributable to command routing, validation, and
+ordering rather than external-resource lifecycle.
 
 ## Target Dependency Shape
 
@@ -18,14 +18,12 @@ cli / daemon entry points
           |
 command registry + command service + session coordinator
           |
-driver (browser/page adapter) + private server + capture modules + preview/artifact helpers
-          |
-process runner / filesystem / Puppeteer / FFmpeg / Rust server
+driver + existing capture / preview / runtime helpers
 ```
 
-Dependencies point downward. Entry points own transport and process signals; the application layer
-owns commands and session semantics; adapters own external resources and never import the command
-service or entry points.
+Entry points own transport and process signals. The application layer owns command definitions,
+validation, session state, aliases, and semantic execution ordering. The driver owns browser/page
+operations and resource-local completion, but no generic command queue.
 
 ## Work
 
@@ -39,62 +37,48 @@ service or entry points.
   - handler key;
   - help descriptor and example.
 - Project CLI recognition/help, daemon/runtime timeout choice, service routing, and lane selection
-  from that registry. Remove separately maintained public-command name lists.
+  from that registry. Remove separately maintained public-command lists in the same commit; do not
+  land another temporary duplicate.
 - Move exact and bounded command input parsing into a focused `command_inputs.mjs` if that keeps the
-  registry readable. Preserve runtime validation and structured details; do not add Zod, codegen, or
-  a dynamic plugin mechanism.
+  registry readable. Preserve runtime validation and structured error details; do not add Zod,
+  codegen, a dynamic plugin system, or TypeScript in this phase.
 
 ### Give semantic ordering one owner
 
 - Add a small `session_coordinator.mjs` that owns the sole semantic FIFO and queue draining during
   close. Select behavior from registry lane metadata rather than command-name conditionals.
-- Start with these explicit lanes and change them only with test evidence:
+- Start with these explicit lanes and change them only with contract evidence:
   - `serialized`: ordinary session mutation/inspection, time/camera, screenshot, media start/stop,
     setup transfer, and fixed capture;
   - `observation`: daemon status, `record-wait`, and existing safe capture progress;
   - `cancellation`: `capture-cancel`;
   - `lifecycle`: open, close, and shutdown.
-- Remove the generic `operationTail`/`enqueue()` semantic queue from `driver.mjs`. Resource-local
-  completion promises, encoder backpressure, watchdogs, and idempotent capture finalization may stay
-  with the resource that owns them.
+- Remove the generic `operationTail`/`enqueue()` semantic queue from `driver.mjs` in the same change
+  that installs the coordinator and lane tests. Resource-local completion promises, encoder
+  backpressure, watchdogs, and idempotent capture finalization remain with their resource owner.
 - Make `daemon.mjs` the sole owner of `SIGINT`, `SIGTERM`, and `SIGHUP`; remove process-level signal
   handling from the driver.
 
-### Make long operations asynchronous and cancellable
-
-- Add a small `process_runner.mjs` around asynchronous `spawn` for finite child processes. It must
-  provide bounded stdout/stderr capture, explicit timeout, `AbortSignal`, TERM then bounded KILL
-  fallback, deterministic result/error projection, and no shell invocation.
-- Add `private_server.mjs` to own loopback URL reuse/validation, ephemeral port allocation, Cargo
-  build, Rust server launch/health polling, server logs, build metadata, and child teardown.
-- Give an in-progress open an `AbortController`; shutdown must abort cold startup before waiting for
-  it. A slow Cargo build or dependency operation must not make shutdown wait for the normal startup
-  timeout.
-- Convert long finite daemon-path operations to the asynchronous runner: Cargo build, any remaining
-  dependency hydration, FFmpeg/ffprobe capability/probe/post-processing steps, fixed-capture finite
-  post-processing, and Tailnet status resolution. Specialized streaming encoders may continue using
-  direct `spawn`, and bounded filesystem operations or pre-request Git inspection may remain
-  synchronous.
-- Make the Lab/Chrome runtime dependency an explicit repository-owned dependency and remove daemon-
-  time `npm ci`/self-install behavior. Reuse the same declared dependency from browser tests rather
-  than borrowing an implicit test-only installation.
-- Keep `driver.mjs` focused on browser/page session ownership and page RPC. Do not split every capture
-  or artifact helper unless the split is necessary to achieve the responsibilities above.
-
-### Add a narrow architecture ratchet
+### Add the application architecture ratchet
 
 - Add `scripts/check-lab-interact-architecture.mjs` and wire it into focused static checks and suite
   selection.
-- Enforce only high-value constraints:
+- Enforce only the application rules established in this phase:
+  - every public command is defined exactly once in the registry with complete metadata;
+  - CLI/daemon/application imports follow the intended downward direction;
+  - the session coordinator is the only generic semantic queue owner;
   - daemon is the sole process-signal owner;
-  - daemon request-path modules do not use `spawnSync`/`execSync`;
-  - entry/application/adapter imports do not point upward;
-  - external-process and private-server adapters do not import CLI, daemon, or command service;
-  - every public command occurs exactly once in the registry;
   - post-extraction `command_service.mjs` and `driver.mjs` stay below ratcheted limits chosen from
     their final Phase 2 sizes with modest headroom.
-- Document the resulting dependency shape, lanes, subprocess cancellation, and dependency ownership
-  in `docs/lab-interact-cli.md`.
+- Document the registry, execution lanes, queue ownership, and dependency shape in
+  `docs/lab-interact-cli.md`.
+
+## Scope Boundary for Phase 3
+
+Do not add a general process runner, extract private-server startup, relocate npm dependencies, or
+convert Cargo/FFmpeg/ffprobe/Tailnet calls in this phase. Preserve current external-resource behavior
+behind the new application boundary; Phase 3 changes those adapters after command semantics are
+settled and protected.
 
 ## Expected Touch Points
 
@@ -107,13 +91,7 @@ service or entry points.
 - new `scripts/lab-interact/command_registry.mjs`
 - new `scripts/lab-interact/command_inputs.mjs`
 - new `scripts/lab-interact/session_coordinator.mjs`
-- new `scripts/lab-interact/process_runner.mjs`
-- new `scripts/lab-interact/private_server.mjs`
-- `scripts/lab-interact/recording.mjs`
-- `scripts/lab-interact/fixed_capture.mjs`
-- `scripts/lab-interact/tailnet_preview.mjs`
 - new `scripts/check-lab-interact-architecture.mjs`
-- repository npm manifest/lock and browser dependency loader
 - focused `tests/lab_interact_*.mjs`
 - `tests/run-all.sh`
 - `tests/select-suites.mjs`
@@ -122,15 +100,13 @@ service or entry points.
 ## Implementation Checklist
 
 - [ ] Establish the static command registry and focused input validators.
-- [ ] Derive routing, lanes, timeouts, and help from the registry.
-- [ ] Move semantic ordering to the session coordinator and remove the driver queue.
+- [ ] Derive recognition, routing, lanes, timeouts, and help from the registry.
+- [ ] Move semantic ordering to the session coordinator and remove the driver queue atomically.
 - [ ] Make daemon the sole signal owner.
-- [ ] Add the bounded/cancellable asynchronous process runner.
-- [ ] Extract private-server startup/lifecycle and make cold open abortable.
-- [ ] Remove daemon-path long synchronous process work and runtime dependency installation.
-- [ ] Add responsive status/shutdown/media-process contract tests.
-- [ ] Add and wire the narrow architecture checker.
-- [ ] Document the final module/lane/process ownership model.
+- [ ] Add lane tests using controllable fake driver promises.
+- [ ] Add and wire the application architecture checker.
+- [ ] Document the final registry, lane, queue, and import ownership model.
+- [ ] Leave external-process, private-server, dependency, and media behavior for Phase 3.
 - [ ] Mark this phase done in this file in the implementation commit.
 
 ## Verification
@@ -151,46 +127,42 @@ node scripts/check-docs-health.mjs
 git diff --check
 ```
 
-Use controllable fake child processes in contracts to prove:
-
-- status promptly reports `opening: true` while a Cargo/dependency child remains open;
-- shutdown aborts cold open and reaps the child without waiting for the ordinary startup timeout;
-- daemon status remains responsive while a finite media-tool stage is held open;
-- `record-wait` does not block unrelated allowed work; and
-- `capture-cancel` remains responsive during fixed capture.
+Use controllable fake driver promises to prove serialized commands remain ordered, observation work
+does not wait behind the semantic FIFO where explicitly allowed, `record-wait` preserves its current
+non-blocking behavior, `capture-cancel` reaches active fixed capture promptly, and close drains work
+according to the documented lane contract.
 
 ## Acceptance Criteria
 
-- Registry coverage proves every command has exactly one scope, lane, timeout class, validator,
+- Registry coverage proves every public command has exactly one scope, lane, timeout class, validator,
   handler key, and help descriptor.
+- CLI recognition/help, runtime timeout selection, service routing, and coordinator lanes derive from
+  the registry; no separately maintained public-command list remains.
 - Invalid fields and current size/count/range bounds fail before driver work begins.
 - The session coordinator is the only semantic FIFO owner; the driver has no generic queue.
-- Daemon status and cancellation remain responsive during the deliberately slow process cases above.
-- Shutdown aborts and reaps in-progress cold startup, and only the daemon installs process signals.
-- No long `spawnSync`/`execSync` remains in architecture-checked daemon request-path modules.
-- Private servers remain loopback-only/capability-enabled and reused non-loopback URLs are rejected.
+- Observation, cancellation, and lifecycle behavior pass focused fake-driver concurrency contracts.
+- Only the daemon installs process signals.
+- Application import, registry, queue, signal, and size ratchets pass and select for Lab source changes.
 - The Phase 1 scripted workflow passes without changing its semantic assertions.
-- Architecture and size ratchets pass and select automatically for Lab source changes.
 
 ## Manual Test Focus
 
 Run the ordinary open/catalog/spawn/inspect/order/time-pause/time-step/camera/screenshot/close/shutdown
-workflow.
-During a cold open, issue `status` from another terminal and confirm it responds while Cargo is still
-building; then start one short recording and one short fixed capture to confirm media and preview
-behavior still work.
+workflow. During a short recording, confirm `record-wait` and an allowed camera command behave as
+documented; during fixed capture, confirm `capture-cancel` remains reachable.
 
 ## Non-Goals
 
+- Async subprocess conversion, private-server extraction, dependency relocation, or cold-open
+  cancellation; those are Phase 3.
 - The deep rename, TypeScript, a Rust rewrite, or a new client automation facade.
-- A DI framework, schema-generation framework, command plugin system, or generalized artifact store.
-- Redesigning codecs/capture output, decomposing every helper, or unifying every error class.
-- Async conversion of every bounded filesystem operation or pre-request inspection.
-- New commands, cross-platform IPC, public service exposure, or broad behavior changes.
+- A DI framework, generated schema framework, command plugin system, generalized artifact store, or
+  full error hierarchy.
+- New commands, public behavior redesign, cross-platform IPC, or public service exposure.
 
 ## Handoff Expectations
 
-Report the final module dependency shape, registry lane assignments, removed duplicate lists/queues,
-which subprocess paths became cancellable, dependency ownership, and exact architecture ratchets.
-Tell the Phase 3 agent to translate these boundaries rather than redesign them, and name the ordinary
-workflow plus cold-open status/shutdown and short media checks for manual re-testing.
+Report the final registry projections, lane assignments, removed duplicate lists/queues, signal owner,
+module sizes, and exact application ratchets. Tell the Phase 3 agent to preserve these application
+semantics while changing external adapters, and name the ordinary workflow plus record-wait and
+capture-cancel behavior for manual re-testing.
