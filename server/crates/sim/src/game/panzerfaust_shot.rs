@@ -177,6 +177,9 @@ fn resolve(
     emit_impact(events, fog, smokes, teams, shot.owner, visual_impact);
 
     if let Some((victim_owner, victim_kind, victim_pos)) = damage_result {
+        let triggers_tank_armor_reaction =
+            combat::weapon_profile(combat::WeaponKind::PanzerfaustLoadedShot)
+                .is_some_and(combat::weapon_triggers_tank_armor_reaction);
         let damage = combat::effective_damage(
             EntityKind::Panzerfaust,
             victim_kind,
@@ -195,7 +198,7 @@ fn resolve(
         let enemy_hit = attribution.is_some();
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {
             let damaged = target.apply_damage(damage, attribution);
-            if damaged && enemy_hit {
+            if damaged && enemy_hit && triggers_tank_armor_reaction {
                 target.record_incoming_direct_ap_threat(
                     shot.attacker,
                     attacker_pos,
