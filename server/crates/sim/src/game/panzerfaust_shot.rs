@@ -187,11 +187,9 @@ fn resolve(
             Some(TerrainKind::Open),
         );
         let source_pos = (shot.source_x, shot.source_y);
-        let attribution = teams.is_enemy_owner(shot.owner, victim_owner).then_some((
-            shot.owner,
-            source_pos,
-            tick,
-        ));
+        let attribution = teams
+            .is_enemy_owner(shot.owner, victim_owner)
+            .then_some((shot.owner, source_pos, tick));
         let enemy_hit = attribution.is_some();
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {
             let damaged = target.apply_damage(damage, attribution);
@@ -294,9 +292,7 @@ mod tests {
         assert_eq!((threat.source_x, threat.source_y), (100.0, 100.0));
         assert_eq!(threat.damage_weight, config::PANZERFAUST_DAMAGE);
         assert_eq!(
-            entities
-                .get(tank)
-                .and_then(|tank| tank.last_damage_pos()),
+            entities.get(tank).and_then(|tank| tank.last_damage_pos()),
             Some((100.0, 100.0)),
             "damage attribution should use the same immutable launch origin"
         );
