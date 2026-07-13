@@ -116,14 +116,14 @@ export class MatchHistory {
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
-    for (const [index, row] of this._rows.entries()) {
+    for (const row of this._rows) {
       const tr = document.createElement("tr");
       tr.className = "match-history-row";
       tr.dataset.id = String(row.id);
       tr.tabIndex = 0;
       tr.setAttribute("role", "button");
       tr.setAttribute("aria-expanded", this._expandedId === row.id ? "true" : "false");
-      tr.appendChild(td(String(index + 1)));
+      tr.appendChild(td(formatReplayNumber(row.replayNumber)));
       tr.appendChild(td(formatRelative(row.startedAt)));
       tr.appendChild(td(row.mapName || "—"));
       tr.appendChild(td((row.participants || []).join(", ")));
@@ -244,6 +244,11 @@ function td(text) {
   const el = document.createElement("td");
   el.textContent = text;
   return el;
+}
+
+function formatReplayNumber(replayNumber) {
+  const value = Number(replayNumber);
+  return Number.isSafeInteger(value) && value > 0 ? String(value) : "—";
 }
 
 function formatDuration(ms) {

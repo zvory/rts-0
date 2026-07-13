@@ -79,7 +79,10 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   one-participant rows. Solo sandbox rows, AI-only rows, and historical debug rows may be
   persisted with replay artifacts but stay out of the lobby table. Local-only rows are included
   only when the request peer address is loopback; public beta/mainline requests filter them out.
-  Each summary includes `replayAvailable` plus `replayUnavailableReason`. Availability is false
+  Each visible summary includes `replayNumber`: a one-based, gapless sequence calculated after
+  those visibility filters across the full matching history, oldest first. The API still returns
+  the newest page first, so its first row has the current highest replay number. Each summary
+  also includes `replayAvailable` plus `replayUnavailableReason`. Availability is false
   when no replay row exists or its artifact schema, map schema, or map content hash is
   incompatible with the running server. Build-SHA mismatches are warning-compatible:
   `replayAvailable` remains true and `replayUnavailableReason` carries the compatibility warning.
