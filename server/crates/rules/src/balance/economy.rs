@@ -14,8 +14,9 @@ pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 625;
-// Resource nodes hold whole units, so halve the former 3,333 amount by rounding down.
-pub const OIL_GEYSER_AMOUNT: u32 = 1666;
+// Twelve steel patches and three oil patches yield a 2.599:1 Steel/Oil base ratio, the nearest
+// whole-unit oil capacity to the 2.6:1 target.
+pub const OIL_GEYSER_AMOUNT: u32 = 962;
 pub const STEEL_PATCHES_PER_BASE: u32 = 12;
 pub const OIL_PATCHES_PER_BASE: u32 = 3;
 

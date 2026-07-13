@@ -471,8 +471,9 @@ folded into default targeting.
   `startLocations`, and flat `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 6`,
   one City Centre at the player's start tile, 12 steel patches with 625 steel each split into
-  two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 1,666 oil
-  each nearby. Oil capacity rounds the exact half of the previous odd whole-unit value down.
+  two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
+  each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
+  nearest whole-unit node capacity to the 2.6:1 target).
 - Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the

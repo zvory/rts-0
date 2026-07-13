@@ -449,7 +449,7 @@ export const isProducerBuilding = (kind) =>
 
 export const RESOURCE_AMOUNTS = Object.freeze({
   [KIND.STEEL]: 625,
-  [KIND.OIL]: 1666,
+  [KIND.OIL]: 962,
 });
 
 // What a worker can build (command card when a worker is selected).
