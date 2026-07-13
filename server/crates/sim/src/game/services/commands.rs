@@ -1874,7 +1874,7 @@ fn order_cancel(
             Some(b) if b.owner == player && b.is_building() => b,
             _ => return,
         };
-        b.set_repeat_production(None);
+        b.set_repeat_production(None, false);
         if let Some(item) = b.pop_last_research() {
             Cancelled::Upgrade(item.upgrade)
         } else if let Some(item) = b.pop_last_production() {

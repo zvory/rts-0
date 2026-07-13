@@ -29,16 +29,12 @@ pub(crate) fn production_system(
             .and_then(|(owner, producer_kind, unit)| unit.map(|unit| (owner, producer_kind, unit)))
         });
         if let Some((owner, producer_kind, unit)) = repeat_request {
-            // Standing production failures are intentionally silent. The intent stays armed and
-            // retries on later ticks when resources, supply, or requirements permit it.
             let faction_id = players
                 .iter()
                 .find(|player| player.id == owner)
                 .map(|player| player.faction_id.clone())
                 .unwrap_or_else(|| rules::faction::DEFAULT_FACTION_ID.to_string());
-            // Multiple idle repeat producers commonly retry on the same tick while supply- or
-            // resource-blocked. Build the prerequisite index only when repeat production is
-            // active, then share its single world scan across every retry this tick.
+            // Build the prerequisite index once and share it across automatic-production retries.
             let completed_buildings_by_owner =
                 completed_buildings_by_owner.get_or_insert_with(|| {
                     let mut by_owner = std::collections::HashMap::<u32, Vec<EntityKind>>::new();
@@ -80,11 +76,15 @@ pub(crate) fn production_system(
                 if upgrade_met && supply_available && player.spend_cost(cost) {
                     if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
-                            producer.push_production(ProdItem {
+                            let queued = producer.push_production(ProdItem {
                                 unit,
                                 progress: 0,
                                 total: stats.build_ticks,
-                            })
+                            });
+                            if queued {
+                                producer.set_repeat_production(None, true);
+                            }
+                            queued
                         });
                         if !queued {
                             player.refund_cost(cost);

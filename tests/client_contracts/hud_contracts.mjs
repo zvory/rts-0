@@ -661,7 +661,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(!trainCard.slots[2].enabled, "Panzerfaust train button should be locked before Training Centre");
   assert(trainCard.slots[2].title === "Requires Training Centre", "Panzerfaust locked tooltip should name Training Centre");
 
-  producingBarracks.prodRepeatKind = KIND.RIFLEMAN;
+  producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks, producingBarracks],
     entities: [cityCentre, barracks, producingBarracks],
@@ -672,7 +672,7 @@ function fakeHudRootWithoutResourceSpans() {
       !repeatingTrainCard.slots[0].contextIntent.enabled,
     "authoritative repeat production should show the swirl and make the next toggle disable it",
   );
-  delete producingBarracks.prodRepeatKind;
+  delete producingBarracks.prodRepeatKinds;
 
   const completedTrainingCentre = { id: 22, owner: 1, kind: KIND.TRAINING_CENTRE, buildProgress: null };
   const unlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({

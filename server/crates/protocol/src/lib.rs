@@ -737,7 +737,7 @@ mod tests {
             serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
         );
         let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
-        assert_eq!(entity_schema.last().unwrap()["name"], "prodRepeatKind");
+        assert_eq!(entity_schema.last().unwrap()["name"], "prodRepeatKinds");
     }
 
     #[test]
@@ -1295,7 +1295,7 @@ mod tests {
         center.prod_kind = Some(kinds::WORKER.to_string());
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
-        center.prod_repeat_kind = Some(kinds::WORKER.to_string());
+        center.prod_repeat_kinds = vec![kinds::WORKER.to_string(), kinds::SCOUT_CAR.to_string()];
         center.prod_scout_plane_queued = true;
         center.build_progress = Some(0.75);
         center.build_active = true;
@@ -1518,7 +1518,7 @@ mod tests {
         assert_eq!(value["e"][2][34], serde_json::json!(true));
         assert_eq!(
             value["e"][2][36],
-            serde_json::json!(kind_code(kinds::WORKER))
+            serde_json::json!([kind_code(kinds::WORKER), kind_code(kinds::SCOUT_CAR)])
         );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(

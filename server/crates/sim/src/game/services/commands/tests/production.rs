@@ -710,6 +710,19 @@ fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
             },
         )],
     );
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::SetProductionRepeat {
+                buildings: vec![barracks],
+                unit: EntityKind::MachineGunner,
+                enabled: true,
+            },
+        )],
+    );
     entities
         .get_mut(barracks)
         .expect("barracks")
@@ -732,7 +745,14 @@ fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
     );
 
     let producer = entities.get(barracks).expect("barracks");
-    assert_eq!(producer.repeat_production(), Some(EntityKind::Rifleman));
+    assert_eq!(
+        &producer
+            .production
+            .as_ref()
+            .expect("production")
+            .repeat_units,
+        &[EntityKind::Rifleman, EntityKind::MachineGunner]
+    );
     assert_eq!(producer.prod_queue().len(), 2);
     assert_eq!(producer.prod_queue()[0].unit, EntityKind::Rifleman);
     assert_eq!(producer.prod_queue()[0].progress, 7);
@@ -745,7 +765,12 @@ fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
         vec![(1, SimCommand::Cancel { building: barracks })],
     );
     let producer = entities.get(barracks).expect("barracks");
-    assert_eq!(producer.repeat_production(), None);
+    assert!(producer
+        .production
+        .as_ref()
+        .expect("production")
+        .repeat_units
+        .is_empty());
     assert_eq!(producer.prod_queue().len(), 1);
     assert_eq!(producer.prod_queue()[0].unit, EntityKind::Rifleman);
 }
@@ -761,7 +786,11 @@ fn repeat_toggle_can_clear_stale_incompatible_intent() {
     entities
         .get_mut(barracks)
         .expect("barracks")
-        .set_repeat_production(Some(EntityKind::Tank));
+        .set_repeat_production(Some(EntityKind::Tank), true);
+    entities
+        .get_mut(barracks)
+        .expect("barracks")
+        .set_repeat_production(Some(EntityKind::Rifleman), true);
     let mut players = vec![player_state(1), player_state(2)];
 
     apply_with_players(
@@ -783,6 +812,6 @@ fn repeat_toggle_can_clear_stale_incompatible_intent() {
             .get(barracks)
             .expect("barracks")
             .repeat_production(),
-        None
+        Some(EntityKind::Rifleman)
     );
 }

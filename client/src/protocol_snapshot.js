@@ -244,8 +244,14 @@ function decodeCompactEntity(record, index) {
   assignScoutPlane(entity, fields, 33);
   assignOptional(entity, "prodScoutPlaneQueued", fields, 34, readBool);
   assignOptional(entity, "panzerfaustLoaded", fields, 35, readBool);
-  assignOptionalCode(entity, "prodRepeatKind", fields, 36, KIND_BY_CODE);
+  assignOptionalCodeList(entity, "prodRepeatKinds", fields, 36, KIND_BY_CODE);
   return entity;
+}
+
+function assignOptionalCodeList(target, key, fields, index, codeMap) {
+  if (index >= fields.length || fields[index] == null) return;
+  target[key] = readArray(fields[index], `entity.${key}`).map((value, listIndex) =>
+    readCode(value, codeMap, `entity.${key}[${listIndex}]`));
 }
 
 /** Decode the optional rally-point slot ([x, y] world px, owner-only) into `entity.rally`. */

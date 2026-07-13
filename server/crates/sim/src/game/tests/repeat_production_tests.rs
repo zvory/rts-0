@@ -43,7 +43,7 @@ fn repeat_fixture() -> (Game, u32) {
         .entities
         .get_mut(barracks)
         .expect("barracks")
-        .set_repeat_production(Some(EntityKind::Rifleman));
+        .set_repeat_production(Some(EntityKind::Rifleman), true);
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     (game, barracks)
 }
@@ -101,7 +101,12 @@ fn repeat_production_revalidates_producer_compatibility() {
         .entities
         .get_mut(barracks)
         .expect("barracks")
-        .set_repeat_production(Some(EntityKind::Tank));
+        .set_repeat_production(None, false);
+    game.state
+        .entities
+        .get_mut(barracks)
+        .expect("barracks")
+        .set_repeat_production(Some(EntityKind::Tank), true);
     game.state.players[0]
         .upgrades
         .insert(UpgradeKind::TankUnlock);
@@ -121,4 +126,55 @@ fn repeat_production_revalidates_producer_compatibility() {
     assert_eq!(game.state.players[0].steel, cost.steel);
     assert_eq!(game.state.players[0].oil, cost.oil);
     assert_eq!(game.state.players[0].supply_used, 0);
+}
+
+#[test]
+fn repeat_production_alternates_enabled_units() {
+    let (mut game, barracks) = repeat_fixture();
+    spawn_building(&mut game, 1, EntityKind::TrainingCentre, (14, 8));
+    game.state
+        .entities
+        .get_mut(barracks)
+        .expect("barracks")
+        .set_repeat_production(Some(EntityKind::MachineGunner), true);
+    game.state.players[0].set_resources(10_000, 10_000);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+
+    for (index, expected) in [
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+        EntityKind::Rifleman,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        game.tick();
+        if index == 0 {
+            let repeat_kinds = game
+                .snapshot_for(1)
+                .entities
+                .into_iter()
+                .find(|entity| entity.id == barracks)
+                .expect("barracks projection")
+                .prod_repeat_kinds;
+            assert_eq!(
+                repeat_kinds,
+                vec!["rifleman".to_string(), "machine_gunner".to_string()]
+            );
+        }
+        assert_eq!(
+            game.state
+                .entities
+                .get(barracks)
+                .expect("barracks")
+                .prod_queue()[0]
+                .unit,
+            expected
+        );
+        game.state
+            .entities
+            .get_mut(barracks)
+            .expect("barracks")
+            .remove_front_production();
+    }
 }
