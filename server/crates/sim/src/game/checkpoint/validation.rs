@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::commands::PendingCommand;
-use crate::game::entity::{Entity, MAX_INCOMING_DIRECT_AP_THREATS, MAX_QUEUED_ORDERS};
+use crate::game::entity::{Entity, EntityKind, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
@@ -196,51 +196,37 @@ fn validate_entity(
             max: MAX_QUEUED_ORDERS,
         });
     }
-    validate_armor_reaction_threats(entity, next_id, world, tick)?;
+    validate_tank_armor_reaction_lock(entity, world, tick)?;
     Ok(())
 }
 
-fn validate_armor_reaction_threats(
+fn validate_tank_armor_reaction_lock(
     entity: &Entity,
-    next_id: u32,
     world: f32,
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
     let Some(combat) = entity.combat.as_ref() else {
         return Ok(());
     };
-    validate_count(
-        "entities.combat.incomingDirectApThreats",
-        combat.incoming_direct_ap_threats.len(),
-        MAX_INCOMING_DIRECT_AP_THREATS,
-    )?;
-    if !combat.incoming_direct_ap_threats.is_empty()
-        && (!rules::combat::unit_reacts_to_direct_ap(entity.kind) || entity.hp == 0)
-    {
+    let Some(lock) = combat.tank_armor_reaction_lock else {
+        return Ok(());
+    };
+    if entity.kind != EntityKind::Tank || entity.hp == 0 {
         return Err(CheckpointPayloadError::InvalidValue {
-            field: "entities.combat.incomingDirectApThreats",
+            field: "entities.combat.tankArmorReactionLock",
         });
     }
-    for (&attacker, threat) in &combat.incoming_direct_ap_threats {
-        validate_allocated_entity_ref(
-            "entities.combat.incomingDirectApThreats.attacker",
-            attacker,
-            next_id,
-        )?;
-        if !in_world(threat.source_x, threat.source_y, world) {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "entities.combat.incomingDirectApThreats.source",
-            });
-        }
-        if threat.damage_weight == 0
-            || threat.last_hit_tick > tick
-            || tick.saturating_sub(threat.last_hit_tick)
-                > rules::combat::DIRECT_AP_ARMOR_REACTION_MEMORY_TICKS
-        {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "entities.combat.incomingDirectApThreats.value",
-            });
-        }
+    if !in_world(lock.source_x, lock.source_y, world) {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.combat.tankArmorReactionLock.source",
+        });
+    }
+    if lock.acquired_tick > tick
+        || tick.saturating_sub(lock.acquired_tick) >= rules::combat::TANK_ARMOR_REACTION_LOCK_TICKS
+    {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.combat.tankArmorReactionLock.acquiredTick",
+        });
     }
     Ok(())
 }

@@ -133,7 +133,7 @@ fn checkpoint_payload_rejects_invalid_panzerfaust_shot_state() {
 }
 
 #[test]
-fn checkpoint_payload_rejects_invalid_tank_armor_reaction_threats() {
+fn checkpoint_payload_rejects_invalid_tank_armor_reaction_lock() {
     let (mut game, attacker, tank) = panzerfaust_fixture();
     let source = game
         .state
@@ -146,31 +146,11 @@ fn checkpoint_payload_rejects_invalid_tank_armor_reaction_threats() {
         .entities
         .get_mut(tank)
         .expect("tank should exist")
-        .record_incoming_direct_ap_threat(attacker, source, 100, reaction_tick);
-    let text = checkpoint_payload_text_for(&game, "invalid armor reaction threat fixture");
-
-    let stale_attacker = mutate_payload(&text, |value| {
-        let threats = armor_reaction_threats_mut(value, tank);
-        let threat = threats
-            .remove(&attacker.to_string())
-            .expect("seeded threat should exist");
-        threats.insert("999999".to_string(), threat);
-    });
-    assert!(matches!(
-        Game::restore_checkpoint_payload_text_for_test(
-            &stale_attacker,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        ),
-        Err(CheckpointPayloadError::InvalidReference {
-            field: "entities.combat.incomingDirectApThreats.attacker",
-            id: 999999,
-        })
-    ));
+        .lock_tank_armor_reaction_source(source, reaction_tick);
+    let text = checkpoint_payload_text_for(&game, "invalid armor reaction lock fixture");
 
     let out_of_world_source = mutate_payload(&text, |value| {
-        armor_reaction_threats_mut(value, tank)[&attacker.to_string()]["source_x"] =
-            serde_json::json!(-1.0);
+        tank_armor_reaction_lock_mut(value, tank)["source_x"] = serde_json::json!(-1.0);
     });
     assert!(matches!(
         Game::restore_checkpoint_payload_text_for_test(
@@ -179,44 +159,22 @@ fn checkpoint_payload_rejects_invalid_tank_armor_reaction_threats() {
             game.map_metadata().clone(),
         ),
         Err(CheckpointPayloadError::InvalidValue {
-            field: "entities.combat.incomingDirectApThreats.source",
+            field: "entities.combat.tankArmorReactionLock.source",
         })
     ));
 
-    let future_hit = mutate_payload(&text, |value| {
-        armor_reaction_threats_mut(value, tank)[&attacker.to_string()]["last_hit_tick"] =
+    let future_lock = mutate_payload(&text, |value| {
+        tank_armor_reaction_lock_mut(value, tank)["acquired_tick"] =
             serde_json::json!(game.tick_count().saturating_add(1));
     });
     assert!(matches!(
         Game::restore_checkpoint_payload_text_for_test(
-            &future_hit,
+            &future_lock,
             game.state.map.clone(),
             game.map_metadata().clone(),
         ),
         Err(CheckpointPayloadError::InvalidValue {
-            field: "entities.combat.incomingDirectApThreats.value",
-        })
-    ));
-
-    let oversized = mutate_payload(&text, |value| {
-        let threats = armor_reaction_threats_mut(value, tank);
-        let threat = threats
-            .get(&attacker.to_string())
-            .cloned()
-            .expect("seeded threat should exist");
-        for id in 1..=crate::game::entity::MAX_INCOMING_DIRECT_AP_THREATS + 1 {
-            threats.insert(id.to_string(), threat.clone());
-        }
-    });
-    assert!(matches!(
-        Game::restore_checkpoint_payload_text_for_test(
-            &oversized,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        ),
-        Err(CheckpointPayloadError::CountCapExceeded {
-            field: "entities.combat.incomingDirectApThreats",
-            ..
+            field: "entities.combat.tankArmorReactionLock.acquiredTick",
         })
     ));
 }
@@ -529,19 +487,17 @@ fn mutate_payload(text: &str, mutate: impl FnOnce(&mut serde_json::Value)) -> St
     serde_json::to_string(&value).expect("mutated checkpoint JSON")
 }
 
-fn armor_reaction_threats_mut(
+fn tank_armor_reaction_lock_mut(
     value: &mut serde_json::Value,
     tank: u32,
-) -> &mut serde_json::Map<String, serde_json::Value> {
+) -> &mut serde_json::Value {
     let tank = value["entities"]["entities"]
         .as_array_mut()
         .expect("entities array")
         .iter_mut()
         .find(|entity| entity["id"].as_u64() == Some(tank as u64))
         .expect("tank entity should exist");
-    tank["combat"]["incoming_direct_ap_threats"]
-        .as_object_mut()
-        .expect("armor reaction threat map")
+    &mut tank["combat"]["tank_armor_reaction_lock"]
 }
 
 fn tick_until_panzerfaust_launch(game: &mut Game) {

@@ -78,13 +78,12 @@ fn tank_default_cannon_direct_hit_uses_ap_damage() {
         60,
         "Tank default cannon damage should remain AP against armored targets"
     );
-    let threat = entities
+    let lock = entities
         .get(victim)
         .and_then(|victim| victim.combat.as_ref())
-        .and_then(|combat| combat.incoming_direct_ap_threats.get(&attacker))
-        .expect("successful enemy Tank cannon hit should record a direct AP threat");
-    assert_eq!((threat.source_x, threat.source_y), (100.0, 100.0));
-    assert_eq!(threat.damage_weight, 60);
+        .and_then(|combat| combat.tank_armor_reaction_lock)
+        .expect("successful enemy Tank cannon hit should lock its source");
+    assert_eq!((lock.source_x, lock.source_y), (100.0, 100.0));
 }
 
 #[test]
@@ -126,13 +125,13 @@ fn machine_gunner_default_hit_remains_small_arms_against_armor() {
         entities
             .get(victim)
             .and_then(|victim| victim.combat.as_ref())
-            .is_some_and(|combat| combat.incoming_direct_ap_threats.is_empty()),
+            .is_some_and(|combat| combat.tank_armor_reaction_lock.is_none()),
         "non-AP direct fire must not trigger a tank hull response"
     );
 }
 
 #[test]
-fn allied_tank_cannon_damage_does_not_record_armor_reaction_threat() {
+fn allied_tank_cannon_damage_does_not_lock_armor_reaction_source() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -162,7 +161,7 @@ fn allied_tank_cannon_damage_does_not_record_armor_reaction_threat() {
         entities
             .get(victim)
             .and_then(|victim| victim.combat.as_ref())
-            .is_some_and(|combat| combat.incoming_direct_ap_threats.is_empty()),
+            .is_some_and(|combat| combat.tank_armor_reaction_lock.is_none()),
         "allied AP damage must not steer the victim tank"
     );
 }

@@ -177,9 +177,9 @@ fn resolve(
     emit_impact(events, fog, smokes, teams, shot.owner, visual_impact);
 
     if let Some((victim_owner, victim_kind, victim_pos)) = damage_result {
-        let triggers_armor_reaction =
+        let triggers_tank_armor_reaction =
             combat::weapon_profile(combat::WeaponKind::PanzerfaustLoadedShot)
-                .is_some_and(combat::weapon_triggers_armor_reaction);
+                .is_some_and(combat::weapon_triggers_tank_armor_reaction);
         let damage = combat::effective_damage(
             EntityKind::Panzerfaust,
             victim_kind,
@@ -193,13 +193,8 @@ fn resolve(
         let enemy_hit = attribution.is_some();
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {
             let damaged = target.apply_damage(damage, attribution);
-            if damaged && enemy_hit && triggers_armor_reaction {
-                target.record_incoming_direct_ap_threat(
-                    shot.attacker,
-                    source_pos,
-                    config::PANZERFAUST_DAMAGE,
-                    tick,
-                );
+            if damaged && enemy_hit && triggers_tank_armor_reaction {
+                target.lock_tank_armor_reaction_source(source_pos, tick);
             }
             damaged
         });
@@ -284,13 +279,12 @@ mod tests {
             config::PANZERFAUST_TRAVEL_TICKS,
         );
 
-        let threat = entities
+        let lock = entities
             .get(tank)
             .and_then(|tank| tank.combat.as_ref())
-            .and_then(|combat| combat.incoming_direct_ap_threats.get(&attacker))
-            .expect("Panzerfaust impact should record its direct AP source");
-        assert_eq!((threat.source_x, threat.source_y), (100.0, 100.0));
-        assert_eq!(threat.damage_weight, config::PANZERFAUST_DAMAGE);
+            .and_then(|combat| combat.tank_armor_reaction_lock)
+            .expect("Panzerfaust impact should lock its launch origin");
+        assert_eq!((lock.source_x, lock.source_y), (100.0, 100.0));
         assert_eq!(
             entities.get(tank).and_then(|tank| tank.last_damage_pos()),
             Some((100.0, 100.0)),
