@@ -290,7 +290,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/geometry.rs",
   "server/crates/sim/src/game/services/move_coordinator.rs",
   "server/crates/sim/src/game/services/movement/mod.rs",
-  // Armor-reaction runtime eligibility is catalog-routed; focused inline tests use the Tank entry.
+  // Armor-reaction runtime eligibility is rules-routed; focused inline tests use the Tank entry.
   "server/crates/sim/src/game/services/movement/armor_reaction.rs",
   "server/crates/sim/src/game/services/movement/pivot_drive.rs",
   "server/crates/sim/src/game/services/movement/scout_car.rs",

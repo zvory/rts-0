@@ -181,19 +181,14 @@ impl Default for MovementState {
     }
 }
 
-/// Weapon and active target state. Present on combat-capable entities.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub(in crate::game) struct IncomingDirectApThreat {
+pub(in crate::game) struct TankArmorReactionLock {
     pub(in crate::game) source_x: f32,
     pub(in crate::game) source_y: f32,
-    /// Pre-facing damage weight, so turning does not itself change the threat average.
-    pub(in crate::game) damage_weight: u32,
-    pub(in crate::game) last_hit_tick: u32,
+    pub(in crate::game) acquired_tick: u32,
 }
 
-/// Defensive ceiling for imported state; ordinary matches cannot approach this in three seconds.
-pub(in crate::game) const MAX_INCOMING_DIRECT_AP_THREATS: usize = 4_096;
-
+/// Weapon and active target state. Present on combat-capable entities.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     /// Ticks until each weapon may attack again (missing or 0 = ready).
@@ -228,10 +223,9 @@ pub struct CombatState {
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
-    /// Recent direct AP attackers considered by this unit's autonomous hull-facing response.
-    /// Keyed by attacker id so repeated shots refresh one threat instead of overweighting it.
+    /// The first direct-AP source this Tank committed to during the current reaction window.
     #[serde(default)]
-    pub(in crate::game) incoming_direct_ap_threats: BTreeMap<u32, IncomingDirectApThreat>,
+    pub(in crate::game) tank_armor_reaction_lock: Option<TankArmorReactionLock>,
     /// Panzerfaust loaded-shot runtime. Only Panzerfaust entities carry this; the projectile is
     /// hidden while in flight or reloading, then restored when the state returns to Loaded.
     pub panzerfaust: Option<PanzerfaustState>,
@@ -254,38 +248,28 @@ impl Default for CombatState {
             autocast_enabled: true,
             tank_stationary_range_ticks: 0,
             tank_stationary_range_reset_this_tick: false,
-            incoming_direct_ap_threats: BTreeMap::new(),
+            tank_armor_reaction_lock: None,
             panzerfaust: None,
         }
     }
 }
 
 impl CombatState {
-    pub(in crate::game) fn record_incoming_direct_ap_threat(
-        &mut self,
-        attacker_id: u32,
-        attacker_pos: (f32, f32),
-        damage_weight: u32,
-        tick: u32,
-    ) {
-        if attacker_id == 0
-            || damage_weight == 0
-            || !attacker_pos.0.is_finite()
-            || !attacker_pos.1.is_finite()
-            || (self.incoming_direct_ap_threats.len() >= MAX_INCOMING_DIRECT_AP_THREATS
-                && !self.incoming_direct_ap_threats.contains_key(&attacker_id))
-        {
+    pub(in crate::game) fn try_lock_tank_armor_reaction(&mut self, source: (f32, f32), tick: u32) {
+        if !source.0.is_finite() || !source.1.is_finite() {
             return;
         }
-        self.incoming_direct_ap_threats.insert(
-            attacker_id,
-            IncomingDirectApThreat {
-                source_x: attacker_pos.0,
-                source_y: attacker_pos.1,
-                damage_weight,
-                last_hit_tick: tick,
-            },
-        );
+        if self.tank_armor_reaction_lock.is_some_and(|lock| {
+            tick.saturating_sub(lock.acquired_tick)
+                < crate::rules::combat::TANK_ARMOR_REACTION_LOCK_TICKS
+        }) {
+            return;
+        }
+        self.tank_armor_reaction_lock = Some(TankArmorReactionLock {
+            source_x: source.0,
+            source_y: source.1,
+            acquired_tick: tick,
+        });
     }
 
     pub(in crate::game) fn weapon_cooldown(&self, weapon: WeaponKind) -> u32 {

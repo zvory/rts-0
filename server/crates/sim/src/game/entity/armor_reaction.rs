@@ -1,18 +1,16 @@
 use super::Entity;
 
 impl Entity {
-    pub(in crate::game) fn record_incoming_direct_ap_threat(
+    pub(in crate::game) fn lock_tank_armor_reaction_source(
         &mut self,
-        attacker_id: u32,
-        attacker_pos: (f32, f32),
-        damage_weight: u32,
+        source: (f32, f32),
         tick: u32,
     ) {
-        if !crate::rules::combat::unit_reacts_to_direct_ap(self.kind) || self.hp == 0 {
+        if !crate::rules::combat::unit_uses_tank_armor_reaction(self.kind) || self.hp == 0 {
             return;
         }
         if let Some(combat) = self.combat.as_mut() {
-            combat.record_incoming_direct_ap_threat(attacker_id, attacker_pos, damage_weight, tick);
+            combat.try_lock_tank_armor_reaction(source, tick);
         }
     }
 }

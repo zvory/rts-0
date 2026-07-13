@@ -234,10 +234,10 @@ weapon range while moving. After a tank has spent three seconds (90 ticks) witho
 translation or hull rotation, its range has linearly expanded to 14 tiles; any later path-driven
 movement or hull rotation resets it to the base range. A stationary Tank that survives enemy direct
 AP damage autonomously turns its hull toward the damage source without changing its order, target,
-path, turret aim, or stationary range. It remembers distinct Tank cannon, Anti-Tank Gun, and
-Panzerfaust attackers for three seconds and turns toward their pre-facing-damage-weighted direction
-average; near-opposite threats cancel instead of making the hull oscillate. Active movement paths
-and zero oil prevent this response, while Hold Position explicitly allows it. Riflemen upgraded with
+path, turret aim, or stationary range. The first Tank cannon, Anti-Tank Gun, or Panzerfaust hit locks
+its source for three seconds. Hits during that window neither redirect the hull nor extend the lock;
+after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
+oil prevent this response, while Hold Position explicitly allows it. Riflemen upgraded with
 Methamphetamines gain
 permanent moving fire, keep advancing while firing with normal accuracy, and move at tank speed.
 Panzerfausts upgraded with Methamphetamines also move at tank speed and receive the Panzerfaust windup/recovery boost. Machine Gunners upgraded with

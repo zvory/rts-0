@@ -554,7 +554,7 @@ fn seed_combat_state(
         tank.set_weapon_facing(0.4);
         tank.set_desired_weapon_facing(0.7);
         tank.start_weapon_firing_reveal_response_delay(WeaponKind::TankCannon, target, 3);
-        tank.record_incoming_direct_ap_threat(at_gun, (640.0, 384.0), 100, reaction_tick);
+        tank.lock_tank_armor_reaction_source((640.0, 384.0), reaction_tick);
         let combat = tank.combat.as_mut().expect("tank should have combat");
         combat.attack_move_no_target_ticks = 2;
         combat.tank_stationary_range_ticks = 4;
