@@ -292,13 +292,12 @@ fn command_trace_label(command: &Command) -> String {
             building,
             x,
             y,
-            node,
             kind,
             queued,
         } => {
             format!(
-                "set_rally building={} x={:.1} y={:.1} node={:?} kind={:?} queued={}",
-                building, x, y, node, kind, queued
+                "set_rally building={} x={:.1} y={:.1} kind={:?} queued={}",
+                building, x, y, kind, queued
             )
         }
         Command::SetupAntiTankGuns {

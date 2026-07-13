@@ -20,13 +20,13 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2472,
-      "reason": "Steel rally production reuses the authoritative mining query through an explicit architecture edge; keep ratcheting until archcheck scanners and tests are split into modules."
+      "lines": 2471,
+      "reason": "Checkpoint policy and simulation-architecture enforcement remain concentrated in this oversized checker; keep ratcheting until scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1716,
-      "reason": "Repeat production and steel rally resource targeting add command DTO coverage to the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1715,
+      "reason": "Production command DTO coverage remains in the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -65,8 +65,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1921,
-      "reason": "Steel rally input coverage extends the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
+      "lines": 1916,
+      "reason": "Input-command coverage remains in the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
 }

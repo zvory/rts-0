@@ -56,14 +56,12 @@ export function _issueTargetedCommand(p, ev = {}) {
     if (producers.length === 0 || !world) return true;
     const queued = !!ev.shiftKey;
     if (commandTarget === "move" || commandTarget === "attack") {
-      if (resource?.kind === KIND.OIL) return true;
+      if (resource) return true;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
-      const rallyPoint = resource?.kind === KIND.STEEL ? resource : world;
-      const node = resource?.kind === KIND.STEEL ? resource.id : null;
       for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, rallyPoint.x, rallyPoint.y, queued, kind, node));
+        this._issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
       }
-      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", rallyPoint.x, rallyPoint.y, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
     }
     return true;
   }
@@ -158,16 +156,14 @@ function normalRightClickAction(input, p) {
     // mixed selection always moves the units.
     const producers = input._selectedProducerBuildingIds();
     if (producers.length === 0 || !world) return null;
-    if (resource?.kind === KIND.OIL) return null;
-    const rallyPoint = resource?.kind === KIND.STEEL ? resource : world;
+    if (resource) return null;
     return {
       kind: "setRally",
       producers,
-      x: rallyPoint.x,
-      y: rallyPoint.y,
-      node: resource?.kind === KIND.STEEL ? resource.id : null,
+      x: world.x,
+      y: world.y,
       stage: ORDER_STAGE.MOVE,
-      feedback: rightClickFeedback("move", rallyPoint.x, rallyPoint.y),
+      feedback: rightClickFeedback("move", world.x, world.y),
     };
   }
 
@@ -250,7 +246,7 @@ function issueNormalRightClickAction(input, action, queued) {
   switch (action.kind) {
     case "setRally":
       for (const building of action.producers) {
-        input._issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage, action.node));
+        input._issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage));
       }
       break;
     case "build":

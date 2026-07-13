@@ -909,7 +909,6 @@ impl Game {
                     .queued_orders
                     .retain(|intent| !order_intent_references_entity(intent, entity_id));
             }
-            entity.clear_rally_resource_target(entity_id);
         }
         self.state.entities.clear_stale_miner_slots();
     }

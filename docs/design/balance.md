@@ -496,9 +496,6 @@ folded into default targeting.
   does not reserve it. Extra gatherers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded gatherer is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Steel patches are valid production rally targets. A newly trained Worker or Golem from that
-  producer starts with a gather order for the authoritative steel node; other unit kinds retain
-  their normal move/attack-move rally behavior. Oil patches are not valid rally targets.
 - Starting and expansion resources: every authored base site gets 12 steel patches and 3 oil
   patches. Map schema v3 stores flat `startLocations` and `baseSites`: the number of start
   locations limits player count, while every base site remains present in every match. A player
