@@ -47,9 +47,14 @@ use crate::rules::projection;
 mod formation;
 mod rally;
 
-/// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
+/// Maximum number of fresh A* searches serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
-const MAX_REQUESTS_PER_TICK: usize = 64;
+const MAX_REQUESTS_PER_TICK: usize = 4;
+
+/// A completed search at or above this deterministic work threshold consumes the rest of the
+/// tick's request allowance. The search itself still receives the full per-route expansion budget;
+/// only later requests are deferred.
+const HEAVY_PATH_EXPANSIONS: usize = 4_096;
 
 /// Minimum ticks between repaths for a single unit. Prevents chase/gather spam.
 const MIN_REPATH_TICKS: u32 = 3;
@@ -868,7 +873,7 @@ impl<'a> MoveCoordinator<'a> {
                     e.reset_attack_unreachable_checks();
                 }
             }
-            self.budget = self.budget.saturating_sub(1);
+            self.consume_request_budget(None);
             self.record_path_request(
                 source,
                 true,
@@ -883,6 +888,13 @@ impl<'a> MoveCoordinator<'a> {
         let radius_tiles = config::unit_radius_tiles(kind);
         let route_shape = if smooth_static_segments && uses_oriented_vehicle_body(kind) {
             RouteShape::VehicleClearance
+        } else if smooth_static_segments
+            && matches!(
+                source,
+                PathingRequestSource::Move | PathingRequestSource::AttackMove
+            )
+        {
+            RouteShape::DirectIfClear
         } else {
             RouteShape::Normal
         };
@@ -936,7 +948,7 @@ impl<'a> MoveCoordinator<'a> {
                 }
             }
         }
-        self.budget = self.budget.saturating_sub(1);
+        self.consume_request_budget(Some(request_diagnostics));
         self.record_path_request(
             source,
             path_ok,
@@ -947,6 +959,19 @@ impl<'a> MoveCoordinator<'a> {
                 .unwrap_or_default(),
         );
         path_ok
+    }
+
+    fn consume_request_budget(&mut self, request: Option<PathingRequestDiagnostics>) {
+        let Some(request) = request else {
+            return;
+        };
+        if request.cache_status == PathCacheStatus::Hit || request.expanded_nodes == 0 {
+            return;
+        }
+        self.budget = self.budget.saturating_sub(1);
+        if request.expanded_nodes >= HEAVY_PATH_EXPANSIONS {
+            self.budget = 0;
+        }
     }
 
     /// Throttle check: has enough time passed, or did the goal materially change?
@@ -1059,7 +1084,7 @@ impl<'a> MoveCoordinator<'a> {
         let (tile_path, request_diagnostics) = self
             .pathing
             .request_tile_path_with_diagnostics(self.map, self.occ, req);
-        self.budget = self.budget.saturating_sub(1);
+        self.consume_request_budget(Some(request_diagnostics));
         let path_ok = tile_path.last().copied() == Some((gx as i32, gy as i32));
         self.record_path_request(
             source,
@@ -1762,10 +1787,16 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
         coordinator.enable_diagnostics();
 
-        // Set budget artificially low (3).
-        coordinator.budget = 3;
-
         coordinator.order_group_move(&mut entities, 1, &ids, (500.0, 500.0), false);
+        for &id in &ids {
+            entities.get_mut(id).unwrap().set_order(Order::ability(
+                AbilityKind::Smoke,
+                500.0,
+                500.0,
+                500.0,
+                500.0,
+            ));
+        }
 
         coordinator.begin_pathing_diagnostics("awaiting_paths", &entities);
         coordinator.process_awaiting_paths(&mut entities);
@@ -1786,24 +1817,57 @@ mod tests {
         }
 
         assert_eq!(
-            processed, 3,
-            "only 3 paths should have been processed with budget=3"
+            processed, MAX_REQUESTS_PER_TICK,
+            "only the tick-scoped path allowance should be processed"
         );
-        assert_eq!(still_waiting, 7, "7 units should still be awaiting path");
+        assert_eq!(
+            still_waiting, 6,
+            "remaining units should still be awaiting path"
+        );
         assert_eq!(diagnostics.pass, "awaiting_paths");
         assert_eq!(diagnostics.awaiting_start, 10);
-        assert_eq!(diagnostics.requests_processed, 3);
-        assert_eq!(diagnostics.still_awaiting, 7);
-        assert_eq!(diagnostics.requests_deferred, 7);
+        assert_eq!(diagnostics.requests_processed, MAX_REQUESTS_PER_TICK);
+        assert_eq!(diagnostics.still_awaiting, 6);
+        assert_eq!(diagnostics.requests_deferred, 6);
         assert!(diagnostics.coordinator_budget_exhausted);
         assert_eq!(diagnostics.queued_for_path, 10);
         assert_eq!(diagnostics.queued_source_counts.move_orders, 10);
-        assert_eq!(diagnostics.source_counts.move_orders, 3);
-        assert_eq!(diagnostics.cache_misses, 3);
+        assert_eq!(
+            diagnostics.source_counts.ability as usize,
+            MAX_REQUESTS_PER_TICK
+        );
+        assert_eq!(diagnostics.cache_misses as usize, MAX_REQUESTS_PER_TICK);
         assert_eq!(diagnostics.group_size_buckets.one, 0);
         assert_eq!(diagnostics.group_size_buckets.two_to_four, 0);
         assert_eq!(diagnostics.group_size_buckets.five_to_sixteen, 1);
         assert!(diagnostics.path_len_max > 0);
+    }
+
+    #[test]
+    fn heavy_completed_search_consumes_remaining_request_allowance() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(32_768, 256);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let initial_budget = coordinator.budget;
+        coordinator.consume_request_budget(Some(PathingRequestDiagnostics {
+            cache_status: PathCacheStatus::Miss,
+            expanded_nodes: 0,
+            budget_exhausted: false,
+            tile_path_len: 1,
+        }));
+        assert_eq!(coordinator.budget, initial_budget);
+
+        coordinator.consume_request_budget(Some(PathingRequestDiagnostics {
+            cache_status: PathCacheStatus::Miss,
+            expanded_nodes: HEAVY_PATH_EXPANSIONS,
+            budget_exhausted: false,
+            tile_path_len: 80,
+        }));
+
+        assert_eq!(coordinator.budget, 0);
     }
 
     #[test]

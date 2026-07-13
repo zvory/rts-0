@@ -95,6 +95,25 @@ const NO_INCOMING_DIR: u8 = u8::MAX;
 
 type SearchKey = (i32, i32, u8);
 
+/// Reusable A* working storage owned by the pathing service.
+///
+/// Searches are strictly sequential inside one room. Clearing these containers between requests
+/// preserves their allocations without making any search result depend on prior requests.
+#[derive(Clone, Default)]
+pub(super) struct SearchScratch {
+    open: BinaryHeap<Node>,
+    came_from: HashMap<SearchKey, SearchKey>,
+    g_score: HashMap<SearchKey, u32>,
+}
+
+impl SearchScratch {
+    fn clear(&mut self) {
+        self.open.clear();
+        self.came_from.clear();
+        self.g_score.clear();
+    }
+}
+
 /// Find a tile path from `(sx, sy)` to `(gx, gy)` with a configurable expansion cap.
 ///
 /// Returns the sequence of tile coordinates to traverse, EXCLUDING the start tile and
@@ -115,27 +134,29 @@ pub fn find_path_with_budget_and_turn_cost<P: Passability>(
     max_expanded: usize,
     turn_penalty: u32,
 ) -> Vec<(i32, i32)> {
-    find_path_with_budget_and_turn_cost_with_diagnostics(
+    let mut scratch = SearchScratch::default();
+    find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
         pass,
-        sx,
-        sy,
-        gx,
-        gy,
+        (sx, sy),
+        (gx, gy),
         max_expanded,
         turn_penalty,
+        &mut scratch,
     )
     .0
 }
 
-pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics<P: Passability>(
+pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P: Passability>(
     pass: &P,
-    sx: i32,
-    sy: i32,
-    gx: i32,
-    gy: i32,
+    start: (i32, i32),
+    goal: (i32, i32),
     max_expanded: usize,
     turn_penalty: u32,
+    scratch: &mut SearchScratch,
 ) -> (Vec<(i32, i32)>, usize, bool) {
+    scratch.clear();
+    let (sx, sy) = start;
+    let (gx, gy) = goal;
     if sx == gx && sy == gy {
         return (Vec::new(), 0, false);
     }
@@ -144,22 +165,19 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics<P: Passabilit
     // we still walk up adjacent (e.g. building a structure, mining a node on a rock edge).
     let (gx, gy) = nearest_passable(pass, gx, gy).unwrap_or((gx, gy));
 
-    let mut open: BinaryHeap<Node> = BinaryHeap::new();
     // came_from[state] = predecessor state. State includes incoming direction when turn costs
     // are enabled, so paths to the same tile with different headings do not overwrite each other.
-    let mut came_from: HashMap<SearchKey, SearchKey> = HashMap::new();
     // best known g per search state.
-    let mut g_score: HashMap<SearchKey, u32> = HashMap::new();
     let start_key = (sx, sy, NO_INCOMING_DIR);
 
-    open.push(Node {
+    scratch.open.push(Node {
         f: heuristic(sx, sy, gx, gy),
         g: 0,
         tx: sx,
         ty: sy,
         dir: NO_INCOMING_DIR,
     });
-    g_score.insert(start_key, 0);
+    scratch.g_score.insert(start_key, 0);
 
     // Track the explored tile closest to the goal for the best-effort fallback.
     let mut best_key = start_key;
@@ -168,14 +186,16 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics<P: Passabilit
     let mut expanded = 0usize;
     let mut budget_exhausted = false;
 
-    while let Some(cur) = open.pop() {
+    while let Some(cur) = scratch.open.pop() {
         let cur_key = (cur.tx, cur.ty, cur.dir);
         if cur.tx == gx && cur.ty == gy {
-            return (reconstruct(&came_from, cur_key), expanded, budget_exhausted);
+            let path = reconstruct(&scratch.came_from, cur_key);
+            scratch.clear();
+            return (path, expanded, budget_exhausted);
         }
 
         // Skip stale heap entries (a better g was found after this was pushed).
-        if let Some(&best_g) = g_score.get(&cur_key) {
+        if let Some(&best_g) = scratch.g_score.get(&cur_key) {
             if cur.g > best_g {
                 continue;
             }
@@ -218,19 +238,19 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics<P: Passabilit
                 .saturating_add(cost)
                 .saturating_add(turn_cost)
                 .saturating_add(pass.movement_cost(nx, ny));
-            let better = match g_score.get(&next_key) {
+            let better = match scratch.g_score.get(&next_key) {
                 Some(&existing) => tentative < existing,
                 None => true,
             };
             if better {
-                came_from.insert(next_key, cur_key);
-                g_score.insert(next_key, tentative);
+                scratch.came_from.insert(next_key, cur_key);
+                scratch.g_score.insert(next_key, tentative);
                 let h = heuristic(nx, ny, gx, gy);
                 if h < best_h {
                     best_h = h;
                     best_key = next_key;
                 }
-                open.push(Node {
+                scratch.open.push(Node {
                     f: tentative + h,
                     g: tentative,
                     tx: nx,
@@ -243,10 +263,11 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics<P: Passabilit
 
     // No complete path: head toward whatever we got closest to.
     let path = if (best_key.0, best_key.1) != (sx, sy) {
-        reconstruct(&came_from, best_key)
+        reconstruct(&scratch.came_from, best_key)
     } else {
         Vec::new()
     };
+    scratch.clear();
     (path, expanded, budget_exhausted)
 }
 

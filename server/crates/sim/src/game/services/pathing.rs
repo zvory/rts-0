@@ -50,6 +50,7 @@ impl PathRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RouteShape {
     Normal,
+    DirectIfClear,
     #[cfg(test)]
     PreferFewerTurns,
     VehicleClearance,
@@ -58,7 +59,7 @@ pub enum RouteShape {
 impl RouteShape {
     fn turn_penalty(self) -> u32 {
         match self {
-            RouteShape::Normal => 0,
+            RouteShape::Normal | RouteShape::DirectIfClear => 0,
             #[cfg(test)]
             RouteShape::PreferFewerTurns => 3,
             RouteShape::VehicleClearance => VEHICLE_ROUTE_TURN_PENALTY,
@@ -209,6 +210,7 @@ pub struct PathingService {
     default_budget: usize,
     cache: HashMap<CacheKey, CacheEntry>,
     cache_cap: usize,
+    search_scratch: pathfinding::SearchScratch,
     tick: u32,
 }
 
@@ -219,6 +221,7 @@ impl PathingService {
             default_budget,
             cache: HashMap::with_capacity(cache_cap),
             cache_cap,
+            search_scratch: pathfinding::SearchScratch::default(),
             tick: 0,
         }
     }
@@ -304,16 +307,31 @@ impl PathingService {
             return (tile_path, diagnostics);
         }
 
+        if req.route_shape == RouteShape::DirectIfClear
+            && req.start != req.goal
+            && pass.passable(req.goal.0, req.goal.1)
+            && direct_segment_standable(map, occupancy, &req)
+        {
+            let tile_path = vec![req.goal];
+            self.cache_insert(&req, static_fingerprint, tile_path.clone());
+            let diagnostics = PathingRequestDiagnostics {
+                cache_status: PathCacheStatus::Miss,
+                expanded_nodes: 0,
+                budget_exhausted: false,
+                tile_path_len: tile_path.len(),
+            };
+            return (tile_path, diagnostics);
+        }
+
         let budget = req.budget.unwrap_or(self.default_budget);
         let (tile_path, expanded_nodes, budget_exhausted) =
-            pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics(
+            pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
                 &pass,
-                req.start.0,
-                req.start.1,
-                req.goal.0,
-                req.goal.1,
+                req.start,
+                req.goal,
                 budget,
                 req.route_shape.turn_penalty(),
+                &mut self.search_scratch,
             );
 
         if !tile_path.is_empty() {
@@ -395,6 +413,15 @@ impl PathingService {
     pub(in crate::game) fn config(&self) -> (usize, usize) {
         (self.default_budget, self.cache_cap)
     }
+}
+
+fn direct_segment_standable(map: &Map, occupancy: &Occupancy, req: &PathRequest) -> bool {
+    if !map.in_bounds(req.start.0, req.start.1) || !map.in_bounds(req.goal.0, req.goal.1) {
+        return false;
+    }
+    let start = map.tile_center(req.start.0 as u32, req.start.1 as u32);
+    let goal = map.tile_center(req.goal.0 as u32, req.goal.1 as u32);
+    standability::unit_static_segment_standable(map, occupancy, req.kind, start, goal)
 }
 
 fn expand_vehicle_diagonal_steps_to_l_waypoints<P: Passability>(
@@ -547,6 +574,8 @@ impl PathingService {
     }
 }
 
+#[cfg(test)]
+mod request_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -864,37 +893,6 @@ mod tests {
             assert!(a.cache_contains(EntityKind::Worker, *start, *goal, 0, RouteShape::Normal));
             assert!(b.cache_contains(EntityKind::Worker, *start, *goal, 0, RouteShape::Normal));
         }
-    }
-
-    #[test]
-    fn request_tile_path_reports_cache_and_complexity_diagnostics() {
-        let map = Map::generate(1, 0x1234_5678);
-        let entities = EntityStore::new();
-        let occ = Occupancy::build(&map, &entities);
-        let mut service = PathingService::new(8_192, 256);
-        service.advance_tick(1);
-        let req = PathRequest {
-            relation: StaticPathingRelation::single_owner(1),
-            kind: EntityKind::Worker,
-            start: (1, 1),
-            goal: (8, 8),
-            radius_tiles: 0,
-            route_shape: RouteShape::Normal,
-            budget: None,
-        };
-
-        let (first_path, first) =
-            service.request_tile_path_with_diagnostics(&map, &occ, req.clone());
-        let (second_path, second) = service.request_tile_path_with_diagnostics(&map, &occ, req);
-
-        assert_eq!(first.cache_status, PathCacheStatus::Miss);
-        assert!(first.expanded_nodes > 0);
-        assert!(!first.budget_exhausted);
-        assert_eq!(first.tile_path_len, first_path.len());
-        assert_eq!(second.cache_status, PathCacheStatus::Hit);
-        assert_eq!(second.expanded_nodes, 0);
-        assert_eq!(second.tile_path_len, second_path.len());
-        assert_eq!(first_path, second_path);
     }
 
     #[test]

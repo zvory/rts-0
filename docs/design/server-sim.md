@@ -1164,8 +1164,17 @@ new validation policy or tick orchestration; those responsibilities remain with 
 queued promotion, or the owning tick system.
 
 Live pathfinding and dev scenarios share a 32,768-node expansion budget per path miss. Requests
-that exhaust the budget return a best-effort path. Pump Jack standability permits a Pump Jack to
-coexist with its oil node, and simulation invariant checks use that same Pump Jack policy.
+that exhaust the budget return a best-effort path. The movement coordinator starts at most four
+fresh A* searches per tick; cache hits, same-tile requests, and proven-clear direct routes do not
+consume that allowance. After any completed search expands at least 4,096 nodes it preserves that
+full result but defers all later searches to the next tick. Deferred units remain
+`AwaitingPath`, so this tick-level scheduling does not lower the per-route search allowance.
+Ordinary non-vehicle move formations bypass A* only when the existing body standability check
+proves their direct segment clear; interaction routes and blocked direct segments retain the full
+tile-guided search. `PathingService` reuses cleared A* working containers between sequential room
+requests; that scratch state remains derived and is never serialized. Pump Jack standability
+permits a Pump Jack to coexist with its oil node, and simulation invariant checks use that same
+Pump Jack policy.
 
 Eligible infantry move and attack-move formation slots bias toward nearby known, unoccupied trench
 terrain within a two-tile footprint band around the normal formation goal. A trench occupant counts
