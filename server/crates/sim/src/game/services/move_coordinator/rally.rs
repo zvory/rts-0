@@ -37,9 +37,8 @@ pub(super) fn nearest_free_goal(
         kind: unit.kind,
         pos: (unit.pos_x, unit.pos_y),
     };
-    let occupied_unit_bodies = occupied_and_reserved_bodies(
-        entities, teams, player, unit_id, fog, smokes,
-    );
+    let occupied_unit_bodies =
+        occupied_and_reserved_bodies(entities, teams, player, unit_id, fog, smokes);
     let relation = StaticPathingRelation::for_player(player, teams);
     let mut reachability = formation::FormationReachability::new(map, occ, relation);
     let max_tile = map.size.checked_sub(1)?;

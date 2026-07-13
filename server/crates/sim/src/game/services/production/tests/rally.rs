@@ -154,9 +154,7 @@ fn hidden_enemy_does_not_change_produced_unit_rally_goal() {
 
     let produced = entities
         .iter()
-        .find(|entity| {
-            entity.id != enemy && entity.owner == 1 && entity.kind == EntityKind::Worker
-        })
+        .find(|entity| entity.id != enemy && entity.owner == 1 && entity.kind == EntityKind::Worker)
         .expect("worker should be produced");
     assert_eq!(
         produced.path_goal(),
