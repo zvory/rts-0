@@ -1,5 +1,5 @@
 {
-  "reason": "steel rallies add validated resource-target state and shared production-time mining eligibility",
+  "reason": "tracked line budgets and import graph for the current simulation architecture",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -79,7 +79,7 @@
     },
     {
       "path": "entity/order.rs",
-      "lines": 521
+      "lines": 508
     },
     {
       "path": "entity/state.rs",
@@ -335,7 +335,7 @@
     },
     {
       "path": "services/commands/guards.rs",
-      "lines": 105
+      "lines": 89
     },
     {
       "path": "services/commands/planner_facts.rs",
@@ -375,7 +375,7 @@
     },
     {
       "path": "services/commands/tests/rally.rs",
-      "lines": 329
+      "lines": 257
     },
     {
       "path": "services/commands/tests/scout_plane_production.rs",
@@ -683,7 +683,7 @@
     },
     {
       "path": "tests/derived_state_tests.rs",
-      "lines": 947
+      "lines": 945
     },
     {
       "path": "tests/determinism_tests.rs",
@@ -1206,12 +1206,6 @@
       "target": "move_coordinator",
       "path": "services/production.rs",
       "line": 3
-    },
-    {
-      "source": "production",
-      "target": "world_query",
-      "path": "services/production.rs",
-      "line": 4
     },
     {
       "source": "standability",
@@ -1901,7 +1895,7 @@
     },
     {
       "path": "entity/order.rs",
-      "count": 60
+      "count": 59
     },
     {
       "path": "entity/state.rs",

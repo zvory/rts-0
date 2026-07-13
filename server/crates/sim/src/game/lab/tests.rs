@@ -1,6 +1,5 @@
 use super::*;
-use crate::game::command::SimCommand;
-use crate::game::entity::{RallyKind, WeaponSetup};
+use crate::game::entity::WeaponSetup;
 use crate::game::services::occupancy::footprint_center;
 use crate::protocol::{terrain, LabMapTile};
 
@@ -678,58 +677,6 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
         game.apply_lab_op(LabOp::DeleteEntity { entity_id }),
         Err(LabError::StaleEntity { .. })
     ));
-}
-
-#[test]
-fn lab_deleting_rally_resource_preserves_the_point_rally() {
-    let mut game = new_game();
-    let city_centre = game
-        .state
-        .entities
-        .iter()
-        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
-        .map(|entity| entity.id)
-        .expect("player one city centre");
-    let (x, y) = tile_center(&game, 26, 16);
-    let steel = game
-        .state
-        .entities
-        .spawn_node(EntityKind::Steel, x, y)
-        .expect("steel node");
-
-    game.enqueue(
-        1,
-        SimCommand::SetRally {
-            building: city_centre,
-            x,
-            y,
-            node: Some(steel),
-            kind: RallyKind::Move,
-            queued: false,
-        },
-    );
-    game.tick();
-    assert_eq!(
-        game.state
-            .entities
-            .get(city_centre)
-            .expect("city centre")
-            .rally_plan()[0]
-            .resource_node,
-        Some(steel)
-    );
-
-    game.apply_lab_op(LabOp::DeleteEntity { entity_id: steel })
-        .expect("deleting steel should succeed");
-
-    let rally = game
-        .state
-        .entities
-        .get(city_centre)
-        .expect("city centre")
-        .rally_plan()[0];
-    assert_eq!(rally.resource_node, None);
-    assert_eq!((rally.point.x, rally.point.y), (x, y));
 }
 
 #[test]

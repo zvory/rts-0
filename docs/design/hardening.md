@@ -26,9 +26,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   shapes.
 - **Building rally cap** (`services/commands.rs` `MAX_RALLY_STAGES = 4`): each production building
   stores at most four move/attack-move rally stages. Non-queued `setRally` replaces the plan; queued
-  `setRally` appends until the cap and ignores further stages. Optional resource-node targets are
-  validated against authoritative live nodes: steel is accepted and canonicalized; oil and invalid
-  ids are rejected.
+  `setRally` appends until the cap and ignores further stages.
 - **Bounds-checked placement** (`services/occupancy.rs` `footprint_tiles`): tile math uses `checked_add` and
   out-of-range build coords are rejected — the tick loop never panics on adversarial input.
 - **Body-aware construction placement**: `services::standability::building_site_clear` is the
@@ -318,8 +316,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   later ticks; cost and supply remain reserved from enqueue time. When the producer has a rally
   plan set, the search picks the closest standable candidate to the first stage within the first
   ring that has any (so units exit the rally-facing side), and the new unit is immediately given
-  the first rally stage as its active move/attack-move order plus later stages as queued orders.
-  Validated steel-target rally stages instead become gather orders for produced gatherers;
+  the first rally stage as its active move/attack-move order plus later stages as queued orders;
   with no rally plan the legacy first-found candidate is used and the unit spawns idle.
 - **Unit collision**: `services::movement::resolve_collisions` runs after production each tick and
   pair-wise pushes overlapping mobile units apart using `services::geometry::unit_body_overlap`.

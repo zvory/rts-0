@@ -1206,13 +1206,8 @@ function buttonByLabel(card, label) {
   rightClickCommands.length = 0;
   input._onRightClick({ x: overlappingSteel.x, y: overlappingSteel.y });
   assert(
-    rightClickCommands.length === 1 &&
-      rightClickCommands[0].c === "setRally" &&
-      rightClickCommands[0].building === rallyCityCentre.id &&
-      rightClickCommands[0].node === overlappingSteel.id &&
-      rightClickCommands[0].x === overlappingSteel.x &&
-      rightClickCommands[0].y === overlappingSteel.y,
-    "production-building right-click on steel should identify the node for a gather rally",
+    rightClickCommands.length === 0,
+    "production-building right-click on steel should not issue a rally command",
   );
   rightClickCommands.length = 0;
   input._onRightClick({ x: overlappingOil.x, y: overlappingOil.y });

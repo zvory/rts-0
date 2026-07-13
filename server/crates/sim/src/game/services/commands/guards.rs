@@ -73,31 +73,15 @@ pub(super) fn is_constructing(entities: &EntityStore, id: u32) -> bool {
 
 pub(super) fn rally_intent_for_map(
     map: &Map,
-    entities: &EntityStore,
     kind: RallyKind,
     x: f32,
     y: f32,
-    requested_node: Option<u32>,
 ) -> Option<RallyIntent> {
     if !x.is_finite() || !y.is_finite() {
         return None;
     }
     let max = (map.world_size_px() - 1.0).max(0.0);
-    let x = x.clamp(0.0, max);
-    let y = y.clamp(0.0, max);
-    let Some(node) = requested_node else {
-        return Some(RallyIntent::new(kind, x, y));
-    };
-    let resource = entities.get(node)?;
-    if resource.kind != EntityKind::Steel || resource.remaining().unwrap_or(0) == 0 {
-        return None;
-    }
-    Some(RallyIntent::to_resource(
-        kind,
-        resource.id,
-        resource.pos_x,
-        resource.pos_y,
-    ))
+    Some(RallyIntent::new(kind, x.clamp(0.0, max), y.clamp(0.0, max)))
 }
 
 fn command_weight(kind: EntityKind) -> u32 {

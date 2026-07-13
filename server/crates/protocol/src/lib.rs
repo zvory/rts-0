@@ -271,10 +271,6 @@ pub enum Command {
         building: u32,
         x: f32,
         y: f32,
-        /// Optional authoritative resource-node target. Steel nodes turn the rally into a gather
-        /// order for newly trained gatherers; oil nodes are rejected by the simulation.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        node: Option<u32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         kind: Option<String>,
         #[serde(default, skip_serializing_if = "is_false")]
@@ -1520,7 +1516,10 @@ mod tests {
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
         assert_eq!(value["e"][2][34], serde_json::json!(true));
-        assert_eq!(value["e"][2][36], serde_json::json!(kind_code(kinds::WORKER)));
+        assert_eq!(
+            value["e"][2][36],
+            serde_json::json!(kind_code(kinds::WORKER))
+        );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
             value["sm"],

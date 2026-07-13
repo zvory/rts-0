@@ -1254,14 +1254,12 @@ export class Minimap {
         .map((e) => e.id);
       if (producers.length === 0) return;
       const resource = resourceRallyTargetAt(this.state.map, wx, wy);
-      if (resource?.kind === KIND.OIL) return;
+      if (resource) return;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
-      const rallyPoint = resource?.kind === KIND.STEEL ? resource : { x: wx, y: wy };
-      const node = resource?.kind === KIND.STEEL ? resource.id : null;
       for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, rallyPoint.x, rallyPoint.y, queued, kind, node));
+        this._issueCommand(cmd.setRally(building, wx, wy, queued, kind));
       }
-      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", rallyPoint.x, rallyPoint.y, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
       return;
     }
     if (commandTarget === "attack") {

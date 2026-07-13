@@ -242,10 +242,6 @@ impl RallyKind {
 pub struct RallyIntent {
     pub kind: RallyKind,
     pub point: PointIntent,
-    /// Steel node selected for this rally stage. Gather-capable produced units receive a gather
-    /// order; other units continue to use the point/kind rally behavior.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resource_node: Option<u32>,
 }
 
 impl RallyIntent {
@@ -253,15 +249,6 @@ impl RallyIntent {
         RallyIntent {
             kind,
             point: PointIntent { x, y },
-            resource_node: None,
-        }
-    }
-
-    pub fn to_resource(kind: RallyKind, node: u32, x: f32, y: f32) -> Self {
-        RallyIntent {
-            kind,
-            point: PointIntent { x, y },
-            resource_node: Some(node),
         }
     }
 
