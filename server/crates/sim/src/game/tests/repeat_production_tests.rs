@@ -182,11 +182,7 @@ fn repeat_production_alternates_enabled_units() {
 #[test]
 fn disabling_repeat_units_preserves_the_next_unit() {
     let (mut game, barracks) = repeat_fixture();
-    let producer = game
-        .state
-        .entities
-        .get_mut(barracks)
-        .expect("barracks");
+    let producer = game.state.entities.get_mut(barracks).expect("barracks");
     producer.set_repeat_production(Some(EntityKind::MachineGunner), true);
     producer.set_repeat_production(Some(EntityKind::Panzerfaust), true);
 
@@ -222,8 +218,5 @@ fn disabling_repeat_units_preserves_the_next_unit() {
         &[EntityKind::Panzerfaust],
         "removing the current unit must select its successor without adding duplicates"
     );
-    assert_eq!(
-        producer.repeat_production(),
-        Some(EntityKind::Panzerfaust)
-    );
+    assert_eq!(producer.repeat_production(), Some(EntityKind::Panzerfaust));
 }
