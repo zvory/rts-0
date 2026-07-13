@@ -11,9 +11,9 @@ use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 use super::EntityStateGroups;
 use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
-    GatherPhase, IncomingDirectApThreat, MovePhase, MovementState, Order, OrderIntent,
-    PanzerfaustState, ProdItem, ProductionState, RallyIntent, ResearchItem, ResourceExtractorState,
-    ResourceNodeState, ScoutPlaneState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
+    GatherPhase, MovePhase, MovementState, Order, OrderIntent, PanzerfaustState, ProdItem,
+    ProductionState, RallyIntent, ResearchItem, ResourceExtractorState, ResourceNodeState,
+    ScoutPlaneState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
@@ -952,36 +952,6 @@ impl Entity {
 
     pub fn last_damage_pos(&self) -> Option<(f32, f32)> {
         self.last_damage_pos
-    }
-
-    pub(in crate::game) fn record_incoming_direct_ap_threat(
-        &mut self,
-        attacker_id: u32,
-        attacker_pos: (f32, f32),
-        damage_weight: u32,
-        tick: u32,
-    ) {
-        if self.kind != EntityKind::Tank
-            || self.hp == 0
-            || attacker_id == 0
-            || damage_weight == 0
-            || !attacker_pos.0.is_finite()
-            || !attacker_pos.1.is_finite()
-        {
-            return;
-        }
-        let Some(combat) = self.combat.as_mut() else {
-            return;
-        };
-        combat.incoming_direct_ap_threats.insert(
-            attacker_id,
-            IncomingDirectApThreat {
-                source_x: attacker_pos.0,
-                source_y: attacker_pos.1,
-                damage_weight,
-                last_hit_tick: tick,
-            },
-        );
     }
 
     pub fn record_damage_from(&mut self, attacker_pos: (f32, f32), tick: u32) {

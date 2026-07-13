@@ -258,6 +258,31 @@ impl Default for CombatState {
 }
 
 impl CombatState {
+    pub(in crate::game) fn record_incoming_direct_ap_threat(
+        &mut self,
+        attacker_id: u32,
+        attacker_pos: (f32, f32),
+        damage_weight: u32,
+        tick: u32,
+    ) {
+        if attacker_id == 0
+            || damage_weight == 0
+            || !attacker_pos.0.is_finite()
+            || !attacker_pos.1.is_finite()
+        {
+            return;
+        }
+        self.incoming_direct_ap_threats.insert(
+            attacker_id,
+            IncomingDirectApThreat {
+                source_x: attacker_pos.0,
+                source_y: attacker_pos.1,
+                damage_weight,
+                last_hit_tick: tick,
+            },
+        );
+    }
+
     pub(in crate::game) fn weapon_cooldown(&self, weapon: WeaponKind) -> u32 {
         self.weapon_cooldowns.get(&weapon).copied().unwrap_or(0)
     }
