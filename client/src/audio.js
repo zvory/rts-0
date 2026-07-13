@@ -450,7 +450,7 @@ export class Audio {
     if (g && this.ctx) {
       const now = this.ctx.currentTime;
       g.gain.cancelScheduledValues(now);
-      g.gain.setValueAtTime(v, now);
+      g.gain.setValueAtTime(this._categoryGainTarget(cat, this.alertDuckDepth > 0), now);
     }
   }
 
@@ -705,9 +705,9 @@ export class Audio {
     const now = this.ctx.currentTime;
     const ramp = duck ? DUCK_IN_S : DUCK_OUT_S;
     const targets = {
-      ambient: duck ? this.volume.ambient * dbToGain(DB_ALERT_AMBIENT) : this.volume.ambient,
-      combat_self: duck ? this.volume.combat_self * dbToGain(DB_ALERT_COMBAT) : this.volume.combat_self,
-      combat_other: duck ? this.volume.combat_other * dbToGain(DB_ALERT_COMBAT) : this.volume.combat_other,
+      ambient: this._categoryGainTarget("ambient", duck),
+      combat_self: this._categoryGainTarget("combat_self", duck),
+      combat_other: this._categoryGainTarget("combat_other", duck),
     };
     for (const [cat, target] of Object.entries(targets)) {
       const g = this.gains[cat];
@@ -716,6 +716,16 @@ export class Audio {
       g.gain.setValueAtTime(g.gain.value, now);
       g.gain.linearRampToValueAtTime(target, now + ramp);
     }
+  }
+
+  _categoryGainTarget(cat, duck) {
+    const base = this.volume[cat];
+    if (!duck) return base;
+    if (cat === "ambient") return base * dbToGain(DB_ALERT_AMBIENT);
+    if (cat === "combat_self" || cat === "combat_other") {
+      return base * dbToGain(DB_ALERT_COMBAT);
+    }
+    return base;
   }
 }
 

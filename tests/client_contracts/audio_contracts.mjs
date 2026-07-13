@@ -274,6 +274,20 @@ assert(
     0.0001,
     "combat duck attacks over 80 milliseconds",
   );
+  audio.setCategoryVolume("ambient", 0.6);
+  audio.setCategoryVolume("combat_self", 0.7);
+  assertApprox(
+    audio.gains.ambient.gain.value,
+    0.6 * Math.pow(10, -12 / 20),
+    0.0001,
+    "ambient slider changes preserve an active duck",
+  );
+  assertApprox(
+    audio.gains.combat_self.gain.value,
+    0.7 * Math.pow(10, -10 / 20),
+    0.0001,
+    "combat slider changes preserve an active duck",
+  );
   assert(audio.play("duck_notice_b", { category: "ui", duck: true }), "overlapping ducking notice plays");
   assert(audio.alertDuckDepth === 2, "overlapping ducking voices increment duck depth");
   const firstDuck = audio.voices.find((voice) => voice.id === "duck_notice_a");
