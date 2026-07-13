@@ -1040,9 +1040,7 @@ impl Entity {
             .get(production.repeat_unit_cursor % count)
             .copied()
     }
-
-    /// Update automatic production. `Some(unit)` toggles that unit by `enabled`; `None` clears
-    /// when disabled and advances the next-unit cursor when enabled.
+    /// `Some(unit)` toggles that unit; `None` clears (false) or advances the repeat cursor (true).
     pub(crate) fn set_repeat_production(
         &mut self,
         unit: Option<EntityKind>,
