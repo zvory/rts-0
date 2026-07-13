@@ -99,11 +99,20 @@ type SearchKey = (i32, i32, u8);
 ///
 /// Searches are strictly sequential inside one room. Clearing these containers between requests
 /// preserves their allocations without making any search result depend on prior requests.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub(super) struct SearchScratch {
     open: BinaryHeap<Node>,
     came_from: HashMap<SearchKey, SearchKey>,
     g_score: HashMap<SearchKey, u32>,
+}
+
+impl Clone for SearchScratch {
+    fn clone(&self) -> Self {
+        debug_assert!(self.open.is_empty());
+        debug_assert!(self.came_from.is_empty());
+        debug_assert!(self.g_score.is_empty());
+        Self::default()
+    }
 }
 
 impl SearchScratch {
@@ -111,6 +120,11 @@ impl SearchScratch {
         self.open.clear();
         self.came_from.clear();
         self.g_score.clear();
+    }
+
+    #[cfg(test)]
+    pub(super) fn retained_capacity(&self) -> usize {
+        self.came_from.capacity() + self.g_score.capacity()
     }
 }
 

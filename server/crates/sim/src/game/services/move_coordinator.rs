@@ -20,7 +20,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, BuildPhase,
-    DeconstructPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order, WeaponSetup,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -45,10 +45,14 @@ use crate::rules::projection;
 
 mod footprint_pathing;
 mod formation;
+#[cfg(test)]
+mod pathing_budget_tests;
 mod rally;
 
-/// Maximum number of fresh A* searches serviced in a single tick. Beyond this,
-/// remaining `AwaitingPath` units stay queued for the next tick.
+#[cfg(test)]
+use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
+
+/// Tile-path requests per tick; hits count so rebuildable-cache state cannot alter scheduling.
 const MAX_REQUESTS_PER_TICK: usize = 4;
 
 /// A completed search at or above this deterministic work threshold consumes the rest of the
@@ -524,8 +528,8 @@ impl<'a> MoveCoordinator<'a> {
     // -------------------------------------------------------------------
 
     /// Process units waiting for a movement or footprint-interaction route in deterministic
-    /// entity-id order. Cache hits and direct routes may still resolve after the fresh-search
-    /// allowance is exhausted; requests that need another A* search remain pending.
+    /// entity-id order. Proven-clear direct routes remain free after the tile-path allowance is
+    /// exhausted; all cache-backed or fresh tile paths remain pending.
     pub fn process_awaiting_paths(&mut self, entities: &mut EntityStore) {
         let waiting: Vec<u32> = entities
             .iter()
@@ -999,11 +1003,11 @@ impl<'a> MoveCoordinator<'a> {
         let Some(request) = request else {
             return;
         };
-        if request.cache_status != PathCacheStatus::Miss || request.expanded_nodes == 0 {
+        if request.scheduling_expanded_nodes == 0 {
             return;
         }
         self.budget = self.budget.saturating_sub(1);
-        if request.expanded_nodes >= HEAVY_PATH_EXPANSIONS {
+        if request.scheduling_expanded_nodes >= HEAVY_PATH_EXPANSIONS {
             self.budget = 0;
         }
     }
@@ -1116,50 +1120,6 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
     }
 }
 
-fn set_entity_path(
-    entities: &mut EntityStore,
-    id: u32,
-    path: Vec<(f32, f32)>,
-    goal: (f32, f32),
-    tick: u32,
-) {
-    if let Some(e) = entities.get_mut(id) {
-        e.set_path(path);
-        e.set_last_repath_tick(tick);
-        e.set_path_goal(Some(goal));
-    }
-}
-
-fn current_staging_goal(
-    map: &Map,
-    entities: &EntityStore,
-    id: u32,
-    kind: EntityKind,
-    footprint: &std::collections::BTreeSet<(u32, u32)>,
-) -> Option<(f32, f32)> {
-    let worker = entities.get(id)?;
-    let tile = map.tile_of(worker.pos_x, worker.pos_y);
-    if footprint.contains(&tile) {
-        return None;
-    }
-    let &(tile_x, tile_y) = footprint.iter().min()?;
-    let goal = (worker.pos_x, worker.pos_y);
-    build_staging_goal_in_range(map, kind, tile_x, tile_y, goal).then_some(goal)
-}
-
-fn build_staging_goal_in_range(
-    map: &Map,
-    kind: EntityKind,
-    tile_x: u32,
-    tile_y: u32,
-    goal: (f32, f32),
-) -> bool {
-    let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
-    let dx = goal.0 - cx;
-    let dy = goal.1 - cy;
-    dx * dx + dy * dy <= interact_range_for_kind(kind).powi(2)
-}
-
 fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
     if !requires_weapon_setup(e.kind) {
         return;
@@ -1175,103 +1135,6 @@ fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
 
 fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::MachineGunner | EntityKind::AntiTankGun)
-}
-
-/// Pick a walk target outside a build footprint.
-///
-/// Construction starts when the worker is close enough to the footprint center, so walking to an
-/// outside perimeter tile keeps the builder from ending up inside the completed building.
-/// Returns `None` when no outside staging tile is available.
-#[cfg(test)]
-pub(crate) fn build_staging_goal(
-    map: &Map,
-    occ: &Occupancy,
-    entities: &EntityStore,
-    worker: u32,
-    kind: EntityKind,
-    tile_x: u32,
-    tile_y: u32,
-) -> Option<(f32, f32)> {
-    build_staging_goals(map, occ, entities, worker, kind, tile_x, tile_y)
-        .into_iter()
-        .next()
-}
-
-fn build_staging_goals(
-    map: &Map,
-    occ: &Occupancy,
-    entities: &EntityStore,
-    worker: u32,
-    kind: EntityKind,
-    tile_x: u32,
-    tile_y: u32,
-) -> Vec<(f32, f32)> {
-    let Some(worker) = entities.get(worker) else {
-        return Vec::new();
-    };
-    let footprint = footprint_tiles(kind, tile_x, tile_y);
-    let Some(stats) = config::building_stats(kind) else {
-        return Vec::new();
-    };
-    if footprint.is_empty() {
-        return Vec::new();
-    }
-    let footprint_set: std::collections::BTreeSet<(u32, u32)> = footprint.iter().copied().collect();
-    let min_x = tile_x as i32;
-    let min_y = tile_y as i32;
-    let Some(max_x) = tile_x.checked_add(stats.foot_w.saturating_sub(1)) else {
-        return Vec::new();
-    };
-    let Some(max_y) = tile_y.checked_add(stats.foot_h.saturating_sub(1)) else {
-        return Vec::new();
-    };
-    let max_x = max_x as i32;
-    let max_y = max_y as i32;
-    let mut candidates = Vec::new();
-
-    // Search outward from the footprint, then order candidates by ring and worker distance.
-    for r in 1i32..=6 {
-        for ty in (min_y - r)..=(max_y + r) {
-            for tx in (min_x - r)..=(max_x + r) {
-                if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
-                    continue;
-                }
-                if !map.in_bounds(tx, ty) {
-                    continue;
-                }
-                let tile = (tx as u32, ty as u32);
-                if footprint_set.contains(&tile) {
-                    continue;
-                }
-                if !map.is_passable(tx, ty) {
-                    continue;
-                }
-                if !occ.passable_for_kind(tx, ty, worker.kind) {
-                    continue;
-                }
-                let center = map.tile_center(tile.0, tile.1);
-                if !build_staging_goal_in_range(map, kind, tile_x, tile_y, center) {
-                    continue;
-                }
-                let dist2 = {
-                    let dx = worker.pos_x - center.0;
-                    let dy = worker.pos_y - center.1;
-                    dx * dx + dy * dy
-                };
-                candidates.push((r, dist2, tile));
-            }
-        }
-    }
-    candidates.sort_by(|left, right| {
-        left.0
-            .cmp(&right.0)
-            .then_with(|| left.1.total_cmp(&right.1))
-            .then_with(|| left.2.cmp(&right.2))
-    });
-    candidates
-        .into_iter()
-        .map(|(_, _, tile)| map.tile_center(tile.0, tile.1))
-        .collect()
 }
 
 #[cfg(test)]
@@ -1505,7 +1368,6 @@ mod tests {
     fn path_failed_is_set_on_unreachable_goal() {
         let map = Map::generate(1, 0x1234_5678);
         let mut entities = EntityStore::new();
-        // Place the unit at tile (10, 10).
         let (ux, uy) = map.tile_center(10, 10);
         let id = entities
             .spawn_unit(1, EntityKind::Rifleman, ux, uy)
@@ -1524,7 +1386,6 @@ mod tests {
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        // Order the unit to move far away (to tile (30, 30)).
         let (gx, gy) = map.tile_center(30, 30);
         coordinator.order_group_move(&mut entities, 1, &[id], (gx, gy), false);
 
@@ -1777,18 +1638,19 @@ mod tests {
         let mut pathing = PathingService::new(32_768, 256);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let initial_budget = coordinator.budget;
         coordinator.consume_request_budget(Some(PathingRequestDiagnostics {
             cache_status: PathCacheStatus::Miss,
             expanded_nodes: 0,
+            scheduling_expanded_nodes: 0,
             budget_exhausted: false,
             tile_path_len: 1,
         }));
-        assert_eq!(coordinator.budget, initial_budget);
+        assert_eq!(coordinator.budget, MAX_REQUESTS_PER_TICK);
 
         coordinator.consume_request_budget(Some(PathingRequestDiagnostics {
             cache_status: PathCacheStatus::Miss,
             expanded_nodes: HEAVY_PATH_EXPANSIONS,
+            scheduling_expanded_nodes: HEAVY_PATH_EXPANSIONS,
             budget_exhausted: false,
             tile_path_len: 80,
         }));

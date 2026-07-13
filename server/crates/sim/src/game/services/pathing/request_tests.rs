@@ -56,8 +56,74 @@ fn request_tile_path_reports_cache_and_complexity_diagnostics() {
     assert_eq!(first.tile_path_len, first_path.len());
     assert_eq!(second.cache_status, PathCacheStatus::Hit);
     assert_eq!(second.expanded_nodes, 0);
+    assert_eq!(second.scheduling_expanded_nodes, first.expanded_nodes);
     assert_eq!(second.tile_path_len, second_path.len());
     assert_eq!(first_path, second_path);
+}
+
+#[test]
+fn cloning_pathing_service_does_not_copy_ephemeral_search_capacity() {
+    let map = flat_test_map(64);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let req = PathRequest {
+        relation: StaticPathingRelation::single_owner(1),
+        kind: EntityKind::Worker,
+        start: (2, 2),
+        goal: (55, 55),
+        radius_tiles: 0,
+        route_shape: RouteShape::Normal,
+        budget: None,
+    };
+
+    assert!(!service.request_tile_path(&map, &occ, req).is_empty());
+    assert!(service.search_scratch.retained_capacity() > 0);
+
+    let cloned = service.clone();
+    assert_eq!(cloned.search_scratch.retained_capacity(), 0);
+    assert_eq!(cloned.cache_len(), service.cache_len());
+
+    service.clear_rebuildable_state();
+    assert_eq!(service.search_scratch.retained_capacity(), 0);
+    assert_eq!(service.cache_len(), 0);
+}
+
+#[test]
+fn budget_exhausted_partial_path_is_cached_only_for_the_same_budget() {
+    let map = flat_test_map(64);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let req = PathRequest {
+        relation: StaticPathingRelation::single_owner(1),
+        kind: EntityKind::Worker,
+        start: (2, 2),
+        goal: (55, 55),
+        radius_tiles: 0,
+        route_shape: RouteShape::Normal,
+        budget: Some(1),
+    };
+
+    let (partial, diagnostics) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
+    assert!(!partial.is_empty());
+    assert!(diagnostics.budget_exhausted);
+    assert_eq!(service.cache_len(), 1);
+
+    let (cached_partial, cached) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
+    assert_eq!(cached_partial, partial);
+    assert_eq!(cached.cache_status, PathCacheStatus::Hit);
+    assert!(!cached.budget_exhausted);
+
+    let mut full_budget_req = req;
+    full_budget_req.budget = None;
+    let (complete, full) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, full_budget_req, true));
+    assert_eq!(complete.last(), Some(&(55, 55)));
+    assert_eq!(full.cache_status, PathCacheStatus::Miss);
+    assert!(!full.budget_exhausted);
 }
 
 #[test]
@@ -153,7 +219,7 @@ fn direct_segment_result_is_not_reused_for_unsafe_offsets_in_the_same_tiles() {
 }
 
 #[test]
-fn search_permission_defers_misses_but_not_cache_hits() {
+fn pathing_permission_defers_cache_hits_and_misses() {
     let map = flat_test_map(32);
     let entities = EntityStore::new();
     let occ = Occupancy::build(&map, &entities);
@@ -176,8 +242,12 @@ fn search_permission_defers_misses_but_not_cache_hits() {
         resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
     assert!(!path.is_empty());
     assert!(diagnostics.expanded_nodes > 0);
+    assert!(matches!(
+        service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), false),
+        PathingRequestOutcome::Deferred
+    ));
     let (cached_path, cached) =
-        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, false));
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, true));
     assert_eq!(cached_path, path);
     assert_eq!(cached.cache_status, PathCacheStatus::Hit);
 }
@@ -213,7 +283,7 @@ fn completed_no_route_result_is_reused_without_another_search() {
     assert!(!first.budget_exhausted);
 
     let (cached_path, cached) =
-        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, false));
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, true));
     assert!(cached_path.is_empty());
     assert_eq!(cached.cache_status, PathCacheStatus::Hit);
     assert_eq!(cached.expanded_nodes, 0);

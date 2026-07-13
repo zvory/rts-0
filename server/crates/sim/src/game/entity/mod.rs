@@ -28,7 +28,7 @@ pub(crate) use kind::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
     MovementBodyClass, StaticBlockerClass,
 };
-pub(crate) use order::tank_trap_deconstruction_ticks;
+pub(crate) use order::{tank_trap_deconstruction_ticks, FootprintRouting};
 #[allow(unused_imports)]
 pub use order::{
     AbilityExecution, AbilityIntent, AbilityOrder, AttackExecution, AttackOrder, AttackPhase,
