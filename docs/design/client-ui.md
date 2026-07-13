@@ -1364,10 +1364,13 @@ labelled `Replay`, and joined as spectators without setting `replayOk`, so rooms
 playback still use the normal replay join confirmation. Countdown, stale, and unknown rows remain
 disabled.
 
-`match_history.js` launches persisted match replays by POSTing `/api/matches/{id}/replay`, then
-hands the returned `__match_replay__:*` room to `App`/`Lobby.joinReplayLobby` instead of redirecting
-the page into replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact
-playback path; `replayRoom` URLs represent replay staging lobbies.
+`match_history.js` renders the visible Recent Matches rows with a one-based **Replay #** column in
+the API's appearance order (newest first). The number is client-local rather than a match database
+id, so the server-filtered public feed has no gaps from saved debug or solo replays. It launches
+persisted match replays by POSTing `/api/matches/{id}/replay`, then hands the returned
+`__match_replay__:*` room to `App`/`Lobby.joinReplayLobby` instead of redirecting the page into
+replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact playback path;
+`replayRoom` URLs represent replay staging lobbies.
 The replay lobby UI is group-watch only: future playable resume work needs separate seat-claim
 controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
