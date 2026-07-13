@@ -238,7 +238,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
-  assert(STATS[KIND.SCOUT_CAR].sight === 14, "Scout Car has the largest mobile sight radius");
+  assert(STATS[KIND.SCOUT_CAR].sight === 17, "Scout Car has the largest mobile sight radius");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
   assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Gun Works");
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
@@ -281,7 +281,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
       STATS[KIND.COMMAND_CAR].supply === 4 &&
-      STATS[KIND.COMMAND_CAR].sight === 10 &&
+      STATS[KIND.COMMAND_CAR].sight === 13 &&
       STATS[KIND.COMMAND_CAR].size < STATS[KIND.SCOUT_CAR].size &&
       STATS[KIND.COMMAND_CAR].body.length < STATS[KIND.SCOUT_CAR].body.length &&
       STATS[KIND.COMMAND_CAR].body.width < STATS[KIND.SCOUT_CAR].body.width,
@@ -299,7 +299,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.PANZERFAUST].cost.steel === 60 &&
       STATS[KIND.PANZERFAUST].cost.oil === 15 &&
       STATS[KIND.PANZERFAUST].supply === 1 &&
-      STATS[KIND.PANZERFAUST].sight === 8 &&
+      STATS[KIND.PANZERFAUST].sight === 11 &&
       STATS[KIND.PANZERFAUST].size === 9 &&
       STATS[KIND.PANZERFAUST].rangeTiles === PANZERFAUST_RANGE_TILES &&
       STATS[KIND.PANZERFAUST].buildTicks === 400 &&

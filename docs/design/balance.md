@@ -309,7 +309,7 @@ folded into default targeting.
   no-attack downtime after launch. Against Armored Tanks, the 50% penetration lands as 63
   effective damage; unarmored Scout Cars take the full 100 damage. Methamphetamines reduces the
   windup constant to 12 ticks; travel stays 15 ticks and recovery stays 60 ticks. The `panzerfaust` unit
-  definition carries 45 HP, 8-tile sight, 9 px radius, 1.6 px/tick loaded speed matching Riflemen,
+  definition carries 45 HP, 11-tile sight, 9 px radius, 1.6 px/tick loaded speed matching Riflemen,
   60 steel / 15 oil cost, 1 supply, and 400 build ticks, but keeps default damage and cooldown at
   zero so the dedicated runtime owns the loaded-shot, reload, and target-priority behavior.
   Barracks trains Panzerfaust after the owner has a completed Training Centre.
@@ -341,7 +341,7 @@ folded into default targeting.
   cars, and command cars cannot advance while their owner has zero oil.
 - Scout Plane constants for the Command Car Scout Plane ability:
   `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 50`,
-  `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 12`,
+  `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 15`,
   `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.0`, `SCOUT_PLANE_SUPPLY = 0`,
   `SCOUT_PLANE_ORBIT_RADIUS_TILES = 4`, `SCOUT_PLANE_ORBIT_DURATION_TICKS = 300`,
   and `SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = 900`. It has no default weapon and a zero-radius
@@ -420,7 +420,7 @@ folded into default targeting.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units besides Golems produced from Zamok. Ekat has 150 HP, no passive
-  regeneration, 1.6 px/tick speed, 9-tile sight, no default attack, and no Steel/Oil/Supply cost. Her
+  regeneration, 1.6 px/tick speed, 12-tile sight, no default attack, and no Steel/Oil/Supply cost. Her
   Dash ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, requires a
   statically standable landing point, and leaves a four-second return marker that can be recast
   after one tick if the marker destination remains standable. Her Line Shot ability targets up to
@@ -507,19 +507,19 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 396 (~13.2s) |
-| golem           | 160 | 16  | 1     | 24 | 2.0   | 7     | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
-| machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
-| panzerfaust     | 45  | 100 reloadable, 50% AP vs vehicles/buildings; Tanks prioritized (default attack disabled) | 3 | 15 windup / 15 travel / 60 recovery; 75 ticks hidden/unarmed after launch | 1.6 | 8 | 60 | 15 | 1 | 400 (~13s); trained at Barracks after completed Training Centre |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
-| scout_car       | 100 | 6   | 5     | 6  | 2.35  | 14    | 125 | 50  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 12    | 50  | 50  | 0   | 0; launched instantly by Command Car ability from the nearest owned completed City Centre; one active per player; non-combat recon with 4-tile orbit radius, 10-second orbit after arrival, 30-second global cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
-| command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
-| ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
+| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
+| golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
+| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
+| machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
+| panzerfaust     | 45  | 100 reloadable, 50% AP vs vehicles/buildings; Tanks prioritized (default attack disabled) | 3 | 15 windup / 15 travel / 60 recovery; 75 ticks hidden/unarmed after launch | 1.6 | 11 | 60 | 15 | 1 | 400 (~13s); trained at Barracks after completed Training Centre |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
+| artillery       | 150 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
+| scout_car       | 100 | 6   | 5     | 6  | 2.35  | 17    | 125 | 50  | 3   | 480 (~16s) |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 50  | 0   | 0; launched instantly by Command Car ability from the nearest owned completed City Centre; one active per player; non-combat recon with 4-tile orbit radius, 10-second orbit after arrival, 30-second global cooldown, no ground collision reservation, and 48x34 px client render body |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| command_car     | 225 | 0   | 0     | 0  | 2.35  | 13    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
 outward from the footprint edge, not from only the building center, so sight 1 reveals the full
