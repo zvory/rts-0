@@ -41,8 +41,8 @@ export const LAB_INTERACT_COMMAND_HELP = Object.freeze({
     bounds: ["1-400 unique resolved references"], example: { sessionId: "<lab-session-id>", refs: ["subject"] },
   }),
   order: descriptor("Issue one normal authoritative game command as a selected player.", "{sessionId:string,playerId:u32,command:game-command,ignoreCommandLimits?:boolean}", {
-    variants: ["move|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|research|cancel|stop|holdPosition|setRally", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
-    defaults: ["ignoreCommandLimits=false", "queued omitted unless supplied by the command variant"], bounds: ["1-100 unit references", "command bridge JSON <=16 KiB"],
+    variants: ["move|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|setProductionRepeat|research|cancel|stop|holdPosition|setRally", "setProductionRepeat {c,buildings,unit,enabled} toggles auto-build on 1-100 producers", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
+    defaults: ["ignoreCommandLimits=false", "queued omitted unless supplied by the command variant"], bounds: ["1-100 entity references", "command bridge JSON <=16 KiB"],
     example: { sessionId: "<lab-session-id>", playerId: 1, command: { c: "move", units: ["subject"], x: 1100, y: 960 } },
   }),
   time: descriptor("Pause, resume, speed, step, or seek authoritative room time.", "{sessionId:string,control:time-control}", {

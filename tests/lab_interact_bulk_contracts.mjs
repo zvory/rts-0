@@ -34,6 +34,43 @@ const service = new LabInteractService({
 const opened = await service.open({});
 const sessionId = opened.sessionId;
 
+const repeatProducers = await service.execute("spawn", {
+  sessionId,
+  spawns: [
+    { owner: 1, kind: "barracks", x: 100, y: 100, alias: "repeat_a" },
+    { owner: 1, kind: "barracks", x: 200, y: 100, alias: "repeat_b" },
+  ],
+});
+const repeat = await service.execute("order", {
+  sessionId,
+  playerId: 1,
+  command: {
+    c: "setProductionRepeat",
+    buildings: ["repeat_a", "repeat_b"],
+    unit: "rifleman",
+    enabled: true,
+  },
+});
+assert.deepEqual(
+  repeat.command,
+  {
+    c: "setProductionRepeat",
+    buildings: repeatProducers.spawned.details.map((entry) => entry.id),
+    unit: "rifleman",
+    enabled: true,
+  },
+  "repeat-production orders resolve every producer alias into one authoritative command",
+);
+assert.deepEqual(
+  repeat.resolved.buildings.map(({ alias, id }) => ({ alias, id })),
+  repeatProducers.spawned.details.map(({ alias, id }) => ({ alias, id })),
+  "repeat-production results retain producer alias resolution evidence",
+);
+await service.execute("remove", { sessionId, refs: ["repeat_a", "repeat_b"] });
+calls.spawn = 0;
+calls.remove = 0;
+calls.inspectSizes.length = 0;
+
 const spawns = Array.from({ length: 100 }, (_, index) => ({
   owner: index % 2 + 1,
   kind: "rifleman",
@@ -180,6 +217,26 @@ assert.throws(() => validateCommandInput("spawn", {
   sessionId,
   spawns: Array.from({ length: 401 }, () => ({ owner: 1, kind: "rifleman", x: 1, y: 1 })),
 }), /1-400/);
+assert.doesNotThrow(() => validateCommandInput("order", {
+  sessionId,
+  playerId: 1,
+  command: {
+    c: "setProductionRepeat",
+    buildings: Array.from({ length: 100 }, (_, index) => index + 1),
+    unit: "rifleman",
+    enabled: false,
+  },
+}));
+assert.throws(() => validateCommandInput("order", {
+  sessionId,
+  playerId: 1,
+  command: {
+    c: "setProductionRepeat",
+    buildings: Array.from({ length: 101 }, (_, index) => index + 1),
+    unit: "rifleman",
+    enabled: true,
+  },
+}), /1-100/, "repeat production retains the bounded command-reference limit");
 
 const normalized = normalizeError(new LabInteractDriverError("labRejected", "blocked", {
   failedIndex: 3,
