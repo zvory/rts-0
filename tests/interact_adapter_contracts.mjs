@@ -146,7 +146,7 @@ async function coldOpenContracts() {
     workspace: { root, head: "a".repeat(40) },
     sessionDir,
     startupTimeoutMs: 10,
-    buildTimeoutMs: 80,
+    buildTimeoutMs: 200,
     artifactCapability: "b".repeat(64),
     processRunner: {
       runOrThrow(_command, _args, options) {
@@ -167,7 +167,7 @@ async function coldOpenContracts() {
     assert.match(error.message, /cold-build deadline/, "the timeout message does not claim a compiler error");
     return true;
   });
-  assert.ok(Date.now() - buildStartedAt >= 80, "Cargo gets its independent build deadline rather than the shorter readiness timeout");
+  assert.ok(Date.now() - buildStartedAt >= 200, "Cargo gets its independent build deadline rather than the shorter readiness timeout");
   assert.equal(processExists(buildPid), false, "timed-out Cargo children are reaped before the failure returns");
   assert.equal(timeoutPortAllocated, false, "failed cold builds do not select a port that can go stale during compilation");
   assert.ok(SERVER_BUILD_TIMEOUT_MS > 60_000, "production cold builds receive multi-minute headroom");
