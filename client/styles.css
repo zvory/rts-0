@@ -5299,40 +5299,33 @@ input[type="text"]:focus {
 
 .map-editor-panel {
   position: absolute;
-  z-index: 30;
-  inset: 12px auto 12px 12px;
-  width: min(370px, calc(100vw - 24px));
+  top: 58px;
+  left: 12px;
+  right: auto;
+  bottom: auto;
+  width: min(390px, calc(100vw - 24px));
+  min-width: min(260px, calc(100vw - 24px));
+  max-height: min(680px, calc(100vh - 24px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(208, 184, 132, 0.38);
-  border-radius: 8px;
-  background: rgba(16, 20, 24, 0.96);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.48);
-  color: var(--ink);
-  font-family: var(--sans);
 }
 
 .map-editor-header {
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(208, 184, 132, 0.22);
-  background: linear-gradient(180deg, rgba(71, 62, 45, 0.72), rgba(26, 29, 30, 0.82));
+  flex: 0 0 auto;
 }
 
-.map-editor-header h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 22px;
-  letter-spacing: 0.04em;
+.map-editor-panel .lab-panel-kicker,
+.map-editor-panel .lab-panel-title h2 {
+  color: #e7dfce;
 }
 
 .map-editor-panel-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 0;
-  padding: 12px;
+  flex: 1 1 auto;
   overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  padding-right: 2px;
 }
 
 .map-editor-group {
@@ -5413,11 +5406,12 @@ input[type="text"]:focus {
 .map-editor-history,
 .map-editor-palette,
 .map-editor-player-picker {
-  display: flex;
+  display: grid;
   gap: 7px;
 }
 
 .map-editor-history {
+  display: flex;
   align-items: center;
 }
 
@@ -5427,7 +5421,15 @@ input[type="text"]:focus {
 
 .map-editor-palette .map-editor-button,
 .map-editor-player-picker .map-editor-button {
-  flex: 1;
+  min-width: 0;
+}
+
+.map-editor-palette {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.map-editor-player-picker {
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
 }
 
 .map-editor-terrain-button {
@@ -5484,9 +5486,9 @@ input[type="text"]:focus {
 }
 
 .map-editor-status {
-  flex: 0 0 auto;
-  padding: 10px 16px;
-  border-bottom: 1px solid rgba(208, 184, 132, 0.2);
+  padding: 8px 10px;
+  border: 1px solid rgba(208, 184, 132, 0.2);
+  border-radius: 4px;
   background: rgba(255, 255, 255, 0.045);
 }
 
@@ -5497,10 +5499,13 @@ input[type="text"]:focus {
   font-weight: 700;
 }
 
-@media (max-width: 650px) {
+@media (max-width: 720px) {
   .map-editor-panel {
-    inset: auto 8px 8px;
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
     width: auto;
-    max-height: 48vh;
+    max-height: min(70vh, calc(100vh - 16px));
   }
 }

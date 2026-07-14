@@ -1,4 +1,5 @@
 import { TERRAIN } from "./protocol.js";
+import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
   MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_BASE_SITES,
@@ -8,6 +9,7 @@ import {
 } from "./map_editor_session.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
+const MAP_EDITOR_PANEL_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 
 export class MapEditorPanel {
   constructor({
@@ -37,9 +39,13 @@ export class MapEditorPanel {
     this.statusError = false;
     this.destroyed = false;
     this.el = document.createElement("aside");
-    this.el.className = "map-editor-panel";
+    this.el.className = "lab-panel map-editor-panel map-editor-window";
     this.el.setAttribute("aria-label", "Map Editor controls");
     root.appendChild(this.el);
+    this.windowChrome = new LabPanelWindowChrome(this.el, {
+      storageKey: MAP_EDITOR_PANEL_STORAGE_KEY,
+      panelLabel: "map editor controls",
+    });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
     this.unsubscribe = session.subscribe(() => this.render());
@@ -48,19 +54,22 @@ export class MapEditorPanel {
 
   render() {
     if (this.destroyed) return;
+    this.windowChrome.clearRenderListeners();
     const previousBody = this.el.querySelector(".map-editor-panel-body");
     const scroll = previousBody && {
       left: previousBody.scrollLeft,
       top: previousBody.scrollTop,
     };
     this.el.replaceChildren();
-    const header = document.createElement("header");
-    header.className = "map-editor-header";
-    const title = document.createElement("h1");
-    title.textContent = "Map Editor";
-    header.appendChild(title);
+    const header = this.windowChrome.renderHeader({
+      kicker: "Editor",
+      title: "Map Editor",
+      collapseLabel: "map editor panel",
+    });
+    header.classList.add("map-editor-header");
     const body = document.createElement("div");
-    body.className = "map-editor-panel-body";
+    body.className = "lab-panel-body map-editor-panel-body";
+    body.appendChild(this.renderStatus());
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
@@ -73,7 +82,7 @@ export class MapEditorPanel {
         this.renderActions(),
       );
     }
-    this.el.append(header, this.renderStatus(), body);
+    this.el.append(header, body, this.windowChrome.renderResizeHandle());
     if (scroll) {
       body.scrollLeft = scroll.left;
       body.scrollTop = scroll.top;
@@ -418,6 +427,7 @@ export class MapEditorPanel {
     this.destroyed = true;
     window.removeEventListener("keydown", this.onKeyDown);
     this.unsubscribe?.();
+    this.windowChrome.destroy();
     this.el.remove();
   }
 }

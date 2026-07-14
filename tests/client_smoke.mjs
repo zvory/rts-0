@@ -411,6 +411,11 @@ try {
       terrainPreviews: [...document.querySelectorAll(".map-editor-terrain-icon")]
         .map((icon) => ({ width: icon.width, height: icon.height })),
       header: document.querySelector(".map-editor-header")?.textContent?.trim() || "",
+      floatingChrome: Boolean(document.querySelector(".map-editor-panel .lab-panel-drag-handle")) &&
+        Boolean(document.querySelector(".map-editor-panel .lab-panel-resize-handle")) &&
+        Boolean(document.querySelector(".map-editor-panel .lab-panel-collapse")),
+      noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
+        .every((node) => node.scrollWidth <= node.clientWidth),
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
@@ -420,10 +425,14 @@ try {
     };
   });
   ok(
-    editorUi.header === "Map Editor" &&
+    editorUi.header.includes("Map Editor") &&
       editorUi.terrainPreviews.length === 8 &&
       editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
     `MAP EDITOR: terrain buttons show eight rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
+  );
+  ok(
+    editorUi.floatingChrome && editorUi.noHorizontalOverflow,
+    "MAP EDITOR: floating panel chrome is present and terrain/start-base pickers stay within the panel width",
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,
