@@ -1,4 +1,4 @@
-use crate::game::entity::{EntityKind, ProdItem, RallyIntent, ResearchItem, MAX_PRODUCTION_QUEUE};
+use crate::game::entity::{EntityKind, ProdItem, MAX_PRODUCTION_QUEUE};
 
 use super::Entity;
 
@@ -118,100 +118,6 @@ impl Entity {
             return false;
         };
         front.progress = progress.min(front.total);
-        true
-    }
-
-    pub(crate) fn research_queue(&self) -> &[ResearchItem] {
-        self.production
-            .as_ref()
-            .map(|p| p.research_queue.as_slice())
-            .unwrap_or(&[])
-    }
-
-    pub(crate) fn research_queue_mut(&mut self) -> Option<&mut Vec<ResearchItem>> {
-        self.production.as_mut().map(|p| &mut p.research_queue)
-    }
-
-    pub(crate) fn push_research(&mut self, item: ResearchItem) -> bool {
-        let Some(p) = self.production.as_mut() else {
-            return false;
-        };
-        if p.research_queue.len() >= MAX_PRODUCTION_QUEUE {
-            return false;
-        }
-        p.research_queue.push(item);
-        true
-    }
-
-    pub(in crate::game) fn mark_front_research_paid(&mut self) -> bool {
-        let Some(front) = self
-            .production
-            .as_mut()
-            .and_then(|p| p.research_queue.first_mut())
-        else {
-            return false;
-        };
-        front.paid = true;
-        true
-    }
-
-    pub(crate) fn pop_last_research(&mut self) -> Option<ResearchItem> {
-        self.production.as_mut()?.research_queue.pop()
-    }
-
-    /// Rally point for a unit-producing building, if one has been set.
-    pub fn rally_point(&self) -> Option<(f32, f32)> {
-        self.production
-            .as_ref()
-            .and_then(|p| p.rally_point)
-            .map(|r| (r.point.x, r.point.y))
-    }
-
-    /// Set (or clear with `None`) this building's rally point. No-op on entities without a
-    /// production component.
-    pub fn set_rally_point(&mut self, rally: Option<RallyIntent>) {
-        if let Some(p) = self.production.as_mut() {
-            p.rally_point = rally;
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn rally_stages(&self) -> &[RallyIntent] {
-        self.production
-            .as_ref()
-            .map(|p| p.rally_queue.as_slice())
-            .unwrap_or(&[])
-    }
-
-    pub fn rally_plan(&self) -> Vec<RallyIntent> {
-        let Some(p) = self.production.as_ref() else {
-            return Vec::new();
-        };
-        p.rally_point
-            .into_iter()
-            .chain(p.rally_queue.iter().copied())
-            .collect()
-    }
-
-    pub fn clear_rally_stages(&mut self) {
-        if let Some(p) = self.production.as_mut() {
-            p.rally_queue.clear();
-        }
-    }
-
-    pub fn append_rally_stage(&mut self, rally: RallyIntent, max_stages: usize) -> bool {
-        let Some(p) = self.production.as_mut() else {
-            return false;
-        };
-        if p.rally_point.is_none() {
-            p.rally_point = Some(rally);
-            return true;
-        }
-        let total = 1usize.saturating_add(p.rally_queue.len());
-        if total >= max_stages {
-            return false;
-        }
-        p.rally_queue.push(rally);
         true
     }
 }

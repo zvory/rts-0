@@ -17,6 +17,8 @@ use super::{
 };
 
 mod production;
+mod rally;
+mod research;
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
 const BUILDING_START_HP_DENOMINATOR: u32 = 10;
