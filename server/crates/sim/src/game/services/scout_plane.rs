@@ -46,7 +46,9 @@ pub(crate) fn launch_ability(
 pub(crate) fn active_scout_plane(entities: &EntityStore, owner: u32) -> Option<u32> {
     entities
         .iter()
-        .filter(|plane| plane.kind == EntityKind::ScoutPlane && plane.owner == owner && plane.hp > 0)
+        .filter(|plane| {
+            plane.kind == EntityKind::ScoutPlane && plane.owner == owner && plane.hp > 0
+        })
         .map(|plane| plane.id)
         .min()
 }
@@ -307,16 +309,13 @@ struct ReturnStep {
     arrived: bool,
 }
 
-fn advance_return(
-    x: f32,
-    y: f32,
-    target: (f32, f32),
-    speed: f32,
-    world_max: f32,
-) -> ReturnStep {
+fn advance_return(x: f32, y: f32, target: (f32, f32), speed: f32, world_max: f32) -> ReturnStep {
     let x = x.clamp(0.0, world_max);
     let y = y.clamp(0.0, world_max);
-    let target = (target.0.clamp(0.0, world_max), target.1.clamp(0.0, world_max));
+    let target = (
+        target.0.clamp(0.0, world_max),
+        target.1.clamp(0.0, world_max),
+    );
     let dx = target.0 - x;
     let dy = target.1 - y;
     let dist = (dx * dx + dy * dy).sqrt();
