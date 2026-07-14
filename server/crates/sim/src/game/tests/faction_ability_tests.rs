@@ -322,12 +322,7 @@ fn breakthrough_uses_configured_plain_and_smoke_speed_multipliers() {
     let baseline = game
         .state
         .entities
-        .spawn_unit(
-            1,
-            EntityKind::Rifleman,
-            baseline_pos.0,
-            baseline_pos.1,
-        )
+        .spawn_unit(1, EntityKind::Rifleman, baseline_pos.0, baseline_pos.1)
         .expect("baseline rifle should spawn");
     game.state.smokes.schedule(
         smoke_pos.0,
@@ -377,21 +372,13 @@ fn breakthrough_uses_configured_plain_and_smoke_speed_multipliers() {
     }
     let plain_dx = game.state.entities.get(plain).expect("plain").pos_x - plain_pos.0;
     let smoke_dx = game.state.entities.get(smoked).expect("smoked").pos_x - smoke_pos.0;
-    let baseline_dx = game
-        .state
-        .entities
-        .get(baseline)
-        .expect("baseline")
-        .pos_x
-        - baseline_pos.0;
+    let baseline_dx = game.state.entities.get(baseline).expect("baseline").pos_x - baseline_pos.0;
     assert!(
-        (plain_dx / baseline_dx - crate::config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER).abs()
-            < 0.001,
+        (plain_dx / baseline_dx - crate::config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER).abs() < 0.001,
         "plain Breakthrough should use its configured multiplier ({plain_dx} / {baseline_dx})"
     );
     assert!(
-        (smoke_dx / baseline_dx - crate::config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER).abs()
-            < 0.001,
+        (smoke_dx / baseline_dx - crate::config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER).abs() < 0.001,
         "smoke Breakthrough should use its configured multiplier ({smoke_dx} / {baseline_dx})"
     );
 }
