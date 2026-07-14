@@ -94,14 +94,18 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   };
   const scheduleIdle = () => {
     clearTimeout(idleTimer);
-    if (stopping || activeRequests > 0) return;
+    if (stopping || activeRequests > 0 || sockets.size > 0) return;
     const remaining = Math.max(1, lastInteractionMark + idleMs - performance.now());
     idleTimer = setTimeout(() => { void shutdown("idleTimeout"); }, remaining);
   };
 
   const server = net.createServer((socket) => {
     sockets.add(socket);
-    socket.once("close", () => sockets.delete(socket));
+    clearTimeout(idleTimer);
+    socket.once("close", () => {
+      sockets.delete(socket);
+      if (!shutdownRequested) scheduleIdle();
+    });
     socket.setEncoding("utf8");
     socket.setTimeout(5_000, () => socket.destroy());
     let body = "";
