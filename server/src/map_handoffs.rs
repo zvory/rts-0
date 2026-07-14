@@ -8,7 +8,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use rts_server::protocol::LabMapDraft;
+use rts_server::protocol::{terrain, LabMapDraft};
 use rts_sim::game::lab::LabOp;
 use rts_sim::game::map::Map;
 use rts_sim::game::{Game, PlayerInit};
@@ -223,9 +223,14 @@ fn validate_materialized_binding(request: &CreateMapHandoffRequest) -> Result<()
         .iter()
         .flat_map(|row| row.as_str().unwrap_or("").bytes())
         .map(|byte| match byte {
-            b'.' => 0,
-            b'#' => 1,
-            b'~' => 2,
+            b'.' => terrain::GRASS,
+            b'#' => terrain::ROCK,
+            b'~' => terrain::WATER,
+            b'=' => terrain::ROAD_BARE,
+            b'-' => terrain::ROAD_HORIZONTAL,
+            b'|' => terrain::ROAD_VERTICAL,
+            b'\\' => terrain::ROAD_DIAGONAL_NW_SE,
+            b'/' => terrain::ROAD_DIAGONAL_NE_SW,
             _ => u8::MAX,
         })
         .collect::<Vec<_>>();
@@ -333,6 +338,28 @@ mod tests {
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
             .contains("do not match"));
+    }
+
+    #[test]
+    fn handoff_validation_binds_every_authored_road_variant() {
+        let mut request = valid_request();
+        let road_chars = ['=', '-', '|', '\\', '/'];
+        let road_codes = [
+            terrain::ROAD_BARE,
+            terrain::ROAD_HORIZONTAL,
+            terrain::ROAD_VERTICAL,
+            terrain::ROAD_DIAGONAL_NW_SE,
+            terrain::ROAD_DIAGONAL_NE_SW,
+        ];
+        let first_row = request.authored_map["terrain"][0]
+            .as_str()
+            .expect("terrain row");
+        let mut chars = first_row.chars().collect::<Vec<_>>();
+        chars[..road_chars.len()].copy_from_slice(&road_chars);
+        request.authored_map["terrain"][0] = chars.into_iter().collect::<String>().into();
+        request.materialized_map.terrain[..road_codes.len()].copy_from_slice(&road_codes);
+
+        assert_eq!(validate_request(&request), Ok(()));
     }
 
     #[test]
