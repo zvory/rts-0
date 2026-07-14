@@ -129,7 +129,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   net.pauseGame();
   net.unpauseGame();
   assert(sent[1].t === "pauseGame" && sent[2].t === "unpauseGame", "Net live pause helpers send exact tags");
-  net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
+  net.lab(12, { op: "setVision", vision: msg.labVisionAll() });
   assert(sent[3].t === "lab" && sent[3].requestId === 12, "Net.lab sends lab request envelopes");
   assert(net.setRoomTimeSpeed(2) === true, "Net reports a successful room-time speed send");
   assert(net.stepRoomTime() === true, "Net reports a successful room-time step send");

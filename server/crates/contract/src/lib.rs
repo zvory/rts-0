@@ -215,9 +215,8 @@ pub enum LabStartRole {
     rename_all_fields = "camelCase"
 )]
 pub enum LabVisionMode {
-    FullWorld,
+    All,
     Team { team_id: TeamId },
-    Teams { team_ids: Vec<TeamId> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

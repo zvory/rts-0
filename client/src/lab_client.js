@@ -232,16 +232,14 @@ export class LabClient {
 
 export function labVisionLabel(vision) {
   if (!vision || typeof vision !== "object") return "-";
-  if (vision.mode === "fullWorld") return "Full world";
+  if (vision.mode === "all") return "Full";
   if (vision.mode === "team") return `Team ${vision.teamId}`;
-  if (vision.mode === "teams") return `Teams ${(vision.teamIds || []).join(", ")}`;
   return String(vision.mode || "-");
 }
 
 export const labVision = Object.freeze({
-  fullWorld: () => msg.labVisionFullWorld(),
+  all: () => msg.labVisionAll(),
   team: (teamId) => msg.labVisionTeam(teamId),
-  teams: (teamIds) => msg.labVisionTeams(teamIds),
 });
 
 function normalizePlayerIds(ids) {

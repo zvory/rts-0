@@ -23,9 +23,8 @@ import {
 } from "./lab_scenario_submission_flow.js";
 
 const labVision = Object.freeze({
-  fullWorld: () => msg.labVisionFullWorld(),
+  all: () => msg.labVisionAll(),
   team: (teamId) => msg.labVisionTeam(teamId),
-  teams: (teamIds) => msg.labVisionTeams(teamIds),
 });
 const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
@@ -73,7 +72,6 @@ export class LabPanel {
     this.authoringValidation = { errors: [], preview: null };
     this.submission = createLabScenarioSubmissionState();
     this.setSubmissionCapability(submissionCapability);
-    this.teamInputs = new Map();
     this.playerButtons = new Map();
     this.spawnPanels = new Map();
     this.fields = new Map();
@@ -118,7 +116,6 @@ export class LabPanel {
     this.removeListeners();
     this.optionsWindowChrome.clearRenderListeners();
     this.toolsWindowChrome.clearRenderListeners();
-    this.teamInputs.clear();
     this.playerButtons.clear();
     this.spawnPanels.clear();
     this.fields.clear();
@@ -240,30 +237,23 @@ export class LabPanel {
 
   renderVisionOptions() {
     const controls = [];
-    controls.push(this.button("Full", () => this.requestVision(labVision.fullWorld())));
+    const fullActive = this.state?.vision?.mode === "all";
+    const fullButton = this.button("Full", () => this.requestVision(labVision.all()), {
+      dataset: { active: fullActive ? "true" : "false" },
+    });
+    fullButton.setAttribute("aria-pressed", fullActive ? "true" : "false");
+    controls.push(fullButton);
 
     for (const teamId of this.teamIds()) {
-      controls.push(this.button(`Team ${teamId}`, () => this.requestVision(labVision.team(teamId))));
-    }
-
-    const union = document.createElement("div");
-    union.className = "lab-team-union";
-    for (const teamId of this.teamIds()) {
-      const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = String(teamId);
-      input.checked = this.visionIncludesTeam(teamId);
-      const text = document.createElement("span");
-      text.textContent = `T${teamId}`;
-      this.teamInputs.set(teamId, input);
-      label.append(input, text);
-      union.appendChild(label);
-    }
-    if (this.teamInputs.size > 0) {
-      const apply = this.button("Apply teams", () => this.requestTeamUnion());
-      union.appendChild(apply);
-      controls.push(union);
+      const teamActive = this.state?.vision?.mode === "team" &&
+        Number(this.state.vision.teamId) === teamId;
+      const teamButton = this.button(
+        `Team ${teamId}`,
+        () => this.requestVision(labVision.team(teamId)),
+        { dataset: { active: teamActive ? "true" : "false" } },
+      );
+      teamButton.setAttribute("aria-pressed", teamActive ? "true" : "false");
+      controls.push(teamButton);
     }
 
     return this.fieldset("Vision", controls, { className: "lab-tool-group lab-vision-group" });
@@ -1235,14 +1225,6 @@ export class LabPanel {
     void this.labClient.setVision(vision);
   }
 
-  requestTeamUnion() {
-    const teamIds = Array.from(this.teamInputs.entries())
-      .filter(([, input]) => input.checked)
-      .map(([teamId]) => teamId);
-    if (teamIds.length === 1) this.requestVision(labVision.team(teamIds[0]));
-    else if (teamIds.length > 1) this.requestVision(labVision.teams(teamIds));
-  }
-
   publicRoomName() {
     return this.launch?.publicRoom || this.state?.room || this.startPayload?.lab?.room || "default";
   }
@@ -1268,13 +1250,6 @@ export class LabPanel {
 
   players() {
     return (this.startPayload?.players || []).filter((player) => Number.isFinite(Number(player?.id)));
-  }
-
-  visionIncludesTeam(teamId) {
-    const vision = this.state?.vision;
-    if (vision?.mode === "team") return Number(vision.teamId) === teamId;
-    if (vision?.mode === "teams") return (vision.teamIds || []).map(Number).includes(teamId);
-    return false;
   }
 
   removeListeners() {
@@ -1479,8 +1454,7 @@ function roleLabel(role) {
 
 function labVisionLabel(vision) {
   if (!vision || typeof vision !== "object") return "-";
-  if (vision.mode === "fullWorld") return "Full world";
+  if (vision.mode === "all") return "Full";
   if (vision.mode === "team") return `Team ${vision.teamId}`;
-  if (vision.mode === "teams") return `Teams ${(vision.teamIds || []).join(", ")}`;
   return String(vision.mode || "-");
 }

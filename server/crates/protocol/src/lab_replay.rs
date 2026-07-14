@@ -876,32 +876,12 @@ fn validate_lab_metadata(
     team_ids: &HashSet<TeamId>,
 ) -> Result<(), LabReplayValidationError> {
     match vision {
-        LabVisionMode::FullWorld => {}
+        LabVisionMode::All => {}
         LabVisionMode::Team { team_id } => {
             if !team_ids.contains(team_id) {
                 return Err(invalid(format!(
                     "{label}.metadata.lab.vision has unknown teamId"
                 )));
-            }
-        }
-        LabVisionMode::Teams { team_ids: ids } => {
-            if ids.is_empty() {
-                return Err(invalid(format!(
-                    "{label}.metadata.lab.vision teamIds must not be empty"
-                )));
-            }
-            let mut seen = HashSet::new();
-            for team_id in ids {
-                if !seen.insert(*team_id) {
-                    return Err(invalid(format!(
-                        "{label}.metadata.lab.vision teamIds must not contain duplicates"
-                    )));
-                }
-                if !team_ids.contains(team_id) {
-                    return Err(invalid(format!(
-                        "{label}.metadata.lab.vision has unknown teamId"
-                    )));
-                }
             }
         }
     }

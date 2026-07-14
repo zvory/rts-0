@@ -415,7 +415,7 @@ mod tests {
             game,
             "timeline baseline".to_string(),
             LabScenarioLabMetadata {
-                vision: LabVisionMode::FullWorld,
+                vision: LabVisionMode::All,
                 god_mode_players: game.lab_god_mode_players(),
                 initial_camera: None,
             },

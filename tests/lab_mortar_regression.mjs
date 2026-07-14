@@ -187,7 +187,7 @@ async function runLabMortarRegressionAttempt(attempt) {
       3_000,
       "lab start payload",
     );
-    requireCondition(start.lab?.vision?.mode === "fullWorld", "lab starts with full-world vision");
+    requireCondition(start.lab?.vision?.mode === "all", "lab starts with all-team vision");
     await operator.waitFor(
       (msg) => msg.t === "snapshot" && msg.entities.length > 0,
       3_000,

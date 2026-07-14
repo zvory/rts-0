@@ -15952,7 +15952,7 @@
         "centerY": 2784
       },
       "vision": {
-        "mode": "fullWorld"
+        "mode": "all"
       }
     },
     "sourceEntityIdMap": [

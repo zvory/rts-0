@@ -278,9 +278,8 @@ export const VISION_SELECTION = Object.freeze({
 
 export const LAB_ROLE = Object.freeze({ OPERATOR: "operator", READ_ONLY: "readOnly" });
 export const LAB_VISION = Object.freeze({
-  FULL_WORLD: "fullWorld",
+  ALL: "all",
   TEAM: "team",
-  TEAMS: "teams",
 });
 export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
   NONE: "none",

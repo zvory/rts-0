@@ -235,7 +235,7 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
                 msg,
                 ServerMessage::LabState(state)
                     if state.role == LabStartRole::Operator
-                        && state.vision == LabVisionMode::FullWorld
+                        && state.vision == LabVisionMode::All
             )
         }));
         assert!(writer.snapshots.take().is_some());
@@ -1072,7 +1072,7 @@ fn lab_vision_state_and_snapshots_are_per_operator() {
         })
         .expect("collaborator lab state");
     assert_eq!(operator_state.vision, LabVisionMode::Team { team_id: 2 });
-    assert_eq!(collab_state.vision, LabVisionMode::FullWorld);
+    assert_eq!(collab_state.vision, LabVisionMode::All);
     assert_eq!(operator_state.operation_count, 1);
     assert_eq!(collab_state.operation_count, 1);
 
@@ -1085,12 +1085,12 @@ fn lab_vision_state_and_snapshots_are_per_operator() {
     let collab_snapshot = collab_writer
         .snapshots
         .take()
-        .expect("collaborator full-world snapshot");
+        .expect("collaborator all-team snapshot");
     let Phase::InGame(game) = &task.phase else {
         panic!("lab should remain running");
     };
     let mut expected_operator = game.snapshot_for_spectator(&[LAB_PLAYER_TWO_ID]);
-    let mut expected_collab = game.snapshot_full_for(LAB_PLAYER_ONE_ID);
+    let mut expected_collab = game.snapshot_for_spectator(&[LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID]);
     compact_snapshot_for_wire(&mut expected_operator);
     compact_snapshot_for_wire(&mut expected_collab);
     assert_eq!(

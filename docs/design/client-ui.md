@@ -573,7 +573,7 @@ export class LabClient {
   destroy()
 }
 export function labVisionLabel(vision)
-export const labVision                   // fullWorld(), team(teamId), teams(teamIds)
+export const labVision                   // all(), team(teamId)
 ```
 
 `lab_catalog.js`
@@ -747,7 +747,9 @@ export class MapEditorSession {
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
 status, lab vision, command-limit policy, setup authoring metadata, validation, PR submission,
 setup import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
-active tool status, and the remove setup tool. App passes the HTTP
+active tool status, and the remove setup tool. Vision presents one `Full` button plus one button per
+team; `Full` requests the authoritative union of every current team's fog, and Lab exposes no
+omniscient/no-fog control. App passes the HTTP
 `/api/lab-scenarios/submission` capability probe into the panel; unavailable deployments keep the
 submit action disabled and leave local setup JSON export visible. Successful submissions open the draft PR
 when allowed and always render the PR URL in-panel so popup blocking does not hide the review link.
@@ -820,7 +822,7 @@ control. Operator gameplay commands still flow through `commandIssuer.issueComma
 `LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
 owner and includes whether that command should bypass the normal command-supply limit.
 Mixed-owner lab selections remain command-blocked, but renderer inspection treats every selected
-operator-controllable owner as a feedback owner so full-world lab overlays such as rally/order
+operator-controllable owner as a feedback owner so all-team Lab overlays such as rally/order
 markers and selected support-weapon field-of-fire wedges can be compared across players.
 Every client surface that needs ownership semantics must read through the injected control policy
 or the `GameState` helpers that delegate to it: command-card resources/faction/upgrades,

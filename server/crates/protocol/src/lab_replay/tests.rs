@@ -67,7 +67,7 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
         metadata: LabCheckpointScenarioMetadata {
             exported_tick: tick,
             lab: LabScenarioLabMetadata {
-                vision: LabVisionMode::FullWorld,
+                vision: LabVisionMode::All,
                 god_mode_players: Vec::new(),
                 initial_camera: None,
             },
@@ -424,7 +424,7 @@ fn lab_replay_artifact_rejects_unsupported_vision_metadata_operation() {
     let mut value = serde_json::to_value(valid_artifact()).unwrap();
     value["operations"][0]["op"] = json!({
         "op": "setVision",
-        "vision": { "mode": "fullWorld" },
+        "vision": { "mode": "all" },
     });
 
     let err = validate_value(value).expect_err("setVision should be excluded");

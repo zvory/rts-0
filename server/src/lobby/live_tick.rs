@@ -30,7 +30,6 @@ pub(super) enum LiveTickResult {
 
 #[derive(Clone)]
 pub(super) enum LabSnapshotProjection {
-    FullWorld { view_player_id: u32 },
     PlayerUnion { player_ids: Vec<u32> },
 }
 
@@ -254,9 +253,6 @@ impl LiveTickDriver<'_> {
                 RecipientRole::ActivePlayer
             };
             let projection = match lab_snapshot_projections.get(&id) {
-                Some(LabSnapshotProjection::FullWorld { view_player_id }) => self
-                    .projection_policy
-                    .live_snapshot_for(role, id, Some(*view_player_id), &spectator_visible_players),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => self
                     .projection_policy
                     .selected_perspective_snapshot_for(player_ids.clone()),

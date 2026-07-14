@@ -78,7 +78,7 @@ impl LabSession {
     pub(super) fn new(config: &LabRoomConfig, operator_id: u32) -> Self {
         let mut viewer_roles = HashMap::new();
         viewer_roles.insert(operator_id, LabStartRole::Operator);
-        let default_vision = LabVisionMode::FullWorld;
+        let default_vision = LabVisionMode::All;
         let mut viewer_visions = HashMap::new();
         viewer_visions.insert(operator_id, default_vision.clone());
         Self {
@@ -169,6 +169,14 @@ fn players_on_teams(game: &Game, team_ids: impl IntoIterator<Item = TeamId>) -> 
         .players
         .into_iter()
         .filter(|player| teams.contains(&player.team_id))
+        .map(|player| player.id)
+        .collect()
+}
+
+fn all_player_ids(game: &Game) -> Vec<u32> {
+    game.start_payload()
+        .players
+        .into_iter()
         .map(|player| player.id)
         .collect()
 }
@@ -326,28 +334,13 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
 fn validate_lab_vision(game: &Game, vision: &LabVisionMode) -> Result<(), String> {
     let players = game.start_payload().players;
     match vision {
-        LabVisionMode::FullWorld => Ok(()),
+        LabVisionMode::All => Ok(()),
         LabVisionMode::Team { team_id } => {
             if players.iter().any(|player| player.team_id == *team_id) {
                 Ok(())
             } else {
                 Err("unknown lab team id".to_string())
             }
-        }
-        LabVisionMode::Teams { team_ids } => {
-            if team_ids.is_empty() {
-                return Err("teamIds must not be empty".to_string());
-            }
-            let mut seen = HashSet::new();
-            for team_id in team_ids {
-                if !seen.insert(*team_id) {
-                    return Err("teamIds must not contain duplicates".to_string());
-                }
-                if !players.iter().any(|player| player.team_id == *team_id) {
-                    return Err("unknown lab team id".to_string());
-                }
-            }
-            Ok(())
         }
     }
 }
@@ -876,14 +869,11 @@ impl RoomTask {
                 continue;
             }
             let projection = match session.vision_for(id) {
-                LabVisionMode::FullWorld => LabSnapshotProjection::FullWorld {
-                    view_player_id: session.view_player_id,
+                LabVisionMode::All => LabSnapshotProjection::PlayerUnion {
+                    player_ids: all_player_ids(game),
                 },
                 LabVisionMode::Team { team_id } => LabSnapshotProjection::PlayerUnion {
                     player_ids: players_on_teams(game, std::iter::once(team_id)),
-                },
-                LabVisionMode::Teams { team_ids } => LabSnapshotProjection::PlayerUnion {
-                    player_ids: players_on_teams(game, team_ids),
                 },
             };
             projections.insert(id, projection);
@@ -918,17 +908,10 @@ impl RoomTask {
         )
         .send_to_recipients(&mut self.players, recipients, |id, player| {
             let projection = match lab_snapshot_projections.get(&id) {
-                Some(LabSnapshotProjection::FullWorld { view_player_id }) => projection_policy
-                    .live_snapshot_for(RecipientRole::Spectator, id, Some(*view_player_id), &[]),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => {
                     projection_policy.selected_perspective_snapshot_for(player_ids.clone())
                 }
-                None => projection_policy.live_snapshot_for(
-                    RecipientRole::Spectator,
-                    id,
-                    Some(LAB_PLAYER_ONE_ID),
-                    &[],
-                ),
+                None => projection_policy.selected_perspective_snapshot_for(all_player_ids(&game)),
             };
             let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))

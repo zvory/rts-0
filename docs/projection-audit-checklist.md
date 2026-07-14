@@ -8,7 +8,7 @@ use a separate diagnostic/full-world policy.
 ## Recipient and issuer
 
 - Name the recipient policy: active player, live spectator, replay selected player(s), lab
-  full-world, lab selected team(s), dev full-world, or replay branch live seat.
+  all-team, lab selected team, dev full-world, or replay branch live seat.
 - If the action can issue gameplay commands, name the issuer separately from the viewer. Lab
   operators use `issueCommandAs` for the single selected owner; mixed-owner selections must stay
   rejected instead of being partitioned.
@@ -21,10 +21,10 @@ use a separate diagnostic/full-world policy.
 - For normal active players, verify entity visibility and `visibleTiles` come from living-team
   current fog. Exact-owner fields remain exact-owner-only: resources, supply, upgrades, command
   authority, ability affordances, order plans, rally plans, and private controls.
-- For replay, live spectator, and lab selected-team views, pass the selected real player ids through
+- For replay, live spectator, and Lab team/all-team views, pass the selected real player ids through
   the same snapshot body, remembered-building memory, resource rows, and event-union path.
-- For full-world lab and dev views, use the full-world snapshot body and the deterministic
-  full-world event union. Do not approximate full-world behavior by choosing viewer id `0`.
+- For full-world dev views, use the full-world snapshot body and the deterministic full-world event
+  union. Do not approximate full-world behavior by choosing viewer id `0`.
 - For remembered buildings, document whether the view uses one player's memory, a selected union, or
   no memory. Union memory should dedupe by building id with newest `observedTick` winning.
 - For `playerResources`, expose rows only for the real player ids selected by the observer view;

@@ -154,7 +154,7 @@ impl RoomTask {
             .lab_session
             .as_ref()
             .map(|session| session.default_vision.clone())
-            .unwrap_or(LabVisionMode::FullWorld);
+            .unwrap_or(LabVisionMode::All);
         let initial_camera = self
             .lab_session
             .as_ref()

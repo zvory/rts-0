@@ -320,7 +320,7 @@ await withFakeDocument(() => {
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
     role: LAB_ROLE.OPERATOR,
-    vision: labVision.fullWorld(),
+    vision: labVision.all(),
     dirty: false,
     operationCount: 0,
   });
@@ -390,7 +390,7 @@ await withFakeDocument(() => {
   );
   labClient.resetScenario();
   assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabClient resets setups by seeking lab room time to tick zero");
-  assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
+  assert(labVisionLabel(labVision.all()) === "Full", "labVisionLabel formats all-team vision");
   labClient.destroy();
 }
 
@@ -539,7 +539,7 @@ await withFakeDocument(async () => {
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
     role: LAB_ROLE.OPERATOR,
-    vision: labVision.fullWorld(),
+    vision: labVision.all(),
     dirty: false,
     operationCount: 0,
   });
@@ -587,7 +587,7 @@ await withFakeDocument(async () => {
       room: "__lab__:sandbox:map=Default",
       operatorId: 1,
       role,
-      vision: labVision.fullWorld(),
+      vision: labVision.all(),
       dirty: true,
       operationCount: 7,
     });
@@ -729,7 +729,7 @@ await withFakeDocument(async () => {
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
     role: LAB_ROLE.OPERATOR,
-    vision: labVision.fullWorld(),
+    vision: labVision.all(),
     dirty: false,
     operationCount: 0,
   });
@@ -932,6 +932,15 @@ await withFakeDocument(async () => {
       buttonByText("Tank Production")?.["aria-pressed"] === "false",
     "LabPanel renders incomplete research as an up unavailable button",
   );
+  assert(!buttonByText("Apply teams"), "LabPanel omits the arbitrary team-union controls");
+  assert(
+    buttonByText("Full")?.dataset.active === "true" &&
+      buttonByText("Full")?.["aria-pressed"] === "true" &&
+      buttonByText("Team 2")?.dataset.active === "false",
+    "LabPanel marks the current vision button as active",
+  );
+  buttonByText("Full").listeners.click();
+  assert(sent.at(-1).op.vision.mode === "all", "LabPanel Full vision requests all-team fog");
   const teamButton = buttonByText("Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
@@ -1267,7 +1276,7 @@ await withFakeDocument(async () => {
     schemaVersion: LAB_CHECKPOINT_SCENARIO.SCHEMA_VERSION,
     kind: LAB_CHECKPOINT_SCENARIO.KIND,
     name: "saved setup",
-    metadata: { exportedTick: 0, lab: { vision: labVision.fullWorld() } },
+    metadata: { exportedTick: 0, lab: { vision: labVision.all() } },
   });
   void panel.importScenario();
   assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted checkpoint setup JSON");
