@@ -158,10 +158,43 @@ function nearPoint(call, point, epsilon = 0.001) {
   _drawBreakthroughAuras.call(
     { _feedbackGfx: unselectedAuraGfx, _map: { tileSize: 32 } },
     { playerId: 1, selectedEntities: () => [] },
+    [selectedCommandCar],
   );
   assert(
     !unselectedAuraGfx.calls.some((call) => call[0] === "drawCircle"),
-    "unselected Command Cars do not draw their speed aura",
+    "unselected inactive Command Cars do not draw their speed aura",
+  );
+
+  const unselectedActiveAuraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: unselectedActiveAuraGfx, _map: { tileSize: 32 } },
+    { playerId: 1, selectedEntities: () => [] },
+    [{
+      ...selectedCommandCar,
+      breakthroughTicks: 12,
+      abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 500 }],
+    }],
+  );
+  assert(
+    unselectedActiveAuraGfx.calls.some(
+      (call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78,
+    ),
+    "an unselected Command Car with active Breakthrough draws a bright aura",
+  );
+
+  const buffedNonCasterAuraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: buffedNonCasterAuraGfx, _map: { tileSize: 32 } },
+    { playerId: 1, selectedEntities: () => [] },
+    [{
+      ...selectedCommandCar,
+      breakthroughTicks: 12,
+      abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0 }],
+    }],
+  );
+  assert(
+    !buffedNonCasterAuraGfx.calls.some((call) => call[0] === "drawCircle"),
+    "an unselected buffed Command Car that did not cast Breakthrough does not draw an aura",
   );
 
   const interpolatedCommandCar = {
@@ -181,12 +214,17 @@ function nearPoint(call, point, epsilon = 0.001) {
   _drawBreakthroughAuras.call(
     { _feedbackGfx: interpolatedAuraGfx, _map: { tileSize: 32 } },
     interpolatedView,
+    [interpolatedCommandCar],
   );
   assert(
     interpolatedAuraGfx.calls.some(
       (call) => call[0] === "drawCircle" && call[1] === interpolatedCommandCar.x,
     ),
     "the selected Command Car aura stays centered on its interpolated render position",
+  );
+  assert(
+    interpolatedAuraGfx.calls.filter((call) => call[0] === "drawCircle").length === 1,
+    "an active selected Command Car draws only one aura",
   );
 }
 
