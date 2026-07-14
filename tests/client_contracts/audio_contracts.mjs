@@ -348,6 +348,18 @@ assert(
   assert(backgroundVoice.spatial?.directionalOnly === true, "world combat bed uses direction-only spatial nodes");
   assertApprox(backgroundVoice.spatial.distGain.gain.value, 1, 0.001, "world combat bed has no distance attenuation");
   assertApprox(backgroundVoice.spatial.panner.pan.value, 1, 0.001, "world combat bed pans toward combat");
+  audio.buffers.set("unrelated_spatial", { duration: 1 });
+  assert(
+    audio.play("unrelated_spatial", {
+      x: 300,
+      y: 100,
+      category: "ambient",
+      pitchVariance: 0,
+    }),
+    "an unrelated spatial voice can play beside the world combat bed",
+  );
+  const unrelatedVoice = audio.voices.find((voice) => voice.id === "unrelated_spatial");
+  const unrelatedPanRampCount = unrelatedVoice.spatial.panner.pan.ramps.length;
   assert(
     audio.setVoicePosition("combat:world_activity_bed", 0, 100) === 1,
     "world combat direction updates without restarting the loop",
@@ -357,6 +369,16 @@ assert(
     -1,
     0.001,
     "updated combat area repans the existing bed",
+  );
+  assert(
+    unrelatedVoice.spatial.panner.pan.ramps.length === unrelatedPanRampCount,
+    "keyed combat-bed repanning does not reschedule unrelated spatial voices",
+  );
+  const bedPanRampCount = backgroundVoice.spatial.panner.pan.ramps.length;
+  assert(
+    audio.setVoicePosition("combat:world_activity_bed", 0, 100) === 1
+      && backgroundVoice.spatial.panner.pan.ramps.length === bedPanRampCount,
+    "an unchanged combat point does not schedule a redundant repan",
   );
   assert(backgroundVoice.node.loop === true, "world combat bed repeats until stopped by key");
   assertApprox(

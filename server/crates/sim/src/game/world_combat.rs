@@ -131,11 +131,11 @@ fn activity_position(event: &Event) -> Option<[f32; 2]> {
 }
 
 fn quantize_position(position: [f32; 2], world_size: f32) -> [f32; 2] {
-    let grid = config::TILE_SIZE as f32 * POSITION_GRID_TILES;
-    let max = (world_size - 1.0).max(0.0);
+    let grid = position_grid_px();
+    let max_grid_point = (((world_size - 1.0).max(0.0) / grid).floor() * grid).max(0.0);
     [
-        ((position[0] / grid).round() * grid).clamp(0.0, max),
-        ((position[1] / grid).round() * grid).clamp(0.0, max),
+        ((position[0] / grid).round() * grid).clamp(0.0, max_grid_point),
+        ((position[1] / grid).round() * grid).clamp(0.0, max_grid_point),
     ]
 }
 
@@ -148,6 +148,15 @@ fn position_in_world(position: [f32; 2], world_size: f32) -> bool {
         && position[1] >= 0.0
         && position[0] < world_size
         && position[1] < world_size
+        && position.into_iter().all(position_component_is_quantized)
+}
+
+fn position_component_is_quantized(component: f32) -> bool {
+    component % position_grid_px() == 0.0
+}
+
+fn position_grid_px() -> f32 {
+    config::TILE_SIZE as f32 * POSITION_GRID_TILES
 }
 
 #[cfg(test)]
@@ -396,5 +405,28 @@ mod tests {
             Some([4096.0, 0.0]),
             4096.0
         ));
+        assert!(!valid_checkpoint_signal_state(
+            Some(17),
+            Some([2049.0, 1024.0]),
+            Some(75),
+            point,
+            4096.0
+        ));
+        assert!(!valid_checkpoint_signal_state(
+            Some(17),
+            point,
+            Some(75),
+            Some([2048.0, 1025.0]),
+            4096.0
+        ));
+    }
+
+    #[test]
+    fn edge_positions_stay_on_the_coarse_grid_and_inside_the_world() {
+        assert_eq!(
+            quantize_position([4095.0, 4095.0], 4096.0),
+            [3072.0, 3072.0]
+        );
+        assert_eq!(quantize_position([511.0, 513.0], 768.0), [0.0, 0.0]);
     }
 }

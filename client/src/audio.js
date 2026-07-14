@@ -397,15 +397,18 @@ export class Audio {
   /** Update the world point of active keyed spatial voices without restarting them. */
   setVoicePosition(key, x, y) {
     if (typeof key !== "string" || !key || !Number.isFinite(x) || !Number.isFinite(y)) return 0;
-    let updated = 0;
+    let matched = 0;
+    const changed = [];
     for (const voice of this.voices) {
       if (voice.key !== key || !voice.spatial) continue;
+      matched += 1;
+      if (voice.spatial.x === x && voice.spatial.y === y) continue;
       voice.spatial.x = x;
       voice.spatial.y = y;
-      updated += 1;
+      changed.push(voice);
     }
-    if (updated > 0) this._refreshSpatialVoices();
-    return updated;
+    if (changed.length > 0) this._refreshSpatialVoices(changed);
+    return matched;
   }
 
   /**
@@ -440,16 +443,16 @@ export class Audio {
   }
 
   /**
-   * Re-evaluate pan/lowpass/distance gain for every in-flight spatial voice
-   * against the current listener pose. Called from setListener so a minimap
-   * jump (or any large camera move) updates dampening within ~30ms instead of
-   * waiting for the next play() of the same sound.
+   * Re-evaluate pan/lowpass/distance gain for the supplied in-flight voices,
+   * defaulting to all voices. Called from setListener so a minimap jump (or any
+   * large camera move) updates dampening within ~30ms instead of waiting for the
+   * next play() of the same sound.
    */
-  _refreshSpatialVoices() {
-    if (!this.ctx || this.voices.length === 0) return;
+  _refreshSpatialVoices(voices = this.voices) {
+    if (!this.ctx || voices.length === 0) return;
     const t = this.ctx.currentTime;
     const ramp = t + SPATIAL_REFRESH_RAMP_S;
-    for (const voice of this.voices) {
+    for (const voice of voices) {
       const s = voice.spatial;
       if (!s) continue;
       const next = s.directionalOnly
