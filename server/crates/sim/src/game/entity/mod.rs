@@ -46,6 +46,7 @@ pub use state::{
     ProductionState, ResearchItem, ResourceExtractorState, ResourceNodeState, WeaponSetup,
     WorkerState,
 };
+pub(crate) use state::MAX_PRODUCTION_QUEUE;
 pub use store::EntityStore;
 
 /// Neutral owner id used for resource nodes (steel / oil nodes).

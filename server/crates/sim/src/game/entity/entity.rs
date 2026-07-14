@@ -1025,7 +1025,18 @@ impl Entity {
         let Some(p) = self.production.as_mut() else {
             return false;
         };
+        if p.queue.len() >= super::MAX_PRODUCTION_QUEUE {
+            return false;
+        }
         p.queue.push(item);
+        true
+    }
+
+    pub(in crate::game) fn mark_front_production_paid(&mut self) -> bool {
+        let Some(front) = self.production.as_mut().and_then(|p| p.queue.first_mut()) else {
+            return false;
+        };
+        front.paid = true;
         true
     }
 
@@ -1094,6 +1105,9 @@ impl Entity {
 
     pub fn tick_front_production(&mut self) -> Option<EntityKind> {
         let front = self.production.as_mut()?.queue.first_mut()?;
+        if !front.paid {
+            return None;
+        }
         if front.progress < front.total {
             front.progress = front.progress.saturating_add(1);
         }
@@ -1132,7 +1146,22 @@ impl Entity {
         let Some(p) = self.production.as_mut() else {
             return false;
         };
+        if p.research_queue.len() >= super::MAX_PRODUCTION_QUEUE {
+            return false;
+        }
         p.research_queue.push(item);
+        true
+    }
+
+    pub(in crate::game) fn mark_front_research_paid(&mut self) -> bool {
+        let Some(front) = self
+            .production
+            .as_mut()
+            .and_then(|p| p.research_queue.first_mut())
+        else {
+            return false;
+        };
+        front.paid = true;
         true
     }
 

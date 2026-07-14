@@ -106,11 +106,13 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             unit: EntityKind::Worker,
             progress: 30,
             total: 120,
+            paid: true,
         });
         building.push_production(ProdItem {
             unit: EntityKind::ScoutPlane,
             progress: 0,
             total: 600,
+            paid: true,
         });
     }
 
@@ -130,11 +132,13 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             unit: EntityKind::Rifleman,
             progress: 30,
             total: 120,
+            paid: true,
         });
         building.push_production(ProdItem {
             unit: EntityKind::MachineGunner,
             progress: 0,
             total: 180,
+            paid: true,
         });
         building.set_rally_point(Some(RallyIntent::new(
             RallyKind::AttackMove,
@@ -160,6 +164,7 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             upgrade: upgrade::UpgradeKind::TankUnlock,
             progress: 60,
             total: 600,
+            paid: true,
         });
 
     let scaffold_pos = game.state.map.tile_center(11, 2);

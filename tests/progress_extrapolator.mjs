@@ -33,6 +33,15 @@ function building(extra = {}) {
 
 {
   const ex = new ProgressExtrapolator({ playerId: 1 });
+  const waiting = building({ prodProgress: 0, prodWaiting: true });
+  ex.updateFromSnapshot([waiting], 1000);
+  const out = ex.apply(waiting, 30_000);
+  assert(out.prodProgress === 0, "unpaid production stays visually paused at zero");
+  assert(out.progressPredicted !== true, "unpaid production is not marked as extrapolated");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
   const entity = building();
   ex.updateFromSnapshot([entity], 1000);
   ex.setPaused(true, 1500);

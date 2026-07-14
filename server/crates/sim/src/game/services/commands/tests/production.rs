@@ -302,7 +302,7 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
 }
 
 #[test]
-fn panzerfaust_training_reports_resource_and_supply_blocks() {
+fn panzerfaust_training_waits_for_resource_and_supply_blocks() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
@@ -326,15 +326,15 @@ fn panzerfaust_training_reports_resource_and_supply_blocks() {
         &mut oil_blocked,
         vec![(1, train_panzerfaust.clone())],
     );
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Not enough oil"
-    ));
-    assert!(entities
-        .get(barracks)
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
+    let queue = entities.get(barracks).expect("barracks").prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert!(!queue[0].paid);
+
+    entities
+        .get_mut(barracks)
         .expect("barracks")
-        .prod_queue()
-        .is_empty());
+        .pop_last_production();
 
     let mut supply_blocked = vec![player_state(1), player_state(2)];
     let supply_cap = supply_blocked[0].supply_cap;
@@ -345,15 +345,10 @@ fn panzerfaust_training_reports_resource_and_supply_blocks() {
         &mut supply_blocked,
         vec![(1, train_panzerfaust)],
     );
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Not enough supply"
-    ));
-    assert!(entities
-        .get(barracks)
-        .expect("barracks")
-        .prod_queue()
-        .is_empty());
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
+    let queue = entities.get(barracks).expect("barracks").prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert!(!queue[0].paid);
 }
 
 #[test]
@@ -556,7 +551,7 @@ fn ballistic_tables_research_requires_heavy_guns() {
 }
 
 #[test]
-fn train_resource_shortages_emit_specific_notices() {
+fn manual_train_resource_shortages_create_unpaid_queue_entries() {
     let map = flat_map(24);
 
     let mut oil_missing_entities = EntityStore::new();
@@ -578,13 +573,16 @@ fn train_resource_shortages_emit_specific_notices() {
             },
         )],
     );
+    let oil_queue = oil_missing_entities
+        .get(factory)
+        .expect("factory")
+        .prod_queue();
+    assert_eq!(oil_queue.len(), 1);
     assert!(
-        matches!(
-            oil_missing_events.get(&1).and_then(|events| events.first()),
-            Some(Event::Notice { msg, .. }) if msg == "Not enough oil"
-        ),
-        "oil-gated units should emit the oil voice-line notice"
+        !oil_queue[0].paid,
+        "broke manual training should wait unpaid"
     );
+    assert!(oil_missing_events.get(&1).is_none_or(Vec::is_empty));
 
     let mut steel_missing_entities = EntityStore::new();
     let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
@@ -605,13 +603,86 @@ fn train_resource_shortages_emit_specific_notices() {
             },
         )],
     );
+    let steel_queue = steel_missing_entities
+        .get(city_centre)
+        .expect("city centre")
+        .prod_queue();
+    assert_eq!(steel_queue.len(), 1);
     assert!(
-        matches!(
-            steel_missing_events.get(&1).and_then(|events| events.first()),
-            Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
-        ),
-        "steel-only units should emit the steel voice-line notice"
+        !steel_queue[0].paid,
+        "steel-short training should wait unpaid"
     );
+    assert!(steel_missing_events.get(&1).is_none_or(Vec::is_empty));
+}
+
+#[test]
+fn manual_research_shortage_creates_unpaid_queue_entry() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::TrainingCentre, 6, 6);
+    let training_centre = entities
+        .spawn_building(1, EntityKind::TrainingCentre, x, y, true)
+        .expect("training centre should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].set_resources(0, 0);
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Research {
+                building: training_centre,
+                upgrade: UpgradeKind::Entrenchment,
+            },
+        )],
+    );
+
+    let queue = entities
+        .get(training_centre)
+        .expect("training centre")
+        .research_queue();
+    assert_eq!(queue.len(), 1);
+    assert!(!queue[0].paid);
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
+}
+
+#[test]
+fn manual_production_queue_is_capped_even_when_entries_are_unpaid() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
+    let city_centre = entities
+        .spawn_building(1, EntityKind::CityCentre, x, y, true)
+        .expect("city centre should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].set_resources(0, 0);
+
+    let commands = (0..=crate::game::entity::MAX_PRODUCTION_QUEUE)
+        .map(|_| {
+            (
+                1,
+                SimCommand::Train {
+                    building: city_centre,
+                    unit: EntityKind::Worker,
+                },
+            )
+        })
+        .collect();
+    let events = apply_with_players(&map, &mut entities, &mut players, commands);
+
+    assert_eq!(
+        entities
+            .get(city_centre)
+            .expect("city centre")
+            .prod_queue()
+            .len(),
+        crate::game::entity::MAX_PRODUCTION_QUEUE
+    );
+    assert!(events.get(&1).is_some_and(|events| events.iter().any(
+        |event| matches!(event, Event::Notice { msg, .. } if msg == "Production queue full")
+    )));
 }
 
 #[test]
@@ -674,13 +745,12 @@ fn cancel_train_removes_latest_queued_unit_without_resetting_active_progress() {
         queue[0].progress, 17,
         "canceling queued production should not reset active progress"
     );
-    let (refunded_steel, refunded_oil) = rules::economy::cost(EntityKind::MachineGunner);
-    assert_eq!(players[0].steel, steel_after_queue + refunded_steel);
-    assert_eq!(players[0].oil, oil_after_queue + refunded_oil);
-    assert_eq!(
-        players[0].supply_used,
-        supply_after_queue - rules::economy::supply_cost(EntityKind::MachineGunner)
-    );
+    assert!(!queue
+        .iter()
+        .any(|item| item.unit == EntityKind::MachineGunner));
+    assert_eq!(players[0].steel, steel_after_queue);
+    assert_eq!(players[0].oil, oil_after_queue);
+    assert_eq!(players[0].supply_used, supply_after_queue);
 }
 
 #[test]
@@ -730,6 +800,7 @@ fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
             unit: EntityKind::Rifleman,
             progress: 7,
             total: 100,
+            paid: true,
         });
     apply_with_players(
         &map,

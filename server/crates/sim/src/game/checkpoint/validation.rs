@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::commands::PendingCommand;
-use crate::game::entity::{Entity, MAX_QUEUED_ORDERS};
+use crate::game::entity::{Entity, MAX_PRODUCTION_QUEUE, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::Map;
@@ -126,7 +126,7 @@ pub(super) fn validate_player_supply(
                     expected_cap =
                         expected_cap.saturating_add(rules::economy::supply_provided(entity.kind));
                 }
-                for item in entity.prod_queue() {
+                for item in entity.prod_queue().iter().filter(|item| item.paid) {
                     if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
                         expected_used =
                             expected_used.saturating_add(rules::economy::supply_cost(item.unit));
@@ -196,6 +196,16 @@ fn validate_entity(
             max: MAX_QUEUED_ORDERS,
         });
     }
+    validate_count(
+        "entities.production.queue",
+        entity.prod_queue().len(),
+        MAX_PRODUCTION_QUEUE,
+    )?;
+    validate_count(
+        "entities.production.researchQueue",
+        entity.research_queue().len(),
+        MAX_PRODUCTION_QUEUE,
+    )?;
     validate_tank_armor_reaction_lock(entity, world, tick)?;
     Ok(())
 }

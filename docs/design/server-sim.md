@@ -877,6 +877,16 @@ production cancel clears the whole list before removing the latest queued item. 
 next-unit cursor are durable entity state, so checkpoints, replay branches, and Lab rewinds
 preserve them without recording synthetic train commands on every retry.
 
+Explicit manual train and research commands use bounded eight-entry FIFO queues. The front entry
+pays immediately when the queue is empty and its cost (plus unit supply) is available; otherwise it
+is stored unpaid at zero progress and retries each production tick. Entries appended behind existing
+work never prepay. An unpaid unit reserves neither resources nor supply, cancellation and producer
+death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
+extrapolate false progress. Production buildings are visited in stable entity-id order, before
+construction, when multiple waiting purchases compete for the same newly available resources.
+Standing repeat production deliberately does not use unpaid entries: it continues retrying while the
+ordinary queue is empty and inserts a normal paid item only after cost and supply succeed.
+
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
 `rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the

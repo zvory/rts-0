@@ -1377,7 +1377,11 @@ The train command card is driven by the first selected production building type,
 are issued to the selected completed compatible production buildings in round-robin order so a
 multi-building selection spreads queued units across its producers. Train and production-cancel
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
-only those repeatable command-card buttons. Alt-clicking a train button or pressing Alt with its
+only those repeatable command-card buttons. Legal manual build, train, and research buttons remain
+actionable while their red cost is unaffordable: build enters placement and relies on the worker's
+authoritative wait at the site, while train/research append an unpaid queue entry. Selected producers
+render `prodWaiting` as a striped zero-progress bar labeled `waiting for resources / supply`, and
+progress extrapolation stays disabled until the server reports the item paid. Alt-clicking a train button or pressing Alt with its
 resolved hotkey adds that unit to one selected compatible producer's ordered standing repeat list;
 holding Shift with the same gesture removes it from one producer. The server applies each signed
 adjustment atomically so rapid inputs allocate distinct producers from current authoritative state.
@@ -1387,7 +1391,8 @@ The server spreads additions toward the least-loaded producer and removes from t
 which balances mixed unit ratios while preserving another automatic order when possible. When more
 than one unit is active on a building, it cycles through that list after each successful automatic
 enqueue. A repeated unit already inserted in the FIFO stays ahead of later manual clicks, and any
-Cancel clears the affected producer's repeat state.
+Cancel clears the affected producer's repeat state. Standing repeat controls never create unpaid
+queue entries; their swirl remains a policy indicator until a fully funded item is admitted.
 Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. The Scout Plane affordance

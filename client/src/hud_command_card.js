@@ -255,7 +255,7 @@ export function buildWorkerBuildCard(ctx) {
       icon: st.icon,
       label: st.label,
       cost: st.cost,
-      enabled: availability === "ready",
+      enabled: availability !== "locked",
       unaffordable: availability === "unaffordable",
       title: buildDisabledReason(ctx, kind, resources),
       tooltipKind: kind,
@@ -459,7 +459,7 @@ export function buildTrainCard(ctx, building) {
       icon: st.icon,
       label: st.label,
       cost: st.cost,
-      enabled: availability === "ready" || availability === "active",
+      enabled: availability !== "locked",
       unaffordable: availability === "unaffordable",
       title: disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp,
       tooltipKind: unit,
@@ -492,7 +492,7 @@ export function buildTrainCard(ctx, building) {
       icon: def.icon,
       label: def.label,
       cost: def.cost,
-      enabled: availability === "ready",
+      enabled: availability !== "locked",
       unaffordable: availability === "unaffordable",
       title: researchDisabledReason(ctx, upgrade, resources, isOwn),
       tooltipUpgrade: upgrade,
@@ -720,7 +720,7 @@ function buildDisabledReason(ctx, kind, resources) {
   if (!st) return "";
   const missing = requirementsOf(st).find((req) => !playerHasCompleteKind(ctx, req));
   if (missing) return `Requires ${STATS[missing]?.label || missing}`;
-  if (!affordable(st.cost, resources)) return "Not enough resources";
+  if (!affordable(st.cost, resources)) return "Place now; construction waits for resources";
   return "";
 }
 

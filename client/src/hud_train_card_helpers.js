@@ -45,8 +45,8 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
     return st.upgradeRequiresText ||
       `Requires ${UPGRADES[st.upgradeRequires]?.label || st.upgradeRequires}`;
   }
-  if (!affordable(st.cost, resources)) return "Not enough resources";
-  if (!hasSupplyFor(st, resources)) return "Not enough supply";
+  if (!affordable(st.cost, resources)) return "Queue now; production waits for resources";
+  if (!hasSupplyFor(st, resources)) return "Queue now; production waits for supply";
   return "";
 }
 
@@ -73,7 +73,7 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
-  if (!affordable(def.cost, resources)) return "Not enough resources";
+  if (!affordable(def.cost, resources)) return "Queue now; research waits for resources";
   return "";
 }
 

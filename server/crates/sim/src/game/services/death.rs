@@ -37,8 +37,18 @@ pub(crate) fn death_system(
             sight_tiles: e.sight_tiles(),
             kind: e.kind,
             killer: e.last_damage_owner(),
-            queued_units: e.prod_queue().iter().map(|item| item.unit).collect(),
-            queued_upgrades: e.research_queue().iter().map(|item| item.upgrade).collect(),
+            queued_units: e
+                .prod_queue()
+                .iter()
+                .filter(|item| item.paid)
+                .map(|item| item.unit)
+                .collect(),
+            queued_upgrades: e
+                .research_queue()
+                .iter()
+                .filter(|item| item.paid)
+                .map(|item| item.upgrade)
+                .collect(),
         })
         .collect();
 

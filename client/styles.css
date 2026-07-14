@@ -3312,6 +3312,15 @@ input[type="text"]:focus {
   outline: 1px dashed rgba(126, 231, 255, 0.75);
   outline-offset: 2px;
 }
+#selected-panel .sel-prod-bar.waiting {
+  outline: 1px dashed rgba(255, 211, 92, 0.75);
+  outline-offset: 2px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 211, 92, 0.05) 0 5px,
+    rgba(255, 211, 92, 0.14) 5px 10px
+  );
+}
 #selected-panel .sel-prod-fill {
   height: 100%;
   background: var(--accent);
@@ -3319,6 +3328,11 @@ input[type="text"]:focus {
 }
 #selected-panel .sel-prod-pending {
   color: #7ee7ff;
+  font-size: 9px;
+  margin-left: 5px;
+}
+#selected-panel .sel-prod-waiting {
+  color: #ffd35c;
   font-size: 9px;
   margin-left: 5px;
 }

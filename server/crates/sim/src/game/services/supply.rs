@@ -17,8 +17,8 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 if catalog.is_some_and(|catalog| catalog.allows_building(e.kind)) {
                     cap += rules::economy::supply_provided(e.kind);
                 }
-                // Units queued for production reserve supply too.
-                for item in e.prod_queue() {
+                // Only paid production items reserve supply; manual waiting entries do not.
+                for item in e.prod_queue().iter().filter(|item| item.paid) {
                     if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
                         used += rules::economy::supply_cost(item.unit);
                     }

@@ -1301,6 +1301,7 @@ mod tests {
         center.prod_queue = Some(2);
         center.prod_repeat_kinds = vec![kinds::WORKER.to_string(), kinds::SCOUT_CAR.to_string()];
         center.prod_scout_plane_queued = true;
+        center.prod_waiting = true;
         center.build_progress = Some(0.75);
         center.build_active = true;
         center.rally = Some([256.0, 512.0]);
