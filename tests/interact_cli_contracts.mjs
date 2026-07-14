@@ -113,6 +113,13 @@ try {
   assert.equal(JSON.parse(missingNamespace.stderr).error.code, "unknownNamespace", "bare commands report the required namespace");
   assert.equal(fs.existsSync(paths.directory), false, "help does not start a daemon or create runtime state");
 
+  const failedOpenEnv = { ...baseEnv, RTS_INTERACT_FAKE_OPEN_FAILURE: "1" };
+  const failedOpen = callFailure("open", {}, failedOpenEnv);
+  assert.equal(failedOpen.error.code, "injectedOpenFailure", "a failed cold open preserves its corrective error");
+  assert.equal(call("status", {}, failedOpenEnv).result.opening, false, "a failed cold open clears opening state and leaves the daemon reachable");
+  call("shutdown", {}, failedOpenEnv);
+  await waitFor(() => !fs.existsSync(paths.directory), 2000, "failed-open daemon shuts down cleanly");
+
   const coldOpen = call("open");
   assert.match(coldOpen.result.sessionId, /^lab_[a-f0-9]{32}$/, "a cold first open returns one complete JSON envelope");
   assert.equal(call("status").result.daemonCheckout.matches, true, "matching checkout status is explicit");
@@ -559,7 +566,9 @@ function callFailure(command, input = {}, env = baseEnv) {
   trackDaemon();
   assert.notEqual(result.status, 0, `${command} fails for rejected input`);
   assert.equal(result.stdout, "", `${command} failure keeps stdout empty`);
-  return JSON.parse(result.stderr);
+  const lines = result.stderr.trim().split("\n");
+  assert.equal(lines.length, 1, `${command} failure writes exactly one JSON value to stderr`);
+  return JSON.parse(lines[0]);
 }
 
 function shutdown(env) {

@@ -6,16 +6,20 @@ import type { ChildProcess, SpawnOptions } from "node:child_process";
 import { once } from "node:events";
 
 import { ProcessRunner, ProcessRunnerError } from "./process_runner.ts";
+import { serverBuildFailure } from "./server_build_failure.ts";
 
 const HEALTH_POLL_MS = 150;
 const SERVER_TERM_GRACE_MS = 1_000;
+export const SERVER_BUILD_TIMEOUT_MS = 300_000;
 
 export class PrivateServerError extends Error {
   code: string;
-  constructor(code: string, message: string) {
+  details: Record<string, unknown>;
+  constructor(code: string, message: string, details: Record<string, unknown> = {}) {
     super(message);
     this.name = "PrivateServerError";
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -26,6 +30,7 @@ interface PrivateServerOptions {
   workspace: WorkspaceInfo;
   sessionDir: string;
   startupTimeoutMs: number;
+  buildTimeoutMs?: number;
   baseUrl?: string;
   artifactCapability: string;
   signal?: AbortSignal;
@@ -54,6 +59,7 @@ export class PrivateServer {
   artifactCapability: string;
   requestedBaseUrl: string;
   startupTimeoutMs: number;
+  buildTimeoutMs: number;
   sessionDir: string;
   workspace: WorkspaceInfo;
   static async open(options: PrivateServerOptions) {
@@ -71,6 +77,7 @@ export class PrivateServer {
     workspace,
     sessionDir,
     startupTimeoutMs,
+    buildTimeoutMs = SERVER_BUILD_TIMEOUT_MS,
     baseUrl = "",
     artifactCapability,
     signal,
@@ -83,6 +90,7 @@ export class PrivateServer {
     this.workspace = workspace;
     this.sessionDir = sessionDir;
     this.startupTimeoutMs = startupTimeoutMs;
+    this.buildTimeoutMs = buildTimeoutMs;
     this.requestedBaseUrl = baseUrl;
     this.artifactCapability = artifactCapability;
     this.signal = signal;
@@ -115,9 +123,9 @@ export class PrivateServer {
       return;
     }
 
-    const port = await this.allocatePrivatePort(this.signal);
     const targetDir = path.join(this.workspace.root, "target", "interact", "lab", "cargo");
     const binary = path.join(targetDir, "debug", "rts-server");
+    const buildLogPath = path.join(this.sessionDir, "cargo-build.log");
     try {
       await this.processRunner.runOrThrow(
         "cargo",
@@ -125,17 +133,21 @@ export class PrivateServer {
         {
           cwd: this.workspace.root,
           env: { ...process.env, CARGO_TARGET_DIR: targetDir },
-          timeoutMs: this.startupTimeoutMs,
+          timeoutMs: this.buildTimeoutMs,
           signal: this.signal,
         },
       );
     } catch (error) {
       if (error instanceof ProcessRunnerError && error.code === "processAborted") throw abortedError();
-      throw new PrivateServerError("serverBuild", conciseProcessFailure("Interact server build failed", error));
+      const failure = serverBuildFailure(error, buildLogPath, this.buildTimeoutMs);
+      throw new PrivateServerError(failure.code, failure.message, failure.details);
     }
     throwIfAborted(this.signal);
     if (!fs.existsSync(binary)) throw new PrivateServerError("serverBuild", "Interact server binary was not produced.");
 
+    // Allocate immediately before spawn. A port selected before a cold build can
+    // be claimed by another process during the several-minute build window.
+    const port = await this.allocatePrivatePort(this.signal);
     this.logPath = path.join(this.sessionDir, "server.log");
     this.logFd = fs.openSync(this.logPath, "w");
     this.child = this.spawnServer(binary, [], {
@@ -282,11 +294,4 @@ function normalizePrivateServerError(error: unknown) {
   if (error instanceof PrivateServerError) return error;
   const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "serverStartFailed";
   return new PrivateServerError(code, error instanceof Error ? error.message : String(error || "Private server startup failed."));
-}
-
-function conciseProcessFailure(prefix: string, error: unknown) {
-  const result = error instanceof ProcessRunnerError ? error.result : null;
-  const detail = String(result?.stderr || result?.stdout || (error instanceof Error ? error.message : "unknown failure"))
-    .trim().split("\n").slice(-4).join("; ").slice(0, 800);
-  return `${prefix}: ${detail}`;
 }
