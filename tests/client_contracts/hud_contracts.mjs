@@ -526,6 +526,42 @@ function fakeHudRootWithoutResourceSpans() {
         return selector === "#selected-panel" ? panel : null;
       },
     };
+    const selected = {
+      id: 2306,
+      owner: 1,
+      kind: KIND.BARRACKS,
+      hp: 500,
+      maxHp: 500,
+      prodQueue: 1,
+      prodKind: KIND.RIFLEMAN,
+      prodProgress: 0,
+      prodWaiting: true,
+    };
+    const state = {
+      playerId: 1,
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return [selected];
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    assert(panel.children[0].innerHTML.includes("waiting for resources / supply"), "HUD labels unpaid production");
+    const waitingNode = panel.children[0];
+
+    selected.prodWaiting = false;
+    hud._renderSelectedPanel();
+    assert(panel.children[0] !== waitingNode, "HUD selected detail refreshes when production pays before rounded progress changes");
+    assert(!panel.children[0].innerHTML.includes("waiting for resources / supply"), "HUD removes the waiting label after payment");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
     const selectedEntities = [
       { id: 2100, owner: 1, kind: KIND.WORKER },
       { id: 2101, owner: 1, kind: KIND.WORKER },

@@ -378,6 +378,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.prodKind),
     sigValue(entity.prodUpgrade),
     productionPct,
+    entity.prodWaiting ? 1 : 0,
     entity.optimisticProduction ? 1 : 0,
   ].join(":");
 }
