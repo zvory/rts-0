@@ -44,6 +44,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "camera_view_selection.js": "app-shell",
   "launch_url.js": "app-shell",
   "interact_bridge.js": "app-shell",
+  "interact_game_bridge.js": "app-shell",
   "clean_presentation.js": "app-shell",
   "map_editor_app.js": "app-shell",
   "map_editor_viewport.js": "app-shell",

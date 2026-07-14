@@ -17,6 +17,12 @@ export class InteractTestArtifacts {
     return sessionId;
   }
 
+  ownGameSession(sessionId) {
+    assert.match(sessionId, /^game_[a-f0-9]{32}$/, "test-owned game session ids stay unguessable");
+    this.ownedSessionDirectories.add(path.join(this.root, "..", "game", sessionId));
+    return sessionId;
+  }
+
   createSessionId() {
     return this.ownSession(`lab_${crypto.randomUUID().replaceAll("-", "")}`);
   }

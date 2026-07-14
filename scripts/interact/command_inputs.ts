@@ -26,7 +26,7 @@ export const ALL_CATALOG_CATEGORIES = Object.freeze([
 export const ALIAS_RE = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
 
 const TOKEN_RE = /^[A-Za-z0-9_]{1,64}$/;
-const SESSION_RE = /^lab_[a-f0-9]{32}$/;
+const SESSION_RE = /^(?:lab|game)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
@@ -59,6 +59,7 @@ export function validatorFor(command: string): (value: unknown) => CommandInput 
 export function validateCommandInput(command: string, value: unknown): CommandInput {
   record(value, "input");
   const session = () => sessionId(value.sessionId);
+  if (command.startsWith("game-")) return validateGameNamespaceInput(command, value, session);
   if (command === "shutdown") return exact(value, [], "shutdown");
   if (command === "status") {
     exact(value, ["sessionId"], "status");
@@ -166,6 +167,66 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
   return value;
 }
 
+function validateGameNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
+  if (command === "game-open") {
+    exact(value, ["workspaceRoot", "map", "opponent", "renderer", "viewport"], "game open");
+    if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("game open.workspaceRoot", "must be a non-empty string");
+    if (value.map != null) displayName(value.map, "game open.map", 64);
+    if (value.opponent != null && !["ai_2_1", "ai_turtle"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1 or ai_turtle");
+    if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("game open.renderer", "must be pixi or babylon");
+    if (value.viewport != null) viewport(value.viewport, 4096, "game open.viewport");
+    return value;
+  }
+  session();
+  if (command === "game-inspect") {
+    exact(value, ["sessionId", "ids", "kinds", "ownership", "cameraViewport", "limit"], "game inspect");
+    if (value.ids != null) idArray(value.ids, "game inspect.ids", 0, INTERACT_LIMITS.maxInspectRefs);
+    if (value.kinds != null) array(value.kinds, "game inspect.kinds", 0, 32, (entry: unknown) => token(entry, "game inspect.kind"));
+    if (value.ownership != null && !["owned", "visible"].includes(String(value.ownership))) invalid("game inspect.ownership", "must be owned or visible");
+    optionalBoolean(value.cameraViewport, "game inspect.cameraViewport");
+    if (value.limit != null) integer(value.limit, "game inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
+  } else if (command === "game-move") {
+    exact(value, ["sessionId", "units", "x", "y", "queued"], "game move");
+    idArray(value.units, "game move.units", 1, INTERACT_LIMITS.maxCommandUnits);
+    finite(value.x, "game move.x");
+    finite(value.y, "game move.y");
+    optionalBoolean(value.queued, "game move.queued");
+  } else if (command === "game-give-up") {
+    exact(value, ["sessionId"], "game give-up");
+  } else if (command === "game-camera") {
+    exact(value, ["sessionId", "camera"], "game camera");
+    validateGameCamera(value.camera);
+  } else if (command === "game-screenshot") {
+    exact(value, ["sessionId", "name", "presentation", "viewport", "subjects"], "game screenshot");
+    artifactToken(value.name, "game screenshot.name");
+    presentation(value.presentation, "game screenshot.presentation");
+    if (value.viewport != null) viewport(value.viewport, 2048, "game screenshot.viewport");
+    if (value.subjects != null) idArray(value.subjects, "game screenshot.subjects", 0, INTERACT_LIMITS.maxScreenshotSubjects);
+  } else if (command === "game-record-start") {
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale", "presentation"], "game record-start");
+    artifactToken(value.name, "game record-start.name");
+    if (value.maxDurationMs != null) integer(value.maxDurationMs, "game record-start.maxDurationMs", 1_000, INTERACT_LIMITS.maxRecordingDurationMs);
+    if (value.viewport != null) viewport(value.viewport, 2048, "game record-start.viewport");
+    if (value.crop != null) recordingCrop(value.crop);
+    if (value.scale != null) boundedNumber(value.scale, "game record-start.scale", 0.25, 1);
+    presentation(value.presentation, "game record-start.presentation");
+  } else {
+    throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
+  }
+  return value;
+}
+
+function validateGameCamera(value: unknown) {
+  record(value, "game camera.camera");
+  if (value.action === "focus") {
+    exact(value, ["action", "entities", "padding"], "game camera");
+    idArray(value.entities, "game camera.entities", 1, INTERACT_LIMITS.maxFocusRefs);
+    if (value.padding != null) boundedNumber(value.padding, "game camera.padding", 0, 1024);
+  } else if (value.action === "set") {
+    validateCamera(value);
+  } else invalid("game camera.action", "is unsupported");
+}
+
 function validateUpdate(value: unknown) {
   record(value, "update");
   const operation = value.operation;
@@ -225,6 +286,25 @@ function recordingCrop(value: unknown) {
   boundedNumber(value.y, "record-start.crop.y", 0, 2048);
   boundedNumber(value.width, "record-start.crop.width", 2, 2048);
   boundedNumber(value.height, "record-start.crop.height", 2, 2048);
+}
+
+function idArray(value: unknown, label: string, minimum: number, maximum: number) {
+  array(value, label, minimum, maximum, (entry) => u32(entry, label));
+  if (new Set(value).size !== value.length) invalid(label, "must not contain duplicate ids");
+}
+
+function artifactToken(value: unknown, label: string) {
+  if (value != null && (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(value))) invalid(label, "must be a safe artifact token");
+}
+
+function presentation(value: unknown, label: string) {
+  if (value != null && !["clean", "normal"].includes(String(value))) invalid(label, "must be clean or normal");
+}
+
+function displayName(value: unknown, label: string, maximumBytes: number) {
+  if (typeof value !== "string" || !value.trim() || Buffer.byteLength(value) > maximumBytes || /[\u0000-\u001f\u007f]/.test(value)) {
+    invalid(label, `must be a non-empty display name of at most ${maximumBytes} UTF-8 bytes without control characters`);
+  }
 }
 
 function validateGameCommand(value: unknown) {

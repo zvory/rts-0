@@ -31,10 +31,16 @@ export async function openInteractDriver(options) {
   }
   const openDelayMs = Number(process.env.RTS_INTERACT_FAKE_OPEN_DELAY_MS || 0);
   if (openDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, openDelayMs));
-  let nextId = 100;
+  let nextId = options.mode === "game" ? 102 : 100;
   let tick = 0;
   let closed = false;
-  let entities = [];
+  let entities = options.mode === "game"
+    ? [
+        { id: 100, kind: "rifleman", owner: 1, x: 512, y: 512, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
+        { id: 101, kind: "rifleman", owner: 2, x: 1536, y: 1536, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
+      ]
+    : [];
+  let gamePhase = "active";
   let recording = null;
   let lastRecording = null;
   let lastRecordingCompletion = null;
@@ -48,11 +54,12 @@ export async function openInteractDriver(options) {
   const cameraWorldBounds = { minX: 0, minY: 0, maxX: 2048, maxY: 2048 };
   const cameraViewportCss = { widthCssPx: 1440, heightCssPx: 900 };
   const project = (entity) => ({ ...entity, orderPlan: entity.orderPlan.map((stage) => ({ ...stage })) });
-  const inspect = ({ ids = [], kinds = [], owners = [], cameraViewport = false, limit = 25 } = {}) => {
+  const inspect = ({ ids = [], kinds = [], owners = [], ownership = "visible", cameraViewport = false, limit = 25 } = {}) => {
     let rows = entities;
     if (ids.length) rows = rows.filter((entity) => ids.includes(entity.id));
     if (kinds.length) rows = rows.filter((entity) => kinds.includes(entity.kind));
     if (owners.length) rows = rows.filter((entity) => owners.includes(entity.owner));
+    if (ownership === "owned") rows = rows.filter((entity) => entity.owner === 1);
     if (cameraViewport) rows = rows.filter((entity) => entity.x >= cameraWorldBounds.minX && entity.x <= cameraWorldBounds.maxX && entity.y >= cameraWorldBounds.minY && entity.y <= cameraWorldBounds.maxY);
     return {
       entities: rows.slice(0, limit).map(project),
@@ -63,6 +70,8 @@ export async function openInteractDriver(options) {
       camera: structuredClone(camera),
       cameraViewport: { ...cameraViewportCss },
       cameraWorldBounds: { ...cameraWorldBounds },
+      player: { ...CATALOG.players[0], resources: { steel: 100, oil: 100, supplyUsed: 1, supplyCap: 10 } },
+      ui: { gameVisible: true, hudVisible: true, timer: "00:01", scoreScreenVisible: gamePhase === "concluded" },
     };
   };
   const finishRecording = (reason, { aliases = [] } = {}) => {
@@ -72,7 +81,7 @@ export async function openInteractDriver(options) {
     current.finalizing = (async () => {
       const finalizeDelayMs = Number(process.env.RTS_INTERACT_FAKE_RECORD_FINALIZE_DELAY_MS || 0);
       if (finalizeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, finalizeDelayMs));
-      const directory = `${options.workspaceRoot}/target/interact/lab/${current.sessionId}/recordings/${current.name}-fixture`;
+      const directory = `${options.workspaceRoot}/target/interact/${options.mode || "lab"}/${current.sessionId}/recordings/${current.name}-fixture`;
       writeFixtureRecording(directory, current.name);
       const result = {
         active: false,
@@ -98,7 +107,11 @@ export async function openInteractDriver(options) {
   return {
     workspace: { root: options.workspaceRoot, branch: "fixture", head: "a".repeat(40) },
     async status() {
-      return { ready: !closed, reason: closed ? "closed" : "ready", snapshotTick: tick, room: "interact-lab-fixture" };
+      return {
+        ready: !closed, reason: closed ? "closed" : "ready", mode: options.mode || "lab",
+        snapshotTick: tick, room: options.mode === "game" ? "interact-game-fixture" : "interact-lab-fixture",
+        phase: options.mode === "game" ? gamePhase : undefined,
+      };
     },
     async catalog() {
       return structuredClone(CATALOG);
@@ -147,6 +160,20 @@ export async function openInteractDriver(options) {
       tick += 1;
       return { result: { op: "issueCommandAs", outcome: { accepted: true }, snapshotTick: tick } };
     },
+    async move(command) {
+      for (const id of command.units || []) {
+        const entity = entities.find((row) => row.id === id && row.owner === 1);
+        if (!entity) throw Object.assign(new Error("unit is not controllable"), { code: "notControllable" });
+        entity.orderPlan = [{ kind: "move", x: command.x, y: command.y, target: null }];
+      }
+      tick += 1;
+      return { accepted: true, admission: "clientSent", units: command.units, destination: { x: command.x, y: command.y }, snapshotTick: tick };
+    },
+    async giveUp() {
+      gamePhase = "concluded";
+      tick += 1;
+      return { accepted: true, phase: gamePhase, snapshotTick: tick };
+    },
     async time(control) {
       if (control.action === "step") tick += control.ticks || 1;
       if (control.action === "seek") tick = control.tick;
@@ -174,7 +201,7 @@ export async function openInteractDriver(options) {
       const width = viewport?.width || 1;
       const height = viewport?.height || 1;
       const subjects = Array.isArray(subjectSummaries) ? subjectSummaries : [];
-      const captureDirectory = `${options.workspaceRoot}/target/interact/lab/${sessionId}/captures`;
+      const captureDirectory = `${options.workspaceRoot}/target/interact/${options.mode || "lab"}/${sessionId}/captures`;
       fs.mkdirSync(captureDirectory, { recursive: true });
       fs.writeFileSync(path.join(captureDirectory, `${name}.png`), Buffer.from(ONE_PIXEL_PNG, "base64"));
       fs.writeFileSync(path.join(captureDirectory, `${name}.json`), "{}\n");
@@ -204,15 +231,15 @@ export async function openInteractDriver(options) {
     recordingStatus() {
       return recording ? { active: true, name: recording.name, maxDurationMs: recording.maxDurationMs } : { active: false, last: lastRecording };
     },
-    async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, scale = 1 }) {
+    async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, scale = 1, presentation = "clean" }) {
       if (recording) throw Object.assign(new Error("A recording is already active."), { code: "recordingActive" });
       const completion = deferred();
       lastRecording = null;
       lastRecordingCompletion = completion;
-      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, startTick: tick, operations: [], completion, finalizing: null };
+      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, presentation, startTick: tick, operations: [], completion, finalizing: null };
       recording.watchdog = setTimeout(() => { void finishRecording("watchdog").catch(() => {}); }, maxDurationMs);
       recording.watchdog.unref?.();
-      return { active: true, name, maxDurationMs, authoritativeStartTick: tick };
+      return { active: true, name, maxDurationMs, presentation, authoritativeStartTick: tick };
     },
     recordAcceptedOperation(operation) {
       if (!recording) return false;

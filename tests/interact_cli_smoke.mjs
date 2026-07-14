@@ -190,6 +190,52 @@ try {
   );
   call("close", { sessionId });
   sessionId = null;
+
+  const gameOpened = callGame("open", {
+    renderer,
+    opponent: "ai_2_1",
+    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+  });
+  sessionId = testArtifacts.ownGameSession(gameOpened.sessionId);
+  assert.equal(gameOpened.status.mode, "game", "game namespace opens a normal isolated match");
+  const gameInspection = callGame("inspect", { sessionId, ownership: "owned", limit: 100 });
+  assert.equal(gameInspection.ui.hudVisible, true, "game inspection sees the normal HUD");
+  const movable = gameInspection.entities.find((entity) => entity.controllable);
+  assert.ok(movable, "game inspection exposes at least one locally controllable starting unit");
+  const map = gameInspection.room.map;
+  const maxX = Number(map.width) * Number(map.tileSize) - 1;
+  const maxY = Number(map.height) * Number(map.tileSize) - 1;
+  const destination = {
+    x: Math.max(0, Math.min(maxX, Number(movable.x) + 96)),
+    y: Math.max(0, Math.min(maxY, Number(movable.y) + 96)),
+  };
+  callGame("camera", { sessionId, camera: { action: "focus", entities: [movable.id] } });
+  const gameScreenshot = callGame("screenshot", {
+    sessionId,
+    name: "game-ui",
+    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+    subjects: [movable.id],
+  });
+  assert.equal(gameScreenshot.presentation, "normal", "game screenshots retain HUD chrome by default");
+  assert.equal(gameScreenshot.preview.available, true, "game screenshot returns a Tailnet preview");
+  const gameRecordingStarted = callGame("record-start", {
+    sessionId,
+    name: "game-move",
+    maxDurationMs: recordingDurationMs,
+    viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+  });
+  assert.equal(gameRecordingStarted.recorder.presentation, "normal", "game recording retains the HUD by default");
+  const gameMove = callGame("move", { sessionId, units: [movable.id], ...destination });
+  assert.equal(gameMove.result.accepted, true, "game move goes through the normal player command surface");
+  const gameRecording = callGame("record-wait", { sessionId });
+  assert.equal(gameRecording.probe.codec, "h264", "game recording probes as H.264");
+  assert.equal(gameRecording.preview.available, true, "game recording returns a Tailnet MP4 preview");
+  const gaveUp = callGame("give-up", { sessionId });
+  assert.equal(gaveUp.result.phase, "concluded", "game give-up reaches the authoritative score screen");
+  const concluded = callGame("inspect", { sessionId, ownership: "owned", limit: 1 });
+  assert.equal(concluded.ui.scoreScreenVisible, true, "game inspection observes the concluded score UI");
+  callGame("close", { sessionId });
+  sessionId = null;
   assert.equal(call("shutdown").shuttingDown, true, "live smoke explicitly requests daemon teardown");
   await waitFor(() => !fs.existsSync(paths.directory), 5_000, "explicit shutdown removes the isolated runtime");
   await waitFor(() => !processAlive(daemonPid), 5_000, "explicit shutdown exits the child daemon");
@@ -247,6 +293,19 @@ function callFailure(command, input = {}) {
   assert.notEqual(result.status, 0, `${command} rejects stale or invalid input`);
   assert.equal(result.stdout, "", `${command} failure keeps stdout empty`);
   return JSON.parse(result.stderr).error;
+}
+
+function callGame(command, input = {}) {
+  const result = spawnSync(process.execPath, [cli, "game", command, JSON.stringify(input)], {
+    cwd: root,
+    env,
+    encoding: "utf8",
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  assert.equal(result.status, 0, `game ${command} succeeds: ${result.stderr}`);
+  const response = JSON.parse(result.stdout);
+  assert.equal(response.ok, true, `game ${command} returns success`);
+  return response.result;
 }
 
 function invokeAsync(command, input = {}) {

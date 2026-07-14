@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   INTERACT_COMMAND_REGISTRY,
+  INTERACT_COMMAND_KEYS,
   INTERACT_COMMANDS,
+  INTERACT_NAMESPACES,
 } from "./interact/command_registry.ts";
 import { SESSION_EXECUTION_LANES } from "./interact/session_coordinator.ts";
 
@@ -34,12 +36,12 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Interact architecture check passed (${INTERACT_COMMANDS.length} registry commands; responsive adapter and size ratchets passed)`);
+console.log(`Interact architecture check passed (${INTERACT_COMMAND_KEYS.length} registry commands across ${Object.keys(INTERACT_NAMESPACES).length} namespaces; responsive adapter and size ratchets passed)`);
 
 function checkRegistry() {
   const names = Object.keys(INTERACT_COMMAND_REGISTRY);
-  if (new Set(names).size !== names.length || names.length !== INTERACT_COMMANDS.length) {
-    failures.push("public commands must be defined exactly once in command_registry.ts");
+  if (new Set(names).size !== names.length || names.length !== INTERACT_COMMAND_KEYS.length) {
+    failures.push("registry command keys must be defined exactly once in command_registry.ts");
   }
   const allowedScopes = new Set(["daemon", "session"]);
   const allowedLanes = new Set(SESSION_EXECUTION_LANES);
@@ -61,11 +63,11 @@ function checkRegistry() {
     if (!help?.example || typeof help.example !== "object" || Array.isArray(help.example)) failures.push(`${name} help is missing an example object`);
   }
 
-  expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown"]);
-  expectMetadata("observation lane", "lane", "observation", ["status", "record-wait"]);
+  expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown", "game-open"]);
+  expectMetadata("observation lane", "lane", "observation", ["status", "record-wait", "game-inspect"]);
   expectMetadata("cancellation lane", "lane", "cancellation", ["capture-cancel"]);
-  expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown"]);
-  expectMetadata("startup timeout", "timeoutClass", "startup", ["open"]);
+  expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown", "game-open"]);
+  expectMetadata("startup timeout", "timeoutClass", "startup", ["open", "game-open"]);
   expectMetadata("lifecycle/media timeout", "timeoutClass", "lifecycle-media", [
     "close", "shutdown", "record-stop", "record-wait", "capture-fixed",
   ]);
@@ -73,16 +75,16 @@ function checkRegistry() {
 
 function checkCliNamespace() {
   const cli = sources.get("cli.ts") || "";
-  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs lab <command> [JSON-object]";')) {
-    failures.push("the Interact CLI usage must require the Lab namespace");
+  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs <lab|game> <command> [JSON-object]";')) {
+    failures.push("the Interact CLI usage must require an explicit supported namespace");
   }
-  if (!cli.includes('argv[0] !== "lab"') || !cli.includes('"unknownNamespace"')) {
+  if (!cli.includes("namespace in INTERACT_NAMESPACES") || !cli.includes('"unknownNamespace"')) {
     failures.push("the Interact CLI must reject bare or unknown namespaces before command dispatch");
   }
 }
 
 function expectMetadata(label, field, value, expected) {
-  const actual = INTERACT_COMMANDS.filter((name) => INTERACT_COMMAND_REGISTRY[name][field] === value).sort();
+  const actual = INTERACT_COMMAND_KEYS.filter((name) => INTERACT_COMMAND_REGISTRY[name][field] === value).sort();
   const wanted = [...expected].sort();
   if (actual.join("\0") !== wanted.join("\0")) {
     failures.push(`${label} must be ${wanted.join(", ")}; got ${actual.join(", ")}`);
@@ -267,7 +269,8 @@ function checkSignalOwnership() {
 
 function checkSizeRatchets() {
   for (const [name, maximum] of [
-    ["command_service.ts", 1_050],
+    // The second namespace adds cross-kind lifecycle guards; game media work stays extracted.
+    ["command_service.ts", 1_060],
     ["driver.ts", 1_400],
     ["abort_signal.ts", 60],
     ["process_runner.ts", 210],

@@ -61,6 +61,7 @@ import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
 import { InteractBridge, interactLaunchEnabled } from "./interact_bridge.js";
+import { InteractGameBridge, interactGameLaunchEnabled } from "./interact_game_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 
@@ -133,7 +134,11 @@ export class App {
     this.labPanel = null;
     this.labControlPolicy = null;
     this.cleanPresentation = new CleanPresentation({ root: dom.app });
-    this.interactBridge = interactLaunchEnabled() ? new InteractBridge({ app: this }) : null;
+    this.interactBridge = interactLaunchEnabled()
+      ? new InteractBridge({ app: this })
+      : interactGameLaunchEnabled()
+        ? new InteractGameBridge({ app: this })
+        : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
     /** @type {number|undefined} heartbeat interval id while connected. */

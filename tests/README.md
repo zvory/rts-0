@@ -87,7 +87,9 @@ Chrome/Chromium and owns a private Rust server; `tests/run-all.sh --only-browser
 reuses the gate's private server via `RTS_INTERACT_LAB_BASE_URL`. The canary authors only a shooter
 and target, verifies update and authoritative stepped movement, fetches a clean 1000x700 PNG
 preview, round-trips a setup and aliases, records a short H.264 clip, and proves reset/close/stale
-session/shutdown cleanup. Tests remove only their UUID-owned session directories and exact portable
+session cleanup. It then opens an isolated normal human-vs-AI match, inspects the HUD and owned
+starting units, captures the UI, records and issues one move, gives up, and confirms the score
+screen before shutdown. Tests remove only their UUID-owned session directories and exact portable
 artifact/sidecar files, leaving concurrent Lab output untouched.
 
 By default, the local gate and Cargo helper use an isolated target directory for each worktree

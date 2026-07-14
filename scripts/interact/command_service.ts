@@ -13,6 +13,7 @@ import {
   commandDefinition,
 } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
+import { captureGameScreenshot } from "./game_screenshot.ts";
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
 
 export { INTERACT_LIMITS } from "./command_inputs.ts";
@@ -29,11 +30,7 @@ interface SpawnInput extends JsonObject {
   y: number;
   alias?: string;
 }
-interface ViewportInput {
-  width: number;
-  height: number;
-  deviceScaleFactor?: number;
-}
+interface ViewportInput { width: number; height: number; deviceScaleFactor?: number }
 interface ServiceInput extends JsonObject {
   sessionId?: string;
   workspaceRoot?: string;
@@ -58,7 +55,7 @@ interface ServiceInput extends JsonObject {
   limit?: number;
   camera?: JsonObject;
   name?: string;
-  presentation?: string;
+  presentation?: "clean" | "normal";
   subjects?: EntityRef[];
   kind?: string;
   artifactId?: string;
@@ -70,9 +67,17 @@ interface ServiceInput extends JsonObject {
   fps?: number;
   frameCount?: number;
   reproduction?: boolean;
+  opponent?: string;
+  ids?: number[];
+  ownership?: string;
+  units?: number[];
+  x?: number;
+  y?: number;
+  queued?: boolean;
 }
-interface LabSession {
+interface InteractSession {
   sessionId: string;
+  kind: "lab" | "game";
   driver: InteractDriver;
   aliases: Map<string, number>;
   sceneRevision: number;
@@ -96,8 +101,9 @@ export class InteractService {
   closePromise: Promise<boolean> | null;
   openAbortController: AbortController | null;
   openPromise: Promise<unknown> | null;
+  openingKind: "lab" | "game" | null;
   coordinator: SessionCoordinator;
-  sessions: Map<string, LabSession>;
+  sessions: Map<string, InteractSession>;
   log: (...values: unknown[]) => void;
   maxSessions: number;
   artifactPreview: InteractTailnetPreview | null;
@@ -122,6 +128,7 @@ export class InteractService {
     this.sessions = new Map();
     this.coordinator = new SessionCoordinator();
     this.openPromise = null;
+    this.openingKind = null;
     this.openAbortController = null;
     this.closePromise = null;
     this.closed = false;
@@ -144,8 +151,8 @@ export class InteractService {
         result = { shuttingDown: true };
       } else if (definition.handlerKey === "status") {
         result = await this.status(input);
-      } else if (definition.handlerKey === "open") {
-        result = await this.open(input);
+      } else if (definition.handlerKey === "open" || definition.handlerKey === "game-open") {
+        result = await this.open(input, definition.handlerKey === "game-open" ? "game" : "lab");
       } else if (definition.handlerKey === "close") {
         result = { sessionId: input.sessionId, closed: await this.close(input.sessionId!) };
       } else if (definition.handlerKey === "capture-cancel") {
@@ -171,38 +178,46 @@ export class InteractService {
     });
   }
 
-  async open(input: ServiceInput) {
+  async open(input: ServiceInput, kind: "lab" | "game" = "lab") {
     if (this.closed) throw new InteractError("serviceClosed", "Interact is shutting down.");
     const workspaceRoot = resolveRequestedWorkspace(input.workspaceRoot, this.workspaceRoot);
     let existing = this.sessions.values().next().value;
-    if (existing) return this.describeSession(existing);
+    if (existing) return this.describeExistingSession(existing, kind);
     await this.closePromise;
     existing = this.sessions.values().next().value;
-    if (existing) return this.describeSession(existing);
-    if (this.openPromise) return this.openPromise;
+    if (existing) return this.describeExistingSession(existing, kind);
+    if (this.openPromise) {
+      if (this.openingKind !== kind) throw new InteractError("sessionKindMismatch", `A ${this.openingKind} session is already opening.`);
+      return this.openPromise;
+    }
     const openAbortController = new AbortController();
     this.openAbortController = openAbortController;
+    this.openingKind = kind;
     this.openPromise = (async () => {
       const driver = await this.driverFactory({
         workspaceRoot,
+        mode: kind,
         map: input.map || "Default",
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
+        opponent: input.opponent || "ai_2_1",
         renderer: input.renderer || "pixi",
         viewport: input.viewport,
-        baseUrl: process.env.RTS_INTERACT_LAB_BASE_URL || "",
+        baseUrl: process.env.RTS_INTERACT_BASE_URL || process.env.RTS_INTERACT_LAB_BASE_URL || "",
         signal: openAbortController.signal,
       });
       if (this.closed) {
         await driver.close().catch(() => {});
         throw new InteractError("serviceClosed", "Interact shut down while the session was opening.");
       }
-      const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
-      const session: LabSession = {
-        sessionId, driver, aliases: new Map<string, number>(), sceneRevision: 0,
+      const sessionId = `${kind}_${crypto.randomUUID().replaceAll("-", "")}`;
+      const session: InteractSession = {
+        sessionId, kind, driver, aliases: new Map<string, number>(), sceneRevision: 0,
         sceneIdentity: {
-          source: "launch", scenario: input.scenario || "blank", map: input.map || "Default",
-          seed: input.seed ?? null, renderer: input.renderer || "pixi",
+          source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
+          map: input.map || "Default", seed: kind === "lab" ? input.seed ?? null : null,
+          opponent: kind === "game" ? input.opponent || "ai_2_1" : null,
+          renderer: input.renderer || "pixi",
         },
       };
       this.sessions.set(sessionId, session);
@@ -216,23 +231,35 @@ export class InteractService {
     })();
     try { return await this.openPromise; } finally {
       this.openPromise = null;
+      this.openingKind = null;
       if (this.openAbortController === openAbortController) this.openAbortController = null;
     }
   }
 
-  async describeSession(session: LabSession) {
-    const [status, catalog] = await Promise.all([session.driver.status(), session.driver.catalog()]);
+  async describeExistingSession(session: InteractSession, requestedKind: "lab" | "game") {
+    if (session.kind !== requestedKind) {
+      throw new InteractError(
+        "sessionKindMismatch",
+        `A ${session.kind} session is already active. Close it before opening a ${requestedKind} session.`,
+        { sessionId: session.sessionId, activeKind: session.kind, requestedKind },
+      );
+    }
+    return this.describeSession(session);
+  }
+
+  async describeSession(session: InteractSession) {
+    const status = await session.driver.status();
+    const catalog = session.kind === "lab" ? await session.driver.catalog() : null;
     return {
       sessionId: session.sessionId,
+      kind: session.kind,
       workspace: session.driver.workspace,
       tick: Number.isInteger(status.snapshotTick) ? status.snapshotTick : null,
-      players: Array.isArray(catalog.players) ? catalog.players : [],
+      players: Array.isArray(catalog?.players) ? catalog.players : [],
       status,
-      capabilities: {
-        aliases: true,
-        catalogCategories: [...ALL_CATALOG_CATEGORIES],
-        maxSessions: this.maxSessions,
-      },
+      capabilities: session.kind === "lab"
+        ? { aliases: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
+        : { aliases: false, inspectUi: true, orders: ["move"], giveUp: true, media: ["screenshot", "recording"], maxSessions: this.maxSessions },
     };
   }
 
@@ -286,6 +313,7 @@ export class InteractService {
       if (fixedCapture.active) {
         return {
           sessionId,
+          kind: session.kind,
           status: session.driver.fixedCapture?.startStatus || { ready: true },
           aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
           recorder: presentRecorderStatus(session.driver.recordingStatus?.() || { active: false }, this.artifactPreview),
@@ -294,6 +322,7 @@ export class InteractService {
       }
       return {
         sessionId,
+        kind: session.kind,
         status: await session.driver.status(),
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
         recorder: presentRecorderStatus(session.driver.recordingStatus?.() || { active: false }, this.artifactPreview),
@@ -303,17 +332,46 @@ export class InteractService {
     return {
       workspaceRoot: this.workspaceRoot,
       opening: this.openPromise != null,
+      openingKind: this.openingKind,
       closing: this.closePromise != null,
       sessions: [...this.sessions.values()].map((session) => ({
         sessionId: session.sessionId,
+        kind: session.kind,
         aliases: session.aliases.size,
       })),
       maxSessions: this.maxSessions,
     };
   }
 
-  async executeSession(command: string, session: LabSession, input: ServiceInput) {
+  async executeSession(command: string, session: InteractSession, input: ServiceInput) {
     const sessionId = session.sessionId;
+    if (command.startsWith("game-") && session.kind !== "game") {
+      throw new InteractError("sessionKindMismatch", "This command requires a game session.");
+    }
+    if (command === "game-inspect") return { sessionId, ...await session.driver.inspect({
+      ids: input.ids, kinds: input.kinds, ownership: input.ownership || "owned",
+      cameraViewport: input.cameraViewport === true, limit: input.limit || 25,
+    }) };
+    if (command === "game-move") return { sessionId, result: await session.driver.move({
+      units: input.units || [], x: input.x, y: input.y, queued: input.queued === true,
+    }) };
+    if (command === "game-give-up") return { sessionId, result: await session.driver.giveUp() };
+    if (command === "game-camera") {
+      const value = input.camera || {};
+      const driverCommand = value.action === "focus"
+        ? { action: "focus", entityIds: value.entities, padding: value.padding }
+        : value;
+      const response = await session.driver.camera(driverCommand);
+      return { sessionId, camera: response.camera || response, cameraViewport: response.cameraViewport || null, cameraWorldBounds: response.cameraWorldBounds || null };
+    }
+    if (command === "game-screenshot") return captureGameScreenshot(session, input, this.artifactPreview);
+    if (command === "game-record-start") {
+      const result = await session.driver.recordStart({ ...input, sessionId, presentation: input.presentation || "normal" });
+      return { sessionId, recorder: presentRecorderStatus(result, this.artifactPreview) };
+    }
+    if (session.kind !== "lab" && !["record-stop"].includes(command)) {
+      throw new InteractError("sessionKindMismatch", "This command requires a Lab session.");
+    }
     if (command === "reset") {
       const before = await aliasSnapshots(session);
       const result = await session.driver.reset();
@@ -368,7 +426,7 @@ export function validateCommandInput(command: string, input: unknown) {
   return definition.validator(input);
 }
 
-async function spawn(session: LabSession, spawns: SpawnInput[] = [], includeDetails = false) {
+async function spawn(session: InteractSession, spawns: SpawnInput[] = [], includeDetails = false) {
   validateSpawnAliases(session, spawns);
   const catalog = await session.driver.catalog();
   const playerIds = new Set(objectArray(catalog.players).map((player) => Number(player.id)));
@@ -410,7 +468,7 @@ async function spawn(session: LabSession, spawns: SpawnInput[] = [], includeDeta
   return { ...compact, results, result };
 }
 
-async function update(session: LabSession, values: JsonObject[] = []) {
+async function update(session: InteractSession, values: JsonObject[] = []) {
   const catalog = await session.driver.catalog();
   const entityValues = values.filter((value) => ["move", "owner"].includes(String(value.operation)));
   const resolvedEntities = entityValues.length
@@ -435,7 +493,7 @@ async function update(session: LabSession, values: JsonObject[] = []) {
   return { sessionId: session.sessionId, result: await session.driver.update(operations) };
 }
 
-async function order(session: LabSession, { playerId, command, ignoreCommandLimits = false }: ServiceInput) {
+async function order(session: InteractSession, { playerId, command, ignoreCommandLimits = false }: ServiceInput) {
   if (typeof playerId !== "number" || !command) throw new InteractError("invalidInput", "order requires playerId and command.");
   const catalog = await session.driver.catalog();
   assertKnownPlayer(catalog, playerId);
@@ -445,7 +503,7 @@ async function order(session: LabSession, { playerId, command, ignoreCommandLimi
   return { sessionId: session.sessionId, command: resolvedCommand, resolved, result };
 }
 
-async function inspect(session: LabSession, { refs, kinds, owners, cameraViewport, limit }: ServiceInput) {
+async function inspect(session: InteractSession, { refs, kinds, owners, cameraViewport, limit }: ServiceInput) {
   const resolved = refs ? await resolveEntityReferences(session, refs) : [];
   const response = await session.driver.inspect({
     ids: resolved.map((entry) => entry.id), kinds, owners,
@@ -462,7 +520,7 @@ async function inspect(session: LabSession, { refs, kinds, owners, cameraViewpor
   };
 }
 
-async function camera(session: LabSession, value: JsonObject = {}) {
+async function camera(session: InteractSession, value: JsonObject = {}) {
   let command: JsonObject = value;
   if (value.action === "focus") {
     const resolved = await resolveEntityReferences(session, value.refs as EntityRef[]);
@@ -477,7 +535,7 @@ async function camera(session: LabSession, value: JsonObject = {}) {
   };
 }
 
-async function screenshot(session: LabSession, { name = "scene", presentation = "clean", viewport, subjects }: ServiceInput, artifactPreview: InteractTailnetPreview | null) {
+async function screenshot(session: InteractSession, { name = "scene", presentation = "clean", viewport, subjects }: ServiceInput, artifactPreview: InteractTailnetPreview | null) {
   const resolved = subjects ? await resolveEntityReferences(session, subjects) : [];
   const inspected = resolved.length
     ? await session.driver.inspect({ ids: resolved.map((entry) => entry.id), limit: resolved.length })
@@ -505,7 +563,7 @@ async function screenshot(session: LabSession, { name = "scene", presentation = 
   return presentScreenshotResult(result, artifactPreview);
 }
 
-const TAILNET_DELIVERY_INSTRUCTION = "Share this Tailnet URL with the user to preview the Lab artifact. Do not share a local file path.";
+const TAILNET_DELIVERY_INSTRUCTION = "Share this Tailnet URL with the user to preview the Interact artifact. Do not share a local file path.";
 
 async function presentScreenshotResult(result: JsonObject & { pngPath: string; manifestPath: string }, artifactPreview: InteractTailnetPreview | null) {
   if (!artifactPreview) return result;
@@ -583,7 +641,7 @@ async function publishPreview(artifactPreview: InteractTailnetPreview, filePath:
   }
 }
 
-async function exportArtifact(workspaceRoot: string, session: LabSession, { kind, name = "", reproduction = false }: ServiceInput) {
+async function exportArtifact(workspaceRoot: string, session: InteractSession, { kind, name = "", reproduction = false }: ServiceInput) {
   if (kind !== "setup" && kind !== "replay") throw new InteractError("invalidArtifactKind", "export requires setup or replay kind.");
   const artifactId = `artifact_${crypto.randomUUID().replaceAll("-", "")}`;
   const directory = artifactDirectory(workspaceRoot);
@@ -623,7 +681,7 @@ async function exportArtifact(workspaceRoot: string, session: LabSession, { kind
   };
 }
 
-async function importArtifact(workspaceRoot: string, session: LabSession, selector: ServiceInput) {
+async function importArtifact(workspaceRoot: string, session: InteractSession, selector: ServiceInput) {
   const selected = readArtifact(workspaceRoot, selector);
   let importResult;
   let reconciliation;
@@ -654,7 +712,7 @@ async function importArtifact(workspaceRoot: string, session: LabSession, select
     : compact;
 }
 
-async function inspectArtifact(workspaceRoot: string, session: LabSession, selector: ServiceInput) {
+async function inspectArtifact(workspaceRoot: string, session: InteractSession, selector: ServiceInput) {
   const selected = readArtifact(workspaceRoot, selector);
   const aliasValidation = await validateAliasesAgainstArtifact(session, selected.kind, selected.artifact, selected.aliases);
   return {
@@ -761,7 +819,7 @@ function readBoundedFile(filePath: string, maxBytes: number, code: string, messa
   return bytes;
 }
 
-async function reconcileImportedAliases(session: LabSession, aliases: AliasEntry[], entityIdMap: unknown) {
+async function reconcileImportedAliases(session: InteractSession, aliases: AliasEntry[], entityIdMap: unknown) {
   const remaps = new Map(objectArray(entityIdMap).map((entry) => [Number(entry.oldId), Number(entry.newId)]));
   session.aliases.clear();
   const candidates = aliases.map((entry) => ({ ...entry, id: remaps.get(entry.id) || entry.id }));
@@ -776,7 +834,7 @@ async function reconcileImportedAliases(session: LabSession, aliases: AliasEntry
   return { restored, stale };
 }
 
-async function validateImportedAliases(session: LabSession, aliases: AliasEntry[]) {
+async function validateImportedAliases(session: InteractSession, aliases: AliasEntry[]) {
   session.aliases.clear();
   const inspected = aliases.length ? await session.driver.inspect({ ids: aliases.map((entry) => entry.id), limit: aliases.length }) : { entities: [] };
   const ids = new Set(objectArray(inspected.entities).map((entity) => Number(entity.id)));
@@ -787,7 +845,7 @@ async function validateImportedAliases(session: LabSession, aliases: AliasEntry[
   return { restored, stale };
 }
 
-async function validateAliasesAgainstArtifact(_session: LabSession, kind: string, artifact: JsonObject, aliases: AliasEntry[]) {
+async function validateAliasesAgainstArtifact(_session: InteractSession, kind: string, artifact: JsonObject, aliases: AliasEntry[]) {
   const setup = kind === "setup" ? artifact : asJsonObject(artifact.initialSetup);
   const metadata = asJsonObject(setup.metadata);
   const idMap = objectArray(metadata.sourceEntityIdMap);
@@ -875,7 +933,7 @@ function projectCatalog(catalog: JsonObject, requested?: string[]) {
 function flattenFactions(factions: unknown, field: string): string[] { return objectArray(factions).flatMap((faction) => Array.isArray(faction[field]) ? faction[field].filter((value): value is string => typeof value === "string") : []); }
 function uniqueStrings(values: unknown): string[] { return [...new Set((Array.isArray(values) ? values : []).filter((value): value is string => typeof value === "string"))].sort(); }
 
-function validateSpawnAliases(session: LabSession, spawns: SpawnInput[]) {
+function validateSpawnAliases(session: InteractSession, spawns: SpawnInput[]) {
   const aliases = new Set<string>();
   for (const { alias: value } of spawns) {
     if (!value) continue;
@@ -902,7 +960,7 @@ function validateCommandCatalog(command: JsonObject, catalog: JsonObject) {
   validateFrom("ability", uniqueStrings(catalog.abilities), "invalidAbility", "ability");
 }
 
-async function resolveCommand(session: LabSession, command: JsonObject) {
+async function resolveCommand(session: InteractSession, command: JsonObject) {
   const wire: JsonObject = { ...command }; const resolved: JsonObject = {};
   for (const field of ["units", "buildings"]) {
     if (!Array.isArray(command[field])) continue;
@@ -917,7 +975,7 @@ async function resolveCommand(session: LabSession, command: JsonObject) {
   return { command: wire, resolved };
 }
 
-async function resolveEntityReferences(session: LabSession, references: EntityRef[]): Promise<ResolvedEntityRef[]> {
+async function resolveEntityReferences(session: InteractSession, references: EntityRef[]): Promise<ResolvedEntityRef[]> {
   const entries: ResolvedEntityRef[] = []; const requestedIds: number[] = [];
   for (const reference of references) {
     if (typeof reference === "number") { entries.push({ input: reference, id: reference, alias: null }); requestedIds.push(reference); continue; }
@@ -940,15 +998,15 @@ async function resolveEntityReferences(session: LabSession, references: EntityRe
   return entries;
 }
 
-async function resolveEntityReference(session: LabSession, reference: EntityRef) { return (await resolveEntityReferences(session, [reference]))[0]; }
-async function aliasSnapshots(session: LabSession) {
+async function resolveEntityReference(session: InteractSession, reference: EntityRef) { return (await resolveEntityReferences(session, [reference]))[0]; }
+async function aliasSnapshots(session: InteractSession) {
   if (!session.aliases.size) return [];
   const entries = [...session.aliases].map(([alias, id]) => ({ alias, id }));
   const inspected = await session.driver.inspect({ ids: entries.map((entry) => entry.id), limit: entries.length });
   const byId = new Map(objectArray(inspected.entities).map((entity) => [Number(entity.id), entity]));
   return entries.map((entry) => ({ ...entry, entity: byId.get(entry.id) || null }));
 }
-async function reconcileAliasesAfterReset(session: LabSession, before: Array<AliasEntry & { entity: JsonObject | null }>) {
+async function reconcileAliasesAfterReset(session: InteractSession, before: Array<AliasEntry & { entity: JsonObject | null }>) {
   session.aliases.clear(); const after = await session.driver.inspect({ limit: INTERACT_LIMITS.maxInspectResults });
   const claimed = new Set(); const aliases = []; const clearedAliases = [];
   for (const entry of before) {

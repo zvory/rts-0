@@ -57,8 +57,8 @@ try {
     assert.equal(help.stderr, "", `${helpCommand} keeps machine-readable help on stdout`);
     const helpEnvelope = JSON.parse(help.stdout);
     assert.equal(helpEnvelope.ok, true, `${helpCommand} returns a successful envelope`);
-    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab"], `${helpCommand} lists the Lab namespace`);
-    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs lab <command> [JSON-object]", `${helpCommand} requires a namespace`);
+    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game"], `${helpCommand} lists both supported namespaces`);
+    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game> <command> [JSON-object]", `${helpCommand} requires a namespace`);
   }
   for (const args of [["lab", "--help"], ["help", "lab"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {
@@ -69,6 +69,19 @@ try {
     assert.equal(result.namespace, "lab", `${args.join(" ")} identifies the namespace`);
     assert.ok(result.commands.includes("open"), `${args.join(" ")} lists open`);
     assert.ok(result.commands.includes("shutdown"), `${args.join(" ")} lists shutdown`);
+  }
+  for (const args of [["game", "--help"], ["help", "game"]]) {
+    const help = spawnSync(process.execPath, [cli, ...args], {
+      cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+    });
+    assert.equal(help.status, 0, `${args.join(" ")} succeeds without a Git workspace`);
+    const result = JSON.parse(help.stdout).result;
+    assert.equal(result.namespace, "game", `${args.join(" ")} identifies the game namespace`);
+    assert.deepEqual(
+      result.commands,
+      ["open", "close", "status", "inspect", "move", "camera", "screenshot", "record-start", "record-stop", "record-wait", "give-up", "shutdown"],
+      "game help exposes only bounded solo-match observation, move, surrender, and media commands",
+    );
   }
   assert.deepEqual(Object.keys(INTERACT_COMMAND_HELP).sort(), [...INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
   assert.deepEqual(
@@ -128,6 +141,34 @@ try {
   call("close", { sessionId: coldOpen.result.sessionId });
   call("shutdown");
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "cold-first-open daemon shuts down cleanly");
+
+  const gameOpened = callNamespace("game", "open", { opponent: "ai_turtle" }).result;
+  const gameSessionId = gameOpened.sessionId;
+  assert.match(gameSessionId, /^game_[a-f0-9]{32}$/, "game open returns a distinct bounded session id");
+  assert.equal(gameOpened.kind, "game", "game open identifies the isolated match kind");
+  assert.deepEqual(gameOpened.capabilities.orders, ["move"], "game capabilities expose move as the only gameplay order");
+  const gameInspection = callNamespace("game", "inspect", { sessionId: gameSessionId }).result;
+  assert.deepEqual(gameInspection.entities.map(({ id }) => id), [100], "game inspect defaults to locally owned fog-filtered entities");
+  assert.equal(gameInspection.ui.hudVisible, true, "game inspect returns semantic UI state");
+  const moved = callNamespace("game", "move", { sessionId: gameSessionId, units: [100], x: 700, y: 700 }).result;
+  assert.equal(moved.result.accepted, true, "game move uses the bounded normal command surface");
+  assert.equal(
+    callNamespaceFailure("game", "move", { sessionId: gameSessionId, units: [101], x: 700, y: 700 }).error.code,
+    "notControllable",
+    "game move rejects non-owned units",
+  );
+  const gameScreenshot = callNamespace("game", "screenshot", { sessionId: gameSessionId, name: "game-ui" }).result;
+  assert.equal(gameScreenshot.presentation, "normal", "game screenshots retain the UI by default");
+  assert.equal(gameScreenshot.preview.available, true, "game screenshots publish a Tailnet preview");
+  const gameRecording = callNamespace("game", "record-start", { sessionId: gameSessionId, name: "game-ui", maxDurationMs: 1000 }).result;
+  assert.equal(gameRecording.recorder.presentation, "normal", "game recordings retain the UI by default");
+  callNamespace("game", "record-stop", { sessionId: gameSessionId });
+  const surrendered = callNamespace("game", "give-up", { sessionId: gameSessionId }).result;
+  assert.equal(surrendered.result.phase, "concluded", "game give-up reaches the concluded score state");
+  assert.equal(callNamespaceFailure("lab", "open").error.code, "sessionKindMismatch", "an active game session cannot be mistaken for Lab");
+  callNamespace("game", "close", { sessionId: gameSessionId });
+  callNamespace("game", "shutdown");
+  await waitFor(() => !fs.existsSync(paths.directory), 2000, "game contract daemon shuts down cleanly");
 
   const mismatchEnv = { ...baseEnv, RTS_INTERACT_TEST_CHECKOUT_COMMIT: "b".repeat(40) };
   const mismatchSession = call("open", {}, mismatchEnv).result.sessionId;
@@ -569,6 +610,25 @@ function callFailure(command, input = {}, env = baseEnv) {
   const lines = result.stderr.trim().split("\n");
   assert.equal(lines.length, 1, `${command} failure writes exactly one JSON value to stderr`);
   return JSON.parse(lines[0]);
+}
+
+function callNamespace(namespace, command, input = {}, env = baseEnv) {
+  const result = spawnSync(process.execPath, [cli, namespace, command, JSON.stringify(input)], { cwd: root, env, encoding: "utf8" });
+  trackDaemon();
+  assert.equal(result.status, 0, `${namespace} ${command} succeeds: ${result.stderr}`);
+  assert.equal(result.stderr, "", `${namespace} ${command} writes no stderr on success`);
+  const response = JSON.parse(result.stdout);
+  assert.equal(response.ok, true, `${namespace} ${command} returns a successful envelope`);
+  if (namespace === "game" && command === "open") testArtifacts.ownGameSession(response.result.sessionId);
+  return response;
+}
+
+function callNamespaceFailure(namespace, command, input = {}, env = baseEnv) {
+  const result = spawnSync(process.execPath, [cli, namespace, command, JSON.stringify(input)], { cwd: root, env, encoding: "utf8" });
+  trackDaemon();
+  assert.notEqual(result.status, 0, `${namespace} ${command} fails for rejected input`);
+  assert.equal(result.stdout, "", `${namespace} ${command} failure keeps stdout empty`);
+  return JSON.parse(result.stderr);
 }
 
 function shutdown(env) {

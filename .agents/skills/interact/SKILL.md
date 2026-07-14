@@ -1,15 +1,22 @@
 ---
 name: interact
-description: Use the local Interact CLI's Lab namespace to arrange and inspect small authoritative Bewegungskrieg scenes, then capture clean Pixi screenshots. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, or camera review in a task worktree when Browser Use and Computer Use are unnecessary.
+description: Use the local Interact CLI to arrange authoritative Lab scenes or inspect one isolated normal human-vs-AI game, then capture Pixi screenshots or H.264 video. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, or basic live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
 ---
 
-# Interact Lab Capture
+# Interact Capture
 
 Use `node scripts/interact/cli.mjs lab <command> '<JSON-object>'` from the task worktree. The first
 command starts that worktree's private daemon automatically. Lab mutations are ephemeral and never
 edit source files. Use `node scripts/interact/cli.mjs lab help <command>` or
 `node scripts/interact/cli.mjs lab <command> --help` when an exact input shape, default, or bound is
 uncertain; command help never starts or inspects the daemon.
+
+For normal match/UI review, use `node scripts/interact/cli.mjs game <command> '<JSON-object>'`.
+`game open` creates one isolated player-vs-AI match. Retain its `game_...` session id, run `inspect`
+to choose a returned entity with `controllable:true`, then use only the bounded `move`, `camera`,
+`screenshot`, recording, and `give-up` commands. Game media defaults to `presentation:"normal"` so
+the HUD and score screen remain visible. This namespace cannot join arbitrary rooms or issue
+attack, build, production, economy, ability, or arbitrary protocol commands.
 
 1. Run `open`, retain `result.sessionId`, then run `catalog` before choosing players or kinds.
    `open` is safe to repeat: it returns the active session. Run `close` first only when a fresh
@@ -35,8 +42,8 @@ uncertain; command help never starts or inspects the daemon.
 6. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
-Capture files are confined to `target/interact/lab/<session-id>/captures/` and ignored by Git. Do
-not request arbitrary paths, add image bytes to Git, or use `interact lab` to play a full match. A
+Capture files are confined to `target/interact/<lab|game>/<session-id>/` and ignored by Git. Do
+not request arbitrary paths, add image bytes to Git, or use either namespace to play a full match. A
 Tailnet Preview URL is copied into the machine-level preview service with at least 24 hours of
 retention. `close`, `shutdown`, daemon idle teardown, and removal of the originating worktree do not
 invalidate it. The preview service has no idle timeout and remains running until explicitly stopped

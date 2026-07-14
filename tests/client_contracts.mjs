@@ -43,6 +43,7 @@ await import("./interact_cli_contracts.mjs");
 await import("./interact_tailnet_preview_contracts.mjs");
 await import("./client_contracts/interact_capture_contracts.mjs");
 await import("./client_contracts/interact_bulk_contracts.mjs");
+await import("./client_contracts/interact_game_bridge_contracts.mjs");
 await import("./client_contracts/lab_control_group_contracts.mjs");
 await import("./client_contracts/lab_input_ownership_contracts.mjs");
 await import("./client_contracts/lab_tool_input_contracts.mjs");
