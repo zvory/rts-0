@@ -243,3 +243,57 @@ fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
         "Scout Plane already active for this Command Car",
     );
 }
+
+#[test]
+fn scout_plane_command_skips_selected_car_with_active_plane() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let active_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
+        .expect("active command car should spawn");
+    let available_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 192.0, 128.0)
+        .expect("available command car should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    let _ = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, scout_plane_command(vec![active_car], 512.0, 512.0))],
+    );
+    entities
+        .get_mut(active_car)
+        .expect("active command car")
+        .start_ability_cooldown(AbilityKind::ScoutPlane, 0);
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            scout_plane_command(vec![active_car, available_car], 640.0, 512.0),
+        )],
+    );
+
+    assert_eq!((players[0].steel, players[0].oil), (900, 900));
+    let mut source_cars = entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
+        .filter_map(|plane| plane.scout_plane_state()?.source_command_car)
+        .collect::<Vec<_>>();
+    source_cars.sort_unstable();
+    assert_eq!(source_cars, vec![active_car, available_car]);
+    assert_eq!(
+        entities
+            .get(available_car)
+            .expect("available command car")
+            .ability_cooldown_ticks(AbilityKind::ScoutPlane),
+        config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS
+    );
+    assert_notice(&events, 1, "Scout Plane");
+}

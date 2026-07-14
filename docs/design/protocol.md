@@ -668,7 +668,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 38. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 39. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -694,7 +694,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 38,
+  "v": 39,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -805,7 +805,8 @@ while the unit is digging in, slotting is unavailable, merely near a trench, or 
 projectile is in flight or the spent launcher is being discarded before Rifleman conversion, so the client can hide the warhead from unit art;
 omitted values should be treated as loaded for older data and non-Panzerfaust entities.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
-the current orbit center; enemy projections that can see the plane omit this state. Scout Plane
+the current orbit center and source Command Car id; enemy projections that can see the plane omit
+this state. Scout Plane
 entities are not selectable or commandable by normal clients, and runtime movement is driven by the
 server-side Command Car ability lifecycle.
 `visionOnly` is a legacy/special projection flag for non-owned units/buildings that are sent as
@@ -905,7 +906,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
   panzerfaustLoaded?: bool,       // Panzerfaust only; false after its disposable shot is launched
   scoutPlane?: {                 // owner/full-world diagnostics only; enemies omit this private state
-    orbitCenter?: [f32, f32]
+    orbitCenter?: [f32, f32],
+    sourceCommandCar?: u32
   },
   setupState?: string,           // machine_gunner/anti_tank_gun/mortar_team/artillery only:
                                   // "packed","setting_up","deployed","tearing_down"

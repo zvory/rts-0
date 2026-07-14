@@ -931,15 +931,35 @@ function fakeHudRootWithoutResourceSpans() {
   assert(oilBlockedScoutPlane.unaffordable, "resource-blocked Scout Plane ability should stay clickable for feedback");
   assert(oilBlockedScoutPlane.title === "Not enough resources", "Scout Plane resource-blocked tooltip should name resources");
 
-  const activeScoutPlane = { id: 75, owner: 1, kind: KIND.SCOUT_PLANE, x: 320, y: 448 };
+  const activeScoutPlane = {
+    id: 75,
+    owner: 1,
+    kind: KIND.SCOUT_PLANE,
+    x: 320,
+    y: 448,
+    scoutPlane: { sourceCommandCar: commandCar.id },
+  };
   const activeScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar],
     entities: [scoutPlaneCityCentre, commandCar, activeScoutPlane],
     resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
   }));
   const activeBlockedScoutPlane = buttonByLabel(activeScoutPlaneCard, "Scout Plane");
-  assert(!activeBlockedScoutPlane.enabled, "Scout Plane ability should disable while a plane is active");
-  assert(activeBlockedScoutPlane.title === "Scout Plane already active", "active Scout Plane block should explain the one-plane limit");
+  assert(!activeBlockedScoutPlane.enabled, "Scout Plane ability should disable while that Command Car's plane is active");
+  assert(activeBlockedScoutPlane.title === "Scout Plane already active", "active Scout Plane block should explain the per-car limit");
+
+  const secondCommandCar = {
+    ...commandCar,
+    id: 76,
+  };
+  const mixedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [commandCar, secondCommandCar],
+    entities: [scoutPlaneCityCentre, commandCar, secondCommandCar, activeScoutPlane],
+    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+  }));
+  const mixedScoutPlaneAbility = buttonByLabel(mixedScoutPlaneCard, "Scout Plane");
+  assert(mixedScoutPlaneAbility.enabled, "another selected Command Car can launch while the first car's plane is active");
+  assert(mixedScoutPlaneAbility.intent.readyIds.join(",") === "76", "Scout Plane targeting excludes only the source car with an active plane");
 
   const scoutCar = {
     id: 30,

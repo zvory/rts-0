@@ -177,7 +177,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         40,
         STATE_CODE[STATE.IDLE],
         ...Array(25).fill(null),
-        [[512, 544]],
+        [[512, 544], 74],
       ],
       [
         6,
@@ -312,7 +312,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.entities[4].kind === KIND.SCOUT_PLANE, "Scout Plane kind code decodes");
   assert(
     decoded.entities[4].scoutPlane.orbitCenter[0] === 512 &&
-      decoded.entities[4].scoutPlane.orbitCenter[1] === 544,
+      decoded.entities[4].scoutPlane.orbitCenter[1] === 544 &&
+      decoded.entities[4].scoutPlane.sourceCommandCar === 74,
     "Scout Plane compact owner state decodes",
   );
   assert(decoded.entities[5].panzerfaustLoaded === false, "entity Panzerfaust loaded flag decodes");

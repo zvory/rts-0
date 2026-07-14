@@ -148,7 +148,6 @@ impl Game {
                     active_construction_sites: Some(&self.state.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
-                    owner_ability_cooldowns: self.player(e.owner).map(|p| &p.ability_cooldowns),
                     ability_runtime: Some(&self.state.ability_runtime),
                     tick: self.state.tick,
                 },
@@ -315,9 +314,6 @@ impl Game {
                     active_construction_sites: Some(&self.state.active_construction_sites),
                     teams: Some(teams),
                     owner_faction_id: self.player(entity.owner).map(|p| p.faction_id.as_str()),
-                    owner_ability_cooldowns: self
-                        .player(entity.owner)
-                        .map(|p| &p.ability_cooldowns),
                     ability_runtime: Some(&self.state.ability_runtime),
                     tick: self.state.tick,
                 },

@@ -506,6 +506,8 @@ pub struct AbilityCooldownView {
 pub struct ScoutPlaneStateView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orbit_center: Option<[f32; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_command_car: Option<u32>,
 }
 
 /// One entity as seen by one player. Optional fields are omitted when not applicable.

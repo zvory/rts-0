@@ -529,11 +529,17 @@ export function selectedAbilityAffordances(ctx, selection) {
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
-      const activeBlock = definition.ability === ABILITY.SCOUT_PLANE && activeOwnScoutPlane(ctx);
-      const readyUnits = activeBlock ? [] : carriers.filter((e) => abilityUnitReady(e, definition));
-      const queueAdmissibleUnits = activeBlock
-        ? []
-        : carriers.filter((e) => abilityUnitQueueAdmissible(e, definition));
+      const activeScoutPlaneSources = definition.ability === ABILITY.SCOUT_PLANE
+        ? activeOwnScoutPlaneSourceIds(ctx)
+        : null;
+      const activeBlockedUnits = activeScoutPlaneSources
+        ? carriers.filter((e) => activeScoutPlaneSources.has(e.id))
+        : [];
+      const activeBlock = activeBlockedUnits.length === carriers.length;
+      const readyUnits = carriers.filter((e) =>
+        !activeScoutPlaneSources?.has(e.id) && abilityUnitReady(e, definition));
+      const queueAdmissibleUnits = carriers.filter((e) =>
+        !activeScoutPlaneSources?.has(e.id) && abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
@@ -754,6 +760,9 @@ function currentEntitiesOf(ctx) {
   return ctx?.selection || [];
 }
 
-function activeOwnScoutPlane(ctx) {
-  return currentEntitiesOf(ctx).some((e) => isOwn(ctx, e) && e.kind === KIND.SCOUT_PLANE && e.hp !== 0);
+function activeOwnScoutPlaneSourceIds(ctx) {
+  return new Set(currentEntitiesOf(ctx)
+    .filter((e) => isOwn(ctx, e) && e.kind === KIND.SCOUT_PLANE && e.hp !== 0)
+    .map((e) => e.scoutPlane?.sourceCommandCar)
+    .filter((id) => Number.isInteger(id) && id > 0));
 }

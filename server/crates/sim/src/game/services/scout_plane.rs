@@ -19,8 +19,6 @@ pub(crate) fn launch_ability(
     entities: &mut EntityStore,
     owner: u32,
     source_command_car: u32,
-    launch_x: f32,
-    launch_y: f32,
     x: f32,
     y: f32,
 ) -> Result<u32, ScoutPlaneLaunchError> {
@@ -28,6 +26,15 @@ pub(crate) fn launch_ability(
         return Err(ScoutPlaneLaunchError::Active);
     }
     let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
+        return Err(ScoutPlaneLaunchError::NoCityCentre);
+    };
+    let Some((launch_x, launch_y)) = entities
+        .get(source_command_car)
+        .filter(|source| {
+            source.owner == owner && source.kind == EntityKind::CommandCar && source.hp > 0
+        })
+        .map(|source| (source.pos_x, source.pos_y))
+    else {
         return Err(ScoutPlaneLaunchError::NoCityCentre);
     };
     let Some((launch_x, launch_y)) = clamp_world_point(map, launch_x, launch_y) else {

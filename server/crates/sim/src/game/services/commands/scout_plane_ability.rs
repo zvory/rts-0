@@ -34,18 +34,30 @@ pub(super) fn use_ability(
     {
         return;
     }
+    let mut active_blocked = false;
     let caster = dedupe_cap_units(request.units, request.max_units_per_command)
         .into_iter()
-        .find_map(|unit| {
+        .find(|unit| {
+            let unit = *unit;
             if !caster_can_accept_order(entities, player, unit, ability)
                 || !ability_orders::caster_allowed_by_faction(entities, faction_id, unit, ability)
             {
-                return None;
+                return false;
             }
-            let caster = entities.get(unit)?;
-            Some((unit, caster.pos_x, caster.pos_y))
+            if scout_plane::active_scout_plane_for_command_car(entities, player, unit).is_some() {
+                active_blocked = true;
+                return false;
+            }
+            true
         });
-    let Some((source_command_car, launch_x, launch_y)) = caster else {
+    let Some(source_command_car) = caster else {
+        if active_blocked {
+            notice(
+                events,
+                player,
+                "Scout Plane already active for this Command Car",
+            );
+        }
         return;
     };
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
@@ -59,16 +71,7 @@ pub(super) fn use_ability(
         );
         return;
     }
-    match scout_plane::launch_ability(
-        map,
-        entities,
-        player,
-        source_command_car,
-        launch_x,
-        launch_y,
-        x,
-        y,
-    ) {
+    match scout_plane::launch_ability(map, entities, player, source_command_car, x, y) {
         Ok(_) => {
             if let Some(caster) = entities.get_mut(source_command_car) {
                 caster.start_ability_cooldown(ability, definition.cooldown_ticks);

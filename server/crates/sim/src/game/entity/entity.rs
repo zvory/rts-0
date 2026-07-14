@@ -698,11 +698,13 @@ impl Entity {
         self.scout_plane.as_mut()
     }
 
-    pub(crate) fn scout_plane_private_details(&self) -> Option<(f32, f32)> {
+    pub(crate) fn scout_plane_private_details(&self) -> Option<((f32, f32), Option<u32>)> {
         if self.kind != EntityKind::ScoutPlane {
             return None;
         }
-        self.scout_plane.as_ref().map(|state| state.orbit_center)
+        self.scout_plane
+            .as_ref()
+            .map(|state| (state.orbit_center, state.source_command_car))
     }
 
     pub(in crate::game) fn ensure_scout_plane_state(&mut self) {

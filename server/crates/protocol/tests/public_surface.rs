@@ -160,7 +160,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 38);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 39);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
@@ -205,6 +205,7 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
     let mut plane = EntityView::new(5, 1, kinds::SCOUT_PLANE, 160.0, 170.0, 40, 40, states::IDLE);
     plane.scout_plane = Some(ScoutPlaneStateView {
         orbit_center: Some([512.0, 544.0]),
+        source_command_car: Some(74),
     });
 
     let snapshot = Snapshot {
@@ -240,5 +241,5 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
     let compact = serialize_compact_snapshot(&snapshot).unwrap();
     let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
     assert_eq!(value["e"][0][2], serde_json::json!(25));
-    assert_eq!(value["e"][0][33], serde_json::json!([[512.0, 544.0]]));
+    assert_eq!(value["e"][0][33], serde_json::json!([[512.0, 544.0], 74]));
 }

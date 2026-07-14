@@ -68,8 +68,11 @@ fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return()
     let far = spawn_city_centre(&mut entities, 1, 96.0, 96.0);
     let near = spawn_city_centre(&mut entities, 1, 768.0, 768.0);
     let enemy = spawn_city_centre(&mut entities, 2, 800.0, 800.0);
+    let source_command_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 320.0, 448.0)
+        .expect("source Command Car should spawn");
 
-    let plane = launch_ability(&map, &mut entities, 1, 42, 320.0, 448.0, 790.0, 790.0)
+    let plane = launch_ability(&map, &mut entities, 1, source_command_car, 790.0, 790.0)
         .expect("launch succeeds");
     let plane_entity = entities.get(plane).expect("plane exists");
     assert_eq!(plane_entity.owner, 1);
@@ -78,14 +81,14 @@ fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return()
 
     let state = plane_state(&entities, plane);
     assert_eq!(state.home_city_centre, Some(near));
-    assert_eq!(state.source_command_car, Some(42));
+    assert_eq!(state.source_command_car, Some(source_command_car));
     assert_eq!(state.orbit_center, (790.0, 790.0));
     assert_eq!(
-        launch_ability(&map, &mut entities, 1, 42, 320.0, 448.0, 128.0, 128.0),
+        launch_ability(&map, &mut entities, 1, source_command_car, 128.0, 128.0,),
         Err(ScoutPlaneLaunchError::Active)
     );
     assert_eq!(
-        launch_ability(&map, &mut entities, 3, 77, 320.0, 448.0, 128.0, 128.0),
+        launch_ability(&map, &mut entities, 3, 77, 128.0, 128.0),
         Err(ScoutPlaneLaunchError::NoCityCentre)
     );
     assert_eq!(entities.get(far).expect("far cc").owner, 1);
