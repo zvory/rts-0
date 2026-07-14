@@ -37,8 +37,10 @@ uncertain; command help never starts or inspects the daemon.
 
 Capture files are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. Do
 not request arbitrary paths, add image bytes to Git, or use Lab Interact to play a full match. A
-Tailnet Preview URL remains available while the Lab daemon is running; `close` preserves it, while
-`shutdown` or daemon idle teardown removes it.
+Tailnet Preview URL is copied into the machine-level preview service with at least 24 hours of
+retention. `close`, `shutdown`, daemon idle teardown, and removal of the originating worktree do not
+invalidate it. The preview service has no idle timeout and remains running until explicitly stopped
+or the machine shuts down.
 
 ## Recovery
 

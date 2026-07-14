@@ -136,6 +136,8 @@ function isQualityPassWorkflowPath(pathname) {
 function isLabInteractPath(pathname) {
   return (
     pathname.startsWith("scripts/lab-interact/") ||
+    pathname === "scripts/tailnet-preview.mjs" ||
+    pathname === "scripts/tailnet-preview.d.mts" ||
     pathname === "scripts/check-lab-interact-architecture.mjs" ||
     pathname === "client/src/lab_interact_bridge.js" ||
     pathname === "server/src/lab_interact_artifacts.rs" ||

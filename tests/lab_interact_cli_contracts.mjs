@@ -18,7 +18,10 @@ import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
+const tailnetPreviewCli = path.join(root, "scripts/tailnet-preview.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-contracts-"));
+const previewRoot = path.join(isolatedTmp, "durable-previews");
+const previewPort = await reserveLoopbackPort();
 const testArtifacts = new LabInteractTestArtifacts(root);
 const originalTmp = process.env.TMPDIR;
 process.env.TMPDIR = isolatedTmp;
@@ -31,6 +34,8 @@ const baseEnv = {
   RTS_LAB_INTERACT_IDLE_MS: "5000",
   RTS_LAB_INTERACT_FAKE_OPEN_DELAY_MS: "250",
   RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1",
+  RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_ROOT: previewRoot,
+  RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_PORT: String(previewPort),
 };
 
 try {
@@ -275,7 +280,8 @@ try {
   assert.equal("pngPath" in screenshot.result, false, "CLI withholds raw screenshot paths in favor of the delivery URL");
   assert.equal("manifestPath" in screenshot.result, false, "CLI withholds raw screenshot manifest paths");
   assert.equal(screenshot.result.preview.available, true, "screenshot creates a Tailnet preview");
-  assert.match(screenshot.result.preview.url, /^http:\/\/127\.0\.0\.1:\d+\/lab-interact-preview\/[a-f0-9]{64}$/, "screenshot emits an opaque Tailnet preview URL");
+  assert.match(screenshot.result.preview.url, new RegExp(`^http://127\\.0\\.0\\.1:${previewPort}/p/[A-Za-z0-9_-]{16,64}/cli-contract\\.png$`), "screenshot emits an opaque durable Tailnet preview URL");
+  assert.ok(screenshot.result.preview.expiresAt >= Date.now() + 24 * 60 * 60 * 1000 - 1_000, "screenshot preview is retained for at least 24 hours");
   assert.match(screenshot.result.preview.instruction, /Share this Tailnet URL/, "screenshot tells the caller to share the Tailnet preview");
   assert.equal(screenshot.result.preview.url.includes("target/lab-interact"), false, "preview URLs never reveal filesystem paths");
   const screenshotPreview = await fetch(screenshot.result.preview.url);
@@ -365,6 +371,7 @@ try {
   const explicit = call("shutdown");
   assert.equal(explicit.result.shuttingDown, true, "shutdown acknowledges immediate teardown");
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "shutdown removes socket, state, and runtime files");
+  assert.equal((await fetch(screenshot.result.preview.url)).status, 200, "Lab daemon shutdown does not invalidate an issued preview URL");
 
   const unavailablePreviewEnv = { ...baseEnv, RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "not-a-loopback-host" };
   const unavailableSession = call("open", {}, unavailablePreviewEnv).result.sessionId;
@@ -481,9 +488,29 @@ try {
 } finally {
   shutdown(baseEnv);
   await stopOwnedDaemon();
+  stopPreviewService();
   testArtifacts.cleanup();
   testArtifacts.assertClean();
   restoreTmp();
+}
+
+function reserveLoopbackPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close((error) => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
+
+function stopPreviewService() {
+  spawnSync(process.execPath, [tailnetPreviewCli, "--stop", "--root", previewRoot, "--port", String(previewPort)], {
+    cwd: root,
+    env: baseEnv,
+    encoding: "utf8",
+  });
 }
 
 function call(command, input = {}, env = baseEnv) {

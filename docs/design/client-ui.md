@@ -625,6 +625,12 @@ without embedding image content. Portable setup export/import uses the bridge's 
 `exportSetup`/`importSetup` methods and keeps checkpoint bytes out of CLI results. Replay bytes bypass
 the browser and normal WebSocket result through the capability-gated private-server handoff; the
 daemon writes only bounded artifacts and alias sidecars under `target/lab-interact/`.
+Visual delivery is deliberately not owned by that per-worktree lifecycle. Before returning a
+Tailnet URL, the daemon validates the artifact and copies it into the machine-level
+`tailnet-preview` service on stable port 8091. The preview server has no idle timeout, and each
+copied artifact has at least 24 hours of retention, so Lab close/shutdown, idle expiry, and worktree
+removal do not invalidate issued links. A later publisher can restart the service and continue
+serving unexpired copies from its OS-temporary root.
 Operational aliases, inspection, camera focus, screenshot subjects, and corresponding bridge
 entity-id inputs accept at most 400 references. Screenshot readiness validates the complete
 requested subject set, but returned and persisted subject detail is capped at 24 rows with total and

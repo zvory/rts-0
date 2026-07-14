@@ -8,8 +8,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_PORT = 8091;
-const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_PORT = 8091;
+export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const HEALTH_PATH = "/_tailnet-preview/health";
 const PREVIEW_PATH_PREFIX = "/p/";
 const SERVICE_NAME = "rts-tailnet-preview";
@@ -144,6 +144,10 @@ function isRegularFile(file) {
   } catch {
     return false;
   }
+}
+
+function isPreviewHost(value) {
+  return isTailnetIpv4(value) || value === "127.0.0.1" || value === "::1";
 }
 
 export function safeFileName(file) {
@@ -628,8 +632,8 @@ async function ensureServer({ host, port, root }) {
 }
 
 function serve({ host, port, root }) {
-  if (!isTailnetIpv4(host)) {
-    throw new Error("preview server must bind to a Tailscale IPv4 address");
+  if (!isPreviewHost(host)) {
+    throw new Error("preview server must bind to a Tailscale IPv4 address (or loopback for tests)");
   }
   const server = createPreviewServer({ root });
   let stopping = false;
@@ -658,31 +662,42 @@ function serve({ host, port, root }) {
   });
 }
 
-async function runPreview(options) {
-  if (!isRegularFile(options.source)) {
-    throw new Error(`preview source must be a regular file: ${options.source}`);
+export async function publishTailnetPreview({
+  source,
+  root = path.join(os.tmpdir(), SERVICE_NAME),
+  host = tailscaleIpv4(),
+  port = DEFAULT_PORT,
+  ttlMs = DEFAULT_TTL_MS,
+  keep = false,
+} = {}) {
+  if (!isRegularFile(source)) {
+    throw new Error(`preview source must be a regular file: ${source}`);
   }
-  const host = tailscaleIpv4();
-  ensureRoot(options.root);
-  cleanupExpiredPreviews(options.root);
-  const preview = stagePreview({
-    root: options.root,
-    source: options.source,
-    ttlMs: options.ttlMs,
-    keep: options.keep,
-  });
+  if (!isPreviewHost(host)) {
+    throw new Error("preview host must be a Tailscale IPv4 address (or loopback for tests)");
+  }
+  ensureRoot(root);
+  cleanupExpiredPreviews(root);
+  const preview = stagePreview({ root, source, ttlMs, keep });
   try {
-    await ensureServer({ host, port: options.port, root: options.root });
+    await ensureServer({ host, port, root });
   } catch (error) {
     try {
-      rmSync(previewDirectory(options.root, preview.id), { recursive: true, force: true });
+      rmSync(previewDirectory(root, preview.id), { recursive: true, force: true });
     } catch {
       // Preserve the startup failure; a later invocation will clean the TTL-bound preview.
     }
     throw error;
   }
-  const url = `http://${host}:${options.port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`;
-  console.log(`Preview URL: ${url}`);
+  return {
+    url: `http://${host}:${port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`,
+    expiresAt: preview.expiresAt,
+  };
+}
+
+async function runPreview(options) {
+  const preview = await publishTailnetPreview(options);
+  console.log(`Preview URL: ${preview.url}`);
   if (preview.expiresAt === null) {
     console.log("Expires: retained until manually removed or the OS clears its temporary directory");
   } else {

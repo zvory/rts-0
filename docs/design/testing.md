@@ -205,6 +205,11 @@ filters fail closed so invalid bounds cannot broaden a query. The driver evaluat
 current frame so transient startup work does not block a later clean capture, and clamps seeks to
 the supported range.
 
+Lab preview contracts require a 24-hour-or-longer artifact TTL and prove that a published URL remains
+fetchable after the Lab publisher closes and its originating worktree is removed. CLI coverage also
+proves daemon shutdown leaves issued screenshot links valid, while concurrent recording wait/stop
+callers receive the same deduplicated durable publication.
+
 Lab Interact source, page-bridge, Rust artifact-bridge, focused-test, CLI-documentation, and local
 skill changes select `lab-interact-contracts` plus the browser `client-smoke` shard. The fast
 Node/static gate installs the root lock and runs the strict no-emit Lab TypeScript check before the

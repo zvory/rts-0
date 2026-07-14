@@ -67,15 +67,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     lastInteractionAt = Date.now();
     lastInteractionMark = performance.now();
   };
-  artifactPreview = new LabInteractTailnetPreview({
-    workspaceRoot: paths.workspaceRoot,
-    onAccess: () => {
-      if (stopping || shutdownRequested) return;
-      recordInteraction();
-      writeState(paths, state());
-      scheduleIdle();
-    },
-  });
+  artifactPreview = new LabInteractTailnetPreview({ workspaceRoot: paths.workspaceRoot });
   const service = new LabInteractService({
     workspaceRoot: paths.workspaceRoot,
     driverFactory,
