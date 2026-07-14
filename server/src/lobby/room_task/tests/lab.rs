@@ -181,6 +181,7 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     assert_eq!(ack_rx.try_recv(), Ok(true));
     let starts = start_payloads(&mut writer);
     assert_eq!(starts.len(), 1);
+    assert_eq!(task.match_map_name, "1v1");
     assert_eq!(starts[0].players.len(), 2);
     assert_eq!(starts[0].players[0].name, "Lab Alpha");
     assert_eq!(starts[0].players[1].name, "Lab Bravo");

@@ -217,7 +217,8 @@ async function main() {
   );
   ok(Object.keys(replayRow).sort().join(",") === SAFE_REPLAY_LOBBY_ROW_KEYS,
     "replay browser row exposes only safe lobby metadata");
-  ok(replayRow.map === "Default", "replay browser row shows the artifact map name");
+  const replaySetup = JSON.parse(fs.readFileSync(LAB_SETUP_FIXTURE, "utf8"));
+  ok(replayRow.map === replaySetup.map.name, "replay browser row shows the artifact map name");
 
   const ReplayGuest = await connectClient("browser-replay-guest");
   ReplayGuest.send({ t: "join", name: "Viewer", room: replayRoom, spectator: true });
