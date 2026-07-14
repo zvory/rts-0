@@ -336,6 +336,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
+| `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek begins rebuilding. Rejected and rate-limited seeks do not emit it. |
 | `livePauseState` | `Live match pause state` (see 2.6). |
 | `observerAnalysis` | `Observer analysis state` (see 2.7). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
@@ -1109,6 +1110,11 @@ Lab rooms expose recorded baseline and periodic keyframe ticks through the same 
 `durationTicks` set to the current maximum retained lab tick. Lab history is bounded by retained
 room-local keyframes and recorded entries; seek requests outside retained history are rejected with
 `error` instead of rebuilding from discarded state.
+
+Before an accepted replay seek starts its synchronous rebuild, the room broadcasts
+`roomTimeSeekStarted` with the authoritative current and clamped target ticks. Every replay viewer,
+including the controller, presents the direction and tick distance as seconds so a temporarily
+frozen replay is visibly busy until the rebuilt `start`/`roomTimeState` sequence arrives.
 
 `livePauseState` is a reliable server message that carries the authoritative live-match pause
 state. Normal live and branch-live match recipients receive it after `start` and after accepted or

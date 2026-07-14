@@ -154,6 +154,19 @@ const { ok } = assertions;
   ok(roomTimeStateA.speed === 2 && roomTimeStateB.speed === 2,
      `REPLAY: playback defaults to 2x (${roomTimeStateA.speed}/${roomTimeStateB.speed})`);
 
+  await A.waitNext((m) => m.t === "snapshot" && m.tick >= 2, 4000, "advancing replay snapshot");
+  A.send({ t: "seekRoomTimeTo", tick: 0 });
+  const [seekStartedA, seekStartedB, seekStartedC] = await Promise.all([
+    A.waitFor((m) => m.t === "roomTimeSeekStarted", 4000, "A replay seek started"),
+    B.waitFor((m) => m.t === "roomTimeSeekStarted", 4000, "B replay seek started"),
+    C.waitFor((m) => m.t === "roomTimeSeekStarted", 4000, "C replay seek started"),
+  ]);
+  ok(
+    [seekStartedA, seekStartedB, seekStartedC].every((m) =>
+      m.controllerId === A.playerId && m.fromTick >= 2 && m.targetTick === 0),
+    `REPLAY: accepted seek immediately broadcasts controller/distance to every viewer (${seekStartedA.fromTick}->${seekStartedA.targetTick})`,
+  );
+
   A.send({ t: "returnToLobby" });
   const lobbyAfterReplay = await A.waitFor((m) => m.t === "lobby" && m.players.length === 3, 4000, "lobby after replay");
   ok(lobbyAfterReplay.players.every((p) => p.isSpectator || !p.ready),

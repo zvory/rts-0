@@ -37,6 +37,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "floating_panel_positioner.js": "app-shell",
   "live_pause_overlay.js": "app-shell",
   "replay_controls.js": "app-shell",
+  "replay_seek_notice.js": "app-shell",
   "room_time_panel.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",

@@ -8,6 +8,7 @@ export const S = Object.freeze({
   START: "start",
   SNAPSHOT: "snapshot",
   ROOM_TIME_STATE: "roomTimeState",
+  ROOM_TIME_SEEK_STARTED: "roomTimeSeekStarted",
   LIVE_PAUSE_STATE: "livePauseState",
   OBSERVER_ANALYSIS: "observerAnalysis",
   JOIN_REPLAY_PROMPT: "joinReplayPrompt",

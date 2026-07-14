@@ -64,6 +64,7 @@ import { InteractBridge, interactLaunchEnabled } from "./interact_bridge.js";
 import { InteractGameBridge, interactGameLaunchEnabled } from "./interact_game_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
+import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -153,6 +154,7 @@ export class App {
     this.onObservationReady = this.onObservationReady.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
     this.onShutdownWarning = this.onShutdownWarning.bind(this);
+    this.onRoomTimeSeekStarted = this.onRoomTimeSeekStarted.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
     this.onCloseScorePanel = this.onCloseScorePanel.bind(this);
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
@@ -185,6 +187,7 @@ export class App {
     this.net.on(S.GAME_OVER, this.onGameOver);
     this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
+    this.net.on(S.ROOM_TIME_SEEK_STARTED, this.onRoomTimeSeekStarted);
     this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
@@ -429,6 +432,11 @@ export class App {
         : "Server deploy in progress. New matches are disabled.";
     this.showToast(text, 8000);
     if (this.lobby) this.lobby.setStatus(text, true);
+  }
+
+  onRoomTimeSeekStarted(m) {
+    const notice = formatReplaySeekNotice(m);
+    if (notice) this.showToast(notice, 5000);
   }
 
   /**
