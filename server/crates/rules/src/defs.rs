@@ -11,7 +11,6 @@ use crate::EntityKind;
 pub enum ArmorClass {
     Small,
     Armored,
-    Hard,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -233,7 +232,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::Artillery,
         stats: balance::UnitStats {
-            hp: 150,
+            hp: 200,
             dmg: 0,
             range_tiles: balance::ARTILLERY_MAX_RANGE_TILES,
             cooldown: balance::ARTILLERY_RELOAD_TICKS,
@@ -245,7 +244,7 @@ pub const UNITS: &[UnitDef] = &[
             build_ticks: 750,
             radius: 18.0,
         },
-        armor_class: ArmorClass::Hard,
+        armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::Steelworks),
         train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
@@ -313,7 +312,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::CommandCar,
         stats: balance::UnitStats {
-            hp: 225,
+            hp: 150,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -725,6 +724,17 @@ mod tests {
             .speed;
 
         assert_eq!(artillery_speed, anti_tank_gun_speed);
+    }
+
+    #[test]
+    fn artillery_and_command_car_use_raw_hp_without_special_armor() {
+        let artillery = unit_def(EntityKind::Artillery).expect("artillery def");
+        let command_car = unit_def(EntityKind::CommandCar).expect("command car def");
+
+        assert_eq!(artillery.stats.hp, 200);
+        assert_eq!(artillery.armor_class, ArmorClass::Small);
+        assert_eq!(command_car.stats.hp, 150);
+        assert_eq!(command_car.armor_class, ArmorClass::Small);
     }
 
     #[test]

@@ -342,10 +342,7 @@ pub fn attack_profile(kind: EntityKind) -> AttackProfile {
 
 /// Armored targets take 75% damage reduction from non-AP weapons.
 pub fn is_armored(kind: EntityKind) -> bool {
-    matches!(
-        armor_class(kind),
-        Some(ArmorClass::Armored | ArmorClass::Hard)
-    )
+    armor_class(kind) == Some(ArmorClass::Armored)
 }
 
 /// Weapons with non-zero armor penetration count as AP threats for target ranking.
@@ -424,7 +421,7 @@ pub fn default_weapon_target_fit(
         WeaponClass::AntiTank => {
             if target_role == TargetThreatRole::AntiArmorThreat {
                 WeaponTargetFit::PreferredThreat
-            } else if matches!(target_armor, Some(ArmorClass::Armored | ArmorClass::Hard)) {
+            } else if target_armor == Some(ArmorClass::Armored) {
                 WeaponTargetFit::PreferredArmor
             } else {
                 WeaponTargetFit::Fallback
@@ -570,10 +567,6 @@ fn effective_damage_for_armor_penetration(
         Some(ArmorClass::Armored) if penetration <= 0.0 => base_dmg / 4,
         Some(ArmorClass::Armored) => {
             let multiplier = 0.25 + (0.75 * penetration);
-            ((base_dmg as f32) * multiplier).round() as u32
-        }
-        Some(ArmorClass::Hard) => {
-            let multiplier = 0.75 + (0.25 * penetration);
             ((base_dmg as f32) * multiplier).round() as u32
         }
         _ => base_dmg,
