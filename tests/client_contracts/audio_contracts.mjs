@@ -114,6 +114,10 @@ assert(
   ),
   "Panzerfaust combat cues are exposed through the shared sound manifest",
 );
+assert(
+  SOUND_MANIFEST.some((entry) => entry.id === "combat_distant_bed_01"),
+  "world combat activity bed is exposed through the shared sound manifest",
+);
 
 // Audio
 // ---------------------------------------------------------------------------
@@ -139,6 +143,7 @@ assert(
   assertHasMethod(audio, "play", "Audio");
   assertHasMethod(audio, "playUI", "Audio");
   assertHasMethod(audio, "stopByKey", "Audio");
+  assertHasMethod(audio, "hasVoiceKey", "Audio");
   assertHasMethod(audio, "preload", "Audio");
   assertHasMethod(audio, "setListener", "Audio");
   assertHasMethod(audio, "pickVariant", "Audio");
@@ -190,7 +195,7 @@ assert(
   );
   assert(
     audio._computeSpatial(581, 100, "combat_self") === null,
-    "Audio drops combat beyond 1.2 reference distances",
+    "localized combat drops beyond 1.2 acoustic reference distances",
   );
 
   const defaultAtCombatDrop = audio._computeSpatial(581, 100, "ambient");
@@ -201,6 +206,24 @@ assert(
     0.001,
     "default non-combat attenuation remains unchanged",
   );
+
+  audio.setListener({ x: 100, y: 100, referenceDistancePx: 4000 });
+  const zoomedOutCombat = audio._computeSpatial(740, 100, "combat_other");
+  assert(zoomedOutCombat !== null, "zoomed-out combat inside the world-bounded envelope still plays");
+  assertApprox(
+    zoomedOutCombat.gain,
+    0.5,
+    0.001,
+    "extreme zoom-out cannot inflate the combat foreground distance",
+  );
+  const zoomedOutNonCombat = audio._computeSpatial(740, 100, "ambient");
+  assertApprox(
+    zoomedOutNonCombat.gain,
+    1,
+    0.001,
+    "combat's acoustic cap does not change the renderer-neutral non-combat profile",
+  );
+  audio.setListener({ x: 100, y: 100, referenceDistancePx: 400 });
 
   const priorPerformance = globalThis.performance;
   let now = 0;
@@ -225,6 +248,13 @@ assert(
     "Audio.stopByKey keeps unrelated voices active",
   );
   audio.voices = [];
+  const fadingVoice = keyedVoice("fading-bed");
+  fadingVoice.stopping = true;
+  audio.voices = [fadingVoice];
+  assert(
+    audio.stopByKey("fading-bed") === 1 && audio.voices.length === 0,
+    "an immediate keyed stop force-stops a voice already fading",
+  );
 
   audio.ctx = fakeAudioContext();
   audio.master = fakeGain();
@@ -280,6 +310,43 @@ assert(
     "listener refresh preserves the smooth spatial ramp",
   );
   movingCombat.node.stop();
+
+  audio.buffers.set("world_combat_bed", { duration: 12 });
+  now = 1000;
+  assert(
+    audio.play("world_combat_bed", {
+      category: "combat_other",
+      gain: 0.035,
+      key: "combat:world_activity_bed",
+      loop: true,
+      fadeInMs: 750,
+      pitchVariance: 0,
+    }),
+    "world combat bed starts as a non-spatial keyed loop",
+  );
+  const backgroundVoice = audio.voices.find((voice) => voice.id === "world_combat_bed");
+  assert(backgroundVoice.spatial === null, "world combat bed carries no positional nodes");
+  assert(backgroundVoice.node.loop === true, "world combat bed repeats until stopped by key");
+  assertApprox(
+    backgroundVoice.gainNode.gain.ramps.at(-1).value,
+    0.035,
+    0.001,
+    "world combat bed fades toward its quiet target gain",
+  );
+  audio.ctx.currentTime = 1;
+  assertApprox(
+    audio.stopByKey("combat:world_activity_bed", { fadeOutMs: 2500 }),
+    1,
+    0.001,
+    "world combat bed is scheduled to stop by its stable key",
+  );
+  assertApprox(
+    backgroundVoice.gainNode.gain.ramps.at(-1).value,
+    0,
+    0.001,
+    "keyed loop fades to silence",
+  );
+  audio.ctx.currentTime = 0;
 
   for (let i = 0; i < 200; i++) audio.buffers.set(`pool_${i}`, { duration: 0.1 });
   for (let i = 0; i < 120; i++) {
@@ -492,6 +559,47 @@ assert(
     attackFeedbackKind(KIND.RIFLEMAN, "future_unknown_weapon") === KIND.RIFLEMAN,
     "unknown attack weapon hints preserve attacker-kind feedback",
   );
+}
+
+{
+  const plays = [];
+  const stops = [];
+  let bedVoicePresent = false;
+  const combatAudio = new MatchCombatAudio({
+    state: {},
+    audio: {
+      play(id, opts) {
+        plays.push({ id, opts });
+        bedVoicePresent = true;
+        return true;
+      },
+      hasVoiceKey() { return bedVoicePresent; },
+      stopByKey(key, opts) {
+        stops.push({ key, opts });
+        if (opts == null) bedVoicePresent = false;
+        return 1;
+      },
+    },
+  });
+  combatAudio.updateWorldCombatBed(true);
+  combatAudio.updateWorldCombatBed(true);
+  assert(plays.length === 1, "active world combat keeps exactly one background loop");
+  bedVoicePresent = false;
+  combatAudio.updateWorldCombatBed(true);
+  assert(plays.length === 2, "active world combat restarts a bed evicted from the voice pool");
+  assert(plays[0].id === "combat_distant_bed_01", "world combat uses the fixed generic bed");
+  assert(plays[0].opts.category === "combat_other", "world combat bed uses the other-combat bus");
+  assert(plays[0].opts.loop === true, "world combat bed is looped");
+  assert(plays[0].opts.x == null && plays[0].opts.y == null, "world combat bed is position-free");
+  assertApprox(plays[0].opts.gain, 0.035, 0.0001, "world combat bed stays very quiet");
+  assert(plays[0].opts.fadeInMs === 750, "world combat bed fades in gently");
+  combatAudio.updateWorldCombatBed(false);
+  assert(stops.at(-1).opts.fadeOutMs === 2500, "world combat bed releases slowly");
+  combatAudio.updateWorldCombatBed(true);
+  assert(plays.length === 3, "combat resuming during release starts one fresh bed loop");
+  assert(stops.at(-1).opts == null, "combat resume force-stops the prior fading loop");
+  combatAudio.destroy();
+  assert(stops.at(-1).opts == null, "destroy force-stops the shared-Audio bed across matches");
 }
 
 {

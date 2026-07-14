@@ -300,6 +300,7 @@ pub(super) fn assert_no_late_spectator_notice(writer: &mut ConnectionWriter, exp
 pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
     Snapshot {
         tick,
+        world_combat_active: false,
         steel: 75,
         oil: 0,
         supply_used: 1,

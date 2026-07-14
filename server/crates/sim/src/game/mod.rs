@@ -47,6 +47,7 @@ mod systems;
 pub mod teams;
 pub(crate) mod trench;
 pub mod upgrade;
+mod world_combat;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -272,6 +273,9 @@ impl Game {
             perf.as_deref_mut(),
         );
         self.derived.set_final_spatial(final_spatial);
+        if let Some(activity_tick) = world_combat::activity_tick(&events, self.state.tick) {
+            self.state.last_world_combat_tick = Some(activity_tick);
+        }
 
         // Live fog last, from the post-systems world state. Lingering death vision is stamped as
         // ordinary temporary sight so snapshots, commands, and combat all consume one visibility

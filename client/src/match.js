@@ -323,6 +323,7 @@ export class Match {
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.roomTimeControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
+      this.combatAudio?.updateWorldCombatBed(m?.worldCombatActive === true);
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
@@ -752,6 +753,7 @@ export class Match {
 
   applyLivePauseState(state) {
     applyLivePauseStateModel(this, state);
+    if (this.livePauseState.paused) this.combatAudio?.updateWorldCombatBed(false);
   }
 
   shouldUseDesktopCursorAutoLock() {
@@ -1226,6 +1228,12 @@ export class Match {
 
   applyRoomTimeState(state) {
     this.roomTimeControls?.applyRoomTimeState(state);
+    const speed = Number(state?.speed);
+    const ended = state?.ended === true
+      || (Number(state?.durationTicks) > 0 && Number(state?.currentTick) >= Number(state?.durationTicks));
+    if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
+      this.combatAudio?.updateWorldCombatBed(false);
+    }
   }
 
   /**

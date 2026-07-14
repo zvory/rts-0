@@ -21,8 +21,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
 - `renderer`: `renderer/` facade, layers, terrain/decals, entities, fog, feedback, rigs, palettes.
-- `platform`: `bootstrap.js`, `audio.js`, `sound_manifest.js`, `combat_audio.js`, `alerts.js`,
-  `fog.js`, `camera.js`, `prediction_settings.js`, `report_window_aggregate.js`.
+- `platform`: `bootstrap.js`, `audio.js`, `audio_spatial.js`, `sound_manifest.js`,
+  `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`, `prediction_settings.js`,
+  `report_window_aggregate.js`.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI`; do not

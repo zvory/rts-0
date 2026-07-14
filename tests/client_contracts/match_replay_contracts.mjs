@@ -736,14 +736,25 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.publishPredictionDebug = () => {};
   livePauseStateMatch.livePauseOverlay = { applyLivePauseState() {} };
   livePauseStateMatch.syncLivePauseUi = () => {};
+  const worldBedStates = [];
+  livePauseStateMatch.combatAudio = {
+    updateWorldCombatBed(active) { worldBedStates.push(active); },
+  };
   livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
   assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
   assert(livePauseOverlays.at(-1)?.predictedSnapshot === null, "entering live pause drops any predicted movement frame");
+  assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");
   livePauseStateMatch.applyLivePauseState({ paused: false, canPause: true, canUnpause: false });
   assert(
     livePauseStateMatch.predictionVisualSuspended,
     "leaving live pause keeps prediction suspended until the next authoritative snapshot",
   );
+
+  livePauseStateMatch.roomTimeControls = { applyRoomTimeState() {} };
+  livePauseStateMatch.applyRoomTimeState({ currentTick: 90, durationTicks: 600, speed: 0, paused: true });
+  assert(worldBedStates.at(-1) === false, "room-time pause fades out the world combat bed");
+  livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 600, speed: 2, paused: false });
+  assert(worldBedStates.at(-1) === false, "ended replay playback fades out the world combat bed");
 
   const manualPointerLockMatch = Object.create(Match.prototype);
   let toggledPointerLock = 0;

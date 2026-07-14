@@ -426,6 +426,7 @@ mod tests {
         let out_of_range = (config::CC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
         let snapshot = Snapshot {
             tick: 0,
+            world_combat_active: false,
             steel: 0,
             oil: 0,
             supply_used: 0,

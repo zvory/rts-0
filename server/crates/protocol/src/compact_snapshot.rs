@@ -78,6 +78,9 @@ impl Serialize for CompactSnapshot<'_> {
                 snapshot.supply_cap,
             ],
         )?;
+        if snapshot.world_combat_active {
+            map.serialize_entry("wc", &true)?;
+        }
         map.serialize_entry(
             "e",
             &snapshot
@@ -320,7 +323,7 @@ fn section_for_compact_key(key: &str) -> &'static str {
         "sm" => SECTION_SMOKES,
         "ao" => SECTION_ABILITY_OBJECTS,
         "tr" => SECTION_TRENCHES,
-        "s" | "pr" | "u" => SECTION_PLAYER_STATUS,
+        "s" | "pr" | "u" | "wc" => SECTION_PLAYER_STATUS,
         "n" => SECTION_NET_STATUS,
         _ => SECTION_OTHER,
     }

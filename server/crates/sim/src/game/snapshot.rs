@@ -203,6 +203,10 @@ impl Game {
 
         Snapshot {
             tick: self.state.tick,
+            world_combat_active: world_combat::signal_active(
+                self.state.tick,
+                self.state.last_world_combat_tick,
+            ),
             steel,
             oil,
             supply_used,

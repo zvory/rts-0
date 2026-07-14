@@ -25,8 +25,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1696,
-      "reason": "Command-envelope tests were split from the existing oversized protocol module; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1699,
+      "reason": "Command-envelope tests were split from the existing oversized protocol module; the global combat snapshot bit adds three compact-fixture lines; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
