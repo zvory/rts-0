@@ -484,11 +484,12 @@ folded into default targeting.
   allied-unit support are deferred.
 - Map: `TILE_SIZE = 32` px. New normal lobbies default to the imported 126×126 two-player map
   at `server/assets/maps/1v1.json` (ten permanent resource base locations), served for tooling
-  at `/maps/1v1.json`. The four-start `Default` map remains the hardcoded asset at
+  at `/maps/1v1.json`. The 1v1 terrain includes authored roads connecting the starts and central
+  approaches. The four-start `Default` map remains the hardcoded asset at
   `server/assets/maps/default-handcrafted.json` for generic simulation setup, Labs, and replay
   compatibility; it is the original 96×96 handcrafted map padded with 15 passable grass tiles on
-  every edge. Both map JSON assets use row strings (`.` grass, `#` rock, `~` water), flat
-  `startLocations`, and flat `baseSites`.
+  every edge. Both map JSON assets use terrain row strings, flat `startLocations`, and flat
+  `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 6`,
   one City Centre at the player's start tile, 12 steel patches with 625 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
