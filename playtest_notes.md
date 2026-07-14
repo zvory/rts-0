@@ -1,3 +1,30 @@
+jeffrey playtest 5
+* pause is not interacting well with movement prediction for the player who did not pause
+* select idle worker button 
+
+jeffrey playtest 4
+* units that have move while firing capability, on move command should always move toward the destination and shoot. but on attack move, they shoudl stop once they reach an enemy. 
+* anti tank gun setting up direction is fucked up and doesn't reflect wher ethe mouse is, as in the preview cone is wrong. but it does set up in the right direction
+* open in lab button during replays
+* when machine gunner is running towards a entrenched rifleman, he just sets up outside rifleman range and kills him, so bump rifleman range by 1
+* we do get too much money because we max so fast 
+* workers should bounce to next additional base with free steel
+* make scout car breakthrough aura permanent
+* make pumpjacks way easier to build. 
+* the gun sounds are too constant and loud, I want information I can use and pew pew pew isnt helping me much. if we could have less audio noise and more notifications for minerals running out and stuff like that I think it would be better
+
+
+
+jeffrey playtest 3
+* artillery does a quarter the damage and has a quarter the cost, but has the same build time and all other stats
+* get an artillery whizz bang noise
+* setting up and unsetting up an artillery should take twice as long
+* create 1v1 map
+* artillery is just unfun!  
+* 
+
+
+
 - [ ] TODO: Tiger raster pass: hull/turret alignment is off; the turret appears to rotate around an offset point instead of its visual center. Fix the PNG rig pivot/anchor alignment later.
 
 - [ ] TODO: download an FW 189 scout plane sound effect
