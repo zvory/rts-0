@@ -41,11 +41,6 @@ import {
 //   Z X C
 export const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
 
-const LOW_PRIORITY_ABILITIES = new Set([
-  ABILITY.POINT_FIRE,
-  ABILITY.BLANKET_FIRE,
-]);
-
 export function gridHotkeyForSlot(slotIndex) {
   return GRID_HOTKEYS[slotIndex] || "";
 }
@@ -415,7 +410,7 @@ export function buildUnitCard(ctx, selection) {
 }
 
 function abilitySlotPriority(definition) {
-  return LOW_PRIORITY_ABILITIES.has(definition?.ability) ? 0 : 1;
+  return definition?.commandCardPriority ?? 0;
 }
 
 export function buildTrainCard(ctx, building) {
