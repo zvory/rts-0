@@ -637,6 +637,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.prod_waiting {
             len = 38;
         }
+        if entity.breakthrough_aura_ticks.is_some() {
+            len = 39;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -760,6 +763,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 37 {
             seq.serialize_element(&entity.prod_waiting)?;
+        }
+        if len > 38 {
+            seq.serialize_element(&entity.breakthrough_aura_ticks)?;
         }
         seq.end()
     }

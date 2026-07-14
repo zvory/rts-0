@@ -125,7 +125,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 39;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 40;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -816,6 +816,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(34, "prodScoutPlaneQueued"),
             optional_field(35, "panzerfaustLoaded"),
             optional_code_field(36, "prodRepeatKinds", "kind"),
+            optional_field(37, "prodWaiting"),
+            optional_field(38, "breakthroughAuraTicks"),
         ],
         event: event_slot_schemas(),
         trench: vec![

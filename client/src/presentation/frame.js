@@ -9,7 +9,7 @@ const ENTITY_FIELDS = Object.freeze([
   "hp", "maxHp", "remaining", "latchedNode", "occupiedTrenchId",
   "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodRepeatKinds",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
-  "panzerfaustLoaded", "breakthroughTicks", "abilities",
+  "panzerfaustLoaded", "breakthroughTicks", "breakthroughAuraTicks", "abilities",
   "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",
   "attackArcRad", "attackMinRangePx", "attackMinRangeTiles", "attackRangePx",
   "attackRangeTiles", "attackRangeProfile", "firingArcRad", "firingMinRangePx",

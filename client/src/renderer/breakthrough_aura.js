@@ -31,8 +31,8 @@ export function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
 }
 
 function auraExpiresIn(entity) {
+  if (Number.isFinite(entity?.breakthroughAuraTicks)) return entity.breakthroughAuraTicks;
   if (!Array.isArray(entity?.abilities)) return 0;
   const ability = entity.abilities.find((entry) => entry?.ability === ABILITY.BREAKTHROUGH);
-  if (Number.isFinite(ability?.expiresIn)) return ability.expiresIn;
-  return ability?.cooldownLeft > 0 && entity.breakthroughTicks > 0 ? entity.breakthroughTicks : 0;
+  return Number.isFinite(ability?.expiresIn) ? ability.expiresIn : 0;
 }

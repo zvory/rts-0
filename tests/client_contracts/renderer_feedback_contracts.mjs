@@ -171,8 +171,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     { playerId: 1, selectedEntities: () => [] },
     [{
       ...selectedCommandCar,
-      breakthroughTicks: 12,
-      abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 500 }],
+      breakthroughAuraTicks: 12,
     }],
   );
   assert(
@@ -189,7 +188,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     [{
       ...selectedCommandCar,
       breakthroughTicks: 12,
-      abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0 }],
+      breakthroughAuraTicks: 0,
     }],
   );
   assert(

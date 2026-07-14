@@ -457,6 +457,9 @@ pub fn project_entity(
     if entity.breakthrough_ticks() > 0 {
         view.breakthrough_ticks = Some(entity.breakthrough_ticks());
     }
+    if entity.breakthrough_aura_ticks() > 0 {
+        view.breakthrough_aura_ticks = Some(entity.breakthrough_aura_ticks());
+    }
     view.occupied_trench_id = active_trench_occupation(entity);
 
     if let Some(progress) = entity.build_progress_fraction() {
