@@ -61,3 +61,21 @@ export function computeSpatialAudio(listener, x, y, category) {
     distancePenalty: Math.min(30, (effectiveDistance / refDist) * 10),
   };
 }
+
+/**
+ * Direction-only profile for quiet strategic ambience. It pans toward a world
+ * point but deliberately carries no distance attenuation, zoom scaling, or
+ * distance priority penalty.
+ */
+export function computeDirectionalAudio(listener, x, y) {
+  const dx = x - listener.x;
+  const dy = y - listener.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  return {
+    gain: 1,
+    pan: distance > 0 ? Math.max(-1, Math.min(1, dx / distance)) : 0,
+    lpHz: LP_NEAR_HZ,
+    distance,
+    distancePenalty: 0,
+  };
+}

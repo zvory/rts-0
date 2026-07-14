@@ -17,6 +17,7 @@
 
 import {
   DEFAULT_AUDIO_REF_DIST,
+  computeDirectionalAudio,
   computeSpatialAudio,
 } from "./audio_spatial.js";
 
@@ -234,6 +235,7 @@ export class Audio {
    * @param {object} [opts]
    * @param {number} [opts.x] world pixels - when present, sound is spatialized
    * @param {number} [opts.y] world pixels - when present, sound is spatialized
+   * @param {boolean} [opts.directionalOnly] pan toward x/y without distance attenuation
    * @param {number} [opts.priority] higher wins eviction (default 1)
    * @param {string} [opts.category] one of CATEGORIES (default "ui")
    * @param {number} [opts.pitchVariance] override default jitter (0 to disable)
@@ -262,7 +264,9 @@ export class Audio {
     // 200-unit fight.
     let spatial = null;
     if (typeof opts.x === "number" && typeof opts.y === "number") {
-      spatial = this._computeSpatial(opts.x, opts.y, category);
+      spatial = opts.directionalOnly === true
+        ? this._computeDirectional(opts.x, opts.y)
+        : this._computeSpatial(opts.x, opts.y, category);
       if (!spatial) return false;
     }
 
@@ -317,7 +321,14 @@ export class Audio {
       distGain.connect(gainNode);
       gainNode.connect(bus);
       trail.push(panner, lp, distGain, gainNode);
-      spatialNodes = { panner, lp, distGain, x: opts.x, y: opts.y };
+      spatialNodes = {
+        panner,
+        lp,
+        distGain,
+        x: opts.x,
+        y: opts.y,
+        directionalOnly: opts.directionalOnly === true,
+      };
     } else {
       src.connect(gainNode);
       gainNode.connect(bus);
@@ -383,6 +394,23 @@ export class Audio {
     return typeof key === "string" && key !== "" && this.voices.some((voice) => voice.key === key);
   }
 
+  /** Update the world point of active keyed spatial voices without restarting them. */
+  setVoicePosition(key, x, y) {
+    if (typeof key !== "string" || !key || !Number.isFinite(x) || !Number.isFinite(y)) return 0;
+    let matched = 0;
+    const changed = [];
+    for (const voice of this.voices) {
+      if (voice.key !== key || !voice.spatial) continue;
+      matched += 1;
+      if (voice.spatial.x === x && voice.spatial.y === y) continue;
+      voice.spatial.x = x;
+      voice.spatial.y = y;
+      changed.push(voice);
+    }
+    if (changed.length > 0) this._refreshSpatialVoices(changed);
+    return matched;
+  }
+
   /**
    * Pick a variant id from a non-empty list using the seeded RNG. Returns null
    * if the list is empty. See PHASE_2.md §"Combat SFX wiring" — avoids the
@@ -415,19 +443,21 @@ export class Audio {
   }
 
   /**
-   * Re-evaluate pan/lowpass/distance gain for every in-flight spatial voice
-   * against the current listener pose. Called from setListener so a minimap
-   * jump (or any large camera move) updates dampening within ~30ms instead of
-   * waiting for the next play() of the same sound.
+   * Re-evaluate pan/lowpass/distance gain for the supplied in-flight voices,
+   * defaulting to all voices. Called from setListener so a minimap jump (or any
+   * large camera move) updates dampening within ~30ms instead of waiting for the
+   * next play() of the same sound.
    */
-  _refreshSpatialVoices() {
-    if (!this.ctx || this.voices.length === 0) return;
+  _refreshSpatialVoices(voices = this.voices) {
+    if (!this.ctx || voices.length === 0) return;
     const t = this.ctx.currentTime;
     const ramp = t + SPATIAL_REFRESH_RAMP_S;
-    for (const voice of this.voices) {
+    for (const voice of voices) {
       const s = voice.spatial;
       if (!s) continue;
-      const next = this._computeSpatial(s.x, s.y, voice.category);
+      const next = s.directionalOnly
+        ? this._computeDirectional(s.x, s.y)
+        : this._computeSpatial(s.x, s.y, voice.category);
       if (!next) {
         // Beyond max distance — fade to zero quickly; let the voice finish naturally.
         s.distGain.gain.cancelScheduledValues(t);
@@ -574,6 +604,10 @@ export class Audio {
    */
   _computeSpatial(x, y, category) {
     return computeSpatialAudio(this.listener, x, y, category);
+  }
+
+  _computeDirectional(x, y) {
+    return computeDirectionalAudio(this.listener, x, y);
   }
 
   _dedupKey(id, category, opts, spatial) {

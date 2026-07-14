@@ -584,7 +584,7 @@ transport decode:
 {
   t: "snapshot",
   tick: u32,
-  worldCombatActive?: bool, // coarse position-free global activity; omitted/false when inactive
+  worldCombatPosition?: [f32, f32], // coarse global combat area; omitted when inactive
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
@@ -635,13 +635,14 @@ fog, so allied units attacking hidden enemies do not reveal hidden target ids or
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.
 
-`worldCombatActive` is the narrow global exception to fog-filtered combat detail. The server sets
-the same position-free boolean for every active player, spectator, replay, Lab, and dev recipient.
-It becomes true only on 15-tick boundaries after hostile weapon fire/impact activity and stays true
-through the last boundary no more than 60 ticks after the most recent activity. It carries no
-position, direction, player, team, entity, weapon, count, or composition information; clients use
-it only to gate one generic background combat bed. Positional combat events and entities remain
-fog-filtered under the ordinary projection rules.
+`worldCombatPosition` is the narrow global exception to fog-filtered combat detail. The server sets
+the same coarse world point for every active player, spectator, replay, Lab, and dev recipient.
+It changes only on 15-tick boundaries after hostile weapon fire/impact activity and remains present
+through the last boundary no more than 60 ticks after the most recent activity. The point is the
+centroid of distinct combat areas observed during the latest activity tick, snapped to a 32-tile
+grid. It intentionally reveals approximate battle direction, but no player, team, entity, weapon,
+count, composition, exact position, or live cadence. Clients use it only to pan one generic
+constant-gain background combat bed; positional combat events and entities remain fog-filtered.
 Full-world diagnostic projections are the explicit exception: they may project those per-entity
 planning and setup details through each entity's real owner so lab/dev inspection overlays are
 complete for every player.
@@ -667,7 +668,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 37. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 38. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -693,7 +694,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 37,
+  "v": 38,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -711,7 +712,7 @@ adds an explicit application compression envelope.
   "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?]], // abilityObjects; omitted when empty
   "tr": [[id, x, y, radiusTiles]], // trenches; omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
-  "wc": true,                     // worldCombatActive; omitted when false
+  "wc": [1024, 2048],             // worldCombatPosition; omitted when inactive
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // projected observer playerResources; omitted when empty
@@ -1060,10 +1061,11 @@ viewer id; per-entity private planning fields are evaluated against each entity'
 `artilleryFiring` remains an intentionally global visual event for minimap firing
 markers, while artillery's actionable world reveal is modeled separately as temporary live fog on
 enemy player grids without granting target-point or surrounding-terrain visibility.
-`worldCombatActive` is the second explicit global exception, but is less revealing: every
-projection receives the identical quantized boolean, with no event payload, location, direction,
-owner, team, entity id, weapon kind, count, or cadence. It may gate generic audio only and never
-changes fog, exploration, targeting, or entity projection.
+`worldCombatPosition` is the second explicit global exception. Every projection receives the
+identical 32-tile-quantized combat-area point. It intentionally conveys broad direction while
+withholding exact location, owner, team, entity id, weapon kind, count, composition, and live
+cadence. It may pan generic constant-gain audio only and never changes fog, exploration, targeting,
+or entity projection.
 
 When adding a projection-affecting field or event, use
 [docs/projection-audit-checklist.md](../projection-audit-checklist.md) and update this section's

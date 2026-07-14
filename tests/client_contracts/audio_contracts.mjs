@@ -160,6 +160,7 @@ assert(
   assertHasMethod(audio, "playUI", "Audio");
   assertHasMethod(audio, "stopByKey", "Audio");
   assertHasMethod(audio, "hasVoiceKey", "Audio");
+  assertHasMethod(audio, "setVoicePosition", "Audio");
   assertHasMethod(audio, "preload", "Audio");
   assertHasMethod(audio, "setListener", "Audio");
   assertHasMethod(audio, "pickVariant", "Audio");
@@ -335,13 +336,50 @@ assert(
       gain: 0.035,
       key: "combat:world_activity_bed",
       loop: true,
+      x: 2000,
+      y: 100,
+      directionalOnly: true,
       fadeInMs: 750,
       pitchVariance: 0,
     }),
-    "world combat bed starts as a non-spatial keyed loop",
+    "world combat bed starts as a direction-only keyed loop",
   );
   const backgroundVoice = audio.voices.find((voice) => voice.id === "world_combat_bed");
-  assert(backgroundVoice.spatial === null, "world combat bed carries no positional nodes");
+  assert(backgroundVoice.spatial?.directionalOnly === true, "world combat bed uses direction-only spatial nodes");
+  assertApprox(backgroundVoice.spatial.distGain.gain.value, 1, 0.001, "world combat bed has no distance attenuation");
+  assertApprox(backgroundVoice.spatial.panner.pan.value, 1, 0.001, "world combat bed pans toward combat");
+  audio.buffers.set("unrelated_spatial", { duration: 1 });
+  assert(
+    audio.play("unrelated_spatial", {
+      x: 300,
+      y: 100,
+      category: "ambient",
+      pitchVariance: 0,
+    }),
+    "an unrelated spatial voice can play beside the world combat bed",
+  );
+  const unrelatedVoice = audio.voices.find((voice) => voice.id === "unrelated_spatial");
+  const unrelatedPanRampCount = unrelatedVoice.spatial.panner.pan.ramps.length;
+  assert(
+    audio.setVoicePosition("combat:world_activity_bed", 0, 100) === 1,
+    "world combat direction updates without restarting the loop",
+  );
+  assertApprox(
+    backgroundVoice.spatial.panner.pan.ramps.at(-1).value,
+    -1,
+    0.001,
+    "updated combat area repans the existing bed",
+  );
+  assert(
+    unrelatedVoice.spatial.panner.pan.ramps.length === unrelatedPanRampCount,
+    "keyed combat-bed repanning does not reschedule unrelated spatial voices",
+  );
+  const bedPanRampCount = backgroundVoice.spatial.panner.pan.ramps.length;
+  assert(
+    audio.setVoicePosition("combat:world_activity_bed", 0, 100) === 1
+      && backgroundVoice.spatial.panner.pan.ramps.length === bedPanRampCount,
+    "an unchanged combat point does not schedule a redundant repan",
+  );
   assert(backgroundVoice.node.loop === true, "world combat bed repeats until stopped by key");
   assertApprox(
     backgroundVoice.gainNode.gain.ramps.at(-1).value,
@@ -580,6 +618,7 @@ assert(
 {
   const plays = [];
   const stops = [];
+  const positions = [];
   let bedVoicePresent = false;
   const combatAudio = new MatchCombatAudio({
     state: {},
@@ -590,6 +629,10 @@ assert(
         return true;
       },
       hasVoiceKey() { return bedVoicePresent; },
+      setVoicePosition(key, x, y) {
+        positions.push({ key, x, y });
+        return 1;
+      },
       stopByKey(key, opts) {
         stops.push({ key, opts });
         if (opts == null) bedVoicePresent = false;
@@ -597,21 +640,23 @@ assert(
       },
     },
   });
-  combatAudio.updateWorldCombatBed(true);
-  combatAudio.updateWorldCombatBed(true);
+  combatAudio.updateWorldCombatBed([1024, 2048]);
+  combatAudio.updateWorldCombatBed([2048, 2048]);
   assert(plays.length === 1, "active world combat keeps exactly one background loop");
+  assert(positions.at(-1).x === 2048, "active combat repans the existing bed toward the latest coarse area");
   bedVoicePresent = false;
-  combatAudio.updateWorldCombatBed(true);
+  combatAudio.updateWorldCombatBed([2048, 2048]);
   assert(plays.length === 2, "active world combat restarts a bed evicted from the voice pool");
   assert(plays[0].id === "combat_distant_bed_01", "world combat uses the fixed generic bed");
   assert(plays[0].opts.category === "combat_other", "world combat bed uses the other-combat bus");
   assert(plays[0].opts.loop === true, "world combat bed is looped");
-  assert(plays[0].opts.x == null && plays[0].opts.y == null, "world combat bed is position-free");
+  assert(plays[0].opts.x === 1024 && plays[0].opts.y === 2048, "world combat bed uses the coarse combat area");
+  assert(plays[0].opts.directionalOnly === true, "world combat bed pans without attenuation");
   assertApprox(plays[0].opts.gain, 0.035, 0.0001, "world combat bed stays very quiet");
   assert(plays[0].opts.fadeInMs === 750, "world combat bed fades in gently");
-  combatAudio.updateWorldCombatBed(false);
+  combatAudio.updateWorldCombatBed(null);
   assert(stops.at(-1).opts.fadeOutMs === 2500, "world combat bed releases slowly");
-  combatAudio.updateWorldCombatBed(true);
+  combatAudio.updateWorldCombatBed([1024, 2048]);
   assert(plays.length === 3, "combat resuming during release starts one fresh bed loop");
   assert(stops.at(-1).opts == null, "combat resume force-stops the prior fading loop");
   combatAudio.destroy();

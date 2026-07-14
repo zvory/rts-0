@@ -1142,7 +1142,7 @@ mod tests {
     fn snapshot(entities: Vec<EntityView>) -> Snapshot {
         Snapshot {
             tick: 0,
-            world_combat_active: false,
+            world_combat_position: None,
             steel: 0,
             oil: 0,
             supply_used: 0,

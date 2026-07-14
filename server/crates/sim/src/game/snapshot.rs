@@ -217,9 +217,10 @@ impl Game {
 
         Snapshot {
             tick: self.state.tick,
-            world_combat_active: world_combat::signal_active(
+            world_combat_position: world_combat::signal_position(
                 self.state.tick,
                 self.state.world_combat_active_through_tick,
+                self.state.world_combat_position,
             ),
             steel,
             oil,
