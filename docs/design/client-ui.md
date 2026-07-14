@@ -30,6 +30,7 @@ src/
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
   auto_spectator_settings.js # persisted opt-in preference for automatic spectator framing
+  spectator_controls_panel.js # floating live-spectator/replay camera controls
   match_auto_spectator.js # Match availability, camera-limit, and director-construction wiring
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
@@ -1116,9 +1117,10 @@ export class AutoSpectatorDirector {
 }
 ```
 
-Replay viewers and ordinary live spectators receive a dedicated **Replay Controls** settings tab
-with one persisted, default-off `Enable Auto Spectator` switch. Lab sessions do not mount the
-director. While enabled, the director retains three simulated seconds of attack, death, and
+Replay viewers and ordinary live spectators receive a floating, draggable **Spectator Controls**
+panel with one persisted, default-off `Follow active fights` switch. The control is deliberately
+kept out of the gear-menu settings. Lab sessions do not mount the director. While enabled, the
+director retains three simulated seconds of attack, death, and
 positioned-impact activity, groups samples within ten tiles, and frames the highest-weight group;
 deaths count as four attacks, impacts as two, and the current fight receives a small stickiness
 bonus. When combat activity expires, the director prefers a likely contact between opposing-team

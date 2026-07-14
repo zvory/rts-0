@@ -3722,6 +3722,97 @@ input[type="text"]:focus {
   display: none;
 }
 
+/* --- Spectator controls --- */
+.spectator-controls-panel {
+  position: absolute;
+  top: 58px;
+  right: max(12px, min(340px, calc(100vw - 304px)));
+  z-index: 25;
+  width: min(292px, calc(100vw - 24px));
+  padding: 9px 10px 10px;
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  color: var(--ink);
+  pointer-events: auto;
+}
+.spectator-controls-drag-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: -3px -4px 7px;
+  padding: 3px 4px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  cursor: grab;
+  user-select: none;
+}
+.spectator-controls-drag-handle:hover,
+.spectator-controls-drag-handle:focus-visible,
+.spectator-controls-panel[data-panel-dragging="true"] .spectator-controls-drag-handle {
+  background: rgba(17, 17, 15, 0.46);
+  color: var(--ink);
+  outline: none;
+}
+.spectator-controls-panel[data-panel-dragging="true"] .spectator-controls-drag-handle {
+  cursor: grabbing;
+}
+.spectator-controls-grip {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+}
+.spectator-controls-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.spectator-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.spectator-controls-label {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.spectator-controls-toggle {
+  appearance: none;
+  min-width: 58px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.8);
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.spectator-controls-toggle[aria-checked="true"] {
+  border-color: var(--accent);
+  background: rgba(153, 129, 72, 0.28);
+  color: var(--accent);
+}
+.spectator-controls-toggle:hover,
+.spectator-controls-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+  outline: none;
+}
+
 /* --- Observer analysis overlay --- */
 .replay-analysis-overlay {
   position: absolute;
@@ -4977,6 +5068,18 @@ input[type="text"]:focus {
     cursor: default;
   }
 
+  .spectator-controls-panel {
+    top: auto;
+    right: var(--mobile-debug-right);
+    bottom: calc(var(--mobile-debug-bottom) + var(--mobile-debug-minimap-reserve));
+    width: min(292px, calc(100vw - var(--mobile-debug-left) - var(--mobile-debug-right)));
+  }
+
+  .spectator-controls-drag-handle {
+    min-height: 36px;
+    cursor: default;
+  }
+
   .replay-analysis-drag-handle {
     min-height: 36px;
     cursor: default;
@@ -5154,6 +5257,13 @@ input[type="text"]:focus {
   #room-time-controls.replay-viewer-controls {
     width: min(42vw, 360px);
     max-height: calc(100vh - var(--mobile-debug-top) - var(--mobile-debug-bottom) - 142px);
+  }
+
+  .spectator-controls-panel {
+    right: auto;
+    left: var(--mobile-debug-left);
+    bottom: var(--mobile-debug-bottom);
+    width: min(292px, calc(42vw - var(--mobile-debug-left)));
   }
 
   #minimap-wrap {

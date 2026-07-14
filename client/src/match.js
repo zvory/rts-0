@@ -207,7 +207,7 @@ export class Match {
     }));
     this.autoSpectator = this._timeInit(
       "match.autoSpectator",
-      () => createMatchAutoSpectator(this, payload, options),
+      () => createMatchAutoSpectator(this, payload, options, dom.gameScreen),
     );
     this.renderer = this._timeInit("match.renderer", () => this.rendererBackendBundle.createRenderer(dom.viewport, {
       renderClock: this.renderClock,
@@ -1002,7 +1002,6 @@ export class Match {
   setAutoSpectatorEnabled(enabled) {
     if (!this.autoSpectator) return;
     this.autoSpectator.setEnabled(enabled);
-    this.syncSettingsToggleUi();
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
