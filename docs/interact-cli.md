@@ -109,7 +109,10 @@ The private server remains loopback-only and retains the artifact-transfer capab
 
 `puppeteer-core`, TypeScript 5.8 or newer, and Node 22 typings are repository-root development
 dependencies in `package.json` and `package-lock.json`. Interact and the browser/performance
-tests import declared dependencies directly; daemon requests never install or hydrate packages. Run `npm ci` at the repository root,
+tests import declared dependencies directly; daemon requests never install or hydrate packages.
+`lab open` checks for Puppeteer before starting an expensive Rust build and returns the
+`puppeteerUnavailable` remediation immediately when a fresh worktree has not installed or linked
+its dependencies. Run `npm ci` at the repository root,
 or use `tests/run-all.sh`, whose pre-suite cache setup installs the root lock into the shared
 lockfile-keyed cache and links the ignored root `node_modules`.
 
@@ -137,9 +140,12 @@ sample is truncated, and at most 12 `{index,alias,id}` rows, plus the authoritat
 Use `details:true` only when the caller needs every decorated entity and the raw authoritative
 outcome. This does not reduce or truncate rejection diagnostics.
 
-A cold first `open` may spend tens of seconds building the selected worktree's Rust server before
-it writes its single JSON response. Keep that CLI process attached until it exits. A concurrent
-`status` reports `opening: true` while startup is still in progress, and an idempotent `open` retry
+A cold first `open` may spend several minutes building the selected worktree's Rust server before
+it writes its single JSON response. Cargo has a separate five-minute build deadline, and the CLI
+remains attached beyond that bounded build plus server/browser readiness. A timed-out build returns
+`serverBuildTimeout` with its exit/signal metadata and `cargo-build.log` path; a compiler failure
+returns `serverBuild` with the same diagnostics. Keep that CLI process attached until it exits.
+A concurrent `status` reports `opening: true` while startup is still in progress, and an idempotent `open` retry
 recovers the same completed session if the original caller was interrupted. Daemon `shutdown`
 aborts and reaps an in-progress Cargo/private-server startup instead of waiting for its normal
 startup deadline. Global `--help`, `-h`, and `help` return the bounded namespace catalog without

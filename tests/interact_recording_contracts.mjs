@@ -15,7 +15,7 @@ import {
   representativeFrameIndices,
 } from "../scripts/interact/recording.ts";
 import {
-  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS,
+  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
 } from "../scripts/interact/runtime.ts";
 import { requestTimeoutMs } from "../scripts/interact/command_registry.ts";
 import { DRIVER_STATES, InteractDriver } from "../scripts/interact/driver.ts";
@@ -63,6 +63,7 @@ try {
   assert.equal(mediaStageTimeoutMs(60_000), RECORDING_LIMITS.maxMediaStageTimeoutMs, "one-minute FFmpeg stages get capped duration-derived headroom");
   assert.equal(mediaAuxiliaryTimeoutMs(60_000), RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs, "one-minute auxiliary media stages stay separately capped");
   assert.equal(requestTimeoutMs("status"), REQUEST_TIMEOUT_MS, "ordinary daemon commands keep their existing IPC deadline");
+  assert.equal(requestTimeoutMs("open"), STARTUP_REQUEST_TIMEOUT_MS, "cold open keeps the CLI attached through its bounded build budget");
   assert.equal(requestTimeoutMs("record-wait"), RECORDING_REQUEST_TIMEOUT_MS, "record-wait gets bounded recording-specific IPC headroom");
   assert.equal(requestTimeoutMs("capture-fixed"), RECORDING_REQUEST_TIMEOUT_MS, "minute-scale fixed capture gets bounded media IPC headroom");
   assert.ok(RECORDING_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "recording IPC headroom exceeds the ordinary command deadline");

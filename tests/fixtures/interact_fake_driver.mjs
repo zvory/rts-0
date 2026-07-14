@@ -26,6 +26,9 @@ const CATALOG = Object.freeze({
 const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLGCQAAAABJRU5ErkJggg==";
 
 export async function openInteractDriver(options) {
+  if (process.env.RTS_INTERACT_FAKE_OPEN_FAILURE === "1") {
+    throw Object.assign(new Error("Injected Interact open failure."), { code: "injectedOpenFailure" });
+  }
   const openDelayMs = Number(process.env.RTS_INTERACT_FAKE_OPEN_DELAY_MS || 0);
   if (openDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, openDelayMs));
   let nextId = 100;

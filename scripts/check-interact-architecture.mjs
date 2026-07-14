@@ -43,7 +43,7 @@ function checkRegistry() {
   }
   const allowedScopes = new Set(["daemon", "session"]);
   const allowedLanes = new Set(SESSION_EXECUTION_LANES);
-  const allowedTimeouts = new Set(["ordinary", "lifecycle-media"]);
+  const allowedTimeouts = new Set(["ordinary", "startup", "lifecycle-media"]);
   for (const [name, definition] of Object.entries(INTERACT_COMMAND_REGISTRY)) {
     if (definition.name !== name) failures.push(`${name} registry identity does not match its key`);
     if (!allowedScopes.has(definition.scope)) failures.push(`${name} has invalid scope ${definition.scope}`);
@@ -65,6 +65,7 @@ function checkRegistry() {
   expectMetadata("observation lane", "lane", "observation", ["status", "record-wait"]);
   expectMetadata("cancellation lane", "lane", "cancellation", ["capture-cancel"]);
   expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown"]);
+  expectMetadata("startup timeout", "timeoutClass", "startup", ["open"]);
   expectMetadata("lifecycle/media timeout", "timeoutClass", "lifecycle-media", [
     "close", "shutdown", "record-stop", "record-wait", "capture-fixed",
   ]);
@@ -105,7 +106,7 @@ function checkImports() {
   const imports = new Map([...sources].map(([name, source]) => [name, relativeImports(source)]));
   forbidImports(imports, "driver.ts", ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "cli.mjs", "daemon.ts"]);
   forbidImports(imports, "runtime.ts", ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "cli.mjs", "daemon.ts"]);
-  for (const name of ["abort_signal.ts", "process_runner.ts", "private_server.ts", "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "workspace_inspection.ts"]) {
+  for (const name of ["abort_signal.ts", "process_runner.ts", "private_server.ts", "server_build_failure.ts", "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "workspace_inspection.ts"]) {
     forbidImports(imports, name, ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "driver.ts", "cli.mjs", "daemon.ts"]);
   }
   for (const name of ["command_inputs.ts", "command_registry.ts", "command_help.ts", "session_coordinator.ts"]) {
@@ -152,7 +153,7 @@ function checkAdapterOwnership() {
 
 function checkBlockingProcesses() {
   const requestPath = [
-    "command_service.ts", "driver.ts", "private_server.ts", "process_runner.ts",
+    "command_service.ts", "driver.ts", "private_server.ts", "server_build_failure.ts", "process_runner.ts",
     "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "daemon.ts",
   ];
   for (const name of requestPath) {
@@ -271,6 +272,7 @@ function checkSizeRatchets() {
     ["abort_signal.ts", 60],
     ["process_runner.ts", 210],
     ["private_server.ts", 310],
+    ["server_build_failure.ts", 60],
     ["recording.ts", 600],
     ["fixed_capture.ts", 140],
     ["tailnet_preview.ts", 400],

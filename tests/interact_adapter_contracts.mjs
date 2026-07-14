@@ -6,12 +6,16 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 
 import { InteractService } from "../scripts/interact/command_service.ts";
-import { PrivateServer, privateLoopbackUrl } from "../scripts/interact/private_server.ts";
+import { InteractDriver, InteractDriverError } from "../scripts/interact/driver.ts";
+import {
+  PrivateServer, SERVER_BUILD_TIMEOUT_MS, privateLoopbackUrl,
+} from "../scripts/interact/private_server.ts";
 import { ProcessRunner } from "../scripts/interact/process_runner.ts";
 
 const holdOpen = "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)";
 
 await processRunnerContracts();
+await dependencyPreflightContracts();
 await coldOpenContracts();
 await responsiveServiceContracts();
 
@@ -62,6 +66,30 @@ async function processRunnerContracts() {
   assert.equal(processExists(abortPid), false, "aborted children are reaped before rejection");
 }
 
+async function dependencyPreflightContracts() {
+  let serverStarted = false;
+  const driver = new InteractDriver({
+    workspaceRoot: process.cwd(),
+    map: "dependency-preflight",
+    puppeteerLoader: async () => {
+      throw new InteractDriverError(
+        "puppeteerUnavailable",
+        "puppeteer-core is not installed from the repository package lock; run npm ci at the repository root.",
+      );
+    },
+    privateServerFactory: async () => {
+      serverStarted = true;
+      throw new Error("private server should not start before dependency preflight");
+    },
+  });
+  try {
+    await assert.rejects(driver.open(), (error) => error?.code === "puppeteerUnavailable", "missing Puppeteer reports its actionable dependency error");
+    assert.equal(serverStarted, false, "missing browser tooling is detected before the private Rust build starts");
+  } finally {
+    if (driver.sessionDir) fs.rmSync(driver.sessionDir, { recursive: true, force: true });
+  }
+}
+
 async function coldOpenContracts() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-private-server-"));
   const sessionDir = path.join(root, "session");
@@ -90,6 +118,54 @@ async function coldOpenContracts() {
   controller.abort();
   await assert.rejects(opening, (error) => error?.code === "sessionClosed", "private-server startup maps Cargo abort to session closure");
   assert.equal(processExists(cargoPid), false, "private-server abort reaps the held Cargo child");
+
+  const timeoutRunner = new ProcessRunner({ termGraceMs: 30 });
+  let buildPid = null;
+  const buildStartedAt = Date.now();
+  const timedOutBuild = PrivateServer.open({
+    workspace: { root, head: "a".repeat(40) },
+    sessionDir,
+    startupTimeoutMs: 10,
+    buildTimeoutMs: 80,
+    artifactCapability: "b".repeat(64),
+    processRunner: {
+      runOrThrow(_command, _args, options) {
+        return timeoutRunner.runOrThrow(process.execPath, ["-e", holdOpen], {
+          ...options,
+          onSpawn: (child) => { buildPid = child.pid; },
+        });
+      },
+    },
+    allocatePrivatePort: async () => 12345,
+  });
+  await assert.rejects(timedOutBuild, (error) => {
+    assert.equal(error?.code, "serverBuildTimeout", "a bounded cold-build timeout is distinct from a compiler failure");
+    assert.equal(error?.details?.timedOut, true, "build diagnostics identify the timeout");
+    assert.equal(error?.details?.processCode, "processTimeout", "build diagnostics retain the process failure class");
+    assert.equal(error?.details?.signal, "SIGKILL", "build diagnostics retain the final child signal");
+    assert.ok(fs.existsSync(error?.details?.buildLog), "build diagnostics provide a readable log path");
+    assert.match(error.message, /cold-build deadline/, "the timeout message does not claim a compiler error");
+    return true;
+  });
+  assert.ok(Date.now() - buildStartedAt >= 80, "Cargo gets its independent build deadline rather than the shorter readiness timeout");
+  assert.equal(processExists(buildPid), false, "timed-out Cargo children are reaped before the failure returns");
+  assert.ok(SERVER_BUILD_TIMEOUT_MS > 60_000, "production cold builds receive multi-minute headroom");
+
+  const failedBuild = PrivateServer.open({
+    workspace: { root, head: "a".repeat(40) }, sessionDir, startupTimeoutMs: 10,
+    artifactCapability: "b".repeat(64), allocatePrivatePort: async () => 12345,
+    processRunner: {
+      runOrThrow(_command, _args, options) {
+        return realRunner.runOrThrow(process.execPath, ["-e", "process.stderr.write('compiler fixture failure'); process.exit(2)"], options);
+      },
+    },
+  });
+  await assert.rejects(failedBuild, (error) => {
+    assert.equal(error?.code, "serverBuild", "a nonzero compiler exit remains a serverBuild failure");
+    assert.equal(error?.details?.exitCode, 2, "compiler diagnostics retain the nonzero exit code");
+    assert.match(fs.readFileSync(error?.details?.buildLog, "utf8"), /compiler fixture failure/, "the build log retains compiler stderr");
+    return true;
+  });
   assert.equal(privateLoopbackUrl("http://localhost:8080"), "http://localhost:8080/", "private-server reuse normalizes loopback URLs");
   assert.throws(() => privateLoopbackUrl("http://192.0.2.1:8080"), (error) => error?.code === "invalidServerUrl", "private-server reuse rejects non-loopback URLs");
 

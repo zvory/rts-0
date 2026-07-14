@@ -8,6 +8,9 @@ export const DEFAULT_IDLE_MS = 30 * 60_000;
 export const MAX_REQUEST_BYTES = 1024 * 1024;
 export const IPC_VERSION = 1;
 export const REQUEST_TIMEOUT_MS = 120_000;
+// A clean worktree may need a full Rust build before browser startup. Keep the
+// client attached beyond the separately bounded Cargo build and readiness work.
+export const STARTUP_REQUEST_TIMEOUT_MS = 600_000;
 // A one-minute wait can be followed by recorder flush, transcode, three auxiliary
 // FFmpeg stages, probes, and browser cleanup. Keep the client deadline beyond the
 // sum of those independently bounded stages so successful cleanup can reply.

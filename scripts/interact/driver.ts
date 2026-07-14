@@ -127,6 +127,8 @@ interface DriverOptions {
   chrome?: string;
   baseUrl?: string;
   signal?: AbortSignal | null;
+  puppeteerLoader?: typeof loadPuppeteer;
+  privateServerFactory?: typeof PrivateServer.open;
 }
 
 declare global {
@@ -170,7 +172,9 @@ export class InteractDriver {
   sessionDir: string;
   workspace: WorkspaceInfo | null;
   state: string;
-  options: Required<Omit<DriverOptions, "workspaceRoot" | "signal">> & Pick<DriverOptions, "workspaceRoot" | "signal">;
+  puppeteerLoader: typeof loadPuppeteer;
+  privateServerFactory: typeof PrivateServer.open;
+  options: Required<Omit<DriverOptions, "workspaceRoot" | "signal" | "puppeteerLoader" | "privateServerFactory">> & Pick<DriverOptions, "workspaceRoot" | "signal">;
   static async open(options: DriverOptions = {}) {
     const driver = new InteractDriver(options);
     try {
@@ -194,6 +198,8 @@ export class InteractDriver {
     chrome = process.env.CHROME || "",
     baseUrl = "",
     signal = null,
+    puppeteerLoader = loadPuppeteer,
+    privateServerFactory = PrivateServer.open,
   }: DriverOptions = {}) {
     this.options = {
       workspaceRoot,
@@ -209,6 +215,8 @@ export class InteractDriver {
       signal,
     };
     this.state = DRIVER_STATES.OPENING;
+    this.puppeteerLoader = puppeteerLoader;
+    this.privateServerFactory = privateServerFactory;
     this.workspace = null;
     this.sessionDir = "";
     this.server = null;
@@ -241,7 +249,10 @@ export class InteractDriver {
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot || process.cwd());
     this.sessionDir = createSessionDirectory(this.workspace!.root, this.options.map);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
-    this.server = await PrivateServer.open({
+    // Dependency availability is deterministic and cheap. Check it before a
+    // clean worktree spends minutes compiling the private Rust server.
+    const puppeteer = await this.openStep(this.puppeteerLoader(), "Puppeteer loading");
+    this.server = await this.privateServerFactory({
       workspace: this.workspace,
       sessionDir: this.sessionDir,
       startupTimeoutMs: this.options.startupTimeoutMs,
@@ -250,8 +261,6 @@ export class InteractDriver {
       signal: this.options.signal || undefined,
     });
     this.serverLogPath = this.server!.logPath || "";
-
-    const puppeteer = await this.openStep(loadPuppeteer(), "Puppeteer loading");
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new InteractDriverError("sessionClosed", "Interact driver was closed during browser startup.");
     }
