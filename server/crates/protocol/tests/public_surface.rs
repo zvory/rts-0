@@ -209,6 +209,7 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
 
     let snapshot = Snapshot {
         tick: 1,
+        world_combat_active: false,
         steel: 0,
         oil: 0,
         supply_used: 0,

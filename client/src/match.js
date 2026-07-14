@@ -29,7 +29,7 @@ import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
-import { MatchCombatAudio } from "./match_combat_audio.js";
+import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
 import {
   applyLivePauseState as applyLivePauseStateModel,
@@ -323,6 +323,11 @@ export class Match {
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.roomTimeControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
+      this.combatAudio?.updateWorldCombatBed(worldCombatBedAllowed(
+        m?.worldCombatActive,
+        this.livePauseState,
+        this.roomTimeControls?.roomTimeState,
+      ));
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
@@ -752,6 +757,7 @@ export class Match {
 
   applyLivePauseState(state) {
     applyLivePauseStateModel(this, state);
+    if (this.livePauseState.paused) this.combatAudio?.updateWorldCombatBed(false);
   }
 
   shouldUseDesktopCursorAutoLock() {
@@ -1226,6 +1232,12 @@ export class Match {
 
   applyRoomTimeState(state) {
     this.roomTimeControls?.applyRoomTimeState(state);
+    const speed = Number(state?.speed);
+    const ended = state?.ended === true
+      || (Number(state?.durationTicks) > 0 && Number(state?.currentTick) >= Number(state?.durationTicks));
+    if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
+      this.combatAudio?.updateWorldCombatBed(false);
+    }
   }
 
   /**

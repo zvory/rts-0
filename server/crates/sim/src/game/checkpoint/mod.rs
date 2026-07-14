@@ -17,6 +17,7 @@ use super::setup::StartingLoadout;
 use super::smoke::SmokeCloudStore;
 use super::state::{GameState, TrackedRng};
 use super::trench::TrenchStore;
+use super::world_combat;
 use super::{setup, Game, MapMetadata, PlayerStartingLoadout};
 
 mod error;
@@ -121,6 +122,10 @@ struct GameCheckpointV1 {
     map_binding: MapBindingV1,
     seed: u32,
     tick: u32,
+    #[serde(default)]
+    last_world_combat_tick: Option<u32>,
+    #[serde(default)]
+    world_combat_active_through_tick: Option<u32>,
     rng: RngDescriptorV1,
     players: Vec<PlayerStateV1>,
     starting_loadouts: Vec<PlayerStartingLoadout>,
@@ -160,6 +165,8 @@ impl GameCheckpointV1 {
             map_binding: MapBindingV1::from_state(state),
             seed: state.seed,
             tick: state.tick,
+            last_world_combat_tick: state.last_world_combat_tick,
+            world_combat_active_through_tick: state.world_combat_active_through_tick,
             rng: RngDescriptorV1::from_rng(&state.rng),
             players: serde_convert(&state.players)?,
             starting_loadouts: state.starting_loadouts.clone(),
@@ -227,6 +234,8 @@ impl GameCheckpointV1 {
             pending: self.pending_commands,
             command_log: self.command_log,
             tick: self.tick,
+            last_world_combat_tick: self.last_world_combat_tick,
+            world_combat_active_through_tick: self.world_combat_active_through_tick,
             lingering_sight: self.lingering_sight,
             firing_reveals: self.firing_reveals,
             smokes: self.smokes,
@@ -262,6 +271,22 @@ impl GameCheckpointV1 {
         }
         self.compatibility.validate()?;
         self.rng.validate(self.seed)?;
+        if self
+            .last_world_combat_tick
+            .is_some_and(|last| last > self.tick)
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "lastWorldCombatTick",
+            });
+        }
+        if !world_combat::valid_checkpoint_signal_state(
+            self.last_world_combat_tick,
+            self.world_combat_active_through_tick,
+        ) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "worldCombatActiveThroughTick",
+            });
+        }
         self.map_binding.validate_against(map, map_metadata)?;
         validate_supplied_map(map)?;
         validate_count("players", self.players.len(), MAX_PLAYERS)?;

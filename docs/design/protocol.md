@@ -584,6 +584,7 @@ transport decode:
 {
   t: "snapshot",
   tick: u32,
+  worldCombatActive?: bool, // coarse position-free global activity; omitted/false when inactive
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
@@ -633,6 +634,14 @@ fog, so allied units attacking hidden enemies do not reveal hidden target ids or
 `steel`, `oil`, supply, `upgrades`, rallies, order plans,
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.
+
+`worldCombatActive` is the narrow global exception to fog-filtered combat detail. The server sets
+the same position-free boolean for every active player, spectator, replay, Lab, and dev recipient.
+It becomes true only on 15-tick boundaries after hostile weapon fire/impact activity and stays true
+through the last boundary no more than 60 ticks after the most recent activity. It carries no
+position, direction, player, team, entity, weapon, count, or composition information; clients use
+it only to gate one generic background combat bed. Positional combat events and entities remain
+fog-filtered under the ordinary projection rules.
 Full-world diagnostic projections are the explicit exception: they may project those per-entity
 planning and setup details through each entity's real owner so lab/dev inspection overlays are
 complete for every player.
@@ -702,6 +711,7 @@ adds an explicit application compression envelope.
   "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?]], // abilityObjects; omitted when empty
   "tr": [[id, x, y, radiusTiles]], // trenches; omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
+  "wc": true,                     // worldCombatActive; omitted when false
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // projected observer playerResources; omitted when empty
@@ -1050,6 +1060,10 @@ viewer id; per-entity private planning fields are evaluated against each entity'
 `artilleryFiring` remains an intentionally global visual event for minimap firing
 markers, while artillery's actionable world reveal is modeled separately as temporary live fog on
 enemy player grids without granting target-point or surrounding-terrain visibility.
+`worldCombatActive` is the second explicit global exception, but is less revealing: every
+projection receives the identical quantized boolean, with no event payload, location, direction,
+owner, team, entity id, weapon kind, count, or cadence. It may gate generic audio only and never
+changes fog, exploration, targeting, or entity projection.
 
 When adding a projection-affecting field or event, use
 [docs/projection-audit-checklist.md](../projection-audit-checklist.md) and update this section's

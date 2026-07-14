@@ -115,6 +115,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 
   "bootstrap.js": "platform",
   "audio.js": "platform",
+  "audio_spatial.js": "platform",
   "sound_manifest.js": "platform",
   "combat_audio.js": "platform",
   "alerts.js": "platform",

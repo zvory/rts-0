@@ -303,6 +303,9 @@ pub struct PlayerScore {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub tick: u32,
+    /// Coarse, position-free world combat activity shared identically with every recipient.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub world_combat_active: bool,
     pub steel: u32,
     pub oil: u32,
     pub supply_used: u32,

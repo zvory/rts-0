@@ -1272,6 +1272,7 @@ mod tests {
         assert_eq!(
             sink.try_send_snapshot(Snapshot {
                 tick: 1,
+                world_combat_active: false,
                 steel: 0,
                 oil: 0,
                 supply_used: 0,

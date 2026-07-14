@@ -1319,6 +1319,7 @@ mod tests {
 
         Snapshot {
             tick: 42,
+            world_combat_active: true,
             steel: 100,
             oil: 25,
             supply_used: 3,
@@ -1472,6 +1473,7 @@ mod tests {
         assert_eq!(value["t"], "snapshot");
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
         assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
+        assert_eq!(value["wc"], serde_json::json!(true));
         assert_eq!(value["e"].as_array().unwrap().len(), 3);
         assert_eq!(value["e"][0][8], serde_json::json!(1.5));
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
@@ -1660,6 +1662,7 @@ mod tests {
     fn compact_entity_trims_trailing_optional_nulls() {
         let snapshot = Snapshot {
             tick: 1,
+            world_combat_active: false,
             steel: 0,
             oil: 0,
             supply_used: 0,

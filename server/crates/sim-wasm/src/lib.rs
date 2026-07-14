@@ -285,6 +285,7 @@ impl CorePredictor {
     fn snapshot(&self) -> Snapshot {
         Snapshot {
             tick: self.tick,
+            world_combat_active: false,
             steel: self.steel.unwrap_or(0),
             oil: self.oil.unwrap_or(0),
             supply_used: self.supply_used.unwrap_or(0),
@@ -869,6 +870,7 @@ mod tests {
         }];
         Snapshot {
             tick: 10,
+            world_combat_active: false,
             steel: 75,
             oil: 0,
             supply_used: 1,

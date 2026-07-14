@@ -16,10 +16,26 @@ const ARTILLERY_FIRE_GAIN = 1.2;
 const ARTILLERY_LANDING_GAIN = 1;
 const PANZERFAUST_LAUNCH_GAIN = 0.52;
 const PANZERFAUST_IMPACT_GAIN = 0.42;
+const WORLD_COMBAT_BED_ID = "combat_distant_bed_01";
+const WORLD_COMBAT_BED_KEY = "combat:world_activity_bed";
+const WORLD_COMBAT_BED_GAIN = 0.035;
+const WORLD_COMBAT_BED_FADE_IN_MS = 750;
+const WORLD_COMBAT_BED_FADE_OUT_MS = 2500;
 
 // Measured from the decoded production asset's first impact transient. Keep the
 // cue's explosion aligned to the authoritative ARTILLERY_IMPACT event.
 const ARTILLERY_LANDING_LEAD_MS = 2808.322;
+
+export function worldCombatBedAllowed(active, livePauseState, roomTimeState) {
+  if (active !== true || livePauseState?.paused === true) return false;
+  const speed = Number(roomTimeState?.speed);
+  const duration = Number(roomTimeState?.durationTicks);
+  const current = Number(roomTimeState?.currentTick);
+  return roomTimeState?.paused !== true
+    && (!Number.isFinite(speed) || speed > 0)
+    && roomTimeState?.ended !== true
+    && !(duration > 0 && current >= duration);
+}
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -92,6 +108,33 @@ export class MatchCombatAudio {
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.pendingArtilleryLandingTimers = new Set();
+    this.worldCombatBedPlaying = false;
+  }
+
+  updateWorldCombatBed(active) {
+    if (!this.audio) return;
+    if (active) {
+      if (
+        this.worldCombatBedPlaying
+        && this.audio.hasVoiceKey?.(WORLD_COMBAT_BED_KEY) !== false
+      ) return;
+      // A prior fade-out may still own the key when combat resumes.
+      this.audio.stopByKey(WORLD_COMBAT_BED_KEY);
+      this.worldCombatBedPlaying = this.audio.play(WORLD_COMBAT_BED_ID, {
+        category: "combat_other",
+        priority: -20,
+        gain: WORLD_COMBAT_BED_GAIN,
+        key: WORLD_COMBAT_BED_KEY,
+        loop: true,
+        fadeInMs: WORLD_COMBAT_BED_FADE_IN_MS,
+        pitchVariance: 0,
+        cooldownMs: 0,
+      });
+      return;
+    }
+    if (!this.worldCombatBedPlaying) return;
+    this.audio.stopByKey(WORLD_COMBAT_BED_KEY, { fadeOutMs: WORLD_COMBAT_BED_FADE_OUT_MS });
+    this.worldCombatBedPlaying = false;
   }
 
   playAttackSound(ev) {
@@ -203,6 +246,8 @@ export class MatchCombatAudio {
   }
 
   destroy() {
+    this.audio?.stopByKey(WORLD_COMBAT_BED_KEY);
+    this.worldCombatBedPlaying = false;
     this.stopAllMachineGunSounds();
     for (const timer of this.pendingArtilleryLandingTimers) {
       this.clearTimer(timer);

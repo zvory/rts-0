@@ -34,6 +34,7 @@ export function decodeCompactSnapshot(raw) {
   return {
     t: S.SNAPSHOT,
     tick: readU32(scalars[0], "tick"),
+    worldCombatActive: raw.wc == null ? false : readBool(raw.wc, "worldCombatActive"),
     steel: readU32(scalars[1], "steel"),
     oil: readU32(scalars[2], "oil"),
     supplyUsed: readU32(scalars[3], "supplyUsed"),

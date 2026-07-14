@@ -15,6 +15,11 @@
 //   - Callers can tag voices with `key` and stop them early for sustained cues
 //     whose authoritative game state has ended.
 
+import {
+  DEFAULT_AUDIO_REF_DIST,
+  computeSpatialAudio,
+} from "./audio_spatial.js";
+
 const CATEGORIES = Object.freeze([
   "ui",
   "alert",
@@ -63,26 +68,6 @@ const STICKY_BONUS = Object.freeze({
   ui: 10,
 });
 const SPOKEN_CATEGORIES = new Set(["alert", "ui", "unit_voice"]);
-const COMBAT_CATEGORIES = new Set(["combat_self", "combat_other"]);
-
-/** Multiple of `refDist` beyond which a spatial sound is dropped entirely. */
-const MAX_DIST_MULT = 3;
-/** Extra distance beyond `refDist` is scaled by this before attenuation/muffling. */
-const FAR_DISTANCE_EFFECT_MULT = 4;
-/** Lowpass cutoff at the listener (Hz). */
-const LP_NEAR_HZ = 20000;
-/** Lowpass cutoff at `maxDist` (Hz). Muffled-far cue. */
-const LP_FAR_HZ = 1200;
-/** Fallback refDist (world px) used until main.js sets one. */
-const DEFAULT_REF_DIST = 1920;
-/** Combat stays full-volume only in the close camera-centered region. */
-const COMBAT_NEAR_MULT = 0.4;
-/** Combat beyond this listener-relative radius is not allocated. */
-const COMBAT_MAX_DIST_MULT = 1.2;
-/** Extra combat distance outside the near region is scaled before attenuation. */
-const COMBAT_DISTANCE_EFFECT_MULT = 4;
-/** Maximum score penalty for combat at the hard-drop boundary. */
-const COMBAT_MAX_DISTANCE_PENALTY = 30;
 
 export { CATEGORIES };
 
@@ -153,7 +138,7 @@ export class Audio {
     /** Whether queued manifests have already been handed to the decoder. */
     this._decodedQueued = false;
     /** Listener pose in world pixels + reference distance (1 screen-width at current zoom). */
-    this.listener = { x: 0, y: 0, refDist: DEFAULT_REF_DIST };
+    this.listener = { x: 0, y: 0, refDist: DEFAULT_AUDIO_REF_DIST };
     /** Number of active alert voices currently forcing lower-priority buses down. */
     this.alertDuckDepth = 0;
 
@@ -254,6 +239,8 @@ export class Audio {
    * @param {number} [opts.pitchVariance] override default jitter (0 to disable)
    * @param {number} [opts.gain] linear gain multiplier applied before the category bus
    * @param {string} [opts.key] caller-owned voice key for early stopping
+   * @param {boolean} [opts.loop] repeat the decoded buffer until stopped by key
+   * @param {number} [opts.fadeInMs] ramp the per-voice gain up from silence
    * @param {string} [opts.dedupKey] override per-sound dedup bucket
    * @param {number} [opts.cooldownMs] override dedup cooldown
    * @param {boolean} [opts.duck] explicitly duck combat and ambient buses for this voice
@@ -296,6 +283,7 @@ export class Audio {
 
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
+    src.loop = opts.loop === true;
     const variance = opts.pitchVariance == null ? PITCH_VARIANCE : Math.max(0, opts.pitchVariance);
     if (variance > 0) {
       src.playbackRate.value = 1 + (this.rng() * 2 - 1) * variance;
@@ -305,7 +293,15 @@ export class Audio {
 
     const trail = [];
     const gainNode = this.ctx.createGain();
-    gainNode.gain.value = gainValue;
+    const fadeInMs = Number(opts.fadeInMs);
+    if (Number.isFinite(fadeInMs) && fadeInMs > 0) {
+      const start = this.ctx.currentTime;
+      gainNode.gain.value = 0;
+      gainNode.gain.setValueAtTime(0, start);
+      gainNode.gain.linearRampToValueAtTime(gainValue, start + fadeInMs / 1000);
+    } else {
+      gainNode.gain.value = gainValue;
+    }
     let spatialNodes = null;
     if (spatial) {
       const panner = this.ctx.createStereoPanner();
@@ -342,6 +338,7 @@ export class Audio {
       id,
       key,
       trail,
+      gainNode,
       distancePenalty,
       spatial: spatialNodes,
       ducking,
@@ -361,17 +358,29 @@ export class Audio {
   /**
    * Stop all active voices tagged with a caller-owned key.
    * @param {string} key
-   * @returns {number} number of voices stopped
+   * @param {{fadeOutMs?:number}} [opts]
+   * @returns {number} number of voices stopped or scheduled to stop
    */
-  stopByKey(key) {
+  stopByKey(key, opts) {
     if (typeof key !== "string" || !key) return 0;
+    const fadeOutMs = Number(opts?.fadeOutMs);
+    const fade = Number.isFinite(fadeOutMs) && fadeOutMs > 0;
     let stopped = 0;
     for (const voice of [...this.voices]) {
-      if (voice.key !== key) continue;
-      this._stopVoice(voice);
+      if (voice.key !== key || (voice.stopping && fade)) continue;
+      if (fade) {
+        this._fadeOutVoice(voice, fadeOutMs);
+      } else {
+        this._stopVoice(voice);
+      }
       stopped += 1;
     }
     return stopped;
+  }
+
+  /** @param {string} key */
+  hasVoiceKey(key) {
+    return typeof key === "string" && key !== "" && this.voices.some((voice) => voice.key === key);
   }
 
   /**
@@ -557,48 +566,20 @@ export class Audio {
   }
 
   /**
-   * Compute spatial parameters for an emitter, or null if it is beyond the
-   * selected profile's max distance and should be dropped before allocation.
-   * Combat has a tight listener-relative envelope; all other categories retain
-   * the original default profile.
+   * Compute spatial parameters through the shared profile helper.
    * @param {number} x emitter world x
    * @param {number} y emitter world y
    * @param {string} [category] voice category
    * @returns {{gain:number, pan:number, lpHz:number,distance:number,distancePenalty:number}|null}
    */
   _computeSpatial(x, y, category) {
-    const refDist = Math.max(1, this.listener.refDist || DEFAULT_REF_DIST);
-    const dx = x - this.listener.x;
-    const dy = y - this.listener.y;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    const pan = Math.max(-1, Math.min(1, dx / refDist));
-
-    if (COMBAT_CATEGORIES.has(category)) {
-      const near = COMBAT_NEAR_MULT * refDist;
-      const maxDist = COMBAT_MAX_DIST_MULT * refDist;
-      if (d > maxDist) return null;
-      const effectiveD = near + Math.max(0, d - near) * COMBAT_DISTANCE_EFFECT_MULT;
-      const gain = clamp01(near / Math.max(effectiveD, near));
-      const farT = clamp01((d - near) / (maxDist - near));
-      const lpHz = LP_NEAR_HZ + (LP_FAR_HZ - LP_NEAR_HZ) * farT;
-      const distancePenalty = COMBAT_MAX_DISTANCE_PENALTY * farT;
-      return { gain, pan, lpHz, distance: d, distancePenalty };
-    }
-
-    const maxDist = MAX_DIST_MULT * refDist;
-    if (d > maxDist) return null;
-    const effectiveD = refDist + Math.max(0, d - refDist) * FAR_DISTANCE_EFFECT_MULT;
-    const gain = clamp01(refDist / Math.max(effectiveD, refDist));
-    const farT = clamp01(effectiveD / maxDist);
-    const lpHz = LP_NEAR_HZ + (LP_FAR_HZ - LP_NEAR_HZ) * farT;
-    const distancePenalty = Math.min(30, (effectiveD / refDist) * 10);
-    return { gain, pan, lpHz, distance: d, distancePenalty };
+    return computeSpatialAudio(this.listener, x, y, category);
   }
 
   _dedupKey(id, category, opts, spatial) {
     if (typeof opts.dedupKey === "string" && opts.dedupKey) return `${id}:${opts.dedupKey}`;
     if (category === "combat_self" || category === "combat_other") {
-      const refDist = Math.max(1, this.listener.refDist || DEFAULT_REF_DIST);
+      const refDist = Math.max(1, this.listener.refDist || DEFAULT_AUDIO_REF_DIST);
       const bucketPx = Math.max(160, refDist / 3);
       const bucket = spatial ? Math.floor(spatial.distance / bucketPx) : 0;
       return `${id}:${category}:d${bucket}`;
@@ -659,6 +640,25 @@ export class Audio {
       /* already stopped */
     }
     this._finishVoice(voice);
+  }
+
+  _fadeOutVoice(voice, fadeOutMs) {
+    if (!this.ctx || !voice.gainNode) {
+      this._stopVoice(voice);
+      return;
+    }
+    voice.stopping = true;
+    const start = this.ctx.currentTime;
+    const end = start + fadeOutMs / 1000;
+    const gain = voice.gainNode.gain;
+    gain.cancelScheduledValues(start);
+    gain.setValueAtTime(gain.value, start);
+    gain.linearRampToValueAtTime(0, end);
+    try {
+      voice.node.stop(end);
+    } catch {
+      this._finishVoice(voice);
+    }
   }
 
   _finishVoice(voice) {
