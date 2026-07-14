@@ -126,10 +126,11 @@ else
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "node not found on PATH — the API suites need Node >= 22 (built-in WebSocket)." >&2
+  echo "node not found on PATH — Node/static and browser suites require Node 22.18 or newer." >&2
   exit 2
 fi
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+NODE_VERSION="$(node -p 'process.versions.node' 2>/dev/null || echo 0.0.0)"
+IFS=. read -r NODE_MAJOR NODE_MINOR _NODE_PATCH <<< "$NODE_VERSION"
 
 alloc_port() {
   node <<'EOF'
@@ -179,8 +180,10 @@ info() { [ "$VERBOSE" = "1" ] && printf '%s\n' "$1"; }
 warn() { printf '%s! %s%s\n' "$YEL" "$1" "$RST"; }
 elapsed_since() { printf '%ss' "$((SECONDS - $1))"; }
 
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  warn "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
+if { [ "$RUN_STATIC_JS" = "1" ] || [ "$RUN_LIVE_NODE" = "1" ] || [ "$RUN_CLIENT" = "1" ]; } &&
+   { [ "${NODE_MAJOR:-0}" -lt 22 ] || { [ "${NODE_MAJOR:-0}" -eq 22 ] && [ "${NODE_MINOR:-0}" -lt 18 ]; }; }; then
+  echo "Node $NODE_VERSION detected; Node/static and browser suites require Node 22.18 or newer." >&2
+  exit 2
 fi
 
 RTS_NODE_DEPS_CACHE_DIR="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"

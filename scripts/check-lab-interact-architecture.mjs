@@ -193,6 +193,11 @@ function checkDependencyOwnership() {
   if (!bootstrap.includes('await import("./cli.ts")') || !bootstrap.includes("22.18")) {
     failures.push("cli.mjs must only preflight Node 22.18+ and import cli.ts");
   }
+  const testRunner = readFileSync(path.join(repoRoot, "tests", "run-all.sh"), "utf8");
+  if (!testRunner.includes("Node 22.18 or newer") ||
+      !/NODE_MAJOR[^\n]+-eq 22[^\n]+NODE_MINOR[^\n]+-lt 18/.test(testRunner)) {
+    failures.push("tests/run-all.sh must reject Node releases older than 22.18 before direct TypeScript suites");
+  }
   for (const [name, source] of sources) {
     if (/\@ts-(?:ignore|nocheck)/.test(source)) failures.push(`${name} contains a blanket TypeScript escape`);
   }
