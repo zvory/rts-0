@@ -1,5 +1,8 @@
+import fs from "node:fs";
+
 import { assert, assertThrows } from "./assertions.mjs";
 import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
+import { initializeWorkloadSetup } from "../../scripts/client-perf/snapshot_stream_setup.mjs";
 import { COMPACT_SNAPSHOT_VERSION, S } from "../../client/src/protocol.js";
 import {
   SnapshotStreamNet,
@@ -66,15 +69,28 @@ function snapshotFrame(tick) {
     () => parseSnapshotStream(fixture.subarray(0, fixture.length - 1)),
     "snapshot stream parser rejects truncated frames",
   );
+
+  const checkedArtifact = parseSnapshotStream(fs.readFileSync(new URL(
+    "../../client/assets/snapshot-streams/supply-300-hellhole.rtsstream",
+    import.meta.url,
+  )));
+  assert(
+    checkedArtifact.header.frameCount === 900 && checkedArtifact.frames.length === 900,
+    "checked-in Hellhole snapshot stream contains the expected 30 seconds at 30 Hz",
+  );
 }
 
 {
   const fixture = streamBytes({ id: "fixture", frames: [snapshotFrame(11), snapshotFrame(12)] });
   const scheduled = [];
+  let fetchOptions = null;
   let now = 100;
   const net = new SnapshotStreamNet({
     id: "fixture",
-    fetchFn: async () => ({ ok: true, arrayBuffer: async () => fixture.buffer }),
+    fetchFn: async (_url, options) => {
+      fetchOptions = options;
+      return { ok: true, arrayBuffer: async () => fixture.buffer };
+    },
     now: () => now,
     setTimeoutFn: (callback, delay) => {
       scheduled.push({ callback, delay });
@@ -88,6 +104,7 @@ function snapshotFrame(tick) {
   net.on(S.SNAPSHOT, (snapshot) => events.push(`snapshot:${snapshot.tick}`));
 
   await net.connect();
+  assert(fetchOptions?.cache === "no-cache", "snapshot stream fetch revalidates stable artifact URLs");
   assert(net.offline && net.ws === null, "snapshot stream transport never creates a WebSocket");
   assert(events.join(",") === "open,start", "offline transport starts the normal match shell");
   assert(scheduled.length === 1 && scheduled[0].delay === 0, "first snapshot is scheduled after start");
@@ -103,4 +120,36 @@ function snapshotFrame(tick) {
   assert(net.publicState.serverSimulation === false && net.publicState.websocket === false,
     "offline transport exposes its isolation state for benchmark verification");
   net.close();
+}
+
+{
+  const priorWindow = globalThis.window;
+  globalThis.window = {
+    __rtsSnapshotStream: {
+      id: "fixture",
+      frameCount: 2,
+      tickRateHz: 30,
+      offline: true,
+      serverSimulation: false,
+      websocket: false,
+    },
+    __rts: { net: { offline: true, ws: null } },
+  };
+  try {
+    const page = {
+      waitForFunction: async () => {},
+      evaluate: async (callback, argument) => callback(argument),
+    };
+    const result = await initializeWorkloadSetup(page, {
+      snapshotStreamId: "fixture",
+      snapshotStreamFrameCount: 900,
+    });
+    assert(
+      result.error === "snapshot stream has 2 frames; expected 900",
+      "performance setup rejects a stale snapshot artifact",
+    );
+  } finally {
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  }
 }

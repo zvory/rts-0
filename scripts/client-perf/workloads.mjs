@@ -24,11 +24,12 @@ export function buildClientPerfWorkloads(env = process.env) {
     },
     {
       id: "supply-300-hellhole-stream",
-      description: "Client-only playback of 300 Hellhole snapshots at the authored 30 Hz cadence.",
+      description: "Client-only playback of 900 Hellhole snapshots at the authored 30 Hz cadence.",
       kind: "snapshotStream",
       url: "/?snapshotStream=supply-300-hellhole",
       setup: {
         snapshotStreamId: "supply-300-hellhole",
+        snapshotStreamFrameCount: 900,
         waitForMinEntities: 380,
         resetPerfAfterSetup: true,
       },

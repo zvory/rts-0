@@ -30,6 +30,10 @@ try {
   );
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }), (error) => error?.code === "invalidInput");
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
+  assert.doesNotThrow(
+    () => validateCommandInput("open", { scenario: "supply-300-hellhole" }),
+    "Lab opens accept hyphenated bundled scenario ids",
+  );
   const gameSessionId = `game_${"b".repeat(32)}`;
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");

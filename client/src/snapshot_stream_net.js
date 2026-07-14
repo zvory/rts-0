@@ -102,7 +102,9 @@ export class SnapshotStreamNet extends Net {
   }
 
   async connect() {
-    const response = await this.fetchFn(this.url, { cache: "force-cache" });
+    // Revalidate the stable asset URL so regenerating a stream cannot leave a benchmark silently
+    // replaying an older cached artifact. A validated response may still be served from cache.
+    const response = await this.fetchFn(this.url, { cache: "no-cache" });
     if (!response?.ok) {
       throw new Error(`Unable to load snapshot stream ${this.id} (${response?.status || "network error"})`);
     }
