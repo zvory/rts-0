@@ -110,9 +110,8 @@ The private server remains loopback-only and retains the artifact-transfer capab
 `puppeteer-core`, TypeScript 5.8 or newer, and Node 22 typings are repository-root development
 dependencies in `package.json` and `package-lock.json`. Interact and the browser/performance
 tests import declared dependencies directly; daemon requests never install or hydrate packages.
-`lab open` checks for Puppeteer before starting an expensive Rust build and returns the
-`puppeteerUnavailable` remediation immediately when a fresh worktree has not installed or linked
-its dependencies. Run `npm ci` at the repository root,
+`lab open` checks for Puppeteer and Chrome before starting an expensive Rust build and returns the
+corresponding remediation immediately when browser tooling is unavailable. Run `npm ci` at the repository root,
 or use `tests/run-all.sh`, whose pre-suite cache setup installs the root lock into the shared
 lockfile-keyed cache and links the ignored root `node_modules`.
 

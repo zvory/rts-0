@@ -88,6 +88,25 @@ async function dependencyPreflightContracts() {
   } finally {
     if (driver.sessionDir) fs.rmSync(driver.sessionDir, { recursive: true, force: true });
   }
+
+  const chromeDriver = new InteractDriver({
+    workspaceRoot: process.cwd(),
+    map: "chrome-preflight",
+    puppeteerLoader: async () => ({}),
+    chromeFinder: () => {
+      throw new InteractDriverError("chromeUnavailable", "Chrome/Chromium not found; set CHROME=/path/to/chrome.");
+    },
+    privateServerFactory: async () => {
+      serverStarted = true;
+      throw new Error("private server should not start before browser preflight");
+    },
+  });
+  try {
+    await assert.rejects(chromeDriver.open(), (error) => error?.code === "chromeUnavailable", "missing Chrome reports its actionable dependency error");
+    assert.equal(serverStarted, false, "missing Chrome is detected before the private Rust build starts");
+  } finally {
+    if (chromeDriver.sessionDir) fs.rmSync(chromeDriver.sessionDir, { recursive: true, force: true });
+  }
 }
 
 async function coldOpenContracts() {
@@ -121,6 +140,7 @@ async function coldOpenContracts() {
 
   const timeoutRunner = new ProcessRunner({ termGraceMs: 30 });
   let buildPid = null;
+  let timeoutPortAllocated = false;
   const buildStartedAt = Date.now();
   const timedOutBuild = PrivateServer.open({
     workspace: { root, head: "a".repeat(40) },
@@ -136,7 +156,7 @@ async function coldOpenContracts() {
         });
       },
     },
-    allocatePrivatePort: async () => 12345,
+    allocatePrivatePort: async () => { timeoutPortAllocated = true; return 12345; },
   });
   await assert.rejects(timedOutBuild, (error) => {
     assert.equal(error?.code, "serverBuildTimeout", "a bounded cold-build timeout is distinct from a compiler failure");
@@ -149,6 +169,7 @@ async function coldOpenContracts() {
   });
   assert.ok(Date.now() - buildStartedAt >= 80, "Cargo gets its independent build deadline rather than the shorter readiness timeout");
   assert.equal(processExists(buildPid), false, "timed-out Cargo children are reaped before the failure returns");
+  assert.equal(timeoutPortAllocated, false, "failed cold builds do not select a port that can go stale during compilation");
   assert.ok(SERVER_BUILD_TIMEOUT_MS > 60_000, "production cold builds receive multi-minute headroom");
 
   const failedBuild = PrivateServer.open({

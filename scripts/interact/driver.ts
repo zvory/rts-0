@@ -128,6 +128,7 @@ interface DriverOptions {
   baseUrl?: string;
   signal?: AbortSignal | null;
   puppeteerLoader?: typeof loadPuppeteer;
+  chromeFinder?: typeof findChrome;
   privateServerFactory?: typeof PrivateServer.open;
 }
 
@@ -173,8 +174,9 @@ export class InteractDriver {
   workspace: WorkspaceInfo | null;
   state: string;
   puppeteerLoader: typeof loadPuppeteer;
+  chromeFinder: typeof findChrome;
   privateServerFactory: typeof PrivateServer.open;
-  options: Required<Omit<DriverOptions, "workspaceRoot" | "signal" | "puppeteerLoader" | "privateServerFactory">> & Pick<DriverOptions, "workspaceRoot" | "signal">;
+  options: Required<Omit<DriverOptions, "workspaceRoot" | "signal" | "puppeteerLoader" | "chromeFinder" | "privateServerFactory">> & Pick<DriverOptions, "workspaceRoot" | "signal">;
   static async open(options: DriverOptions = {}) {
     const driver = new InteractDriver(options);
     try {
@@ -199,6 +201,7 @@ export class InteractDriver {
     baseUrl = "",
     signal = null,
     puppeteerLoader = loadPuppeteer,
+    chromeFinder = findChrome,
     privateServerFactory = PrivateServer.open,
   }: DriverOptions = {}) {
     this.options = {
@@ -216,6 +219,7 @@ export class InteractDriver {
     };
     this.state = DRIVER_STATES.OPENING;
     this.puppeteerLoader = puppeteerLoader;
+    this.chromeFinder = chromeFinder;
     this.privateServerFactory = privateServerFactory;
     this.workspace = null;
     this.sessionDir = "";
@@ -249,9 +253,10 @@ export class InteractDriver {
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot || process.cwd());
     this.sessionDir = createSessionDirectory(this.workspace!.root, this.options.map);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
-    // Dependency availability is deterministic and cheap. Check it before a
-    // clean worktree spends minutes compiling the private Rust server.
+    // Local browser prerequisites are deterministic and cheap. Check them before
+    // a clean worktree spends minutes compiling the private Rust server.
     const puppeteer = await this.openStep(this.puppeteerLoader(), "Puppeteer loading");
+    const chrome = this.chromeFinder(this.options.chrome);
     this.server = await this.privateServerFactory({
       workspace: this.workspace,
       sessionDir: this.sessionDir,
@@ -264,7 +269,6 @@ export class InteractDriver {
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new InteractDriverError("sessionClosed", "Interact driver was closed during browser startup.");
     }
-    const chrome = findChrome(this.options.chrome);
     this.profileDir = fs.mkdtempSync(path.join(this.sessionDir, "chrome-profile-"));
     const browser = await this.openStep(
       puppeteer.launch({

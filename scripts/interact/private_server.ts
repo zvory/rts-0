@@ -123,7 +123,6 @@ export class PrivateServer {
       return;
     }
 
-    const port = await this.allocatePrivatePort(this.signal);
     const targetDir = path.join(this.workspace.root, "target", "interact", "lab", "cargo");
     const binary = path.join(targetDir, "debug", "rts-server");
     const buildLogPath = path.join(this.sessionDir, "cargo-build.log");
@@ -146,6 +145,9 @@ export class PrivateServer {
     throwIfAborted(this.signal);
     if (!fs.existsSync(binary)) throw new PrivateServerError("serverBuild", "Interact server binary was not produced.");
 
+    // Allocate immediately before spawn. A port selected before a cold build can
+    // be claimed by another process during the several-minute build window.
+    const port = await this.allocatePrivatePort(this.signal);
     this.logPath = path.join(this.sessionDir, "server.log");
     this.logFd = fs.openSync(this.logPath, "w");
     this.child = this.spawnServer(binary, [], {
