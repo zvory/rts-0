@@ -600,7 +600,7 @@ impl RoomTask {
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
         let projection_policy = self.projection_policy();
-        let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+        let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => {
                 // Stay in lobby; nothing to simulate.
                 self.phase = Phase::Lobby;
@@ -622,6 +622,9 @@ impl RoomTask {
         let spectator_visible_players = self.spectator_visible_player_ids();
         let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient(&game);
         let record_lab_timeline = matches!(self.mode, super::types::RoomMode::Lab(_));
+        if let Some(driver) = self.lab_driver.as_mut() {
+            driver.enqueue_for_tick(&self.room, &mut game);
+        }
         let result = LiveTickDriver {
             room: &self.room,
             scheduled,
