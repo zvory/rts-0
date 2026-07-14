@@ -273,9 +273,12 @@ impl Game {
             perf.as_deref_mut(),
         );
         self.derived.set_final_spatial(final_spatial);
-        if let Some(activity_tick) = world_combat::activity_tick(&events, self.state.tick) {
-            self.state.last_world_combat_tick = Some(activity_tick);
-        }
+        world_combat::record_activity(
+            &events,
+            self.state.tick,
+            &mut self.state.last_world_combat_tick,
+            &mut self.state.world_combat_active_through_tick,
+        );
 
         // Live fog last, from the post-systems world state. Lingering death vision is stamped as
         // ordinary temporary sight so snapshots, commands, and combat all consume one visibility
@@ -400,10 +403,7 @@ impl Game {
     }
 
     fn primary_base_alive_for(&self, player_id: u32, start_tile: (u32, u32)) -> bool {
-        let (start_x, start_y) = self
-            .state
-            .map
-            .tile_center(start_tile.0, start_tile.1);
+        let (start_x, start_y) = self.state.map.tile_center(start_tile.0, start_tile.1);
         let max_dist = config::TILE_SIZE as f32 * 0.5;
         let max_dist_sq = max_dist * max_dist;
         services::world_query::owned_buildings(&self.state.entities, player_id).any(|entity| {

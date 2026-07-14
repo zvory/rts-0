@@ -3,10 +3,11 @@ use std::collections::BTreeSet;
 use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
 
 use super::{
-    ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore, building_memory::BuildingMemory,
-    commands, firing_reveal::FiringRevealSource, fog::Fog, fog::LingeringSightSource, map::Map,
-    mortar::MortarShellStore, replay::CommandLogEntry, setup::StartingLoadout, smoke::SmokeCloudStore,
-    trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout, PlayerState,
+    ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore,
+    building_memory::BuildingMemory, commands, firing_reveal::FiringRevealSource, fog::Fog,
+    fog::LingeringSightSource, map::Map, mortar::MortarShellStore, replay::CommandLogEntry,
+    setup::StartingLoadout, smoke::SmokeCloudStore, trench::TrenchStore, EntityStore, MapMetadata,
+    PlayerStartingLoadout, PlayerState,
 };
 
 #[derive(Clone)]
@@ -20,6 +21,7 @@ pub(in crate::game) struct GameState {
     pub(in crate::game) command_log: Vec<CommandLogEntry>,
     pub(in crate::game) tick: u32,
     pub(in crate::game) last_world_combat_tick: Option<u32>,
+    pub(in crate::game) world_combat_active_through_tick: Option<u32>,
     pub(in crate::game) lingering_sight: Vec<LingeringSightSource>,
     pub(in crate::game) firing_reveals: Vec<FiringRevealSource>,
     pub(in crate::game) smokes: SmokeCloudStore,
@@ -121,6 +123,7 @@ impl GameState {
             command_log: Vec::new(),
             tick: 0,
             last_world_combat_tick: None,
+            world_combat_active_through_tick: None,
             lingering_sight: Vec::new(),
             firing_reveals: Vec::new(),
             smokes: SmokeCloudStore::new(),

@@ -29,7 +29,7 @@ import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
-import { MatchCombatAudio } from "./match_combat_audio.js";
+import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
 import {
   applyLivePauseState as applyLivePauseStateModel,
@@ -323,7 +323,11 @@ export class Match {
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.roomTimeControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
-      this.combatAudio?.updateWorldCombatBed(m?.worldCombatActive === true);
+      this.combatAudio?.updateWorldCombatBed(worldCombatBedAllowed(
+        m?.worldCombatActive,
+        this.livePauseState,
+        this.roomTimeControls?.roomTimeState,
+      ));
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);

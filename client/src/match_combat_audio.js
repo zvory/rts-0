@@ -26,6 +26,17 @@ const WORLD_COMBAT_BED_FADE_OUT_MS = 2500;
 // cue's explosion aligned to the authoritative ARTILLERY_IMPACT event.
 const ARTILLERY_LANDING_LEAD_MS = 2808.322;
 
+export function worldCombatBedAllowed(active, livePauseState, roomTimeState) {
+  if (active !== true || livePauseState?.paused === true) return false;
+  const speed = Number(roomTimeState?.speed);
+  const duration = Number(roomTimeState?.durationTicks);
+  const current = Number(roomTimeState?.currentTick);
+  return roomTimeState?.paused !== true
+    && (!Number.isFinite(speed) || speed > 0)
+    && roomTimeState?.ended !== true
+    && !(duration > 0 && current >= duration);
+}
+
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
     ids: ["combat_tank_01"],

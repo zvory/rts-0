@@ -21,7 +21,10 @@ import {
   panzerfaustFeedbackDedupKey,
   panzerfaustFeedbackSoundId,
 } from "../../client/src/combat_audio.js";
-import { MatchCombatAudio } from "../../client/src/match_combat_audio.js";
+import {
+  MatchCombatAudio,
+  worldCombatBedAllowed,
+} from "../../client/src/match_combat_audio.js";
 import {
   EVENT,
   KIND,
@@ -117,6 +120,19 @@ assert(
 assert(
   SOUND_MANIFEST.some((entry) => entry.id === "combat_distant_bed_01"),
   "world combat activity bed is exposed through the shared sound manifest",
+);
+assert(worldCombatBedAllowed(true, null, null), "active live combat allows the global bed");
+assert(
+  !worldCombatBedAllowed(true, { paused: true }, null),
+  "live pause suppresses the global bed even if a snapshot arrives",
+);
+assert(
+  !worldCombatBedAllowed(true, null, { paused: true, speed: 1 }),
+  "paused room time suppresses the global bed even if a seek snapshot arrives",
+);
+assert(
+  !worldCombatBedAllowed(true, null, { currentTick: 100, durationTicks: 100, speed: 2 }),
+  "ended room time suppresses the global bed",
 );
 
 // Audio
