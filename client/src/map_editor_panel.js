@@ -44,7 +44,7 @@ export class MapEditorPanel {
     root.appendChild(this.el);
     this.windowChrome = new LabPanelWindowChrome(this.el, {
       storageKey: MAP_EDITOR_PANEL_STORAGE_KEY,
-      panelLabel: "map editor controls",
+      panelLabel: "map editor",
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
@@ -54,7 +54,6 @@ export class MapEditorPanel {
 
   render() {
     if (this.destroyed) return;
-    this.windowChrome.clearRenderListeners();
     const previousBody = this.el.querySelector(".map-editor-panel-body");
     const scroll = previousBody && {
       left: previousBody.scrollLeft,

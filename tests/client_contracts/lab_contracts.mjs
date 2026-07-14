@@ -1309,6 +1309,7 @@ await withFakeDocument(async () => {
     windowObj,
     storage,
     storageKey: "test.lab.panel.window",
+    panelLabel: "map editor",
   });
   const header = chrome.renderHeader({ kicker: "Lab", title: "sandbox" });
   const resizeHandle = chrome.renderResizeHandle();
@@ -1318,6 +1319,11 @@ await withFakeDocument(async () => {
   const actions = header.children[1];
   const collapseButton = actions.children[0];
   assert(actions.children.length === 1, "LabPanelWindowChrome omits the reset button from panel headers");
+  assert(
+    dragHandle["aria-label"] === "Move map editor panel" &&
+      resizeHandle["aria-label"] === "Resize map editor panel",
+    "LabPanelWindowChrome applies the panel label to move and resize controls",
+  );
   dragHandle.listeners.pointerdown({
     button: 0,
     pointerId: 7,

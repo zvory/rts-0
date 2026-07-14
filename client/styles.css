@@ -5305,7 +5305,7 @@ input[type="text"]:focus {
   bottom: auto;
   width: min(390px, calc(100vw - 24px));
   min-width: min(260px, calc(100vw - 24px));
-  max-height: min(680px, calc(100vh - 24px));
+  max-height: min(680px, calc(100vh - 70px));
   display: flex;
   flex-direction: column;
   overflow: hidden;

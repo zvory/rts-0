@@ -100,7 +100,7 @@ export class LabPanelWindowChrome {
     handle.type = "button";
     handle.className = "lab-panel-resize-handle";
     handle.title = "Drag to resize. Arrow keys resize.";
-    handle.setAttribute("aria-label", "Resize lab controls panel");
+    handle.setAttribute("aria-label", `Resize ${this.panelLabel} panel`);
     handle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight");
     this.listenRender(handle, "pointerdown", (event) => this.beginInteraction("resize", event));
     this.listenRender(handle, "keydown", (event) => this.handleResizeKey(event));
