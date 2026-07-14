@@ -3,6 +3,7 @@ import { hash2 } from "./shared.js";
 import {
   isImpassableAt,
   isImpassableTerrain,
+  roadEdgeDirections,
   roadMarkingOrientation,
   terrainColor,
   terrainOverlayColor,
@@ -51,8 +52,40 @@ function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
       ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
     }
   }
+  drawRoadShoulder(ctx, map, tx, ty, code, textureTileSize);
   drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+}
+
+function drawRoadShoulder(ctx, map, tx, ty, code, size) {
+  const edges = roadEdgeDirections(map, tx, ty, code);
+  if (!edges.length) return;
+
+  const x = tx * size;
+  const y = ty * size;
+  const edgeWidth = Math.max(1, Math.floor(size * 0.14));
+  const chipSize = Math.max(1, Math.floor(size * 0.1));
+  for (const edge of edges) {
+    ctx.fillStyle = colorCss(COLORS.roadShoulderDark, 0.94);
+    if (edge === "north") ctx.fillRect(x, y, size, edgeWidth);
+    if (edge === "south") ctx.fillRect(x, y + size - edgeWidth, size, edgeWidth);
+    if (edge === "west") ctx.fillRect(x, y, edgeWidth, size);
+    if (edge === "east") ctx.fillRect(x + size - edgeWidth, y, edgeWidth, size);
+
+    for (let offset = 0; offset < size; offset += chipSize) {
+      const horizontal = edge === "north" || edge === "south";
+      const sampleX = horizontal ? tx * 41 + offset : tx * 41 + (edge === "east" ? 17 : 5);
+      const sampleY = horizontal ? ty * 43 + (edge === "south" ? 19 : 7) : ty * 43 + offset;
+      const n = hash2(sampleX, sampleY);
+      if (n < 0.48) continue;
+      const depth = n > 0.82 ? edgeWidth + chipSize : edgeWidth;
+      ctx.fillStyle = colorCss(COLORS.roadShoulder, n > 0.82 ? 0.88 : 0.68);
+      if (edge === "north") ctx.fillRect(x + offset, y, chipSize, depth);
+      if (edge === "south") ctx.fillRect(x + offset, y + size - depth, chipSize, depth);
+      if (edge === "west") ctx.fillRect(x, y + offset, depth, chipSize);
+      if (edge === "east") ctx.fillRect(x + size - depth, y + offset, depth, chipSize);
+    }
+  }
 }
 
 function drawRoadMarking(ctx, code, x, y, size) {

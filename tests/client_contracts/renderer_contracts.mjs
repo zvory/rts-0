@@ -10,6 +10,7 @@ import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../cl
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   isImpassableTerrain,
+  roadEdgeDirections,
   roadMarkingOrientation,
   terrainColor,
 } from "../../client/src/renderer/terrain_palette.js";
@@ -28,6 +29,7 @@ import {
 import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 
 {
+  assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");
   const bareRoad = terrainColor(TERRAIN.ROAD_BARE, 2, 3);
   assert(
     bareRoad === COLORS.road || bareRoad === COLORS.roadAlt,
@@ -51,6 +53,28 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(!isImpassableTerrain(code), `${orientation} road renders as passable terrain`);
     assert(roadMarkingOrientation(code) === orientation, `${orientation} road keeps its yellow-line direction`);
   }
+
+  const roadMap = {
+    width: 3,
+    height: 3,
+    terrain: [
+      TERRAIN.GRASS, TERRAIN.ROAD_BARE, TERRAIN.GRASS,
+      TERRAIN.GRASS, TERRAIN.ROAD_HORIZONTAL, TERRAIN.ROAD_BARE,
+      TERRAIN.GRASS, TERRAIN.GRASS, TERRAIN.GRASS,
+    ],
+  };
+  assert(
+    roadEdgeDirections(roadMap, 1, 1, TERRAIN.ROAD_HORIZONTAL).join(",") === "south,west",
+    "road shoulders appear only where neighboring terrain is not road",
+  );
+  assert(
+    roadEdgeDirections(roadMap, 1, 0, TERRAIN.ROAD_BARE).join(",") === "north,west,east",
+    "road shoulders include exposed map and terrain boundaries",
+  );
+  assert(
+    roadEdgeDirections(roadMap, 0, 0, TERRAIN.GRASS).length === 0,
+    "non-road terrain never receives a road shoulder",
+  );
 }
 
 {

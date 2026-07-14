@@ -17,8 +17,24 @@ export function terrainColor(code, tx, ty) {
 export function terrainOverlayColor(code, n) {
   if (code === TERRAIN.ROCK) return n > 0.74 ? 0x8a8777 : 0x4f4c43;
   if (code === TERRAIN.WATER) return n > 0.74 ? 0x527482 : 0x1d3d48;
-  if (isRoadTerrain(code)) return n > 0.74 ? 0x5a5b55 : 0x31322f;
+  if (isRoadTerrain(code)) return n > 0.74 ? 0x4b4c46 : 0x242522;
   return n > 0.74 ? 0x817555 : 0x343127;
+}
+
+/** Exposed road sides, including map boundaries, for the cached terrain shoulder pass. */
+export function roadEdgeDirections(map, tx, ty, code) {
+  if (!isRoadTerrain(code)) return [];
+  const roadAt = (x, y) => x >= 0
+    && y >= 0
+    && x < map.width
+    && y < map.height
+    && isRoadTerrain(map.terrain[y * map.width + x]);
+  const edges = [];
+  if (!roadAt(tx, ty - 1)) edges.push("north");
+  if (!roadAt(tx, ty + 1)) edges.push("south");
+  if (!roadAt(tx - 1, ty)) edges.push("west");
+  if (!roadAt(tx + 1, ty)) edges.push("east");
+  return edges;
 }
 
 /** Draw dark perimeter strips only where impassable terrain borders passable ground. */
