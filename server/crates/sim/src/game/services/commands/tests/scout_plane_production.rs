@@ -90,11 +90,10 @@ fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_c
     assert_eq!(players[0].steel, 950);
     assert_eq!(players[0].oil, 950);
     assert_eq!(
-        players[0]
-            .ability_cooldowns
-            .get(&AbilityKind::ScoutPlane)
-            .copied()
-            .unwrap_or(0),
+        entities
+            .get(command_car)
+            .expect("command car")
+            .ability_cooldown_ticks(AbilityKind::ScoutPlane),
         config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS
     );
     let plane = entities
@@ -106,7 +105,54 @@ fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_c
     assert_eq!(plane.pos_y, 128.0);
     let state = plane.scout_plane_state().expect("plane state");
     assert_eq!(state.home_city_centre, Some(near_city_centre));
+    assert_eq!(state.source_command_car, Some(command_car));
     assert_eq!(state.orbit_center, (near_x + 16.0, near_y + 16.0));
+    assert_notice(&events, 1, "Scout Plane");
+}
+
+#[test]
+fn each_command_car_can_launch_its_own_scout_plane() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let first_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
+        .expect("first command car should spawn");
+    let second_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 192.0, 128.0)
+        .expect("second command car should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![
+            (1, scout_plane_command(vec![first_car], 512.0, 512.0)),
+            (1, scout_plane_command(vec![second_car], 640.0, 512.0)),
+        ],
+    );
+
+    assert_eq!((players[0].steel, players[0].oil), (900, 900));
+    let mut source_cars = entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
+        .filter_map(|plane| plane.scout_plane_state()?.source_command_car)
+        .collect::<Vec<_>>();
+    source_cars.sort_unstable();
+    assert_eq!(source_cars, vec![first_car, second_car]);
+    for command_car in [first_car, second_car] {
+        assert_eq!(
+            entities
+                .get(command_car)
+                .expect("command car")
+                .ability_cooldown_ticks(AbilityKind::ScoutPlane),
+            config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS
+        );
+    }
     assert_notice(&events, 1, "Scout Plane");
 }
 
@@ -163,13 +209,17 @@ fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
     let command_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("command car should spawn");
-    entities
-        .spawn_unit(1, EntityKind::ScoutPlane, cc_x, cc_y)
-        .expect("active Scout Plane should spawn");
     let mut players = vec![player_state(1), player_state(2)];
-    players[0]
-        .ability_cooldowns
-        .remove(&AbilityKind::ScoutPlane);
+    let _ = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, scout_plane_command(vec![command_car], 512.0, 512.0))],
+    );
+    entities
+        .get_mut(command_car)
+        .expect("command car")
+        .start_ability_cooldown(AbilityKind::ScoutPlane, 0);
     let resources_before = (players[0].steel, players[0].oil);
 
     let events = apply_with_players(
@@ -187,5 +237,9 @@ fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
             .count(),
         1
     );
-    assert_notice(&events, 1, "Scout Plane already active");
+    assert_notice(
+        &events,
+        1,
+        "Scout Plane already active for this Command Car",
+    );
 }

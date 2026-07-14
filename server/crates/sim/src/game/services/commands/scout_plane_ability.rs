@@ -34,7 +34,7 @@ pub(super) fn use_ability(
     {
         return;
     }
-    let caster_position = dedupe_cap_units(request.units, request.max_units_per_command)
+    let caster = dedupe_cap_units(request.units, request.max_units_per_command)
         .into_iter()
         .find_map(|unit| {
             if !caster_can_accept_order(entities, player, unit, ability)
@@ -43,17 +43,14 @@ pub(super) fn use_ability(
                 return None;
             }
             let caster = entities.get(unit)?;
-            Some((caster.pos_x, caster.pos_y))
+            Some((unit, caster.pos_x, caster.pos_y))
         });
-    let Some((launch_x, launch_y)) = caster_position else {
+    let Some((source_command_car, launch_x, launch_y)) = caster else {
         return;
     };
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return;
     };
-    if ps.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0 {
-        return;
-    }
     if !ps.spend_cost(definition.cost) {
         notice(
             events,
@@ -62,19 +59,29 @@ pub(super) fn use_ability(
         );
         return;
     }
-    match scout_plane::launch_ability(map, entities, player, launch_x, launch_y, x, y) {
+    match scout_plane::launch_ability(
+        map,
+        entities,
+        player,
+        source_command_car,
+        launch_x,
+        launch_y,
+        x,
+        y,
+    ) {
         Ok(_) => {
-            if definition.cooldown_ticks == 0 {
-                ps.ability_cooldowns.remove(&ability);
-            } else {
-                ps.ability_cooldowns
-                    .insert(ability, definition.cooldown_ticks);
+            if let Some(caster) = entities.get_mut(source_command_car) {
+                caster.start_ability_cooldown(ability, definition.cooldown_ticks);
             }
             notice_positioned(events, player, "Scout Plane", NoticeSeverity::Info, x, y);
         }
         Err(ScoutPlaneLaunchError::Active) => {
             ps.refund_cost(definition.cost);
-            notice(events, player, "Scout Plane already active");
+            notice(
+                events,
+                player,
+                "Scout Plane already active for this Command Car",
+            );
         }
         Err(ScoutPlaneLaunchError::NoCityCentre) => {
             ps.refund_cost(definition.cost);
