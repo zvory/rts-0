@@ -381,6 +381,12 @@ try {
   assert.match(unavailablePreview.preview.instruction, /Do not share a local file path/, "an unavailable preview prevents fallback local-file delivery");
   call("shutdown", {}, unavailablePreviewEnv);
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "unavailable-preview daemon still shuts down cleanly");
+  stopPreviewService();
+  await assert.rejects(
+    fetch(screenshot.result.preview.url),
+    /fetch failed/,
+    "explicit preview-service shutdown terminates the detached loopback server",
+  );
 
   prepareStaleRuntime();
   const alreadyStopped = call("shutdown");
@@ -506,11 +512,12 @@ function reserveLoopbackPort() {
 }
 
 function stopPreviewService() {
-  spawnSync(process.execPath, [tailnetPreviewCli, "--stop", "--root", previewRoot, "--port", String(previewPort)], {
+  const result = spawnSync(process.execPath, [tailnetPreviewCli, "--stop", "--root", previewRoot, "--port", String(previewPort)], {
     cwd: root,
     env: baseEnv,
     encoding: "utf8",
   });
+  assert.equal(result.status, 0, `preview service stops cleanly: ${result.stderr}`);
 }
 
 function call(command, input = {}, env = baseEnv) {

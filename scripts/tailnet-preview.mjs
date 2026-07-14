@@ -150,6 +150,10 @@ function isPreviewHost(value) {
   return isTailnetIpv4(value) || value === "127.0.0.1" || value === "::1";
 }
 
+function urlHost(host) {
+  return net.isIP(host) === 6 ? `[${host}]` : host;
+}
+
 export function safeFileName(file) {
   const name = path.basename(file).replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^\.+$/, "");
   return name || "artifact";
@@ -216,19 +220,15 @@ function readManifest(root, id) {
   }
 }
 
-export function stagePreview({ root, source, ttlMs = DEFAULT_TTL_MS, keep = false, now = Date.now() }) {
+export function stagePreview({ root, source, ttlMs = DEFAULT_TTL_MS, keep = false, now } = {}) {
   if (!isRegularFile(source)) {
     throw new Error(`preview source must be a regular file: ${source}`);
   }
   if (!keep && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
     throw new Error("preview TTL must be a positive millisecond duration");
   }
-  if (!Number.isSafeInteger(now) || now < 0) {
+  if (now !== undefined && (!Number.isSafeInteger(now) || now < 0)) {
     throw new Error("preview clock must be a non-negative safe millisecond timestamp");
-  }
-  const expiresAt = keep ? null : now + ttlMs;
-  if (expiresAt !== null && !Number.isSafeInteger(expiresAt)) {
-    throw new Error("preview expiration is out of range");
   }
 
   ensureRoot(root);
@@ -236,11 +236,17 @@ export function stagePreview({ root, source, ttlMs = DEFAULT_TTL_MS, keep = fals
   const name = safeFileName(source);
   const staging = path.join(root, `.${id}.staging`);
   const destination = path.join(staging, ARTIFACT_FILE_NAME);
-  const manifest = { version: 1, name, createdAt: now, expiresAt };
+  let expiresAt;
 
   try {
     mkdirSync(staging, { mode: 0o700 });
     copyFileSync(source, destination);
+    const createdAt = now ?? Date.now();
+    expiresAt = keep ? null : createdAt + ttlMs;
+    if (expiresAt !== null && !Number.isSafeInteger(expiresAt)) {
+      throw new Error("preview expiration is out of range");
+    }
+    const manifest = { version: 1, name, createdAt, expiresAt };
     writeFileSync(path.join(staging, MANIFEST_FILE_NAME), `${JSON.stringify(manifest)}\n`, { mode: 0o600 });
     renameSync(staging, path.join(root, id));
   } catch (error) {
@@ -338,7 +344,7 @@ function readServerState(root, port) {
       state.pid < 1 ||
       state.port !== port ||
       state.rootTag !== rootTag(root) ||
-      !isTailnetIpv4(state.host) ||
+      !isPreviewHost(state.host) ||
       typeof state.script !== "string" ||
       !path.isAbsolute(state.script)
     ) {
@@ -658,14 +664,14 @@ function serve({ host, port, root }) {
   });
   server.listen(port, host, () => {
     writeServerState({ root, host, port });
-    console.log(`${SERVICE_NAME} listening on http://${host}:${port}`);
+    console.log(`${SERVICE_NAME} listening on http://${urlHost(host)}:${port}`);
   });
 }
 
 export async function publishTailnetPreview({
   source,
   root = path.join(os.tmpdir(), SERVICE_NAME),
-  host = tailscaleIpv4(),
+  host = "",
   port = DEFAULT_PORT,
   ttlMs = DEFAULT_TTL_MS,
   keep = false,
@@ -673,24 +679,22 @@ export async function publishTailnetPreview({
   if (!isRegularFile(source)) {
     throw new Error(`preview source must be a regular file: ${source}`);
   }
-  if (!isPreviewHost(host)) {
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("preview port must be an integer from 1 through 65535");
+  }
+  if (!keep && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
+    throw new Error("preview TTL must be a positive millisecond duration");
+  }
+  const previewHost = host || tailscaleIpv4();
+  if (!isPreviewHost(previewHost)) {
     throw new Error("preview host must be a Tailscale IPv4 address (or loopback for tests)");
   }
   ensureRoot(root);
   cleanupExpiredPreviews(root);
+  await ensureServer({ host: previewHost, port, root });
   const preview = stagePreview({ root, source, ttlMs, keep });
-  try {
-    await ensureServer({ host, port, root });
-  } catch (error) {
-    try {
-      rmSync(previewDirectory(root, preview.id), { recursive: true, force: true });
-    } catch {
-      // Preserve the startup failure; a later invocation will clean the TTL-bound preview.
-    }
-    throw error;
-  }
   return {
-    url: `http://${host}:${port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`,
+    url: `http://${urlHost(previewHost)}:${port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`,
     expiresAt: preview.expiresAt,
   };
 }

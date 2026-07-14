@@ -215,11 +215,12 @@ function reserveLoopbackPort() {
 }
 
 function stopPreviewService() {
-  spawnSync(process.execPath, [tailnetPreviewCli, "--stop", "--root", previewRoot, "--port", String(previewPort)], {
+  const result = spawnSync(process.execPath, [tailnetPreviewCli, "--stop", "--root", previewRoot, "--port", String(previewPort)], {
     cwd: root,
     env,
     encoding: "utf8",
   });
+  assert.equal(result.status, 0, `preview service stops cleanly: ${result.stderr}`);
 }
 
 console.log("✅ lab_interact_cli_smoke.mjs: semantic scene, setup round trip, PNG preview, H.264 recording, and teardown passed");

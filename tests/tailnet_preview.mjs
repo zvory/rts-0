@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   cleanupExpiredPreviews,
@@ -13,6 +15,7 @@ import {
   parseArgs,
   parseByteRange,
   parseDuration,
+  publishTailnetPreview,
   safeFileName,
   stagePreview,
   tailnetIpv4FromStatus,
@@ -24,6 +27,17 @@ const previewRoot = path.join(tempRoot, "previews");
 let server;
 
 try {
+  const missingSource = spawnSync(process.execPath, [
+    fileURLToPath(new URL("../scripts/tailnet-preview.mjs", import.meta.url)),
+    path.join(tempRoot, "missing.png"),
+  ], { encoding: "utf8" });
+  assert.notEqual(missingSource.status, 0);
+  assert.match(
+    missingSource.stderr,
+    /preview source must be a regular file/,
+    "the CLI validates its source before querying or starting the Tailnet service",
+  );
+
   assert.equal(parseDuration("30m"), 1_800_000);
   assert.equal(parseDuration("2h"), 7_200_000);
   assert.equal(parseDuration("1d"), 86_400_000);
@@ -67,6 +81,11 @@ try {
 
   const source = path.join(tempRoot, "My clip (final).mp4");
   fs.writeFileSync(source, "0123456789");
+  await assert.rejects(
+    publishTailnetPreview({ source, host: "127.0.0.1", port: 0 }),
+    /preview port must be an integer from 1 through 65535/,
+    "the programmatic publisher rejects invalid ports before starting a service",
+  );
   const createdAt = 1_000_000;
   assert.throws(
     () => stagePreview({ root: previewRoot, source, ttlMs: Number.MAX_SAFE_INTEGER, now: createdAt }),
@@ -95,6 +114,14 @@ try {
   assert.equal(clearServerState({ root: previewRoot, port: statePort, ownerPid: process.pid + 1 }), false);
   assert.equal(fs.existsSync(statePath), true, "a competing daemon cannot remove another daemon's state");
   assert.equal(clearServerState({ root: previewRoot, port: statePort, ownerPid: process.pid }), true);
+  assert.equal(fs.existsSync(statePath), false);
+
+  writeServerState({ root: previewRoot, host: "127.0.0.1", port: statePort });
+  assert.equal(
+    clearServerState({ root: previewRoot, port: statePort, ownerPid: process.pid }),
+    true,
+    "loopback test servers can authenticate and clear their own state",
+  );
   assert.equal(fs.existsSync(statePath), false);
 
   let clock = createdAt + 1;
