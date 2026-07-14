@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{AttackPhase, EntityKind, EntityStore, PanzerfaustState};
+use crate::game::entity::{AttackPhase, EntityStore, PanzerfaustState};
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::protocol::Event;
 
@@ -143,10 +143,9 @@ fn tick_windup(
         .unwrap_or((ax, ay));
     shots.schedule(owner, id, target, (ax, ay), (impact_x, impact_y), tick);
     if let Some(attacker) = entities.get_mut(id) {
-        let base_rifle_cooldown =
-            crate::rules::combat::default_weapon_profile(EntityKind::Rifleman)
-                .map(|profile| profile.cooldown)
-                .unwrap_or(16);
+        let base_rifle_cooldown = crate::rules::combat::default_weapon_profile(attacker.kind)
+            .map(|profile| profile.cooldown)
+            .unwrap_or(16);
         let rifle_cooldown = if methamphetamines_researched(owner) {
             base_rifle_cooldown.saturating_mul(config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR)
                 / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR
