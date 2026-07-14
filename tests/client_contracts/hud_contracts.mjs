@@ -113,6 +113,9 @@ function commandCardCtx({
     { id: 13, owner: 1, kind: KIND.WORKER, state: STATE.GATHER },
     { id: 14, owner: 2, kind: KIND.WORKER, state: STATE.IDLE },
   ]);
+  const predictedEntities = entities.map((entity) => (
+    entity.id === 11 ? { ...entity, state: STATE.MOVE, predicted: true } : entity
+  ));
   let selected = [];
   let menuClosed = 0;
   let plannedSelection = [];
@@ -121,7 +124,9 @@ function commandCardCtx({
     spectator: false,
     selection: new Set(),
     isOwnOwner: (owner) => owner === 1,
-    entitiesInterpolated: () => entities,
+    entitiesInterpolated: (_alpha, options = {}) => (
+      options.includePrediction === false ? entities : predictedEntities
+    ),
     entityById: (id) => entities.find((entity) => entity.id === id) || null,
     setSelection(ids) {
       selected = Array.from(ids);
@@ -141,6 +146,10 @@ function commandCardCtx({
   };
   const hud = new HUD(root, state, {}, null, null, intent);
   assert(count.textContent === "2" && button.disabled === false, "HUD shows the active idle-worker count");
+  assert(
+    predictedEntities[0].state === STATE.MOVE,
+    "HUD idle-worker count ignores prediction-overlaid activity until authority confirms it",
+  );
   assert(button["aria-label"] === "Select 2 idle workers", "HUD exposes the idle-worker selection action accessibly");
 
   hud.controlPolicy = { canUseCommandSurface: () => false };

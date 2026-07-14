@@ -79,6 +79,13 @@ function frameCurrentEntities(state, frameViews = null) {
   return typeof state?.entitiesInterpolated === "function" ? state.entitiesInterpolated(1) || [] : [];
 }
 
+function frameAuthoritativeEntities(state, frameViews = null) {
+  if (Array.isArray(frameViews?.authoritativeEntities)) return frameViews.authoritativeEntities;
+  return typeof state?.entitiesInterpolated === "function"
+    ? state.entitiesInterpolated(1, { includePrediction: false }) || []
+    : [];
+}
+
 /**
  * Group cooldown-left values that are visually close enough to share one clock arm.
  * @param {number[]} cooldowns ticks left; ready values (<= 0) are ignored
@@ -274,7 +281,10 @@ export class HUD {
 
   _renderIdleWorkers(frameViews = null) {
     if (!this.elIdleWorkers || !this.elIdleWorkersCount) return;
-    const count = activeIdleWorkers(frameCurrentEntities(this.state, frameViews), this.state).length;
+    const count = activeIdleWorkers(
+      frameAuthoritativeEntities(this.state, frameViews),
+      this.state,
+    ).length;
     const canSelect = this._canUseCommandSurface();
     const enabled = count > 0 && canSelect;
     const sig = `${count}:${enabled ? 1 : 0}`;
@@ -293,7 +303,7 @@ export class HUD {
 
   _selectIdleWorkers() {
     if (!this._canUseCommandSurface() || typeof this.state?.setSelection !== "function") return;
-    const workers = activeIdleWorkers(frameCurrentEntities(this.state), this.state);
+    const workers = activeIdleWorkers(frameAuthoritativeEntities(this.state), this.state);
     if (workers.length === 0) return;
     this._intent()?.closeCommandCardMenu?.();
     this.state.setSelection(workers.map((worker) => worker.id));
