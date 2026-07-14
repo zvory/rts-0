@@ -323,6 +323,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/protocol.rs",
   "server/crates/sim/src/rules/projection.rs",
   "server/src/dev_scenarios.rs",
+  // The frame-budget hellhole generator deliberately materializes a fixed current-roster Kriegsia
+  // Lab checkpoint for benchmarking; runtime faction admission remains outside this offline tool.
+  "server/src/bin/generate_supply_300_hellhole.rs",
   "server/src/lobby/room_task.rs",
   "server/src/protocol.rs",
   // Server-rendered wiki examples intentionally cite current catalog kinds.
