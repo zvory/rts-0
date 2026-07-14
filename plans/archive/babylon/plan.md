@@ -175,7 +175,7 @@ The proof must include all of the following:
    canvases, active render loops, listeners, particle systems, or WebGL contexts. Publish bounded
    diagnostics for engine backend, frame time, draw calls, active meshes/instances, triangles,
    active particles, and shadow settings. Capture one clean gameplay PNG through the project-local
-   Lab Interact workflow and inspect it once as required by repository guidance.
+   Interact workflow and inspect it once as required by repository guidance.
 
 ## Recommended implementation boundary
 
@@ -225,7 +225,7 @@ The proof is complete only when all of these statements are supported by code an
 - Focused automated checks cover URL/config selection, coordinate conversion and ray/ground math,
   renderer lifecycle/idempotent teardown, hidden/default dependency loading, and any plain-data
   entity/effect adapters. `node scripts/check-client-architecture.mjs` passes.
-- Lab Interact produces a clean PNG under `target/lab-interact/` showing the perspective camera,
+- Interact produces a clean PNG under `target/interact/lab/` showing the perspective camera,
   representative 3D unit, dynamic shadow, vegetation, selection indication, and a particle effect
   if it can be captured deterministically. The implementing agent inspects that artifact once and
   reports its absolute path.
@@ -254,7 +254,7 @@ The implementing agent must finish with a concise go/no-go assessment, not merel
 It must include:
 
 - the exact launch URL or command for the proof;
-- the inspected Lab Interact PNG path;
+- the inspected Interact PNG path;
 - focused automated-check results;
 - the reproducible benchmark setup and recorded metrics;
 - which parts were Babylon, Pixi, Canvas/DOM, procedural, or GLB-backed;
@@ -266,5 +266,5 @@ It must include:
   rematch teardown.
 
 Implementation follows the repository's normal task-worktree and owned-PR workflow. Because the
-proof changes rendering, the implementing agent must use the project-local `lab-interact` skill for
+proof changes rendering, the implementing agent must use the project-local `interact` skill for
 the authoritative scene capture and visual review.

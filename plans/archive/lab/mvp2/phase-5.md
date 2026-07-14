@@ -6,7 +6,7 @@
 
 ## Objective
 
-Harden the MVP2 lab interaction model, update source-of-truth docs, and verify the end-to-end
+Harden the MVP2 Lab interaction model, update source-of-truth docs, and verify the end-to-end
 operator workflow before closing the plan.
 
 ## Work

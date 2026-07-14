@@ -1321,10 +1321,10 @@ It is not sim-private `LabOp`, not `LabSession.operationLog`, and not the room-l
 ```
 Whole artifacts are capped at 8 MiB. The operation stream is capped at 50,000 entries, each
 non-setup operation payload is capped at 64 KiB, and embedded `GameCheckpointV1` text payloads in
-the initial setup are capped at 4 MiB. A lab replay may be saved/opened by Lab Interact's bounded
+the initial setup are capped at 4 MiB. A lab replay may be saved/opened by Interact's bounded
 local artifact path; it is not carried through the current WebSocket `lab` request envelope because
 long lab sessions can exceed that control frame budget. The daemon-started private server enables
-a loopback-only handoff only when `RTS_LAB_INTERACT_ARTIFACT_CAPABILITY` contains the driver's
+a loopback-only handoff only when `RTS_INTERACT_LAB_ARTIFACT_CAPABILITY` contains the driver's
 random 256-bit capability. Requests echo that capability and address artifacts by expiring opaque
 transfer id. Production startup leaves the seam unavailable. Export/import still execute on the
 single-owner room task, so accepted ticks, operation order, truncation, and rebuild validation never
@@ -1345,7 +1345,7 @@ move into the browser or daemon.
 { op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
 { op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 ```
-New Lab Interact writes use the plural replay vocabulary even for one-item requests. Existing
+New Interact writes use the plural replay vocabulary even for one-item requests. Existing
 schema-version-1 artifacts containing singular spawn/delete/move/owner/player operations remain
 readable.
 `setVision` is excluded because it is per-operator projection metadata; reopening a lab replay

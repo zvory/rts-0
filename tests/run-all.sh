@@ -7,7 +7,7 @@
 #   2. Rust nextest fast scripted tests (deterministic, in-process, no server)
 #   3. Rust lint                    (cargo clippy)
 #   4. Node API suites              (protocol/UI units, live API batch, then serialized lab_mortar_regression)
-#   5. Headless browser suites      (client and Lab Interact smokes, plus opted-in tri-state scenarios; needs Chrome)
+#   5. Headless browser suites      (client and Interact smokes, plus opted-in tri-state scenarios; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -700,14 +700,14 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
   if hydrate_client_deps; then
     NODE_DEPS_READY=1
     record_timing "Node dependency hydration" "$((SECONDS - deps_start))" "PASS"
-    run_suite_bg "TypeScript: Lab Interact no-emit" \
-      npm --prefix "$REPO_ROOT" run check:lab-interact-types
+    run_suite_bg "TypeScript: Interact no-emit" \
+      npm --prefix "$REPO_ROOT" run check:interact-types
   else
     record_timing "Node dependency hydration" "$((SECONDS - deps_start))" "FAIL"
-    FAILED+=("Node dependency hydration" "TypeScript: Lab Interact no-emit")
+    FAILED+=("Node dependency hydration" "TypeScript: Interact no-emit")
   fi
-  run_suite_bg "Architecture: Lab Interact application" \
-    node "$REPO_ROOT/scripts/check-lab-interact-architecture.mjs"
+  run_suite_bg "Architecture: Interact application" \
+    node "$REPO_ROOT/scripts/check-interact-architecture.mjs"
   run_suite_bg "JS protocol contracts" \
     node "$SCRIPT_DIR/protocol_parity.mjs"
   run_suite_bg "JS client contracts" \
@@ -718,18 +718,18 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/tri_state/self_test.mjs"
   run_suite_bg "JS minimap input contracts" \
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
-  run_suite_bg "Lab Interact artifact contracts" \
-    node "$SCRIPT_DIR/lab_interact_artifact_contracts.mjs"
-  run_suite_bg "Lab Interact bulk contracts" \
-    node "$SCRIPT_DIR/lab_interact_bulk_contracts.mjs"
-  run_suite_bg "Lab Interact adapter contracts" \
-    node "$SCRIPT_DIR/lab_interact_adapter_contracts.mjs"
-  run_suite_bg "Lab Interact recording contracts" \
-    node "$SCRIPT_DIR/lab_interact_recording_contracts.mjs"
-  run_suite_bg "Lab Interact fixed-capture contracts" \
-    node "$SCRIPT_DIR/lab_interact_fixed_capture_contracts.mjs"
-  run_suite_bg "Lab Interact session coordinator contracts" \
-    node "$SCRIPT_DIR/lab_interact_session_coordinator_contracts.mjs"
+  run_suite_bg "Interact artifact contracts" \
+    node "$SCRIPT_DIR/interact_artifact_contracts.mjs"
+  run_suite_bg "Interact bulk contracts" \
+    node "$SCRIPT_DIR/interact_bulk_contracts.mjs"
+  run_suite_bg "Interact adapter contracts" \
+    node "$SCRIPT_DIR/interact_adapter_contracts.mjs"
+  run_suite_bg "Interact recording contracts" \
+    node "$SCRIPT_DIR/interact_recording_contracts.mjs"
+  run_suite_bg "Interact fixed-capture contracts" \
+    node "$SCRIPT_DIR/interact_fixed_capture_contracts.mjs"
+  run_suite_bg "Interact session coordinator contracts" \
+    node "$SCRIPT_DIR/interact_session_coordinator_contracts.mjs"
   run_suite_bg "JS HUD command card" \
     node "$SCRIPT_DIR/hud_command_card.mjs"
   run_suite_bg "Utility: tailnet preview" \
@@ -799,7 +799,7 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
     if [ -z "${CHROME:-}" ] || [ ! -x "$CHROME" ]; then
       info "skipping browser suites: no Chrome found (set CHROME=/path/to/chrome to override)"
       SKIPPED+=("Client smoke (no Chrome)")
-      SKIPPED+=("Lab Interact CLI smoke (no Chrome)")
+      SKIPPED+=("Interact CLI smoke (no Chrome)")
       SKIPPED+=("Tri-state lag scenarios (no Chrome)")
     else
       deps_start=$SECONDS
@@ -819,11 +819,11 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       fi
       if browser_scenario_selected smoke; then
         CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
-        CHROME="$CHROME" RTS_LAB_INTERACT_BASE_URL="$RTS_URL" \
-          run_suite "Lab Interact CLI smoke (headless Chrome)" node "$SCRIPT_DIR/lab_interact_cli_smoke.mjs"
+        CHROME="$CHROME" RTS_INTERACT_LAB_BASE_URL="$RTS_URL" \
+          run_suite "Interact CLI smoke (headless Chrome)" node "$SCRIPT_DIR/interact_cli_smoke.mjs"
       else
         SKIPPED+=("Client smoke (not selected for this browser shard)")
-        SKIPPED+=("Lab Interact CLI smoke (not selected for this browser shard)")
+        SKIPPED+=("Interact CLI smoke (not selected for this browser shard)")
       fi
       if [ "$RUN_TRI_STATE_BROWSER" = "1" ]; then
         for scenario in phase-0.5 phase-2.5 phase-5; do

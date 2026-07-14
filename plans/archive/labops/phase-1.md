@@ -52,9 +52,9 @@ enough structured evidence for a caller to correct the request without guessing 
 - public `Game` Lab seam only if a new method is required
 - protocol Lab operation/result/replay types and public-surface tests
 - room-task Lab routing, timeline/replay application, scenario error conversion, and tests
-- `client/src/protocol.js`, `lab_client.js`, and `lab_interact_bridge.js`
-- `scripts/lab-interact/command_service.mjs`, driver, fake driver, and CLI/driver tests
-- protocol, server-simulation, and Lab Interact documentation
+- `client/src/protocol.js`, `lab_client.js`, and `interact_bridge.js`
+- `scripts/interact/command_service.mjs`, driver, fake driver, and CLI/driver tests
+- protocol, server-simulation, and Interact documentation
 
 ## Verification
 
@@ -68,7 +68,7 @@ enough structured evidence for a caller to correct the request without guessing 
 - Client/bridge tests proving one request and structured error-detail preservation.
 - CLI/driver contracts plus live smoke covering a large bulk spawn, bulk move, bulk remove, and an
   intentionally rejected placement corrected using a returned suggestion.
-- Run the smallest selected Rust, client, and Lab Interact suites, then the owned-PR workflow.
+- Run the smallest selected Rust, client, and Interact suites, then the owned-PR workflow.
 
 ## Manual Testing Focus
 

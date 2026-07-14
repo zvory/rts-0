@@ -32,7 +32,7 @@ then collect a real user playtest before expanding content.
   absent from the presentation frame, Babylon scene, picking candidates, and diagnostics.
 - Enable explicit Babylon live and Lab routes after the focused checks pass. Leave replay and
   spectator routes on Pixi.
-- Use `lab-interact` to capture and inspect one fogged playable scene, expose a Tailscale preview
+- Use `interact` to capture and inspect one fogged playable scene, expose a Tailscale preview
   when useful, and obtain a user playtest.
 
 ## Keep Small

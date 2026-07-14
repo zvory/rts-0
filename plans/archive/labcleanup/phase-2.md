@@ -61,7 +61,7 @@ operations and resource-local completion, but no generic command queue.
 
 ### Add the application architecture ratchet
 
-- Add `scripts/check-lab-interact-architecture.mjs` and wire it into focused static checks and suite
+- Add `scripts/check-interact-architecture.mjs` and wire it into focused static checks and suite
   selection.
 - Enforce only the application rules established in this phase:
   - every public command is defined exactly once in the registry with complete metadata;
@@ -71,7 +71,7 @@ operations and resource-local completion, but no generic command queue.
   - post-extraction `command_service.mjs` and `driver.mjs` stay below ratcheted limits chosen from
     their final Phase 2 sizes with modest headroom.
 - Document the registry, execution lanes, queue ownership, and dependency shape in
-  `docs/lab-interact-cli.md`.
+  `docs/interact-cli.md`.
 
 ## Scope Boundary for Phase 3
 
@@ -82,20 +82,20 @@ settled and protected.
 
 ## Expected Touch Points
 
-- `scripts/lab-interact/cli.mjs`
-- `scripts/lab-interact/daemon.mjs`
-- `scripts/lab-interact/runtime.mjs`
-- `scripts/lab-interact/command_service.mjs`
-- `scripts/lab-interact/command_help.mjs`
-- `scripts/lab-interact/driver.mjs`
-- new `scripts/lab-interact/command_registry.mjs`
-- new `scripts/lab-interact/command_inputs.mjs`
-- new `scripts/lab-interact/session_coordinator.mjs`
-- new `scripts/check-lab-interact-architecture.mjs`
-- focused `tests/lab_interact_*.mjs`
+- `scripts/interact/cli.mjs`
+- `scripts/interact/daemon.mjs`
+- `scripts/interact/runtime.mjs`
+- `scripts/interact/command_service.mjs`
+- `scripts/interact/command_help.mjs`
+- `scripts/interact/driver.mjs`
+- new `scripts/interact/command_registry.mjs`
+- new `scripts/interact/command_inputs.mjs`
+- new `scripts/interact/session_coordinator.mjs`
+- new `scripts/check-interact-architecture.mjs`
+- focused `tests/interact_*.mjs`
 - `tests/run-all.sh`
 - `tests/select-suites.mjs`
-- `docs/lab-interact-cli.md`
+- `docs/interact-cli.md`
 
 ## Implementation Checklist
 
@@ -112,17 +112,17 @@ settled and protected.
 ## Verification
 
 ```bash
-node scripts/check-lab-interact-architecture.mjs
+node scripts/check-interact-architecture.mjs
 node scripts/check-source-file-sizes.mjs
-node tests/lab_interact_cli_contracts.mjs
-node tests/lab_interact_driver_contracts.mjs
-node tests/lab_interact_bulk_contracts.mjs
-node tests/lab_interact_artifact_contracts.mjs
-node tests/lab_interact_recording_contracts.mjs
-node tests/lab_interact_fixed_capture_contracts.mjs
-node tests/lab_interact_tailnet_preview_contracts.mjs
+node tests/interact_cli_contracts.mjs
+node tests/interact_driver_contracts.mjs
+node tests/interact_bulk_contracts.mjs
+node tests/interact_artifact_contracts.mjs
+node tests/interact_recording_contracts.mjs
+node tests/interact_fixed_capture_contracts.mjs
+node tests/interact_tailnet_preview_contracts.mjs
 node tests/select-suites.mjs --verify
-node tests/lab_interact_cli_smoke.mjs
+node tests/interact_cli_smoke.mjs
 node scripts/check-docs-health.mjs
 git diff --check
 ```

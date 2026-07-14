@@ -16,8 +16,8 @@ Use for tests, CI/hooks, or focused verification.
 - `node tests/ai_integration.mjs` — dep-free AI opponent lobby flow; needs a running server.
 - `node tests/lab_mortar_regression.mjs` — mortar event regression; needs a server.
 - `node tests/minimap_input_contracts.mjs` — minimap/router pointer-lock contracts.
-- Lab Interact commands, dependencies, architecture/lane checks, and canary ownership modes are
-  documented in `docs/lab-interact-cli.md`.
+- Interact commands, dependencies, architecture/lane checks, and canary ownership modes are
+  documented in `docs/interact-cli.md`.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
 - `tests/run-all.sh --only-rust-checks` — policy plus lint, without nextest.
 - `RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest` — one CI partition.

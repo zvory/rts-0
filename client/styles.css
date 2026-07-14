@@ -77,7 +77,7 @@ body {
   width: 100vw;
 }
 
-/* Lab Interact captures use the normal game screen and Pixi world. Only app-shell
+/* Interact captures use the normal game screen and Pixi world. Only app-shell
    DOM chrome is hidden, and the attribute is always removed after a capture. */
 #app[data-clean-presentation="true"] > :not(#game-screen) {
   visibility: hidden;

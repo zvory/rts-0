@@ -60,7 +60,7 @@ import {
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
-import { LabInteractBridge, labInteractLaunchEnabled } from "./lab_interact_bridge.js";
+import { InteractBridge, interactLaunchEnabled } from "./interact_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 
@@ -133,7 +133,7 @@ export class App {
     this.labPanel = null;
     this.labControlPolicy = null;
     this.cleanPresentation = new CleanPresentation({ root: dom.app });
-    this.labInteractBridge = labInteractLaunchEnabled() ? new LabInteractBridge({ app: this }) : null;
+    this.interactBridge = interactLaunchEnabled() ? new InteractBridge({ app: this }) : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
     /** @type {number|undefined} heartbeat interval id while connected. */
@@ -756,7 +756,7 @@ export class App {
         this.match = null;
       }
       this.destroyLabShell();
-      this.destroyLabInteractBridge();
+      this.destroyInteractBridge();
       this.allowUnloadWithoutWarning = true;
       window.location.assign(new URL("/", window.location.href).toString());
       return;
@@ -767,7 +767,7 @@ export class App {
       this.match = null;
     }
     this.destroyLabShell();
-    this.destroyLabInteractBridge();
+    this.destroyInteractBridge();
     this.inReplayPlayback = false;
     this.lastObservationRunId = "";
     this.statusBadge.clearMatchMetrics();
@@ -796,9 +796,9 @@ export class App {
     this.labControlPolicy = null;
   }
 
-  destroyLabInteractBridge() {
-    this.labInteractBridge?.destroy();
-    this.labInteractBridge = null;
+  destroyInteractBridge() {
+    this.interactBridge?.destroy();
+    this.interactBridge = null;
   }
 
   setCleanPresentation(enabled) {

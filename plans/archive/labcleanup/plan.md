@@ -1,8 +1,8 @@
-# Lab Interact CLI Cleanup Plan
+# Interact CLI Cleanup Plan
 
 ## Purpose
 
-Turn the Lab Interact CLI from a successful proof of concept into a small, understandable developer
+Turn the Interact CLI from a successful proof of concept into a small, understandable developer
 tool without treating it like production software. The current Node/JavaScript implementation is the
 right runtime shape because it coordinates Chrome, page RPC, media tools, Tailnet previews, and a
 private Rust game server; Rust remains authoritative for game state, but moving the orchestrator to
@@ -16,7 +16,7 @@ have landed independently. The deep product/command rename remains a separate la
 
 ## Current Evidence
 
-- `tests/lab_interact_cli_smoke.mjs` already exercises a real daemon, browser, authoritative Lab
+- `tests/interact_cli_smoke.mjs` already exercises a real daemon, browser, authoritative Lab
   scene, PNG screenshot, Tailnet preview, short H.264 recording, session reuse, and teardown. Phase 1
   should improve and promote this test rather than create a competing harness.
 - `command_service.mjs` currently combines input validation, command routing/help metadata, session
@@ -32,7 +32,7 @@ have landed independently. The deep product/command rename remains a separate la
 
 ## Outcome
 
-At the checkpoint, Lab Interact should have one meaningful live smoke workflow, one source of command
+At the checkpoint, Interact should have one meaningful live smoke workflow, one source of command
 metadata, one owner of semantic command ordering, responsive/cancellable long process work, and
 explicit layer constraints, with the Node-side implementation checked as strict TypeScript. It should
 still be a plain repository tool: no packaging, generated client, service framework, or deployment
@@ -48,7 +48,7 @@ must remain intact.
   simulation rules or bypass server validation.
 - Preserve exact and bounded command validation, loopback-only private-server access, one
   authoritative session per worktree, per-session artifact capability, replay transfer checks,
-  artifact confinement under `target/lab-interact/`, and opaque Tailnet preview registration.
+  artifact confinement under `target/interact/lab/`, and opaque Tailnet preview registration.
 - Optimize for one developer on a pre-alpha game. Prefer a few explicit modules and static tables to
   frameworks, generalized plugin systems, generated schemas, or speculative abstractions.
 - Use semantic smoke assertions rather than freezing full JSON envelopes, generated ids/ticks, exact
@@ -56,7 +56,7 @@ must remain intact.
   stay recognizable through the cleanup so the canary remains useful.
 - Keep the browser client in native JavaScript with no build step. Keep the Node tool in JavaScript
   through Phases 1-3, then convert only that settled Node-side implementation in Phase 4.
-- Every phase must update `docs/lab-interact-cli.md` and relevant testing/context documentation when
+- Every phase must update `docs/interact-cli.md` and relevant testing/context documentation when
   it changes an operator command, dependency, architecture rule, or verification path.
 - Each phase is implemented on its own `zvorygin/` branch, committed, pushed as an owned PR with
   auto-merge armed, and followed through a definite merge. Before reporting completion or starting
@@ -72,7 +72,7 @@ must remain intact.
 Strengthen the existing live CLI smoke into one small, semantic scene workflow that proves commands,
 state mutation, PNG output, preview serving, media, and teardown still work. Repair the current test
 runner and artifact-isolation gaps so Lab-specific failures cannot be lost or caused by concurrent
-tests deleting shared output. Make Lab Interact changes select the focused contracts and browser
+tests deleting shared output. Make Interact changes select the focused contracts and browser
 smoke explicitly, while avoiding golden images, exhaustive compatibility snapshots, and slow media
 matrices.
 
@@ -115,7 +115,7 @@ The rename should remain a fresh later task, not be mixed into architecture or T
 
 ## Deferred Backlog
 
-- Deep Lab Interact product, executable, command, socket, documentation, and artifact rename.
+- Deep Interact product, executable, command, socket, documentation, and artifact rename.
 - Client-wide TypeScript, a browser bundler, or conversion of the JavaScript page bridge and tests.
 - Generated runtime schemas/types, a command plugin framework, DI container, or full error hierarchy.
 - A new client `LabAutomationFacade` unless future bridge growth demonstrates the need.

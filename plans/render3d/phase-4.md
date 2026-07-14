@@ -31,7 +31,7 @@ without building fog parity, an asset pipeline, or production lifecycle machiner
   generic visible primitives from `PresentationFrameV1` in an explicit Lab route.
 - Call only `scene.render()` when Match invokes the backend. Support resize and idempotent destroy;
   show a bounded capability/creation error and perform one leave/re-enter cleanup check.
-- Use `lab-interact` to capture and inspect one authoritative kernel PNG.
+- Use `interact` to capture and inspect one authoritative kernel PNG.
 
 ## Keep Small
 

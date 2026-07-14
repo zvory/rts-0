@@ -73,8 +73,8 @@ src/
   live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
-  lab_interact_bridge.js # LabInteractBridge: launch-gated narrow local automation facade
-  clean_presentation.js # app-shell reversible DOM chrome mode for Lab Interact capture
+  interact_bridge.js # InteractBridge: launch-gated narrow local automation facade
+  clean_presentation.js # app-shell reversible DOM chrome mode for Interact capture
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
   lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
@@ -590,17 +590,17 @@ hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start t
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 
-`lab_interact_bridge.js`
+`interact_bridge.js`
 ```js
-export const LAB_INTERACT_BRIDGE_KEY = "__rtsLabInteract"
-export class LabInteractBridge {
+export const INTERACT_BRIDGE_KEY = "__rtsInteract"
+export class InteractBridge {
   status()                            // readiness only; no internal references
   call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset/presentation/captureReadiness
   destroy()
 }
-export function labInteractLaunchEnabled(locationLike?)
+export function interactLaunchEnabled(locationLike?)
 ```
-`App` composes this bridge only when the `/lab` URL includes `labInteract=1`. Its global surface is a
+`App` composes this bridge only when the `/lab` URL includes `interact=lab`. Its global surface is a
 frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`, `Renderer`, or
 `GameState`. Calls delegate through existing `LabClient`, normal `issueCommandAs`, room-time,
 semantic camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
@@ -617,14 +617,14 @@ consumed before success.
 hides Pixi world layers; it is removed on capture completion, rematch, and app teardown. `captureReadiness`
 reports bounded live PNG/frame-strip/profile/decal asset status, font status, render frames, frame-loop
 errors, renderer errors, and subject missing-texture fallbacks without exposing renderer references.
-The local `scripts/lab-interact/driver.ts` owns the selected-worktree server, headless browser, logs,
+The local `scripts/interact/driver.ts` owns the selected-worktree server, headless browser, logs,
 clean viewport clipping, readiness wait, PNG/JSON artifacts, and profile cleanup. The bounded command
 service owns aliases and exact input contracts. Its per-worktree daemon preserves that state across
 machine-readable CLI calls, expires after 30 idle minutes, and returns screenshot paths and metadata
 without embedding image content. Portable setup export/import uses the bridge's narrow
 `exportSetup`/`importSetup` methods and keeps checkpoint bytes out of CLI results. Replay bytes bypass
 the browser and normal WebSocket result through the capability-gated private-server handoff; the
-daemon writes only bounded artifacts and alias sidecars under `target/lab-interact/`.
+daemon writes only bounded artifacts and alias sidecars under `target/interact/lab/`.
 Visual delivery is deliberately not owned by that per-worktree lifecycle. Before returning a
 Tailnet URL, the daemon validates the artifact and copies it into the machine-level
 `tailnet-preview` service on stable port 8091. The preview server has no idle timeout, and each
@@ -1117,7 +1117,7 @@ export class Renderer {
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
   render(stateFacade, cameraFacade, fogFacade, alpha, options?) // Pixi-private engine seam
-  captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Lab Interact capture
+  captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Interact capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // Pixi implementation used by PixiPresentationAdapter's screenOverlay reconciliation:
   drawSelectionBox(rectOrNull)
@@ -1491,7 +1491,7 @@ minimap, and audio together.
 the artillery rig icon above fog for every recipient without using it as entity visibility.
 
 `Match` composes a render-only clock and injects it into `Renderer`. Normal play reads monotonic
-`performance.now()` with the prior semantics. Lab Interact fixed capture may explicitly suspend
+`performance.now()` with the prior semantics. Interact fixed capture may explicitly suspend
 the ordinary rAF loop, replace only that render clock with a monotonically advanced capture clock,
 render with interpolation disabled, and then restore the normal clock and rAF ownership. Renderer
 rig sampling, deployed-weapon transitions, frame strips, recoil, command feedback, smoke,

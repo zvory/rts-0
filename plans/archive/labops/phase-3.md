@@ -35,7 +35,7 @@ watchdog/finalization result without writing sleeps or polling loops.
 - command catalog, validation, dispatch, CLI timeout selection, daemon request plumbing, and fake
   driver
 - recording, CLI, driver, close/shutdown, and live smoke tests
-- Lab Interact CLI documentation, testing context, and skill workflow
+- Interact CLI documentation, testing context, and skill workflow
 
 ## Verification
 

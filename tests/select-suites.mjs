@@ -27,7 +27,7 @@ const suiteOrder = [
   "node-ai-integration",
   "node-team-integration",
   "node-minimap-input-contracts",
-  "lab-interact-contracts",
+  "interact-contracts",
   "client-smoke",
   "full-ai",
   "docs-only",
@@ -133,22 +133,23 @@ function isQualityPassWorkflowPath(pathname) {
   );
 }
 
-function isLabInteractPath(pathname) {
+function isInteractPath(pathname) {
   return (
-    pathname.startsWith("scripts/lab-interact/") ||
+    pathname.startsWith("scripts/interact/") ||
     pathname === "scripts/tailnet-preview.mjs" ||
     pathname === "scripts/tailnet-preview.d.mts" ||
-    pathname === "scripts/check-lab-interact-architecture.mjs" ||
-    pathname === "client/src/lab_interact_bridge.js" ||
-    pathname === "server/src/lab_interact_artifacts.rs" ||
-    pathname.startsWith("tests/lab_interact_") ||
-    pathname.startsWith("tests/fixtures/lab_interact_") ||
+    pathname === "scripts/check-interact-architecture.mjs" ||
+    pathname === "client/src/interact_bridge.js" ||
+    pathname === "server/src/interact_lab_artifacts.rs" ||
+    pathname.startsWith("tests/interact_") ||
+    pathname.startsWith("tests/client_contracts/interact_") ||
+    pathname.startsWith("tests/fixtures/interact_") ||
     pathname === "package.json" ||
     pathname === "package-lock.json" ||
-    pathname === "docs/lab-interact-cli.md" ||
+    pathname === "docs/interact-cli.md" ||
     pathname === "docs/context/testing.md" ||
     pathname === "docs/design/testing.md" ||
-    pathname.startsWith(".agents/skills/lab-interact/")
+    pathname.startsWith(".agents/skills/interact/")
   );
 }
 
@@ -317,8 +318,8 @@ export function selectSuites(files) {
       suites.add("source-file-sizes");
     }
 
-    if (isLabInteractPath(normalized)) {
-      addAll(suites, ["lab-interact-contracts", "client-smoke"]);
+    if (isInteractPath(normalized)) {
+      addAll(suites, ["interact-contracts", "client-smoke"]);
     }
 
     if (rustCode || normalized.startsWith("server/Cargo.")) {
@@ -480,16 +481,17 @@ function verify() {
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
-    [["scripts/lab-interact/driver.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
-    [["scripts/lab-interact/command_service.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
-    [["scripts/lab-interact/process_runner.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
-    [["scripts/lab-interact/private_server.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
-    [["package.json"], ["lab-interact-contracts", "client-smoke"]],
-    [["scripts/check-lab-interact-architecture.mjs"], ["lab-interact-contracts", "client-smoke"]],
-    [["client/src/lab_interact_bridge.js"], ["lab-interact-contracts", "client-smoke"]],
-    [["server/src/lab_interact_artifacts.rs"], ["lab-interact-contracts", "client-smoke"]],
-    [["docs/lab-interact-cli.md"], ["lab-interact-contracts", "client-smoke"]],
-    [[".agents/skills/lab-interact/SKILL.md"], ["lab-interact-contracts", "client-smoke"]],
+    [["scripts/interact/driver.ts"], ["source-file-sizes", "interact-contracts", "client-smoke"]],
+    [["scripts/interact/command_service.ts"], ["source-file-sizes", "interact-contracts", "client-smoke"]],
+    [["scripts/interact/process_runner.ts"], ["source-file-sizes", "interact-contracts", "client-smoke"]],
+    [["scripts/interact/private_server.ts"], ["source-file-sizes", "interact-contracts", "client-smoke"]],
+    [["package.json"], ["interact-contracts", "client-smoke"]],
+    [["scripts/check-interact-architecture.mjs"], ["interact-contracts", "client-smoke"]],
+    [["client/src/interact_bridge.js"], ["interact-contracts", "client-smoke"]],
+    [["server/src/interact_lab_artifacts.rs"], ["interact-contracts", "client-smoke"]],
+    [["tests/client_contracts/interact_capture_contracts.mjs"], ["interact-contracts", "client-smoke"]],
+    [["docs/interact-cli.md"], ["interact-contracts", "client-smoke"]],
+    [[".agents/skills/interact/SKILL.md"], ["interact-contracts", "client-smoke"]],
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["plans/teams/phase-1.md"], ["node-team-integration"]],
     [["tests/team_harness.mjs"], ["node-server-integration", "node-regression", "node-ai-integration", "node-team-integration"]],

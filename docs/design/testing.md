@@ -210,8 +210,8 @@ fetchable after the Lab publisher closes and its originating worktree is removed
 proves daemon shutdown leaves issued screenshot links valid, while concurrent recording wait/stop
 callers receive the same deduplicated durable publication.
 
-Lab Interact source, page-bridge, Rust artifact-bridge, focused-test, CLI-documentation, and local
-skill changes select `lab-interact-contracts` plus the browser `client-smoke` shard. The fast
+Interact source, page-bridge, Rust artifact-bridge, focused-test, CLI-documentation, and local
+skill changes select `interact-contracts` plus the browser `client-smoke` shard. The fast
 Node/static gate installs the root lock and runs the strict no-emit Lab TypeScript check before the
 contracts. Node-side Lab implementation sources execute directly as `.ts` on Node 22.18+, while the
 browser bridge and tests remain buildless JavaScript. The fast contracts use the fake driver and
@@ -219,7 +219,7 @@ isolate UUID-named session and portable artifacts, while the one
 live canary exercises open, spawn, update, order/step, screenshot/PNG preview, setup round trip,
 short H.264 recording, reset, close, stale-session rejection, and daemon shutdown. Standalone live
 canary runs own a private server; the browser shard passes its existing loopback server through
-`RTS_LAB_INTERACT_BASE_URL` so CI does not build or start a second one.
+`RTS_INTERACT_LAB_BASE_URL` so CI does not build or start a second one.
 
 - Phase runner plan/path handling: run `node tests/phase_runner_agents.mjs` when changing
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan

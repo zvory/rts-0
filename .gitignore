@@ -4,9 +4,10 @@
 /desktop/maccursor-shell/src-tauri/gen
 /desktop/maccursor-shell/src-tauri/target
 /target/client-perf
-# Legacy Agent Lab artifacts may still exist in older checkouts; never stage them.
+# Current and legacy local interaction artifacts must never be staged.
 /target/agent-lab
 /target/lab-interact
+/target/interact
 **/*.rs.bk
 Cargo.lock.orig
 

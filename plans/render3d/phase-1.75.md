@@ -40,7 +40,7 @@ selection semantics change.
 - `client/src/frame_recovery.js`
 - `client/src/match.js`, `client/src/app.js`, and `client/src/replay_viewer.js`
 - `client/src/visual_profiles.js` and `client/src/camera_view_selection.js`
-- `client/src/lab_interact_bridge.js` plus Lab driver/status/capture manifest contracts
+- `client/src/interact_bridge.js` plus Lab driver/status/capture manifest contracts
 - `client/src/frame_profiler.js`
 - observer/visual-sample/viewport-alert consumers
 - camera, audio, replay, Lab, observer, and architecture contracts
@@ -73,7 +73,7 @@ selection semantics change.
     node tests/client_contracts/audio_contracts.mjs
     node tests/client_contracts/match_replay_contracts.mjs
     node tests/minimap_input_contracts.mjs
-    node tests/lab_interact_driver_contracts.mjs
+    node tests/interact_driver_contracts.mjs
     node scripts/check-client-architecture.mjs
     node tests/select-suites.mjs --verify
     tests/run-all.sh --only-browser-scenarios=smoke

@@ -9,7 +9,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - [client-rendering.md](../design/client-rendering.md) — renderer-neutral contracts and parity ledger
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `lab_interact_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
+- `app-shell`: `main.js`, `app.js`, `interact_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
   AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`, and
   `room_capabilities.js`.
 - `model`: `state.js`, `state_ground_decals.js` (client-only received death/impact decal queue), `client_intent.js`, `command_budget.js`,
@@ -35,8 +35,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `ALLOWED_CROSS_AREA_IMPORTS` with a reason.
 - **Lab UI stays app-owned.** `App` owns `LabClient` and `LabPanel`; `Match` receives injected lab
   metadata/control policy and must not import the lab transport or panel modules directly.
-- **Lab Interact bridge.** Only `/lab?...&labInteract=1` installs it; it exposes no app, match,
-  transport, renderer, or state references. `scripts/lab-interact/` is its local caller.
+- **Interact bridge.** Only `/lab?...&interact=lab` installs it; it exposes no app, match,
+  transport, renderer, or state references. `scripts/interact/` is its local caller.
 - **Setup authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
   authoritative state before draft-PR submission, with setup JSON export/import as the disabled
   fallback.

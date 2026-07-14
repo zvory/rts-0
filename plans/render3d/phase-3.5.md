@@ -73,7 +73,7 @@ normalization begins.
 
     node tests/client_contracts/presentation_frame_contracts.mjs
     node tests/client_contracts/renderer_feedback_contracts.mjs
-    node tests/client_contracts/lab_interact_capture_contracts.mjs
+    node tests/client_contracts/interact_capture_contracts.mjs
     node scripts/check-client-architecture.mjs
     tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check

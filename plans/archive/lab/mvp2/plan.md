@@ -126,7 +126,7 @@ explicit tools rather than a collection of unrelated mutations.
 
 ### [Phase 5 - Hardening, Smoke, and Docs](phase-5.md)
 
-Harden the end-to-end MVP2 lab interaction model and document the stable contracts. This phase adds
+Harden the end-to-end MVP2 Lab interaction model and document the stable contracts. This phase adds
 or refreshes focused client, protocol, and architecture coverage, tightens active-tool UI state,
 and performs a manual browser smoke of command-card ordering plus click-to-spawn. It closes the
 plan by updating the relevant design/context docs and recording remaining lab gaps for future

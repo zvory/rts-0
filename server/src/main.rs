@@ -24,7 +24,7 @@ mod client_optional_assets;
 mod connection_writer;
 mod dev_replay_pages;
 mod dev_scenario_pages;
-mod lab_interact_artifacts;
+mod interact_lab_artifacts;
 #[cfg(test)]
 mod main_replay_tests;
 mod map_handoffs;
@@ -114,7 +114,7 @@ struct AppState {
     /// failed; the front-page `/api/matches` endpoint returns an empty list in that case.
     db: Option<Arc<Db>>,
     lab_scenario_submission: LabScenarioSubmissionService,
-    lab_interact_artifacts: lab_interact_artifacts::LabInteractArtifactBridge,
+    interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge,
     map_handoffs: map_handoffs::MapHandoffStore,
 }
 
@@ -172,7 +172,7 @@ async fn main() {
         maps_dir: maps_dir.clone(),
         db,
         lab_scenario_submission,
-        lab_interact_artifacts: lab_interact_artifacts::LabInteractArtifactBridge::from_env(),
+        interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge::from_env(),
         map_handoffs: map_handoffs::MapHandoffStore::default(),
     };
     let shutdown_lobby = state.lobby.clone();
@@ -195,26 +195,26 @@ async fn main() {
         .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
         .route(
-            "/dev/lab-interact/artifacts/export",
-            post(lab_interact_artifacts::export_handler),
+            "/dev/interact/lab/artifacts/export",
+            post(interact_lab_artifacts::export_handler),
         )
         .route(
-            "/dev/lab-interact/artifacts/upload",
-            post(lab_interact_artifacts::upload_handler).layer(DefaultBodyLimit::max(
-                lab_interact_artifacts::MAX_ARTIFACT_BYTES,
+            "/dev/interact/lab/artifacts/upload",
+            post(interact_lab_artifacts::upload_handler).layer(DefaultBodyLimit::max(
+                interact_lab_artifacts::MAX_ARTIFACT_BYTES,
             )),
         )
         .route(
-            "/dev/lab-interact/artifacts/import",
-            post(lab_interact_artifacts::import_handler),
+            "/dev/interact/lab/artifacts/import",
+            post(interact_lab_artifacts::import_handler),
         )
         .route(
-            "/dev/lab-interact/artifacts/cleanup",
-            post(lab_interact_artifacts::cleanup_handler),
+            "/dev/interact/lab/artifacts/cleanup",
+            post(interact_lab_artifacts::cleanup_handler),
         )
         .route(
-            "/dev/lab-interact/artifacts/{artifact_id}",
-            get(lab_interact_artifacts::download_handler),
+            "/dev/interact/lab/artifacts/{artifact_id}",
+            get(interact_lab_artifacts::download_handler),
         )
         .route("/dev/replay-artifact", get(dev_replay_artifact_handler))
         .route(

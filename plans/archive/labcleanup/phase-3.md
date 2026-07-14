@@ -65,7 +65,7 @@ honor it and deterministically reap their children.
 
 ### Extend the architecture ratchet
 
-- Extend `scripts/check-lab-interact-architecture.mjs` with adapter rules:
+- Extend `scripts/check-interact-architecture.mjs` with adapter rules:
   - defined daemon request-path modules contain no `spawnSync`/`execSync`; documented bounded
     pre-request exceptions live outside that checked path;
   - process/private-server/media adapters never import application or entry-point modules upward;
@@ -73,23 +73,23 @@ honor it and deterministically reap their children.
     child; `cli.mjs` remains the explicit daemon-bootstrap owner;
   - driver and adapter size limits are ratcheted from the final split with modest headroom.
 - Document process ownership, cold-open cancellation, dependency installation, and the intentional
-  remaining synchronous exceptions in `docs/lab-interact-cli.md`.
+  remaining synchronous exceptions in `docs/interact-cli.md`.
 
 ## Expected Touch Points
 
-- `scripts/lab-interact/command_service.mjs`
-- `scripts/lab-interact/driver.mjs`
-- new `scripts/lab-interact/process_runner.mjs`
-- new `scripts/lab-interact/private_server.mjs`
-- `scripts/lab-interact/recording.mjs`
-- `scripts/lab-interact/fixed_capture.mjs`
-- `scripts/lab-interact/tailnet_preview.mjs`
-- `scripts/check-lab-interact-architecture.mjs`
+- `scripts/interact/command_service.mjs`
+- `scripts/interact/driver.mjs`
+- new `scripts/interact/process_runner.mjs`
+- new `scripts/interact/private_server.mjs`
+- `scripts/interact/recording.mjs`
+- `scripts/interact/fixed_capture.mjs`
+- `scripts/interact/tailnet_preview.mjs`
+- `scripts/check-interact-architecture.mjs`
 - repository npm manifest/lock and browser dependency loader
-- focused `tests/lab_interact_*.mjs`
+- focused `tests/interact_*.mjs`
 - `tests/run-all.sh`
 - `tests/select-suites.mjs`
-- `docs/lab-interact-cli.md`
+- `docs/interact-cli.md`
 
 ## Implementation Checklist
 
@@ -106,17 +106,17 @@ honor it and deterministically reap their children.
 ## Verification
 
 ```bash
-node scripts/check-lab-interact-architecture.mjs
+node scripts/check-interact-architecture.mjs
 node scripts/check-source-file-sizes.mjs
-node tests/lab_interact_cli_contracts.mjs
-node tests/lab_interact_driver_contracts.mjs
-node tests/lab_interact_bulk_contracts.mjs
-node tests/lab_interact_artifact_contracts.mjs
-node tests/lab_interact_recording_contracts.mjs
-node tests/lab_interact_fixed_capture_contracts.mjs
-node tests/lab_interact_tailnet_preview_contracts.mjs
+node tests/interact_cli_contracts.mjs
+node tests/interact_driver_contracts.mjs
+node tests/interact_bulk_contracts.mjs
+node tests/interact_artifact_contracts.mjs
+node tests/interact_recording_contracts.mjs
+node tests/interact_fixed_capture_contracts.mjs
+node tests/interact_tailnet_preview_contracts.mjs
 node tests/select-suites.mjs --verify
-node tests/lab_interact_cli_smoke.mjs
+node tests/interact_cli_smoke.mjs
 node scripts/check-docs-health.mjs
 git diff --check
 ```

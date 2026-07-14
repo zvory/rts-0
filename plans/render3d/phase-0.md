@@ -22,7 +22,7 @@ phase: it must not add Babylon runtime code or change current Pixi behavior.
   and visual clock, server world pixels, renderer-neutral input/selection, renderer-owned GPU
   resources, already-filtered events/fog, Babylon-free default loading, and Pixi default status.
 - Inventory raw camera-representation consumers using current `main`, including match/frame logic,
-  minimap, audio, input/control groups, Lab Interact, diagnostics, observer overlays, visual
+  minimap, audio, input/control groups, Interact, diagnostics, observer overlays, visual
   samples, capture, resize, replay, and carryover. Distinguish backend-private orthographic math
   from application/UI/input reads that Phases 1, 1.5, and 1.75 must remove.
 - Inventory the complete current Pixi presentation catalog from the documented layer order and

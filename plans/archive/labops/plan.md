@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Make Lab Interact fast and predictable for general scene authoring without adding a scene-specific
+Make Interact fast and predictable for general scene authoring without adding a scene-specific
 composition language. The existing `spawn`, `update`, `remove`, inspection, camera, and recording
 concepts remain, but the primitive operations become genuinely bulk, placement failures become
 actionable, command help becomes discoverable, daemon freshness becomes visible, and one-minute
@@ -33,7 +33,7 @@ recordings become a first-class workflow.
 - Keep the existing primitive vocabulary; do not add a declarative battle/formation/scene DSL.
 - Bulk mutations are atomic: validate the entire request against a scratch state, commit only when
   every input succeeds, preserve input ordering, and identify the failed input index on rejection.
-- Use plural wire and replay operations for Lab Interact, including one-item requests, while keeping
+- Use plural wire and replay operations for Interact, including one-item requests, while keeping
   old singular artifact operations readable when compatibility requires it.
 - Run repair and authoritative commit once per accepted batch rather than once per item. The CLI
   waits for one post-batch observation; ordinary 30 Hz live snapshot publication remains free to
@@ -46,7 +46,7 @@ recordings become a first-class workflow.
 - Checkout mismatch must leave `status` and `shutdown` usable. Automatic restart is allowed only
   when no active session or request can be lost; otherwise return a clear warning/error with both
   commit ids and the recovery command.
-- Preserve mobile-compatible H.264 MP4 output, artifact confinement under `target/lab-interact/`,
+- Preserve mobile-compatible H.264 MP4 output, artifact confinement under `target/interact/lab/`,
   strict stdout JSON, per-worktree daemon isolation, and existing teardown guarantees.
 - Update `docs/design/protocol.md` and any changed `Game` API documentation with the owning contract
   in the same phase.
