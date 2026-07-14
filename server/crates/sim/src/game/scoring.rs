@@ -10,6 +10,15 @@ impl PlayerState {
         }
     }
 
+    pub(crate) fn record_construction_cancelled(&mut self, kind: EntityKind) {
+        if kind.is_building() {
+            self.score.structure_score = self
+                .score
+                .structure_score
+                .saturating_sub(entity_score_value(kind));
+        }
+    }
+
     pub(crate) fn record_entity_lost(&mut self, kind: EntityKind) {
         if kind.is_unit() {
             self.score.units_lost = self.score.units_lost.saturating_add(1);
@@ -36,7 +45,8 @@ pub(super) fn entity_score_value(kind: EntityKind) -> u32 {
 
 impl Game {
     pub fn scores(&self) -> Vec<PlayerScore> {
-        self.state.players
+        self.state
+            .players
             .iter()
             .map(|p| PlayerScore {
                 id: p.id,

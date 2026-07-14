@@ -562,6 +562,11 @@ export class HUD {
       case "cancelProduction":
         this._issueCancelProduction(intent.buildingKind);
         return;
+      case "cancelConstruction":
+        if (Number.isInteger(intent.buildingId)) {
+          this._issueCommand(cmd.cancel(intent.buildingId));
+        }
+        return;
       case "research":
         this._issueResearch(intent.upgrade);
         return;

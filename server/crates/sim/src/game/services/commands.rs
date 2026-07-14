@@ -1828,13 +1828,42 @@ fn order_set_rally(
     }
 }
 
-/// Cancel the latest item in a building's production queue, refunding its cost + supply.
+/// Cancel an unfinished building for a full refund, or cancel the latest item in a completed
+/// building's production queue and refund any paid cost and reserved supply.
 fn order_cancel(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     player: u32,
     building: u32,
 ) {
+    let construction_kind = entities.get(building).and_then(|entity| {
+        (entity.owner == player && entity.is_building() && entity.under_construction())
+            .then_some(entity.kind)
+    });
+    if let Some(kind) = construction_kind {
+        let Some(player_index) = players.iter().position(|candidate| candidate.id == player) else {
+            return;
+        };
+        let builders = entities
+            .iter()
+            .filter(|entity| {
+                entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(building)
+            })
+            .map(|entity| entity.id)
+            .collect::<Vec<_>>();
+        if entities.remove(building).is_none() {
+            return;
+        }
+        for builder in builders {
+            if let Some(worker) = entities.get_mut(builder) {
+                worker.clear_active_order();
+            }
+        }
+        players[player_index].refund_cost(rules::economy::resource_cost(kind));
+        players[player_index].record_construction_cancelled(kind);
+        return;
+    }
+
     enum Cancelled {
         Unit(ProdItem),
         Upgrade(ResearchItem),

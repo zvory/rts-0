@@ -24,10 +24,18 @@ export function _groundAtScreen(sx, sy) {
   return finiteClampedGroundPoint(this, point);
 }
 
-export function _entityAtScreen(screen, ownPreferred = false, eligible = () => true) {
+export function _entityAtScreen(
+  screen,
+  ownPreferred = false,
+  eligible = () => true,
+  preference = () => 0,
+) {
   const proxy = pickSelectionProxy(this.selectionScene, screen, {
     eligible: (candidate) => eligible(entityForProxy(candidate), candidate),
-    preference: (candidate) => ownPreferred && ownOwner(this.state, candidate.owner) ? 1 : 0,
+    preference: (candidate) => {
+      const ownPreference = ownPreferred && ownOwner(this.state, candidate.owner) ? 1 : 0;
+      return ownPreference + preference(entityForProxy(candidate), candidate);
+    },
   });
   return entityForProxy(proxy);
 }
@@ -48,6 +56,12 @@ export function _selectionEntities() {
 export function _commitClickSelection(p, additive, ctrl) {
   const hit = this._entityAtScreen(p, true, (entity) => (
     entity?.kind !== KIND.SCOUT_PLANE || scoutPlaneInspectable(this.state)
+  ), (entity) => (
+    ownOwner(this.state, entity?.owner) &&
+    isBuilding(entity?.kind) &&
+    Number.isFinite(entity?.buildProgress)
+      ? 1
+      : 0
   ));
   if (!hit) {
     if (!additive) clearSelection(this);
