@@ -116,7 +116,7 @@ process runner / filesystem / Puppeteer / FFmpeg / Rust server / Tailscale
 | --- | --- | --- |
 | `serialized` | reset, catalog, mutations, order/time/camera, screenshot, artifact transfer, recording start/stop, fixed capture | Run in admission order for the session. |
 | `observation` | status, record-wait | Observe safe current/resource-local state without waiting behind the FIFO. |
-| `cancellation` | capture-cancel | Reach active fixed capture promptly. |
+| `cancellation` | capture-cancel | Reach an active fixed or time-lapse capture promptly. |
 | `lifecycle` | open, close, shutdown | Own application lifecycle; close rejects new session admission and drains work already admitted. |
 
 Resource-local recording completion, encoder backpressure, capture finalization, and watchdogs

@@ -223,6 +223,7 @@ export async function openInteractDriver(options) {
           height,
         },
         presentation,
+        region: { preset: region },
         readiness: {
           ready: true,
           frame: 2,
@@ -232,7 +233,6 @@ export async function openInteractDriver(options) {
           missingTextureSubjectCount: 0,
           missingTextureSubjectsTruncated: false,
           request,
-          region,
         },
       };
     },

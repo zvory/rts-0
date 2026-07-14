@@ -1,7 +1,7 @@
 import { validatorFor } from "./command_inputs.ts";
 import type { CommandInput } from "./command_inputs.ts";
 import {
-  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
+  MEDIA_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
 } from "./runtime.ts";
 
 export type CommandScope = "daemon" | "session";
@@ -151,7 +151,7 @@ const COMMAND_RECORDS = Object.freeze({
   "record-wait": descriptor("Wait for the current recording to finalize without blocking other session commands.", "{sessionId:string}", {
     lane: "observation", timeoutClass: "lifecycle-media", recordable: false,
     variants: ["active and finalizing recordings share one completion", "a completed current recording returns its last result", "completion includes the same Tailnet preview URLs as record-stop"],
-    bounds: ["a recording must have been started in the current session", "recording-only IPC timeout is capped at 420 seconds"],
+    bounds: ["a recording must have been started in the current session", "media IPC timeout is capped at 540 seconds"],
     example: { sessionId: "<lab-session-id>" },
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence and return a Tailnet video preview.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
@@ -159,9 +159,9 @@ const COMMAND_RECORDS = Object.freeze({
     defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
-  "capture-cancel": descriptor("Request cancellation of the active fixed-step capture.", "{sessionId:string}", {
+  "capture-cancel": descriptor("Request cancellation of the active fixed-step or time-lapse capture.", "{sessionId:string}", {
     lane: "cancellation", recordable: false,
-    bounds: ["an active fixed capture is required"], example: { sessionId: "<lab-session-id>" },
+    bounds: ["an active fixed or time-lapse capture is required"], example: { sessionId: "<session-id>" },
   }),
   "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
@@ -172,7 +172,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
     lane: "observation",
-    defaults: ["ids/kinds=unfiltered", "ownership=owned", "cameraViewport=false", "limit=25"],
+    defaults: ["ids/kinds=unfiltered", "ownership=owned for players and visible for spectators", "cameraViewport=false", "limit=25"],
     bounds: ["0-400 unique ids", "0-32 kinds", "limit 1-400", "only the normal recipient's fog-filtered snapshot is inspectable"],
     example: { sessionId: "<game-session-id>", ownership: "owned", limit: 25 },
   }),
@@ -280,5 +280,5 @@ export function validateCommandInput(command: string, input: unknown) {
 export function requestTimeoutMs(command: string) {
   const definition = commandDefinition(command);
   if (definition?.timeoutClass === "startup") return STARTUP_REQUEST_TIMEOUT_MS;
-  return definition?.timeoutClass === "lifecycle-media" ? RECORDING_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  return definition?.timeoutClass === "lifecycle-media" ? MEDIA_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
 }

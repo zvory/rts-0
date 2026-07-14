@@ -8,7 +8,9 @@ import { InteractService, validateCommandInput } from "../scripts/interact/comma
 import {
   createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices,
 } from "../scripts/interact/fixed_capture.ts";
-import { GAME_TIMELAPSE_LIMITS, timelapseFrameBound } from "../scripts/interact/game_timelapse.ts";
+import {
+  GAME_TIMELAPSE_LIMITS, timelapseFrameBound, timelapseMayCaptureFrame,
+} from "../scripts/interact/game_timelapse.ts";
 import { checkMediaCapabilities } from "../scripts/interact/recording.ts";
 import { openInteractDriver } from "./fixtures/interact_fake_driver.mjs";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
@@ -32,6 +34,9 @@ try {
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");
   assert.equal(timelapseFrameBound(60_000, 1_000), 60, "one-minute default time-lapse samples exactly 60 frames");
+  assert.equal(timelapseMayCaptureFrame(0, 1_000, 500, 1_500), true, "time-lapse always retains its initial frame");
+  assert.equal(timelapseMayCaptureFrame(1, 1_000, 500, 1_499), true, "time-lapse samples later frames before its deadline");
+  assert.equal(timelapseMayCaptureFrame(1, 1_000, 500, 1_500), false, "time-lapse does not start another frame at its duration ceiling");
   assert.throws(
     () => validateCommandInput("game-capture-timelapse", { sessionId: gameSessionId, maxDurationMs: GAME_TIMELAPSE_LIMITS.maxDurationMs, sampleEveryMs: 100 }),
     (error) => error?.code === "invalidInput",
@@ -68,7 +73,7 @@ try {
   assert.deepEqual(result.authoritative, { startTick: 1, endTick: 2 }, "service preserves exact simulation-to-frame mapping");
   assert.equal(result.fixtureMetadata.sceneRevision, 1, "manifest input identifies mutations after the launch scene");
   assert.deepEqual(result.fixtureMetadata.aliases, [{ alias: "subject", id: 100 }], "manifest input retains bounded alias identity");
-  await assert.rejects(service.execute("capture-cancel", { sessionId: opened.sessionId }), (error) => error?.code === "captureInactive", "cancel reports an actionable error when no fixed capture is active");
+  await assert.rejects(service.execute("capture-cancel", { sessionId: opened.sessionId }), (error) => error?.code === "captureInactive", "cancel reports an actionable error when no capture is active");
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-fixed-contract-"));
   try {
     const tools = await checkMediaCapabilities();

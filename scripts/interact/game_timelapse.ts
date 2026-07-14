@@ -4,7 +4,7 @@ import type { Page, Viewport } from "puppeteer-core";
 
 import { resolveCaptureRegion } from "./capture_region.ts";
 import type { CaptureRegion } from "./capture_region.ts";
-import { createFixedCaptureEncoder, hashFrame } from "./fixed_capture.ts";
+import { createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, hashFrame } from "./fixed_capture.ts";
 import { removePartialRecording } from "./recording.ts";
 import { interactArtifactRoot } from "./interact_paths.ts";
 import type { InteractDriver } from "./driver.ts";
@@ -29,6 +29,10 @@ export function timelapseFrameBound(durationMs: number, sampleEveryMs: number) {
   return Math.max(1, Math.ceil(durationMs / sampleEveryMs));
 }
 
+export function timelapseMayCaptureFrame(frameIndex: number, startedMs: number, maxDurationMs: number, nowMs: number) {
+  return frameIndex === 0 || nowMs < startedMs + maxDurationMs;
+}
+
 export async function captureGameTimelapse(driver: InteractDriver, {
   sessionId, name = "timelapse", maxDurationMs = GAME_TIMELAPSE_LIMITS.defaultDurationMs,
   sampleEveryMs = GAME_TIMELAPSE_LIMITS.defaultSampleEveryMs, fps = GAME_TIMELAPSE_LIMITS.defaultFps,
@@ -38,6 +42,7 @@ export async function captureGameTimelapse(driver: InteractDriver, {
   speed?: number; viewport?: Viewport | null; region?: CaptureRegion; presentation?: "normal" | "clean";
 } = {}) {
   if (driver.recording) throw driver.decorateError(codedError("recordingActive", "Time-lapse capture is unavailable while real-time recording is active."));
+  if (driver.fixedCapture) throw driver.decorateError(codedError("captureActive", "Another fixed or time-lapse capture is already active."));
   const normalizedSessionId = validSessionId(sessionId);
   const artifactName = safeName(name);
   const abortController = new AbortController();
@@ -101,7 +106,7 @@ async function captureSampledTimelapse({
   let captureDir = "";
   let encoder: Awaited<ReturnType<typeof createFixedCaptureEncoder>> | null = null;
   let originalSpeed: number | null = null;
-  let speedChanged = false;
+  let speedChangeAttempted = false;
   try {
     if (viewport) await page.setViewport(viewport);
     if (region === "minimap" && presentation === "clean") {
@@ -111,10 +116,6 @@ async function captureSampledTimelapse({
     await page.evaluate(() => document.fonts?.ready || Promise.resolve());
     await ready();
     const resolvedRegion = await resolveCaptureRegion(page, region);
-    const before = await call("status", {});
-    originalSpeed = finiteNumber((before.roomTime as JsonObject | undefined)?.speed);
-    await call("time", { action: "speed", speed });
-    speedChanged = true;
 
     const suffix = new Date().toISOString().replace(/[:.]/g, "-");
     captureDir = path.join(root, artifactRoot, sessionId, "timelapse", `${name}-${suffix}`);
@@ -126,14 +127,23 @@ async function captureSampledTimelapse({
       outputPath: videoPath, contactSheetPath, fps, frameCount: maximumFrames, signal,
     });
 
+    // Prepare all local media machinery before accelerating authoritative time so
+    // encoder capability checks cannot consume an unrecorded portion of the match.
+    const before = await call("status", {});
+    originalSpeed = finiteNumber((before.roomTime as JsonObject | undefined)?.speed);
+    speedChangeAttempted = true;
+    const speedResult = await call("time", { action: "speed", speed });
+
     const startedMs = Date.now();
     const frames: JsonObject[] = [];
     let endStatus = before;
     for (let index = 0; index < maximumFrames; index += 1) {
       if (index > 0) await waitUntil(startedMs + index * sampleEveryMs, signal);
       if (signal.aborted) throw codedError("captureCancelled", "Time-lapse capture was cancelled and its partial artifacts were removed.");
+      if (!timelapseMayCaptureFrame(index, startedMs, maxDurationMs, Date.now())) break;
       const png = Buffer.from(await page.screenshot({ type: "png", clip: resolvedRegion.clip }) || []);
       if (png.length === 0) throw codedError("captureEmpty", "Chrome returned an empty time-lapse frame.");
+      if (png.length > FIXED_CAPTURE_LIMITS.maxFrameBytes) throw codedError("captureTooLarge", "One time-lapse PNG exceeded its bounded frame budget.");
       await encoder.write(png);
       endStatus = await call("status", {});
       frames.push({
@@ -158,7 +168,11 @@ async function captureSampledTimelapse({
       },
       output: { fps, frameCount: frames.length, maximumFrames },
       region: resolvedRegion,
-      authoritative: { startTick: before.snapshotTick ?? null, endTick: endStatus.snapshotTick ?? null, phase: endStatus.phase ?? null },
+      authoritative: {
+        startTick: speedResult.snapshotTick ?? before.snapshotTick ?? null,
+        endTick: endStatus.snapshotTick ?? null,
+        phase: endStatus.phase ?? null,
+      },
       frames,
       media: { videoPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe },
     };
@@ -173,7 +187,7 @@ async function captureSampledTimelapse({
     removePartialRecording([captureDir]);
     throw error;
   } finally {
-    if (speedChanged && originalSpeed != null) await call("time", { action: "speed", speed: originalSpeed }).catch(() => {});
+    if (speedChangeAttempted && originalSpeed != null) await call("time", { action: "speed", speed: originalSpeed }).catch(() => {});
     await call("presentation", { mode: "default" }).catch(() => {});
     if (originalViewport) await page.setViewport(originalViewport).catch(() => {});
   }

@@ -15,12 +15,13 @@ import {
   representativeFrameIndices,
 } from "../scripts/interact/recording.ts";
 import {
-  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
+  MEDIA_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
 } from "../scripts/interact/runtime.ts";
 import { requestTimeoutMs } from "../scripts/interact/command_registry.ts";
 import { DRIVER_STATES, InteractDriver } from "../scripts/interact/driver.ts";
 import { INTERACT_SUMMARY_LIMITS } from "../scripts/interact/manifest_summary.ts";
 import { resolveCaptureRegion } from "../scripts/interact/capture_region.ts";
+import { GAME_TIMELAPSE_LIMITS } from "../scripts/interact/game_timelapse.ts";
 import { openInteractDriver } from "./fixtures/interact_fake_driver.mjs";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
 
@@ -89,15 +90,21 @@ try {
   assert.equal(mediaAuxiliaryTimeoutMs(60_000), RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs, "one-minute auxiliary media stages stay separately capped");
   assert.equal(requestTimeoutMs("status"), REQUEST_TIMEOUT_MS, "ordinary daemon commands keep their existing IPC deadline");
   assert.equal(requestTimeoutMs("open"), STARTUP_REQUEST_TIMEOUT_MS, "cold open keeps the CLI attached through its bounded build budget");
-  assert.equal(requestTimeoutMs("record-wait"), RECORDING_REQUEST_TIMEOUT_MS, "record-wait gets bounded recording-specific IPC headroom");
-  assert.equal(requestTimeoutMs("capture-fixed"), RECORDING_REQUEST_TIMEOUT_MS, "minute-scale fixed capture gets bounded media IPC headroom");
-  assert.equal(requestTimeoutMs("game-capture-timelapse"), RECORDING_REQUEST_TIMEOUT_MS, "game time-lapse gets lifecycle/media IPC headroom");
-  assert.ok(RECORDING_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "recording IPC headroom exceeds the ordinary command deadline");
+  assert.equal(requestTimeoutMs("record-wait"), MEDIA_REQUEST_TIMEOUT_MS, "record-wait gets bounded media IPC headroom");
+  assert.equal(requestTimeoutMs("capture-fixed"), MEDIA_REQUEST_TIMEOUT_MS, "minute-scale fixed capture gets bounded media IPC headroom");
+  assert.equal(requestTimeoutMs("game-capture-timelapse"), MEDIA_REQUEST_TIMEOUT_MS, "game time-lapse gets lifecycle/media IPC headroom");
+  assert.ok(MEDIA_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "media IPC headroom exceeds the ordinary command deadline");
   const boundedMediaBudgetMs = RECORDING_LIMITS.maxDurationMs + RECORDING_LIMITS.maxStopTimeoutMs +
     RECORDING_LIMITS.maxMediaStageTimeoutMs + 3 * RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs + 22_000;
   assert.ok(
-    RECORDING_REQUEST_TIMEOUT_MS >= boundedMediaBudgetMs + 60_000,
+    MEDIA_REQUEST_TIMEOUT_MS >= boundedMediaBudgetMs + 60_000,
     "recording IPC deadline covers the bounded wait, media stages, probes, flush, and browser cleanup headroom",
+  );
+  const boundedTimelapseBudgetMs = GAME_TIMELAPSE_LIMITS.maxDurationMs + 10_000 + 15_000 +
+    75_000 + 30_000 + 15_000;
+  assert.ok(
+    MEDIA_REQUEST_TIMEOUT_MS >= boundedTimelapseBudgetMs + 60_000,
+    "media IPC deadline covers the maximum time-lapse, encoder stages, and cleanup headroom",
   );
 
   const tools = await checkMediaCapabilities();

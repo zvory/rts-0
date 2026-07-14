@@ -147,6 +147,7 @@ try {
   assert.match(gameSessionId, /^game_[a-f0-9]{32}$/, "game open returns a distinct bounded session id");
   assert.equal(gameOpened.kind, "game", "game open identifies the isolated match kind");
   assert.deepEqual(gameOpened.capabilities.orders, ["move"], "game capabilities expose move as the only gameplay order");
+  assert.deepEqual(gameOpened.capabilities.media, ["screenshot", "recording"], "player capabilities omit spectator-only time-lapse capture");
   const gameInspection = callNamespace("game", "inspect", { sessionId: gameSessionId }).result;
   assert.deepEqual(gameInspection.entities.map(({ id }) => id), [100], "game inspect defaults to locally owned fog-filtered entities");
   assert.equal(gameInspection.ui.hudVisible, true, "game inspect returns semantic UI state");
@@ -170,12 +171,13 @@ try {
   const spectatorOpened = callNamespace("game", "open", { spectate: ["ai_2_1", "ai_turtle"] }).result;
   assert.equal(spectatorOpened.capabilities.role, "spectator", "AI-vs-AI open reports the spectator role");
   assert.deepEqual(spectatorOpened.capabilities.orders, [], "AI-vs-AI spectators receive no gameplay orders");
+  assert.deepEqual(spectatorOpened.capabilities.media, ["screenshot", "recording", "timelapse"], "spectator capabilities advertise time-lapse capture");
   const spectatorInspection = callNamespace("game", "inspect", { sessionId: spectatorOpened.sessionId }).result;
   assert.deepEqual(spectatorInspection.entities.map(({ id }) => id), [100, 101], "spectator inspection defaults to all visible entities");
   const overview = callNamespace("game", "camera", { sessionId: spectatorOpened.sessionId, camera: { action: "overview" } }).result;
   assert.deepEqual(overview.camera.focus, { x: 1024, y: 1024 }, "overview camera frames the complete map");
   const minimap = callNamespace("game", "screenshot", { sessionId: spectatorOpened.sessionId, name: "minimap", region: "minimap" }).result;
-  assert.equal(minimap.readiness.region, "minimap", "game screenshots preserve the selected region through the driver request");
+  assert.equal(minimap.region.preset, "minimap", "game screenshots report the resolved capture region");
   const timelapse = callNamespace("game", "capture-timelapse", {
     sessionId: spectatorOpened.sessionId, name: "whole-map", maxDurationMs: 1000,
     sampleEveryMs: 500, fps: 30, speed: 8, region: "viewport",

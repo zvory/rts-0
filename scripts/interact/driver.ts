@@ -745,7 +745,7 @@ export class InteractDriver {
   }
 
   cancelFixedCapture() {
-    if (!this.fixedCapture) throw new InteractDriverError("captureInactive", "No fixed capture is active.");
+    if (!this.fixedCapture) throw new InteractDriverError("captureInactive", "No fixed or time-lapse capture is active.");
     this.fixedCapture.cancelled = true;
     this.fixedCapture.abortController?.abort();
     return { cancelling: true };
@@ -1035,7 +1035,7 @@ export class InteractDriver {
           width: dimensions.width,
           height: dimensions.height,
         },
-        presentation,
+        presentation, region: resolvedRegion,
         readiness: readinessSummary,
       };
     } finally {

@@ -41,6 +41,7 @@ export async function captureGameScreenshot(
   const visible = {
     sessionId: session.sessionId,
     presentation: capture.presentation,
+    region: capture.region,
     image: { mimeType: image.mimeType, bytes: image.bytes, width: image.width, height: image.height },
     readiness: capture.readiness,
   };

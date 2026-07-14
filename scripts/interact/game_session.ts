@@ -1,8 +1,10 @@
 export function gameSessionCapabilities(role: unknown, maxSessions: number) {
   const player = role === "player";
+  const spectator = role === "spectator";
   return {
     aliases: false, inspectUi: true, orders: player ? ["move"] : [], giveUp: player,
-    media: ["screenshot", "recording", "timelapse"], role, maxSessions,
+    media: spectator ? ["screenshot", "recording", "timelapse"] : ["screenshot", "recording"],
+    role, maxSessions,
   };
 }
 
