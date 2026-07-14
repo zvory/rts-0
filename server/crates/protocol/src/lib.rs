@@ -741,10 +741,7 @@ mod tests {
             serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
         );
         let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
-        assert_eq!(
-            entity_schema.last().unwrap()["name"],
-            "breakthroughAuraTicks"
-        );
+        assert_eq!(entity_schema[38]["name"], "breakthroughAuraTicks");
     }
 
     #[test]

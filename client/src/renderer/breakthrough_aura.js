@@ -13,7 +13,9 @@ export function _drawBreakthroughAuras(view, entities = []) {
   for (const entity of entities) {
     if (entity.kind !== KIND.COMMAND_CAR || auraExpiresIn(entity) <= 0) continue;
     if (!finiteNumber(entity.x) || !finiteNumber(entity.y)) continue;
-    drawBreakthroughAura(this._feedbackGfx, entity.x, entity.y, radiusPx, 0.78);
+    // Active auras are projected world state. Keep them below fog so team-intel
+    // (`visionOnly`) entities do not promote their effects to tactical feedback.
+    drawBreakthroughAura(this._abilityObjectGfx, entity.x, entity.y, radiusPx, 0.78);
     drawnIds.add(entity.id);
   }
 
@@ -21,7 +23,13 @@ export function _drawBreakthroughAuras(view, entities = []) {
     if (entity.kind !== KIND.COMMAND_CAR || drawnIds.has(entity.id)) continue;
     if (!finiteNumber(entity.x) || !finiteNumber(entity.y)) continue;
     const active = auraExpiresIn(entity) > 0;
-    drawBreakthroughAura(this._feedbackGfx, entity.x, entity.y, radiusPx, active ? 0.78 : 0.32);
+    drawBreakthroughAura(
+      active ? this._abilityObjectGfx : this._feedbackGfx,
+      entity.x,
+      entity.y,
+      radiusPx,
+      active ? 0.78 : 0.32,
+    );
   }
 }
 
@@ -31,8 +39,5 @@ export function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
 }
 
 function auraExpiresIn(entity) {
-  if (Number.isFinite(entity?.breakthroughAuraTicks)) return entity.breakthroughAuraTicks;
-  if (!Array.isArray(entity?.abilities)) return 0;
-  const ability = entity.abilities.find((entry) => entry?.ability === ABILITY.BREAKTHROUGH);
-  return Number.isFinite(ability?.expiresIn) ? ability.expiresIn : 0;
+  return Number.isFinite(entity?.breakthroughAuraTicks) ? entity.breakthroughAuraTicks : 0;
 }

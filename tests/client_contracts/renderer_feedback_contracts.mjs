@@ -114,6 +114,7 @@ function nearPoint(call, point, epsilon = 0.001) {
 
 {
   const auraGfx = new RecordingGraphics();
+  const auraWorldGfx = new RecordingGraphics();
   const selectedCommandCar = {
     id: 2,
     owner: 1,
@@ -123,7 +124,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     abilities: [],
   };
   _drawBreakthroughAuras.call(
-    { _feedbackGfx: auraGfx, _map: { tileSize: 32 } },
+    { _feedbackGfx: auraGfx, _abilityObjectGfx: auraWorldGfx, _map: { tileSize: 32 } },
     { playerId: 1, selectedEntities: () => [selectedCommandCar] },
   );
 
@@ -137,53 +138,89 @@ function nearPoint(call, point, epsilon = 0.001) {
     auraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.32),
     "a selected Command Car draws its faint speed aura",
   );
+  assert(
+    !auraWorldGfx.calls.some((call) => call[0] === "drawCircle"),
+    "an inactive selected Command Car does not draw a world-state aura",
+  );
 
   const activeAuraGfx = new RecordingGraphics();
+  const activeAuraWorldGfx = new RecordingGraphics();
   _drawBreakthroughAuras.call(
-    { _feedbackGfx: activeAuraGfx, _map: { tileSize: 32 } },
+    {
+      _feedbackGfx: activeAuraGfx,
+      _abilityObjectGfx: activeAuraWorldGfx,
+      _map: { tileSize: 32 },
+    },
     {
       playerId: 1,
       selectedEntities: () => [{
         ...selectedCommandCar,
-        abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 12 }],
+        breakthroughAuraTicks: 12,
       }],
     },
   );
   assert(
-    activeAuraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78),
-    "a selected Command Car with active Breakthrough draws a bright aura",
+    activeAuraWorldGfx.calls.some(
+      (call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78,
+    ),
+    "an active selected Command Car draws its bright aura below fog",
+  );
+  assert(
+    !activeAuraGfx.calls.some((call) => call[0] === "drawCircle"),
+    "an active selected Command Car does not duplicate its aura above fog",
   );
 
   const unselectedAuraGfx = new RecordingGraphics();
+  const unselectedAuraWorldGfx = new RecordingGraphics();
   _drawBreakthroughAuras.call(
-    { _feedbackGfx: unselectedAuraGfx, _map: { tileSize: 32 } },
+    {
+      _feedbackGfx: unselectedAuraGfx,
+      _abilityObjectGfx: unselectedAuraWorldGfx,
+      _map: { tileSize: 32 },
+    },
     { playerId: 1, selectedEntities: () => [] },
     [selectedCommandCar],
   );
   assert(
-    !unselectedAuraGfx.calls.some((call) => call[0] === "drawCircle"),
+    !unselectedAuraGfx.calls.some((call) => call[0] === "drawCircle") &&
+      !unselectedAuraWorldGfx.calls.some((call) => call[0] === "drawCircle"),
     "unselected inactive Command Cars do not draw their speed aura",
   );
 
   const unselectedActiveAuraGfx = new RecordingGraphics();
+  const unselectedActiveAuraWorldGfx = new RecordingGraphics();
   _drawBreakthroughAuras.call(
-    { _feedbackGfx: unselectedActiveAuraGfx, _map: { tileSize: 32 } },
+    {
+      _feedbackGfx: unselectedActiveAuraGfx,
+      _abilityObjectGfx: unselectedActiveAuraWorldGfx,
+      _map: { tileSize: 32 },
+    },
     { playerId: 1, selectedEntities: () => [] },
     [{
       ...selectedCommandCar,
       breakthroughAuraTicks: 12,
+      visionOnly: true,
     }],
   );
   assert(
-    unselectedActiveAuraGfx.calls.some(
+    unselectedActiveAuraWorldGfx.calls.some(
       (call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78,
     ),
-    "an unselected Command Car with active Breakthrough draws a bright aura",
+    "a vision-only Command Car with active Breakthrough draws its bright aura below fog",
+  );
+  assert(
+    !unselectedActiveAuraGfx.calls.some((call) => call[0] === "drawCircle"),
+    "an unselected active aura does not bypass fog on the tactical-feedback layer",
   );
 
   const buffedNonCasterAuraGfx = new RecordingGraphics();
+  const buffedNonCasterAuraWorldGfx = new RecordingGraphics();
   _drawBreakthroughAuras.call(
-    { _feedbackGfx: buffedNonCasterAuraGfx, _map: { tileSize: 32 } },
+    {
+      _feedbackGfx: buffedNonCasterAuraGfx,
+      _abilityObjectGfx: buffedNonCasterAuraWorldGfx,
+      _map: { tileSize: 32 },
+    },
     { playerId: 1, selectedEntities: () => [] },
     [{
       ...selectedCommandCar,
@@ -192,14 +229,15 @@ function nearPoint(call, point, epsilon = 0.001) {
     }],
   );
   assert(
-    !buffedNonCasterAuraGfx.calls.some((call) => call[0] === "drawCircle"),
+    !buffedNonCasterAuraGfx.calls.some((call) => call[0] === "drawCircle") &&
+      !buffedNonCasterAuraWorldGfx.calls.some((call) => call[0] === "drawCircle"),
     "an unselected buffed Command Car that did not cast Breakthrough does not draw an aura",
   );
 
   const interpolatedCommandCar = {
     ...selectedCommandCar,
     x: 248,
-    abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 8 }],
+    breakthroughAuraTicks: 8,
   };
   const interpolatedView = buildRendererFeedbackView(
     { playerId: 1 },
@@ -210,19 +248,24 @@ function nearPoint(call, point, epsilon = 0.001) {
     "selected renderer overlays use the frame-interpolated entity record",
   );
   const interpolatedAuraGfx = new RecordingGraphics();
+  const interpolatedAuraWorldGfx = new RecordingGraphics();
   _drawBreakthroughAuras.call(
-    { _feedbackGfx: interpolatedAuraGfx, _map: { tileSize: 32 } },
+    {
+      _feedbackGfx: interpolatedAuraGfx,
+      _abilityObjectGfx: interpolatedAuraWorldGfx,
+      _map: { tileSize: 32 },
+    },
     interpolatedView,
     [interpolatedCommandCar],
   );
   assert(
-    interpolatedAuraGfx.calls.some(
+    interpolatedAuraWorldGfx.calls.some(
       (call) => call[0] === "drawCircle" && call[1] === interpolatedCommandCar.x,
     ),
     "the selected Command Car aura stays centered on its interpolated render position",
   );
   assert(
-    interpolatedAuraGfx.calls.filter((call) => call[0] === "drawCircle").length === 1,
+    interpolatedAuraWorldGfx.calls.filter((call) => call[0] === "drawCircle").length === 1,
     "an active selected Command Car draws only one aura",
   );
 }

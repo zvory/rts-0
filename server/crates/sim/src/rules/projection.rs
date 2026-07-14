@@ -1084,6 +1084,43 @@ mod tests {
     }
 
     #[test]
+    fn breakthrough_caster_status_is_visible_without_owner_ability_details() {
+        let mut entities = EntityStore::new();
+        let command_car_id = entities
+            .spawn_unit(1, EntityKind::CommandCar, 120.0, 100.0)
+            .expect("Command Car should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy spotter should spawn");
+        entities
+            .get_mut(command_car_id)
+            .expect("Command Car should exist")
+            .start_breakthrough_aura(90);
+
+        let map = flat_map(64);
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let command_car = entities
+            .get(command_car_id)
+            .expect("Command Car should exist");
+
+        let owner_view = project_for_test(1, command_car, &fog, true, &entities, None, false)
+            .expect("owner should see Command Car");
+        assert_eq!(owner_view.breakthrough_aura_ticks, Some(90));
+        assert!(owner_view.abilities.iter().any(|ability| {
+            ability.ability == protocol::abilities::BREAKTHROUGH && ability.expires_in == Some(90)
+        }));
+
+        let enemy_view = project_for_test(2, command_car, &fog, true, &entities, None, false)
+            .expect("enemy spotter should reveal Command Car");
+        assert_eq!(enemy_view.breakthrough_aura_ticks, Some(90));
+        assert!(
+            enemy_view.abilities.is_empty(),
+            "caster status must not expose owner-only ability details"
+        );
+    }
+
+    #[test]
     fn order_plan_is_owner_only_and_projects_safe_stages() {
         let mut entities = EntityStore::new();
         let unit_id = entities
