@@ -107,6 +107,9 @@ function checkImports() {
       !imports.get("command_service.ts")?.includes("driver.ts")) {
     failures.push("command_service.ts must connect the registry/coordinator application layer to the driver adapter");
   }
+  if ((sources.get("command_service.ts") || "").includes("puppeteer-core")) {
+    failures.push("command_service.ts must use structural application types instead of Puppeteer adapter types");
+  }
 }
 
 function checkAdapterOwnership() {

@@ -14,7 +14,6 @@ import {
 } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
 import type { LabInteractTailnetPreview } from "./tailnet_preview.ts";
-import type { Viewport } from "puppeteer-core";
 
 export { LAB_INTERACT_LIMITS } from "./command_inputs.ts";
 export { LAB_INTERACT_COMMANDS } from "./command_registry.ts";
@@ -30,6 +29,11 @@ interface SpawnInput extends JsonObject {
   y: number;
   alias?: string;
 }
+interface ViewportInput {
+  width: number;
+  height: number;
+  deviceScaleFactor?: number;
+}
 interface ServiceInput extends JsonObject {
   sessionId?: string;
   workspaceRoot?: string;
@@ -37,7 +41,7 @@ interface ServiceInput extends JsonObject {
   seed?: string | number;
   scenario?: string;
   renderer?: string;
-  viewport?: Viewport;
+  viewport?: ViewportInput;
   categories?: string[];
   details?: boolean;
   spawns?: SpawnInput[];
