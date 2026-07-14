@@ -586,6 +586,8 @@ pub struct EntityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakthrough_ticks: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub breakthrough_aura_ticks: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub occupied_trench_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scout_plane: Option<ScoutPlaneStateView>,
@@ -645,6 +647,7 @@ impl EntityView {
             charge_cooldown_left: None,
             abilities: Vec::new(),
             breakthrough_ticks: None,
+            breakthrough_aura_ticks: None,
             occupied_trench_id: None,
             scout_plane: None,
             vision_only: false,

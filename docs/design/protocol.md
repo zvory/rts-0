@@ -670,7 +670,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 39. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 40. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -696,7 +696,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 39,
+  "v": 40,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -706,7 +706,7 @@ adds an explicit application compression envelope.
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
-      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?
+      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -794,7 +794,10 @@ Breakthrough aura duration on the casting Command Car. `lockoutUntilTick` is ava
 owner-only ability lockouts; Magic Anchor does not currently use a destruction lockout because the
 anchor is not attackable.
 `breakthroughTicks` is present only while the affected visible unit has active Breakthrough speed
-status; it is not caster identity. Owner snapshots also expose the Command Car's `breakthrough`
+status; it is not caster identity. `breakthroughAuraTicks` is present only on a visible casting
+Command Car while its authoritative aura remains active, so renderers can keep the bright radius
+visible without selection or owner-private ability affordances. Owner snapshots also expose the
+Command Car's `breakthrough`
 ability cooldown and, while the caster's aura is active, its caster-only `expiresIn` through
 `abilities`.
 `weaponRangeTiles` is present for owner/allied Tank views and carries the current authoritative
@@ -931,6 +934,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
       activeObjectId?: u32, availableTick?: u32, lockoutUntilTick?: u32, expiresIn?: u16 }
   ],
   breakthroughTicks?: u16,       // active Breakthrough speed status; visible only with the entity
+  breakthroughAuraTicks?: u16,   // casting Command Car only; active aura duration, visible with caster
   visionOnly?: bool,             // legacy/special render-only intel; current death vision does not set this
   debugPath?: {                  // diagnostic policy only; remaining movement path; owner-only unless policy says full projected diagnostics
     waypoints: { x: f32, y: f32 }[],

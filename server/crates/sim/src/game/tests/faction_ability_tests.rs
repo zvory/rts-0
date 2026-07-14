@@ -263,6 +263,11 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
         Some(car.breakthrough_aura_ticks()),
         "caster affordance should expose active aura duration"
     );
+    assert_eq!(
+        caster_view.breakthrough_aura_ticks,
+        Some(car.breakthrough_aura_ticks()),
+        "visible caster view should expose active aura duration for rendering"
+    );
     let nearby_car_view = owner_snapshot
         .entities
         .iter()
@@ -275,6 +280,10 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
             .find(|ability| ability.ability == crate::protocol::abilities::BREAKTHROUGH)
             .is_none_or(|ability| ability.expires_in.is_none()),
         "buffed non-caster Command Cars should not project aura duration"
+    );
+    assert_eq!(
+        nearby_car_view.breakthrough_aura_ticks, None,
+        "buffed non-caster Command Cars should not project caster aura status"
     );
 
     let remaining = game

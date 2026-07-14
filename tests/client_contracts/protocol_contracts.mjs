@@ -192,6 +192,18 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         ...Array(27).fill(null),
         false,
       ],
+      [
+        7,
+        1,
+        KIND_CODE[KIND.COMMAND_CAR],
+        220,
+        230,
+        150,
+        150,
+        STATE_CODE[STATE.IDLE],
+        ...Array(30).fill(null),
+        120,
+      ],
     ],
     r: [[200, 1498]],
     sm: [[50, 320, 352, 2, 120]],
@@ -241,7 +253,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact prediction version decodes");
   assert(decoded.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client sequence decodes");
   assert(decoded.netStatus.lastSimConsumedClientTick === 42, "compact consumed client tick decodes");
-  assert(decoded.entities.length === 6, "compact entities decode");
+  assert(decoded.entities.length === 7, "compact entities decode");
   assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
@@ -312,6 +324,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.entities[3].weaponRangeTiles === 9.5, "entity weaponRangeTiles decodes");
   assert(decoded.entities[3].occupiedTrenchId === 80, "entity occupiedTrenchId decodes");
   assert(decoded.entities[4].kind === KIND.SCOUT_PLANE, "Scout Plane kind code decodes");
+  assert(decoded.entities[6].breakthroughAuraTicks === 120, "caster aura status decodes");
   assert(
     decoded.entities[4].scoutPlane.orbitCenter[0] === 512 &&
       decoded.entities[4].scoutPlane.orbitCenter[1] === 544 &&

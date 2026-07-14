@@ -610,7 +610,7 @@ export class Renderer {
       this._drawSafely("panzerfaustShots", () => this._drawPanzerfaustShots(feedbackView));
       this._drawSafely("panzerfaustImpacts", () => this._drawPanzerfaustImpacts(feedbackView));
       this._drawSafely("selectedUnitRanges", () => this._drawSelectedUnitRanges(feedbackView));
-      this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView));
+      this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView, regularEntities));
       this._drawSafely("abilityTargetPreview", () => this._drawAbilityTargetPreview(feedbackView));
       this._drawSafely("antiTankGunSetupPreview", () => this._drawAntiTankGunSetupPreview(feedbackView));
       this._drawSafely("orderPlan", () => this._drawOrderPlan(feedbackView));

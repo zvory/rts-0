@@ -160,7 +160,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 39);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 40);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
@@ -201,12 +201,23 @@ fn stable_rust_public_surface_compiles() {
 }
 
 #[test]
-fn compact_snapshot_encodes_scout_plane_owner_state() {
+fn compact_snapshot_encodes_appended_entity_state() {
     let mut plane = EntityView::new(5, 1, kinds::SCOUT_PLANE, 160.0, 170.0, 40, 40, states::IDLE);
     plane.scout_plane = Some(ScoutPlaneStateView {
         orbit_center: Some([512.0, 544.0]),
         source_command_car: Some(74),
     });
+    let mut command_car = EntityView::new(
+        6,
+        1,
+        kinds::COMMAND_CAR,
+        220.0,
+        230.0,
+        150,
+        150,
+        states::IDLE,
+    );
+    command_car.breakthrough_aura_ticks = Some(90);
 
     let snapshot = Snapshot {
         tick: 1,
@@ -215,7 +226,7 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
         oil: 0,
         supply_used: 0,
         supply_cap: 0,
-        entities: vec![plane],
+        entities: vec![plane, command_car],
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),
@@ -242,4 +253,6 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
     let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
     assert_eq!(value["e"][0][2], serde_json::json!(25));
     assert_eq!(value["e"][0][33], serde_json::json!([[512.0, 544.0], 74]));
+    assert_eq!(value["e"][1].as_array().unwrap().len(), 39);
+    assert_eq!(value["e"][1][38], serde_json::json!(90));
 }

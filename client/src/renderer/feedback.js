@@ -9,7 +9,6 @@ import {
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
-  ABILITIES,
   MORTAR_INNER_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
@@ -44,6 +43,7 @@ import {
 } from "./attack_feedback_origin.js";
 import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
 import { drawLabToolPreview } from "./lab_tool_preview.js";
+import { drawBreakthroughAura } from "./breakthrough_aura.js";
 import {
   angleDelta,
   clamp01,
@@ -70,6 +70,8 @@ import {
   weaponRecoilOffset,
 } from "./shared.js";
 import { drawImpassableEdge, isImpassableAt } from "./terrain_palette.js";
+
+export { _drawBreakthroughAuras } from "./breakthrough_aura.js";
 
 const MORTAR_WARNING_COLOR = 0x9f1f1f;
 const FIELD_OF_FIRE_COLOR = 0x4aa3ff;
@@ -374,22 +376,6 @@ export function _drawAntiTankGunSetupPreview(view) {
   }
 }
 
-export function _drawBreakthroughAuras(view) {
-  if (!view || typeof view.selectedEntities !== "function") return;
-  const g = this._feedbackGfx;
-  const definition = ABILITIES[ABILITY.BREAKTHROUGH];
-  const tileSize = (this._map && this._map.tileSize) || 32;
-  const radiusPx = (definition?.radiusTiles || 0) * tileSize;
-  if (radiusPx <= 0) return;
-
-  for (const e of view.selectedEntities()) {
-    if (e.kind !== KIND.COMMAND_CAR) continue;
-    if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
-    const active = breakthroughAuraExpiresIn(e) > 0;
-    drawBreakthroughAura(g, e.x, e.y, radiusPx, active ? 0.78 : 0.32);
-  }
-}
-
 export function _drawAbilityTargetPreview(view) {
   const preview = view?.abilityTargetPreview;
   if (!preview || !Array.isArray(preview.carriers)) return;
@@ -495,18 +481,6 @@ export function _drawAbilityTargetPreview(view) {
     g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
     g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
   }
-}
-
-function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
-  const color = 0xf2d16b;
-  g.lineStyle(2.5, color, alpha);
-  g.drawCircle(x, y, radiusPx);
-}
-
-function breakthroughAuraExpiresIn(entity) {
-  if (!Array.isArray(entity?.abilities)) return 0;
-  const ability = entity.abilities.find((entry) => entry?.ability === ABILITY.BREAKTHROUGH);
-  return Number.isFinite(ability?.expiresIn) ? ability.expiresIn : 0;
 }
 
 export function _drawAbilityObjects(state) {
