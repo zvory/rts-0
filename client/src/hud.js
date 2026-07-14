@@ -239,7 +239,7 @@ export class HUD {
     if (this.elIdleWorkers) {
       this.elIdleWorkers.disabled = true;
       this.elIdleWorkers.title = "No idle workers";
-      this.elIdleWorkers.setAttribute?.("aria-label", "No idle workers to select");
+      this.elIdleWorkers.setAttribute?.("aria-label", "No idle workers");
     }
     this._cardSig = null;
     this._trainRoundRobin.clear();
@@ -275,18 +275,19 @@ export class HUD {
   _renderIdleWorkers(frameViews = null) {
     if (!this.elIdleWorkers || !this.elIdleWorkersCount) return;
     const count = activeIdleWorkers(frameCurrentEntities(this.state, frameViews), this.state).length;
-    const enabled = count > 0 && this._canUseCommandSurface();
+    const canSelect = this._canUseCommandSurface();
+    const enabled = count > 0 && canSelect;
     const sig = `${count}:${enabled ? 1 : 0}`;
     if (sig === this._idleWorkersSig) return;
     this.elIdleWorkersCount.textContent = String(count);
     this.elIdleWorkers.disabled = !enabled;
-    this.elIdleWorkers.title = enabled
-      ? `Select ${count} idle worker${count === 1 ? "" : "s"}`
-      : "No idle workers";
-    this.elIdleWorkers.setAttribute?.(
-      "aria-label",
-      enabled ? this.elIdleWorkers.title : "No idle workers to select",
-    );
+    const workersLabel = `${count} idle worker${count === 1 ? "" : "s"}`;
+    this.elIdleWorkers.title = count === 0
+      ? "No idle workers"
+      : canSelect
+        ? `Select ${workersLabel}`
+        : `${workersLabel}; selection unavailable`;
+    this.elIdleWorkers.setAttribute?.("aria-label", this.elIdleWorkers.title);
     this._idleWorkersSig = sig;
   }
 

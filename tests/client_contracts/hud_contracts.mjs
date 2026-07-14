@@ -142,6 +142,16 @@ function commandCardCtx({
   const hud = new HUD(root, state, {}, null, null, intent);
   assert(count.textContent === "2" && button.disabled === false, "HUD shows the active idle-worker count");
   assert(button["aria-label"] === "Select 2 idle workers", "HUD exposes the idle-worker selection action accessibly");
+
+  hud.controlPolicy = { canUseCommandSurface: () => false };
+  hud._renderIdleWorkers();
+  assert(
+    count.textContent === "2" && button.disabled === true &&
+      button["aria-label"] === "2 idle workers; selection unavailable",
+    "read-only HUDs preserve the idle-worker count without announcing that no workers exist",
+  );
+  hud.controlPolicy = null;
+  hud._renderIdleWorkers();
   listeners.get("click")();
   assert(selected.join(",") === "11,12", "clicking the HUD tab selects every active idle worker");
   assert(menuClosed === 1 && plannedSelection.join(",") === "11,12", "idle-worker selection reconciles local HUD intent");
@@ -152,6 +162,7 @@ function commandCardCtx({
   assert(count.textContent === "0" && button.disabled === true, "HUD disables the idle-worker tab when none are idle");
   hud.destroy();
   assert(!listeners.has("click"), "HUD teardown removes the idle-worker click listener");
+  assert(button["aria-label"] === "No idle workers", "HUD teardown restores accurate idle-worker text");
 }
 
 function defaultFactionCommandId(family, subject) {
