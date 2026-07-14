@@ -114,36 +114,79 @@ function nearPoint(call, point, epsilon = 0.001) {
 
 {
   const auraGfx = new RecordingGraphics();
+  const selectedCommandCar = {
+    id: 2,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 256,
+    y: 192,
+    abilities: [],
+  };
   _drawBreakthroughAuras.call(
     { _feedbackGfx: auraGfx, _map: { tileSize: 32 } },
-    { playerId: 1 },
-    [
-      { id: 1, owner: 2, kind: KIND.COMMAND_CAR, x: 160, y: 192, abilities: [] },
-      {
-        id: 2,
-        owner: 1,
-        kind: KIND.COMMAND_CAR,
-        x: 256,
-        y: 192,
-        abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 12 }],
-      },
-      { id: 3, owner: 2, kind: KIND.RIFLEMAN, x: 224, y: 224 },
-    ],
+    { playerId: 1, selectedEntities: () => [selectedCommandCar] },
   );
 
   const rings = auraGfx.calls.filter((call) => call[0] === "drawCircle");
-  assert(rings.length === 2, "every visible Command Car draws its passive aura, including enemies");
+  assert(rings.length === 1, "only selected Command Cars draw their speed aura");
   assert(
-    rings.some((call) => call[1] === 160 && call[2] === 192 && call[3] === 288),
-    "the visible enemy Command Car draws its nine-tile passive aura",
+    rings[0][1] === 256 && rings[0][2] === 192 && rings[0][3] === 288,
+    "the selected Command Car draws its nine-tile speed aura",
   );
   assert(
     auraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.32),
-    "inactive Command Cars draw a faint passive aura",
+    "a selected Command Car draws its faint speed aura",
+  );
+
+  const activeAuraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: activeAuraGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 1,
+      selectedEntities: () => [{
+        ...selectedCommandCar,
+        abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 12 }],
+      }],
+    },
   );
   assert(
-    auraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78),
-    "active Breakthrough Command Cars brighten their aura",
+    activeAuraGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 2.5 && call[3] === 0.78),
+    "a selected Command Car with active Breakthrough draws a bright aura",
+  );
+
+  const unselectedAuraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: unselectedAuraGfx, _map: { tileSize: 32 } },
+    { playerId: 1, selectedEntities: () => [] },
+  );
+  assert(
+    !unselectedAuraGfx.calls.some((call) => call[0] === "drawCircle"),
+    "unselected Command Cars do not draw their speed aura",
+  );
+
+  const interpolatedCommandCar = {
+    ...selectedCommandCar,
+    x: 248,
+    abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 8 }],
+  };
+  const interpolatedView = buildRendererFeedbackView(
+    { playerId: 1 },
+    { entities: [interpolatedCommandCar], selectedEntities: [selectedCommandCar] },
+  );
+  assert(
+    interpolatedView.selectedEntities()[0] === interpolatedCommandCar,
+    "selected renderer overlays use the frame-interpolated entity record",
+  );
+  const interpolatedAuraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: interpolatedAuraGfx, _map: { tileSize: 32 } },
+    interpolatedView,
+  );
+  assert(
+    interpolatedAuraGfx.calls.some(
+      (call) => call[0] === "drawCircle" && call[1] === interpolatedCommandCar.x,
+    ),
+    "the selected Command Car aura stays centered on its interpolated render position",
   );
 }
 
