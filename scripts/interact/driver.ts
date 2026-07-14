@@ -49,6 +49,7 @@ interface CaptureClip { x: number; y: number; width: number; height: number }
 interface BridgeResult extends JsonObject {
   snapshotTick?: number;
   room?: string;
+  phase?: string;
   roomTime?: { paused?: boolean; speed?: number };
   frame?: number;
   ready?: boolean;
@@ -1058,7 +1059,7 @@ export class InteractDriver {
       if (readiness.failedAssets?.length) {
         throw new InteractDriverError("assetLoadFailed", captureReadinessMessage(readiness, this.diagnostics()));
       }
-      if (readiness.ready && Number(readiness.frame) >= initialFrame + 2) return readiness;
+      if (readiness.ready && (readiness.phase === "concluded" || Number(readiness.frame) >= initialFrame + 2)) return readiness;
       await sleep(25);
     }
     throw new InteractDriverError("captureTimeout", captureReadinessMessage(last, this.diagnostics()));

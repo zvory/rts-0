@@ -48,6 +48,8 @@ try {
   const entities = [
     { id: 10, kind: "rifleman", owner: 1, x: 100, y: 100, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
     { id: 20, kind: "rifleman", owner: 2, x: 300, y: 300, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
+    { id: 30, kind: "rifleman", owner: 1, x: 120, y: 120, hp: 0, maxHp: 100, state: "dead", visionOnly: true, orderPlan: [] },
+    { id: 40, kind: "rifleman", owner: 2, x: 320, y: 320, hp: 100, maxHp: 100, state: "firing", shotReveal: true, orderPlan: [] },
   ];
   let issuedCommand = null;
   const match = {
@@ -107,15 +109,26 @@ try {
   assert.deepEqual(inspection.entities.map(({ id }) => id), [10], "inspection defaults to locally owned entities");
   assert.equal(inspection.entities[0].controllable, true, "inspection labels movable local units");
   assert.deepEqual(inspection.ui.resources, { steel: "100", oil: "75", supply: "2 / 10" }, "inspection projects bounded HUD text");
+  assert.deepEqual(
+    bridge.inspect({ ownership: "visible" }).entities.map(({ id }) => id),
+    [10, 20],
+    "inspection excludes shot-reveal and lingering vision-only render records",
+  );
 
   const moved = await bridge.move({ units: [10], x: 500, y: 500 });
   assert.equal(moved.accepted, true, "move reports normal client admission");
   assert.deepEqual(issuedCommand, { c: "move", units: [10], x: 500, y: 500 }, "move builds exactly one normal move command");
   await assert.rejects(() => bridge.move({ units: [20], x: 500, y: 500 }), (error) => error?.code === "notControllable");
+  await assert.rejects(
+    () => bridge.move({ units: [30], x: 500, y: 500 }),
+    (error) => error?.code === "notControllable",
+    "lingering vision records cannot be moved as owned units",
+  );
 
   const gaveUp = await bridge.giveUp();
   assert.equal(gaveUp.phase, "concluded", "give-up waits for the score screen");
   assert.equal(gaveUp.ui.scoreScreenVisible, true, "give-up returns the concluded UI state");
+  assert.equal(bridge.captureReadiness().phase, "concluded", "capture readiness identifies the stable stopped score-screen frame");
   match.state.spectator = true;
   assert.equal(bridge.status().ready, true, "the concluded score screen remains inspectable after replay-backed spectator replacement");
   await assert.rejects(() => bridge.move({ units: [10], x: 600, y: 600 }), (error) => error?.code === "matchConcluded");

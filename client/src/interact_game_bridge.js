@@ -160,7 +160,7 @@ export class InteractGameBridge {
     if (!match.state.worldInBounds(x, y)) throw bridgeError("outOfBounds", "move destination must be inside the current map.");
     const entities = units.map((id) => match.state.entityById(id));
     if (entities.some((entity) => !entity)) throw bridgeError("unknownEntity", "move.units contains an entity outside the current fog-filtered snapshot.");
-    if (entities.some((entity) => entity.owner !== match.state.playerId || !isUnit(entity.kind))) {
+    if (entities.some((entity) => !isControllableUnit(entity, match.state.playerId))) {
       throw bridgeError("notControllable", "move.units may contain only the local player's units.");
     }
     const before = snapshotSequence(match);
@@ -201,7 +201,7 @@ export class InteractGameBridge {
       if (!match.camera.restore(input.snapshot)) throw bridgeError("invalidCamera", "camera.snapshot must be a valid CameraSnapshotV1.");
     } else if (action === "focus") {
       const ids = boundedIds(input.entityIds, "camera.entityIds", INTERACT_GAME_LIMITS.focusEntities);
-      const entities = ids.map((id) => match.state.entityById(id)).filter(Boolean);
+      const entities = ids.map((id) => match.state.entityById(id)).filter(isInspectableEntity);
       if (entities.length !== ids.length) throw bridgeError("unknownEntity", "camera.focus contains an unavailable entity.");
       const defaultPadding = entities.length === 1 && isUnit(entities[0].kind)
         ? SINGLE_UNIT_FOCUS_PADDING
@@ -236,7 +236,7 @@ export class InteractGameBridge {
   captureReadiness(input = {}) {
     const { match } = this.session();
     const subjectIds = optionalBoundedIds(input.subjectIds, "captureReadiness.subjectIds", INTERACT_GAME_LIMITS.captureSubjects);
-    const subjects = subjectIds.map((id) => match.state.entityById(id)).filter(Boolean);
+    const subjects = subjectIds.map((id) => match.state.entityById(id)).filter(isInspectableEntity);
     if (subjects.length !== subjectIds.length) throw bridgeError("unknownEntity", "captureReadiness contains an unavailable entity.");
     const rendererReadiness = match.renderer?.captureReadiness?.({
       subjectIds,
@@ -252,6 +252,7 @@ export class InteractGameBridge {
       ...rendererReadiness,
       ready: rendererReadiness.ready && fonts.status === "ready" && frameErrors === 0 &&
         rendererReadiness.renderErrors.length === 0 && rendererReadiness.missingTextureSubjectIds.length === 0,
+      phase: gamePhase(match),
       snapshotTick: match.state.tick,
       roomTime: null,
       viewport: projectViewport(),
@@ -302,6 +303,7 @@ function normalizeInspect(input) {
 }
 
 function inspectionIncludes(entity, query, match) {
+  if (!isInspectableEntity(entity)) return false;
   if (query.ids.size && !query.ids.has(entity.id)) return false;
   if (query.kinds.size && !query.kinds.has(entity.kind)) return false;
   if (query.ownership === "owned" && entity.owner !== match.state.playerId) return false;
@@ -316,7 +318,7 @@ function projectEntity(entity, playerId = null) {
     id: entity.id,
     kind: entity.kind,
     owner: entity.owner,
-    controllable: entity.owner === playerId && isUnit(entity.kind),
+    controllable: isControllableUnit(entity, playerId),
     x: finiteOrNull(entity.x),
     y: finiteOrNull(entity.y),
     hp: finiteOrNull(entity.hp),
@@ -331,6 +333,14 @@ function projectEntity(entity, playerId = null) {
       target: Number.isInteger(stage?.target) ? stage.target : null,
     })) : [],
   };
+}
+
+function isInspectableEntity(entity) {
+  return !!entity && entity.shotReveal !== true && entity.visionOnly !== true;
+}
+
+function isControllableUnit(entity, playerId) {
+  return isInspectableEntity(entity) && entity.owner === playerId && isUnit(entity.kind);
 }
 
 function projectLocalPlayer(state) {
