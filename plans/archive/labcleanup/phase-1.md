@@ -14,7 +14,7 @@ freezing the entire pre-alpha interface or turning into a slow exhaustive suite.
 
 ### Strengthen the existing live smoke
 
-- Extend `tests/lab_interact_cli_smoke.mjs`; do not add a second end-to-end harness.
+- Extend `tests/interact_cli_smoke.mjs`; do not add a second end-to-end harness.
 - Keep the scenario small: one shooter and one target with aliases, not a large unit population.
 - Exercise this semantic flow through ordinary CLI invocations:
   1. start from shutdown and open an isolated session;
@@ -34,11 +34,11 @@ freezing the entire pre-alpha interface or turning into a slow exhaustive suite.
 
 ### Make the test gate honest and isolated
 
-- Give `tests/lab_interact_fixed_capture_contracts.mjs` its own named/tracked `run_suite_bg` entry in
+- Give `tests/interact_fixed_capture_contracts.mjs` its own named/tracked `run_suite_bg` entry in
   `tests/run-all.sh`. The current bare invocation can fail without being included in the aggregated
   runner result.
 - Stop Lab artifact tests from recursively deleting the shared
-  `target/lab-interact/artifacts` directory. Track every generated artifact/sidecar/setup/replay path,
+  `target/interact/lab/artifacts` directory. Track every generated artifact/sidecar/setup/replay path,
   clean only test-owned files in `finally`, and remove a directory only if the test owns it or it is
   empty.
 - Make fake CLI contracts clean up their own exported setup and replay outputs, including failure
@@ -49,11 +49,11 @@ freezing the entire pre-alpha interface or turning into a slow exhaustive suite.
 
 ### Select the right checks
 
-- Add explicit Lab Interact contract and smoke selections in `tests/select-suites.mjs` for changes to:
-  - `scripts/lab-interact/**`;
-  - `client/src/lab_interact_bridge.js`;
+- Add explicit Interact contract and smoke selections in `tests/select-suites.mjs` for changes to:
+  - `scripts/interact/**`;
+  - `client/src/interact_bridge.js`;
   - the Rust Lab artifact bridge;
-  - Lab Interact tests, docs, and project-local skill instructions where applicable.
+  - Interact tests, docs, and project-local skill instructions where applicable.
 - Add selector self-test cases proving representative `driver` and `command_service` changes select
   both Lab contracts and the browser smoke.
 - Document the canonical fast contract command, the live browser canary, its server ownership modes,
@@ -61,16 +61,16 @@ freezing the entire pre-alpha interface or turning into a slow exhaustive suite.
 
 ## Expected Touch Points
 
-- `tests/lab_interact_cli_smoke.mjs`
-- `tests/lab_interact_cli_contracts.mjs`
-- `tests/lab_interact_artifact_contracts.mjs`
-- `tests/lab_interact_fixed_capture_contracts.mjs`
+- `tests/interact_cli_smoke.mjs`
+- `tests/interact_cli_contracts.mjs`
+- `tests/interact_artifact_contracts.mjs`
+- `tests/interact_fixed_capture_contracts.mjs`
 - `tests/run-all.sh`
 - `tests/select-suites.mjs`
 - `tests/README.md`
 - `docs/context/testing.md`
 - `docs/design/testing.md`
-- `docs/lab-interact-cli.md`
+- `docs/interact-cli.md`
 
 ## Implementation Checklist
 
@@ -91,13 +91,13 @@ Run the smallest focused set that proves the changed plumbing and canary:
 ```bash
 bash -n tests/run-all.sh
 node tests/select-suites.mjs --verify
-node tests/lab_interact_cli_contracts.mjs
-node tests/lab_interact_artifact_contracts.mjs
-node tests/lab_interact_bulk_contracts.mjs
-node tests/lab_interact_recording_contracts.mjs
-node tests/lab_interact_fixed_capture_contracts.mjs
-node tests/lab_interact_tailnet_preview_contracts.mjs
-node tests/lab_interact_cli_smoke.mjs
+node tests/interact_cli_contracts.mjs
+node tests/interact_artifact_contracts.mjs
+node tests/interact_bulk_contracts.mjs
+node tests/interact_recording_contracts.mjs
+node tests/interact_fixed_capture_contracts.mjs
+node tests/interact_tailnet_preview_contracts.mjs
+node tests/interact_cli_smoke.mjs
 node scripts/check-docs-health.mjs
 git diff --check
 ```

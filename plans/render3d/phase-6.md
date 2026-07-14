@@ -33,7 +33,7 @@ by those real examples; do not generalize beyond demonstrated needs.
 - Record simple scene counters before/after the representative asset/effect on the same machine.
   Optimize only an obvious per-entity resource duplication; do not create benchmark schemas or
   budgets.
-- Use `lab-interact` to capture and inspect the representative fogged asset/effect scene.
+- Use `interact` to capture and inspect the representative fogged asset/effect scene.
 
 ## Keep Small
 

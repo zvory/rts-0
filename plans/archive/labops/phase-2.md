@@ -32,12 +32,12 @@ background daemon was started from a different checkout commit.
 
 ## Expected Touch Points
 
-- a focused command-help metadata module plus `scripts/lab-interact/cli.mjs`
+- a focused command-help metadata module plus `scripts/interact/cli.mjs`
 - command service, driver bounds, recording/fixed manifest summary helpers, and fake driver
-- `client/src/lab_interact_bridge.js`
+- `client/src/interact_bridge.js`
 - daemon runtime/state/probe lifecycle and CLI contracts
-- Lab Interact CLI/driver/recording/fixed-capture contracts and smoke coverage
-- CLI documentation and the Lab Interact skill
+- Interact CLI/driver/recording/fixed-capture contracts and smoke coverage
+- CLI documentation and the Interact skill
 
 ## Verification
 
@@ -50,7 +50,7 @@ background daemon was started from a different checkout commit.
 - A live canary bulk-spawns a large scene through Phase 1, focuses the full authored subject set,
   captures one clean PNG, and confirms readiness checks cover all requested subjects without
   returning 400 detailed summaries.
-- Run focused client architecture, Lab Interact contracts/smokes, docs health, suite selection, and
+- Run focused client architecture, Interact contracts/smokes, docs health, suite selection, and
   the owned-PR workflow.
 
 ## Manual Testing Focus

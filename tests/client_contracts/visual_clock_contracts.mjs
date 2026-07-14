@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { CaptureRenderClock, RenderClock } from "../../client/src/visual_clock.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture } from "../../client/src/match_fixed_capture.js";
-import { fixedFrameTick } from "../../scripts/lab-interact/fixed_capture.ts";
+import { fixedFrameTick } from "../../scripts/interact/fixed_capture.ts";
 
 const clock = new CaptureRenderClock(100);
 assert.equal(clock.now(), 100, "capture clock starts at the injected visual timestamp");

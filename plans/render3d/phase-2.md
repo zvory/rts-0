@@ -123,7 +123,7 @@ placeholder art must never become selection authority.
     node tests/client_contracts/state_input_contracts.mjs
     node tests/client_contracts/selection_projection_contracts.mjs
     node tests/minimap_input_contracts.mjs
-    node tests/lab_interact_driver_contracts.mjs
+    node tests/interact_driver_contracts.mjs
     node scripts/check-client-architecture.mjs
     tests/run-all.sh --only-browser-scenarios=smoke
     git diff --check

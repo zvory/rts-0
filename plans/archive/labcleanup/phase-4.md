@@ -6,7 +6,7 @@
 
 ## Objective
 
-Migrate the settled Node-side Lab Interact implementation to strict TypeScript without adding a build
+Migrate the settled Node-side Interact implementation to strict TypeScript without adding a build
 product or starting another architecture redesign. Execute source directly with Node 22.18 or newer,
 use a no-emit compiler pass for type checking, and keep the browser client/bridge in native
 JavaScript.
@@ -27,17 +27,17 @@ References:
 
 ### Establish direct TypeScript execution and checking
 
-- Require Node 22.18 or newer for Lab Interact and enforce it with a concise preflight. The repository
+- Require Node 22.18 or newer for Interact and enforce it with a concise preflight. The repository
   and CI already use Node 22; pin/document the minimum patch level wherever Lab dependencies and
   checks are installed.
-- Keep a tiny `scripts/lab-interact/cli.mjs` bootstrap so every operator command, help example,
+- Keep a tiny `scripts/interact/cli.mjs` bootstrap so every operator command, help example,
   recovery string, and skill instruction can continue using the same entry point until the separate
   deep rename. Its only jobs are the Node version check and importing `cli.ts`.
-- Rename the remaining Node implementation files under `scripts/lab-interact/` from `.mjs` to `.ts`,
+- Rename the remaining Node implementation files under `scripts/interact/` from `.mjs` to `.ts`,
   bottom-up, with explicit `.ts` import specifiers. Spawn the TypeScript daemon using
   `process.execPath` rather than a shell wrapper.
 - Add a Lab-scoped TypeScript configuration and a repository script such as
-  `check:lab-interact-types` with:
+  `check:interact-types` with:
   - `noEmit: true` and `strict: true`;
   - `target: "ESNext"`;
   - `module: "NodeNext"` and `moduleResolution: "NodeNext"`;
@@ -62,7 +62,7 @@ References:
   it must not replace exact/bounded validation.
 - Avoid blanket `any`, `@ts-ignore`, or assertion casts that erase a whole boundary. Localized casts
   at a runtime-validated edge are acceptable when documented and covered by its contract test.
-- Keep `client/src/lab_interact_bridge.js` as native browser JavaScript because the client has no
+- Keep `client/src/interact_bridge.js` as native browser JavaScript because the client has no
   build step. Add small JSDoc or `@ts-check` only if it is nearly free and does not turn this phase
   into client migration.
 
@@ -79,19 +79,19 @@ References:
 
 ## Expected Touch Points
 
-- `scripts/lab-interact/cli.mjs` plus new `cli.ts`
-- `scripts/lab-interact/*.mjs -> *.ts`
-- new `scripts/lab-interact/tsconfig.json` or root `tsconfig.lab-interact.json`
+- `scripts/interact/cli.mjs` plus new `cli.ts`
+- `scripts/interact/*.mjs -> *.ts`
+- new `scripts/interact/tsconfig.json` or root `tsconfig.interact.json`
 - repository npm manifest/lock
-- `tests/lab_interact_*.mjs`
-- `tests/fixtures/lab_interact_fake_driver.mjs`
+- `tests/interact_*.mjs`
+- `tests/fixtures/interact_fake_driver.mjs`
 - `tests/run-all.sh`
 - `tests/select-suites.mjs`
 - `scripts/check-source-file-sizes.mjs`
-- `scripts/check-lab-interact-architecture.mjs`
+- `scripts/check-interact-architecture.mjs`
 - `.github/workflows/main-tests.yml` only if the existing dependency-install step cannot run the check
-- `docs/lab-interact-cli.md`
-- relevant context/design source pointers and `.agents/skills/lab-interact/` instructions
+- `docs/interact-cli.md`
+- relevant context/design source pointers and `.agents/skills/interact/` instructions
 
 ## Implementation Checklist
 
@@ -111,19 +111,19 @@ Use the final script names established during implementation; the intended focus
 
 ```bash
 npm ci
-npm run check:lab-interact-types
-node scripts/lab-interact/cli.mjs help
-node scripts/check-lab-interact-architecture.mjs
+npm run check:interact-types
+node scripts/interact/cli.mjs lab help
+node scripts/check-interact-architecture.mjs
 node scripts/check-source-file-sizes.mjs
-node tests/lab_interact_cli_contracts.mjs
-node tests/lab_interact_driver_contracts.mjs
-node tests/lab_interact_bulk_contracts.mjs
-node tests/lab_interact_artifact_contracts.mjs
-node tests/lab_interact_recording_contracts.mjs
-node tests/lab_interact_fixed_capture_contracts.mjs
-node tests/lab_interact_tailnet_preview_contracts.mjs
+node tests/interact_cli_contracts.mjs
+node tests/interact_driver_contracts.mjs
+node tests/interact_bulk_contracts.mjs
+node tests/interact_artifact_contracts.mjs
+node tests/interact_recording_contracts.mjs
+node tests/interact_fixed_capture_contracts.mjs
+node tests/interact_tailnet_preview_contracts.mjs
 node tests/select-suites.mjs --verify
-node tests/lab_interact_cli_smoke.mjs
+node tests/interact_cli_smoke.mjs
 node scripts/check-docs-health.mjs
 git diff --check
 ```
@@ -134,7 +134,7 @@ the tool emits no `dist/`, compiled JavaScript, declaration, or source-map files
 ## Acceptance Criteria
 
 - `cli.mjs` is the only compatibility JavaScript implementation file remaining under
-  `scripts/lab-interact/`; Node-side implementation modules are strict `.ts`.
+  `scripts/interact/`; Node-side implementation modules are strict `.ts`.
 - The CLI runs source directly on Node 22.18+ with no loader warning, build prerequisite, runtime TS
   dependency, or emitted code. Below-minimum Node gets a concise version error.
 - The strict no-emit check passes without blanket type escapes.

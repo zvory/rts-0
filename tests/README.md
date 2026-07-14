@@ -68,23 +68,23 @@ SHA-256 hash of the repository `package-lock.json`, then links this worktree's i
 to the matching cache entry. Hydration uses `npm ci`, so a lockfile/package mismatch fails the
 gate instead of silently reusing the wrong dependency tree.
 
-## Lab Interact canary
+## Interact canary
 
-The canonical fast Lab Interact check is the focused contract set below. It uses the fake driver,
+The canonical fast Interact check is the focused contract set below. It uses the fake driver,
 needs no Rust server or Chrome, and requires FFmpeg/ffprobe with H.264 support for its media checks:
 
 ```bash
-node tests/lab_interact_cli_contracts.mjs
-node tests/lab_interact_artifact_contracts.mjs
-node tests/lab_interact_bulk_contracts.mjs
-node tests/lab_interact_recording_contracts.mjs
-node tests/lab_interact_fixed_capture_contracts.mjs
-node tests/lab_interact_tailnet_preview_contracts.mjs
+node tests/interact_cli_contracts.mjs
+node tests/interact_artifact_contracts.mjs
+node tests/interact_bulk_contracts.mjs
+node tests/interact_recording_contracts.mjs
+node tests/interact_fixed_capture_contracts.mjs
+node tests/interact_tailnet_preview_contracts.mjs
 ```
 
-Run `node tests/lab_interact_cli_smoke.mjs` for the live browser canary. A standalone run needs
+Run `node tests/interact_cli_smoke.mjs` for the live browser canary. A standalone run needs
 Chrome/Chromium and owns a private Rust server; `tests/run-all.sh --only-browser-scenarios=smoke`
-reuses the gate's private server via `RTS_LAB_INTERACT_BASE_URL`. The canary authors only a shooter
+reuses the gate's private server via `RTS_INTERACT_LAB_BASE_URL`. The canary authors only a shooter
 and target, verifies update and authoritative stepped movement, fetches a clean 1000x700 PNG
 preview, round-trips a setup and aliases, records a short H.264 clip, and proves reset/close/stale
 session/shutdown cleanup. Tests remove only their UUID-owned session directories and exact portable

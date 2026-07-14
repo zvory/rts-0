@@ -6,7 +6,7 @@
 /target/client-perf
 # Legacy Agent Lab artifacts may still exist in older checkouts; never stage them.
 /target/agent-lab
-/target/lab-interact
+/target/interact
 **/*.rs.bk
 Cargo.lock.orig
 

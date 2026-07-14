@@ -118,7 +118,7 @@ a new small plan only when a playtest, content need, or measurement justifies on
 Implement one phase per clean branch/owned PR and wait for it to merge before starting the next.
 Run Phases 4 and 5 as the first chain, then stop; do not invoke Phases 4–6 as one unattended runner
 range. Phase 6 requires explicit user approval after the Phase 5 playtest. Each graphics phase uses
-Lab Interact once for a small authoritative scene, inspects the returned PNG, and reports the
+Interact once for a small authoritative scene, inspects the returned PNG, and reports the
 capture path. Verification should cover the phase's architectural risk, not an exhaustive matrix
 of every route and lifecycle combination.
 
