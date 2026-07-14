@@ -22,6 +22,7 @@ assert.equal(
 );
 
 const previousDocument = globalThis.document;
+const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
 const elements = new Map([
   ["game-screen", node({ hidden: false })],
   ["viewport", node({ hidden: false, rect: { x: 0, y: 0, width: 1000, height: 700 } })],
@@ -42,6 +43,7 @@ globalThis.document = {
   fonts: { status: "loaded" },
   getElementById: (id) => elements.get(id) || null,
 };
+globalThis.requestAnimationFrame = (callback) => callback();
 
 try {
   let snapshotSequence = 1;
@@ -52,6 +54,7 @@ try {
     { id: 40, kind: "rifleman", owner: 2, x: 320, y: 320, hp: 100, maxHp: 100, state: "firing", shotReveal: true, orderPlan: [] },
   ];
   let issuedCommand = null;
+  const presentationCalls = [];
   const match = {
     giveUpSent: false,
     matchRunId: "run-test",
@@ -83,6 +86,7 @@ try {
       this.giveUpSent = true;
       elements.get("game-over").hidden = false;
     },
+    handleResize: () => presentationCalls.push("match-resize"),
     camera: {
       snapshot: () => ({ version: 1, focus: { x: 0, y: 0 }, framingScale: 1, boundsPolicy: "mapOverscroll" }),
       projectionSnapshot: () => ({ viewport: { widthCssPx: 1000, heightCssPx: 700 } }),
@@ -98,6 +102,7 @@ try {
       matchLaunch: { room: "interact-game-test" },
       matchLaunchFailed: false,
       net: { ws: { readyState: 1 } },
+      setCleanPresentation: (enabled) => presentationCalls.push(`app-presentation:${enabled}`),
     },
     windowLike,
     enabled: true,
@@ -109,6 +114,8 @@ try {
   assert.deepEqual(inspection.entities.map(({ id }) => id), [10], "inspection defaults to locally owned entities");
   assert.equal(inspection.entities[0].controllable, true, "inspection labels movable local units");
   assert.deepEqual(inspection.ui.resources, { steel: "100", oil: "75", supply: "2 / 10" }, "inspection projects bounded HUD text");
+  await bridge.presentation({ mode: "clean" });
+  assert.deepEqual(presentationCalls, ["app-presentation:true"], "presentation delegates its one resize to the app-owned seam");
   assert.deepEqual(
     bridge.inspect({ ownership: "visible" }).entities.map(({ id }) => id),
     [10, 20],
@@ -136,6 +143,8 @@ try {
 } finally {
   if (previousDocument === undefined) delete globalThis.document;
   else globalThis.document = previousDocument;
+  if (previousRequestAnimationFrame === undefined) delete globalThis.requestAnimationFrame;
+  else globalThis.requestAnimationFrame = previousRequestAnimationFrame;
 }
 
 function node({ hidden = false, text = "", rect = null, buttons = [] } = {}) {
