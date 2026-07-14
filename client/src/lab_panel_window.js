@@ -20,6 +20,7 @@ export class LabPanelWindowChrome {
     this.windowObj = options.windowObj ?? globalThis.window ?? null;
     this.storage = options.storage ?? this.windowObj?.localStorage ?? null;
     this.storageKey = options.storageKey || DEFAULT_STORAGE_KEY;
+    this.panelLabel = String(options.panelLabel || "lab controls").trim() || "panel";
     this.renderListeners = [];
     this.windowListeners = [];
     this.activeListeners = [];
@@ -47,7 +48,7 @@ export class LabPanelWindowChrome {
     dragHandle.className = "lab-panel-drag-handle";
     dragHandle.tabIndex = 0;
     dragHandle.setAttribute("role", "button");
-    dragHandle.setAttribute("aria-label", "Move lab controls panel");
+    dragHandle.setAttribute("aria-label", `Move ${this.panelLabel} panel`);
     dragHandle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight Home");
     dragHandle.title = "Drag to move. Arrow keys nudge. Home resets.";
     dragHandle.dataset.labPanelDragHandle = "true";
@@ -99,7 +100,7 @@ export class LabPanelWindowChrome {
     handle.type = "button";
     handle.className = "lab-panel-resize-handle";
     handle.title = "Drag to resize. Arrow keys resize.";
-    handle.setAttribute("aria-label", "Resize lab controls panel");
+    handle.setAttribute("aria-label", `Resize ${this.panelLabel} panel`);
     handle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight");
     this.listenRender(handle, "pointerdown", (event) => this.beginInteraction("resize", event));
     this.listenRender(handle, "keydown", (event) => this.handleResizeKey(event));
