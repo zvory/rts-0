@@ -3,14 +3,15 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 export class WorkspaceInspectionError extends Error {
-  constructor(code, message) {
+code: string;
+  constructor(code: string, message: string|undefined) {
     super(message);
     this.name = "WorkspaceInspectionError";
     this.code = code;
   }
 }
 
-export function validateWorkspaceRoot(workspaceRoot) {
+export function validateWorkspaceRoot(workspaceRoot: fs.PathLike) {
   if (!workspaceRoot) throw new WorkspaceInspectionError("workspaceRequired", "workspaceRoot is required.");
   let root;
   try { root = fs.realpathSync(workspaceRoot); } catch {
@@ -30,7 +31,7 @@ export function validateWorkspaceRoot(workspaceRoot) {
   return { root, branch: git(root, ["branch", "--show-current"]) || "HEAD", head };
 }
 
-export function findChrome(explicit, env = process.env) {
+export function findChrome(explicit: unknown, env = process.env) {
   const candidates = [
     explicit,
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -39,13 +40,13 @@ export function findChrome(explicit, env = process.env) {
     ...pathCandidates("google-chrome", env),
     ...pathCandidates("chromium-browser", env),
     ...pathCandidates("chromium", env),
-  ].filter(Boolean);
+  ].filter((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
   const chrome = candidates.find((candidate) => fs.existsSync(candidate));
   if (!chrome) throw new WorkspaceInspectionError("chromeUnavailable", "Chrome/Chromium not found; set CHROME=/path/to/chrome.");
   return chrome;
 }
 
-function git(cwd, args) {
+function git(cwd: string, args: string[]) {
   const result = spawnSync("git", ["-C", cwd, ...args], {
     encoding: "utf8",
     timeout: 2_000,
@@ -54,6 +55,6 @@ function git(cwd, args) {
   return result.status === 0 ? result.stdout.trim() : "";
 }
 
-function pathCandidates(command, env) {
+function pathCandidates(command: string, env: NodeJS.ProcessEnv) {
   return String(env.PATH || "").split(path.delimiter).filter(Boolean).map((directory) => path.join(directory, command));
 }

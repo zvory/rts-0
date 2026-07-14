@@ -7,14 +7,14 @@ import { fileURLToPath } from "node:url";
 import {
   LAB_INTERACT_COMMAND_REGISTRY,
   LAB_INTERACT_COMMANDS,
-} from "./lab-interact/command_registry.mjs";
-import { SESSION_EXECUTION_LANES } from "./lab-interact/session_coordinator.mjs";
+} from "./lab-interact/command_registry.ts";
+import { SESSION_EXECUTION_LANES } from "./lab-interact/session_coordinator.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const labRoot = path.join(repoRoot, "scripts", "lab-interact");
 const failures = [];
 const sources = new Map(readdirSync(labRoot)
-  .filter((name) => name.endsWith(".mjs"))
+  .filter((name) => name.endsWith(".ts") || name === "cli.mjs")
   .map((name) => [name, readFileSync(path.join(labRoot, name), "utf8")]));
 
 checkRegistry();
@@ -38,7 +38,7 @@ console.log(`Lab Interact architecture check passed (${LAB_INTERACT_COMMANDS.len
 function checkRegistry() {
   const names = Object.keys(LAB_INTERACT_COMMAND_REGISTRY);
   if (new Set(names).size !== names.length || names.length !== LAB_INTERACT_COMMANDS.length) {
-    failures.push("public commands must be defined exactly once in command_registry.mjs");
+    failures.push("public commands must be defined exactly once in command_registry.ts");
   }
   const allowedScopes = new Set(["daemon", "session"]);
   const allowedLanes = new Set(SESSION_EXECUTION_LANES);
@@ -78,9 +78,9 @@ function expectMetadata(label, field, value, expected) {
 }
 
 function checkServiceRouting() {
-  const service = sources.get("command_service.mjs") || "";
+  const service = sources.get("command_service.ts") || "";
   if (!service.includes("executeSession(definition.handlerKey")) {
-    failures.push("command_service.mjs must route registry handler keys into session handlers");
+    failures.push("command_service.ts must route registry handler keys into session handlers");
   }
   for (const definition of Object.values(LAB_INTERACT_COMMAND_REGISTRY)) {
     const key = definition.handlerKey.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -92,66 +92,66 @@ function checkServiceRouting() {
 
 function checkImports() {
   const imports = new Map([...sources].map(([name, source]) => [name, relativeImports(source)]));
-  forbidImports(imports, "driver.mjs", ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "cli.mjs", "daemon.mjs"]);
-  forbidImports(imports, "runtime.mjs", ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "cli.mjs", "daemon.mjs"]);
-  for (const name of ["abort_signal.mjs", "process_runner.mjs", "private_server.mjs", "recording.mjs", "fixed_capture.mjs", "tailnet_preview.mjs", "workspace_inspection.mjs"]) {
-    forbidImports(imports, name, ["command_inputs.mjs", "command_registry.mjs", "command_service.mjs", "session_coordinator.mjs", "driver.mjs", "cli.mjs", "daemon.mjs"]);
+  forbidImports(imports, "driver.ts", ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "cli.mjs", "daemon.ts"]);
+  forbidImports(imports, "runtime.ts", ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "cli.mjs", "daemon.ts"]);
+  for (const name of ["abort_signal.ts", "process_runner.ts", "private_server.ts", "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "workspace_inspection.ts"]) {
+    forbidImports(imports, name, ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "driver.ts", "cli.mjs", "daemon.ts"]);
   }
-  for (const name of ["command_inputs.mjs", "command_registry.mjs", "command_help.mjs", "session_coordinator.mjs"]) {
-    forbidImports(imports, name, ["command_service.mjs", "driver.mjs", "cli.mjs", "daemon.mjs"]);
+  for (const name of ["command_inputs.ts", "command_registry.ts", "command_help.ts", "session_coordinator.ts"]) {
+    forbidImports(imports, name, ["command_service.ts", "driver.ts", "cli.mjs", "daemon.ts"]);
   }
-  forbidImports(imports, "cli.mjs", ["driver.mjs", "command_service.mjs", "session_coordinator.mjs"]);
-  forbidImports(imports, "daemon.mjs", ["driver.mjs", "session_coordinator.mjs"]);
-  if (!imports.get("command_service.mjs")?.includes("session_coordinator.mjs") ||
-      !imports.get("command_service.mjs")?.includes("command_registry.mjs") ||
-      !imports.get("command_service.mjs")?.includes("driver.mjs")) {
-    failures.push("command_service.mjs must connect the registry/coordinator application layer to the driver adapter");
+  forbidImports(imports, "cli.ts", ["driver.ts", "command_service.ts", "session_coordinator.ts"]);
+  forbidImports(imports, "daemon.ts", ["driver.ts", "session_coordinator.ts"]);
+  if (!imports.get("command_service.ts")?.includes("session_coordinator.ts") ||
+      !imports.get("command_service.ts")?.includes("command_registry.ts") ||
+      !imports.get("command_service.ts")?.includes("driver.ts")) {
+    failures.push("command_service.ts must connect the registry/coordinator application layer to the driver adapter");
   }
 }
 
 function checkAdapterOwnership() {
-  const driverImports = relativeImports(sources.get("driver.mjs") || "");
-  if (!driverImports.includes("private_server.mjs")) failures.push("driver.mjs must delegate private-server lifecycle to private_server.mjs");
-  if (!driverImports.includes("workspace_inspection.mjs")) failures.push("driver.mjs must keep bounded pre-request workspace inspection outside the request-path process check");
-  const privateServerImports = relativeImports(sources.get("private_server.mjs") || "");
-  if (!privateServerImports.includes("process_runner.mjs")) failures.push("private_server.mjs must use process_runner.mjs for finite Cargo builds");
+  const driverImports = relativeImports(sources.get("driver.ts") || "");
+  if (!driverImports.includes("private_server.ts")) failures.push("driver.ts must delegate private-server lifecycle to private_server.ts");
+  if (!driverImports.includes("workspace_inspection.ts")) failures.push("driver.ts must keep bounded pre-request workspace inspection outside the request-path process check");
+  const privateServerImports = relativeImports(sources.get("private_server.ts") || "");
+  if (!privateServerImports.includes("process_runner.ts")) failures.push("private_server.ts must use process_runner.ts for finite Cargo builds");
 
   const allowedChildOwners = new Set([
-    "cli.mjs", "process_runner.mjs", "private_server.mjs", "recording.mjs",
-    "runtime.mjs", "workspace_inspection.mjs",
+    "cli.ts", "process_runner.ts", "private_server.ts", "recording.ts",
+    "runtime.ts", "workspace_inspection.ts",
   ]);
   for (const [name, source] of sources) {
     if (/from\s+["']node:child_process["']/.test(source) && !allowedChildOwners.has(name)) {
       failures.push(`${name} imports child_process without owning an approved child lifecycle`);
     }
   }
-  for (const owner of ["process_runner.mjs", "private_server.mjs", "recording.mjs"]) {
+  for (const owner of ["process_runner.ts", "private_server.ts", "recording.ts"]) {
     if (!/from\s+["']node:child_process["']/.test(sources.get(owner) || "")) {
       failures.push(`${owner} must remain an explicit request-path/tool child owner`);
     }
   }
-  const cli = sources.get("cli.mjs") || "";
-  if (!/spawn\(process\.execPath,\s*\[path\.join\(scriptDir,\s*["']daemon\.mjs["']\)/.test(cli)) {
-    failures.push("cli.mjs must remain the explicit daemon bootstrap child owner");
+  const cli = sources.get("cli.ts") || "";
+  if (!/spawn\(process\.execPath,\s*\[path\.join\(scriptDir,\s*["']daemon\.ts["']\)/.test(cli)) {
+    failures.push("cli.ts must remain the explicit daemon bootstrap child owner and spawn daemon.ts with Node");
   }
 }
 
 function checkBlockingProcesses() {
   const requestPath = [
-    "command_service.mjs", "driver.mjs", "private_server.mjs", "process_runner.mjs",
-    "recording.mjs", "fixed_capture.mjs", "tailnet_preview.mjs", "daemon.mjs",
+    "command_service.ts", "driver.ts", "private_server.ts", "process_runner.ts",
+    "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "daemon.ts",
   ];
   for (const name of requestPath) {
     if (/\b(?:spawnSync|execSync|execFileSync)\b/.test(sources.get(name) || "")) {
       failures.push(`${name} contains a blocking child process in the daemon request path`);
     }
   }
-  const workspaceInspection = sources.get("workspace_inspection.mjs") || "";
+  const workspaceInspection = sources.get("workspace_inspection.ts") || "";
   if (!/spawnSync\("git"/.test(workspaceInspection) || !/timeout:\s*2_000/.test(workspaceInspection)) {
-    failures.push("workspace_inspection.mjs must keep its documented synchronous Git exception explicitly bounded");
+    failures.push("workspace_inspection.ts must keep its documented synchronous Git exception explicitly bounded");
   }
   const labRuntimeSources = [...sources]
-    .filter(([name]) => name !== "cli.mjs")
+    .filter(([name]) => name !== "cli.mjs" && name !== "cli.ts")
     .map(([, source]) => source)
     .join("\n");
   if (/(?:runOrThrow|\.run)\s*\(\s*["']npm["']|spawn\s*\(\s*["']npm["']/.test(labRuntimeSources)) {
@@ -167,12 +167,41 @@ function checkDependencyOwnership() {
       rootLock?.packages?.[""]?.devDependencies?.["puppeteer-core"] !== "^23") {
     failures.push("repository package and lock must own the puppeteer-core runtime dependency");
   }
+  if (rootPackage?.engines?.node !== ">=22.18.0" || rootLock?.packages?.[""]?.engines?.node !== ">=22.18.0") {
+    failures.push("repository package and lock must require Node 22.18.0 or newer");
+  }
+  if (rootPackage?.devDependencies?.typescript !== "^5.8" ||
+      rootLock?.packages?.[""]?.devDependencies?.typescript !== "^5.8" ||
+      rootPackage?.devDependencies?.["@types/node"] !== "^22" ||
+      rootLock?.packages?.[""]?.devDependencies?.["@types/node"] !== "^22") {
+    failures.push("repository package and lock must own TypeScript 5.8+ and Node 22 typings");
+  }
+  if (rootPackage?.scripts?.["check:lab-interact-types"] !== "tsc --project scripts/lab-interact/tsconfig.json") {
+    failures.push("repository package must expose the Lab Interact no-emit typecheck");
+  }
+  const tsconfig = readJson(path.join(labRoot, "tsconfig.json"));
+  const compiler = tsconfig?.compilerOptions || {};
+  for (const [field, expected] of Object.entries({
+    noEmit: true, strict: true, target: "ESNext", module: "NodeNext", moduleResolution: "NodeNext",
+    allowImportingTsExtensions: true, erasableSyntaxOnly: true, verbatimModuleSyntax: true,
+  })) {
+    if (compiler[field] !== expected) failures.push(`Lab TypeScript config must set ${field} to ${JSON.stringify(expected)}`);
+  }
+  const implementationMjs = readdirSync(labRoot).filter((name) => name.endsWith(".mjs"));
+  if (implementationMjs.join("\0") !== "cli.mjs") failures.push("cli.mjs must be the only JavaScript implementation file in scripts/lab-interact");
+  const bootstrap = sources.get("cli.mjs") || "";
+  if (!bootstrap.includes('await import("./cli.ts")') || !bootstrap.includes("22.18")) {
+    failures.push("cli.mjs must only preflight Node 22.18+ and import cli.ts");
+  }
+  for (const [name, source] of sources) {
+    if (/\@ts-(?:ignore|nocheck)/.test(source)) failures.push(`${name} contains a blanket TypeScript escape`);
+  }
   if (testPackage?.devDependencies?.["puppeteer-core"] != null) {
     failures.push("tests/package.json may not retain a test-only puppeteer-core dependency");
   }
-  const driver = sources.get("driver.mjs") || "";
+  const driver = sources.get("driver.ts") || "";
   if (!/import\(["']puppeteer-core["']\)/.test(driver) || /testsDir|ensureTestNodeModules|createRequire/.test(driver)) {
-    failures.push("driver.mjs must import repository-owned puppeteer-core without runtime hydration");
+    failures.push("driver.ts must import repository-owned puppeteer-core without runtime hydration");
   }
 }
 
@@ -192,40 +221,40 @@ function forbidImports(imports, owner, forbidden) {
 
 function checkQueueOwnership() {
   for (const [name, source] of sources) {
-    if (name === "session_coordinator.mjs") continue;
+    if (name === "session_coordinator.ts") continue;
     if (/semanticTail|operationTail|\benqueue\s*\(/.test(source)) {
-      failures.push(`${name} contains a generic semantic queue; session_coordinator.mjs is the sole owner`);
+      failures.push(`${name} contains a generic semantic queue; session_coordinator.ts is the sole owner`);
     }
   }
-  const coordinator = sources.get("session_coordinator.mjs") || "";
-  if (!/semanticTails/.test(coordinator) || !/drain\(sessionId\)/.test(coordinator)) {
-    failures.push("session_coordinator.mjs must own the semantic FIFO and close drain");
+  const coordinator = sources.get("session_coordinator.ts") || "";
+  if (!/semanticTails/.test(coordinator) || !/drain\(sessionId(?::[^)]*)?\)/.test(coordinator)) {
+    failures.push("session_coordinator.ts must own the semantic FIFO and close drain");
   }
 }
 
 function checkSignalOwnership() {
   for (const [name, source] of sources) {
-    if (name === "daemon.mjs") continue;
+    if (name === "daemon.ts") continue;
     if (/process\.(?:once|on|addListener)\s*\(/.test(source)) {
-      failures.push(`${name} installs a process listener; daemon.mjs is the sole process-signal owner`);
+      failures.push(`${name} installs a process listener; daemon.ts is the sole process-signal owner`);
     }
   }
-  const daemon = sources.get("daemon.mjs") || "";
+  const daemon = sources.get("daemon.ts") || "";
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    if (!daemon.includes(`"${signal}"`)) failures.push(`daemon.mjs does not own ${signal}`);
+    if (!daemon.includes(`"${signal}"`)) failures.push(`daemon.ts does not own ${signal}`);
   }
 }
 
 function checkSizeRatchets() {
   for (const [name, maximum] of [
-    ["command_service.mjs", 925],
-    ["driver.mjs", 1_200],
-    ["abort_signal.mjs", 60],
-    ["process_runner.mjs", 190],
-    ["private_server.mjs", 275],
-    ["recording.mjs", 525],
-    ["fixed_capture.mjs", 125],
-    ["tailnet_preview.mjs", 375],
+    ["command_service.ts", 1_050],
+    ["driver.ts", 1_400],
+    ["abort_signal.ts", 60],
+    ["process_runner.ts", 210],
+    ["private_server.ts", 310],
+    ["recording.ts", 600],
+    ["fixed_capture.ts", 140],
+    ["tailnet_preview.ts", 400],
   ]) {
     const lines = countLines(sources.get(name) || "");
     if (lines > maximum) failures.push(`${name} is ${lines} lines; responsive-adapter ratchet is ${maximum}`);

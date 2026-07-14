@@ -6,14 +6,15 @@ import { pathToFileURL } from "node:url";
 
 import {
   LabInteractError, LabInteractService, conciseError, loadDriverFactory, normalizeError,
-} from "./command_service.mjs";
-import { requestTimeoutMs, validateCommandInput } from "./command_registry.mjs";
+} from "./command_service.ts";
+import { requestTimeoutMs, validateCommandInput } from "./command_registry.ts";
 import {
   IPC_VERSION, MAX_REQUEST_BYTES, claimStartupLock, cleanupOwnedRuntime,
   checkoutCommit, configuredIdleMs, prepareRuntime, removeOwnedStartupLock, runtimePaths, startupLockOwned, writeState,
   writeStartupError,
-} from "./runtime.mjs";
-import { LabInteractTailnetPreview } from "./tailnet_preview.mjs";
+} from "./runtime.ts";
+import type { RuntimeRecord } from "./runtime.ts";
+import { LabInteractTailnetPreview } from "./tailnet_preview.ts";
 
 export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = configuredIdleMs(), startupNonce = "" } = {}) {
   const paths = runtimePaths(workspaceRoot);
@@ -28,14 +29,14 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     throw new Error("Lab Interact startup lease was replaced before the daemon could bind.");
   }
   const driverFactory = await loadDriverFactory(paths.workspaceRoot);
-  let artifactPreview = null;
+  let artifactPreview: LabInteractTailnetPreview;
   let activeRequests = 0;
   let lastInteractionAt = Date.now();
   let lastInteractionMark = performance.now();
-  let idleTimer = null;
+  let idleTimer: NodeJS.Timeout | undefined;
   let stopping = false;
   let shutdownRequested = false;
-  const sockets = new Set();
+  const sockets = new Set<net.Socket>();
   const daemonId = crypto.randomUUID();
   const capability = crypto.randomBytes(32).toString("hex");
   const configuredCheckoutCommit = process.env.RTS_LAB_INTERACT_TEST_CHECKOUT_COMMIT || "";
@@ -80,13 +81,13 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     driverFactory,
     artifactPreview,
   });
-  const shutdown = async (reason) => {
+  const shutdown = async (reason: string|undefined) => {
     if (stopping) return;
     stopping = true;
     clearTimeout(idleTimer);
     for (const socket of sockets) socket.destroy();
-    server.closeAllConnections?.();
-    await new Promise((resolve) => server.close(resolve));
+    (server as net.Server & { closeAllConnections?: () => void }).closeAllConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await service.shutdown(reason);
     await artifactPreview.close();
     cleanup();
@@ -119,12 +120,13 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     socket.on("error", () => {});
   });
 
-  const handle = async (line, socket) => {
+  const handle = async (line: string, socket: net.Socket) => {
     let command = "";
     let admitted = false;
     try {
-      const request = JSON.parse(line);
-      if (!request || typeof request !== "object" || Array.isArray(request)) throw Object.assign(new Error("Request must be a JSON object."), { code: "invalidRequest" });
+      const parsed: unknown = JSON.parse(line);
+      if (!isRecord(parsed)) throw Object.assign(new Error("Request must be a JSON object."), { code: "invalidRequest" });
+      const request = parsed;
       if (Object.keys(request).length === 2 && request.protocolVersion === IPC_VERSION && request.probe === "lab-interact") {
         socket.end(`${JSON.stringify({ ok: true, probe: {
           protocolVersion: IPC_VERSION,
@@ -185,13 +187,13 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     }
   };
 
-  const handleRuntimeError = async (error) => {
+  const handleRuntimeError = async (error: unknown) => {
     await shutdown("socketError").catch(() => cleanup());
-    process.stderr.write(`${JSON.stringify(errorEnvelope(error.code || "socketError", conciseError(error)))}\n`);
+    process.stderr.write(`${JSON.stringify(errorEnvelope(errorCode(error) || "socketError", conciseError(error)))}\n`);
     process.exitCode = 1;
   };
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     if (!startupLockOwned(paths, startupNonce, process.pid, "daemon")) {
       reject(new Error("Lab Interact startup lease was replaced before socket bind."));
       return;
@@ -215,14 +217,14 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
     removeOwnedStartupLock(paths, startupNonce, process.pid, "daemon");
   } catch (error) {
     for (const socket of sockets) socket.destroy();
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await service.shutdown("startupFailed");
     cleanup();
     throw error;
   }
   server.on("error", handleRuntimeError);
   scheduleIdle();
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
     process.once(signal, () => { void shutdown(signal); });
   }
   process.once("uncaughtException", (error) => {
@@ -236,7 +238,7 @@ export async function runDaemon({ workspaceRoot = process.cwd(), idleMs = config
   return { server, service, paths, shutdown };
 }
 
-function errorEnvelope(code, message, details = undefined) {
+function errorEnvelope(code: string, message: string, details?: RuntimeRecord) {
   return {
     ok: false,
     error: {
@@ -256,12 +258,20 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       prepareRuntime(paths);
       writeStartupError(paths, {
         nonce: startupNonce,
-        code: error.code || "startupFailed",
+        code: errorCode(error) || "startupFailed",
         message: conciseError(error),
       });
       removeOwnedStartupLock(paths, startupNonce, process.pid, "daemon");
     } catch {}
-    process.stderr.write(`${JSON.stringify(errorEnvelope(error.code || "startupFailed", conciseError(error)))}\n`);
+    process.stderr.write(`${JSON.stringify(errorEnvelope(errorCode(error) || "startupFailed", conciseError(error)))}\n`);
     process.exitCode = 1;
   });
+}
+
+function isRecord(value: unknown): value is RuntimeRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function errorCode(error: unknown): string {
+  return isRecord(error) && typeof error.code === "string" ? error.code : "";
 }

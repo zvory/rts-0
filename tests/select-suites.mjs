@@ -101,7 +101,8 @@ function isSourceFileSizePath(pathname) {
       (
         pathname.endsWith(".rs") ||
         pathname.endsWith(".js") ||
-        pathname.endsWith(".mjs")
+        pathname.endsWith(".mjs") ||
+        pathname.endsWith(".ts")
       )
     )
   );
@@ -477,10 +478,10 @@ function verify() {
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
-    [["scripts/lab-interact/driver.mjs"], ["lab-interact-contracts", "client-smoke"]],
-    [["scripts/lab-interact/command_service.mjs"], ["lab-interact-contracts", "client-smoke"]],
-    [["scripts/lab-interact/process_runner.mjs"], ["lab-interact-contracts", "client-smoke"]],
-    [["scripts/lab-interact/private_server.mjs"], ["lab-interact-contracts", "client-smoke"]],
+    [["scripts/lab-interact/driver.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
+    [["scripts/lab-interact/command_service.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
+    [["scripts/lab-interact/process_runner.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
+    [["scripts/lab-interact/private_server.ts"], ["source-file-sizes", "lab-interact-contracts", "client-smoke"]],
     [["package.json"], ["lab-interact-contracts", "client-smoke"]],
     [["scripts/check-lab-interact-architecture.mjs"], ["lab-interact-contracts", "client-smoke"]],
     [["client/src/lab_interact_bridge.js"], ["lab-interact-contracts", "client-smoke"]],

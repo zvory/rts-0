@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { processAlive, runtimePaths, sleep } from "../scripts/lab-interact/runtime.mjs";
+import { processAlive, runtimePaths, sleep } from "../scripts/lab-interact/runtime.ts";
 import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

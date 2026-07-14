@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { LabInteractService } from "../scripts/lab-interact/command_service.mjs";
+import { LabInteractService } from "../scripts/lab-interact/command_service.ts";
 
 const calls = [];
 const timeDefers = [];

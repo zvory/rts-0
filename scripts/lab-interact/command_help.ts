@@ -1,13 +1,13 @@
 import {
   LAB_INTERACT_COMMAND_REGISTRY,
   LAB_INTERACT_COMMANDS,
-} from "./command_registry.mjs";
+} from "./command_registry.ts";
 
 export const LAB_INTERACT_COMMAND_HELP = Object.freeze(Object.fromEntries(
   LAB_INTERACT_COMMANDS.map((command) => [command, LAB_INTERACT_COMMAND_REGISTRY[command].help]),
 ));
 
-export function commandHelp(command) {
+export function commandHelp(command: string) {
   return LAB_INTERACT_COMMAND_REGISTRY[command]?.help || null;
 }
 

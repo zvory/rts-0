@@ -5,20 +5,81 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { LabInteractDriver, LabInteractDriverError } from "./driver.mjs";
+import { LabInteractDriver, LabInteractDriverError } from "./driver.ts";
 import {
   ALIAS_RE, ALL_CATALOG_CATEGORIES, LAB_INTERACT_LIMITS,
-} from "./command_inputs.mjs";
+} from "./command_inputs.ts";
 import {
   commandDefinition,
-} from "./command_registry.mjs";
-import { SessionCoordinator } from "./session_coordinator.mjs";
+} from "./command_registry.ts";
+import { SessionCoordinator } from "./session_coordinator.ts";
+import type { LabInteractTailnetPreview } from "./tailnet_preview.ts";
+import type { Viewport } from "puppeteer-core";
 
-export { LAB_INTERACT_LIMITS } from "./command_inputs.mjs";
-export { LAB_INTERACT_COMMANDS } from "./command_registry.mjs";
+export { LAB_INTERACT_LIMITS } from "./command_inputs.ts";
+export { LAB_INTERACT_COMMANDS } from "./command_registry.ts";
+
+type JsonObject = Record<string, unknown>;
+type EntityRef = string | number;
+interface AliasEntry { alias: string; id: number }
+interface ResolvedEntityRef { input: EntityRef; id: number; alias: string | null }
+interface SpawnInput extends JsonObject {
+  owner: number;
+  kind: string;
+  x: number;
+  y: number;
+  alias?: string;
+}
+interface ServiceInput extends JsonObject {
+  sessionId?: string;
+  workspaceRoot?: string;
+  map?: string;
+  seed?: string | number;
+  scenario?: string;
+  renderer?: string;
+  viewport?: Viewport;
+  categories?: string[];
+  details?: boolean;
+  spawns?: SpawnInput[];
+  update?: JsonObject;
+  updates?: JsonObject[];
+  refs?: EntityRef[];
+  playerId?: number;
+  command?: JsonObject;
+  ignoreCommandLimits?: boolean;
+  control?: JsonObject;
+  kinds?: string[];
+  owners?: number[];
+  cameraViewport?: boolean;
+  limit?: number;
+  camera?: JsonObject;
+  name?: string;
+  presentation?: string;
+  subjects?: EntityRef[];
+  kind?: string;
+  artifactId?: string;
+  path?: string;
+  maxDurationMs?: number;
+  crop?: { x: number; y: number; width: number; height: number };
+  scale?: number;
+  resumeSpeed?: number | null;
+  fps?: number;
+  frameCount?: number;
+  reproduction?: boolean;
+}
+interface LabSession {
+  sessionId: string;
+  driver: LabInteractDriver;
+  aliases: Map<string, number>;
+  sceneRevision: number;
+  sceneIdentity: JsonObject;
+}
+type DriverFactory = (options: ConstructorParameters<typeof LabInteractDriver>[0]) => Promise<LabInteractDriver>;
 
 export class LabInteractError extends Error {
-  constructor(code, message, details = {}) {
+  details: JsonObject;
+  code: string;
+  constructor(code: string, message: string, details: JsonObject = {}) {
     super(message);
     this.name = "LabInteractError";
     this.code = code;
@@ -27,11 +88,27 @@ export class LabInteractError extends Error {
 }
 
 export class LabInteractService {
+  closed: boolean;
+  closePromise: Promise<boolean> | null;
+  openAbortController: AbortController | null;
+  openPromise: Promise<unknown> | null;
+  coordinator: SessionCoordinator;
+  sessions: Map<string, LabSession>;
+  log: (...values: unknown[]) => void;
+  maxSessions: number;
+  artifactPreview: LabInteractTailnetPreview | null;
+  driverFactory: DriverFactory;
+  workspaceRoot: string;
   constructor({
     workspaceRoot = process.cwd(),
-    driverFactory = (options) => LabInteractDriver.open(options),
+    driverFactory = (options: ConstructorParameters<typeof LabInteractDriver>[0]) => LabInteractDriver.open(options),
     artifactPreview = null,
     log = () => {},
+  }: {
+    workspaceRoot?: string;
+    driverFactory?: DriverFactory;
+    artifactPreview?: LabInteractTailnetPreview | null;
+    log?: (...values: unknown[]) => void;
   } = {}) {
     this.workspaceRoot = realWorkspaceRoot(workspaceRoot);
     this.driverFactory = driverFactory;
@@ -46,14 +123,15 @@ export class LabInteractService {
     this.closed = false;
   }
 
-  async execute(command, rawInput = {}) {
+  async execute(command: string, rawInput: unknown = {}) {
     const definition = commandDefinition(command);
     if (!definition) {
       throw new LabInteractError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);
     }
-    const input = definition.validator(rawInput);
+    // The registry validator has already performed exact, bounded runtime validation.
+    const input = definition.validator(rawInput) as ServiceInput;
     const session = definition.scope === "session" && command !== "close"
-      ? this.get(input.sessionId)
+      ? this.get(input.sessionId!)
       : null;
     return this.coordinator.execute(definition, input.sessionId, async () => {
       let result;
@@ -65,14 +143,14 @@ export class LabInteractService {
       } else if (definition.handlerKey === "open") {
         result = await this.open(input);
       } else if (definition.handlerKey === "close") {
-        result = { sessionId: input.sessionId, closed: await this.close(input.sessionId) };
+        result = { sessionId: input.sessionId, closed: await this.close(input.sessionId!) };
       } else if (definition.handlerKey === "capture-cancel") {
-        result = { sessionId: input.sessionId, ...session.driver.cancelFixedCapture() };
+        result = { sessionId: input.sessionId, ...session!.driver.cancelFixedCapture() };
       } else if (definition.handlerKey === "record-wait") {
-        const recording = await session.driver.recordWait();
+        const recording = await session!.driver.recordWait();
         result = await presentRecordingResult({ sessionId: input.sessionId, ...recording }, this.artifactPreview);
       } else {
-        result = await this.executeSession(definition.handlerKey, session, input);
+        result = await this.executeSession(definition.handlerKey, session!, input);
       }
       if (session && definition.sceneMutation) session.sceneRevision += 1;
       if (session && definition.recordable) {
@@ -89,7 +167,7 @@ export class LabInteractService {
     });
   }
 
-  async open(input) {
+  async open(input: ServiceInput) {
     if (this.closed) throw new LabInteractError("serviceClosed", "Lab Interact is shutting down.");
     const workspaceRoot = resolveRequestedWorkspace(input.workspaceRoot, this.workspaceRoot);
     let existing = this.sessions.values().next().value;
@@ -116,8 +194,8 @@ export class LabInteractService {
         throw new LabInteractError("serviceClosed", "Lab Interact shut down while the session was opening.");
       }
       const sessionId = `lab_${crypto.randomUUID().replaceAll("-", "")}`;
-      const session = {
-        sessionId, driver, aliases: new Map(), sceneRevision: 0,
+      const session: LabSession = {
+        sessionId, driver, aliases: new Map<string, number>(), sceneRevision: 0,
         sceneIdentity: {
           source: "launch", scenario: input.scenario || "blank", map: input.map || "Default",
           seed: input.seed ?? null, renderer: input.renderer || "pixi",
@@ -138,7 +216,7 @@ export class LabInteractService {
     }
   }
 
-  async describeSession(session) {
+  async describeSession(session: LabSession) {
     const [status, catalog] = await Promise.all([session.driver.status(), session.driver.catalog()]);
     return {
       sessionId: session.sessionId,
@@ -154,13 +232,14 @@ export class LabInteractService {
     };
   }
 
-  get(sessionId) {
+  get(sessionId: string | null | undefined) {
+    if (!sessionId) throw new LabInteractError("unknownSession", "Unknown or closed sessionId. Run open first.");
     const session = this.sessions.get(sessionId);
     if (!session) throw new LabInteractError("unknownSession", "Unknown or closed sessionId. Run open first.");
     return session;
   }
 
-  async close(sessionId, reason = "explicit") {
+  async close(sessionId: string, reason = "explicit") {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     this.sessions.delete(sessionId);
@@ -169,11 +248,11 @@ export class LabInteractService {
       const recorderSettlement = session.driver.settleRecording?.("sessionClose", {
         aliases: [...session.aliases].map(([alias, id]) => ({ alias, id })),
       });
-      await recorderSettlement?.catch((error) => this.log("recordingSettlementFailed", {
+      await recorderSettlement?.catch((error: unknown) => this.log("recordingSettlementFailed", {
         sessionId, reason, error: conciseError(error),
       }));
       await this.coordinator.drain(sessionId);
-      await session.driver.close().catch((error) => this.log("sessionCloseFailed", {
+      await session.driver.close().catch((error: unknown) => this.log("sessionCloseFailed", {
         sessionId, reason, error: conciseError(error),
       }));
       this.coordinator.release(sessionId);
@@ -196,7 +275,7 @@ export class LabInteractService {
     return !this.closed && this.openPromise == null && this.closePromise == null && this.sessions.size === 0;
   }
 
-  async status({ sessionId } = {}) {
+  async status({ sessionId }: Pick<ServiceInput, "sessionId"> = {}) {
     if (sessionId) {
       const session = this.get(sessionId);
       const fixedCapture = session.driver.fixedCaptureStatus?.() || { active: false };
@@ -229,7 +308,7 @@ export class LabInteractService {
     };
   }
 
-  async executeSession(command, session, input) {
+  async executeSession(command: string, session: LabSession, input: ServiceInput) {
     const sessionId = session.sessionId;
     if (command === "reset") {
       const before = await aliasSnapshots(session);
@@ -240,18 +319,18 @@ export class LabInteractService {
       return { sessionId, ...projectCatalog(await session.driver.catalog(), input.categories) };
     }
     if (command === "spawn") return spawn(session, input.spawns, input.details === true);
-    if (command === "update") return update(session, input.updates || [input.update]);
+    if (command === "update") return update(session, input.updates || (input.update ? [input.update] : []));
     if (command === "remove") {
-      const resolved = await resolveEntityReferences(session, input.refs);
+      const resolved = await resolveEntityReferences(session, input.refs || []);
       const result = await session.driver.remove(resolved.map((entry) => entry.id));
       const removed = resolved.map((entry) => ({ id: entry.id, alias: aliasForEntity(session.aliases, entry.id) }));
       for (const entry of resolved) clearAliasesForEntity(session.aliases, entry.id);
       return { sessionId, removed, result };
     }
     if (command === "order") return order(session, input);
-    if (command === "time") return { sessionId, result: await session.driver.time(input.control) };
+    if (command === "time") return { sessionId, result: await session.driver.time(input.control || {}) };
     if (command === "inspect") return inspect(session, input);
-    if (command === "camera") return camera(session, input.camera);
+    if (command === "camera") return camera(session, input.camera || {});
     if (command === "screenshot") return screenshot(session, input, this.artifactPreview);
     if (command === "export") return exportArtifact(this.workspaceRoot, session, input);
     if (command === "import") return importArtifact(this.workspaceRoot, session, input);
@@ -277,7 +356,7 @@ export class LabInteractService {
   }
 }
 
-export function validateCommandInput(command, input) {
+export function validateCommandInput(command: string, input: unknown) {
   const definition = commandDefinition(command);
   if (!definition) {
     throw new LabInteractError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);
@@ -285,25 +364,27 @@ export function validateCommandInput(command, input) {
   return definition.validator(input);
 }
 
-async function spawn(session, spawns, includeDetails = false) {
+async function spawn(session: LabSession, spawns: SpawnInput[] = [], includeDetails = false) {
   validateSpawnAliases(session, spawns);
   const catalog = await session.driver.catalog();
-  const playerIds = new Set((catalog.players || []).map((player) => Number(player.id)));
+  const playerIds = new Set(objectArray(catalog.players).map((player) => Number(player.id)));
   const spawnableKinds = new Set(flattenFactions(catalog.factions, "units").concat(flattenFactions(catalog.factions, "buildings")));
   for (const spec of spawns) {
     if (!playerIds.has(spec.owner)) throw new LabInteractError("unknownPlayer", `Player ${spec.owner} is not available.`);
     if (!spawnableKinds.has(spec.kind)) throw new LabInteractError("invalidKind", `${spec.kind} is not spawnable.`);
   }
   const response = await session.driver.spawn(spawns.map(({ alias: _alias, ...spec }) => spec));
-  const entities = Array.isArray(response?.entities) ? response.entities : [];
-  const outcomes = Array.isArray(response?.result?.outcome?.items) ? response.result.outcome.items : [];
-  const staged = [];
+  const entities = objectArray(response.entities);
+  const result = asJsonObject(response.result);
+  const outcome = asJsonObject(result.outcome);
+  const outcomes = objectArray(outcome.items);
+  const staged: Array<{ spec: SpawnInput; id: number; entity: JsonObject | null }> = [];
   for (let index = 0; index < spawns.length; index += 1) {
     const spec = spawns[index];
     const entity = entities[index] || null;
-    const id = entity?.id ?? outcomes[index]?.outcome?.entityId;
-    if (!Number.isInteger(id) || id <= 0) throw new LabInteractError("missingEntityId", "Spawn did not return an entity id.");
-    staged.push({ spec, id, entity });
+    const candidateId = entity?.id ?? asJsonObject(outcomes[index]?.outcome).entityId;
+    if (!Number.isInteger(candidateId) || Number(candidateId) <= 0) throw new LabInteractError("missingEntityId", "Spawn did not return an entity id.");
+    staged.push({ spec, id: Number(candidateId), entity });
   }
   for (const { spec, id } of staged) if (spec.alias) session.aliases.set(spec.alias, id);
   const summary = boundedResponseSummary(staged.map(({ spec, id }, index) => ({
@@ -322,17 +403,17 @@ async function spawn(session, spawns, includeDetails = false) {
     id,
     entity: decorateEntity(entity, session.aliases),
   }));
-  return { ...compact, results, result: response.result };
+  return { ...compact, results, result };
 }
 
-async function update(session, values) {
+async function update(session: LabSession, values: JsonObject[] = []) {
   const catalog = await session.driver.catalog();
-  const entityValues = values.filter((value) => ["move", "owner"].includes(value.operation));
+  const entityValues = values.filter((value) => ["move", "owner"].includes(String(value.operation)));
   const resolvedEntities = entityValues.length
-    ? await resolveEntityReferences(session, entityValues.map((value) => value.entity))
+    ? await resolveEntityReferences(session, entityValues.map((value) => value.entity as EntityRef))
     : [];
   let resolvedIndex = 0;
-  const operations = [];
+  const operations: JsonObject[] = [];
   for (const value of values) {
     assertKnownPlayer(catalog, value.playerId ?? value.owner);
     let operation = value;
@@ -342,7 +423,7 @@ async function update(session, values) {
     } else if (value.operation === "owner") {
       const entity = resolvedEntities[resolvedIndex++];
       operation = { operation: "reassign", entityId: entity.id, owner: value.owner };
-    } else if (value.operation === "research" && !flattenFactions(catalog.factions, "upgrades").includes(value.upgrade)) {
+    } else if (value.operation === "research" && !flattenFactions(catalog.factions, "upgrades").includes(String(value.upgrade))) {
       throw new LabInteractError("invalidUpgrade", `${value.upgrade} is not an available lab upgrade.`);
     }
     operations.push(operation);
@@ -350,7 +431,8 @@ async function update(session, values) {
   return { sessionId: session.sessionId, result: await session.driver.update(operations) };
 }
 
-async function order(session, { playerId, command, ignoreCommandLimits = false }) {
+async function order(session: LabSession, { playerId, command, ignoreCommandLimits = false }: ServiceInput) {
+  if (typeof playerId !== "number" || !command) throw new LabInteractError("invalidInput", "order requires playerId and command.");
   const catalog = await session.driver.catalog();
   assertKnownPlayer(catalog, playerId);
   validateCommandCatalog(command, catalog);
@@ -359,7 +441,7 @@ async function order(session, { playerId, command, ignoreCommandLimits = false }
   return { sessionId: session.sessionId, command: resolvedCommand, resolved, result };
 }
 
-async function inspect(session, { refs, kinds, owners, cameraViewport, limit }) {
+async function inspect(session: LabSession, { refs, kinds, owners, cameraViewport, limit }: ServiceInput) {
   const resolved = refs ? await resolveEntityReferences(session, refs) : [];
   const response = await session.driver.inspect({
     ids: resolved.map((entry) => entry.id), kinds, owners,
@@ -367,7 +449,7 @@ async function inspect(session, { refs, kinds, owners, cameraViewport, limit }) 
   });
   return {
     sessionId: session.sessionId,
-    entities: (response.entities || []).map((entity) => decorateEntity(entity, session.aliases)),
+    entities: objectArray(response.entities).map((entity) => decorateEntity(entity, session.aliases)),
     players: response.players || [], room: response.room || null, camera: response.camera || null,
     cameraViewport: response.cameraViewport || null,
     cameraWorldBounds: response.cameraWorldBounds || null,
@@ -376,10 +458,10 @@ async function inspect(session, { refs, kinds, owners, cameraViewport, limit }) 
   };
 }
 
-async function camera(session, value) {
-  let command = value;
+async function camera(session: LabSession, value: JsonObject = {}) {
+  let command: JsonObject = value;
   if (value.action === "focus") {
-    const resolved = await resolveEntityReferences(session, value.refs);
+    const resolved = await resolveEntityReferences(session, value.refs as EntityRef[]);
     command = { action: "focus", entityIds: resolved.map((entry) => entry.id), padding: value.padding };
   }
   const response = await session.driver.camera(command);
@@ -391,12 +473,12 @@ async function camera(session, value) {
   };
 }
 
-async function screenshot(session, { name = "scene", presentation = "clean", viewport, subjects }, artifactPreview) {
+async function screenshot(session: LabSession, { name = "scene", presentation = "clean", viewport, subjects }: ServiceInput, artifactPreview: LabInteractTailnetPreview | null) {
   const resolved = subjects ? await resolveEntityReferences(session, subjects) : [];
   const inspected = resolved.length
     ? await session.driver.inspect({ ids: resolved.map((entry) => entry.id), limit: resolved.length })
     : { entities: [] };
-  const entitiesById = new Map((inspected.entities || []).map((entity) => [entity.id, entity]));
+  const entitiesById = new Map(objectArray(inspected.entities).map((entity) => [Number(entity.id), entity]));
   const subjectSummaries = resolved.map((entry) => decorateEntity(entitiesById.get(entry.id), session.aliases));
   const capture = await session.driver.screenshot({
     sessionId: session.sessionId, name, presentation, viewport,
@@ -421,7 +503,7 @@ async function screenshot(session, { name = "scene", presentation = "clean", vie
 
 const TAILNET_DELIVERY_INSTRUCTION = "Share this Tailnet URL with the user to preview the Lab artifact. Do not share a local file path.";
 
-async function presentScreenshotResult(result, artifactPreview) {
+async function presentScreenshotResult(result: JsonObject & { pngPath: string; manifestPath: string }, artifactPreview: LabInteractTailnetPreview | null) {
   if (!artifactPreview) return result;
   const { pngPath, manifestPath, ...visible } = result;
   return {
@@ -431,7 +513,7 @@ async function presentScreenshotResult(result, artifactPreview) {
   };
 }
 
-async function presentRecordingResult(result, artifactPreview) {
+async function presentRecordingResult(result: JsonObject & { videoPath: string; framePaths: string[]; contactSheetPath: string; manifestPath: string }, artifactPreview: LabInteractTailnetPreview | null) {
   if (!artifactPreview) return result;
   const { videoPath, framePaths, contactSheetPath, manifestPath, ...visible } = result;
   const [preview, poster] = await Promise.all([
@@ -446,7 +528,7 @@ async function presentRecordingResult(result, artifactPreview) {
   };
 }
 
-async function presentFixedCaptureResult(result, artifactPreview) {
+async function presentFixedCaptureResult(result: JsonObject & { videoPath: string; contactSheetPath: string; manifestPath: string; frameSummary: JsonObject }, artifactPreview: LabInteractTailnetPreview | null) {
   if (!artifactPreview) return result;
   const { videoPath, contactSheetPath, manifestPath, frameSummary, ...visible } = result;
   const [preview, poster] = await Promise.all([
@@ -466,11 +548,11 @@ async function presentFixedCaptureResult(result, artifactPreview) {
   };
 }
 
-function presentRecorderStatus(value, artifactPreview) {
+function presentRecorderStatus(value: JsonObject, artifactPreview: LabInteractTailnetPreview | null) {
   if (!artifactPreview || !value || typeof value !== "object") return value;
   const { videoPath, last, ...status } = value;
   if (!last || typeof last !== "object") return videoPath == null ? status : { ...status, localPathWithheld: true };
-  const { videoPath: lastVideoPath, framePaths, contactSheetPath, manifestPath, ...lastStatus } = last;
+  const { videoPath: lastVideoPath, framePaths, contactSheetPath, manifestPath, ...lastStatus } = last as JsonObject;
   return {
     ...status,
     ...(videoPath == null ? {} : { localPathWithheld: true }),
@@ -483,21 +565,22 @@ function presentRecorderStatus(value, artifactPreview) {
   };
 }
 
-async function publishPreview(artifactPreview, filePath, mimeType) {
+async function publishPreview(artifactPreview: LabInteractTailnetPreview, filePath: string, mimeType: string) {
   try {
     const preview = await artifactPreview.publish({ filePath, mimeType });
     return { available: true, ...preview, instruction: TAILNET_DELIVERY_INSTRUCTION };
   } catch (error) {
     return {
       available: false,
-      code: String(error?.code || "tailnetPreviewUnavailable").slice(0, 80),
+      code: String(errorCode(error) || "tailnetPreviewUnavailable").slice(0, 80),
       message: conciseError(error),
       instruction: "Do not share a local file path. Restore Tailnet preview availability, then capture again.",
     };
   }
 }
 
-async function exportArtifact(workspaceRoot, session, { kind, name = "", reproduction = false }) {
+async function exportArtifact(workspaceRoot: string, session: LabSession, { kind, name = "", reproduction = false }: ServiceInput) {
+  if (kind !== "setup" && kind !== "replay") throw new LabInteractError("invalidArtifactKind", "export requires setup or replay kind.");
   const artifactId = `artifact_${crypto.randomUUID().replaceAll("-", "")}`;
   const directory = artifactDirectory(workspaceRoot);
   fs.mkdirSync(directory, { recursive: true });
@@ -522,7 +605,7 @@ async function exportArtifact(workspaceRoot, session, { kind, name = "", reprodu
     aliases,
     reproduction: reproduction ? reproductionSummary(kind, artifactId, aliases) : null,
   };
-  fs.writeFileSync(artifactPath, bytes, { mode: 0o600 });
+  fs.writeFileSync(artifactPath, new Uint8Array(bytes), { mode: 0o600 });
   fs.writeFileSync(sidecarPath, `${JSON.stringify(sidecar, null, 2)}\n`, { mode: 0o600 });
   return {
     sessionId: session.sessionId,
@@ -536,7 +619,7 @@ async function exportArtifact(workspaceRoot, session, { kind, name = "", reprodu
   };
 }
 
-async function importArtifact(workspaceRoot, session, selector) {
+async function importArtifact(workspaceRoot: string, session: LabSession, selector: ServiceInput) {
   const selected = readArtifact(workspaceRoot, selector);
   let importResult;
   let reconciliation;
@@ -567,7 +650,7 @@ async function importArtifact(workspaceRoot, session, selector) {
     : compact;
 }
 
-async function inspectArtifact(workspaceRoot, session, selector) {
+async function inspectArtifact(workspaceRoot: string, session: LabSession, selector: ServiceInput) {
   const selected = readArtifact(workspaceRoot, selector);
   const aliasValidation = await validateAliasesAgainstArtifact(session, selected.kind, selected.artifact, selected.aliases);
   return {
@@ -589,13 +672,16 @@ async function inspectArtifact(workspaceRoot, session, selector) {
   };
 }
 
-function artifactDirectory(workspaceRoot) {
+function artifactDirectory(workspaceRoot: string) {
   return path.join(workspaceRoot, "target", "lab-interact", "artifacts");
 }
 
-function readArtifact(workspaceRoot, { kind = null, artifactId = null, path: requestedPath = null }) {
+function readArtifact(workspaceRoot: string, selector: ServiceInput) {
+  const kind = selector.kind || null;
+  const artifactId = selector.artifactId || null;
+  const requestedPath = selector.path || null;
   const directory = artifactDirectory(workspaceRoot);
-  let artifactPath;
+  let artifactPath: string | undefined;
   if (artifactId) {
     if (!/^artifact_[a-f0-9]{32}$/.test(artifactId)) throw new LabInteractError("invalidArtifactId", "artifactId is invalid.");
     const candidates = kind
@@ -604,6 +690,7 @@ function readArtifact(workspaceRoot, { kind = null, artifactId = null, path: req
     artifactPath = candidates.find((candidate) => fs.existsSync(candidate));
     if (!artifactPath) throw new LabInteractError("artifactNotFound", "Artifact id does not exist in this worktree.");
   } else {
+    if (!requestedPath) throw new LabInteractError("invalidArtifactPath", "Artifact import requires artifactId or path.");
     if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(requestedPath)) throw new LabInteractError("unsafeArtifactPath", "Artifact URLs are not accepted.");
     artifactPath = path.resolve(workspaceRoot, requestedPath);
   }
@@ -616,16 +703,16 @@ function readArtifact(workspaceRoot, { kind = null, artifactId = null, path: req
   const resolvedKind = match[2];
   if (kind && kind !== resolvedKind) throw new LabInteractError("artifactKindMismatch", "Requested artifact kind does not match the file.");
   const bytes = readBoundedFile(realPath, LAB_INTERACT_LIMITS.maxArtifactBytes, "artifactTooLarge", "Artifact exceeds 8 MiB.");
-  let artifact;
-  try { artifact = JSON.parse(bytes); } catch { throw new LabInteractError("invalidArtifact", "Artifact is not valid JSON."); }
+  let artifact: unknown;
+  try { artifact = JSON.parse(bytes.toString("utf8")) as unknown; } catch { throw new LabInteractError("invalidArtifact", "Artifact is not valid JSON."); }
   validateArtifactShape(resolvedKind, artifact);
   const sidecarPath = path.join(path.dirname(realPath), `${match[1]}.aliases.json`);
   const aliases = readAliasSidecar(sidecarPath, match[1], resolvedKind);
   return { artifactId: match[1], kind: resolvedKind, path: realPath, sidecarPath, bytes, artifact, aliases };
 }
 
-function validateArtifactShape(kind, artifact) {
-  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) throw new LabInteractError("invalidArtifact", "Artifact must be an object.");
+function validateArtifactShape(kind: string, artifact: unknown): asserts artifact is JsonObject {
+  if (!isJsonObject(artifact)) throw new LabInteractError("invalidArtifact", "Artifact must be an object.");
   if (kind === "setup") {
     if (artifact.schemaVersion !== 1 || artifact.kind !== "labCheckpointScenario" || typeof artifact.checkpointPayload !== "string") {
       throw new LabInteractError("incompatibleArtifact", "Only LabCheckpointScenarioV1 setup artifacts are accepted.");
@@ -635,9 +722,9 @@ function validateArtifactShape(kind, artifact) {
   }
 }
 
-function readAliasSidecar(sidecarPath, artifactId, kind) {
+function readAliasSidecar(sidecarPath: string, artifactId: string, kind: string): AliasEntry[] {
   if (!fs.existsSync(sidecarPath)) return [];
-  let sidecar;
+  let sidecar: unknown;
   try {
     const bytes = readBoundedFile(
       sidecarPath,
@@ -645,23 +732,23 @@ function readAliasSidecar(sidecarPath, artifactId, kind) {
       "invalidAliasSidecar",
       "Alias sidecar exceeds 64 KiB.",
     );
-    sidecar = JSON.parse(bytes);
+    sidecar = JSON.parse(bytes.toString("utf8")) as unknown;
   } catch (error) {
     if (error instanceof LabInteractError) throw error;
     throw new LabInteractError("invalidAliasSidecar", "Alias sidecar is invalid JSON.");
   }
-  if (sidecar?.schemaVersion !== 1 || sidecar.artifactId !== artifactId || sidecar.kind !== kind || !Array.isArray(sidecar.aliases) || sidecar.aliases.length > LAB_INTERACT_LIMITS.maxAliases) {
+  if (!isJsonObject(sidecar) || sidecar.schemaVersion !== 1 || sidecar.artifactId !== artifactId || sidecar.kind !== kind || !Array.isArray(sidecar.aliases) || sidecar.aliases.length > LAB_INTERACT_LIMITS.maxAliases) {
     throw new LabInteractError("invalidAliasSidecar", "Alias sidecar identity or bounds are invalid.");
   }
-  const seen = new Set();
-  return sidecar.aliases.map((entry) => {
-    if (!entry || !ALIAS_RE.test(entry.alias) || !Number.isInteger(entry.id) || entry.id <= 0 || seen.has(entry.alias)) throw new LabInteractError("invalidAliasSidecar", "Alias sidecar contains an invalid or duplicate entry.");
+  const seen = new Set<string>();
+  return sidecar.aliases.map((entry: unknown) => {
+    if (!isJsonObject(entry) || typeof entry.alias !== "string" || !ALIAS_RE.test(entry.alias) || !Number.isInteger(entry.id) || Number(entry.id) <= 0 || seen.has(entry.alias)) throw new LabInteractError("invalidAliasSidecar", "Alias sidecar contains an invalid or duplicate entry.");
     seen.add(entry.alias);
-    return { alias: entry.alias, id: entry.id };
+    return { alias: entry.alias, id: Number(entry.id) };
   });
 }
 
-function readBoundedFile(filePath, maxBytes, code, message) {
+function readBoundedFile(filePath: string, maxBytes: number, code: string, message: string) {
   let size;
   try { size = fs.statSync(filePath).size; } catch { throw new LabInteractError("artifactNotFound", "Artifact path does not exist."); }
   if (size > maxBytes) throw new LabInteractError(code, message);
@@ -670,14 +757,14 @@ function readBoundedFile(filePath, maxBytes, code, message) {
   return bytes;
 }
 
-async function reconcileImportedAliases(session, aliases, entityIdMap) {
-  const remaps = new Map(entityIdMap.map((entry) => [Number(entry.oldId), Number(entry.newId)]));
+async function reconcileImportedAliases(session: LabSession, aliases: AliasEntry[], entityIdMap: unknown) {
+  const remaps = new Map(objectArray(entityIdMap).map((entry) => [Number(entry.oldId), Number(entry.newId)]));
   session.aliases.clear();
   const candidates = aliases.map((entry) => ({ ...entry, id: remaps.get(entry.id) || entry.id }));
   const inspected = candidates.length ? await session.driver.inspect({ ids: candidates.map((entry) => entry.id), limit: candidates.length }) : { entities: [] };
-  const existing = new Set((inspected.entities || []).map((entity) => entity.id));
-  const restored = [];
-  const stale = [];
+  const existing = new Set(objectArray(inspected.entities).map((entity) => Number(entity.id)));
+  const restored: Array<AliasEntry & { oldId?: number }> = [];
+  const stale: AliasEntry[] = [];
   for (const entry of candidates) {
     if (existing.has(entry.id)) { session.aliases.set(entry.alias, entry.id); restored.push({ alias: entry.alias, oldId: aliases.find((source) => source.alias === entry.alias)?.id, id: entry.id }); }
     else stale.push({ alias: entry.alias, id: entry.id });
@@ -685,57 +772,61 @@ async function reconcileImportedAliases(session, aliases, entityIdMap) {
   return { restored, stale };
 }
 
-async function validateImportedAliases(session, aliases) {
+async function validateImportedAliases(session: LabSession, aliases: AliasEntry[]) {
   session.aliases.clear();
   const inspected = aliases.length ? await session.driver.inspect({ ids: aliases.map((entry) => entry.id), limit: aliases.length }) : { entities: [] };
-  const ids = new Set((inspected.entities || []).map((entity) => entity.id));
-  const restored = [], stale = [];
+  const ids = new Set(objectArray(inspected.entities).map((entity) => Number(entity.id)));
+  const restored: AliasEntry[] = [], stale: AliasEntry[] = [];
   for (const entry of aliases) {
     if (ids.has(entry.id)) { session.aliases.set(entry.alias, entry.id); restored.push(entry); } else stale.push(entry);
   }
   return { restored, stale };
 }
 
-async function validateAliasesAgainstArtifact(_session, kind, artifact, aliases) {
-  const setup = kind === "setup" ? artifact : artifact.initialSetup;
-  const idMap = setup?.metadata?.sourceEntityIdMap || [];
-  const known = new Set([...artifactEntityIds(setup), ...idMap.flatMap((entry) => [entry.oldId, entry.newId])]);
+async function validateAliasesAgainstArtifact(_session: LabSession, kind: string, artifact: JsonObject, aliases: AliasEntry[]) {
+  const setup = kind === "setup" ? artifact : asJsonObject(artifact.initialSetup);
+  const metadata = asJsonObject(setup.metadata);
+  const idMap = objectArray(metadata.sourceEntityIdMap);
+  const known = new Set([...artifactEntityIds(setup), ...idMap.flatMap((entry) => [Number(entry.oldId), Number(entry.newId)])]);
   return { entries: aliases, stale: aliases.filter((entry) => !known.has(entry.id)), status: "sidecarValidated" };
 }
 
-function artifactSummary(kind, artifact, aliases) {
-  const setup = kind === "setup" ? artifact : artifact.initialSetup;
+function artifactSummary(kind: string, artifact: JsonObject, aliases: AliasEntry[]) {
+  const setup = kind === "setup" ? artifact : asJsonObject(artifact.initialSetup);
+  const timeline = asJsonObject(artifact.timeline);
+  const map = asJsonObject(setup.map);
   let entityCount = null;
   try {
     entityCount = artifactEntityIds(setup).length;
   } catch {}
   return {
     authoring: kind === "setup" ? { name: artifact.name || "" } : artifact.authoring || {},
-    map: setup?.map ? { name: setup.map.name, contentHash: setup.map.contentHash, materializedHash: setup.map.materializedHash } : null,
-    tick: kind === "setup" ? setup?.metadata?.exportedTick ?? null : artifact.timeline?.initialTick ?? null,
-    durationTicks: kind === "replay" ? artifact.timeline?.durationTicks ?? null : 0,
+    map: Object.keys(map).length ? { name: map.name, contentHash: map.contentHash, materializedHash: map.materializedHash } : null,
+    tick: kind === "setup" ? asJsonObject(setup.metadata).exportedTick ?? null : timeline.initialTick ?? null,
+    durationTicks: kind === "replay" ? timeline.durationTicks ?? null : 0,
     entityCount,
-    operationCount: kind === "replay" ? artifact.operations.length : 0,
+    operationCount: kind === "replay" && Array.isArray(artifact.operations) ? artifact.operations.length : 0,
     serverBuildSha: kind === "replay" ? artifact.serverBuildSha || null : null,
     aliasCount: aliases.length,
   };
 }
 
-function artifactEntityIds(setup) {
+function artifactEntityIds(setup: JsonObject): number[] {
   try {
-    const entities = JSON.parse(setup?.checkpointPayload || "")?.entities;
-    const rows = Array.isArray(entities) ? entities : entities?.entities;
-    return Array.isArray(rows) ? rows.map((entity) => entity?.id).filter((id) => Number.isInteger(id) && id > 0) : [];
+    const parsed = JSON.parse(typeof setup.checkpointPayload === "string" ? setup.checkpointPayload : "") as unknown;
+    const entities = asJsonObject(parsed).entities;
+    const rows = Array.isArray(entities) ? entities : asJsonObject(entities).entities;
+    return objectArray(rows).map((entity) => Number(entity.id)).filter((id) => Number.isInteger(id) && id > 0);
   } catch { return []; }
 }
 
-function reproductionSummary(kind, artifactId, aliases) {
+function reproductionSummary(kind: string | undefined, artifactId: string, aliases: AliasEntry[]) {
   const refs = aliases.slice(0, 12).map((entry) => entry.alias).join(", ");
   const input = JSON.stringify({ sessionId: "<current-session-id>", kind, artifactId });
   return `node scripts/lab-interact/cli.mjs import '${input}'; aliases: ${refs || "none"}`;
 }
 
-function boundedResponseSummary(values) {
+function boundedResponseSummary<T>(values: T[]) {
   const source = Array.isArray(values) ? values : [];
   return {
     count: source.length,
@@ -744,7 +835,7 @@ function boundedResponseSummary(values) {
   };
 }
 
-function recordingOperation(command, input, result) {
+function recordingOperation(command: string, input: JsonObject, result: unknown) {
   return {
     command,
     acceptedAt: new Date().toISOString(),
@@ -753,9 +844,9 @@ function recordingOperation(command, input, result) {
   };
 }
 
-function findSnapshotTick(value, depth = 0) {
-  if (!value || typeof value !== "object" || depth > 5) return null;
-  if (Number.isInteger(value.snapshotTick)) return value.snapshotTick;
+function findSnapshotTick(value: unknown, depth = 0): number | null {
+  if (!isJsonObject(value) || depth > 5) return null;
+  if (Number.isInteger(value.snapshotTick)) return Number(value.snapshotTick);
   for (const child of Object.values(value)) {
     const tick = findSnapshotTick(child, depth + 1);
     if (tick != null) return tick;
@@ -763,25 +854,25 @@ function findSnapshotTick(value, depth = 0) {
   return null;
 }
 
-function projectCatalog(catalog, requested) {
+function projectCatalog(catalog: JsonObject, requested?: string[]) {
   const categories = [...new Set(requested?.length ? requested : ALL_CATALOG_CATEGORIES)];
   const all = {
     maps: Array.isArray(catalog.maps) ? catalog.maps : [], players: Array.isArray(catalog.players) ? catalog.players : [],
-    factions: Array.isArray(catalog.factions) ? catalog.factions.map((faction) => ({
-      id: String(faction?.id || ""), label: String(faction?.label || ""), units: uniqueStrings(faction?.units),
-      buildings: uniqueStrings(faction?.buildings), upgrades: uniqueStrings(faction?.upgrades),
-    })) : [],
+    factions: objectArray(catalog.factions).map((faction) => ({
+      id: String(faction.id || ""), label: String(faction.label || ""), units: uniqueStrings(faction.units),
+      buildings: uniqueStrings(faction.buildings), upgrades: uniqueStrings(faction.upgrades),
+    })),
     units: uniqueStrings(flattenFactions(catalog.factions, "units")), buildings: uniqueStrings(flattenFactions(catalog.factions, "buildings")),
     upgrades: uniqueStrings(flattenFactions(catalog.factions, "upgrades")), commands: uniqueStrings(catalog.supportedCommandKinds), abilities: uniqueStrings(catalog.abilities),
   };
-  return { categories: Object.fromEntries(categories.map((category) => [category, all[category]])), truncated: false };
+  return { categories: Object.fromEntries(categories.map((category) => [category, all[category as keyof typeof all]])), truncated: false };
 }
 
-function flattenFactions(factions, field) { return (Array.isArray(factions) ? factions : []).flatMap((faction) => Array.isArray(faction?.[field]) ? faction[field] : []); }
-function uniqueStrings(values) { return [...new Set((Array.isArray(values) ? values : []).filter((value) => typeof value === "string"))].sort(); }
+function flattenFactions(factions: unknown, field: string): string[] { return objectArray(factions).flatMap((faction) => Array.isArray(faction[field]) ? faction[field].filter((value): value is string => typeof value === "string") : []); }
+function uniqueStrings(values: unknown): string[] { return [...new Set((Array.isArray(values) ? values : []).filter((value): value is string => typeof value === "string"))].sort(); }
 
-function validateSpawnAliases(session, spawns) {
-  const aliases = new Set();
+function validateSpawnAliases(session: LabSession, spawns: SpawnInput[]) {
+  const aliases = new Set<string>();
   for (const { alias: value } of spawns) {
     if (!value) continue;
     if (session.aliases.has(value) || aliases.has(value)) throw new LabInteractError("duplicateAlias", `Alias ${JSON.stringify(value)} is already in use.`);
@@ -790,39 +881,40 @@ function validateSpawnAliases(session, spawns) {
   if (session.aliases.size + aliases.size > LAB_INTERACT_LIMITS.maxAliases) throw new LabInteractError("aliasLimit", `At most ${LAB_INTERACT_LIMITS.maxAliases} aliases are allowed.`);
 }
 
-function assertKnownPlayer(catalog, playerId) {
+function assertKnownPlayer(catalog: JsonObject, playerId: unknown) {
   if (playerId == null) return;
-  if (!(catalog.players || []).some((player) => Number(player?.id) === Number(playerId))) throw new LabInteractError("unknownPlayer", `Player ${playerId} is not available.`);
+  if (!objectArray(catalog.players).some((player) => Number(player.id) === Number(playerId))) throw new LabInteractError("unknownPlayer", `Player ${playerId} is not available.`);
 }
 
-function validateCommandCatalog(command, catalog) {
+function validateCommandCatalog(command: JsonObject, catalog: JsonObject) {
+  if (typeof command.c !== "string") throw new LabInteractError("invalidCommand", "Command kind is required.");
   if (!new Set(uniqueStrings(catalog.supportedCommandKinds)).has(command.c)) throw new LabInteractError("unsupportedCommand", `${command.c} is not supported.`);
-  const validateFrom = (field, values, code, label) => {
+  const validateFrom = (field: string, values: Iterable<unknown>, code: string, label: string) => {
     if (command[field] != null && !new Set(values).has(command[field])) throw new LabInteractError(code, `${command[field]} is not an available ${label}.`);
   };
   if (command.c === "build") validateFrom("building", flattenFactions(catalog.factions, "buildings"), "invalidKind", "building");
   validateFrom("unit", flattenFactions(catalog.factions, "units"), "invalidKind", "unit");
   validateFrom("upgrade", flattenFactions(catalog.factions, "upgrades"), "invalidUpgrade", "upgrade");
-  validateFrom("ability", catalog.abilities, "invalidAbility", "ability");
+  validateFrom("ability", uniqueStrings(catalog.abilities), "invalidAbility", "ability");
 }
 
-async function resolveCommand(session, command) {
-  const wire = { ...command }; const resolved = {};
+async function resolveCommand(session: LabSession, command: JsonObject) {
+  const wire: JsonObject = { ...command }; const resolved: JsonObject = {};
   for (const field of ["units", "buildings"]) {
     if (!Array.isArray(command[field])) continue;
-    const entries = await resolveEntityReferences(session, command[field]);
+    const entries = await resolveEntityReferences(session, command[field] as EntityRef[]);
     wire[field] = entries.map((entry) => entry.id);
     resolved[field] = entries;
   }
   for (const field of ["target", "node", "building"]) {
     if (command[field] == null || (field === "building" && command.c === "build")) continue;
-    const entry = await resolveEntityReference(session, command[field]); wire[field] = entry.id; resolved[field] = entry;
+    const entry = await resolveEntityReference(session, command[field] as EntityRef); wire[field] = entry.id; resolved[field] = entry;
   }
   return { command: wire, resolved };
 }
 
-async function resolveEntityReferences(session, references) {
-  const entries = []; const requestedIds = [];
+async function resolveEntityReferences(session: LabSession, references: EntityRef[]): Promise<ResolvedEntityRef[]> {
+  const entries: ResolvedEntityRef[] = []; const requestedIds: number[] = [];
   for (const reference of references) {
     if (typeof reference === "number") { entries.push({ input: reference, id: reference, alias: null }); requestedIds.push(reference); continue; }
     const id = session.aliases.get(reference);
@@ -834,7 +926,7 @@ async function resolveEntityReferences(session, references) {
   for (let offset = 0; offset < requestedIds.length; offset += LAB_INTERACT_LIMITS.maxInspectRefs) {
     const ids = requestedIds.slice(offset, offset + LAB_INTERACT_LIMITS.maxInspectRefs);
     const existing = await session.driver.inspect({ ids, limit: ids.length });
-    for (const entity of existing.entities || []) found.add(entity.id);
+    for (const entity of objectArray(existing.entities)) found.add(Number(entity.id));
   }
   for (const entry of entries) {
     if (found.has(entry.id)) continue;
@@ -844,43 +936,59 @@ async function resolveEntityReferences(session, references) {
   return entries;
 }
 
-async function resolveEntityReference(session, reference) { return (await resolveEntityReferences(session, [reference]))[0]; }
-async function aliasSnapshots(session) {
+async function resolveEntityReference(session: LabSession, reference: EntityRef) { return (await resolveEntityReferences(session, [reference]))[0]; }
+async function aliasSnapshots(session: LabSession) {
   if (!session.aliases.size) return [];
   const entries = [...session.aliases].map(([alias, id]) => ({ alias, id }));
   const inspected = await session.driver.inspect({ ids: entries.map((entry) => entry.id), limit: entries.length });
-  const byId = new Map((inspected.entities || []).map((entity) => [entity.id, entity]));
+  const byId = new Map(objectArray(inspected.entities).map((entity) => [Number(entity.id), entity]));
   return entries.map((entry) => ({ ...entry, entity: byId.get(entry.id) || null }));
 }
-async function reconcileAliasesAfterReset(session, before) {
+async function reconcileAliasesAfterReset(session: LabSession, before: Array<AliasEntry & { entity: JsonObject | null }>) {
   session.aliases.clear(); const after = await session.driver.inspect({ limit: LAB_INTERACT_LIMITS.maxInspectResults });
   const claimed = new Set(); const aliases = []; const clearedAliases = [];
   for (const entry of before) {
-    const matches = (after.entities || []).filter((entity) => exactAliasMatch(entry.entity, entity) && !claimed.has(entity.id));
-    if (matches.length === 1) { const id = matches[0].id; claimed.add(id); session.aliases.set(entry.alias, id); aliases.push({ alias: entry.alias, id }); }
+    const matches = objectArray(after.entities).filter((entity) => exactAliasMatch(entry.entity, entity) && !claimed.has(entity.id));
+    if (matches.length === 1) { const id = Number(matches[0].id); claimed.add(id); session.aliases.set(entry.alias, id); aliases.push({ alias: entry.alias, id }); }
     else clearedAliases.push(entry.alias);
   }
   return { aliases, clearedAliases };
 }
-function exactAliasMatch(before, after) { return !!before && !!after && before.kind === after.kind && before.owner === after.owner && Number(before.x) === Number(after.x) && Number(before.y) === Number(after.y); }
-function decorateEntity(entity, aliases) { return entity && typeof entity === "object" ? { ...entity, alias: aliasForEntity(aliases, entity.id) } : entity || null; }
-function aliasForEntity(aliases, id) { for (const [alias, entityId] of aliases) if (entityId === id) return alias; return null; }
-function clearAliasesForEntity(aliases, id) { for (const [alias, entityId] of aliases) if (entityId === id) aliases.delete(alias); }
+function exactAliasMatch(before: JsonObject | null, after: JsonObject) { return !!before && before.kind === after.kind && before.owner === after.owner && Number(before.x) === Number(after.x) && Number(before.y) === Number(after.y); }
+function decorateEntity(entity: unknown, aliases: Map<string, number>) { return isJsonObject(entity) ? { ...entity, alias: aliasForEntity(aliases, entity.id) } : entity || null; }
+function aliasForEntity(aliases: Map<string, number>, id: unknown) { for (const [alias, entityId] of aliases) if (entityId === id) return alias; return null; }
+function clearAliasesForEntity(aliases: Map<string, number>, id: number) { for (const [alias, entityId] of aliases) if (entityId === id) aliases.delete(alias); }
 
-function realWorkspaceRoot(value) { try { return fs.realpathSync(value); } catch { throw new LabInteractError("invalidWorkspace", `Workspace does not exist: ${String(value)}`); } }
-function resolveRequestedWorkspace(requested, allowed) { const candidate = realWorkspaceRoot(requested || allowed); if (candidate !== allowed) throw new LabInteractError("workspaceNotAllowed", "open may use only the worktree that launched this daemon."); return candidate; }
+function realWorkspaceRoot(value: string) { try { return fs.realpathSync(value); } catch { throw new LabInteractError("invalidWorkspace", `Workspace does not exist: ${String(value)}`); } }
+function resolveRequestedWorkspace(requested: string | undefined, allowed: string) { const candidate = realWorkspaceRoot(requested || allowed); if (candidate !== allowed) throw new LabInteractError("workspaceNotAllowed", "open may use only the worktree that launched this daemon."); return candidate; }
 
-export function normalizeError(error) {
+export function normalizeError(error: unknown) {
   if (error instanceof LabInteractError) return error;
   if (error instanceof LabInteractDriverError) return new LabInteractError(error.code || "driverError", conciseError(error), error.details || {});
-  return new LabInteractError(error?.code || "commandFailed", conciseError(error));
+  return new LabInteractError(errorCode(error) || "commandFailed", conciseError(error));
 }
-export function conciseError(error) { return String(error?.message || "Lab Interact command failed.").split("\nServer log tail:")[0].slice(0, 1000); }
+export function conciseError(error: unknown) { return String(error instanceof Error ? error.message : "Lab Interact command failed.").split("\nServer log tail:")[0].slice(0, 1000); }
 
 export async function loadDriverFactory(workspaceRoot = process.cwd()) {
   const modulePath = process.env.RTS_LAB_INTERACT_DRIVER_FACTORY_MODULE;
   if (!modulePath) return undefined;
   const module = await import(pathToFileURL(path.resolve(workspaceRoot, modulePath)).href);
   if (typeof module.openLabInteractDriver !== "function") throw new LabInteractError("invalidDriverFactory", "Driver factory module must export openLabInteractDriver(options).");
-  return module.openLabInteractDriver;
+  return module.openLabInteractDriver as DriverFactory;
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asJsonObject(value: unknown): JsonObject {
+  return isJsonObject(value) ? value : {};
+}
+
+function objectArray(value: unknown): JsonObject[] {
+  return Array.isArray(value) ? value.filter(isJsonObject) : [];
+}
+
+function errorCode(error: unknown): string | null {
+  return isJsonObject(error) && typeof error.code === "string" ? error.code : null;
 }

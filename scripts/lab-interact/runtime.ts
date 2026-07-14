@@ -14,7 +14,19 @@ export const REQUEST_TIMEOUT_MS = 120_000;
 export const RECORDING_REQUEST_TIMEOUT_MS = 420_000;
 export const STARTUP_GRACE_MS = 15_000;
 
-export function checkoutCommit(workspaceRoot) {
+export interface RuntimePaths {
+  workspaceRoot: string;
+  parent: string;
+  directory: string;
+  socket: string;
+  state: string;
+  lock: string;
+  startupError: string;
+}
+
+export type RuntimeRecord = Record<string, unknown>;
+
+export function checkoutCommit(workspaceRoot: string) {
   const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot, encoding: "utf8" });
   const commit = String(result.stdout || "").trim().toLowerCase();
   if (result.status !== 0 || !/^[a-f0-9]{40}$/.test(commit)) {
@@ -23,7 +35,7 @@ export function checkoutCommit(workspaceRoot) {
   return commit;
 }
 
-export function runtimePaths(workspaceRoot, { tmpDir = os.tmpdir() } = {}) {
+export function runtimePaths(workspaceRoot: fs.PathLike, { tmpDir = os.tmpdir() } = {}): RuntimePaths {
   const root = fs.realpathSync(workspaceRoot);
   const key = crypto.createHash("sha256").update(root).digest("hex").slice(0, 24);
   const owner = typeof process.getuid === "function" ? process.getuid() : "user";
@@ -56,74 +68,75 @@ export function configuredIdleMs(env = process.env) {
   return value;
 }
 
-export function prepareRuntime(paths) {
+export function prepareRuntime(paths: RuntimePaths) {
   fs.mkdirSync(paths.parent, { recursive: true, mode: 0o700 });
   fs.chmodSync(paths.parent, 0o700);
   fs.mkdirSync(paths.directory, { recursive: true, mode: 0o700 });
   fs.chmodSync(paths.directory, 0o700);
 }
 
-export function writeState(paths, state) {
+export function writeState(paths: RuntimePaths, state: RuntimeRecord) {
   const temporary = `${paths.state}.${process.pid}.tmp`;
   fs.writeFileSync(temporary, `${JSON.stringify(state)}\n`, { mode: 0o600 });
   fs.renameSync(temporary, paths.state);
 }
 
-export function readState(paths) {
+export function readState(paths: RuntimePaths): RuntimeRecord | null {
   try {
-    return JSON.parse(fs.readFileSync(paths.state, "utf8"));
+    return parsedRecord(fs.readFileSync(paths.state, "utf8"));
   } catch {
     return null;
   }
 }
 
-export function writeStartupError(paths, error) {
+export function writeStartupError(paths: RuntimePaths, error: RuntimeRecord) {
   const temporary = `${paths.startupError}.${process.pid}.tmp`;
   fs.writeFileSync(temporary, `${JSON.stringify(error)}\n`, { mode: 0o600 });
   fs.renameSync(temporary, paths.startupError);
 }
 
-export function readStartupError(paths) {
+export function readStartupError(paths: RuntimePaths): RuntimeRecord | null {
   try {
-    return JSON.parse(fs.readFileSync(paths.startupError, "utf8"));
+    return parsedRecord(fs.readFileSync(paths.startupError, "utf8"));
   } catch {
     return null;
   }
 }
 
-export function processAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
+export function processAlive(pid: unknown) {
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error?.code === "EPERM";
+    return error instanceof Error && "code" in error && error.code === "EPERM";
   }
 }
 
-export function readStartupLock(paths) {
+export function readStartupLock(paths: Pick<RuntimePaths, "lock">): RuntimeRecord | null {
   try {
-    return JSON.parse(fs.readFileSync(paths.lock, "utf8"));
+    return parsedRecord(fs.readFileSync(paths.lock, "utf8"));
   } catch {
     return null;
   }
 }
 
-export function startupLockStale(paths, now = Date.now()) {
+export function startupLockStale(paths: RuntimePaths, now = Date.now()) {
   const lock = readStartupLock(paths);
   let stat;
   try { stat = fs.statSync(paths.lock); } catch { return false; }
-  const validRecord = /^[a-f0-9]{32}$/.test(lock?.nonce) &&
-    ["cli", "daemon"].includes(lock?.role) && Number.isInteger(lock?.pid) && lock.pid > 0 &&
-    Number.isFinite(lock?.createdAt) && lock.createdAt <= now + 1_000;
+  const validRecord = typeof lock?.nonce === "string" && /^[a-f0-9]{32}$/.test(lock.nonce) &&
+    typeof lock.role === "string" && ["cli", "daemon"].includes(lock.role) &&
+    typeof lock.pid === "number" && Number.isInteger(lock.pid) && lock.pid > 0 &&
+    typeof lock.createdAt === "number" && Number.isFinite(lock.createdAt) && lock.createdAt <= now + 1_000;
   if (!validRecord) return (stat.mtimeMs > now ? STARTUP_GRACE_MS + 1 : now - stat.mtimeMs) > STARTUP_GRACE_MS;
   return now - Number(lock.createdAt) > STARTUP_GRACE_MS && !processAlive(lock.pid);
 }
 
-export function claimStartupLock(paths, nonce) {
+export function claimStartupLock(paths: RuntimePaths, nonce: string) {
   const fd = fs.openSync(paths.lock, "r+");
   try {
-    const current = JSON.parse(fs.readFileSync(fd, "utf8"));
+    const current = parsedRecord(fs.readFileSync(fd, "utf8"));
     if (current?.nonce !== nonce || current?.role !== "cli") {
       throw new Error("Lab Interact startup lock nonce no longer belongs to this daemon.");
     }
@@ -139,12 +152,12 @@ export function claimStartupLock(paths, nonce) {
   }
 }
 
-export function startupLockOwned(paths, nonce, pid, role) {
+export function startupLockOwned(paths: RuntimePaths, nonce: string, pid: number, role: string) {
   const lock = readStartupLock(paths);
   return lock?.nonce === nonce && lock?.pid === pid && lock?.role === role;
 }
 
-export function removeOwnedStartupLock(paths, nonce, pid, role) {
+export function removeOwnedStartupLock(paths: RuntimePaths, nonce: string, pid: number, role: string) {
   if (!startupLockOwned(paths, nonce, pid, role)) return false;
   const moved = `${paths.lock}.release-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
   try {
@@ -162,7 +175,7 @@ export function removeOwnedStartupLock(paths, nonce, pid, role) {
   return false;
 }
 
-export function reclaimStaleStartupLock(paths) {
+export function reclaimStaleStartupLock(paths: RuntimePaths) {
   const expected = readStartupLock(paths);
   let expectedStat;
   try { expectedStat = fs.statSync(paths.lock); } catch { return false; }
@@ -189,17 +202,23 @@ export function reclaimStaleStartupLock(paths) {
   return false;
 }
 
-export function cleanupRuntime(paths) {
+export function cleanupRuntime(paths: Pick<RuntimePaths, "directory">) {
   fs.rmSync(paths.directory, { recursive: true, force: true });
 }
 
-export function cleanupOwnedRuntime(paths, daemonId, pid = process.pid) {
+export function cleanupOwnedRuntime(paths: RuntimePaths, daemonId: string, pid = process.pid) {
   const state = readState(paths);
   if (state?.daemonId !== daemonId || state?.pid !== pid) return false;
   cleanupRuntime(paths);
   return true;
 }
 
-export function sleep(ms) {
+export function sleep(ms = 0): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parsedRecord(text: string): RuntimeRecord {
+  const value: unknown = JSON.parse(text);
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Expected a JSON object.");
+  return value as RuntimeRecord;
 }

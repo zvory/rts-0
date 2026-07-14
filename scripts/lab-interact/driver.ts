@@ -6,20 +6,21 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Browser, Page, Viewport } from "puppeteer-core";
 
-import { withAbortSignal as abortable } from "./abort_signal.mjs";
+import { withAbortSignal as abortable } from "./abort_signal.ts";
 import {
   checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, LabInteractRecordingError,
   RECORDING_LIMITS, removePartialRecording,
-} from "./recording.mjs";
+} from "./recording.ts";
 import {
   createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame,
-} from "./fixed_capture.mjs";
-import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "./manifest_summary.mjs";
-import { PrivateServer } from "./private_server.mjs";
-import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.mjs";
+} from "./fixed_capture.ts";
+import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "./manifest_summary.ts";
+import { PrivateServer } from "./private_server.ts";
+import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
 
-export { validateWorkspaceRoot } from "./workspace_inspection.mjs";
+export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -41,8 +42,106 @@ export const DRIVER_STATES = Object.freeze({
   CLOSED: "closed",
 });
 
+type JsonObject = Record<string, unknown>;
+interface WorkspaceInfo { root: string; branch: string; head: string }
+interface CaptureClip { x: number; y: number; width: number; height: number }
+interface BridgeResult extends JsonObject {
+  snapshotTick?: number;
+  room?: string;
+  roomTime?: { paused?: boolean; speed?: number };
+  frame?: number;
+  ready?: boolean;
+  visualStartMs?: number;
+  rendererFrame?: number;
+  frameErrors?: unknown[];
+  renderErrors?: unknown[];
+  missingTextureSubjectIds?: number[];
+  failedAssets?: unknown[];
+  pendingAssets?: unknown[];
+  subjects?: unknown[];
+  assets?: unknown;
+  camera?: unknown;
+  cameraViewport?: unknown;
+  cameraWorldBounds?: unknown;
+  visualProfileId?: string;
+}
+interface Completion<T> { promise: Promise<T>; resolve(value: T): boolean; reject(error: unknown): boolean }
+type WallClockRecorder = Awaited<ReturnType<typeof createWallClockRecorder>>;
+type MediaTools = Awaited<ReturnType<typeof checkMediaCapabilities>>;
+interface RecordingResult extends JsonObject {
+  active: false;
+  stoppedBy: string;
+  videoPath: string;
+  framePaths: string[];
+  contactSheetPath: string;
+  manifestPath: string;
+}
+interface ActiveRecording {
+  name: string;
+  recorder: WallClockRecorder;
+  tools: MediaTools;
+  recordingDir: string;
+  mp4Path: string;
+  framesDir: string;
+  contactSheetPath: string;
+  manifestPath: string;
+  startedMs: number;
+  startedAt: string;
+  startStatus: BridgeResult;
+  resumeResult: BridgeResult | null;
+  resumeSpeed: number | null;
+  clip: CaptureClip;
+  scale: number;
+  viewport: Viewport | null;
+  originalViewport: Viewport | null;
+  maxDurationMs: number;
+  finalizing: Promise<RecordingResult> | null;
+  stoppedBy: string | null;
+  operations: unknown[];
+  operationCount: number;
+  operationsTruncated: boolean;
+  aliases: Array<{ alias: string; id: number }>;
+  completion: Completion<RecordingResult>;
+  watchdog?: NodeJS.Timeout;
+  sizeWatchdog?: NodeJS.Timeout;
+}
+interface ActiveFixedCapture {
+  active: true;
+  cancelled: boolean;
+  name: string;
+  fps: number;
+  frameCount: number;
+  frameIndex: number;
+  startStatus: BridgeResult;
+  abortController: AbortController;
+}
+interface DriverOptions {
+  workspaceRoot?: string;
+  map?: string;
+  seed?: string;
+  scenario?: string;
+  renderer?: string;
+  viewport?: Viewport;
+  timeoutMs?: number;
+  startupTimeoutMs?: number;
+  chrome?: string;
+  baseUrl?: string;
+  signal?: AbortSignal | null;
+}
+
+declare global {
+  interface Window {
+    __rtsLabInteract?: {
+      status(): { ready?: boolean };
+      call(method: string, input: unknown): Promise<{ ok: boolean; value?: unknown; error?: { code?: string; message?: string; details?: JsonObject } }>;
+    };
+  }
+}
+
 export class LabInteractDriverError extends Error {
-  constructor(code, message, details = {}) {
+  details: JsonObject;
+  code: string;
+  constructor(code: string, message: string, details: JsonObject = {}) {
     super(message);
     this.name = "LabInteractDriverError";
     this.code = code;
@@ -51,7 +150,28 @@ export class LabInteractDriverError extends Error {
 }
 
 export class LabInteractDriver {
-  static async open(options = {}) {
+  artifactCapability: string;
+  openStarted: boolean;
+  lastFixedCapture: JsonObject | null;
+  fixedCapture: ActiveFixedCapture | null;
+  lastRecordingCompletion: Completion<RecordingResult> | null;
+  lastRecording: RecordingResult | null;
+  recording: ActiveRecording | null;
+  closePromise: Promise<void> | null;
+  requestFailures: string[];
+  pageErrors: string[];
+  pageConsoleErrors: string[];
+  profileDir: string;
+  page: Page | null;
+  browserVersion: string;
+  browser: Browser | null;
+  serverLogPath: string;
+  server: PrivateServer | null;
+  sessionDir: string;
+  workspace: WorkspaceInfo | null;
+  state: string;
+  options: Required<Omit<DriverOptions, "workspaceRoot" | "signal">> & Pick<DriverOptions, "workspaceRoot" | "signal">;
+  static async open(options: DriverOptions = {}) {
     const driver = new LabInteractDriver(options);
     try {
       await driver.open();
@@ -74,7 +194,7 @@ export class LabInteractDriver {
     chrome = process.env.CHROME || "",
     baseUrl = "",
     signal = null,
-  } = {}) {
+  }: DriverOptions = {}) {
     this.options = {
       workspaceRoot,
       map,
@@ -118,8 +238,8 @@ export class LabInteractDriver {
       throw new LabInteractDriverError("invalidLifecycle", "Lab Interact driver can only be opened once.");
     }
     this.openStarted = true;
-    this.workspace = validateWorkspaceRoot(this.options.workspaceRoot);
-    this.sessionDir = createSessionDirectory(this.workspace.root, this.options.map);
+    this.workspace = validateWorkspaceRoot(this.options.workspaceRoot || process.cwd());
+    this.sessionDir = createSessionDirectory(this.workspace!.root, this.options.map);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
     this.server = await PrivateServer.open({
       workspace: this.workspace,
@@ -127,9 +247,9 @@ export class LabInteractDriver {
       startupTimeoutMs: this.options.startupTimeoutMs,
       baseUrl: this.options.baseUrl,
       artifactCapability: this.artifactCapability,
-      signal: this.options.signal,
+      signal: this.options.signal || undefined,
     });
-    this.serverLogPath = this.server.logPath || "";
+    this.serverLogPath = this.server!.logPath || "";
 
     const puppeteer = await this.openStep(loadPuppeteer(), "Puppeteer loading");
     if (this.state !== DRIVER_STATES.OPENING) {
@@ -140,7 +260,7 @@ export class LabInteractDriver {
     const browser = await this.openStep(
       puppeteer.launch({
         executablePath: chrome,
-        headless: "new",
+        headless: true,
         defaultViewport: normalizeViewport(this.options.viewport),
         args: [
           "--no-sandbox",
@@ -150,7 +270,7 @@ export class LabInteractDriver {
         ],
       }),
       "browser startup",
-      (lateBrowser) => lateBrowser.close(),
+      (lateBrowser: Browser) => lateBrowser.close(),
     );
     if (this.state !== DRIVER_STATES.OPENING) {
       await browser.close().catch(() => {});
@@ -166,11 +286,11 @@ export class LabInteractDriver {
     this.page = page;
     this.attachPageDiagnostics();
     await this.openStep(
-      this.page.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
+      this.page!.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
       "page navigation",
     );
     await this.openStep(
-      this.page.waitForFunction(
+      this.page!.waitForFunction(
         () => window.__rtsLabInteract?.status?.().ready === true,
         { timeout: this.options.startupTimeoutMs },
       ),
@@ -186,8 +306,8 @@ export class LabInteractDriver {
     const ready = await this.openStep(this.status(), "session verification");
     this.writeManifest({
       status: this.state,
-      baseUrl: this.server.baseUrl,
-      reusedServer: this.server.reused,
+      baseUrl: this.server!.baseUrl,
+      reusedServer: this.server!.reused,
       browser: { chrome, viewport: normalizeViewport(this.options.viewport) },
       ready,
     });
@@ -200,7 +320,7 @@ export class LabInteractDriver {
       : { ...status, ready: false, reason: "pageError" };
   }
 
-  openStep(promise, detail, disposeLateValue = null) {
+  openStep<T>(promise: PromiseLike<T>, detail: string, disposeLateValue: ((value: T) => void | Promise<void>) | null = null): Promise<T> {
     return abortable(
       promise,
       this.options.signal,
@@ -209,35 +329,35 @@ export class LabInteractDriver {
     );
   }
 
-  async catalog(query = {}) {
+  async catalog(query: JsonObject = {}) {
     return this.call("catalog", query);
   }
 
-  async spawn(spawns) {
+  async spawn(spawns: JsonObject[]) {
     return this.call("spawn", { spawns });
   }
 
-  async update(updates) {
+  async update(updates: JsonObject[]) {
     return this.call("update", { updates });
   }
 
-  async remove(entityIds) {
+  async remove(entityIds: number[]) {
     return this.call("remove", { entityIds });
   }
 
-  async order({ playerId, command, ignoreCommandLimits = false }) {
+  async order({ playerId, command, ignoreCommandLimits = false }: { playerId: number; command: JsonObject; ignoreCommandLimits?: boolean }) {
     return this.call("order", { playerId, command, ignoreCommandLimits });
   }
 
-  async time(control) {
+  async time(control: JsonObject) {
     return this.call("time", control);
   }
 
-  async inspect(query = {}) {
+  async inspect(query: JsonObject = {}) {
     return this.call("inspect", query);
   }
 
-  async camera(command) {
+  async camera(command: JsonObject) {
     return this.call("camera", command);
   }
 
@@ -249,14 +369,15 @@ export class LabInteractDriver {
     return this.call("exportSetup", { name });
   }
 
-  async importSetup(scenario) {
+  async importSetup(scenario: JsonObject) {
     return this.call("importSetup", { scenario });
   }
 
   async exportReplay(name = "") {
     const room = (await this.status()).room;
-    const transfer = await this.artifactRequest("export", { room, name }, "json");
-    const response = await fetch(new URL(`dev/lab-interact/artifacts/${transfer.artifactId}`, this.server.baseUrl), {
+    if (typeof room !== "string") throw new LabInteractDriverError("artifactTransferFailed", "Lab room identity is unavailable.");
+    const transfer = await this.artifactRequest("export", { room, name });
+    const response = await fetch(new URL(`dev/lab-interact/artifacts/${transfer.artifactId}`, this.server!.baseUrl), {
       headers: {
         [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability,
         "x-lab-interact-room": room,
@@ -269,12 +390,13 @@ export class LabInteractDriver {
     return { bytes, transfer };
   }
 
-  async importReplay(bytes) {
+  async importReplay(bytes: Buffer) {
     if (!Buffer.isBuffer(bytes) || bytes.length > 8 * 1024 * 1024) {
       throw new LabInteractDriverError("artifactTooLarge", "Replay artifact must be a buffer no larger than 8 MiB.");
     }
     const room = (await this.status()).room;
-    const uploadUrl = new URL("dev/lab-interact/artifacts/upload", this.server.baseUrl);
+    if (typeof room !== "string") throw new LabInteractDriverError("artifactTransferFailed", "Lab room identity is unavailable.");
+    const uploadUrl = new URL("dev/lab-interact/artifacts/upload", this.server!.baseUrl);
     const uploadedResponse = await fetch(uploadUrl, {
       method: "POST",
       headers: {
@@ -282,25 +404,26 @@ export class LabInteractDriver {
         "x-lab-interact-room": room,
         "content-type": "application/json",
       },
-      body: bytes,
+      body: new Uint8Array(bytes),
       signal: AbortSignal.timeout(this.options.timeoutMs),
     });
     if (!uploadedResponse.ok) throw await artifactHttpError(uploadedResponse, "replay upload failed");
-    const uploaded = await uploadedResponse.json();
-    const imported = await this.artifactRequest("import", { room, artifactId: uploaded.artifactId }, "json");
+    const uploaded = jsonObject(await uploadedResponse.json(), "replay upload response");
+    if (typeof uploaded.artifactId !== "string") throw new LabInteractDriverError("artifactTransferFailed", "Replay upload response has no artifact id.");
+    const imported = await this.artifactRequest("import", { room, artifactId: uploaded.artifactId });
     await this.callBridge("status", {});
     return { uploaded, imported };
   }
 
-  async artifactRequest(action, body) {
-    const response = await fetch(new URL(`dev/lab-interact/artifacts/${action}`, this.server.baseUrl), {
+  async artifactRequest(action: string, body: { room: string; name?: string; artifactId?: string }) {
+    const response = await fetch(new URL(`dev/lab-interact/artifacts/${action}`, this.server!.baseUrl), {
       method: "POST",
       headers: { [ARTIFACT_CAPABILITY_HEADER]: this.artifactCapability, "content-type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(this.options.timeoutMs),
     });
     if (!response.ok) throw await artifactHttpError(response, `replay ${action} failed`);
-    return response.json();
+    return jsonObject(await response.json(), `replay ${action} response`);
   }
 
   async screenshot({
@@ -311,6 +434,14 @@ export class LabInteractDriver {
     subjectIds = [],
     subjectSummaries = [],
     request = {},
+  }: {
+    sessionId?: string;
+    name?: string;
+    presentation?: string;
+    viewport?: Viewport | null;
+    subjectIds?: number[];
+    subjectSummaries?: unknown[];
+    request?: JsonObject;
   } = {}) {
     try {
       return await this.captureScreenshot({
@@ -349,21 +480,29 @@ export class LabInteractDriver {
     crop = null,
     scale = 1,
     resumeSpeed = null,
+  }: {
+    sessionId?: string;
+    name?: string;
+    maxDurationMs?: number;
+    viewport?: Viewport | null;
+    crop?: CaptureClip | null;
+    scale?: number;
+    resumeSpeed?: number | null;
   } = {}) {
     try {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
       const tools = await checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
-      const originalViewport = this.page.viewport?.() || null;
+      const originalViewport = this.page!.viewport?.() || null;
       let recordingDir = "";
       let recorder = null;
       try {
-        if (normalizedViewport) await this.page.setViewport(normalizedViewport);
+        if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
         await this.callBridge("presentation", { mode: "clean" });
-        await this.page.evaluate(() => document.fonts?.ready || Promise.resolve());
+        await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
         await this.waitForCaptureReadiness([]);
-        const viewportClip = await this.page.evaluate(() => {
+        const viewportClip = await this.page!.evaluate(() => {
           const rect = document.getElementById("viewport")?.getBoundingClientRect?.();
           return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
         });
@@ -371,12 +510,12 @@ export class LabInteractDriver {
         const clip = crop ? normalizeRecordingCrop(crop, viewportClip) : viewportClip;
         const artifactName = safeArtifactName(name, "recording");
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
-        recordingDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
+        recordingDir = path.join(this.workspace!.root, LAB_INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
         fs.mkdirSync(recordingDir, { recursive: true });
         const mp4Path = path.join(recordingDir, `${artifactName}.mp4`);
         const startStatus = await this.callBridge("status", {});
         recorder = await createWallClockRecorder({
-          page: this.page, outputPath: mp4Path, clip, scale, tools, maxDurationMs,
+          page: this.page!, outputPath: mp4Path, clip, scale, tools, maxDurationMs,
           timeoutMs: this.options.timeoutMs,
         });
         let resumeResult = null;
@@ -385,8 +524,8 @@ export class LabInteractDriver {
         }
         recorder.start();
         const startedMs = Date.now();
-        const completion = recordingCompletion();
-        const recording = {
+        const completion = recordingCompletion<RecordingResult>();
+        const recording: ActiveRecording = {
           name: artifactName, recorder, tools, recordingDir, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
@@ -414,7 +553,7 @@ export class LabInteractDriver {
       } catch (error) {
         if (recorder) await recorder.abort().catch(() => {});
         removePartialRecording([recordingDir]);
-        if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
+        if (originalViewport) await this.page!.setViewport(originalViewport).catch(() => {});
         await this.callBridge("presentation", { mode: "default" }).catch(() => {});
         throw error;
       }
@@ -423,12 +562,21 @@ export class LabInteractDriver {
     }
   }
 
-  async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, viewport = null, sceneIdentity = null, sceneRevision = 0, aliases = [] } = {}) {
+  async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, viewport = null, sceneIdentity = null, sceneRevision = 0, aliases = [] }: {
+    sessionId?: string;
+    name?: string;
+    fps?: number;
+    frameCount?: number;
+    viewport?: Viewport | null;
+    sceneIdentity?: JsonObject | null;
+    sceneRevision?: number;
+    aliases?: Array<{ alias: string; id: number }>;
+  } = {}) {
     try {
       if (this.recording) throw new LabInteractDriverError("recordingActive", "Fixed capture is unavailable while real-time recording is active.");
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const artifactName = safeArtifactName(name, "fixed");
-      const originalViewport = this.page.viewport?.() || null;
+      const originalViewport = this.page!.viewport?.() || null;
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
       let captureDir = "";
       let captureEntered = false;
@@ -436,11 +584,11 @@ export class LabInteractDriver {
       try {
         const status = await this.callBridge("status", {});
         if (!status.roomTime?.paused) throw new LabInteractDriverError("roomTimeNotPaused", "capture-fixed requires paused authoritative room time.");
-        if (normalizedViewport) await this.page.setViewport(normalizedViewport);
+        if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
         await this.callBridge("presentation", { mode: "clean" });
-        await this.page.evaluate(() => document.fonts?.ready || Promise.resolve());
+        await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
         await this.waitForCaptureReadiness([]);
-        const clip = await this.page.evaluate(() => {
+        const clip = await this.page!.evaluate(() => {
           const rect = document.getElementById("viewport")?.getBoundingClientRect?.();
           return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
         });
@@ -450,7 +598,7 @@ export class LabInteractDriver {
           startStatus: status, abortController: new AbortController(),
         };
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
-        captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
+        captureDir = path.join(this.workspace!.root, LAB_INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
         const framesDir = path.join(captureDir, "frames");
         fs.mkdirSync(framesDir, { recursive: true });
         const videoPath = path.join(captureDir, `${artifactName}.mp4`);
@@ -466,6 +614,7 @@ export class LabInteractDriver {
         const entered = await this.callBridge("captureFixedEnter", {});
         captureEntered = true;
         const startTick = status.snapshotTick;
+        if (typeof startTick !== "number" || !Number.isInteger(startTick)) throw new LabInteractDriverError("captureStateInvalid", "Fixed capture requires an authoritative start tick.");
         let currentTick = startTick;
         let processedPngBytes = 0;
         const frames = [];
@@ -478,9 +627,10 @@ export class LabInteractDriver {
             await this.callBridge("time", { action: "step", ticks });
             currentTick = tick;
           }
+          if (typeof entered.visualStartMs !== "number") throw new LabInteractDriverError("captureStateInvalid", "Fixed capture did not receive a visual start time.");
           const visualTimeMs = entered.visualStartMs + index * (1000 / fps);
           const rendered = await this.callBridge("captureFixedFrame", { visualTimeMs });
-          const screenshot = Buffer.from(await this.page.screenshot({ type: "png", clip }) || []);
+          const screenshot = Buffer.from(await this.page!.screenshot({ type: "png", clip }) || []);
           if (screenshot.length === 0) throw new LabInteractDriverError("captureEmpty", "Chrome returned an empty fixed-capture frame.");
           processedPngBytes += screenshot.length;
           if (screenshot.length > FIXED_CAPTURE_LIMITS.maxFrameBytes) throw new LabInteractDriverError("captureTooLarge", "One fixed-capture PNG exceeded its bounded frame budget.");
@@ -488,9 +638,9 @@ export class LabInteractDriver {
           let representativePath = null;
           if (representativeIndices.has(index)) {
             representativePath = path.join(framesDir, `frame-${String(index).padStart(4, "0")}.png`);
-            fs.writeFileSync(representativePath, screenshot, { mode: 0o600 });
+            fs.writeFileSync(representativePath, new Uint8Array(screenshot), { mode: 0o600 });
           }
-          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, sha256: hashFrame(screenshot), representativePath });
+          frames.push({ index, tick, visualTimeMs, rendererFrame: rendered.rendererFrame, sha256: hashFrame(new Uint8Array(screenshot)), representativePath });
         }
         const media = await encoder.finish();
         encoder = null;
@@ -566,7 +716,7 @@ export class LabInteractDriver {
     return { cancelling: true };
   }
 
-  recordAcceptedOperation(operation, aliases = []) {
+  recordAcceptedOperation(operation: unknown, aliases: Array<{ alias: string; id: number }> = []) {
     if (!this.recording || this.recording.finalizing) return false;
     this.recording.operationCount += 1;
     if (this.recording.operations.length < RECORDING_LIMITS.maxOperations) this.recording.operations.push(operation);
@@ -575,7 +725,7 @@ export class LabInteractDriver {
     return true;
   }
 
-  async recordStop(metadata = {}) {
+  async recordStop(metadata: JsonObject = {}) {
     try {
       const recording = this.recording;
       if (!recording) {
@@ -601,17 +751,17 @@ export class LabInteractDriver {
     return completion.promise;
   }
 
-  settleRecording(reason, metadata = {}) {
+  settleRecording(reason: string, metadata: JsonObject = {}) {
     if (!this.recording) return null;
     return this.finishRecording(reason, metadata);
   }
 
-  async finishRecording(reason, metadata = {}) {
+  async finishRecording(reason: string, metadata: JsonObject = {}) {
     const recording = this.recording;
     if (!recording) throw new LabInteractDriverError("recordingInactive", "No recording is active for this session. Start one before stopping.");
     if (recording.finalizing) return recording.finalizing;
     recording.stoppedBy = reason;
-    recording.finalizing = (async () => {
+    const finalizing = (async (): Promise<RecordingResult> => {
       clearTimeout(recording.watchdog);
       clearInterval(recording.sizeWatchdog);
       try {
@@ -624,6 +774,7 @@ export class LabInteractDriver {
           mp4Path: recording.mp4Path, framesDir: recording.framesDir,
           contactSheetPath: recording.contactSheetPath, targetDurationMs: wallDurationMs,
           tools: recording.tools, frameDiagnostics,
+          signal: undefined,
         });
         const diagnostics = this.diagnostics();
         const manifest = {
@@ -636,7 +787,7 @@ export class LabInteractDriver {
           workspace: this.workspace,
           serverBuild: this.server?.build || null,
           runtime: { node: process.version, platform: process.platform, architecture: process.arch },
-          browser: { chrome: this.browserVersion || null, userAgent: await this.page.evaluate(() => navigator.userAgent).catch(() => null) },
+          browser: { chrome: this.browserVersion || null, userAgent: await this.page!.evaluate(() => navigator.userAgent).catch(() => null) },
           mediaTools: recording.tools,
           authoritative: {
             startTick: recording.startStatus?.snapshotTick ?? null,
@@ -670,7 +821,7 @@ export class LabInteractDriver {
           errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },
         };
         fs.writeFileSync(recording.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
-        const result = {
+        const result: RecordingResult = {
           active: false, stoppedBy: reason, videoPath: recording.mp4Path,
           framePaths: media.framePaths, contactSheetPath: recording.contactSheetPath,
           manifestPath: recording.manifestPath, probe: media.probe,
@@ -694,11 +845,12 @@ export class LabInteractDriver {
         if (this.recording === recording) this.recording = null;
       }
     })();
-    void recording.finalizing.then(
+    recording.finalizing = finalizing;
+    void finalizing.then(
       (result) => recording.completion.resolve(result),
       (error) => recording.completion.reject(error),
     );
-    return recording.finalizing;
+    return finalizing;
   }
 
   diagnostics() {
@@ -711,7 +863,7 @@ export class LabInteractDriver {
     };
   }
 
-  async call(method, input) {
+  async call(method: string, input: JsonObject): Promise<BridgeResult> {
     try {
       return await this.callBridge(method, input);
     } catch (error) {
@@ -719,13 +871,13 @@ export class LabInteractDriver {
     }
   }
 
-  async callBridge(method, input) {
+  async callBridge(method: string, input: JsonObject): Promise<BridgeResult> {
     if (this.state !== DRIVER_STATES.OPEN || !this.page) {
       throw new LabInteractDriverError("sessionClosed", "Lab Interact driver session is not open.");
     }
     const result = await withTimeout(
-      this.page.evaluate(
-        ({ method: bridgeMethod, input: bridgeInput }) => window.__rtsLabInteract.call(bridgeMethod, bridgeInput),
+      this.page!.evaluate(
+        ({ method: bridgeMethod, input: bridgeInput }: { method: string; input: JsonObject }) => window.__rtsLabInteract!.call(bridgeMethod, bridgeInput),
         { method, input },
       ),
       this.options.timeoutMs,
@@ -738,10 +890,21 @@ export class LabInteractDriver {
         { method, ...(result?.error?.details || {}) },
       );
     }
-    return result.value;
+    if (!result.value || typeof result.value !== "object" || Array.isArray(result.value)) {
+      throw new LabInteractDriverError("bridgeError", `Lab Interact ${method} returned a non-object result.`);
+    }
+    return result.value as BridgeResult;
   }
 
-  async captureScreenshot({ sessionId, name, presentation, viewport, subjectIds, subjectSummaries, request }) {
+  async captureScreenshot({ sessionId, name, presentation, viewport, subjectIds, subjectSummaries, request }: {
+    sessionId?: string;
+    name: string;
+    presentation: string;
+    viewport: Viewport | null;
+    subjectIds: number[];
+    subjectSummaries: unknown[];
+    request: JsonObject;
+  }) {
     if (this.recording) {
       throw new LabInteractDriverError(
         "recordingActive",
@@ -754,27 +917,27 @@ export class LabInteractDriver {
     const normalizedSessionId = safeCaptureSessionId(sessionId);
     const artifactName = safeArtifactName(name);
     const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
-    const originalViewport = this.page.viewport?.() || null;
+    const originalViewport = this.page!.viewport?.() || null;
     const requestedSubjectIds = boundedEntityIds(subjectIds);
     try {
-      if (normalizedViewport) await this.page.setViewport(normalizedViewport);
+      if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
       await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
-      await this.page.evaluate(() => document.fonts?.ready || Promise.resolve());
+      await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
       const readiness = await this.waitForCaptureReadiness(requestedSubjectIds);
-      const clip = await this.page.evaluate(() => {
+      const clip = await this.page!.evaluate(() => {
         const viewportEl = document.getElementById("viewport");
         const rect = viewportEl?.getBoundingClientRect?.();
         return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
       });
       if (!validClip(clip)) throw new LabInteractDriverError("viewportUnavailable", "The Pixi viewport is not available for capture.");
 
-      const captureDir = path.join(this.workspace.root, LAB_INTERACT_ROOT, normalizedSessionId, "captures");
+      const captureDir = path.join(this.workspace!.root, LAB_INTERACT_ROOT, normalizedSessionId, "captures");
       fs.mkdirSync(captureDir, { recursive: true });
       const suffix = new Date().toISOString().replace(/[:.]/g, "-");
       const baseName = `${artifactName}-${suffix}`;
       const pngPath = path.join(captureDir, `${baseName}.png`);
       const manifestPath = path.join(captureDir, `${baseName}.json`);
-      const screenshot = await this.page.screenshot({ type: "png", clip, path: pngPath });
+      const screenshot = await this.page!.screenshot({ type: "png", clip, path: pngPath });
       const png = Buffer.from(screenshot || []);
       if (png.length === 0) {
         throw new LabInteractDriverError("captureEmpty", "Chrome returned an empty Pixi screenshot.");
@@ -825,7 +988,7 @@ export class LabInteractDriver {
         request: boundedRequestMetadata(request),
         browser: {
           chrome: this.browserVersion || null,
-          puppeteer: await this.page.evaluate(() => navigator.userAgent),
+          puppeteer: await this.page!.evaluate(() => navigator.userAgent),
         },
       };
       fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -843,12 +1006,12 @@ export class LabInteractDriver {
         readiness: readinessSummary,
       };
     } finally {
-      if (originalViewport) await this.page.setViewport(originalViewport).catch(() => {});
+      if (originalViewport) await this.page!.setViewport(originalViewport).catch(() => {});
       await this.callBridge("presentation", { mode: "default" }).catch(() => {});
     }
   }
 
-  async waitForCaptureReadiness(subjectIds) {
+  async waitForCaptureReadiness(subjectIds: number[]) {
     const deadline = Date.now() + this.options.timeoutMs;
     let initialFrame = null;
     let last = null;
@@ -869,8 +1032,8 @@ export class LabInteractDriver {
   }
 
   launchUrl() {
-    const url = new URL("/lab", this.server.baseUrl);
-    url.searchParams.set("room", generatedRoomId(this.workspace.head));
+    const url = new URL("/lab", this.server!.baseUrl);
+    url.searchParams.set("room", generatedRoomId(this.workspace!.head));
     url.searchParams.set("map", safeToken(this.options.map, "Default", 48));
     if (this.options.seed !== "" && this.options.seed != null) url.searchParams.set("seed", String(this.options.seed));
     if (this.options.scenario) url.searchParams.set("scenario", safeToken(this.options.scenario, "blank", 48));
@@ -881,16 +1044,16 @@ export class LabInteractDriver {
   }
 
   attachPageDiagnostics() {
-    this.page.on("console", (message) => {
+    this.page!.on("console", (message) => {
       if (message.type() === "error") appendBounded(this.pageConsoleErrors, message.text());
     });
-    this.page.on("pageerror", (error) => appendBounded(this.pageErrors, error.message));
-    this.page.on("requestfailed", (request) => {
+    this.page!.on("pageerror", (error) => appendBounded(this.pageErrors, error.message));
+    this.page!.on("requestfailed", (request) => {
       if (!request.url().includes("favicon")) {
         appendBounded(this.requestFailures, `${request.failure()?.errorText || "request failed"} ${request.url()}`);
       }
     });
-    this.page.on("close", () => {
+    this.page!.on("close", () => {
       if (this.recording) void this.finishRecording("pageClosed").catch(() => {});
     });
   }
@@ -901,7 +1064,7 @@ export class LabInteractDriver {
       if (this.state === DRIVER_STATES.CLOSED) return;
       if (this.recording) {
         await this.settleRecording("sessionClose")?.catch(() => {
-          removePartialRecording([this.recording?.recordingDir]);
+          removePartialRecording(this.recording?.recordingDir ? [this.recording.recordingDir] : []);
           this.recording = null;
         });
       }
@@ -923,18 +1086,18 @@ export class LabInteractDriver {
     return this.closePromise;
   }
 
-  transition(event) {
+  transition(event: string) {
     this.state = transitionDriverState(this.state, event);
   }
 
-  writeManifest(extra) {
+  writeManifest(extra: JsonObject) {
     if (!this.sessionDir) return;
     const manifest = {
       schemaVersion: 1,
       workspace: this.workspace ? {
-        root: this.workspace.root,
-        branch: this.workspace.branch,
-        head: this.workspace.head,
+        root: this.workspace!.root,
+        branch: this.workspace!.branch,
+        head: this.workspace!.head,
       } : null,
       session: {
         state: this.state,
@@ -945,25 +1108,30 @@ export class LabInteractDriver {
     fs.writeFileSync(path.join(this.sessionDir, "session.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   }
 
-  decorateError(error) {
+  decorateError(error: unknown) {
     if (error instanceof LabInteractDriverError && error.details?.diagnostics) return error;
     const diagnostics = this.diagnostics();
     const serverTail = diagnostics.serverLog ? readTail(diagnostics.serverLog, LOG_TAIL_LINES) : [];
-    const message = [error?.message || "Lab Interact driver failed."]
+    const source = error instanceof Error ? error : null;
+    const code = source && "code" in source && typeof source.code === "string" ? source.code : "driverError";
+    const details = source && "details" in source && source.details && typeof source.details === "object" && !Array.isArray(source.details)
+      ? source.details as JsonObject
+      : {};
+    const message = [source?.message || "Lab Interact driver failed."]
       .concat(serverTail.length ? [`Server log tail:\n${serverTail.join("\n")}`] : [])
       .join("\n");
-    return new LabInteractDriverError(error?.code || "driverError", message, {
-      ...error?.details,
+    return new LabInteractDriverError(code, message, {
+      ...details,
       diagnostics: { ...diagnostics, serverTail },
     });
   }
 }
 
-function recordingCompletion() {
-  let resolvePromise;
-  let rejectPromise;
+function recordingCompletion<T>(): Completion<T> {
+  let resolvePromise!: (value: T) => void;
+  let rejectPromise!: (reason?: unknown) => void;
   let settled = false;
-  const promise = new Promise((resolve, reject) => {
+  const promise = new Promise<T>((resolve, reject) => {
     resolvePromise = resolve;
     rejectPromise = reject;
   });
@@ -972,13 +1140,13 @@ function recordingCompletion() {
   void promise.catch(() => {});
   return {
     promise,
-    resolve(value) {
+    resolve(value: T) {
       if (settled) return false;
       settled = true;
       resolvePromise(value);
       return true;
     },
-    reject(error) {
+    reject(error: unknown) {
       if (settled) return false;
       settled = true;
       rejectPromise(error);
@@ -987,16 +1155,16 @@ function recordingCompletion() {
   };
 }
 
-export function safeToken(value, fallback = "session", maxLength = 64) {
+export function safeToken(value: string, fallback = "session", maxLength = 64) {
   const token = String(value || "").trim();
   return /^[A-Za-z0-9_-]+$/.test(token) && token.length <= maxLength ? token : fallback;
 }
 
-export function safeArtifactName(value, fallback = "scene") {
+export function safeArtifactName(value: string, fallback = "scene") {
   return safeToken(value, fallback, 48);
 }
 
-function safeCaptureSessionId(value) {
+function safeCaptureSessionId(value: unknown) {
   const sessionId = String(value || "").trim();
   if (!/^lab_[a-f0-9]{32}$/.test(sessionId)) {
     throw new LabInteractDriverError("invalidSession", "sessionId must be a valid Lab Interact session id.");
@@ -1004,7 +1172,7 @@ function safeCaptureSessionId(value) {
   return sessionId;
 }
 
-function normalizeCaptureViewport(viewport) {
+function normalizeCaptureViewport(viewport: Viewport) {
   const normalized = normalizeViewport(viewport);
   if (normalized.width > MAX_CAPTURE_VIEWPORT || normalized.height > MAX_CAPTURE_VIEWPORT) {
     throw new LabInteractDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
@@ -1012,7 +1180,7 @@ function normalizeCaptureViewport(viewport) {
   return normalized;
 }
 
-function normalizeRecordingCrop(crop, viewportClip) {
+function normalizeRecordingCrop(crop: CaptureClip, viewportClip: CaptureClip) {
   const normalized = { x: Number(crop.x), y: Number(crop.y), width: Number(crop.width), height: Number(crop.height) };
   if (!Object.values(normalized).every(Number.isFinite) || normalized.x < 0 || normalized.y < 0 || normalized.width < 2 || normalized.height < 2) {
     throw new LabInteractDriverError("invalidCrop", "recording crop must contain finite non-negative x/y and width/height of at least 2.");
@@ -1024,7 +1192,7 @@ function normalizeRecordingCrop(crop, viewportClip) {
   return absolute;
 }
 
-function boundedEntityIds(values) {
+function boundedEntityIds(values: unknown) {
   if (!Array.isArray(values) || values.length > 400) {
     throw new LabInteractDriverError("invalidSubjects", "subjectIds must contain at most 400 positive entity ids.");
   }
@@ -1035,10 +1203,10 @@ function boundedEntityIds(values) {
   return ids;
 }
 
-function summarizeCaptureReadiness(readiness) {
-  const subjects = boundedSummary(readiness?.subjects, LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects);
+function summarizeCaptureReadiness(readiness: BridgeResult) {
+  const subjects = boundedSummary(readiness.subjects || [], LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects);
   const missingTextures = boundedSummary(
-    readiness?.missingTextureSubjectIds,
+    readiness.missingTextureSubjectIds || [],
     LAB_INTERACT_SUMMARY_LIMITS.detailedSubjects,
   );
   return {
@@ -1050,25 +1218,26 @@ function summarizeCaptureReadiness(readiness) {
   };
 }
 
-function validClip(clip) {
-  return Number.isFinite(clip?.x) && Number.isFinite(clip?.y) &&
-    Number.isFinite(clip?.width) && Number.isFinite(clip?.height) &&
-    clip.width >= 1 && clip.height >= 1 &&
-    clip.width <= MAX_CAPTURE_VIEWPORT && clip.height <= MAX_CAPTURE_VIEWPORT;
+function validClip(clip: unknown): clip is CaptureClip {
+  if (!clip || typeof clip !== "object" || Array.isArray(clip)) return false;
+  const value = clip as JsonObject;
+  return typeof value.x === "number" && typeof value.y === "number" && typeof value.width === "number" && typeof value.height === "number" &&
+    Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.width) && Number.isFinite(value.height) &&
+    value.width >= 1 && value.height >= 1 && value.width <= MAX_CAPTURE_VIEWPORT && value.height <= MAX_CAPTURE_VIEWPORT;
 }
 
-function boundedRequestMetadata(request) {
+function boundedRequestMetadata(request: unknown): JsonObject {
   const text = JSON.stringify(request && typeof request === "object" ? request : {});
   if (text.length > 4000) return { truncated: true };
-  return JSON.parse(text);
+  return jsonObject(JSON.parse(text) as unknown, "capture request metadata");
 }
 
-function captureReadinessMessage(readiness, diagnostics) {
+function captureReadinessMessage(readiness: BridgeResult | null, diagnostics: ReturnType<LabInteractDriver["diagnostics"]>) {
   const failures = [
-    ...(readiness?.failedAssets || []).map((asset) => `${asset.id}: ${asset.message || "failed"}`),
-    ...(readiness?.pendingAssets || []).map((asset) => `${asset.id}: pending`),
-    ...(readiness?.frameErrors || []).map((error) => `frame: ${error.message || "failed"}`),
-    ...(readiness?.renderErrors || []).map((error) => `render ${error.label}: ${error.message || "failed"}`),
+    ...(readiness?.failedAssets || []).map((asset) => `${recordField(asset, "id")}: ${recordField(asset, "message") || "failed"}`),
+    ...(readiness?.pendingAssets || []).map((asset) => `${recordField(asset, "id")}: pending`),
+    ...(readiness?.frameErrors || []).map((error) => `frame: ${recordField(error, "message") || "failed"}`),
+    ...(readiness?.renderErrors || []).map((error) => `render ${recordField(error, "label")}: ${recordField(error, "message") || "failed"}`),
     ...(readiness?.missingTextureSubjectIds || []).map((id) => `subject ${id}: missing texture fallback`),
     ...(diagnostics?.pageErrors || []).map((error) => `page: ${error}`),
     ...(diagnostics?.pageConsoleErrors || []).map((error) => `console: ${error}`),
@@ -1076,7 +1245,7 @@ function captureReadinessMessage(readiness, diagnostics) {
   return failures.length ? `Screenshot readiness failed: ${failures.slice(0, 12).join("; ")}` : "Screenshot did not become ready before the timeout.";
 }
 
-function readPngDimensions(buffer) {
+function readPngDimensions(buffer: Buffer) {
   if (buffer.length < 24 || buffer.toString("ascii", 1, 4) !== "PNG") {
     throw new LabInteractDriverError("invalidCapture", "Chrome did not return a PNG image.");
   }
@@ -1088,23 +1257,24 @@ export function generatedRoomId(head = "") {
   return safeToken(`labinteract-${safeToken(head.slice(0, 8), "head", 8)}-${process.pid}-${suffix}`, "labinteract", 40);
 }
 
-export function transitionDriverState(state, event) {
-  const next = {
+export function transitionDriverState(state: string, event: string) {
+  const transitions: Record<string, Record<string, string>> = {
     [DRIVER_STATES.OPENING]: { opened: DRIVER_STATES.OPEN, closing: DRIVER_STATES.CLOSING },
     [DRIVER_STATES.OPEN]: { closing: DRIVER_STATES.CLOSING },
     [DRIVER_STATES.CLOSING]: { closed: DRIVER_STATES.CLOSED },
     [DRIVER_STATES.CLOSED]: {},
-  }[state]?.[event];
+  };
+  const next = transitions[state]?.[event];
   if (!next) throw new LabInteractDriverError("invalidLifecycle", `Cannot ${event} Lab Interact driver from ${state}.`);
   return next;
 }
 
-export async function withTimeout(promise, timeoutMs, detail = "operation") {
-  let timer;
+export async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number | undefined, detail = "operation"): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
       promise,
-      new Promise((_, reject) => {
+      new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new LabInteractDriverError("timeout", `${detail} timed out after ${timeoutMs}ms.`)), timeoutMs);
       }),
     ]);
@@ -1113,22 +1283,22 @@ export async function withTimeout(promise, timeoutMs, detail = "operation") {
   }
 }
 
-function createSessionDirectory(workspaceRoot, map) {
+function createSessionDirectory(workspaceRoot: string, map: unknown) {
   const root = path.join(workspaceRoot, LAB_INTERACT_ROOT, "sessions");
   fs.mkdirSync(root, { recursive: true });
-  const name = `${safeToken(map, "default", 32)}-${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
+  const name = `${safeToken(String(map || ""), "default", 32)}-${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
   const directory = path.join(root, name);
   fs.mkdirSync(directory, { recursive: true });
   return directory;
 }
 
-async function artifactHttpError(response, fallback) {
+async function artifactHttpError(response: Response, fallback: string) {
   let message = fallback;
   try { message = (await response.json())?.error || message; } catch {}
   return new LabInteractDriverError("artifactTransferFailed", message);
 }
 
-function normalizeViewport(viewport) {
+function normalizeViewport(viewport: { width: number; height: number; deviceScaleFactor?: number; dpr?: number }): Viewport {
   const width = Number(viewport?.width);
   const height = Number(viewport?.height);
   const deviceScaleFactor = Number(viewport?.deviceScaleFactor ?? viewport?.dpr ?? 1);
@@ -1138,7 +1308,7 @@ function normalizeViewport(viewport) {
   return { width, height, deviceScaleFactor };
 }
 
-function boundedTimeout(value, label, maximum) {
+function boundedTimeout(value: number, label: string, maximum: number) {
   const timeoutMs = Number(value);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > maximum) {
     throw new LabInteractDriverError("invalidTimeout", `${label} must be an integer from 1 to ${maximum}ms.`);
@@ -1153,13 +1323,24 @@ async function loadPuppeteer() {
   } catch (error) {
     throw new LabInteractDriverError(
       "puppeteerUnavailable",
-      `puppeteer-core is not installed from the repository package lock; run npm ci at the repository root (${String(error?.code || "import failed")}).`,
+      `puppeteer-core is not installed from the repository package lock; run npm ci at the repository root (${error instanceof Error && "code" in error ? String(error.code) : "import failed"}).`,
     );
   }
   return imported.default || imported;
 }
 
-function readTail(file, maxLines) {
+function recordField(value: unknown, field: string): unknown {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonObject)[field] : undefined;
+}
+
+function jsonObject(value: unknown, label: string): JsonObject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new LabInteractDriverError("artifactTransferFailed", `${label} was not an object.`);
+  }
+  return value as JsonObject;
+}
+
+function readTail(file: fs.PathOrFileDescriptor, maxLines: number) {
   try {
     return fs.readFileSync(file, "utf8")
       .trimEnd()
@@ -1171,7 +1352,7 @@ function readTail(file, maxLines) {
   }
 }
 
-export function boundLogLine(value, maxChars = LOG_TAIL_LINE_CHARS) {
+export function boundLogLine(value: string, maxChars = LOG_TAIL_LINE_CHARS) {
   const line = String(value ?? "");
   const marker = " …<truncated>… ";
   const limit = Number.isInteger(maxChars) ? Math.max(0, maxChars) : LOG_TAIL_LINE_CHARS;
@@ -1183,11 +1364,11 @@ export function boundLogLine(value, maxChars = LOG_TAIL_LINE_CHARS) {
   return `${line.slice(0, leading)}${marker}${trailing > 0 ? line.slice(-trailing) : ""}`;
 }
 
-function appendBounded(values, value) {
+function appendBounded(values: string[], value: string) {
   values.push(boundLogLine(value));
   if (values.length > MAX_PAGE_ERRORS) values.splice(0, values.length - MAX_PAGE_ERRORS);
 }
 
-function sleep(ms) {
+function sleep(ms: number|undefined) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

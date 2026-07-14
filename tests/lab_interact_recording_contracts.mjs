@@ -8,18 +8,18 @@ import { fileURLToPath } from "node:url";
 
 import {
   LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput,
-} from "../scripts/lab-interact/command_service.mjs";
+} from "../scripts/lab-interact/command_service.ts";
 import {
   checkMediaCapabilities, createPngMp4Encoder, finalizeMp4Artifacts, LabInteractRecordingError,
   mediaAuxiliaryTimeoutMs, mediaStageTimeoutMs, recordingStopTimeoutMs, RECORDING_LIMITS,
   representativeFrameIndices,
-} from "../scripts/lab-interact/recording.mjs";
+} from "../scripts/lab-interact/recording.ts";
 import {
   RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS,
-} from "../scripts/lab-interact/runtime.mjs";
-import { requestTimeoutMs } from "../scripts/lab-interact/command_registry.mjs";
-import { DRIVER_STATES, LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
-import { LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
+} from "../scripts/lab-interact/runtime.ts";
+import { requestTimeoutMs } from "../scripts/lab-interact/command_registry.ts";
+import { DRIVER_STATES, LabInteractDriver } from "../scripts/lab-interact/driver.ts";
+import { LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.ts";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 

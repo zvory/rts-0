@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LabInteractDriver } from "../scripts/lab-interact/driver.mjs";
+import { LabInteractDriver } from "../scripts/lab-interact/driver.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let driver;

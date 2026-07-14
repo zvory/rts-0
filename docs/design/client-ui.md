@@ -616,7 +616,7 @@ consumed before success.
 hides Pixi world layers; it is removed on capture completion, rematch, and app teardown. `captureReadiness`
 reports bounded live PNG/frame-strip/profile/decal asset status, font status, render frames, frame-loop
 errors, renderer errors, and subject missing-texture fallbacks without exposing renderer references.
-The local `scripts/lab-interact/driver.mjs` owns the selected-worktree server, headless browser, logs,
+The local `scripts/lab-interact/driver.ts` owns the selected-worktree server, headless browser, logs,
 clean viewport clipping, readiness wait, PNG/JSON artifacts, and profile cleanup. The bounded command
 service owns aliases and exact input contracts. Its per-worktree daemon preserves that state across
 machine-readable CLI calls, expires after 30 idle minutes, and returns screenshot paths and metadata
