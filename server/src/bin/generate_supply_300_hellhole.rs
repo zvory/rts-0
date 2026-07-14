@@ -62,6 +62,8 @@ fn run(out: PathBuf) -> Result<(), String> {
     let sim_scenario = game
         .export_lab_checkpoint_scenario(SCENARIO_NAME.to_string(), BUILD_SHA)
         .map_err(|err| format!("failed to export checkpoint scenario: {err:?}"))?;
+    let restored = Game::restore_lab_checkpoint_scenario(sim_scenario.clone())
+        .map_err(|err| format!("generated checkpoint did not restore: {err:?}"))?;
     let protocol_scenario = add_protocol_lab_metadata(sim_scenario)?;
     let payload = LabScenarioPayload::Checkpoint(protocol_scenario);
     let json = serde_json::to_string(&payload)
@@ -76,8 +78,6 @@ fn run(out: PathBuf) -> Result<(), String> {
     std::fs::write(&out, json)
         .map_err(|err| format!("failed to write {}: {err}", out.display()))?;
 
-    let restored = rts_server::lab_scenarios::load_lab_scenario_by_id("supply-300-hellhole")
-        .and_then(|loaded| loaded.build_game())?;
     let supply: Vec<_> = restored
         .snapshot_full_for(1)
         .player_resources

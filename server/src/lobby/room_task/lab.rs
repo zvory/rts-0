@@ -20,13 +20,13 @@ use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
 use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID};
-use super::lab_driver::{lab_scenario_driver_for, LabScenarioDriver};
 use super::types::{LabRoomConfig, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::lab_scenarios::{
     export_lab_checkpoint_scenario_for_protocol, lab_scenario_payload_lab_metadata,
     lab_scenario_payload_to_lab_op, load_lab_scenario_by_id, validate_lab_scenario_authoring,
 };
+use crate::lobby::lab_scenario_driver::lab_scenario_driver_for;
 use crate::protocol::{
     Event, InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
     LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode, ServerMessage,
@@ -72,7 +72,6 @@ struct LabLaunch {
     default_vision: Option<LabVisionMode>,
     initial_camera: Option<InitialCamera>,
     god_mode_players: Vec<u32>,
-    driver: Option<LabScenarioDriver>,
 }
 
 impl LabSession {
@@ -597,7 +596,7 @@ impl RoomTask {
             session.initial_camera = launch.initial_camera;
         }
         let launch_god_mode_players = launch.god_mode_players.clone();
-        let launch_driver = launch.driver;
+        let launch_driver = config.scenario.as_deref().and_then(lab_scenario_driver_for);
         let game = launch.game;
         let initial_setup =
             match self.export_lab_replay_initial_setup(&game, "Initial lab setup".to_string()) {
@@ -698,7 +697,6 @@ impl RoomTask {
             default_vision: Some(lab_metadata.vision.clone()),
             initial_camera: lab_metadata.initial_camera,
             god_mode_players,
-            driver: lab_scenario_driver_for(scenario_id),
         })
     }
 
@@ -747,7 +745,6 @@ impl RoomTask {
             default_vision: None,
             initial_camera: None,
             god_mode_players: Vec::new(),
-            driver: None,
         })
     }
 
@@ -1306,6 +1303,7 @@ impl RoomTask {
             }
             if resets_timeline {
                 session.initial_camera = imported_initial_camera;
+                self.lab_driver = None;
             }
             if log_operations {
                 session.operation_log.push(LabOperationLogEntry {

@@ -22,7 +22,6 @@ mod branch;
 mod dev;
 mod helpers;
 mod lab;
-mod lab_driver;
 mod lifecycle;
 mod live;
 mod lobby;
@@ -30,6 +29,7 @@ mod match_history;
 mod replay;
 mod types;
 
+use super::lab_scenario_driver::LabScenarioDriver;
 #[cfg(test)]
 use super::replay_session::ReplaySession;
 use dev::DevDriver;
@@ -43,7 +43,6 @@ pub(super) use helpers::{
 #[cfg(test)]
 use helpers::{LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
 use lab::LabSession;
-use lab_driver::LabScenarioDriver;
 use types::{AiSlot, Phase};
 pub(super) use types::{
     DevScenarioConfig, DevScenarioId, LabRoomConfig, PendingClientCommandAck, RoomMode, RoomPlayer,

@@ -670,6 +670,17 @@ impl Game {
         self.state.lab_god_mode_players.iter().copied().collect()
     }
 
+    pub fn lab_owned_unit_ids(&self, player_id: u32) -> Result<Vec<u32>, LabError> {
+        self.validate_owner(player_id)?;
+        Ok(self
+            .state
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == player_id && entity.is_unit() && entity.hp > 0)
+            .map(|entity| entity.id)
+            .collect())
+    }
+
     pub fn restore_lab_checkpoint_scenario_op(
         &mut self,
         scenario: LabCheckpointScenarioV1,

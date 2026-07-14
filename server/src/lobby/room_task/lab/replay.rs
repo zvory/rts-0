@@ -74,6 +74,30 @@ fn truncate_lab_replay_name(name: &str) -> String {
 }
 
 impl RoomTask {
+    pub(in crate::lobby::room_task) fn enqueue_lab_scenario_commands(&mut self) {
+        let commands = match (&mut self.lab_driver, &self.phase) {
+            (Some(driver), Phase::InGame(game)) => driver.commands_for_tick(game),
+            _ => return,
+        };
+        let Some(operator_id) = self.lab_session.as_ref().map(|session| session.operator_id) else {
+            return;
+        };
+        for command in commands {
+            let player_id = command.player_id;
+            let result = self.apply_lab_issue_command(
+                command.request_id,
+                operator_id,
+                player_id,
+                command.command,
+                command.options,
+            );
+            if !result.ok {
+                crate::log_warn!(room = %self.room, player_id, error = ?result.error,
+                    "lab scenario shuttle command rejected");
+            }
+        }
+    }
+
     pub(super) fn apply_lab_issue_command(
         &mut self,
         request_id: u32,
@@ -288,6 +312,9 @@ impl RoomTask {
                     rebuild_ms = seek.rebuild_ms,
                     "lab seek rebuilt"
                 );
+                if let (Some(driver), Some(timeline)) = (&mut self.lab_driver, &self.lab_timeline) {
+                    driver.sync_to_tick(seek.target_tick, timeline.replay_entries());
+                }
                 self.phase = Phase::InGame(Box::new(seek.game));
                 self.lab_room_time_controller_id = Some(player_id);
                 self.send_lab_start_payloads_to_all(true);
@@ -408,6 +435,7 @@ impl RoomTask {
         let (game, timeline) = Self::rebuild_lab_replay_artifact(&artifact, deadline)?;
         self.phase = Phase::InGame(Box::new(game));
         self.lab_timeline = Some(timeline);
+        self.lab_driver = None;
         if let Some(session) = &mut self.lab_session {
             session.import_vision_for(operator_id, artifact.initial_setup.metadata.lab.vision);
             session.initial_camera = artifact.initial_setup.metadata.lab.initial_camera;
