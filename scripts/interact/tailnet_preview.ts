@@ -59,10 +59,10 @@ export class InteractTailnetPreview {
     if (!Number.isSafeInteger(ttlMs) || ttlMs < INTERACT_PREVIEW_TTL_MS) {
       throw new InteractTailnetPreviewError(
         "invalidPreviewTtl",
-        "Lab preview retention must be at least 24 hours.",
+        "Interact preview retention must be at least 24 hours.",
       );
     }
-    this.artifactRoot = path.join(this.workspaceRoot, "target", "interact", "lab");
+    this.artifactRoot = path.join(this.workspaceRoot, "target", "interact");
     this.ttlMs = ttlMs;
     this.publishArtifact = publishArtifact;
     this.fingerprints = new Map();
@@ -71,7 +71,7 @@ export class InteractTailnetPreview {
 
   async publish({ filePath, mimeType }: { filePath: string; mimeType: string }) {
     if (!MIME_TYPES.has(mimeType as PreviewMimeType)) {
-      throw new InteractTailnetPreviewError("invalidPreviewMimeType", "Lab preview accepts only PNG images and MP4 videos.");
+      throw new InteractTailnetPreviewError("invalidPreviewMimeType", "Interact preview accepts only PNG images and MP4 videos.");
     }
     const artifact = inspectArtifact(this.artifactRoot, filePath);
     const existing = this.fingerprints.get(artifact.fingerprint);
@@ -132,29 +132,29 @@ export class InteractTailnetPreview {
 
 function inspectArtifact(artifactRoot: string, filePath: fs.PathLike): ArtifactInfo {
   if (typeof filePath !== "string" || !filePath) {
-    throw new InteractTailnetPreviewError("unsafePreviewArtifact", "Lab preview requires a confined artifact file.");
+    throw new InteractTailnetPreviewError("unsafePreviewArtifact", "Interact preview requires a confined artifact file.");
   }
-  const root = realDirectory(artifactRoot, "unsafePreviewArtifact", "Lab preview artifact root is unavailable.");
+  const root = realDirectory(artifactRoot, "unsafePreviewArtifact", "Interact preview artifact root is unavailable.");
   let realPath;
   try {
     realPath = fs.realpathSync(filePath);
   } catch {
-    throw new InteractTailnetPreviewError("previewArtifactMissing", "Lab preview artifact is no longer available.");
+    throw new InteractTailnetPreviewError("previewArtifactMissing", "Interact preview artifact is no longer available.");
   }
   if (!isWithin(root, realPath)) {
-    throw new InteractTailnetPreviewError("unsafePreviewArtifact", "Lab preview may publish only this worktree's Lab artifacts.");
+    throw new InteractTailnetPreviewError("unsafePreviewArtifact", "Interact preview may publish only this worktree's Interact artifacts.");
   }
   let stat;
   try {
     stat = fs.statSync(realPath);
   } catch {
-    throw new InteractTailnetPreviewError("previewArtifactMissing", "Lab preview artifact is no longer available.");
+    throw new InteractTailnetPreviewError("previewArtifactMissing", "Interact preview artifact is no longer available.");
   }
   if (!stat.isFile() || stat.size <= 0) {
-    throw new InteractTailnetPreviewError("previewArtifactMissing", "Lab preview artifact is not a readable file.");
+    throw new InteractTailnetPreviewError("previewArtifactMissing", "Interact preview artifact is not a readable file.");
   }
   if (stat.size > MAX_TAILNET_PREVIEW_ARTIFACT_BYTES) {
-    throw new InteractTailnetPreviewError("previewArtifactTooLarge", "Lab preview artifact exceeds the 64 MiB delivery limit.");
+    throw new InteractTailnetPreviewError("previewArtifactTooLarge", "Interact preview artifact exceeds the 64 MiB delivery limit.");
   }
   return {
     realPath,

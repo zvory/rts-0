@@ -19,6 +19,8 @@ import {
 import { boundedSummary, INTERACT_SUMMARY_LIMITS } from "./manifest_summary.ts";
 import { PrivateServer } from "./private_server.ts";
 import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
+import { interactLaunchUrl } from "./game_launch_url.ts";
+import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 
@@ -32,7 +34,6 @@ const LOG_TAIL_LINE_CHARS = 512;
 const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
-const INTERACT_ROOT = path.join("target", "interact", "lab");
 const ARTIFACT_CAPABILITY_HEADER = "x-interact-lab-capability";
 
 export const DRIVER_STATES = Object.freeze({
@@ -48,6 +49,7 @@ interface CaptureClip { x: number; y: number; width: number; height: number }
 interface BridgeResult extends JsonObject {
   snapshotTick?: number;
   room?: string;
+  phase?: string;
   roomTime?: { paused?: boolean; speed?: number };
   frame?: number;
   ready?: boolean;
@@ -92,6 +94,7 @@ interface ActiveRecording {
   resumeSpeed: number | null;
   clip: CaptureClip;
   scale: number;
+  presentation: "clean" | "normal";
   viewport: Viewport | null;
   originalViewport: Viewport | null;
   maxDurationMs: number;
@@ -117,9 +120,11 @@ interface ActiveFixedCapture {
 }
 interface DriverOptions {
   workspaceRoot?: string;
+  mode?: "lab" | "game";
   map?: string;
   seed?: string;
   scenario?: string;
+  opponent?: string;
   renderer?: string;
   viewport?: Viewport;
   timeoutMs?: number;
@@ -153,6 +158,7 @@ export class InteractDriverError extends Error {
 }
 
 export class InteractDriver {
+  gameRoom: string;
   artifactCapability: string;
   openStarted: boolean;
   lastFixedCapture: JsonObject | null;
@@ -190,9 +196,11 @@ export class InteractDriver {
 
   constructor({
     workspaceRoot,
+    mode = "lab",
     map = "Default",
     seed = "",
     scenario = "blank",
+    opponent = "ai_2_1",
     renderer = "pixi",
     viewport = DEFAULT_VIEWPORT,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -206,9 +214,11 @@ export class InteractDriver {
   }: DriverOptions = {}) {
     this.options = {
       workspaceRoot,
+      mode,
       map,
       seed,
       scenario,
+      opponent,
       renderer,
       viewport,
       timeoutMs: boundedTimeout(timeoutMs, "timeoutMs", MAX_TIMEOUT_MS),
@@ -218,6 +228,7 @@ export class InteractDriver {
       signal,
     };
     this.state = DRIVER_STATES.OPENING;
+    this.gameRoom = `interact-game-${crypto.randomBytes(8).toString("hex")}`;
     this.puppeteerLoader = puppeteerLoader;
     this.chromeFinder = chromeFinder;
     this.privateServerFactory = privateServerFactory;
@@ -251,7 +262,7 @@ export class InteractDriver {
     }
     this.openStarted = true;
     this.workspace = validateWorkspaceRoot(this.options.workspaceRoot || process.cwd());
-    this.sessionDir = createSessionDirectory(this.workspace!.root, this.options.map);
+    this.sessionDir = createInteractSessionDirectory(this.workspace!.root, this.options.map, this.options.mode);
     this.writeManifest({ status: DRIVER_STATES.OPENING });
     // Local browser prerequisites are deterministic and cheap. Check them before
     // a clean worktree spends minutes compiling the private Rust server.
@@ -361,6 +372,12 @@ export class InteractDriver {
   async order({ playerId, command, ignoreCommandLimits = false }: { playerId: number; command: JsonObject; ignoreCommandLimits?: boolean }) {
     return this.call("order", { playerId, command, ignoreCommandLimits });
   }
+
+  async move(input: { units: number[]; x?: number; y?: number; queued?: boolean }) {
+    return this.call("move", input);
+  }
+
+  async giveUp() { return this.call("giveUp", {}); }
 
   async time(control: JsonObject) {
     return this.call("time", control);
@@ -493,6 +510,7 @@ export class InteractDriver {
     crop = null,
     scale = 1,
     resumeSpeed = null,
+    presentation = this.options.mode === "game" ? "normal" : "clean",
   }: {
     sessionId?: string;
     name?: string;
@@ -501,9 +519,11 @@ export class InteractDriver {
     crop?: CaptureClip | null;
     scale?: number;
     resumeSpeed?: number | null;
+    presentation?: "clean" | "normal";
   } = {}) {
     try {
       if (this.recording) throw new InteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
+      if (presentation !== "clean" && presentation !== "normal") throw new InteractDriverError("invalidPresentation", "recording presentation must be clean or normal.");
       const tools = await checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
@@ -512,7 +532,7 @@ export class InteractDriver {
       let recorder = null;
       try {
         if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
-        await this.callBridge("presentation", { mode: "clean" });
+        await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
         await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
         await this.waitForCaptureReadiness([]);
         const viewportClip = await this.page!.evaluate(() => {
@@ -523,7 +543,7 @@ export class InteractDriver {
         const clip = crop ? normalizeRecordingCrop(crop, viewportClip) : viewportClip;
         const artifactName = safeArtifactName(name, "recording");
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
-        recordingDir = path.join(this.workspace!.root, INTERACT_ROOT, normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
+        recordingDir = path.join(this.workspace!.root, interactArtifactRoot(this.options.mode), normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
         fs.mkdirSync(recordingDir, { recursive: true });
         const mp4Path = path.join(recordingDir, `${artifactName}.mp4`);
         const startStatus = await this.callBridge("status", {});
@@ -542,7 +562,7 @@ export class InteractDriver {
           name: artifactName, recorder, tools, recordingDir, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
-          startStatus, resumeResult, resumeSpeed, clip, scale, viewport: normalizedViewport, originalViewport,
+          startStatus, resumeResult, resumeSpeed, clip, scale, presentation, viewport: normalizedViewport, originalViewport,
           maxDurationMs, finalizing: null, stoppedBy: null, operations: [], operationCount: 0,
           operationsTruncated: false, aliases: [], completion,
         };
@@ -561,7 +581,7 @@ export class InteractDriver {
           ...this.recordingStatus(), clip, scale,
           authoritativeStartTick: startStatus.snapshotTick ?? null,
           authoritativeResumed: resumeSpeed != null,
-          resumeSpeed,
+          resumeSpeed, presentation,
         };
       } catch (error) {
         if (recorder) await recorder.abort().catch(() => {});
@@ -611,7 +631,7 @@ export class InteractDriver {
           startStatus: status, abortController: new AbortController(),
         };
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
-        captureDir = path.join(this.workspace!.root, INTERACT_ROOT, normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
+        captureDir = path.join(this.workspace!.root, interactArtifactRoot(this.options.mode), normalizedSessionId, "fixed", `${artifactName}-${suffix}`);
         const framesDir = path.join(captureDir, "frames");
         fs.mkdirSync(framesDir, { recursive: true });
         const videoPath = path.join(captureDir, `${artifactName}.mp4`);
@@ -817,6 +837,7 @@ export class InteractDriver {
           capture: {
             fps: RECORDING_LIMITS.fps, audio: false, timingAuthority: "monotonicWallClockFrameSlots",
             clip: recording.clip, scale: recording.scale, viewport: recording.viewport,
+            presentation: recording.presentation,
             wallDurationMs, maxDurationMs: recording.maxDurationMs,
             atomicResume: recording.resumeSpeed == null ? null : { speed: recording.resumeSpeed, result: recording.resumeResult },
           },
@@ -944,7 +965,7 @@ export class InteractDriver {
       });
       if (!validClip(clip)) throw new InteractDriverError("viewportUnavailable", "The Pixi viewport is not available for capture.");
 
-      const captureDir = path.join(this.workspace!.root, INTERACT_ROOT, normalizedSessionId, "captures");
+      const captureDir = path.join(this.workspace!.root, interactArtifactRoot(this.options.mode), normalizedSessionId, "captures");
       fs.mkdirSync(captureDir, { recursive: true });
       const suffix = new Date().toISOString().replace(/[:.]/g, "-");
       const baseName = `${artifactName}-${suffix}`;
@@ -1038,22 +1059,23 @@ export class InteractDriver {
       if (readiness.failedAssets?.length) {
         throw new InteractDriverError("assetLoadFailed", captureReadinessMessage(readiness, this.diagnostics()));
       }
-      if (readiness.ready && Number(readiness.frame) >= initialFrame + 2) return readiness;
+      if (readiness.ready && (readiness.phase === "concluded" || Number(readiness.frame) >= initialFrame + 2)) return readiness;
       await sleep(25);
     }
     throw new InteractDriverError("captureTimeout", captureReadinessMessage(last, this.diagnostics()));
   }
 
   launchUrl() {
-    const url = new URL("/lab", this.server!.baseUrl);
-    url.searchParams.set("room", generatedRoomId(this.workspace!.head));
-    url.searchParams.set("map", safeToken(this.options.map, "Default", 48));
-    if (this.options.seed !== "" && this.options.seed != null) url.searchParams.set("seed", String(this.options.seed));
-    if (this.options.scenario) url.searchParams.set("scenario", safeToken(this.options.scenario, "blank", 48));
-    if (this.options.renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
-    url.searchParams.set("interact", "lab");
-    url.searchParams.set("rtsNoAutoPointerLock", "1");
-    return url.href;
+    return interactLaunchUrl({
+      mode: this.options.mode,
+      baseUrl: this.server!.baseUrl,
+      room: this.options.mode === "game" ? this.gameRoom : generatedRoomId(this.workspace!.head),
+      map: this.options.map,
+      opponent: this.options.opponent,
+      renderer: this.options.renderer,
+      seed: this.options.seed,
+      scenario: this.options.scenario,
+    });
   }
 
   attachPageDiagnostics() {
@@ -1081,7 +1103,7 @@ export class InteractDriver {
           this.recording = null;
         });
       }
-      if (this.page && this.server) {
+      if (this.options.mode === "lab" && this.page && this.server) {
         const room = await this.callBridge("status", {}).then((status) => status.room).catch(() => "");
         if (room) await this.artifactRequest("cleanup", { room }).catch(() => {});
       }
@@ -1179,7 +1201,7 @@ export function safeArtifactName(value: string, fallback = "scene") {
 
 function safeCaptureSessionId(value: unknown) {
   const sessionId = String(value || "").trim();
-  if (!/^lab_[a-f0-9]{32}$/.test(sessionId)) {
+  if (!/^(?:lab|game)_[a-f0-9]{32}$/.test(sessionId)) {
     throw new InteractDriverError("invalidSession", "sessionId must be a valid Interact session id.");
   }
   return sessionId;
@@ -1294,15 +1316,6 @@ export async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number 
   } finally {
     clearTimeout(timer);
   }
-}
-
-function createSessionDirectory(workspaceRoot: string, map: unknown) {
-  const root = path.join(workspaceRoot, INTERACT_ROOT, "sessions");
-  fs.mkdirSync(root, { recursive: true });
-  const name = `${safeToken(String(map || ""), "default", 32)}-${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
-  const directory = path.join(root, name);
-  fs.mkdirSync(directory, { recursive: true });
-  return directory;
 }
 
 async function artifactHttpError(response: Response, fallback: string) {

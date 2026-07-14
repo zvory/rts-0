@@ -1,11 +1,10 @@
 # Interact CLI
 
-Interact is a project-local, namespaced command-line tool. Its first namespace is `lab`, which
-arranges and inspects small authoritative Lab scenes through a machine-readable local interface.
-It starts this worktree's normal Rust server and a headless client using Pixi by default. Mutations
-are ephemeral and never edit source files; `lab open` accepts `renderer:"babylon"` for the explicit
-Babylon Lab route. Future namespaces such as game, UI, and replay are intentionally not part of
-this contract yet.
+Interact is a project-local, namespaced command-line tool. The `lab` namespace arranges and
+inspects small authoritative Lab scenes. The `game` namespace opens one isolated normal
+human-vs-AI match for bounded UI inspection, a move order, surrender, screenshots, and video. Both
+start this worktree's normal Rust server and a headless client using Pixi by default; `open` accepts
+`renderer:"babylon"` in either namespace. Interact never edits source files.
 
 Interact requires Node 22.18 or newer and runs its TypeScript source directly through Node's
 built-in type stripping; there is no compile or generated-output step. Install the repository-owned
@@ -44,12 +43,36 @@ node scripts/interact/cli.mjs lab help screenshot
 node scripts/interact/cli.mjs lab screenshot --help
 ```
 
+The bounded normal-match surface is separate from Lab authoring:
+
+```bash
+node scripts/interact/cli.mjs game open '{"opponent":"ai_2_1","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs game inspect '{"sessionId":"<id>","ownership":"owned","limit":100}'
+node scripts/interact/cli.mjs game camera '{"sessionId":"<id>","camera":{"action":"focus","entities":[42]}}'
+node scripts/interact/cli.mjs game screenshot '{"sessionId":"<id>","name":"opening-ui"}'
+node scripts/interact/cli.mjs game record-start '{"sessionId":"<id>","name":"opening-move","maxDurationMs":10000}'
+node scripts/interact/cli.mjs game move '{"sessionId":"<id>","units":[42],"x":1100,"y":960}'
+node scripts/interact/cli.mjs game record-wait '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs game give-up '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs game close '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs game shutdown
+```
+
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
 `time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
 `import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
 writes exactly one JSON envelope to stdout. Failure writes a concise JSON error to stderr and exits
 nonzero. Every command has an exact, bounded input shape; arbitrary state patches, protocol
 messages, browser evaluation, and caller-selected artifact paths are not accepted.
+
+The complete `game` surface is `open`, `close`, `status`, `inspect`, `move`, `camera`, `screenshot`,
+`record-start`, `record-stop`, `record-wait`, `give-up`, and `shutdown`. `game open` creates a fresh
+public-name-prefixed lobby with exactly one local player and one AI, then starts it through the
+ordinary lobby flow. The launch gate requires `interact-game-*`, player role, and `interact=game`,
+so it cannot attach to an arbitrary room. `move` accepts only currently visible, locally owned unit
+ids and an in-map destination. There is no arbitrary command, attack, build, train, economy,
+ability, input-event, DOM-selector, or browser-evaluation surface. `give-up` uses the normal player
+surrender flow and returns only after the score screen appears.
 
 Global help returns the namespace catalog. `lab --help`, `lab help <command>`, and
 `lab <command> --help` return the Lab command catalog or a command's exact accepted shape and
@@ -125,7 +148,8 @@ concurrent calls return the one active session instead of starting another brows
 before `open` when a fresh session or different launch options are required. Optional aliases match
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
 cross-session aliases are rejected rather than guessed. A session may retain up to 400 aliases.
-Only one authoritative session may be open per worktree.
+Only one authoritative session may be open per worktree across both namespaces. Opening the other
+kind while a session is active returns `sessionKindMismatch` and preserves the current session.
 
 `spawn`, `update`, and `remove` accept 1–400 items and each command reaches the authoritative game
 as one atomic plural operation. `update` accepts `updates:[...]`; the legacy singular `update:{...}`
@@ -188,7 +212,8 @@ deliberately withholds local PNG and manifest paths so callers share the Tailnet
 raw file. Readiness checks cover every requested subject, while
 the response and manifest record the subject count, `truncated` state, and at most 24 detailed
 subject rows. `presentation: "clean"` hides UI chrome; `presentation: "normal"` retains visible Lab
-panels and game UI. Inspect the Tailnet preview once before delivery.
+panels and game UI. Game screenshots and recordings default to `normal`; Lab screenshots and
+recordings default to `clean`. Inspect the Tailnet preview once before delivery.
 
 Successful visual responses include this delivery-shaped field (the URL is opaque and host-specific):
 
@@ -197,7 +222,7 @@ Successful visual responses include this delivery-shaped field (the URL is opaqu
   "preview": {
     "available": true,
     "url": "http://100.x.y.z:port/interact-preview/<opaque-token>",
-    "instruction": "Share this Tailnet URL with the user to preview the Lab artifact. Do not share a local file path."
+    "instruction": "Share this Tailnet URL with the user to preview the Interact artifact. Do not share a local file path."
   }
 }
 ```
@@ -219,7 +244,7 @@ Repeat production uses the normal authoritative `adjustProductionRepeat` game co
 producer. Producer ownership, compatibility, allocation policy, resources, supply, and retry
 behavior remain ordinary simulation rules.
 
-Artifacts are first confined to `target/interact/lab/<session-id>/captures/` and ignored by Git.
+Artifacts are first confined to `target/interact/<lab|game>/<session-id>/` and ignored by Git.
 On publication, Interact copies the PNG or MP4 into the machine-level `tailnet-preview` service
 outside the worktree. That service binds the stable Tailnet port 8091, has no idle timeout, and
 retains each copied artifact for at least 24 hours. The URL therefore survives Lab `close`,
@@ -260,7 +285,7 @@ Production startup has no bridge capability and returns 404 for these routes.
 ## Real-time recording
 
 `record-start` begins one 30 FPS, audio-free H.264 MP4 recording from the persistent headless page.
-It keeps clean presentation active and crops to the game viewport, so ordinary `order`, `time`,
+It keeps the selected presentation active and crops to the game viewport, so ordinary `order`, `time`,
 mutation, inspection, and `camera` commands can continue through the same session while recording. Inputs
 accept only a safe name, a 1–60 second maximum duration (10 seconds by default), an optional
 viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns

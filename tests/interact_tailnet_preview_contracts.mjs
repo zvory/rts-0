@@ -76,7 +76,7 @@ try {
   await assert.rejects(
     validationPreview.publish({ filePath: "/etc/passwd", mimeType: "image/png" }),
     (error) => error?.code === "unsafePreviewArtifact",
-    "preview rejects files outside target/interact/lab",
+    "preview rejects files outside target/interact",
   );
   await assert.rejects(
     validationPreview.publish({ filePath: validationPng, mimeType: "text/html" }),

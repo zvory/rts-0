@@ -7,7 +7,9 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { INTERACT_COMMANDS, requestTimeoutMs } from "./command_registry.ts";
+import {
+  INTERACT_NAMESPACES, namespaceCommandKey, requestTimeoutMs,
+} from "./command_registry.ts";
 import { commandHelp, helpCatalog } from "./command_help.ts";
 import {
   IPC_VERSION, checkoutCommit, configuredIdleMs, prepareRuntime, processAlive,
@@ -18,7 +20,11 @@ import type { RuntimePaths, RuntimeRecord } from "./runtime.ts";
 
 const STARTUP_TIMEOUT_MS = 15_000;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const USAGE = "node scripts/interact/cli.mjs lab <command> [JSON-object]";
+const USAGE = "node scripts/interact/cli.mjs <lab|game> <command> [JSON-object]";
+const NAMESPACE_SUMMARIES = Object.freeze({
+  lab: "Arrange and inspect authoritative Lab scenes.",
+  game: "Observe and minimally control one isolated human-vs-AI match.",
+});
 
 interface DaemonIdentity extends RuntimeRecord {
   protocolVersion: number;
@@ -52,57 +58,61 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
       ok: true,
       result: {
         usage: USAGE,
-        namespaces: [{ name: "lab", summary: "Arrange and inspect authoritative Lab scenes." }],
+        namespaces: Object.entries(NAMESPACE_SUMMARIES).map(([name, summary]) => ({ name, summary })),
         documentation: "docs/interact-cli.md",
       },
     };
   }
-  if (argv[0] === "help" && argv[1] !== "lab") {
-    throw cliError("unknownNamespace", `Unknown Interact namespace ${JSON.stringify(argv[1])}. Available namespaces: lab.`);
-  }
-  if (argv[0] !== "lab" && !(argv[0] === "help" && argv[1] === "lab")) {
+  const namespaceHelp = argv[0] === "help";
+  const namespace = namespaceHelp ? argv[1] : argv[0];
+  if (!namespace || !(namespace in INTERACT_NAMESPACES)) {
+    if (namespaceHelp && namespace) {
+      throw cliError("unknownNamespace", `Unknown Interact namespace ${JSON.stringify(namespace)}. Available namespaces: lab, game.`);
+    }
     throw cliError("unknownNamespace", `Interact requires a namespace. Usage: ${USAGE}`);
   }
-  const namespaceHelp = argv[0] === "help";
-  const labArgv = namespaceHelp ? argv.slice(2) : argv.slice(1);
-  if (labArgv.length === 0 || (labArgv.length === 1 && ["--help", "-h", "help"].includes(labArgv[0]))) {
+  const namespaceArgv = namespaceHelp ? argv.slice(2) : argv.slice(1);
+  const publicCommands = INTERACT_NAMESPACES[namespace];
+  const namespaceUsage = `node scripts/interact/cli.mjs ${namespace} <command> [JSON-object]`;
+  if (namespaceArgv.length === 0 || (namespaceArgv.length === 1 && ["--help", "-h", "help"].includes(namespaceArgv[0]))) {
     return {
       ok: true,
       result: {
-        namespace: "lab",
-        usage: USAGE,
-        commands: [...INTERACT_COMMANDS],
-        catalog: helpCatalog(),
+        namespace,
+        usage: namespaceUsage,
+        commands: [...publicCommands],
+        catalog: helpCatalog(namespace),
         documentation: "docs/interact-cli.md",
       },
     };
   }
   let helpCommand: string | null = null;
-  if (namespaceHelp && labArgv.length === 1) {
-    helpCommand = labArgv[0];
-  } else if (labArgv.length === 2 && labArgv[0] === "help") {
-    helpCommand = labArgv[1];
-  } else if (labArgv.length === 2 && ["--help", "-h"].includes(labArgv[1])) {
-    helpCommand = labArgv[0];
+  if (namespaceHelp && namespaceArgv.length === 1) {
+    helpCommand = namespaceArgv[0];
+  } else if (namespaceArgv.length === 2 && namespaceArgv[0] === "help") {
+    helpCommand = namespaceArgv[1];
+  } else if (namespaceArgv.length === 2 && ["--help", "-h"].includes(namespaceArgv[1])) {
+    helpCommand = namespaceArgv[0];
   }
   if (helpCommand != null) {
-    if (!INTERACT_COMMANDS.includes(helpCommand)) {
+    if (!publicCommands.includes(helpCommand)) {
       throw cliError("unknownCommand", `Unknown command ${JSON.stringify(helpCommand)}.`);
     }
     return {
       ok: true,
       result: {
-        namespace: "lab",
+        namespace,
         command: helpCommand,
-        ...commandHelp(helpCommand),
+        ...commandHelp(helpCommand, namespace),
         documentation: "docs/interact-cli.md",
       },
     };
   }
-  if (namespaceHelp) throw cliError("usage", `Usage: ${USAGE}`);
-  if (labArgv.length < 1 || labArgv.length > 2) throw cliError("usage", `Usage: ${USAGE}`);
-  const [command, rawInput = "{}"] = labArgv;
-  if (!INTERACT_COMMANDS.includes(command)) throw cliError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);
+  if (namespaceHelp) throw cliError("usage", `Usage: ${namespaceUsage}`);
+  if (namespaceArgv.length < 1 || namespaceArgv.length > 2) throw cliError("usage", `Usage: ${namespaceUsage}`);
+  const [publicCommand, rawInput = "{}"] = namespaceArgv;
+  const command = namespaceCommandKey(namespace, publicCommand);
+  if (!command) throw cliError("unknownCommand", `Unknown command ${JSON.stringify(publicCommand)}.`);
   let input: unknown;
   try { input = JSON.parse(rawInput); } catch { throw cliError("invalidJson", "Input must be one valid JSON object argument."); }
   if (!isRecord(input)) throw cliError("invalidJson", "Input must be a JSON object.");

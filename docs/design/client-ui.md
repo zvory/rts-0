@@ -74,6 +74,7 @@ src/
   branch_staging.js # replay branch staging panel
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
   interact_bridge.js # InteractBridge: launch-gated narrow local automation facade
+  interact_game_bridge.js # Isolated normal-match inspection/move/surrender automation facade
   clean_presentation.js # app-shell reversible DOM chrome mode for Interact capture
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
@@ -609,7 +610,7 @@ padding, defaults to a close 32-world-pixel frame for readable single-unit captu
 48 world pixels for multi-subject and non-unit framing), and returns `CameraSnapshotV1` plus
 semantic CSS viewport and ground bounds. Camera set accepts only `CameraSnapshotV1`; status,
 readiness, screenshot manifest v2, recording manifest v2, and fixed-capture manifest v2 carry the
-same versioned shape. The bridge surface version is 3. Setup mutations
+same versioned shape. The Lab bridge surface version is 4. Setup mutations
 wait for the server's immediate authoritative snapshot without advancing paused simulation. Order
 calls also wait for a new snapshot and request one bounded tick when paused so the queued command is
 consumed before success.
@@ -648,6 +649,27 @@ gaps and exact source-frame reuse; it warns below 80% source-slot coverage. `rec
 resume authoritative time atomically after the initial frame through its bounded `resumeSpeed`.
 Fixed capture likewise streams up to 1,800 rendered PNG buffers into H.264, retains at most six
 representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of the CLI response.
+
+`interact_game_bridge.js`
+```js
+export class InteractGameBridge {
+  status()                            // isolated-match readiness and bounded semantic UI state
+  call(method, input)                 // status/inspect/move/giveUp/camera/presentation/captureReadiness
+  destroy()
+}
+export function interactGameLaunchEnabled(locationLike?)
+```
+`App` composes this bridge only for a root `rtsLaunch=match` URL whose room begins
+`interact-game-`, role is `player`, and `interact=game`. The CLI creates the room with one local
+human and one AI through ordinary lobby automation; an unexpected human prevents launch. The
+bridge observes only the recipient's normal fog-filtered `GameState`, projects a fixed semantic UI
+schema (HUD resources, timer, selection, command-card labels, give-up dialog, and score screen),
+and never returns internal object references. Its only gameplay command is `move`, which validates
+1–100 unique visible locally owned unit ids plus an in-map destination and delegates to the normal
+`Match.commandIssuer`. `giveUp` delegates to `Match.requestGiveUp` and waits for the ordinary score
+screen. It exposes no arbitrary protocol command, DOM selector, browser evaluation, attack,
+production, economy, or ability surface. Game screenshots and recordings default to normal
+presentation so UI remains visible; clean presentation is an explicit opt-in.
 
 `lab_scenario_authoring.js`
 ```js

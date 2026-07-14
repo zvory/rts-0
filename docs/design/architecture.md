@@ -37,6 +37,9 @@
 - App-owned launch URLs use the namespaced `rtsLaunch` query parameter for setup automation. The
   initial live-match mode is `/?rtsLaunch=match...`, which joins a normal lobby and drives existing
   lobby messages for spectator AI self-play setup instead of adding a special server protocol.
+- Interact's `game` namespace uses that same normal lobby path for one isolated human-vs-AI match.
+  Its client bridge is gated to fresh `interact-game-*` player launches and exposes only bounded
+  fog-filtered/UI inspection, camera, move, surrender, screenshots, and recording.
 - The same server exposes a lightweight documentation wiki at `/wiki`. It renders only allowlisted
   Markdown under `docs/context` and `docs/design`, rewrites relative Markdown doc links into
   `/wiki/...` links, rejects traversal or unsupported paths, and serves `/wiki/stats` from

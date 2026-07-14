@@ -121,6 +121,24 @@ assert.deepEqual(
   { ready: false, reason: "pageError" },
   "driver does not report readiness after a page error",
 );
+const concludedCaptureDriver = new InteractDriver({ workspaceRoot: root });
+concludedCaptureDriver.pageErrors = [];
+concludedCaptureDriver.pageConsoleErrors = [];
+concludedCaptureDriver.options.timeoutMs = 50;
+concludedCaptureDriver.callBridge = async () => ({
+  ready: true,
+  phase: "concluded",
+  frame: 12,
+  frameErrors: [],
+  renderErrors: [],
+  missingTextureSubjectIds: [],
+  failedAssets: [],
+});
+assert.equal(
+  (await concludedCaptureDriver.waitForCaptureReadiness([])).frame,
+  12,
+  "driver accepts the stable stopped renderer frame behind a concluded score screen",
+);
 
 assert.throws(
   () => normalizeInspectionQuery({ ids: Array.from({ length: 401 }, (_, index) => index + 1) }),

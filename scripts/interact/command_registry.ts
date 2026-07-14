@@ -163,6 +163,48 @@ const COMMAND_RECORDS = Object.freeze({
     lane: "cancellation", recordable: false,
     bounds: ["an active fixed capture is required"], example: { sessionId: "<lab-session-id>" },
   }),
+  "game-open": descriptor("Open or recover one isolated normal human-vs-AI match.", "{workspaceRoot?:string,map?:string,opponent?:\"ai_2_1\"|\"ai_turtle\",renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
+    scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
+    defaults: ["workspaceRoot=current worktree", "map=Default", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
+    bounds: ["one session across Lab and game", "one local player and one AI opponent", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    example: { opponent: "ai_2_1", viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
+  }),
+  "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
+    lane: "observation",
+    defaults: ["ids/kinds=unfiltered", "ownership=owned", "cameraViewport=false", "limit=25"],
+    bounds: ["0-400 unique ids", "0-32 kinds", "limit 1-400", "only the normal recipient's fog-filtered snapshot is inspectable"],
+    example: { sessionId: "<game-session-id>", ownership: "owned", limit: 25 },
+  }),
+  "game-move": descriptor("Issue one normal move order for bounded locally owned units.", "{sessionId:string,units:u32[],x:number,y:number,queued?:boolean}", {
+    sceneMutation: true,
+    defaults: ["queued=false"],
+    bounds: ["1-100 unique unit ids", "owned units only", "destination must be inside the map", "no attack, build, economy, ability, or arbitrary protocol commands"],
+    example: { sessionId: "<game-session-id>", units: [42], x: 1100, y: 960 },
+  }),
+  "game-give-up": descriptor("Surrender the isolated match through the normal player give-up flow.", "{sessionId:string}", {
+    sceneMutation: true,
+    bounds: ["active isolated match only", "waits for the authoritative score screen"],
+    example: { sessionId: "<game-session-id>" },
+  }),
+  "game-camera": descriptor("Set the camera or focus bounded visible entity ids.", "{sessionId:string,camera:game-camera-command}", {
+    variants: ["focus {action,entities,padding?}", "set {action,snapshot:CameraSnapshotV1}"],
+    defaults: ["focus.padding=32 for one unit, otherwise 48"],
+    bounds: ["focus 1-400 unique ids", "padding 0-1024", "snapshot framingScale >0 and <=16"],
+    example: { sessionId: "<game-session-id>", camera: { action: "focus", entities: [42] } },
+  }),
+  "game-screenshot": descriptor("Capture a readiness-checked match PNG with UI visible by default.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport,subjects?:u32[]}", {
+    variants: ["presentation=normal retains the HUD and overlays", "presentation=clean captures only the rendered battlefield", "response.preview.url is the user-delivery URL"],
+    defaults: ["name=game", "presentation=normal", "viewport=current", "subjects=[]"],
+    bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
+    example: { sessionId: "<game-session-id>", name: "opening-ui", presentation: "normal" },
+  }),
+  "game-record-start": descriptor("Start one real-time H.264 recording with match UI visible by default.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:crop,scale?:number,presentation?:\"normal\"|\"clean\"}", {
+    recordable: false,
+    variants: ["presentation=normal retains the HUD and overlays", "presentation=clean records only the battlefield"],
+    defaults: ["name=game", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1", "presentation=normal"],
+    bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
+    example: { sessionId: "<game-session-id>", name: "opening-move", maxDurationMs: 10000, presentation: "normal" },
+  }),
 });
 
 export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinition>> = Object.freeze(Object.fromEntries(
@@ -179,7 +221,41 @@ export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinitio
   })]),
 ));
 
-export const INTERACT_COMMANDS = Object.freeze(Object.keys(INTERACT_COMMAND_REGISTRY));
+export const INTERACT_COMMAND_KEYS = Object.freeze(Object.keys(INTERACT_COMMAND_REGISTRY));
+
+const NAMESPACE_COMMAND_KEYS = Object.freeze({
+  lab: Object.freeze(Object.fromEntries(INTERACT_COMMAND_KEYS.filter((name) => !name.startsWith("game-")).map((name) => [name, name]))),
+  game: Object.freeze({
+    open: "game-open",
+    close: "close",
+    status: "status",
+    inspect: "game-inspect",
+    move: "game-move",
+    camera: "game-camera",
+    screenshot: "game-screenshot",
+    "record-start": "game-record-start",
+    "record-stop": "record-stop",
+    "record-wait": "record-wait",
+    "give-up": "game-give-up",
+    shutdown: "shutdown",
+  }),
+});
+
+export const INTERACT_NAMESPACES = Object.freeze(Object.fromEntries(
+  Object.entries(NAMESPACE_COMMAND_KEYS).map(([namespace, commands]) => [namespace, Object.freeze(Object.keys(commands))]),
+));
+
+// Backward-compatible name for the original public Lab command catalog.
+export const INTERACT_COMMANDS = INTERACT_NAMESPACES.lab;
+
+export function namespaceCommandKey(namespace: string, command: string): string | null {
+  return (NAMESPACE_COMMAND_KEYS as Record<string, Readonly<Record<string, string>>>)[namespace]?.[command] || null;
+}
+
+export function namespaceCommandDefinition(namespace: string, command: string): CommandDefinition | null {
+  const key = namespaceCommandKey(namespace, command);
+  return key ? commandDefinition(key) : null;
+}
 
 export function commandDefinition(command: string): CommandDefinition | null {
   return INTERACT_COMMAND_REGISTRY[command] || null;
