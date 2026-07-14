@@ -1,6 +1,6 @@
 ---
 name: interact
-description: Use the local Interact CLI to arrange authoritative Lab scenes or inspect one isolated normal human-vs-AI game, then capture Pixi screenshots or H.264 video. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, or basic live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
+description: Use the local Interact CLI to arrange authoritative Lab scenes or inspect isolated human-vs-AI and AI-vs-AI spectator games, then capture Pixi screenshots, H.264 video, or region-aware time lapses. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, or live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
 ---
 
 # Interact Capture
@@ -12,9 +12,10 @@ edit source files. Use `node scripts/interact/cli.mjs lab help <command>` or
 uncertain; command help never starts or inspects the daemon.
 
 For normal match/UI review, use `node scripts/interact/cli.mjs game <command> '<JSON-object>'`.
-`game open` creates one isolated player-vs-AI match. Retain its `game_...` session id, run `inspect`
-to choose a returned entity with `controllable:true`, then use only the bounded `move`, `camera`,
-`screenshot`, recording, and `give-up` commands. Game media defaults to `presentation:"normal"` so
+`game open` creates one isolated player-vs-AI match, or accepts `spectate:["ai_2_1","ai_turtle"]`
+for an AI-vs-AI spectator match. Retain its `game_...` session id. Player sessions may use bounded
+`move` and `give-up`; spectator sessions are observation/media-only. Both may use `inspect`, `camera`,
+`screenshot`, recording, and capture commands. Game media defaults to `presentation:"normal"` so
 the HUD and score screen remain visible. This namespace cannot join arbitrary rooms or issue
 attack, build, production, economy, ability, or arbitrary protocol commands.
 
@@ -36,14 +37,22 @@ attack, build, production, economy, ability, or arbitrary protocol commands.
 4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700 at DPR 1, and any subject
    aliases. Use `presentation: "clean"` to hide UI chrome or `presentation: "normal"` to retain
    visible Lab panels and game UI.
-5. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
+   Game screenshots and recordings also accept `region:"viewport"`, `region:"minimap"`, or a
+   viewport-relative `{x,y,width,height}` region. Minimap capture requires normal presentation.
+5. For an AI-vs-AI time lapse, open with `spectate:[ai,ai]`. Use `game camera` with
+   `{"action":"overview"}` for a fixed whole-map view, then run `game capture-timelapse` with a
+   bounded `maxDurationMs`, `sampleEveryMs`, and optional `speed` up to 8. Use `region:"minimap"`
+   for a minimap-only time lapse. The capture stops at match conclusion or the duration ceiling;
+   use `status` for progress and `capture-cancel` to interrupt it.
+6. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
    visual artifact: share that Tailnet URL and a concise scene result with the user. Never share a
-   raw `target/interact/lab` path; the adjacent JSON manifest remains local reproduction evidence.
-6. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
+   raw `target/interact` path; the adjacent JSON manifest remains local reproduction evidence.
+7. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
 Capture files are confined to `target/interact/<lab|game>/<session-id>/` and ignored by Git. Do
-not request arbitrary paths, add image bytes to Git, or use either namespace to play a full match. A
+not request arbitrary paths or add image bytes to Git. Lab remains for bounded authored scenes;
+full-match observation is limited to the game namespace's isolated AI-vs-AI spectator mode. A
 Tailnet Preview URL is copied into the machine-level preview service with at least 24 hours of
 retention. `close`, `shutdown`, daemon idle teardown, and removal of the originating worktree do not
 invalidate it. The preview service has no idle timeout and remains running until explicitly stopped

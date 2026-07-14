@@ -20,6 +20,7 @@ import {
 import { requestTimeoutMs } from "../scripts/interact/command_registry.ts";
 import { DRIVER_STATES, InteractDriver } from "../scripts/interact/driver.ts";
 import { INTERACT_SUMMARY_LIMITS } from "../scripts/interact/manifest_summary.ts";
+import { resolveCaptureRegion } from "../scripts/interact/capture_region.ts";
 import { openInteractDriver } from "./fixtures/interact_fake_driver.mjs";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
 
@@ -44,6 +45,30 @@ try {
     [0, 3, 6, 8, 11, 14],
     "representative sampling is evenly spaced and includes both recording endpoints",
   );
+  const regionPage = {
+    evaluate: async () => ({
+      viewport: { x: 0, y: 0, width: 1000, height: 700 },
+      minimap: { x: 16, y: 440, width: 242, height: 242 },
+    }),
+  };
+  assert.deepEqual(
+    await resolveCaptureRegion(regionPage, "minimap"),
+    {
+      preset: "minimap", clip: { x: 16, y: 440, width: 242, height: 242 },
+      viewport: { x: 0, y: 0, width: 1000, height: 700 },
+    },
+    "minimap capture resolves from the live DOM instead of hard-coded HUD coordinates",
+  );
+  assert.deepEqual(
+    (await resolveCaptureRegion(regionPage, { x: 100, y: 50, width: 300, height: 200 })).clip,
+    { x: 100, y: 50, width: 300, height: 200 },
+    "custom capture regions are relative to the game viewport",
+  );
+  await assert.rejects(
+    resolveCaptureRegion(regionPage, { x: 900, y: 600, width: 300, height: 200 }),
+    (error) => error?.code === "invalidRegion",
+    "custom capture regions cannot escape the game viewport",
+  );
 
   assert.throws(
     () => validateCommandInput("record-start", { sessionId, maxDurationMs: 60_001 }),
@@ -66,6 +91,7 @@ try {
   assert.equal(requestTimeoutMs("open"), STARTUP_REQUEST_TIMEOUT_MS, "cold open keeps the CLI attached through its bounded build budget");
   assert.equal(requestTimeoutMs("record-wait"), RECORDING_REQUEST_TIMEOUT_MS, "record-wait gets bounded recording-specific IPC headroom");
   assert.equal(requestTimeoutMs("capture-fixed"), RECORDING_REQUEST_TIMEOUT_MS, "minute-scale fixed capture gets bounded media IPC headroom");
+  assert.equal(requestTimeoutMs("game-capture-timelapse"), RECORDING_REQUEST_TIMEOUT_MS, "game time-lapse gets lifecycle/media IPC headroom");
   assert.ok(RECORDING_REQUEST_TIMEOUT_MS > REQUEST_TIMEOUT_MS, "recording IPC headroom exceeds the ordinary command deadline");
   const boundedMediaBudgetMs = RECORDING_LIMITS.maxDurationMs + RECORDING_LIMITS.maxStopTimeoutMs +
     RECORDING_LIMITS.maxMediaStageTimeoutMs + 3 * RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs + 22_000;
@@ -348,7 +374,10 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
       }
       if (bridgeCall?.method === "presentation") return { ok: true, value: { mode: bridgeCall.input.mode } };
       const source = String(fn);
-      if (source.includes("getElementById")) return { x: 0, y: 0, width: viewport.width, height: viewport.height };
+      if (source.includes("getElementById")) return {
+        viewport: { x: 0, y: 0, width: viewport.width, height: viewport.height },
+        minimap: { x: 0, y: Math.max(0, viewport.height - 242), width: 242, height: 242 },
+      };
       if (source.includes("navigator.userAgent")) return "fixture-agent";
       return undefined;
     },

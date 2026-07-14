@@ -111,6 +111,8 @@ export async function openInteractDriver(options) {
         ready: !closed, reason: closed ? "closed" : "ready", mode: options.mode || "lab",
         snapshotTick: tick, room: options.mode === "game" ? "interact-game-fixture" : "interact-lab-fixture",
         phase: options.mode === "game" ? gamePhase : undefined,
+        role: options.spectate ? "spectator" : "player",
+        roomTime: options.spectate ? { currentTick: tick, speed: 1, paused: false } : null,
       };
     },
     async catalog() {
@@ -161,6 +163,7 @@ export async function openInteractDriver(options) {
       return { result: { op: "issueCommandAs", outcome: { accepted: true }, snapshotTick: tick } };
     },
     async move(command) {
+      if (options.spectate) throw Object.assign(new Error("spectator has no controllable units"), { code: "playerSeatRequired" });
       for (const id of command.units || []) {
         const entity = entities.find((row) => row.id === id && row.owner === 1);
         if (!entity) throw Object.assign(new Error("unit is not controllable"), { code: "notControllable" });
@@ -191,13 +194,17 @@ export async function openInteractDriver(options) {
         camera.focus.x = rows.reduce((sum, entity) => sum + entity.x, 0) / rows.length;
         camera.focus.y = rows.reduce((sum, entity) => sum + entity.y, 0) / rows.length;
       }
+      if (command.action === "overview") {
+        camera.focus = { x: 1024, y: 1024 };
+        camera.framingScale = 0.4;
+      }
       return {
         camera: structuredClone(camera),
         cameraViewport: { ...cameraViewportCss },
         cameraWorldBounds: { ...cameraWorldBounds },
       };
     },
-    async screenshot({ sessionId, name, presentation, viewport, subjectSummaries, request }) {
+    async screenshot({ sessionId, name, presentation, viewport, region, subjectSummaries, request }) {
       const width = viewport?.width || 1;
       const height = viewport?.height || 1;
       const subjects = Array.isArray(subjectSummaries) ? subjectSummaries : [];
@@ -225,18 +232,19 @@ export async function openInteractDriver(options) {
           missingTextureSubjectCount: 0,
           missingTextureSubjectsTruncated: false,
           request,
+          region,
         },
       };
     },
     recordingStatus() {
       return recording ? { active: true, name: recording.name, maxDurationMs: recording.maxDurationMs } : { active: false, last: lastRecording };
     },
-    async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, scale = 1, presentation = "clean" }) {
+    async recordStart({ sessionId, name = "recording", maxDurationMs = 10_000, viewport = null, crop = null, region = null, scale = 1, presentation = "clean" }) {
       if (recording) throw Object.assign(new Error("A recording is already active."), { code: "recordingActive" });
       const completion = deferred();
       lastRecording = null;
       lastRecordingCompletion = completion;
-      recording = { sessionId, name, maxDurationMs, viewport, crop, scale, presentation, startTick: tick, operations: [], completion, finalizing: null };
+      recording = { sessionId, name, maxDurationMs, viewport, crop, region, scale, presentation, startTick: tick, operations: [], completion, finalizing: null };
       recording.watchdog = setTimeout(() => { void finishRecording("watchdog").catch(() => {}); }, maxDurationMs);
       recording.watchdog.unref?.();
       return { active: true, name, maxDurationMs, presentation, authoritativeStartTick: tick };
@@ -278,6 +286,20 @@ export async function openInteractDriver(options) {
         frameSummary: { count: frameCount, uniqueHashes: frameCount, representativeFramePaths, detailsInManifest: true },
         authoritative: { startTick, endTick: tick },
         mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases },
+      };
+    },
+    async captureTimelapse({ sessionId, name = "timelapse", fps = 30, speed = 8, region = "viewport" }) {
+      const directory = `${options.workspaceRoot}/target/interact/game/${sessionId}/timelapse/${name}`;
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(path.join(directory, `${name}.mp4`), "fixture-mp4\n");
+      fs.writeFileSync(path.join(directory, `${name}-contact-sheet.png`), Buffer.from(ONE_PIXEL_PNG, "base64"));
+      fs.writeFileSync(path.join(directory, `${name}.json`), "{}\n");
+      tick += 240;
+      return {
+        videoPath: path.join(directory, `${name}.mp4`), contactSheetPath: path.join(directory, `${name}-contact-sheet.png`),
+        manifestPath: path.join(directory, `${name}.json`), frameSummary: { count: 2, uniqueHashes: 2, detailsInManifest: true },
+        authoritative: { startTick: tick - 240, endTick: tick, phase: gamePhase },
+        probe: { codec: "h264", frameRate: `${fps}/1`, frameCount: 2 }, source: { simulationSpeed: speed }, region: { preset: region },
       };
     },
     fixedCaptureStatus() { return fixedCapture || { active: false }; },

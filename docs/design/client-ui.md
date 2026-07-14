@@ -654,22 +654,25 @@ representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of
 ```js
 export class InteractGameBridge {
   status()                            // isolated-match readiness and bounded semantic UI state
-  call(method, input)                 // status/inspect/move/giveUp/camera/presentation/captureReadiness
+  call(method, input)                 // status/inspect/move/giveUp/time/camera/presentation/captureReadiness
   destroy()
 }
 export function interactGameLaunchEnabled(locationLike?)
 ```
 `App` composes this bridge only for a root `rtsLaunch=match` URL whose room begins
-`interact-game-`, role is `player`, and `interact=game`. The CLI creates the room with one local
-human and one AI through ordinary lobby automation; an unexpected human prevents launch. The
+`interact-game-`, role is `player` or `spectator`, and `interact=game`. The CLI creates either one
+local human plus one AI or exactly two AI seats through ordinary lobby automation. The
 bridge observes only the recipient's normal fog-filtered `GameState`, projects a fixed semantic UI
 schema (HUD resources, timer, selection, command-card labels, give-up dialog, and score screen),
 and never returns internal object references. Its only gameplay command is `move`, which validates
 1–100 unique visible locally owned unit ids plus an in-map destination and delegates to the normal
 `Match.commandIssuer`. `giveUp` delegates to `Match.requestGiveUp` and waits for the ordinary score
 screen. It exposes no arbitrary protocol command, DOM selector, browser evaluation, attack,
-production, economy, or ability surface. Game screenshots and recordings default to normal
-presentation so UI remains visible; clean presentation is an explicit opt-in.
+production, economy, or ability surface. Spectators cannot call move or give-up; only AI-only room
+speed control is exposed for sampled time-lapse capture. Camera `overview` disables the automatic
+spectator director and fits authoritative map bounds. Game screenshots and recordings default to
+normal presentation and accept full-viewport, live-minimap, or bounded custom regions; clean
+presentation is an explicit opt-in.
 
 `lab_scenario_authoring.js`
 ```js

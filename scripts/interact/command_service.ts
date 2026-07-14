@@ -1,10 +1,8 @@
 // Transport-neutral, bounded command service for Interact.
-
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-
 import { InteractDriver, InteractDriverError } from "./driver.ts";
 import {
   ALIAS_RE, ALL_CATALOG_CATEGORIES, INTERACT_LIMITS,
@@ -14,11 +12,10 @@ import {
 } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
 import { captureGameScreenshot } from "./game_screenshot.ts";
+import { gameInspectionOwnership, gameSessionCapabilities, requireGameSpectator } from "./game_session.ts";
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
-
 export { INTERACT_LIMITS } from "./command_inputs.ts";
 export { INTERACT_COMMANDS } from "./command_registry.ts";
-
 type JsonObject = Record<string, unknown>;
 type EntityRef = string | number;
 interface AliasEntry { alias: string; id: number }
@@ -62,12 +59,14 @@ interface ServiceInput extends JsonObject {
   path?: string;
   maxDurationMs?: number;
   crop?: { x: number; y: number; width: number; height: number };
+  region?: "viewport" | "minimap" | { x: number; y: number; width: number; height: number };
   scale?: number;
   resumeSpeed?: number | null;
   fps?: number;
   frameCount?: number;
   reproduction?: boolean;
   opponent?: string;
+  spectate?: string[]; sampleEveryMs?: number; speed?: number;
   ids?: number[];
   ownership?: string;
   units?: number[];
@@ -84,7 +83,6 @@ interface InteractSession {
   sceneIdentity: JsonObject;
 }
 type DriverFactory = (options: ConstructorParameters<typeof InteractDriver>[0]) => Promise<InteractDriver>;
-
 export class InteractError extends Error {
   details: JsonObject;
   code: string;
@@ -95,7 +93,6 @@ export class InteractError extends Error {
     this.details = details;
   }
 }
-
 export class InteractService {
   closed: boolean;
   closePromise: Promise<boolean> | null;
@@ -201,6 +198,7 @@ export class InteractService {
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
         opponent: input.opponent || "ai_2_1",
+        spectate: input.spectate || null,
         renderer: input.renderer || "pixi",
         viewport: input.viewport,
         baseUrl: process.env.RTS_INTERACT_BASE_URL || process.env.RTS_INTERACT_LAB_BASE_URL || "",
@@ -216,7 +214,8 @@ export class InteractService {
         sceneIdentity: {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
           map: input.map || "Default", seed: kind === "lab" ? input.seed ?? null : null,
-          opponent: kind === "game" ? input.opponent || "ai_2_1" : null,
+          opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
+          spectate: kind === "game" ? input.spectate || null : null, role: kind === "game" ? (input.spectate ? "spectator" : "player") : null,
           renderer: input.renderer || "pixi",
         },
       };
@@ -259,7 +258,7 @@ export class InteractService {
       status,
       capabilities: session.kind === "lab"
         ? { aliases: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
-        : { aliases: false, inspectUi: true, orders: ["move"], giveUp: true, media: ["screenshot", "recording"], maxSessions: this.maxSessions },
+        : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
     };
   }
 
@@ -349,7 +348,7 @@ export class InteractService {
       throw new InteractError("sessionKindMismatch", "This command requires a game session.");
     }
     if (command === "game-inspect") return { sessionId, ...await session.driver.inspect({
-      ids: input.ids, kinds: input.kinds, ownership: input.ownership || "owned",
+      ids: input.ids, kinds: input.kinds, ownership: gameInspectionOwnership(input.ownership, session.sceneIdentity.role),
       cameraViewport: input.cameraViewport === true, limit: input.limit || 25,
     }) };
     if (command === "game-move") return { sessionId, result: await session.driver.move({
@@ -368,6 +367,11 @@ export class InteractService {
     if (command === "game-record-start") {
       const result = await session.driver.recordStart({ ...input, sessionId, presentation: input.presentation || "normal" });
       return { sessionId, recorder: presentRecorderStatus(result, this.artifactPreview) };
+    }
+    if (command === "game-capture-timelapse") {
+      requireGameSpectator(session.sceneIdentity.role);
+      const result = await session.driver.captureTimelapse({ ...input, sessionId });
+      return presentFixedCaptureResult({ sessionId, ...result }, this.artifactPreview);
     }
     if (session.kind !== "lab" && !["record-stop"].includes(command)) {
       throw new InteractError("sessionKindMismatch", "This command requires a Lab session.");

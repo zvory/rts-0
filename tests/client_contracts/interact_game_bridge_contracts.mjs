@@ -17,8 +17,8 @@ assert.equal(
 );
 assert.equal(
   interactGameLaunchEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=interact-game-test&rtsRole=spectator&interact=game")),
-  false,
-  "the game bridge requires the one controlled player seat",
+  true,
+  "the game bridge accepts its isolated AI-vs-AI spectator launch",
 );
 
 const previousDocument = globalThis.document;
@@ -54,6 +54,8 @@ try {
     { id: 40, kind: "rifleman", owner: 2, x: 320, y: 320, hp: 100, maxHp: 100, state: "firing", shotReveal: true, orderPlan: [] },
   ];
   let issuedCommand = null;
+  let overview = null;
+  let autoSpectatorEnabled = true;
   const presentationCalls = [];
   const match = {
     giveUpSent: false,
@@ -87,12 +89,21 @@ try {
       elements.get("game-over").hidden = false;
     },
     handleResize: () => presentationCalls.push("match-resize"),
+    capabilities: { roomTime: { setSpeed: true } },
+    roomTimeControls: { roomTimeState: { currentTick: 3, speed: 1, paused: false, ended: false } },
+    net: {
+      setRoomTimeSpeed(speed) {
+        match.roomTimeControls.roomTimeState = { ...match.roomTimeControls.roomTimeState, speed, paused: false };
+        return true;
+      },
+    },
+    setAutoSpectatorEnabled(enabled) { autoSpectatorEnabled = enabled; },
     camera: {
       snapshot: () => ({ version: 1, focus: { x: 0, y: 0 }, framingScale: 1, boundsPolicy: "mapOverscroll" }),
       projectionSnapshot: () => ({ viewport: { widthCssPx: 1000, heightCssPx: 700 } }),
       viewportGroundBounds: () => ({ minX: 0, minY: 0, maxX: 2048, maxY: 2048 }),
       containsProjected: () => true,
-      fitWorldPoints: () => {},
+      fitWorldPoints: (points, options) => { overview = { points, options }; },
     },
   };
   const windowLike = {};
@@ -110,6 +121,7 @@ try {
   });
 
   assert.equal(bridge.status().ready, true, "an authoritative isolated match makes the game bridge ready");
+  assert.equal(bridge.status().role, "player", "status identifies the controlled-player launch");
   const inspection = bridge.inspect();
   assert.deepEqual(inspection.entities.map(({ id }) => id), [10], "inspection defaults to locally owned entities");
   assert.equal(inspection.entities[0].controllable, true, "inspection labels movable local units");
@@ -136,9 +148,20 @@ try {
   assert.equal(gaveUp.phase, "concluded", "give-up waits for the score screen");
   assert.equal(gaveUp.ui.scoreScreenVisible, true, "give-up returns the concluded UI state");
   assert.equal(bridge.captureReadiness().phase, "concluded", "capture readiness identifies the stable stopped score-screen frame");
+  elements.get("game-over").hidden = true;
+  match.giveUpSent = false;
   match.state.spectator = true;
-  assert.equal(bridge.status().ready, true, "the concluded score screen remains inspectable after replay-backed spectator replacement");
-  await assert.rejects(() => bridge.move({ units: [10], x: 600, y: 600 }), (error) => error?.code === "matchConcluded");
+  assert.equal(bridge.status().role, "spectator", "status identifies the AI-vs-AI spectator launch");
+  assert.equal(bridge.status().ready, true, "an active spectator remains fully inspectable");
+  await assert.rejects(() => bridge.move({ units: [10], x: 600, y: 600 }), (error) => error?.code === "playerSeatRequired");
+  const time = await bridge.time({ action: "speed", speed: 8 });
+  assert.equal(time.roomTime.speed, 8, "AI-only spectator time control confirms the authoritative speed");
+  bridge.camera({ action: "overview", padding: 20 });
+  assert.equal(autoSpectatorEnabled, false, "whole-map framing disables automatic fight-following camera movement");
+  assert.deepEqual(overview, {
+    points: [{ x: 0, y: 0 }, { x: 2048, y: 2048 }],
+    options: { paddingCssPx: 20 },
+  }, "whole-map framing fits authoritative map bounds with CSS padding");
   bridge.destroy();
 } finally {
   if (previousDocument === undefined) delete globalThis.document;

@@ -1,5 +1,6 @@
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
 import type { InteractDriver } from "./driver.ts";
+import type { CaptureRegion } from "./capture_region.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -31,9 +32,10 @@ export async function captureGameScreenshot(
     name,
     presentation,
     viewport,
+    region: (input.region || "viewport") as CaptureRegion,
     subjectIds,
     subjectSummaries,
-    request: { command: "game screenshot", sessionId: session.sessionId, name, presentation, viewport, subjects: subjectIds },
+    request: { command: "game screenshot", sessionId: session.sessionId, name, presentation, viewport, region: input.region || "viewport", subjects: subjectIds },
   });
   const image = asObject(capture.image);
   const visible = {

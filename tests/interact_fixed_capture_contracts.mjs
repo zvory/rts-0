@@ -8,6 +8,7 @@ import { InteractService, validateCommandInput } from "../scripts/interact/comma
 import {
   createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices,
 } from "../scripts/interact/fixed_capture.ts";
+import { GAME_TIMELAPSE_LIMITS, timelapseFrameBound } from "../scripts/interact/game_timelapse.ts";
 import { checkMediaCapabilities } from "../scripts/interact/recording.ts";
 import { openInteractDriver } from "./fixtures/interact_fake_driver.mjs";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
@@ -27,6 +28,20 @@ try {
   );
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }), (error) => error?.code === "invalidInput");
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
+  const gameSessionId = `game_${"b".repeat(32)}`;
+  assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
+  assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");
+  assert.equal(timelapseFrameBound(60_000, 1_000), 60, "one-minute default time-lapse samples exactly 60 frames");
+  assert.throws(
+    () => validateCommandInput("game-capture-timelapse", { sessionId: gameSessionId, maxDurationMs: GAME_TIMELAPSE_LIMITS.maxDurationMs, sampleEveryMs: 100 }),
+    (error) => error?.code === "invalidInput",
+    "time-lapse rejects requests beyond its sampled-frame bound",
+  );
+  assert.throws(
+    () => validateCommandInput("game-screenshot", { sessionId: gameSessionId, region: { x: 0, y: 0, width: 1, height: 100 } }),
+    (error) => error?.code === "invalidInput",
+    "region screenshots reject unusable custom crops",
+  );
   assert.equal(FIXED_CAPTURE_LIMITS.maxFrames, 1_800, "fixed capture supports one minute at 30 FPS");
   assert.deepEqual([0, 1, 2, 3].map((index) => fixedFrameTick(9, index, 60)), [9, 9, 10, 10]);
   assert.deepEqual(
@@ -61,9 +76,9 @@ try {
     assert.equal(generated.status, 0, String(generated.stderr));
     const outputPath = path.join(tmp, "fixed.mp4");
     const contactSheetPath = path.join(tmp, "contact.png");
-    const encoder = await createFixedCaptureEncoder({ outputPath, contactSheetPath, fps: 30, frameCount: 3 });
+    const encoder = await createFixedCaptureEncoder({ outputPath, contactSheetPath, fps: 30, frameCount: 6 });
     encoder.write(generated.stdout);
-    const media = await encoder.finish();
+    const media = await encoder.finish(3);
     assert.ok(media.bytes > 0, "fixed frame sequence encodes to non-empty H.264 MP4 media");
     assert.deepEqual({ codec: media.probe.codec, frames: media.probe.frameCount, fps: media.probe.frameRate }, { codec: "h264", frames: 3, fps: "30/1" }, "ffprobe confirms fixed codec, frame count, and FPS");
     assert.deepEqual({ width: media.probe.width, height: media.probe.height }, { width: 64, height: 64 }, "fixed capture pads odd dimensions for H.264 compatibility");
@@ -77,6 +92,15 @@ try {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+
+  await service.execute("close", { sessionId: opened.sessionId });
+  const spectator = await service.execute("game-open", { spectate: ["ai_2_1", "ai_turtle"] });
+  testArtifacts.ownGameSession(spectator.sessionId);
+  assert.equal(spectator.capabilities.role, "spectator", "AI-vs-AI game sessions expose their spectator role");
+  const timelapse = await service.execute("game-capture-timelapse", {
+    sessionId: spectator.sessionId, maxDurationMs: 1_000, sampleEveryMs: 500, region: "minimap",
+  });
+  assert.equal(timelapse.frameSummary.count, 2, "game time-lapse returns sampled media through the bounded service surface");
 
   console.log("✅ interact_fixed_capture_contracts.mjs: bounds, tick mapping, service, and media passed");
 } finally {

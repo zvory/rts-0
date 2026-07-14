@@ -1,8 +1,9 @@
 # Interact CLI
 
 Interact is a project-local, namespaced command-line tool. The `lab` namespace arranges and
-inspects small authoritative Lab scenes. The `game` namespace opens one isolated normal
-human-vs-AI match for bounded UI inspection, a move order, surrender, screenshots, and video. Both
+inspects small authoritative Lab scenes. The `game` namespace opens either one isolated normal
+human-vs-AI match or a spectator-only AI-vs-AI match for bounded inspection, screenshots, real-time
+video, and sampled time-lapse video. Both
 start this worktree's normal Rust server and a headless client using Pixi by default; `open` accepts
 `renderer:"babylon"` in either namespace. Interact never edits source files.
 
@@ -47,12 +48,17 @@ The bounded normal-match surface is separate from Lab authoring:
 
 ```bash
 node scripts/interact/cli.mjs game open '{"opponent":"ai_2_1","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs game open '{"spectate":["ai_2_1","ai_turtle"],"viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs game inspect '{"sessionId":"<id>","ownership":"owned","limit":100}'
 node scripts/interact/cli.mjs game camera '{"sessionId":"<id>","camera":{"action":"focus","entities":[42]}}'
-node scripts/interact/cli.mjs game screenshot '{"sessionId":"<id>","name":"opening-ui"}'
+node scripts/interact/cli.mjs game camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
+node scripts/interact/cli.mjs game screenshot '{"sessionId":"<id>","name":"minimap","region":"minimap"}'
 node scripts/interact/cli.mjs game record-start '{"sessionId":"<id>","name":"opening-move","maxDurationMs":10000}'
 node scripts/interact/cli.mjs game move '{"sessionId":"<id>","units":[42],"x":1100,"y":960}'
 node scripts/interact/cli.mjs game record-wait '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs game capture-timelapse '{"sessionId":"<id>","name":"whole-map","maxDurationMs":120000,"sampleEveryMs":1000,"speed":8,"region":"viewport"}'
+node scripts/interact/cli.mjs game capture-timelapse '{"sessionId":"<id>","name":"minimap","maxDurationMs":120000,"sampleEveryMs":1000,"speed":8,"region":"minimap"}'
+node scripts/interact/cli.mjs game capture-cancel '{"sessionId":"<id>"}'
 node scripts/interact/cli.mjs game give-up '{"sessionId":"<id>"}'
 node scripts/interact/cli.mjs game close '{"sessionId":"<id>"}'
 node scripts/interact/cli.mjs game shutdown
@@ -66,13 +72,17 @@ nonzero. Every command has an exact, bounded input shape; arbitrary state patche
 messages, browser evaluation, and caller-selected artifact paths are not accepted.
 
 The complete `game` surface is `open`, `close`, `status`, `inspect`, `move`, `camera`, `screenshot`,
-`record-start`, `record-stop`, `record-wait`, `give-up`, and `shutdown`. `game open` creates a fresh
-public-name-prefixed lobby with exactly one local player and one AI, then starts it through the
-ordinary lobby flow. The launch gate requires `interact-game-*`, player role, and `interact=game`,
-so it cannot attach to an arbitrary room. `move` accepts only currently visible, locally owned unit
-ids and an in-map destination. There is no arbitrary command, attack, build, train, economy,
+`record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, `give-up`, and
+`shutdown`. `game open` creates a fresh public-name-prefixed lobby. `opponent` creates exactly one
+local player and one AI; `spectate:[ai,ai]` creates exactly two opposing AI seats and one spectator,
+then starts through the ordinary lobby flow. The launch gate requires `interact-game-*`, player or
+spectator role, and `interact=game`, so it cannot attach to an arbitrary room. `move` accepts only
+currently visible, locally owned unit ids and an in-map destination. There is no arbitrary command,
+attack, build, train, economy,
 ability, input-event, DOM-selector, or browser-evaluation surface. `give-up` uses the normal player
-surrender flow and returns only after the score screen appears.
+surrender flow and returns only after the score screen appears. Spectator sessions expose neither
+move nor surrender; their only mutation is the AI-only room's existing bounded speed control used
+internally by time-lapse capture.
 
 Global help returns the namespace catalog. `lab --help`, `lab help <command>`, and
 `lab <command> --help` return the Lab command catalog or a command's exact accepted shape and
@@ -288,7 +298,8 @@ Production startup has no bridge capability and returns 404 for these routes.
 It keeps the selected presentation active and crops to the game viewport, so ordinary `order`, `time`,
 mutation, inspection, and `camera` commands can continue through the same session while recording. Inputs
 accept only a safe name, a 1–60 second maximum duration (10 seconds by default), an optional
-viewport or in-viewport crop, and scale from 0.25 through 1. A second start returns
+viewport, `region:"viewport"`, `region:"minimap"`, or an in-viewport custom crop, and scale from
+0.25 through 1. A second start returns
 `recordingActive`; `status` with the current session id reports recorder state. Optional
 `resumeSpeed` from 0.01 through 16 resumes authoritative time only after Chrome has delivered the
 initial capture frame, within the same serialized command. This avoids paused dead air between
@@ -325,7 +336,7 @@ duration, capped at 45, 75, and 30 seconds respectively. `record-stop`, `record-
 120-second deadline. Close, shutdown, and idle cleanup initiate recorder settlement before draining
 queued session work, so an outstanding waiter cannot prevent the lifecycle action that resolves it.
 
-Recordings live under `target/interact/lab/<session-id>/recordings/`, are capped at 64 MiB, and are
+Recordings live under `target/interact/<lab|game>/<session-id>/recordings/`, are capped at 64 MiB, and are
 never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
 daemon `shutdown`, and idle teardown attempt bounded finalization and remove a partial directory if
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
@@ -334,6 +345,25 @@ finalization fails; they do not leave FFmpeg owned by the session. Recording che
 
 Real-time recordings are silent. Chrome's screencast API does not expose the page's WebAudio
 graph, and Interact does not depend on macOS system-audio routing.
+
+## AI-vs-AI time-lapse capture
+
+`game capture-timelapse` requires a session opened with `spectate:[ai,ai]`. It temporarily selects
+the AI-only live room's existing authoritative speed (8× by default), samples a PNG at a bounded
+wall-clock interval (one second by default), and encodes the samples at 10–60 output FPS (30 by
+default). It stops when the score screen appears or after 1–300 seconds. At most 1,800 samples and
+64 MiB of H.264 MP4 are retained. The prior room speed, viewport, and presentation are restored on
+success, cancellation, or failure.
+
+`region:"viewport"` captures the full game screen; `region:"minimap"` resolves the live minimap DOM
+bounds so responsive layouts do not require hard-coded coordinates. A custom
+`region:{x,y,width,height}` is relative to the game viewport and must stay entirely inside it.
+Minimap capture requires normal presentation because clean presentation hides the HUD. For a
+stable whole-battlefield time-lapse, run `game camera` with `action:"overview"` first; this fits the
+authoritative map bounds and disables the automatic spectator camera. Time-lapse results include
+Tailnet video/contact-sheet previews, sampled ticks and hashes in the withheld manifest, the actual
+stop reason, and the selected region. `status` reports progress and `capture-cancel` interrupts at
+the next wait/frame boundary.
 
 ## Fixed-step capture
 

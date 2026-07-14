@@ -79,8 +79,8 @@ try {
     assert.equal(result.namespace, "game", `${args.join(" ")} identifies the game namespace`);
     assert.deepEqual(
       result.commands,
-      ["open", "close", "status", "inspect", "move", "camera", "screenshot", "record-start", "record-stop", "record-wait", "give-up", "shutdown"],
-      "game help exposes only bounded solo-match observation, move, surrender, and media commands",
+      ["open", "close", "status", "inspect", "move", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "give-up", "shutdown"],
+      "game help exposes bounded match observation, player controls, and region-aware media commands",
     );
   }
   assert.deepEqual(Object.keys(INTERACT_COMMAND_HELP).sort(), [...INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
@@ -167,6 +167,23 @@ try {
   assert.equal(surrendered.result.phase, "concluded", "game give-up reaches the concluded score state");
   assert.equal(callNamespaceFailure("lab", "open").error.code, "sessionKindMismatch", "an active game session cannot be mistaken for Lab");
   callNamespace("game", "close", { sessionId: gameSessionId });
+  const spectatorOpened = callNamespace("game", "open", { spectate: ["ai_2_1", "ai_turtle"] }).result;
+  assert.equal(spectatorOpened.capabilities.role, "spectator", "AI-vs-AI open reports the spectator role");
+  assert.deepEqual(spectatorOpened.capabilities.orders, [], "AI-vs-AI spectators receive no gameplay orders");
+  const spectatorInspection = callNamespace("game", "inspect", { sessionId: spectatorOpened.sessionId }).result;
+  assert.deepEqual(spectatorInspection.entities.map(({ id }) => id), [100, 101], "spectator inspection defaults to all visible entities");
+  const overview = callNamespace("game", "camera", { sessionId: spectatorOpened.sessionId, camera: { action: "overview" } }).result;
+  assert.deepEqual(overview.camera.focus, { x: 1024, y: 1024 }, "overview camera frames the complete map");
+  const minimap = callNamespace("game", "screenshot", { sessionId: spectatorOpened.sessionId, name: "minimap", region: "minimap" }).result;
+  assert.equal(minimap.readiness.region, "minimap", "game screenshots preserve the selected region through the driver request");
+  const timelapse = callNamespace("game", "capture-timelapse", {
+    sessionId: spectatorOpened.sessionId, name: "whole-map", maxDurationMs: 1000,
+    sampleEveryMs: 500, fps: 30, speed: 8, region: "viewport",
+  }).result;
+  assert.equal(timelapse.frameSummary.count, 2, "time-lapse returns a compact sampled-frame summary");
+  assert.equal(timelapse.preview.available, true, "time-lapse publishes a Tailnet video preview");
+  assert.equal(callNamespaceFailure("game", "move", { sessionId: spectatorOpened.sessionId, units: [100], x: 700, y: 700 }).error.code, "playerSeatRequired", "spectator sessions cannot issue player moves");
+  callNamespace("game", "close", { sessionId: spectatorOpened.sessionId });
   callNamespace("game", "shutdown");
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "game contract daemon shuts down cleanly");
 
