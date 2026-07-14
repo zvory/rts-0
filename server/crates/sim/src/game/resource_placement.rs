@@ -84,11 +84,15 @@ pub(crate) fn nearest_oil_patch_tile_center(
             .contains(&dist_tiles)
     };
 
-    nearest_resource_tile_center(map, x, y, |tile, cx, cy| accepts(tile, cx, cy, true))
-        .or_else(|| {
-            nearest_resource_tile_center(map, x, y, |tile, cx, cy| accepts(tile, cx, cy, false))
+    nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
+        accepts(tile, cx, cy, true)
+    })
+    .or_else(|| {
+        nearest_resource_tile_center(map, x, y, |tile, cx, cy| {
+            accepts(tile, cx, cy, false)
         })
-        .unwrap_or_else(|| nearest_tile_center(map, x, y))
+    })
+    .unwrap_or_else(|| nearest_tile_center(map, x, y))
 }
 
 pub(crate) fn occupied_resource_tiles(

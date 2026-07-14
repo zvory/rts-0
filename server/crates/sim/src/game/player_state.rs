@@ -75,19 +75,12 @@ impl PlayerState {
             .retain(|entry| entry.tick >= cutoff);
     }
 
-    pub(crate) fn observer_analysis_resources(
-        &self,
-        current_tick: u32,
-    ) -> ObserverAnalysisResources {
+    pub(crate) fn observer_analysis_resources(&self, current_tick: u32) -> ObserverAnalysisResources {
         let history = &self.score.resource_income_history;
         ObserverAnalysisResources {
             lifetime: observer_resource_totals(self.score.resources_mined),
             last_5s: resource_income_in_window(history, current_tick, RESOURCE_WINDOW_5S_TICKS),
-            last_minute: resource_income_in_window(
-                history,
-                current_tick,
-                RESOURCE_WINDOW_MINUTE_TICKS,
-            ),
+            last_minute: resource_income_in_window(history, current_tick, RESOURCE_WINDOW_MINUTE_TICKS),
         }
     }
 
@@ -163,8 +156,5 @@ fn resource_income_in_window(
 }
 
 fn observer_resource_totals(totals: super::ResourceTotals) -> ObserverAnalysisResourceTotals {
-    ObserverAnalysisResourceTotals {
-        steel: totals.steel,
-        oil: totals.oil,
-    }
+    ObserverAnalysisResourceTotals { steel: totals.steel, oil: totals.oil }
 }
