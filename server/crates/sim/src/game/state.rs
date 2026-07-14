@@ -3,11 +3,10 @@ use std::collections::BTreeSet;
 use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
 
 use super::{
-    ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore,
-    building_memory::BuildingMemory, commands, firing_reveal::FiringRevealSource, fog::Fog,
-    fog::LingeringSightSource, map::Map, mortar::MortarShellStore, replay::CommandLogEntry,
-    setup::StartingLoadout, smoke::SmokeCloudStore, trench::TrenchStore, EntityStore, MapMetadata,
-    PlayerStartingLoadout, PlayerState,
+    ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore, building_memory::BuildingMemory,
+    commands, firing_reveal::FiringRevealSource, fog::Fog, fog::LingeringSightSource, map::Map,
+    mortar::MortarShellStore, replay::CommandLogEntry, setup::StartingLoadout, smoke::SmokeCloudStore,
+    trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout, PlayerState,
 };
 
 #[derive(Clone)]
