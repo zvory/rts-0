@@ -728,6 +728,62 @@ mod tests {
         dir
     }
 
+    fn assert_entity_position(snapshot: &crate::protocol::Snapshot, id: u32, x: f32, y: f32) {
+        let entity = snapshot
+            .entities
+            .iter()
+            .find(|entity| entity.id == id)
+            .unwrap_or_else(|| panic!("missing scenario entity {id}"));
+        assert_eq!((entity.x, entity.y), (x, y));
+    }
+
+    fn assert_scenario_buildings_on_grass(
+        scenario: &LabScenarioPayload,
+        snapshot: &crate::protocol::Snapshot,
+    ) {
+        let map = &checkpoint_payload_ref(scenario).map.data;
+        let tile_size = rts_rules::balance::TILE_SIZE as f32;
+        for entity in &snapshot.entities {
+            let kind = entity
+                .kind
+                .parse::<rts_rules::EntityKind>()
+                .unwrap_or_else(|_| panic!("unknown scenario entity kind {:?}", entity.kind));
+            let Some(definition) = rts_rules::defs::building_def(kind) else {
+                continue;
+            };
+            if matches!(
+                kind,
+                rts_rules::EntityKind::PumpJack | rts_rules::EntityKind::TankTrap
+            ) {
+                continue;
+            }
+
+            let center_x = (entity.x / tile_size).floor() as u32;
+            let center_y = (entity.y / tile_size).floor() as u32;
+            let start_x = center_x
+                .checked_sub(definition.stats.foot_w / 2)
+                .unwrap_or_else(|| {
+                    panic!("scenario entity {} footprint is out of bounds", entity.id)
+                });
+            let start_y = center_y
+                .checked_sub(definition.stats.foot_h / 2)
+                .unwrap_or_else(|| {
+                    panic!("scenario entity {} footprint is out of bounds", entity.id)
+                });
+            for tile_y in start_y..start_y + definition.stats.foot_h {
+                for tile_x in start_x..start_x + definition.stats.foot_w {
+                    let terrain = map.terrain[(tile_y * map.size + tile_x) as usize];
+                    assert_eq!(
+                        terrain,
+                        rts_rules::terrain::MAP_TERRAIN_GRASS,
+                        "scenario entity {} occupies non-grass tile ({tile_x}, {tile_y})",
+                        entity.id
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn bundled_lab_scenario_catalog_loads_bundled_scenarios_and_restores() {
         let catalog = load_lab_scenario_catalog().expect("bundled lab catalog should load");
@@ -757,6 +813,9 @@ mod tests {
         assert_eq!(game.seed(), 3_566_641_871);
         assert_eq!(game.start_payload().players.len(), 2);
         assert_eq!(game.perf_entity_counts().entities, 227);
+        assert_entity_position(&snapshot, 1, 2960.0, 1040.0);
+        assert_entity_position(&snapshot, 21, 1072.0, 2992.0);
+        assert_scenario_buildings_on_grass(&loaded.scenario, &snapshot);
         let tile_size = rts_rules::balance::TILE_SIZE as f32;
         let mut oil_tiles = Vec::new();
         for entity in snapshot
@@ -806,6 +865,9 @@ mod tests {
         assert_eq!(game.seed(), 126_097_607);
         assert_eq!(game.start_payload().players.len(), 2);
         assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
+        assert_entity_position(&snapshot, 1, 1072.0, 2992.0);
+        assert_entity_position(&snapshot, 21, 2960.0, 1040.0);
+        assert_scenario_buildings_on_grass(&loaded.scenario, &snapshot);
 
         let render_kinds: HashSet<_> = snapshot
             .entities
