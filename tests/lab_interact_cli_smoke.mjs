@@ -1,6 +1,7 @@
 // Live CLI canary. Standalone runs own a private Rust server; browser CI reuses its loopback server.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -10,11 +11,16 @@ import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/lab-interact/cli.mjs");
+const tailnetPreviewCli = path.join(root, "scripts/tailnet-preview.mjs");
 const isolatedTmp = fs.mkdtempSync(path.join("/tmp", "rts-li-smoke-"));
+const previewRoot = path.join(isolatedTmp, "durable-previews");
+const previewPort = await reserveLoopbackPort();
 const env = {
   ...process.env,
   TMPDIR: isolatedTmp,
   RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_HOST: "127.0.0.1",
+  RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_ROOT: previewRoot,
+  RTS_LAB_INTERACT_TEST_TAILNET_PREVIEW_PORT: String(previewPort),
 };
 const renderer = env.RTS_LAB_INTERACT_RENDERER || "pixi";
 assert.ok(["pixi", "babylon"].includes(renderer), "Lab Interact smoke renderer must be pixi or babylon");
@@ -191,9 +197,30 @@ try {
   if (sessionId) invoke("close", { sessionId });
   invoke("shutdown");
   if (daemonPid) await waitFor(() => !processAlive(daemonPid), 5_000, "smoke cleanup exits the daemon");
+  stopPreviewService();
   testArtifacts.cleanup();
   testArtifacts.assertClean();
   fs.rmSync(isolatedTmp, { recursive: true, force: true });
+}
+
+function reserveLoopbackPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close((error) => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
+
+function stopPreviewService() {
+  const result = spawnSync(process.execPath, [tailnetPreviewCli, "--stop", "--root", previewRoot, "--port", String(previewPort)], {
+    cwd: root,
+    env,
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, `preview service stops cleanly: ${result.stderr}`);
 }
 
 console.log("✅ lab_interact_cli_smoke.mjs: semantic scene, setup round trip, PNG preview, H.264 recording, and teardown passed");

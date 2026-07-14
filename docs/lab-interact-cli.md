@@ -153,7 +153,8 @@ The daemon preserves its browser, private Rust server, aliases, and authoritativ
 CLI processes. Each accepted interaction resets a 30-minute idle deadline. An in-flight command
 cannot expire. Idle expiry or `shutdown` closes the driver, browser, and Rust server, removes its
 socket/state/runtime files, and exits. `RTS_LAB_INTERACT_IDLE_MS` is a bounded test-only override;
-normal use should leave it unset.
+normal use should leave it unset. Visual preview delivery has a separate machine-level lifecycle:
+issued URLs remain available after this per-worktree daemon exits.
 
 The daemon state and compatible probe publish the checkout commit captured at daemon startup. The
 CLI compares it with the selected worktree's current `HEAD` before dispatch. `status` remains
@@ -208,12 +209,17 @@ Repeat production uses the normal authoritative `adjustProductionRepeat` game co
 producer. Producer ownership, compatibility, allocation policy, resources, supply, and retry
 behavior remain ordinary simulation rules.
 
-Artifacts are confined to `target/lab-interact/<session-id>/captures/` and ignored by Git. The
-daemon starts an artifact-only HTTP listener on this machine's Tailnet IP on first visual capture.
-Each URL has an unguessable per-artifact token, serves only its registered PNG or MP4 with no
-directory route, and remains available until daemon shutdown or idle teardown. It never exposes the
-private Lab game server or local filesystem paths. If Tailscale is unavailable, the visual capture
-still completes and its response reports an actionable unavailable preview instead of a raw path.
+Artifacts are first confined to `target/lab-interact/<session-id>/captures/` and ignored by Git.
+On publication, Lab Interact copies the PNG or MP4 into the machine-level `tailnet-preview` service
+outside the worktree. That service binds the stable Tailnet port 8091, has no idle timeout, and
+retains each copied artifact for at least 24 hours. The URL therefore survives Lab `close`,
+`shutdown`, idle teardown, and removal of the originating worktree. A later publication restarts
+the service if it is not running while retaining any unexpired copied artifacts.
+
+Each URL has an unguessable per-artifact id, serves only its registered PNG or MP4 with no directory
+route, and never exposes the private Lab game server or local filesystem paths. If Tailscale is
+unavailable, the visual capture still completes and its response reports an actionable unavailable
+preview instead of a raw path.
 For a single-unit detail capture, camera `focus` defaults to close 32-world-pixel padding.
 Multi-subject and non-unit focus defaults to 48 world pixels.
 
@@ -336,7 +342,7 @@ fixed visual-time contract.
 | `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
 | `ffmpegUnavailable`, `ffprobeUnavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libx264`, or set the explicit tool paths, then retry. |
-| `tailnetUnavailable` / `tailnetPreviewBindFailed` | Start Tailscale and capture again; share the returned Tailnet URL rather than a local path. |
+| `tailnetPreviewUnavailable` | Start Tailscale or restore the machine-level preview service, then capture again; share the returned Tailnet URL rather than a local path. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop/wait for the active recorder or start a new one. A wait before any start is inactive. |
 
 ## Focused verification
