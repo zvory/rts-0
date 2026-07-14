@@ -62,24 +62,6 @@ pub(crate) fn execute_anti_tank_gun_setup(
     true
 }
 
-pub(crate) fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, ids: &[u32]) {
-    for id in ids {
-        let Some(e) = entities.get_mut(*id) else {
-            continue;
-        };
-        if e.kind != EntityKind::Artillery {
-            continue;
-        }
-        e.reset_artillery_accuracy();
-        e.reset_artillery_blanket_sequence();
-        if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
-            e.set_weapon_setup(WeaponSetup::TearingDown {
-                ticks: config::ARTILLERY_SETUP_TICKS,
-            });
-        }
-    }
-}
-
 fn is_artillery_entity(e: &Entity) -> bool {
     e.kind == EntityKind::Artillery
 }

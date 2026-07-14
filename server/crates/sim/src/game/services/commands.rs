@@ -27,8 +27,8 @@ use crate::game::services::order_execution::targeting::{
     stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
 };
 use crate::game::services::order_execution::{
-    begin_artillery_teardown_for_movement, execute_anti_tank_gun_setup,
-    start_artillery_fire_command_order, ArtilleryFireMode, FutureOrderMode,
+    execute_anti_tank_gun_setup, start_artillery_fire_command_order, ArtilleryFireMode,
+    FutureOrderMode,
 };
 use crate::game::services::order_planner as planner;
 use crate::game::services::spatial::SpatialIndex;
@@ -981,13 +981,11 @@ mod planned_actions {
             clear_queued_orders(entities, &move_units);
             clear_staged_anti_tank_gun_setup(entities, &move_units);
             coordinator.order_group_move(entities, player, &move_units, goal, false);
-            begin_artillery_teardown_for_movement(entities, &move_units);
         }
         if let Some(goal) = attack_move_goal.filter(|_| !attack_move_units.is_empty()) {
             clear_queued_orders(entities, &attack_move_units);
             clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
             coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
-            begin_artillery_teardown_for_movement(entities, &attack_move_units);
         }
         for planner_notice in output.notices {
             match planner_notice {

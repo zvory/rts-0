@@ -628,16 +628,24 @@ fn move_order_tears_down_deployed_anti_tank_guns_before_moving() {
 }
 
 #[test]
-fn replacement_move_preserves_machine_gunner_teardown_progress() {
+fn replacement_move_preserves_support_weapon_teardown_progress() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let machine_gunner = entities
-        .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
-        .expect("machine gunner should spawn");
-    entities
-        .get_mut(machine_gunner)
-        .expect("machine gunner should exist")
-        .set_weapon_setup(WeaponSetup::Deployed);
+    let support_weapons = [
+        (EntityKind::MachineGunner, 100.0),
+        (EntityKind::AntiTankGun, 120.0),
+        (EntityKind::Artillery, 140.0),
+    ]
+    .map(|(kind, y)| {
+        let id = entities
+            .spawn_unit(1, kind, 100.0, y)
+            .expect("support weapon should spawn");
+        entities
+            .get_mut(id)
+            .expect("support weapon should exist")
+            .set_weapon_setup(WeaponSetup::Deployed);
+        id
+    });
 
     apply(
         &map,
@@ -645,7 +653,7 @@ fn replacement_move_preserves_machine_gunner_teardown_progress() {
         vec![(
             1,
             SimCommand::Move {
-                units: vec![machine_gunner],
+                units: support_weapons.to_vec(),
                 x: 220.0,
                 y: 100.0,
                 queued: false,
@@ -653,18 +661,91 @@ fn replacement_move_preserves_machine_gunner_teardown_progress() {
         )],
     );
     for _ in 0..5 {
+        for id in support_weapons {
+            entities
+                .get_mut(id)
+                .expect("support weapon should exist")
+                .tick_weapon_setup();
+        }
+    }
+    let teardown_states = support_weapons.map(|id| {
+        let weapon = entities.get(id).expect("support weapon should exist");
+        (weapon.weapon_setup(), weapon.path_goal())
+    });
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: support_weapons.to_vec(),
+                x: 260.0,
+                y: 120.0,
+                queued: false,
+            },
+        )],
+    );
+
+    for (id, (teardown_state, first_goal)) in support_weapons.into_iter().zip(teardown_states) {
+        let weapon = entities.get(id).expect("support weapon should exist");
+        assert!(matches!(teardown_state, WeaponSetup::TearingDown { .. }));
+        assert_eq!(
+            weapon.weapon_setup(),
+            teardown_state,
+            "replacement movement should not restart an in-progress teardown for {:?}",
+            weapon.kind
+        );
+        assert!(
+            matches!(weapon.order(), Order::Move(_)),
+            "replacement movement should still update the active destination"
+        );
+        assert_ne!(
+            weapon.path_goal(),
+            first_goal,
+            "replacement movement should still update the path goal"
+        );
+    }
+}
+
+#[test]
+fn move_preserves_redeploy_teardown_progress_and_cancels_redeploy() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    entities
+        .get_mut(anti_tank_gun)
+        .expect("anti-tank gun should exist")
+        .set_weapon_setup(WeaponSetup::Deployed);
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetupAntiTankGuns {
+                units: vec![anti_tank_gun],
+                x: 100.0,
+                y: 220.0,
+                queued: false,
+            },
+        )],
+    );
+    for _ in 0..5 {
         entities
-            .get_mut(machine_gunner)
-            .expect("machine gunner should exist")
+            .get_mut(anti_tank_gun)
+            .expect("anti-tank gun should exist")
             .tick_weapon_setup();
     }
-    let machine_gunner_state = entities
-        .get(machine_gunner)
-        .expect("machine gunner should exist");
-    let first_goal = machine_gunner_state.path_goal();
-    let remaining_ticks = match machine_gunner_state.weapon_setup() {
-        WeaponSetup::TearingDown { ticks } => ticks,
-        setup => panic!("expected machine gunner to be tearing down, got {setup:?}"),
+    let remaining_ticks = match entities
+        .get(anti_tank_gun)
+        .expect("anti-tank gun should exist")
+        .weapon_setup()
+    {
+        WeaponSetup::TearingDownToRedeploy { ticks } => ticks,
+        setup => panic!("expected redeploy teardown, got {setup:?}"),
     };
 
     apply(
@@ -673,33 +754,24 @@ fn replacement_move_preserves_machine_gunner_teardown_progress() {
         vec![(
             1,
             SimCommand::Move {
-                units: vec![machine_gunner],
-                x: 260.0,
-                y: 120.0,
+                units: vec![anti_tank_gun],
+                x: 220.0,
+                y: 100.0,
                 queued: false,
             },
         )],
     );
 
-    let machine_gunner = entities
-        .get(machine_gunner)
-        .expect("machine gunner should exist");
+    let anti_tank_gun = entities
+        .get(anti_tank_gun)
+        .expect("anti-tank gun should exist");
     assert_eq!(
-        machine_gunner.weapon_setup(),
+        anti_tank_gun.weapon_setup(),
         WeaponSetup::TearingDown {
             ticks: remaining_ticks
-        },
-        "replacement movement should not restart an in-progress teardown"
+        }
     );
-    assert!(
-        matches!(machine_gunner.order(), Order::Move(_)),
-        "replacement movement should still update the active destination"
-    );
-    assert_ne!(
-        machine_gunner.path_goal(),
-        first_goal,
-        "replacement movement should still update the path goal"
-    );
+    assert_eq!(anti_tank_gun.pending_redeploy_facing(), None);
 }
 
 #[test]
