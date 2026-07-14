@@ -357,7 +357,7 @@ function buttonSlots(card) {
     { commandId: kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE), slotIndex: 8, hotkey: "C" },
   ]);
   assert.equal(commandCarCard.slots[8].cost.steel, 50);
-  assert.equal(commandCarCard.slots[8].cost.oil, 50);
+  assert.equal(commandCarCard.slots[8].cost.oil, 75);
 }
 
 {
