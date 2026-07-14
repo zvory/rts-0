@@ -29,6 +29,7 @@ mod match_history;
 mod replay;
 mod types;
 
+use super::lab_scenario_driver::LabScenarioDriver;
 #[cfg(test)]
 use super::replay_session::ReplaySession;
 use dev::DevDriver;
@@ -87,6 +88,7 @@ pub(super) struct RoomTask {
     lab_scenario_submission: LabScenarioSubmissionService,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
+    lab_driver: Option<LabScenarioDriver>,
     ai_controllers: Vec<AiController>,
     /// Room-time speed multiplier; 1.0 = real-time, 2.0 = 2x faster, etc.
     room_time_speed: f32,
@@ -155,6 +157,7 @@ impl RoomTask {
             lab_scenario_submission: LabScenarioSubmissionService::disabled(),
             dev_driver: None,
             dev_view_player_id: None,
+            lab_driver: None,
             ai_controllers: Vec::new(),
             room_time_speed: 1.0,
             room_time_paused: false,

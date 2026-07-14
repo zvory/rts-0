@@ -719,6 +719,7 @@ fn lab_setup_error_text(reason: &str) -> String {
 mod tests {
     use super::*;
     use crate::protocol::Event;
+    use std::collections::BTreeMap;
 
     fn temp_catalog_dir(name: &str) -> PathBuf {
         let dir =
@@ -955,6 +956,88 @@ mod tests {
             saw_anti_tank_attack,
             "render-preview AT guns should auto-acquire in-arc targets and emit tracer events"
         );
+    }
+
+    #[test]
+    fn supply_300_hellhole_lab_scenario_is_structurally_stable() {
+        let catalog = load_lab_scenario_catalog().expect("bundled lab catalog should load");
+        let hellhole = catalog
+            .iter()
+            .find(|entry| entry.id == "supply-300-hellhole")
+            .expect("supply-300-hellhole catalog row");
+        assert_eq!(hellhole.map, "No Terrain");
+        assert_eq!(hellhole.player_count, 4);
+        assert_eq!(hellhole.filename, "supply-300-hellhole.json");
+
+        let loaded = load_lab_scenario_by_id("supply-300-hellhole")
+            .expect("bundled supply-300-hellhole scenario should load");
+        assert!(loaded.is_checkpoint_backed());
+        lab_scenario_payload_to_lab_op(loaded.scenario.clone())
+            .expect("checkpoint scenario should fit import cap");
+        let metadata = lab_scenario_payload_lab_metadata(&loaded.scenario);
+        assert_eq!(metadata.god_mode_players, vec![1, 2, 3, 4]);
+        assert!(matches!(metadata.vision, LabVisionMode::All));
+        assert_eq!(
+            metadata
+                .initial_camera
+                .as_ref()
+                .map(|camera| (camera.center_x, camera.center_y)),
+            Some((2016, 2016))
+        );
+
+        let game = loaded
+            .build_game()
+            .expect("supply-300-hellhole scenario should restore through lab APIs");
+        assert_eq!(game.seed(), 0x5a00_0300);
+        assert_eq!(game.start_payload().players.len(), 4);
+        assert_eq!(game.lab_god_mode_players(), vec![1, 2, 3, 4]);
+        assert_eq!(game.perf_entity_counts().entities, 380);
+
+        let snapshot = game.snapshot_full_for(1);
+        let supply: Vec<_> = snapshot
+            .player_resources
+            .iter()
+            .map(|player| (player.id, player.supply_used))
+            .collect();
+        assert_eq!(supply, vec![(1, 300), (2, 300), (3, 300), (4, 300)]);
+
+        let expected_counts = BTreeMap::from([
+            ("anti_tank_gun".to_string(), 9),
+            ("artillery".to_string(), 1),
+            ("barracks".to_string(), 1),
+            ("city_centre".to_string(), 1),
+            ("command_car".to_string(), 9),
+            ("depot".to_string(), 5),
+            ("factory".to_string(), 1),
+            ("golem".to_string(), 1),
+            ("machine_gunner".to_string(), 10),
+            ("mortar_team".to_string(), 9),
+            ("panzerfaust".to_string(), 9),
+            ("research_complex".to_string(), 1),
+            ("rifleman".to_string(), 9),
+            ("scout_car".to_string(), 10),
+            ("steelworks".to_string(), 1),
+            ("tank".to_string(), 17),
+            ("worker".to_string(), 1),
+        ]);
+        let mut counts_by_owner = BTreeMap::<u32, BTreeMap<String, usize>>::new();
+        for entity in &snapshot.entities {
+            if (1..=4).contains(&entity.owner) {
+                *counts_by_owner
+                    .entry(entity.owner)
+                    .or_default()
+                    .entry(entity.kind.clone())
+                    .or_default() += 1;
+            }
+        }
+        assert_eq!(counts_by_owner.len(), 4);
+        for player_id in 1..=4 {
+            assert_eq!(
+                counts_by_owner.get(&player_id),
+                Some(&expected_counts),
+                "player {player_id} hellhole composition drifted"
+            );
+        }
     }
 
     #[test]

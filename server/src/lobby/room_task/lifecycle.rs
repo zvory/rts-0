@@ -344,6 +344,7 @@ impl RoomTask {
         self.reset_live_pause_state();
         self.reset_room_time_state();
         self.replay_start = None;
+        self.lab_driver = None;
     }
 
     pub(super) fn capture_replay_start_for(&mut self, game: &Game) {
@@ -435,6 +436,7 @@ impl RoomTask {
         self.human_faction_assignments.clear();
         self.dev_driver = None;
         self.dev_view_player_id = None;
+        self.lab_driver = None;
         self.ai_controllers.clear();
         self.pending_client_command_acks.clear();
         self.reset_room_time_state();

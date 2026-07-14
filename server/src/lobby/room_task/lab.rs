@@ -26,6 +26,7 @@ use crate::lab_scenarios::{
     export_lab_checkpoint_scenario_for_protocol, lab_scenario_payload_lab_metadata,
     lab_scenario_payload_to_lab_op, load_lab_scenario_by_id, validate_lab_scenario_authoring,
 };
+use crate::lobby::lab_scenario_driver::lab_scenario_driver_for;
 use crate::protocol::{
     Event, InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
     LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode, ServerMessage,
@@ -595,6 +596,7 @@ impl RoomTask {
             session.initial_camera = launch.initial_camera;
         }
         let launch_god_mode_players = launch.god_mode_players.clone();
+        let launch_driver = config.scenario.as_deref().and_then(lab_scenario_driver_for);
         let game = launch.game;
         let initial_setup =
             match self.export_lab_replay_initial_setup(&game, "Initial lab setup".to_string()) {
@@ -616,6 +618,7 @@ impl RoomTask {
         self.ai_controllers.clear();
         self.dev_driver = None;
         self.dev_view_player_id = None;
+        self.lab_driver = launch_driver;
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
@@ -1300,6 +1303,7 @@ impl RoomTask {
             }
             if resets_timeline {
                 session.initial_camera = imported_initial_camera;
+                self.lab_driver = None;
             }
             if log_operations {
                 session.operation_log.push(LabOperationLogEntry {
