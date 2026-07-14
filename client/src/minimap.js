@@ -15,6 +15,7 @@ import {
   PASSABLE,
   TERRAIN,
   UPGRADE,
+  isBuilding,
   isResource,
   isRoadTerrain,
   isUnit,
@@ -24,6 +25,7 @@ import {
   COLORS,
   FOG_EXPLORED_ALPHA,
   FOG_UNEXPLORED_ALPHA,
+  STATS,
   isProducerBuilding,
 } from "./config.js";
 import {
@@ -44,6 +46,11 @@ const MINIMAP_TAP_SLOP_PX = 8;
 const MINIMAP_BLIP_SCALE = 1.6;
 const MINIMAP_OWNED_ENTITY_BLIP_RADIUS = 1.6 * MINIMAP_BLIP_SCALE;
 const MINIMAP_STATIC_ENTITY_BLIP_RADIUS = 2.2;
+const MINIMAP_MIN_ENTITY_BLIP_SCALE = 0.5;
+const MINIMAP_UNIT_SUPPLY_MIN = STATS[KIND.RIFLEMAN].supply;
+const MINIMAP_UNIT_SUPPLY_MAX = STATS[KIND.TANK].supply;
+const MINIMAP_BUILDING_COST_MIN = totalResourceCost(STATS[KIND.TANK_TRAP].cost);
+const MINIMAP_BUILDING_COST_MAX = totalResourceCost(STATS[KIND.CITY_CENTRE].cost);
 const MINIMAP_PLAYER_BLIP_OUTLINE_COLOR = "rgba(255,255,255,0.92)";
 const MINIMAP_PLAYER_BLIP_OUTLINE_OFFSETS = Object.freeze([
   [0, -1],
@@ -51,6 +58,16 @@ const MINIMAP_PLAYER_BLIP_OUTLINE_OFFSETS = Object.freeze([
   [0, 1],
 ]);
 const TWO_PI = Math.PI * 2;
+
+function totalResourceCost(cost) {
+  return Math.max(0, Number(cost?.steel) || 0) + Math.max(0, Number(cost?.oil) || 0);
+}
+
+const scaleBetween = (value, min, max) => {
+  const progress = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  return MINIMAP_MIN_ENTITY_BLIP_SCALE
+    + progress * (1 - MINIMAP_MIN_ENTITY_BLIP_SCALE);
+};
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
@@ -728,18 +745,42 @@ export class Minimap {
   _drawEntityBlip(ctx, e, color, playerOwned, { scoutStroke = true } = {}) {
     const p = this._worldToCanvas(e.x, e.y);
     ctx.fillStyle = color;
+    const entityScale = this._entityBlipScale(e);
     if (e.kind === KIND.SCOUT_PLANE) {
-      this._drawScoutPlaneBlip(ctx, p.x, p.y, color, { stroke: scoutStroke });
+      this._drawScoutPlaneBlip(ctx, p.x, p.y, color, {
+        scale: entityScale,
+        stroke: scoutStroke,
+      });
       return;
     }
-    const r = playerOwned
+    const baseRadius = playerOwned
       ? MINIMAP_OWNED_ENTITY_BLIP_RADIUS
       : MINIMAP_STATIC_ENTITY_BLIP_RADIUS;
+    const r = baseRadius * entityScale;
     ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
   }
 
-  _drawScoutPlaneBlip(ctx, cx, cy, color, { stroke = true } = {}) {
-    const s = MINIMAP_BLIP_SCALE;
+  _entityBlipScale(e) {
+    const stats = STATS[e?.kind];
+    if (isUnit(e?.kind)) {
+      return scaleBetween(
+        Math.max(MINIMAP_UNIT_SUPPLY_MIN, Number(stats?.supply) || 0),
+        MINIMAP_UNIT_SUPPLY_MIN,
+        MINIMAP_UNIT_SUPPLY_MAX,
+      );
+    }
+    if (isBuilding(e?.kind)) {
+      return scaleBetween(
+        totalResourceCost(stats?.cost),
+        MINIMAP_BUILDING_COST_MIN,
+        MINIMAP_BUILDING_COST_MAX,
+      );
+    }
+    return 1;
+  }
+
+  _drawScoutPlaneBlip(ctx, cx, cy, color, { scale = 1, stroke = true } = {}) {
+    const s = MINIMAP_BLIP_SCALE * scale;
     ctx.save();
     ctx.strokeStyle = "#101010";
     ctx.fillStyle = color;

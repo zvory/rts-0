@@ -1672,7 +1672,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [client-rendering.md](client-rendering.md) and its active
 [rendering parity ledger](rendering-parity.md).
 
-- Minimap player-owned unit and building blips render at 1.6× their original size above resource blips, with a merged one-pixel white outline mask for clustered-icon readability; resource blips retain their original size. Legacy vision-only intel remains scaled but renders below the fog overlay and does not use the foreground outline/resource-overlap pass.
+- Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through City Centre), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost →
