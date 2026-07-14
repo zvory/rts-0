@@ -701,7 +701,7 @@ await withFakeDocument(async () => {
     state: {
       map: { width: 64, height: 64 },
       playerId: 1,
-      playerResources: [{ steel: 500, oil: 200 }],
+      playerResources: [{ id: 1, steel: 500, oil: 200 }],
       upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
       playerUpgrades: [
         { id: 2, upgrades: [] },
@@ -833,6 +833,18 @@ await withFakeDocument(async () => {
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
   assert(panel.fields.has("lab-player"), "LabPanel tracks one shared target player for lab setup tools");
+  assertDeepEqual(
+    panel.resourcesForTargetPlayer(),
+    { steel: 500, oil: 200 },
+    "LabPanel resolves target resources from the explicitly tagged player row",
+  );
+  match.state.playerResources = [{ id: 2, steel: 900, oil: 800 }];
+  assertDeepEqual(
+    panel.resourcesForTargetPlayer(),
+    { steel: 0, oil: 0 },
+    "LabPanel does not borrow another visible player's resource row for the target player",
+  );
+  match.state.playerResources = [{ id: 1, steel: 500, oil: 200 }];
   assert(
     playerButtons().length === 2 &&
       playerButtonById(1)?.dataset.color === "#2255aa" &&
