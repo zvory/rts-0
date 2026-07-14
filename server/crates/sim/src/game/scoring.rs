@@ -36,7 +36,8 @@ pub(super) fn entity_score_value(kind: EntityKind) -> u32 {
 
 impl Game {
     pub fn scores(&self) -> Vec<PlayerScore> {
-        self.state.players
+        self.state
+            .players
             .iter()
             .map(|p| PlayerScore {
                 id: p.id,

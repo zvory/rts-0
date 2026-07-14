@@ -116,10 +116,16 @@ impl std::fmt::Display for ReplayValidationError {
                 write!(f, "checkpoint-backed replay is missing startState")
             }
             ReplayValidationError::CheckpointStartInvalid { reason } => {
-                write!(f, "checkpoint-backed replay start state is invalid: {reason}")
+                write!(
+                    f,
+                    "checkpoint-backed replay start state is invalid: {reason}"
+                )
             }
             ReplayValidationError::StartStateMismatch { field } => {
-                write!(f, "checkpoint-backed replay startState mismatch for {field}")
+                write!(
+                    f,
+                    "checkpoint-backed replay startState mismatch for {field}"
+                )
             }
         }
     }
