@@ -63,7 +63,8 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
   if (argv[0] !== "lab" && !(argv[0] === "help" && argv[1] === "lab")) {
     throw cliError("unknownNamespace", `Interact requires a namespace. Usage: ${USAGE}`);
   }
-  const labArgv = argv[0] === "help" ? argv.slice(2) : argv.slice(1);
+  const namespaceHelp = argv[0] === "help";
+  const labArgv = namespaceHelp ? argv.slice(2) : argv.slice(1);
   if (labArgv.length === 0 || (labArgv.length === 1 && ["--help", "-h", "help"].includes(labArgv[0]))) {
     return {
       ok: true,
@@ -76,11 +77,14 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
       },
     };
   }
-  const helpCommand = labArgv.length === 2 && labArgv[0] === "help"
-    ? labArgv[1]
-    : labArgv.length === 2 && ["--help", "-h"].includes(labArgv[1])
-      ? labArgv[0]
-      : null;
+  let helpCommand: string | null = null;
+  if (namespaceHelp && labArgv.length === 1) {
+    helpCommand = labArgv[0];
+  } else if (labArgv.length === 2 && labArgv[0] === "help") {
+    helpCommand = labArgv[1];
+  } else if (labArgv.length === 2 && ["--help", "-h"].includes(labArgv[1])) {
+    helpCommand = labArgv[0];
+  }
   if (helpCommand != null) {
     if (!INTERACT_COMMANDS.includes(helpCommand)) {
       throw cliError("unknownCommand", `Unknown command ${JSON.stringify(helpCommand)}.`);
@@ -95,6 +99,7 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
       },
     };
   }
+  if (namespaceHelp) throw cliError("usage", `Usage: ${USAGE}`);
   if (labArgv.length < 1 || labArgv.length > 2) throw cliError("usage", `Usage: ${USAGE}`);
   const [command, rawInput = "{}"] = labArgv;
   if (!INTERACT_COMMANDS.includes(command)) throw cliError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);

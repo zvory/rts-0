@@ -81,8 +81,8 @@ try {
     "order help exposes signed repeat-production adjustments and their multi-building shape",
   );
   for (const command of INTERACT_COMMANDS) {
-    for (const args of [["help", command], [command, "--help"]]) {
-      const help = spawnSync(process.execPath, [cli, "lab", ...args], {
+    for (const args of [["lab", "help", command], ["lab", command, "--help"], ["help", "lab", command]]) {
+      const help = spawnSync(process.execPath, [cli, ...args], {
         cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
       });
       assert.equal(help.status, 0, `${args.join(" ")} succeeds outside a Git checkout`);
@@ -101,6 +101,11 @@ try {
   });
   assert.notEqual(unknownHelp.status, 0, "unknown per-command help remains a concise failure");
   assert.equal(JSON.parse(unknownHelp.stderr).error.code, "unknownCommand", "unknown help reports unknownCommand without Git or daemon access");
+  const overlongNamespaceHelp = spawnSync(process.execPath, [cli, "help", "lab", "open", "{}"], {
+    cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+  });
+  assert.notEqual(overlongNamespaceHelp.status, 0, "root-qualified help never dispatches a command payload");
+  assert.equal(JSON.parse(overlongNamespaceHelp.stderr).error.code, "usage", "overlong root-qualified help fails closed before Git or daemon access");
   const missingNamespace = spawnSync(process.execPath, [cli, "status", "{}"], {
     cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
   });
