@@ -190,11 +190,12 @@ export class InteractService {
     const openAbortController = new AbortController();
     this.openAbortController = openAbortController;
     this.openingKind = kind;
+    const map = input.map || (kind === "lab" ? "1v1" : "Default");
     this.openPromise = (async () => {
       const driver = await this.driverFactory({
         workspaceRoot,
         mode: kind,
-        map: input.map || "Default",
+        map,
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
         opponent: input.opponent || "ai_2_1",
@@ -213,7 +214,7 @@ export class InteractService {
         sessionId, kind, driver, aliases: new Map<string, number>(), sceneRevision: 0,
         sceneIdentity: {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
-          map: input.map || "Default", seed: kind === "lab" ? input.seed ?? null : null,
+          map, seed: kind === "lab" ? input.seed ?? null : null,
           opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
           spectate: kind === "game" ? input.spectate || null : null, role: kind === "game" ? (input.spectate ? "spectator" : "player") : null,
           renderer: input.renderer || "pixi",

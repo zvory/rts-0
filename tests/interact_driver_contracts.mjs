@@ -73,7 +73,9 @@ await assert.rejects(
 const babylonDriver = new InteractDriver({ workspaceRoot: root, renderer: "babylon" });
 babylonDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 babylonDriver.workspace = workspace;
-assert.equal(new URL(babylonDriver.launchUrl()).searchParams.get("rtsRenderer"), "babylon", "Interact can launch the explicit Babylon route");
+const babylonUrl = new URL(babylonDriver.launchUrl());
+assert.equal(babylonUrl.searchParams.get("rtsRenderer"), "babylon", "Interact can launch the explicit Babylon route");
+assert.equal(babylonUrl.searchParams.get("map"), "1v1", "blank Interact labs use the current default 1v1 map");
 const spectatorDriver = new InteractDriver({ workspaceRoot: root, mode: "game", spectate: ["ai_2_1", "ai_turtle"] });
 spectatorDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 spectatorDriver.workspace = workspace;

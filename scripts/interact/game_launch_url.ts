@@ -22,7 +22,7 @@ export function interactLaunchUrl({
   if (mode === "lab") {
     const url = new URL("/lab", baseUrl);
     url.searchParams.set("room", room);
-    url.searchParams.set("map", safeToken(map, "Default", 48));
+    url.searchParams.set("map", safeToken(map, "1v1", 48));
     if (seed) url.searchParams.set("seed", seed);
     if (scenario) url.searchParams.set("scenario", safeToken(scenario, "blank", 48));
     if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");

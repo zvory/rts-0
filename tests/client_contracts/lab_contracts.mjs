@@ -291,9 +291,9 @@ await withFakeDocument(() => {
   blankButton.listeners.click();
   assert(
     starts[0]?.room === "sandbox" &&
-      starts[0]?.map === "No Terrain" &&
+      starts[0]?.map === "1v1" &&
       starts[0]?.scenario === "blank",
-    "LabCatalogScreen starts blank labs on the no-terrain map",
+    "LabCatalogScreen starts blank labs on the current default 1v1 map",
   );
 });
 

@@ -625,7 +625,7 @@ remain on their current schemas until their phases introduce containers around t
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
   authority. Plain `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
-  the No Terrain map, while catalog setups retain their selected maps. Direct lab URLs keep
+  the current default `1v1` map, while catalog setups retain their selected maps. Direct lab URLs keep
   compatibility: `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps
   blank lab startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
   lab setup ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the

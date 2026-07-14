@@ -198,7 +198,7 @@ export class InteractDriver {
   constructor({
     workspaceRoot,
     mode = "lab",
-    map = "Default",
+    map,
     seed = "",
     scenario = "blank",
     opponent = "ai_2_1",
@@ -217,7 +217,7 @@ export class InteractDriver {
     this.options = {
       workspaceRoot,
       mode,
-      map,
+      map: map || (mode === "lab" ? "1v1" : "Default"),
       seed,
       scenario,
       opponent,

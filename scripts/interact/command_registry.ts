@@ -57,7 +57,7 @@ const COMMAND_RECORDS = Object.freeze({
     "{workspaceRoot?:string,map?:token,seed?:string|u32,scenario?:token,renderer?:\"pixi\"|\"babylon\",viewport?:{width:int,height:int,deviceScaleFactor?:number}}",
     {
       scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
-      defaults: ["workspaceRoot=current worktree", "map=Default", "scenario=blank", "renderer=pixi", "seed=empty", "viewport=1440x900 at DPR 1"],
+      defaults: ["workspaceRoot=current worktree", "map=1v1", "scenario=blank", "renderer=pixi", "seed=empty", "viewport=1440x900 at DPR 1"],
       bounds: ["one session", "map/scenario <=48 safe-token characters", "viewport 320-4096 x 240-4096", "DPR >0 and <=4"],
       example: { renderer: "babylon", viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
     },
