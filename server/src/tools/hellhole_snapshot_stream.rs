@@ -9,7 +9,7 @@ use crate::lab_scenarios::load_lab_scenario_by_id;
 use crate::protocol::{serialize_messagepack_compact_snapshot, Command, Event};
 
 pub const STREAM_ID: &str = "supply-300-hellhole";
-pub const DEFAULT_FRAME_COUNT: u32 = 300;
+pub const DEFAULT_FRAME_COUNT: u32 = 900;
 pub const TICK_RATE_HZ: u32 = 30;
 pub const MAGIC: &[u8; 8] = b"RTSSTRM1";
 
@@ -95,8 +95,10 @@ pub fn generate_hellhole_snapshot_stream(
         "schemaVersion": 1,
         "id": STREAM_ID,
         "tickRateHz": TICK_RATE_HZ,
-        "loop": true,
-        "loopGapMs": 500,
+        // Keep the benchmark stream finite. Restarting it would emit another start payload,
+        // rebuild Match (including its renderer and profiler), and make a run that crosses the
+        // boundary report only the post-restart tail instead of one coherent workload.
+        "loop": false,
         "frameCount": frame_count,
         "firstTick": first_tick,
         "lastTick": last_tick,
@@ -180,6 +182,7 @@ mod tests {
         let header: serde_json::Value =
             serde_json::from_slice(&bytes[12..12 + header_len]).unwrap();
         assert_eq!(header["frameCount"], 3);
+        assert_eq!(header["loop"], false);
         assert_eq!(header["start"]["spectator"], true);
         assert_eq!(header["start"]["snapshotStream"]["serverSimulation"], false);
 
@@ -189,5 +192,10 @@ mod tests {
             offset += 4 + len;
         }
         assert_eq!(offset, bytes.len());
+    }
+
+    #[test]
+    fn default_artifact_covers_thirty_seconds() {
+        assert_eq!(DEFAULT_FRAME_COUNT / TICK_RATE_HZ, 30);
     }
 }

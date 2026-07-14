@@ -248,7 +248,7 @@ under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set 
 `supply-300-hellhole-stream`, a client-only isolation lane. The latter fetches the generated
 `client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
 MessagePack snapshots into the normal decoder and renderer at 30 Hz. Its setup assertion fails unless
-the page reports no WebSocket and no live simulation. Regenerate the ten-second, 300-frame artifact
+the page reports no WebSocket and no live simulation. Regenerate the thirty-second, 900-frame artifact
 with `cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream`.
 Preserved schema 2
 incident replays are analysis evidence only and are not replay-harness workloads. The

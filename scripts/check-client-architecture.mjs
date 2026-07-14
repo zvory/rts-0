@@ -67,6 +67,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "auto_spectator_settings.js": "platform",
 
   "net.js": "transport",
+  "snapshot_stream_net.js": "transport",
   "protocol.js": "transport",
   "protocol_constants.js": "transport",
   "protocol_frame.js": "transport",
