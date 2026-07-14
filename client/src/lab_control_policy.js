@@ -257,10 +257,7 @@ function emptyResources() {
 function resourcesForOwner(state, owner) {
   const ownerId = positiveOwner(owner);
   if (ownerId == null) return emptyResources();
-  const row = rowForOwner(state?.playerResources, ownerId);
-  if (row) return row;
-  if (Number(state?.playerId) === ownerId && state?.resources) return state.resources;
-  return emptyResources();
+  return rowForOwner(state?.playerResources, ownerId) || emptyResources();
 }
 
 function factionIdForOwner(state, owner) {
@@ -295,9 +292,7 @@ function upgradeArrayForOwner(source, ownerId) {
 
 function rowForOwner(rows, ownerId) {
   if (!Array.isArray(rows)) return null;
-  return rows.find((row) => Number(row?.id ?? row?.playerId ?? row?.owner) === ownerId) ||
-    rows[ownerId - 1] ||
-    null;
+  return rows.find((row) => Number(row?.id ?? row?.playerId ?? row?.owner) === ownerId) || null;
 }
 
 function ownerValue(source, ownerId) {

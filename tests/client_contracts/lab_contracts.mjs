@@ -439,6 +439,14 @@ await withFakeDocument(() => {
     policy.commandResources(blueState).oil === 999 && policy.commandResources(blueState).supplyCap === 99,
     "lab command resources prefer the authoritative blue-player row over spectator-shaped top-level resources",
   );
+  blueState.playerResources = [
+    { id: 2, steel: 125, oil: 50, supplyUsed: 7, supplyCap: 12 },
+  ];
+  assertDeepEqual(
+    policy.commandResources(blueState),
+    { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
+    "lab command resources do not borrow a projected row belonging to another owner",
+  );
   assert(policy.commandFactionId(state) === "ekat", "lab command faction resolves from the selected owner");
   assertDeepEqual(
     policy.commandUpgrades(state),

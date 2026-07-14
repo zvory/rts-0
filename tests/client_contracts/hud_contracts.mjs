@@ -731,7 +731,7 @@ function fakeHudRootWithoutResourceSpans() {
   const p1LabHudState = {
     playerId: 1,
     spectator: true,
-    resources: { steel: 75, oil: 0, supplyUsed: 6, supplyCap: 50 },
+    resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
     playerResources: [
       { id: 1, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50 },
       { id: 2, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50 },
