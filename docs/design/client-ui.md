@@ -942,6 +942,7 @@ export class GameState {
   setSelection(ids), addToSelection(ids), clearSelection()
   selectedEntities()                     // resolved entity objects from current snapshot
   entityById(id)
+  setProgressPredictionPaused(paused)    // freezes/resumes wall-clock progress display prediction
   // control groups (client-only):
   controlGroups                          // ten budget-admitted Array<entityId> slots; slot 9 maps to key 0
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
@@ -1779,8 +1780,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate
   `buildProgress` only while the latest authoritative snapshot marks them `buildActive`; the display
   clamps below completion and never unlocks supply, tech, production, pathing, or command behavior
-  before the server snapshot. Completed damaged/selected buildings use the same HP-layer bar for
-  normal health.
+  before the server snapshot. Live pause state freezes both construction and production progress
+  extrapolation for every recipient, and the active display clock resumes from the first
+  authoritative post-unpause snapshot without counting paused wall time. Completed damaged/selected
+  buildings use the same HP-layer bar for normal health.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre
