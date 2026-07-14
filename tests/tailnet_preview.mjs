@@ -86,6 +86,16 @@ try {
     /preview port must be an integer from 1 through 65535/,
     "the programmatic publisher rejects invalid ports before starting a service",
   );
+  await assert.rejects(
+    publishTailnetPreview({
+      source,
+      root: previewRoot,
+      host: "127.0.0.1",
+      ttlMs: Number.MAX_SAFE_INTEGER,
+    }),
+    /preview expiration is out of range/,
+    "the programmatic publisher rejects overflowing expirations before starting a service",
+  );
   const createdAt = 1_000_000;
   assert.throws(
     () => stagePreview({ root: previewRoot, source, ttlMs: Number.MAX_SAFE_INTEGER, now: createdAt }),

@@ -685,6 +685,9 @@ export async function publishTailnetPreview({
   if (!keep && (!Number.isSafeInteger(ttlMs) || ttlMs <= 0)) {
     throw new Error("preview TTL must be a positive millisecond duration");
   }
+  if (!keep && ttlMs > Number.MAX_SAFE_INTEGER - Date.now()) {
+    throw new Error("preview expiration is out of range");
+  }
   const previewHost = host || tailscaleIpv4();
   if (!isPreviewHost(previewHost)) {
     throw new Error("preview host must be a Tailscale IPv4 address (or loopback for tests)");
