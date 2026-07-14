@@ -19,6 +19,10 @@ assert(
   formatReplaySeekNotice({ fromTick: 30, targetTick: 30 }) === "Seeking to the current replay position…",
   "replay seek notices handle an accepted no-distance seek",
 );
+assert(
+  formatReplaySeekNotice({ fromTick: "invalid", targetTick: 30 }) === "",
+  "replay seek notices ignore malformed protocol values",
+);
 
 const priorWindow = globalThis.window;
 const priorDocument = globalThis.document;

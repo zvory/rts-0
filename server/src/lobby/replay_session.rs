@@ -466,6 +466,27 @@ impl ReplaySession {
         controller_id: u32,
         plan: ReplaySeekPlan,
     ) -> Result<u32, String> {
+        // Replay reconstruction is synchronous CPU work. In the production multi-thread runtime,
+        // mark this section as blocking so Tokio can hand this worker's async tasks (especially
+        // connection writers carrying RoomTimeSeekStarted) to a replacement worker. The fallback
+        // keeps ordinary unit tests and any current-thread runtime usable.
+        if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
+            handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
+        }) {
+            return tokio::task::block_in_place(|| {
+                self.apply_seek_blocking(room, viewer_count, controller_id, plan)
+            });
+        }
+        self.apply_seek_blocking(room, viewer_count, controller_id, plan)
+    }
+
+    fn apply_seek_blocking(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        plan: ReplaySeekPlan,
+    ) -> Result<u32, String> {
         debug_assert_eq!(self.current_tick(), plan.from_tick);
         let seek_start = StdInstant::now();
         let keyframe_tick = self.rebuild_to(plan.target_tick)?;

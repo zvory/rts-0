@@ -143,6 +143,8 @@ export class App {
         : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
+    /** @type {string} active replay-seek toast, cleared by the rebuilt replay start. */
+    this.replaySeekNotice = "";
     /** @type {number|undefined} heartbeat interval id while connected. */
     this.heartbeatTimer = undefined;
     /** Whether the WebSocket has ever reached open in this page session. */
@@ -436,7 +438,9 @@ export class App {
 
   onRoomTimeSeekStarted(m) {
     const notice = formatReplaySeekNotice(m);
-    if (notice) this.showToast(notice, 5000);
+    if (!notice) return;
+    this.replaySeekNotice = notice;
+    this.showToast(notice, 5000);
   }
 
   /**
@@ -486,6 +490,10 @@ export class App {
     });
     this.setCleanPresentation(false);
     const startsReplay = !!payload?.replay;
+    if (this.replaySeekNotice) {
+      this.hideToast(this.replaySeekNotice);
+      this.replaySeekNotice = "";
+    }
     if (!startsReplay) this.lastObservationRunId = "";
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
     const capabilities = createRoomCapabilities({ startPayload: payload });
@@ -941,7 +949,17 @@ export class App {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => {
       dom.toast.hidden = true;
+      this.toastTimer = undefined;
     }, timeoutMs);
+  }
+
+  /** Hide the current toast, optionally only when it still contains the expected notice. */
+  hideToast(expectedText = null) {
+    if (expectedText != null && dom.toast.textContent !== expectedText) return false;
+    if (this.toastTimer !== undefined) clearTimeout(this.toastTimer);
+    this.toastTimer = undefined;
+    dom.toast.hidden = true;
+    return true;
   }
 
   shutdownSecondsRemaining(m) {

@@ -112,6 +112,7 @@ async fn send_server_message(
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
         ServerMessage::RoomTimeState(_) => "room_time_state",
+        ServerMessage::RoomTimeSeekStarted { .. } => "room_time_seek_started",
         ServerMessage::LivePauseState(_) => "live_pause_state",
         ServerMessage::ObserverAnalysis(_) => "observer_analysis",
         ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
