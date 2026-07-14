@@ -343,8 +343,12 @@ fn print_client_constants(indent: &str) {
         balance::SCOUT_PLANE_ORBIT_RADIUS_TILES
     );
     println!(
-        "{indent}    \"scoutPlaneOrbitDurationTicks\": {},",
-        balance::SCOUT_PLANE_ORBIT_DURATION_TICKS
+        "{indent}    \"scoutPlaneSpeedPxPerTick\": {},",
+        json_f32(balance::SCOUT_PLANE_SPEED_PX_PER_TICK)
+    );
+    println!(
+        "{indent}    \"scoutPlaneLifetimeTicks\": {},",
+        balance::SCOUT_PLANE_LIFETIME_TICKS
     );
     println!(
         "{indent}    \"scoutPlaneAbilityCooldownTicks\": {},",

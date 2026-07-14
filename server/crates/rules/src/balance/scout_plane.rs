@@ -9,7 +9,7 @@ pub const SCOUT_PLANE_COST_STEEL: u32 = 50;
 pub const SCOUT_PLANE_COST_OIL: u32 = 75;
 pub const SCOUT_PLANE_SUPPLY: u32 = 0;
 pub const SCOUT_PLANE_ORBIT_RADIUS_TILES: u32 = 4;
-pub const SCOUT_PLANE_ORBIT_DURATION_TICKS: u16 = (TICK_HZ * 20) as u16;
+pub const SCOUT_PLANE_LIFETIME_TICKS: u16 = (TICK_HZ * 20) as u16;
 pub const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ * 30) as u16;
 
 // Client render/selection body only. The authoritative movement/collision body stays zero-radius

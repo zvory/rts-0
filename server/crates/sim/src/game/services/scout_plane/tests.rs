@@ -51,7 +51,7 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     assert_eq!(def.stats.supply, 0);
     assert_eq!(def.stats.build_ticks, 0);
     assert_eq!(config::SCOUT_PLANE_ORBIT_RADIUS_TILES, 4);
-    assert_eq!(config::SCOUT_PLANE_ORBIT_DURATION_TICKS, 600);
+    assert_eq!(config::SCOUT_PLANE_LIFETIME_TICKS, 600);
     assert_eq!(config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS, 900);
 }
 
@@ -84,7 +84,37 @@ fn scout_plane_launches_from_caster_without_a_city_centre() {
 }
 
 #[test]
-fn scout_plane_orbit_timer_starts_after_arrival_then_plane_disappears() {
+fn scout_plane_lifetime_expires_during_transit() {
+    let map = test_map(32);
+    let mut entities = EntityStore::new();
+    let plane = spawn_plane(&mut entities, 1, 256.0, 256.0);
+    if let Some(state) = entities
+        .get_mut(plane)
+        .and_then(|plane| plane.scout_plane_state_mut())
+    {
+        *state = ScoutPlaneState::launched_at(790.0, 790.0);
+        state.lifetime_ticks_remaining = 2;
+    }
+
+    advance_scout_planes(&map, &mut entities);
+    let state = plane_state(&entities, plane);
+    assert!(
+        !state.orbiting,
+        "distant target should keep the plane in transit"
+    );
+    assert_eq!(
+        state.lifetime_ticks_remaining, 1,
+        "transit should consume sortie lifetime"
+    );
+    advance_scout_planes(&map, &mut entities);
+    assert!(
+        entities.get(plane).is_none(),
+        "plane should disappear when its total lifetime expires before arrival"
+    );
+}
+
+#[test]
+fn scout_plane_arrival_uses_only_remaining_lifetime_for_orbit() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
     let plane = spawn_plane(&mut entities, 1, 256.0, 256.0);
@@ -93,20 +123,20 @@ fn scout_plane_orbit_timer_starts_after_arrival_then_plane_disappears() {
         .and_then(|plane| plane.scout_plane_state_mut())
     {
         *state = ScoutPlaneState::launched_at(256.0, 256.0);
-        state.station_ticks_remaining = 1;
+        state.lifetime_ticks_remaining = 2;
     }
 
     advance_scout_planes(&map, &mut entities);
     let state = plane_state(&entities, plane);
     assert!(state.orbiting, "arrival should establish orbit");
     assert_eq!(
-        state.station_ticks_remaining, 1,
-        "station timer should not decrement on the arrival tick"
+        state.lifetime_ticks_remaining, 1,
+        "arrival should not reset the lifetime consumed by the sortie"
     );
     advance_scout_planes(&map, &mut entities);
     assert!(
         entities.get(plane).is_none(),
-        "plane should disappear as soon as its station time expires"
+        "plane should orbit only for its remaining lifetime"
     );
 }
 

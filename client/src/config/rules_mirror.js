@@ -104,7 +104,8 @@ export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 1.35;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 20;
 export const SCOUT_PLANE_ORBIT_RADIUS_TILES = 4;
-export const SCOUT_PLANE_ORBIT_DURATION_TICKS = TICK_HZ * 20;
+export const SCOUT_PLANE_SPEED_PX_PER_TICK = 2;
+export const SCOUT_PLANE_LIFETIME_TICKS = TICK_HZ * 20;
 export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
@@ -291,7 +292,7 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 50, oil: 75 }),
     radiusTiles: SCOUT_PLANE_ORBIT_RADIUS_TILES,
-    durationTicks: SCOUT_PLANE_ORBIT_DURATION_TICKS,
+    durationTicks: SCOUT_PLANE_LIFETIME_TICKS,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),

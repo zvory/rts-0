@@ -9,7 +9,13 @@ import {
   ORDER_STAGE,
   UPGRADE,
 } from "../protocol.js";
-import { ABILITIES, MINING_CC_RANGE_TILES, STATS, isProducerBuilding } from "../config.js";
+import {
+  ABILITIES,
+  MINING_CC_RANGE_TILES,
+  SCOUT_PLANE_SPEED_PX_PER_TICK,
+  STATS,
+  isProducerBuilding,
+} from "../config.js";
 import { DEFAULT_TILE_SIZE } from "./constants.js";
 import {
   buildArtilleryTargetLocks,
@@ -410,7 +416,14 @@ export function _refreshAbilityTargetPreview() {
     return;
   }
   const definition = ABILITIES[target.ability];
-  if (!definition || !Array.isArray(definition.carriers) || !definition.rangeTiles) {
+  const scoutPlaneTravelRangePx = target.ability === ABILITY.SCOUT_PLANE
+    ? SCOUT_PLANE_SPEED_PX_PER_TICK * (definition?.durationTicks || 0)
+    : 0;
+  if (
+    !definition ||
+    !Array.isArray(definition.carriers) ||
+    (!definition.rangeTiles && !(scoutPlaneTravelRangePx > 0))
+  ) {
     intent?.updateAbilityTargetPreview?.(null);
     return;
   }
@@ -423,7 +436,7 @@ export function _refreshAbilityTargetPreview() {
     return;
   }
   const tileSize = this.state.map?.tileSize || DEFAULT_TILE_SIZE;
-  const rangePx = definition.rangeTiles * tileSize;
+  const rangePx = scoutPlaneTravelRangePx || definition.rangeTiles * tileSize;
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const locksRangeBand = isArtilleryFireAbility(target.ability);
   // Cursor feedback is rendered after this frame's camera update. Map its
@@ -513,6 +526,7 @@ export function _refreshAbilityTargetPreview() {
     artilleryLocks,
     rangeOrigins: carrierOrigins,
     pathOrigins: target.ability === ABILITY.EKAT_LINE_SHOT
+      || target.ability === ABILITY.SCOUT_PLANE
       ? carrierOrigins.concat(anchorOrigins)
       : [],
     returnMarkers,
