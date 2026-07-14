@@ -2,15 +2,21 @@
 // Scout Plane-specific input contracts split out of the broad state/input suite.
 
 import { assert } from "./assertions.mjs";
+import {
+  ABILITIES,
+  SCOUT_PLANE_SPEED_PX_PER_TICK,
+} from "../../client/src/config.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { Minimap } from "../../client/src/minimap.js";
-import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
+import { ABILITY, KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
+import { _drawAbilityTargetPreview } from "../../client/src/renderer/feedback.js";
 import { GameState } from "../../client/src/state.js";
 import { buildSelectionScene } from "../../client/src/input/selection_projection.js";
 import { createOrthographicProjectionSnapshot } from "../../client/src/camera_projection.js";
 import { pointHitsOrientedVehicle } from "../../client/src/input/placement.js";
+import { RecordingGraphics } from "./pixi_fakes.mjs";
 
 function startInfo() {
   return {
@@ -64,6 +70,52 @@ function commandInput(selected, entities) {
   input._resourceAtScreen = () => null;
   input._addCommandFeedback = () => {};
   return { input, commands };
+}
+
+{
+  const commandCar = { id: 5700, owner: 1, kind: KIND.COMMAND_CAR, x: 128, y: 160 };
+  const input = Object.create(Input.prototype);
+  input.mouse = { x: 480, y: 320 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    selectedEntities: () => [commandCar],
+  };
+  input.clientIntent = new ClientIntent();
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.SCOUT_PLANE });
+  input.camera = {
+    projectionSnapshot: () => ({
+      groundAtScreen: ({ x, y }) => ({ x, y }),
+    }),
+  };
+
+  input._refreshAbilityTargetPreview();
+  const preview = input.clientIntent.abilityTargetPreview;
+  const travelRangePx = SCOUT_PLANE_SPEED_PX_PER_TICK
+    * ABILITIES[ABILITY.SCOUT_PLANE].durationTicks;
+  assert(preview?.rangePx === travelRangePx, "Scout Plane targeting uses its total lifetime travel budget as the advisory range");
+  assert(
+    preview?.pathOrigins?.length === 1 && preview.pathOrigins[0].id === commandCar.id,
+    "Scout Plane targeting connects the launching Command Car to the cursor",
+  );
+
+  const gfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: gfx, _map: input.state.map },
+    { abilityTargetPreview: preview },
+  );
+  assert(
+    gfx.calls.some((call) =>
+      call[0] === "moveTo" &&
+      call[1] === commandCar.x + travelRangePx &&
+      call[2] === commandCar.y),
+    "armed Scout Plane targeting draws the maximum travel range around the Command Car",
+  );
+  assert(
+    gfx.calls.some((call) => call[0] === "moveTo" && call[1] === commandCar.x && call[2] === commandCar.y) &&
+      gfx.calls.some((call) => call[0] === "lineTo"),
+    "armed Scout Plane targeting draws a path line from the Command Car toward the cursor",
+  );
 }
 
 {

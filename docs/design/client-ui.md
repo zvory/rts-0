@@ -1406,7 +1406,10 @@ and 75 oil, has no City Centre requirement, disables while that Command Car has 
 Plane or its 30-second cooldown is running, and issues immediately rather than entering a
 building production queue. Scout Planes are hit-testable for hover/readout purposes but normal
 selection, box selection, control groups, right-click commands, and command-card descriptors filter
-them out, so they are unselectable and uncontrollable in live play.
+them out, so they are unselectable and uncontrollable in live play. While the Scout Plane ability is
+armed, the ground overlay draws an advisory line from the launching Command Car to the cursor and a
+dotted ring around the car for the plane's maximum 20-second travel distance; targets outside that
+ring remain valid and produce sorties that expire before arrival.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.
@@ -1541,7 +1544,7 @@ use real time and are hidden or out of scope for the clean Pixi viewport artifac
 fixed capture of them must extend the injected seam explicitly rather than changing their clocks
 as a side effect.
 
-### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire, Blanket Fire)
+### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire, Blanket Fire, Scout Plane)
 
 `input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
 abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ kind: "ability", ability })`,
@@ -1594,10 +1597,12 @@ Anchor, and line-projectile rendering, so the client must not infer gameplay aut
 preview state.
 
 Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
-- While in targeted ability mode, draws a dotted range ring (radius = `rangeTiles × tileSize`) around
-  each eligible carrier.
-- `rangeOrigins` keeps normal range rings tied to carrier units, while `pathOrigins` can add
-  server-projected origins such as Magic Anchors for multi-origin line-shot previews.
+- While in targeted ability mode, draws a dotted range ring (normally `rangeTiles × tileSize`) around
+  each eligible carrier. Scout Plane instead derives its advisory ring from plane speed multiplied
+  by its total lifetime; the ring does not clamp or reject farther targets.
+- `rangeOrigins` keeps normal range rings tied to carrier units, while `pathOrigins` adds the
+  Command Car-to-cursor Scout Plane route and can add server-projected origins such as Magic Anchors
+  for multi-origin line-shot previews.
 - `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
 - Point Fire and Blanket Fire draw the current artillery cone when the locked point is inside a
   deployed gun's cone, otherwise they draw the future setup/redeploy cone toward the locked point.

@@ -91,7 +91,7 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
         };
 
         let step = advance_one(snapshot.flight, speed, orbit_radius, world_max);
-        let mut station_expired = false;
+        let mut lifetime_expired = false;
         if let Some(plane) = entities.get_mut(id) {
             plane.clear_path();
             plane.set_path_goal(None);
@@ -101,19 +101,13 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
                 plane.set_facing(facing);
             }
             let _ = plane.update_scout_plane_runtime(step.center, step.phase, step.orbiting);
-            if step.orbiting {
-                let just_arrived = !snapshot.flight.orbiting;
-                if let Some(state) = plane.scout_plane_state_mut() {
-                    if !just_arrived {
-                        state.station_ticks_remaining =
-                            state.station_ticks_remaining.saturating_sub(1);
-                    }
-                    station_expired = state.station_ticks_remaining == 0;
-                }
+            if let Some(state) = plane.scout_plane_state_mut() {
+                state.lifetime_ticks_remaining = state.lifetime_ticks_remaining.saturating_sub(1);
+                lifetime_expired = state.lifetime_ticks_remaining == 0;
             }
         }
 
-        if station_expired {
+        if lifetime_expired {
             removals.push(id);
         }
     }

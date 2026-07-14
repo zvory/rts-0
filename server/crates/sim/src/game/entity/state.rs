@@ -52,9 +52,9 @@ pub(in crate::game) struct ScoutPlaneState {
     /// Command Car that launched this sortie. Each car may have one active plane.
     #[serde(default)]
     pub(in crate::game) source_command_car: Option<u32>,
-    /// Ticks remaining on station after reaching the orbit area.
-    #[serde(default = "default_scout_plane_station_ticks")]
-    pub(in crate::game) station_ticks_remaining: u16,
+    /// Ticks remaining in the sortie, including both transit and orbit time.
+    #[serde(default = "default_scout_plane_lifetime_ticks")]
+    pub(in crate::game) lifetime_ticks_remaining: u16,
 }
 
 impl ScoutPlaneState {
@@ -64,7 +64,7 @@ impl ScoutPlaneState {
             orbit_phase: 0.0,
             orbiting: false,
             source_command_car: None,
-            station_ticks_remaining: config::SCOUT_PLANE_ORBIT_DURATION_TICKS,
+            lifetime_ticks_remaining: config::SCOUT_PLANE_LIFETIME_TICKS,
         }
     }
 
@@ -95,8 +95,8 @@ impl ScoutPlaneState {
     }
 }
 
-fn default_scout_plane_station_ticks() -> u16 {
-    config::SCOUT_PLANE_ORBIT_DURATION_TICKS
+fn default_scout_plane_lifetime_ticks() -> u16 {
+    config::SCOUT_PLANE_LIFETIME_TICKS
 }
 
 /// Reserved for future round-trip harvesting if attached mining is replaced.
