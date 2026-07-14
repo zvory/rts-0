@@ -40,13 +40,13 @@ pub use order::{
 #[cfg(test)]
 pub use state::EntityStateGroups;
 pub(in crate::game) use state::ScoutPlaneState;
+pub(crate) use state::MAX_PRODUCTION_QUEUE;
 #[allow(unused_imports)]
 pub use state::{
     CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, ProdItem,
     ProductionState, ResearchItem, ResourceExtractorState, ResourceNodeState, WeaponSetup,
     WorkerState,
 };
-pub(crate) use state::MAX_PRODUCTION_QUEUE;
 pub use store::EntityStore;
 
 /// Neutral owner id used for resource nodes (steel / oil nodes).

@@ -109,10 +109,8 @@ pub(crate) fn production_system(
                 .map(|item| (building.owner, item.upgrade))
         }) {
             let definition = upgrade::definition(research);
-            let cost = rules::economy::ResourceCost::new(
-                definition.cost_steel,
-                definition.cost_oil,
-            );
+            let cost =
+                rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
                 if player.spend_cost(cost)
                     && !entities
