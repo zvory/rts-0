@@ -32,7 +32,8 @@
                 pre-join product controls.
         Game:   #game-screen, #viewport (selected renderer canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
-                #game-timer, #minimap (canvas), #selection-area, #control-group-tabs,
+                #game-timer, #idle-workers, #idle-workers-count, #minimap (canvas),
+                #selection-area, #control-group-tabs,
                 #selected-panel, #command-card,
                 #game-menu, #settings-button, #settings-menu, #pointer-lock-toggle,
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
@@ -173,7 +174,13 @@
 
         <!-- Bottom-left minimap -->
         <div id="minimap-wrap">
-          <div id="game-timer" class="game-timer" aria-label="Game time">00:00</div>
+          <div class="minimap-status-row">
+            <div id="game-timer" class="game-timer" aria-label="Game time">00:00</div>
+            <button id="idle-workers" class="idle-workers-button" type="button" disabled>
+              <span class="idle-workers-label">Idle workers:</span>
+              <span id="idle-workers-count">0</span>
+            </button>
+          </div>
           <canvas id="minimap" width="242" height="242"></canvas>
         </div>
 
