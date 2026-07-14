@@ -1739,7 +1739,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   selected. When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
-  field-of-fire overlays. In Lab scenario authoring, deployed Anti-Tank Gun and artillery
+  field-of-fire overlays. A Command Car's speed-boost aura ring is visible only while that Command
+  Car is selected, and brightens while Breakthrough is active. In Lab scenario authoring, deployed
+  Anti-Tank Gun and artillery
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
