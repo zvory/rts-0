@@ -17,6 +17,7 @@ use super::{
 };
 
 mod production;
+mod production_repeat;
 mod rally;
 mod research;
 
