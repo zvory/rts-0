@@ -493,6 +493,40 @@ mod tests {
     }
 
     #[test]
+    fn one_v_one_map_is_rotationally_symmetric() {
+        let map = Map::load("1v1", 2, 0x1234_5678).expect("1v1 should load");
+        let size = map.size as usize;
+
+        for y in 0..size {
+            for x in 0..size {
+                let rotated_x = size - 1 - x;
+                let rotated_y = size - 1 - y;
+                assert_eq!(
+                    map.terrain[y * size + x],
+                    map.terrain[rotated_y * size + rotated_x],
+                    "1v1 terrain differs at ({x},{y}) and its rotation ({rotated_x},{rotated_y})"
+                );
+            }
+        }
+
+        let starts: HashSet<_> = map.starts.iter().copied().collect();
+        for &(x, y) in &map.starts {
+            assert!(
+                starts.contains(&(map.size - 1 - x, map.size - 1 - y)),
+                "1v1 start ({x},{y}) has no rotational counterpart"
+            );
+        }
+
+        let base_sites: HashSet<_> = map.base_sites.iter().copied().collect();
+        for &(x, y) in &map.base_sites {
+            assert!(
+                base_sites.contains(&(map.size - 1 - x, map.size - 1 - y)),
+                "1v1 base site ({x},{y}) has no rotational counterpart"
+            );
+        }
+    }
+
+    #[test]
     fn same_seed_produces_identical_start_assignment() {
         let a = Map::generate(4, 0xdead_beef);
         let b = Map::generate(4, 0xdead_beef);
