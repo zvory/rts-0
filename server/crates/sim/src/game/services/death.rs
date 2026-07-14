@@ -7,14 +7,14 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::Event;
-use crate::rules::projection;
+use crate::rules::{economy, projection};
 
 /// Remove entities whose hp has hit zero, emitting a fog-respecting `Death` event: a player
 /// gets the poof only if they owned the entity or its death position is currently visible to
 /// them (events are best-effort flavor). `death_system` runs before the fog recompute, so the
 /// current fog still reflects who could see the unit while it was alive — exactly the players
-/// who should see it die. A dead building drops its queue implicitly by being removed. Workers
-/// building a since-removed site are reset elsewhere.
+/// who should see it die. A dead building refunds every prepaid unit and research item before its
+/// queues are removed. Workers building a since-removed site are reset elsewhere.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn death_system(
     entities: &mut EntityStore,
@@ -37,10 +37,27 @@ pub(crate) fn death_system(
             sight_tiles: e.sight_tiles(),
             kind: e.kind,
             killer: e.last_damage_owner(),
+            queued_units: e.prod_queue().iter().map(|item| item.unit).collect(),
+            queued_upgrades: e.research_queue().iter().map(|item| item.upgrade).collect(),
         })
         .collect();
 
     for dead in dead {
+        if let Some(player) = players.iter_mut().find(|player| player.id == dead.owner) {
+            for unit in dead.queued_units {
+                if config::unit_stats(unit).is_some() {
+                    player.refund_cost(economy::resource_cost(unit));
+                    player.release_supply(economy::supply_cost(unit));
+                }
+            }
+            for queued_upgrade in dead.queued_upgrades {
+                let definition = crate::game::upgrade::definition(queued_upgrade);
+                player.refund_cost(economy::ResourceCost::new(
+                    definition.cost_steel,
+                    definition.cost_oil,
+                ));
+            }
+        }
         entities.release_miner(dead.id);
         entities.remove(dead.id);
         record_score_death(players, dead.owner, dead.kind, dead.killer);
@@ -138,6 +155,8 @@ struct DeadEntity {
     sight_tiles: u32,
     kind: EntityKind,
     killer: Option<u32>,
+    queued_units: Vec<EntityKind>,
+    queued_upgrades: Vec<crate::game::upgrade::UpgradeKind>,
 }
 
 fn record_score_death(
@@ -156,3 +175,6 @@ fn record_score_death(
         player.record_entity_killed(kind);
     }
 }
+
+#[cfg(test)]
+mod tests;
