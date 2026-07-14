@@ -245,6 +245,7 @@ export class HUD {
     if (this.elIdleWorkersLabel) this.elIdleWorkersLabel.textContent = "Idle workers (T):";
     if (this.elIdleWorkers) {
       this.elIdleWorkers.disabled = true;
+      if (this.elIdleWorkers.dataset) this.elIdleWorkers.dataset.selectable = "false";
       this.elIdleWorkers.title = "No idle workers";
       this.elIdleWorkers.setAttribute?.("aria-label", "No idle workers");
     }

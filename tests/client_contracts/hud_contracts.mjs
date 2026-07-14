@@ -189,12 +189,36 @@ function commandCardCtx({
   assert(prevented && selected.join(",") === "11,12", "the configured hotkey selects every active idle worker");
   assert(menuClosed === 1 && plannedSelection.join(",") === "11,12", "idle-worker selection reconciles local HUD intent");
 
+  let modifiedActivations = 0;
+  for (const modifier of ["altKey", "ctrlKey", "metaKey"]) {
+    let modifiedPrevented = false;
+    _handleKeyDown.call({
+      hotkeyProfiles: hotkeys,
+      globalHotkeyActions: [{
+        commandId: "hud.selectIdleWorkers",
+        activate: () => { modifiedActivations += 1; },
+      }],
+      _activateCommandHotkey: () => false,
+      _handleControlGroupHotkey: () => false,
+    }, {
+      code: "KeyK",
+      key: "k",
+      repeat: false,
+      target: null,
+      [modifier]: true,
+      preventDefault() { modifiedPrevented = true; },
+    });
+    assert(!modifiedPrevented, `idle-worker hotkey leaves ${modifier} browser chords available`);
+  }
+  assert(modifiedActivations === 0, "idle-worker hotkey ignores browser and OS modifier chords");
+
   ownIdle[0].state = STATE.MOVE;
   ownIdle[1].state = STATE.BUILD;
   hud._renderIdleWorkers();
   assert(count.textContent === "0" && button.disabled === true, "HUD keeps the idle-worker status disabled when none are idle");
   hud.destroy();
   assert(!listeners.has("click"), "HUD teardown leaves no idle-worker click listener");
+  assert(button.dataset.selectable === "false", "HUD teardown clears the idle-worker selectable styling state");
   assert(button["aria-label"] === "No idle workers", "HUD teardown restores accurate idle-worker text");
 }
 

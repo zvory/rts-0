@@ -57,7 +57,7 @@ export function _handleKeyDown(ev) {
 }
 
 function activateGlobalHotkey(input, ev) {
-  if (ev.repeat) return false;
+  if (ev.repeat || ev.altKey || ev.ctrlKey || ev.metaKey) return false;
   const key = commandHotkeyFromEvent(ev);
   if (!key) return false;
   for (const action of input.globalHotkeyActions || []) {
