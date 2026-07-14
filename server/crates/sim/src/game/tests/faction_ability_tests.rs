@@ -298,15 +298,17 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
 }
 
 #[test]
-fn breakthrough_smoke_synergy_speeds_units_more() {
+fn breakthrough_uses_configured_plain_and_smoke_speed_multipliers() {
     let (mut game, _scout, _target, _) = smoke_command_fixture();
     for id in game.state.entities.ids() {
         game.state.entities.remove(id);
     }
     let plain_pos = game.state.map.tile_center(8, 5);
     let smoke_pos = game.state.map.tile_center(8, 10);
+    let baseline_pos = game.state.map.tile_center(8, 15);
     let goal_plain = game.state.map.tile_center(20, 5);
     let goal_smoke = game.state.map.tile_center(20, 10);
+    let goal_baseline = game.state.map.tile_center(20, 15);
     let plain = game
         .state
         .entities
@@ -317,6 +319,11 @@ fn breakthrough_smoke_synergy_speeds_units_more() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, smoke_pos.0, smoke_pos.1)
         .expect("smoked rifle should spawn");
+    let baseline = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, baseline_pos.0, baseline_pos.1)
+        .expect("baseline rifle should spawn");
     game.state.smokes.schedule(
         smoke_pos.0,
         smoke_pos.1,
@@ -345,6 +352,15 @@ fn breakthrough_smoke_synergy_speeds_units_more() {
     game.enqueue(
         1,
         Command::Move {
+            units: vec![baseline],
+            x: goal_baseline.0,
+            y: goal_baseline.1,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
             units: vec![smoked],
             x: goal_smoke.0,
             y: goal_smoke.1,
@@ -356,14 +372,19 @@ fn breakthrough_smoke_synergy_speeds_units_more() {
     }
     let plain_dx = game.state.entities.get(plain).expect("plain").pos_x - plain_pos.0;
     let smoke_dx = game.state.entities.get(smoked).expect("smoked").pos_x - smoke_pos.0;
+    let baseline_dx = game.state.entities.get(baseline).expect("baseline").pos_x - baseline_pos.0;
     assert!(
-        smoke_dx > plain_dx,
-        "unit in smoke should receive the stronger Breakthrough multiplier ({smoke_dx} <= {plain_dx})"
+        (plain_dx / baseline_dx - crate::config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER).abs() < 0.001,
+        "plain Breakthrough should use its configured multiplier ({plain_dx} / {baseline_dx})"
+    );
+    assert!(
+        (smoke_dx / baseline_dx - crate::config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER).abs() < 0.001,
+        "smoke Breakthrough should use its configured multiplier ({smoke_dx} / {baseline_dx})"
     );
 }
 
 #[test]
-fn command_car_passive_aura_is_half_speed_and_has_no_smoke_bonus() {
+fn command_car_passive_aura_uses_configured_speed_and_has_no_smoke_bonus() {
     let (mut game, _scout, _target, _) = smoke_command_fixture();
     for id in game.state.entities.ids() {
         game.state.entities.remove(id);
@@ -437,6 +458,6 @@ fn command_car_passive_aura_is_half_speed_and_has_no_smoke_bonus() {
     );
     assert!(
         (near_dx / far_dx - crate::config::COMMAND_CAR_AURA_SPEED_MULTIPLIER).abs() < 0.001,
-        "the permanent aura should be the configured half-strength multiplier"
+        "the permanent aura should use the configured multiplier"
     );
 }

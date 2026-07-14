@@ -862,7 +862,7 @@ policy is centralized instead of scattered through services.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. `Open`, bare road, and all four marked road orientations project to passable
   `Road` terrain and share combat/visibility defaults, raw stone blocks LOS, and `Road` supplies
-  the authoritative 1.4x movement multiplier sampled from a moving unit's center tile each tick.
+  the authoritative 1.5x movement multiplier sampled from a moving unit's center tile each tick.
   Future forest/hill behavior grows through the same rules seam.
 - `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
   projection support, and event visibility predicates.
