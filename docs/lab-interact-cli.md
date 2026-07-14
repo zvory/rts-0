@@ -5,6 +5,12 @@ Lab scenes through a machine-readable local interface. It starts this worktree's
 server and a headless client using Pixi by default. Mutations are ephemeral and never edit source
 files; `open` accepts `renderer:"babylon"` for the explicit Babylon Lab route.
 
+Lab Interact requires Node 22.18 or newer and runs its TypeScript source directly through Node's
+built-in type stripping; there is no compile or generated-output step. Install the repository-owned
+tooling with `npm ci`, and run the strict no-emit check with `npm run check:lab-interact-types`.
+The stable `cli.mjs` entry point only checks the Node version and imports `cli.ts`; the browser
+bridge remains native JavaScript because the client is buildless.
+
 ## Commands
 
 Run commands from the worktree root. The optional second argument must be one JSON object:
@@ -49,16 +55,16 @@ checked against the public command catalog.
 
 ## Application ownership
 
-`scripts/lab-interact/command_registry.mjs` is the single public-command definition source. Each
+`scripts/lab-interact/command_registry.ts` is the single public-command definition source. Each
 entry contains its daemon/session scope, execution lane, ordinary or lifecycle/media timeout
 class, runtime validator, service handler key, and help descriptor. CLI recognition and help,
 daemon request deadlines, validation, service dispatch, and semantic ordering all project from
-that registry; `command_inputs.mjs` owns the exact bounded parsers used by its entries.
+that registry; `command_inputs.ts` owns the exact bounded parsers used by its entries.
 
 The application dependency direction is intentionally small:
 
 ```text
-cli.mjs / daemon.mjs
+cli.mjs -> cli.ts / daemon.ts
         |
 command registry + command service + session coordinator
         |
@@ -67,7 +73,7 @@ driver + private server + recording / fixed capture / Tailnet / runtime helpers
 process runner / filesystem / Puppeteer / FFmpeg / Rust server / Tailscale
 ```
 
-`session_coordinator.mjs` owns the only generic semantic FIFO. Commands use four explicit lanes:
+`session_coordinator.ts` owns the only generic semantic FIFO. Commands use four explicit lanes:
 
 | Lane | Commands | Ordering contract |
 | --- | --- | --- |
@@ -84,28 +90,28 @@ semantic queue policy.
 
 ## External process and dependency ownership
 
-`process_runner.mjs` owns finite request-path children. It invokes direct argv without a shell,
+`process_runner.ts` owns finite request-path children. It invokes direct argv without a shell,
 caps stdout and stderr, accepts a timeout and `AbortSignal`, sends TERM before a bounded KILL
 fallback, and resolves or rejects only after the child is reaped. Cargo builds, FFmpeg/ffprobe
 capability checks and finite post-processing/probes, and `tailscale status --json` use this runner.
-The streaming H.264 encoder remains a direct `spawn` owned by `recording.mjs` because it requires
+The streaming H.264 encoder remains a direct `spawn` owned by `recording.ts` because it requires
 stdin backpressure and explicit finalization.
 
-`private_server.mjs` owns loopback URL validation/reuse, ephemeral port selection, Cargo build,
+`private_server.ts` owns loopback URL validation/reuse, ephemeral port selection, Cargo build,
 the long-running Rust server child, health polling, bounded log ownership, build metadata, and
 TERM/KILL teardown. The command service owns the `AbortController` for a cold `open`; shutdown
 aborts it before awaiting the open promise, so held Cargo startup cannot block daemon teardown.
 The private server remains loopback-only and retains the artifact-transfer capability boundary.
 
-`puppeteer-core` is a repository-root development dependency in `package.json` and
-`package-lock.json`. Lab Interact and the browser/performance tests import that declared dependency
-directly; daemon requests never install or hydrate packages. Run `npm ci` at the repository root,
+`puppeteer-core`, TypeScript 5.8 or newer, and Node 22 typings are repository-root development
+dependencies in `package.json` and `package-lock.json`. Lab Interact and the browser/performance
+tests import declared dependencies directly; daemon requests never install or hydrate packages. Run `npm ci` at the repository root,
 or use `tests/run-all.sh`, whose pre-suite cache setup installs the root lock into the shared
 lockfile-keyed cache and links the ignored root `node_modules`.
 
 Intentional synchronous exceptions are bounded filesystem work and Git checkout inspection in
-`workspace_inspection.mjs`, daemon checkout identity in `runtime.mjs`, and CLI bootstrap/worktree
-inspection in `cli.mjs`. They run before long external request work; architecture-checked daemon
+`workspace_inspection.ts`, daemon checkout identity in `runtime.ts`, and CLI worktree inspection in
+`cli.ts`. They run before long external request work; architecture-checked daemon
 paths contain no `spawnSync` or `execSync`.
 
 `open` returns the `sessionId` required by session commands. It is idempotent: repeated or
@@ -339,6 +345,7 @@ The fast contract set uses the fake driver and needs no Chrome or Rust server. F
 with H.264 support are required by the recording and fixed-capture contracts:
 
 ```bash
+npm run check:lab-interact-types
 node scripts/check-lab-interact-architecture.mjs
 node scripts/check-source-file-sizes.mjs
 node tests/lab_interact_adapter_contracts.mjs

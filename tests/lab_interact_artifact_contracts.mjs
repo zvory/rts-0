@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.mjs";
+import { LAB_INTERACT_LIMITS, LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.ts";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 

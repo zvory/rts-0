@@ -8,7 +8,7 @@ const baselinePath = path.join(repoRoot, "scripts", "source-file-size-baseline.j
 
 const MAX_LINES = 1_500;
 const INCLUDED_ROOTS = ["server", "client/src", "tests", "scripts"];
-const INCLUDED_EXTENSIONS = new Set([".rs", ".js", ".mjs"]);
+const INCLUDED_EXTENSIONS = new Set([".rs", ".js", ".mjs", ".ts"]);
 const EXCLUDED_PATH_PREFIXES = [
   "server/target/",
   "client/vendor/",

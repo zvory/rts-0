@@ -12,7 +12,7 @@ import {
   isTailnetIpv4,
   resolveTailnetHost,
   tailnetHostFromStatus,
-} from "../scripts/lab-interact/tailnet_preview.mjs";
+} from "../scripts/lab-interact/tailnet_preview.ts";
 
 await assertAbandonedReadClosesSource();
 

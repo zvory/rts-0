@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -95,15 +95,15 @@ References:
 
 ## Implementation Checklist
 
-- [ ] Add Node-version preflight, strict no-emit config, dependencies, and check script.
-- [ ] Convert Node implementation modules bottom-up to `.ts` with erasable syntax.
-- [ ] Keep `cli.mjs` as the only compatibility JavaScript implementation file in the tool directory.
-- [ ] Type command/IPC/session/error/adapter/capture seams.
-- [ ] Preserve runtime validation on all untrusted boundaries.
-- [ ] Update tests, fake-driver injection, source policies, selectors, CI, docs, and skill instructions.
-- [ ] Prove direct execution has no loader warning or build prerequisite.
-- [ ] Confirm no generated output or client build pipeline was added.
-- [ ] Mark this phase done in this file in the implementation commit.
+- [x] Add Node-version preflight, strict no-emit config, dependencies, and check script.
+- [x] Convert Node implementation modules bottom-up to `.ts` with erasable syntax.
+- [x] Keep `cli.mjs` as the only compatibility JavaScript implementation file in the tool directory.
+- [x] Type command/IPC/session/error/adapter/capture seams.
+- [x] Preserve runtime validation on all untrusted boundaries.
+- [x] Update tests, fake-driver injection, source policies, selectors, CI, docs, and skill instructions.
+- [x] Prove direct execution has no loader warning or build prerequisite.
+- [x] Confirm no generated output or client build pipeline was added.
+- [x] Mark this phase done in this file in the implementation commit.
 
 ## Verification
 

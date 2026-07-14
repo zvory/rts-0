@@ -1,13 +1,13 @@
-export function withAbortSignal(
-  promise,
-  signal,
-  createError,
-  disposeLateValue = null,
-) {
+export function withAbortSignal<T>(
+  promise: PromiseLike<T> | T,
+  signal: AbortSignal | null | undefined,
+  createError: () => Error,
+  disposeLateValue: ((value: T) => void | Promise<void>) | null = null,
+): Promise<T> {
   const operation = Promise.resolve(promise);
   if (!signal) return operation;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     let settled = false;
     const onAbort = () => {
       if (settled) return;

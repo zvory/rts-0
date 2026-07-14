@@ -50,7 +50,7 @@ Use for tests, CI/hooks, or focused verification.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
 - `scripts/agent-pr.sh` skips Codex only for pure `.md` diffs; otherwise it formats touched Rust
   with the pinned toolchain before the final push.
-- Root package/lock own Puppeteer; `run-all.sh` installs it, never Lab daemon requests.
+- Root npm supports Node 22.18+ Lab TypeScript and no-emit checks; daemon requests never install.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.
 - Skip only when `tests/select-suites.mjs` maps changed files away from the suite.

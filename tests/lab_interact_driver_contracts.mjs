@@ -14,7 +14,7 @@ import {
   transitionDriverState,
   validateWorkspaceRoot,
   withTimeout,
-} from "../scripts/lab-interact/driver.mjs";
+} from "../scripts/lab-interact/driver.ts";
 import {
   LAB_INTERACT_BRIDGE_KEY,
   LAB_INTERACT_BRIDGE_VERSION,

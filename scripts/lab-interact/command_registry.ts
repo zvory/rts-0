@@ -1,11 +1,48 @@
-import { validatorFor } from "./command_inputs.mjs";
-import { RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "./runtime.mjs";
+import { validatorFor } from "./command_inputs.ts";
+import type { CommandInput } from "./command_inputs.ts";
+import { RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "./runtime.ts";
 
-function descriptor(summary, acceptedShape, {
+export type CommandScope = "daemon" | "session";
+export type CommandLane = "serialized" | "observation" | "cancellation" | "lifecycle";
+export type TimeoutClass = "ordinary" | "lifecycle-media";
+
+type HelpExample = Readonly<Record<string, unknown>>;
+interface DescriptorOptions {
+  scope?: CommandScope;
+  lane?: CommandLane;
+  timeoutClass?: TimeoutClass;
+  sceneMutation?: boolean;
+  recordable?: boolean;
+  variants?: string[];
+  defaults?: string[];
+  bounds?: string[];
+  example?: HelpExample;
+}
+
+export interface CommandDefinition {
+  name: string;
+  scope: CommandScope;
+  lane: CommandLane;
+  timeoutClass: TimeoutClass;
+  validator: (value: unknown) => CommandInput;
+  handlerKey: string;
+  sceneMutation: boolean;
+  recordable: boolean;
+  help: Readonly<{
+    summary: string;
+    acceptedShape: string;
+    variants: string[];
+    defaults: string[];
+    bounds: string[];
+    example?: HelpExample;
+  }>;
+}
+
+function descriptor(summary: string, acceptedShape: string, {
   scope = "session", lane = "serialized", timeoutClass = "ordinary",
   sceneMutation = false, recordable = true,
   variants = [], defaults = [], bounds = [], example,
-} = {}) {
+}: DescriptorOptions = {}) {
   return Object.freeze({
     scope, lane, timeoutClass, sceneMutation, recordable,
     help: Object.freeze({ summary, acceptedShape, variants, defaults, bounds, example }),
@@ -126,7 +163,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
 });
 
-export const LAB_INTERACT_COMMAND_REGISTRY = Object.freeze(Object.fromEntries(
+export const LAB_INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinition>> = Object.freeze(Object.fromEntries(
   Object.entries(COMMAND_RECORDS).map(([name, record]) => [name, Object.freeze({
     name,
     scope: record.scope,
@@ -142,17 +179,17 @@ export const LAB_INTERACT_COMMAND_REGISTRY = Object.freeze(Object.fromEntries(
 
 export const LAB_INTERACT_COMMANDS = Object.freeze(Object.keys(LAB_INTERACT_COMMAND_REGISTRY));
 
-export function commandDefinition(command) {
+export function commandDefinition(command: string): CommandDefinition | null {
   return LAB_INTERACT_COMMAND_REGISTRY[command] || null;
 }
 
-export function validateCommandInput(command, input) {
+export function validateCommandInput(command: string, input: unknown) {
   const definition = commandDefinition(command);
   if (!definition) throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
   return definition.validator(input);
 }
 
-export function requestTimeoutMs(command) {
+export function requestTimeoutMs(command: string) {
   const definition = commandDefinition(command);
   return definition?.timeoutClass === "lifecycle-media" ? RECORDING_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
 }

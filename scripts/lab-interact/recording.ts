@@ -5,7 +5,41 @@ import path from "node:path";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 
-import { ProcessRunner } from "./process_runner.mjs";
+import { ProcessRunner, ProcessRunnerError } from "./process_runner.ts";
+import type { ProcessResult } from "./process_runner.ts";
+import type { ChildProcessByStdio } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
+import type { Page } from "puppeteer-core";
+
+type JsonObject = Record<string, unknown>;
+
+export interface MediaTools {
+  ffmpeg: string;
+  ffprobe: string;
+  ffmpegVersion: string;
+  ffprobeVersion: string;
+}
+
+interface CaptureClip {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface ProbeResult {
+  codec: string;
+  codecTag: string | null;
+  pixelFormat: string | null;
+  container: string | null;
+  width: number | null;
+  height: number | null;
+  frameRate: string | null;
+  frameCount: number | null;
+  durationSeconds: number | null;
+  probedBytes: number | null;
+  fastStart?: boolean;
+}
 
 export const RECORDING_LIMITS = Object.freeze({
   fps: 30,
@@ -24,19 +58,19 @@ export const RECORDING_LIMITS = Object.freeze({
   maxMediaAuxiliaryTimeoutMs: 30_000,
 });
 
-export function recordingStopTimeoutMs(targetDurationMs) {
+export function recordingStopTimeoutMs(targetDurationMs: number) {
   return derivedTimeout(targetDurationMs, RECORDING_LIMITS.stopTimeoutMs, RECORDING_LIMITS.maxStopTimeoutMs, 0.5);
 }
 
-export function mediaStageTimeoutMs(targetDurationMs) {
+export function mediaStageTimeoutMs(targetDurationMs: number) {
   return derivedTimeout(targetDurationMs, RECORDING_LIMITS.mediaStageTimeoutMs, RECORDING_LIMITS.maxMediaStageTimeoutMs, 1);
 }
 
-export function mediaAuxiliaryTimeoutMs(targetDurationMs) {
+export function mediaAuxiliaryTimeoutMs(targetDurationMs: number) {
   return derivedTimeout(targetDurationMs, RECORDING_LIMITS.mediaStageTimeoutMs, RECORDING_LIMITS.maxMediaAuxiliaryTimeoutMs, 0.25);
 }
 
-export function representativeFrameIndices(frameCount, limit = RECORDING_LIMITS.maxFrames) {
+export function representativeFrameIndices(frameCount: number, limit = RECORDING_LIMITS.maxFrames) {
   const total = Math.max(1, Math.trunc(frameCount));
   const count = Math.min(total, Math.max(1, Math.trunc(limit)));
   if (count === 1) return new Set([0]);
@@ -47,7 +81,9 @@ export function representativeFrameIndices(frameCount, limit = RECORDING_LIMITS.
 }
 
 export class LabInteractRecordingError extends Error {
-  constructor(code, message, details = {}) {
+  details: JsonObject;
+  code: string;
+  constructor(code: string, message: string, details: JsonObject = {}) {
     super(message);
     this.name = "LabInteractRecordingError";
     this.code = code;
@@ -61,7 +97,13 @@ export async function checkMediaCapabilities({
   requireH264 = true,
   processRunner = new ProcessRunner(),
   signal,
-} = {}) {
+}: {
+  ffmpeg?: string;
+  ffprobe?: string;
+  requireH264?: boolean;
+  processRunner?: ProcessRunner;
+  signal?: AbortSignal;
+} = {}): Promise<MediaTools> {
   let encoderCheck;
   try {
     encoderCheck = await processRunner.run(ffmpeg, ["-hide_banner", "-encoders"], { timeoutMs: 5_000, signal });
@@ -88,7 +130,15 @@ export async function checkMediaCapabilities({
 // Chrome's screencast timestamps describe compositor events, not a complete video timeline.
 // This recorder deliberately uses one authority: cumulative elapsed monotonic wall time mapped
 // to 30 FPS slots. Each slot receives the newest acknowledged CDP frame, and any reuse is counted.
-export async function createWallClockRecorder({ page, outputPath, clip, scale, tools, maxDurationMs, timeoutMs = 15_000 }) {
+export async function createWallClockRecorder({ page, outputPath, clip, scale, tools, maxDurationMs, timeoutMs = 15_000 }: {
+  page: Page;
+  outputPath: string;
+  clip: CaptureClip;
+  scale: number;
+  tools: MediaTools;
+  maxDurationMs: number;
+  timeoutMs?: number;
+}) {
   const fps = RECORDING_LIMITS.fps;
   const client = await page.createCDPSession();
   const viewport = page.viewport?.() || { deviceScaleFactor: 1 };
@@ -100,24 +150,28 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
     height: Math.max(2, Math.round(clip.height * dpr)),
   };
   const encoder = createPngMp4Encoder({ outputPath, fps, crop, scale, tools });
-  let currentFrame = null;
+  let currentFrame: Buffer|null = null;
   let currentFrameId = 0;
   let rawEvents = 0;
   let recordingEvents = 0;
-  let firstChromeTimestamp = null;
-  let lastChromeTimestamp = null;
+  let firstChromeTimestamp: number|null = null;
+  let lastChromeTimestamp: number|null = null;
   let largestChromeGapMs = 0;
-  let startedNs = null;
-  let interval = null;
+  let startedNs: bigint | null = null;
+  let interval: NodeJS.Timeout | undefined;
   let stopping = false;
   let slotsQueued = 0;
-  const sourceFramesUsed = new Set();
+  const sourceFramesUsed = new Set<number>();
   const maximumSlots = Math.max(1, Math.ceil(maxDurationMs * fps / 1000));
-  let firstFrameResolve;
-  let firstFrameReject;
-  const firstFrame = new Promise((resolve, reject) => { firstFrameResolve = resolve; firstFrameReject = reject; });
+  let firstFrameResolve!: () => void;
+  let firstFrameReject!: (error: LabInteractRecordingError) => void;
+  const firstFrame = new Promise<void>((resolve, reject) => { firstFrameResolve = resolve; firstFrameReject = reject; });
 
-  const onFrame = ({ data, metadata = {}, sessionId }) => {
+  const onFrame = ({ data, metadata = {}, sessionId }: {
+    data: string;
+    metadata?: { timestamp?: number };
+    sessionId: number;
+  }) => {
     void client.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
     if (stopping) return;
     const buffer = Buffer.from(data || "", "base64");
@@ -149,14 +203,16 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
     throw error;
   }
 
-  const queueElapsedSlots = (nowNs = process.hrtime.bigint()) => {
-    if (startedNs == null || stopping || !currentFrame) return;
-    const elapsedMs = Math.min(maxDurationMs, Number(nowNs - startedNs) / 1e6);
+  const queueElapsedSlots = (nowNs: bigint = process.hrtime.bigint()) => {
+    const startNs = startedNs;
+    const frame = currentFrame;
+    if (startNs == null || stopping || !frame) return;
+    const elapsedMs = Math.min(maxDurationMs, Number(nowNs - startNs) / 1e6);
     const due = Math.min(maximumSlots, Math.max(1, Math.ceil(elapsedMs * fps / 1000)));
     while (slotsQueued < due) {
       // The interval cannot await backpressure, but it must still observe a
       // failed encoder immediately enough to avoid an unhandled rejection.
-      void encoder.write(currentFrame).catch(() => {});
+      void encoder.write(frame).catch(() => {});
       sourceFramesUsed.add(currentFrameId);
       slotsQueued += 1;
     }
@@ -174,9 +230,10 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       if (startedNs == null) this.start();
       clearInterval(interval);
       const stoppedNs = process.hrtime.bigint();
+      const startNs = startedNs!;
       const wallDurationMs = Math.min(
         maxDurationMs,
-        Math.max(1, Number(stoppedNs - startedNs) / 1e6),
+        Math.max(1, Number(stoppedNs - startNs) / 1e6),
       );
       queueElapsedSlots(stoppedNs);
       stopping = true;
@@ -189,7 +246,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
         }
         const encodedFrames = Math.max(1, Math.ceil(wallDurationMs * fps / 1000));
         while (slotsQueued < encodedFrames) {
-          void encoder.write(currentFrame).catch(() => {});
+          void encoder.write(currentFrame!).catch(() => {});
           sourceFramesUsed.add(currentFrameId);
           slotsQueued += 1;
         }
@@ -236,8 +293,14 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   };
 }
 
-export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, tools }) {
-  const filters = [];
+export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, tools }: {
+  outputPath: string;
+  fps: number;
+  crop?: CaptureClip | null;
+  scale?: number;
+  tools: MediaTools;
+}) {
+  const filters: string[] = [];
   if (crop) filters.push(`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}`);
   if (scale !== 1) filters.push(`scale=ceil(iw*${scale}/2)*2:ceil(ih*${scale}/2)*2`);
   filters.push("pad=ceil(iw/2)*2:ceil(ih/2)*2");
@@ -249,28 +312,28 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4000); });
   let tail = Promise.resolve();
-  let spawnFailure = null;
-  let writeFailure = null;
+  let spawnFailure: Error|null = null;
+  let writeFailure: Error|null = null;
   // ChildProcess emits `error` (rather than a normal non-zero close) when the
   // executable cannot be started. Always observe it so a post-capability-check
   // launch failure rejects this recording instead of crashing the daemon.
   child.on("error", (error) => { spawnFailure = error; });
   child.stdin.on("error", (error) => { writeFailure = error; });
   return {
-    write(buffer) {
+    write(buffer: Buffer) {
       tail = tail.then(async () => {
         if (spawnFailure) throw encoderSpawnError(spawnFailure);
         if (writeFailure) throw encoderInputError(writeFailure);
         if (child.exitCode != null || child.signalCode != null) {
           throw encoderExitError(child.exitCode, child.signalCode, stderr);
         }
-        if (!child.stdin.write(buffer)) {
+        if (!child.stdin.write(new Uint8Array(buffer))) {
           await waitForEncoderDrain(child, () => stderr, () => spawnFailure);
         }
       });
       return tail;
     },
-    async finish(timeoutMs = 45_000) {
+    async finish(timeoutMs: number = 45_000) {
       await tail;
       if (spawnFailure) throw encoderSpawnError(spawnFailure);
       if (writeFailure) throw encoderInputError(writeFailure);
@@ -297,6 +360,15 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
 export async function finalizeMp4Artifacts({
   mp4Path, framesDir, contactSheetPath, targetDurationMs, tools, frameDiagnostics,
   processRunner = new ProcessRunner(), signal,
+}: {
+  mp4Path: string;
+  framesDir: string;
+  contactSheetPath: string;
+  targetDurationMs: number;
+  tools: MediaTools;
+  frameDiagnostics: JsonObject;
+  processRunner?: ProcessRunner;
+  signal?: AbortSignal;
 }) {
   const stat = safeStat(mp4Path);
   if (!stat || stat.size === 0) throw new LabInteractRecordingError("recordingEmpty", "FFmpeg produced no MP4 recording bytes.");
@@ -338,15 +410,15 @@ export async function finalizeMp4Artifacts({
   };
 }
 
-function representativeFrameNames(framesDir) {
+function representativeFrameNames(framesDir: string) {
   return fs.readdirSync(framesDir).filter((name) => /^frame-\d+\.png$/.test(name)).sort().slice(0, RECORDING_LIMITS.maxFrames);
 }
 
-export function removePartialRecording(paths) {
+export function removePartialRecording(paths: string[]) {
   for (const value of paths || []) if (value) fs.rmSync(value, { recursive: true, force: true });
 }
 
-async function probeMedia(file, ffprobe, expectedCodec, label, processRunner, signal) {
+async function probeMedia(file: string, ffprobe: string, expectedCodec: string, label: string, processRunner: ProcessRunner, signal?: AbortSignal): Promise<ProbeResult> {
   let result;
   try {
     result = await processRunner.run(ffprobe, [
@@ -358,25 +430,28 @@ async function probeMedia(file, ffprobe, expectedCodec, label, processRunner, si
     throw new LabInteractRecordingError("mediaProbeFailed", `ffprobe could not inspect the ${label}: ${conciseProcessError(error)}`);
   }
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProbeFailed", conciseToolFailure(`ffprobe rejected the ${label}`, result));
-  let parsed;
-  try { parsed = JSON.parse(result.stdout); } catch { throw new LabInteractRecordingError("mediaProbeFailed", "ffprobe returned invalid JSON."); }
-  const stream = parsed.streams?.[0] || {};
+  let parsed: unknown;
+  try { parsed = JSON.parse(result.stdout) as unknown; } catch { throw new LabInteractRecordingError("mediaProbeFailed", "ffprobe returned invalid JSON."); }
+  if (!isJsonObject(parsed)) throw new LabInteractRecordingError("mediaProbeFailed", "ffprobe returned an invalid payload.");
+  const streams = Array.isArray(parsed.streams) ? parsed.streams : [];
+  const stream = isJsonObject(streams[0]) ? streams[0] : {};
+  const format = isJsonObject(parsed.format) ? parsed.format : {};
   if (stream.codec_name !== expectedCodec) throw new LabInteractRecordingError("mediaProbeFailed", `Expected ${expectedCodec} ${label}, received ${stream.codec_name || "an unknown codec"}.`);
   return {
-    codec: stream.codec_name,
-    codecTag: stream.codec_tag_string || null,
-    pixelFormat: stream.pix_fmt || null,
-    container: parsed.format?.format_name || null,
+    codec: String(stream.codec_name),
+    codecTag: typeof stream.codec_tag_string === "string" ? stream.codec_tag_string : null,
+    pixelFormat: typeof stream.pix_fmt === "string" ? stream.pix_fmt : null,
+    container: typeof format.format_name === "string" ? format.format_name : null,
     width: Number(stream.width) || null,
     height: Number(stream.height) || null,
-    frameRate: stream.r_frame_rate || null,
-    frameCount: /^\d+$/.test(stream.nb_read_frames || "") ? Number(stream.nb_read_frames) : null,
-    durationSeconds: Number(parsed.format?.duration) || null,
-    probedBytes: Number(parsed.format?.size) || null,
+    frameRate: typeof stream.r_frame_rate === "string" ? stream.r_frame_rate : null,
+    frameCount: /^\d+$/.test(String(stream.nb_read_frames ?? "")) ? Number(stream.nb_read_frames) : null,
+    durationSeconds: Number(format.duration) || null,
+    probedBytes: Number(format.size) || null,
   };
 }
 
-async function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaStageTimeoutMs, processRunner = new ProcessRunner(), signal) {
+async function runTool(command: string, args: string[], label: string, timeoutMs: number = RECORDING_LIMITS.mediaStageTimeoutMs, processRunner = new ProcessRunner(), signal?: AbortSignal) {
   let result;
   try {
     result = await processRunner.run(command, args, { timeoutMs, signal });
@@ -386,8 +461,8 @@ async function runTool(command, args, label, timeoutMs = RECORDING_LIMITS.mediaS
   if (result.status !== 0) throw new LabInteractRecordingError("mediaProcessingFailed", conciseToolFailure(`${label} failed`, result));
 }
 
-function waitForEncoderDrain(child, stderr, spawnFailure) {
-  return new Promise((resolve, reject) => {
+function waitForEncoderDrain(child: ChildProcessByStdio<Writable, null, Readable>, stderr: () => string, spawnFailure: () => Error | null) {
+  return new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       child.stdin.off("drain", onDrain);
       child.stdin.off("error", onError);
@@ -397,11 +472,11 @@ function waitForEncoderDrain(child, stderr, spawnFailure) {
       cleanup();
       resolve();
     };
-    const onError = (error) => {
+    const onError = (error: Error) => {
       cleanup();
       reject(spawnFailure() ? encoderSpawnError(spawnFailure()) : encoderInputError(error));
     };
-    const onClose = (code, signal) => {
+    const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
       cleanup();
       reject(spawnFailure() ? encoderSpawnError(spawnFailure()) : encoderExitError(code, signal, stderr()));
     };
@@ -411,17 +486,18 @@ function waitForEncoderDrain(child, stderr, spawnFailure) {
   });
 }
 
-async function waitForChild(child, timeoutMs, stderr, spawnFailure) {
+async function waitForChild(child: ChildProcessByStdio<Writable, null, Readable>, timeoutMs: number, stderr: () => string, spawnFailure: () => Error | null) {
   if (spawnFailure()) throw encoderSpawnError(spawnFailure());
   if (child.exitCode != null || child.signalCode != null) {
     if (child.exitCode !== 0) throw encoderExitError(child.exitCode, child.signalCode, stderr());
     return;
   }
-  let timer;
+  let timer: NodeJS.Timeout | undefined;
   try {
+    const closed = once(child, "close") as Promise<[number | null, NodeJS.Signals | null]>;
     const [code, signal] = await Promise.race([
-      once(child, "close"),
-      new Promise((_, reject) => {
+      closed,
+      new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
           child.kill("SIGKILL");
           reject(new LabInteractRecordingError("recordingFinalizeTimeout", `Recording encoder did not finalize within ${timeoutMs}ms.`));
@@ -436,49 +512,59 @@ async function waitForChild(child, timeoutMs, stderr, spawnFailure) {
   }
 }
 
-function encoderSpawnError(error) {
+function encoderSpawnError(error: unknown) {
   return new LabInteractRecordingError(
     "mediaProcessingFailed",
-    `H.264 encoder could not start: ${String(error?.message || error || "unknown failure").trim().slice(-800)}`,
+    `H.264 encoder could not start: ${errorMessage(error)}`,
   );
 }
 
-function encoderInputError(error) {
+function encoderInputError(error: unknown) {
   return new LabInteractRecordingError(
     "mediaProcessingFailed",
-    `H.264 encoder input failed: ${String(error?.message || error || "unknown failure").trim().slice(-800)}`,
+    `H.264 encoder input failed: ${errorMessage(error)}`,
   );
 }
 
-function encoderExitError(code, signal, stderr) {
+function encoderExitError(code: number|null, signal: string|null, stderr: string) {
   return new LabInteractRecordingError(
     "mediaProcessingFailed",
     `H.264 encoder failed${signal ? ` (${signal})` : code == null ? "" : ` with exit ${code}`}: ${String(stderr || "unknown failure").trim().slice(-800)}`,
   );
 }
 
-function derivedTimeout(targetDurationMs, minimumMs, maximumMs, durationScale) {
+function derivedTimeout(targetDurationMs: number, minimumMs: number, maximumMs: number, durationScale: number) {
   const duration = Number.isFinite(targetDurationMs) && targetDurationMs > 0 ? targetDurationMs : 0;
   return Math.min(maximumMs, Math.max(minimumMs, Math.ceil(minimumMs + duration * durationScale)));
 }
 
-function conciseToolFailure(prefix, result) {
-  const detail = String(result.error?.message || result.stderr || result.stdout || "unknown failure").trim().split("\n").slice(-4).join("; ").slice(0, 800);
+function conciseToolFailure(prefix: string, result: ProcessResult) {
+  const detail = String(result.stderr || result.stdout || "unknown failure").trim().split("\n").slice(-4).join("; ").slice(0, 800);
   return `${prefix}: ${detail}`;
 }
-function conciseProcessError(error) {
-  const result = error?.result;
-  return String(result?.stderr || result?.stdout || error?.message || "unknown failure").trim().split("\n").slice(-4).join("; ").slice(0, 800);
+function conciseProcessError(error: unknown) {
+  const result = error instanceof ProcessRunnerError ? error.result : null;
+  const message = error instanceof Error ? error.message : error;
+  return String(result?.stderr || result?.stdout || message || "unknown failure").trim().split("\n").slice(-4).join("; ").slice(0, 800);
 }
-function firstLine(value) { return String(value || "").split("\n").find(Boolean) || ""; }
-function safeStat(file) { try { return fs.statSync(file); } catch { return null; } }
-function hasFastStart(file) {
+function firstLine(value: unknown) { return String(value || "").split("\n").find(Boolean) || ""; }
+function safeStat(file: fs.PathLike) { try { return fs.statSync(file); } catch { return null; } }
+function hasFastStart(file: fs.PathOrFileDescriptor) {
   const bytes = fs.readFileSync(file);
-  const moov = bytes.indexOf(Buffer.from("moov"));
-  const mdat = bytes.indexOf(Buffer.from("mdat"));
+  const moov = bytes.indexOf("moov");
+  const mdat = bytes.indexOf("mdat");
   return moov >= 0 && mdat >= 0 && moov < mdat;
 }
-function readPngDimensions(buffer) {
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : error;
+  return String(message || "unknown failure").trim().slice(-800);
+}
+function readPngDimensions(buffer: Buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 24 || buffer.toString("ascii", 1, 4) !== "PNG") throw new LabInteractRecordingError("contactSheetInvalid", "Contact sheet is not a valid PNG.");
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }

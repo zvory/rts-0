@@ -5,9 +5,9 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
-import { LabInteractService } from "../scripts/lab-interact/command_service.mjs";
-import { PrivateServer, privateLoopbackUrl } from "../scripts/lab-interact/private_server.mjs";
-import { ProcessRunner } from "../scripts/lab-interact/process_runner.mjs";
+import { LabInteractService } from "../scripts/lab-interact/command_service.ts";
+import { PrivateServer, privateLoopbackUrl } from "../scripts/lab-interact/private_server.ts";
+import { ProcessRunner } from "../scripts/lab-interact/process_runner.ts";
 
 const holdOpen = "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)";
 

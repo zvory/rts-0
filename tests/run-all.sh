@@ -67,6 +67,7 @@ RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
 RUN_WASM_TRI_STATE="${RTS_RUN_WASM_TRI_STATE:-1}"
+NODE_DEPS_READY=0
 BROWSER_SCENARIOS="smoke,phase-0.5,phase-2.5,phase-5,phase-3.5,phase-4.5,phase-6"
 VERBOSE=0
 case "${RTS_RUN_TRI_STATE_BROWSER:-}" in
@@ -125,10 +126,11 @@ else
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "node not found on PATH — the API suites need Node >= 22 (built-in WebSocket)." >&2
+  echo "node not found on PATH — Node/static and browser suites require Node 22.18 or newer." >&2
   exit 2
 fi
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+NODE_VERSION="$(node -p 'process.versions.node' 2>/dev/null || echo 0.0.0)"
+IFS=. read -r NODE_MAJOR NODE_MINOR _NODE_PATCH <<< "$NODE_VERSION"
 
 alloc_port() {
   node <<'EOF'
@@ -178,8 +180,10 @@ info() { [ "$VERBOSE" = "1" ] && printf '%s\n' "$1"; }
 warn() { printf '%s! %s%s\n' "$YEL" "$1" "$RST"; }
 elapsed_since() { printf '%ss' "$((SECONDS - $1))"; }
 
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  warn "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
+if { [ "$RUN_STATIC_JS" = "1" ] || [ "$RUN_LIVE_NODE" = "1" ] || [ "$RUN_CLIENT" = "1" ]; } &&
+   { [ "${NODE_MAJOR:-0}" -lt 22 ] || { [ "${NODE_MAJOR:-0}" -eq 22 ] && [ "${NODE_MINOR:-0}" -lt 18 ]; }; }; then
+  echo "Node $NODE_VERSION detected; Node/static and browser suites require Node 22.18 or newer." >&2
+  exit 2
 fi
 
 RTS_NODE_DEPS_CACHE_DIR="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"
@@ -472,7 +476,7 @@ hydrate_client_deps() {
   ready="$cache_dir/.ready"
   lock_dir="$cache_dir.lock"
 
-  if [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ]; then
+  if [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ] || [ ! -d "$cache_node_modules/typescript" ] || [ ! -d "$cache_node_modules/@types/node" ]; then
     mkdir -p "$RTS_NODE_DEPS_CACHE_DIR" 2>/dev/null || {
       warn "client smoke dependencies cannot be hydrated: could not create $RTS_NODE_DEPS_CACHE_DIR"
       return 1
@@ -481,7 +485,7 @@ hydrate_client_deps() {
     start=$SECONDS
     deadline=$((SECONDS + 180))
     while ! mkdir "$lock_dir" 2>/dev/null; do
-      if [ -f "$ready" ] && [ -d "$cache_node_modules/puppeteer-core" ]; then
+      if [ -f "$ready" ] && [ -d "$cache_node_modules/puppeteer-core" ] && [ -d "$cache_node_modules/typescript" ] && [ -d "$cache_node_modules/@types/node" ]; then
         break
       fi
       if [ "$SECONDS" -ge "$deadline" ]; then
@@ -491,7 +495,7 @@ hydrate_client_deps() {
       info "waiting for client dependency cache lock: $lock_dir"
       sleep 1
     done
-    if [ -d "$lock_dir" ] && { [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ]; }; then
+    if [ -d "$lock_dir" ] && { [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ] || [ ! -d "$cache_node_modules/typescript" ] || [ ! -d "$cache_node_modules/@types/node" ]; }; then
       lock_acquired=1
     fi
 
@@ -538,8 +542,8 @@ hydrate_client_deps() {
     fi
   fi
 
-  if [ ! -d "$cache_node_modules/puppeteer-core" ]; then
-    warn "client smoke dependencies cannot be hydrated: cache missing puppeteer-core at $cache_node_modules"
+  if [ ! -d "$cache_node_modules/puppeteer-core" ] || [ ! -d "$cache_node_modules/typescript" ] || [ ! -d "$cache_node_modules/@types/node" ]; then
+    warn "Node dependencies cannot be hydrated: cache is missing puppeteer-core, TypeScript, or Node typings at $cache_node_modules"
     return 1
   fi
 
@@ -692,6 +696,16 @@ else
 fi
 
 if [ "$RUN_STATIC_JS" = "1" ]; then
+  deps_start=$SECONDS
+  if hydrate_client_deps; then
+    NODE_DEPS_READY=1
+    record_timing "Node dependency hydration" "$((SECONDS - deps_start))" "PASS"
+    run_suite_bg "TypeScript: Lab Interact no-emit" \
+      npm --prefix "$REPO_ROOT" run check:lab-interact-types
+  else
+    record_timing "Node dependency hydration" "$((SECONDS - deps_start))" "FAIL"
+    FAILED+=("Node dependency hydration" "TypeScript: Lab Interact no-emit")
+  fi
   run_suite_bg "Architecture: Lab Interact application" \
     node "$REPO_ROOT/scripts/check-lab-interact-architecture.mjs"
   run_suite_bg "JS protocol contracts" \
@@ -789,7 +803,8 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       SKIPPED+=("Tri-state lag scenarios (no Chrome)")
     else
       deps_start=$SECONDS
-      if hydrate_client_deps; then
+      if [ "$NODE_DEPS_READY" = "1" ] || hydrate_client_deps; then
+        NODE_DEPS_READY=1
         record_timing "Client dependency hydration" "$((SECONDS - deps_start))" "PASS"
       else
         record_timing "Client dependency hydration" "$((SECONDS - deps_start))" "FAIL"
