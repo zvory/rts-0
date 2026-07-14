@@ -1024,6 +1024,23 @@ mod tests {
     }
 
     #[test]
+    fn artillery_uses_soft_target_damage_and_targeting_policy() {
+        assert!(!is_armored(EntityKind::Artillery));
+        assert_eq!(
+            effective_damage(EntityKind::Rifleman, EntityKind::Artillery, 40, None),
+            40
+        );
+        assert_eq!(
+            default_weapon_target_fit(
+                WeaponClass::SmallArms,
+                armor_class(EntityKind::Artillery),
+                target_threat_role(EntityKind::Artillery),
+            ),
+            WeaponTargetFit::PreferredSoft
+        );
+    }
+
+    #[test]
     fn entrenched_direct_damage_reduces_only_eligible_infantry() {
         assert_eq!(
             direct_damage_after_entrenchment(EntityKind::Rifleman, 100, true),
