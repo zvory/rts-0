@@ -20,7 +20,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, BuildPhase,
-    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order, WeaponSetup,
+    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -48,6 +48,9 @@ mod formation;
 #[cfg(test)]
 mod pathing_budget_tests;
 mod rally;
+mod support_weapon;
+
+use support_weapon::begin_weapon_teardown_for_movement;
 
 #[cfg(test)]
 use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
@@ -1116,32 +1119,6 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
                 0.0
             };
             (dx * dx + dy * dy).sqrt()
-        }
-    }
-}
-
-fn begin_weapon_teardown_for_movement(e: &mut crate::game::entity::Entity) {
-    let teardown_ticks = match e.kind {
-        EntityKind::MachineGunner => config::MACHINE_GUNNER_SETUP_TICKS,
-        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
-        EntityKind::Artillery => {
-            e.reset_artillery_accuracy();
-            e.reset_artillery_blanket_sequence();
-            config::ARTILLERY_SETUP_TICKS
-        }
-        _ => return,
-    };
-    match e.weapon_setup() {
-        WeaponSetup::Packed | WeaponSetup::TearingDown { .. } => {}
-        WeaponSetup::TearingDownToRedeploy { ticks } => {
-            e.set_pending_redeploy_facing(None);
-            e.set_weapon_setup(WeaponSetup::TearingDown { ticks });
-        }
-        WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed => {
-            e.set_pending_redeploy_facing(None);
-            e.set_weapon_setup(WeaponSetup::TearingDown {
-                ticks: teardown_ticks,
-            });
         }
     }
 }
