@@ -24,13 +24,15 @@ pub(crate) fn production_system(
 ) {
     let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
+        let active_producer = entities.get(id).is_some_and(|producer| {
+            producer.hp > 0 && producer.is_building() && !producer.under_construction()
+        });
         let repeat_request = entities.get(id).and_then(|producer| {
-            (producer.hp > 0
-                && producer.is_building()
-                && !producer.under_construction()
-                && producer.prod_queue().is_empty())
-            .then(|| (producer.owner, producer.kind, producer.repeat_production()))
-            .and_then(|(owner, producer_kind, unit)| unit.map(|unit| (owner, producer_kind, unit)))
+            (active_producer && producer.prod_queue().is_empty())
+                .then(|| (producer.owner, producer.kind, producer.repeat_production()))
+                .and_then(|(owner, producer_kind, unit)| {
+                    unit.map(|unit| (owner, producer_kind, unit))
+                })
         });
         if let Some((owner, producer_kind, unit)) = repeat_request {
             let faction_id = players
@@ -101,13 +103,18 @@ pub(crate) fn production_system(
                 }
             }
         }
-        if let Some((owner, research)) = entities.get(id).and_then(|building| {
-            building
-                .research_queue()
-                .first()
-                .filter(|item| !item.paid)
-                .map(|item| (building.owner, item.upgrade))
-        }) {
+        if let Some((owner, research)) =
+            entities
+                .get(id)
+                .filter(|_| active_producer)
+                .and_then(|building| {
+                    building
+                        .research_queue()
+                        .first()
+                        .filter(|item| !item.paid)
+                        .map(|item| (building.owner, item.upgrade))
+                })
+        {
             let definition = upgrade::definition(research);
             let cost =
                 rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
@@ -121,13 +128,18 @@ pub(crate) fn production_system(
                 }
             }
         }
-        if let Some((owner, unit)) = entities.get(id).and_then(|building| {
-            building
-                .prod_queue()
-                .first()
-                .filter(|item| !item.paid)
-                .map(|item| (building.owner, item.unit))
-        }) {
+        if let Some((owner, unit)) =
+            entities
+                .get(id)
+                .filter(|_| active_producer)
+                .and_then(|building| {
+                    building
+                        .prod_queue()
+                        .first()
+                        .filter(|item| !item.paid)
+                        .map(|item| (building.owner, item.unit))
+                })
+        {
             let cost = rules::economy::resource_cost(unit);
             let supply = rules::economy::supply_cost(unit);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
@@ -152,12 +164,7 @@ pub(crate) fn production_system(
         }
         let completed_research = {
             match entities.get_mut(id) {
-                Some(b)
-                    if b.hp > 0
-                        && b.is_building()
-                        && !b.under_construction()
-                        && !b.research_queue().is_empty() =>
-                {
+                Some(b) if active_producer && !b.research_queue().is_empty() => {
                     let owner = b.owner;
                     if let Some(queue) = b.research_queue_mut() {
                         let front = &mut queue[0];
@@ -196,14 +203,7 @@ pub(crate) fn production_system(
 
         let ready = {
             let b = match entities.get_mut(id) {
-                Some(b)
-                    if b.hp > 0
-                        && b.is_building()
-                        && !b.under_construction()
-                        && !b.prod_queue().is_empty() =>
-                {
-                    b
-                }
+                Some(b) if active_producer && !b.prod_queue().is_empty() => b,
                 _ => continue,
             };
             let owner = b.owner;
