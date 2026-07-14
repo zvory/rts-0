@@ -115,10 +115,8 @@ fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
 }
 
 pub(super) fn panzerfaust_damage_to(victim_kind: EntityKind) -> u32 {
-    crate::rules::combat::effective_damage(
-        EntityKind::Panzerfaust,
+    crate::rules::combat::panzerfaust_loaded_shot_damage(
         victim_kind,
-        config::PANZERFAUST_DAMAGE,
         Some(crate::rules::terrain::TerrainKind::Open),
     )
 }
@@ -644,11 +642,14 @@ fn panzerfaust_killed_during_post_shot_recovery_does_not_convert_after_death() {
             .get_mut(panzerfaust)
             .expect("panzerfaust exists");
         entity.set_invulnerable(false);
-        entity
+        let combat = entity
             .combat
             .as_mut()
-            .expect("panzerfaust has combat state")
-            .panzerfaust = Some(PanzerfaustState::Recovery { ticks_remaining: 1 });
+            .expect("panzerfaust has combat state");
+        combat.panzerfaust = Some(PanzerfaustState::Recovery {
+            target: 0,
+            ticks_remaining: 1,
+        });
         entity.apply_damage(u32::MAX, None);
     }
 
@@ -741,6 +742,77 @@ fn replacing_order_after_launch_spends_shot_and_resumes_movement_before_conversi
         distance_sq((converted.pos_x, converted.pos_y), start) > 4.0,
         "replacement movement should resume while the spent launcher is discarded"
     );
+}
+
+#[test]
+fn replacement_attack_after_launch_survives_conversion() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    let rifleman = spawn_unit_on_tile(&mut game, 2, EntityKind::Rifleman, 8, 10);
+    refresh_world(&mut game);
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+
+    let mut launched = false;
+    for _ in 0..40 {
+        let events = game.tick();
+        if player_events(&events, 1)
+            .iter()
+            .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }))
+        {
+            launched = true;
+            break;
+        }
+    }
+    assert!(
+        launched,
+        "test setup should launch before replacing the order"
+    );
+    enqueue_attack(&mut game, panzerfaust, rifleman, false);
+
+    for _ in 0..100 {
+        game.tick();
+        if game
+            .state
+            .entities
+            .get(panzerfaust)
+            .is_some_and(|entity| entity.kind == EntityKind::Rifleman)
+        {
+            break;
+        }
+    }
+
+    let converted = game
+        .state
+        .entities
+        .get(panzerfaust)
+        .expect("same entity id should survive conversion");
+    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert_eq!(converted.order().attack_target(), Some(rifleman));
+}
+
+#[test]
+fn conversion_preserves_rifle_cooldown() {
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    if let Some(entity) = game.state.entities.get_mut(panzerfaust) {
+        entity.set_attack_cd(12);
+        let combat = entity
+            .combat
+            .as_mut()
+            .expect("Panzerfaust should have combat state");
+        combat.panzerfaust = Some(PanzerfaustState::Recovery {
+            target: tank,
+            ticks_remaining: 1,
+        });
+    }
+
+    game.tick();
+
+    let converted = game
+        .state
+        .entities
+        .get(panzerfaust)
+        .expect("same entity id should survive conversion");
+    assert_eq!(converted.kind, EntityKind::Rifleman);
+    assert_eq!(converted.attack_cd(), 11);
 }
 
 #[test]

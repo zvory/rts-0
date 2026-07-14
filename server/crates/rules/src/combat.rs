@@ -323,13 +323,6 @@ pub fn default_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile
     default_weapon_kind(kind).and_then(weapon_profile)
 }
 
-pub fn damage_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile> {
-    match kind {
-        EntityKind::Panzerfaust => weapon_profile(WeaponKind::PanzerfaustLoadedShot),
-        _ => default_weapon_profile(kind),
-    }
-}
-
 pub fn default_target_priority_policy(kind: EntityKind) -> TargetPriorityPolicyId {
     if kind == EntityKind::Tank {
         TargetPriorityPolicyId::TankCannon
@@ -357,7 +350,7 @@ pub fn is_armored(kind: EntityKind) -> bool {
 
 /// Weapons with non-zero armor penetration count as AP threats for target ranking.
 pub fn is_ap(kind: EntityKind) -> bool {
-    damage_weapon_profile(kind).is_some_and(weapon_is_ap)
+    kind == EntityKind::Panzerfaust || default_weapon_profile(kind).is_some_and(weapon_is_ap)
 }
 
 pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
@@ -445,7 +438,7 @@ pub fn default_weapon_target_fit(
 /// against infantry-sized targets — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| miss_chance_for_weapon(profile, victim_kind))
         .unwrap_or(0.0)
 }
@@ -505,7 +498,7 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain))
         .unwrap_or_else(|| {
             effective_damage_for_weapon_class(
@@ -515,6 +508,22 @@ pub fn effective_damage(
                 victim_terrain,
             )
         })
+}
+
+pub fn panzerfaust_loaded_shot_damage(
+    victim_kind: EntityKind,
+    victim_terrain: Option<TerrainKind>,
+) -> u32 {
+    weapon_profile(WeaponKind::PanzerfaustLoadedShot)
+        .map(|profile| {
+            effective_damage_for_weapon(
+                profile,
+                victim_kind,
+                crate::balance::PANZERFAUST_DAMAGE,
+                victim_terrain,
+            )
+        })
+        .unwrap_or(0)
 }
 
 pub fn effective_damage_for_weapon(
@@ -594,7 +603,7 @@ pub fn facing_damage_multiplier(
     victim_kind: EntityKind,
     facing: ArmorFacing,
 ) -> f32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| facing_damage_multiplier_for_weapon(profile, victim_kind, facing))
         .unwrap_or(1.0)
 }
@@ -627,7 +636,7 @@ pub fn effective_damage_with_facing(
     victim_pos: (f32, f32),
     attacker_pos: (f32, f32),
 ) -> u32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| {
             effective_damage_with_facing_for_weapon(
                 profile,
@@ -939,8 +948,13 @@ mod tests {
             weapon_profile(WeaponKind::RiflemanRifle)
         );
         assert_eq!(
-            damage_weapon_profile(EntityKind::Panzerfaust),
-            Some(panzerfaust)
+            panzerfaust_loaded_shot_damage(EntityKind::Tank, None),
+            effective_damage_for_weapon(
+                panzerfaust,
+                EntityKind::Tank,
+                crate::balance::PANZERFAUST_DAMAGE,
+                None,
+            )
         );
     }
 
@@ -1080,34 +1094,19 @@ mod tests {
             facing_damage_multiplier(EntityKind::Panzerfaust, EntityKind::Tank, ArmorFacing::Rear),
             1.0
         );
+        assert_eq!(panzerfaust_loaded_shot_damage(EntityKind::Tank, None), 63);
         assert_eq!(
             effective_damage(
-                EntityKind::Panzerfaust,
-                EntityKind::Tank,
-                crate::balance::PANZERFAUST_DAMAGE,
-                None
-            ),
-            63
-        );
-        assert_eq!(
-            effective_damage_with_facing(
                 EntityKind::Panzerfaust,
                 EntityKind::Tank,
                 crate::balance::PANZERFAUST_DAMAGE,
                 None,
-                Some(0.0),
-                (100.0, 100.0),
-                (60.0, 100.0),
             ),
-            63
+            25,
+            "kind-based damage must use the Panzerfaust carrier's default rifle profile"
         );
         assert_eq!(
-            effective_damage(
-                EntityKind::Panzerfaust,
-                EntityKind::ScoutCar,
-                crate::balance::PANZERFAUST_DAMAGE,
-                None
-            ),
+            panzerfaust_loaded_shot_damage(EntityKind::ScoutCar, None),
             100
         );
     }

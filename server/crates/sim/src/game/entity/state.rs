@@ -334,6 +334,8 @@ pub enum PanzerfaustState {
         ticks_remaining: u32,
     },
     Recovery {
+        #[serde(default)]
+        target: u32,
         ticks_remaining: u16,
     },
 }

@@ -67,8 +67,20 @@ pub(in crate::game::services::combat) fn tick_states(
                 (impact_x, impact_y),
                 ticks_remaining,
             ),
-            PanzerfaustState::Recovery { ticks_remaining } => {
-                tick_recovery(entities, teams, fog, smokes, events, id, ticks_remaining);
+            PanzerfaustState::Recovery {
+                target,
+                ticks_remaining,
+            } => {
+                tick_recovery(
+                    entities,
+                    teams,
+                    fog,
+                    smokes,
+                    events,
+                    id,
+                    target,
+                    ticks_remaining,
+                );
             }
         }
     }
@@ -206,12 +218,14 @@ fn tick_in_flight(
         set_panzerfaust_state(
             attacker,
             PanzerfaustState::Recovery {
+                target,
                 ticks_remaining: recovery_ticks(methamphetamines_researched(owner)),
             },
         );
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn tick_recovery(
     entities: &mut EntityStore,
     teams: &TeamRelations,
@@ -219,6 +233,7 @@ fn tick_recovery(
     smokes: &SmokeCloudStore,
     events: &mut HashMap<u32, Vec<Event>>,
     id: u32,
+    target: u32,
     ticks_remaining: u16,
 ) {
     if ticks_remaining > 1 {
@@ -226,6 +241,7 @@ fn tick_recovery(
             set_panzerfaust_state(
                 attacker,
                 PanzerfaustState::Recovery {
+                    target,
                     ticks_remaining: ticks_remaining - 1,
                 },
             );
@@ -240,7 +256,7 @@ fn tick_recovery(
     };
     let converted = entities
         .get_mut(id)
-        .is_some_and(convert_panzerfaust_to_rifleman);
+        .is_some_and(|entity| convert_panzerfaust_to_rifleman(entity, target));
     if converted {
         emit_conversion(events, fog, smokes, teams, owner, id, (x, y));
     }

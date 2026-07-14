@@ -1,4 +1,3 @@
-use crate::config;
 use crate::game::entity::{
     movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order,
 };
@@ -154,6 +153,57 @@ pub(super) fn resolve_target(
     attacker_can_fire_while_moving: bool,
     target_filter: &dyn Fn(u32) -> bool,
 ) -> Option<u32> {
+    let attacker = entities.get(self_id)?;
+    let profile = effective_attack_profile(attacker);
+    let weapon_range_px = profile.range_tiles * crate::config::TILE_SIZE as f32
+        + attacker.radius()
+        + super::RANGE_SLACK;
+    resolve_target_for_weapon(
+        map,
+        entities,
+        teams,
+        spatial,
+        los,
+        fog,
+        smokes,
+        tank_trap_obstructs_vehicle_route,
+        self_id,
+        owner,
+        px,
+        py,
+        acquire_px,
+        mode,
+        attacker_can_fire_while_moving,
+        profile
+            .weapon
+            .map(|weapon| weapon.weapon_class)
+            .unwrap_or(crate::rules::defs::WeaponClass::None),
+        weapon_range_px,
+        target_filter,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn resolve_target_for_weapon(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    spatial: &SpatialIndex,
+    los: &LineOfSight<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    acquire_px: f32,
+    mode: CombatMode,
+    attacker_can_fire_while_moving: bool,
+    attacker_weapon_class: crate::rules::defs::WeaponClass,
+    weapon_range_px: f32,
+    target_filter: &dyn Fn(u32) -> bool,
+) -> Option<u32> {
     if smokes.point_inside(px, py) {
         return None;
     }
@@ -186,17 +236,12 @@ pub(super) fn resolve_target(
     let attacker = entities.get(self_id)?;
     let context = AttackPriorityContext {
         attacker_is_unit: attacker.is_unit(),
-        attacker_weapon_class: if attacker.kind == EntityKind::Panzerfaust {
-            crate::rules::defs::WeaponClass::AntiTank
-        } else {
-            combat_rules::weapon_class(attacker.kind)
-        },
+        attacker_weapon_class,
         policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };
     let attacker_is_vehicle_body =
         movement_body_class(attacker.kind) == MovementBodyClass::VehicleBody;
-    let weapon_range_px = weapon_range_px(attacker);
     let candidates = legal_target_candidates(
         map,
         entities,
@@ -251,19 +296,6 @@ fn aggressive_auto_acquisition_prefers_currently_fireable_targets(mode: CombatMo
 fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {
     !(movement_body_class(attacker) == MovementBodyClass::InfantryLike
         && target.kind == EntityKind::TankTrap)
-}
-
-fn weapon_range_px(attacker: &Entity) -> f32 {
-    if attacker.kind == EntityKind::Panzerfaust {
-        return entrenchment_combat::attack_range_tiles(
-            attacker,
-            config::PANZERFAUST_RANGE_TILES as f32,
-        ) * config::TILE_SIZE as f32
-            + attacker.radius()
-            + super::RANGE_SLACK;
-    }
-    let profile = effective_attack_profile(attacker);
-    profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + super::RANGE_SLACK
 }
 
 #[allow(clippy::too_many_arguments)]

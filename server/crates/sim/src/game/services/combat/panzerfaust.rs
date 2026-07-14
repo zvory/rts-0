@@ -7,9 +7,8 @@ use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
 use super::acquisition::{
-    combat_mode_with_moving_fire, direct_fire_target_legal,
-    resolve_target as resolve_target_with_obstruction, CombatMode, DirectFireLegality,
-    DirectFireVisibility,
+    combat_mode_with_moving_fire, direct_fire_target_legal, resolve_target_for_weapon, CombatMode,
+    DirectFireLegality, DirectFireVisibility,
 };
 use super::chase::{chase_goal_for_target, chase_path_needs_refresh};
 use super::weapons::mirror_weapon_to_body;
@@ -85,7 +84,8 @@ fn handle_loaded_combat(
 
     let los = LineOfSight::with_smoke(map, smokes);
     let target = resolve_panzerfaust_target(
-        map, entities, teams, occ, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
+        map, entities, teams, occ, spatial, &los, fog, smokes, id, owner, px, py, range_px,
+        acquire_px, mode,
     );
     let Some(target) = target else {
         return false;
@@ -195,6 +195,7 @@ fn resolve_panzerfaust_target(
     owner: u32,
     px: f32,
     py: f32,
+    range_px: f32,
     acquire_px: f32,
     mode: CombatMode,
 ) -> Option<u32> {
@@ -210,7 +211,7 @@ fn resolve_panzerfaust_target(
     let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
         occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
     };
-    resolve_target_with_obstruction(
+    resolve_target_for_weapon(
         map,
         entities,
         teams,
@@ -226,6 +227,8 @@ fn resolve_panzerfaust_target(
         acquire_px,
         mode,
         false,
+        crate::rules::defs::WeaponClass::AntiTank,
+        range_px,
         &|target_id| panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target_id),
     )
 }
@@ -262,8 +265,8 @@ fn set_panzerfaust_state(entity: &mut Entity, state: PanzerfaustState) {
     }
 }
 
-fn convert_panzerfaust_to_rifleman(entity: &mut Entity) -> bool {
-    convert_panzerfaust_entity(entity)
+fn convert_panzerfaust_to_rifleman(entity: &mut Entity, completed_target: u32) -> bool {
+    convert_panzerfaust_entity(entity, completed_target)
 }
 
 fn panzerfaust_range_tiles(attacker: &Entity) -> f32 {
