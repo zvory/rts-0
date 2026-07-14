@@ -374,16 +374,17 @@ export function _drawAntiTankGunSetupPreview(view) {
   }
 }
 
-export function _drawBreakthroughAuras(state) {
-  if (!state || typeof state.selectedEntities !== "function") return;
+export function _drawBreakthroughAuras(view) {
+  if (!view || typeof view.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const definition = ABILITIES[ABILITY.BREAKTHROUGH];
   const tileSize = (this._map && this._map.tileSize) || 32;
   const radiusPx = (definition?.radiusTiles || 0) * tileSize;
   if (radiusPx <= 0) return;
 
-  for (const e of state.selectedEntities()) {
+  for (const e of view.selectedEntities()) {
     if (e.kind !== KIND.COMMAND_CAR) continue;
+    if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
     const active = breakthroughAuraExpiresIn(e) > 0;
     drawBreakthroughAura(g, e.x, e.y, radiusPx, active ? 0.78 : 0.32);
   }

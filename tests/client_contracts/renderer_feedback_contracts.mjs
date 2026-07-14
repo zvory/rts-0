@@ -163,6 +163,31 @@ function nearPoint(call, point, epsilon = 0.001) {
     !unselectedAuraGfx.calls.some((call) => call[0] === "drawCircle"),
     "unselected Command Cars do not draw their speed aura",
   );
+
+  const interpolatedCommandCar = {
+    ...selectedCommandCar,
+    x: 248,
+    abilities: [{ ability: ABILITY.BREAKTHROUGH, expiresIn: 8 }],
+  };
+  const interpolatedView = buildRendererFeedbackView(
+    { playerId: 1 },
+    { entities: [interpolatedCommandCar], selectedEntities: [selectedCommandCar] },
+  );
+  assert(
+    interpolatedView.selectedEntities()[0] === interpolatedCommandCar,
+    "selected renderer overlays use the frame-interpolated entity record",
+  );
+  const interpolatedAuraGfx = new RecordingGraphics();
+  _drawBreakthroughAuras.call(
+    { _feedbackGfx: interpolatedAuraGfx, _map: { tileSize: 32 } },
+    interpolatedView,
+  );
+  assert(
+    interpolatedAuraGfx.calls.some(
+      (call) => call[0] === "drawCircle" && call[1] === interpolatedCommandCar.x,
+    ),
+    "the selected Command Car aura stays centered on its interpolated render position",
+  );
 }
 
 {

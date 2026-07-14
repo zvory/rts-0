@@ -15,11 +15,12 @@ export function buildRendererFeedbackView(
   state,
   { clientIntent = null, entities = EMPTY_ARRAY, selectedEntities = null, now = defaultNow() } = {},
 ) {
-  const selected = Array.isArray(selectedEntities)
+  const selectedStateEntities = Array.isArray(selectedEntities)
     ? selectedEntities
     : typeof state?.selectedEntities === "function"
     ? arrayOrEmpty(state.selectedEntities())
     : EMPTY_ARRAY;
+  const selected = selectRenderedEntities(entities, selectedStateEntities);
   const entityLookup = buildEntityLookup(entities, selected);
   const intent = clientIntent || null;
   const controlOwner = buildControlOwnerReadModel(state, selected);
@@ -148,6 +149,22 @@ function liveArray(state, method, now) {
 
 function arrayOrEmpty(value) {
   return Array.isArray(value) ? value : EMPTY_ARRAY;
+}
+
+function selectRenderedEntities(entities, selectedEntities) {
+  if (!Array.isArray(entities) || entities.length === 0 || selectedEntities.length === 0) {
+    return selectedEntities;
+  }
+  const renderedById = new Map();
+  addEntities(renderedById, entities);
+  let remapped = false;
+  const selected = selectedEntities.map((entity) => {
+    const rendered = renderedById.get(entity?.id);
+    if (!rendered) return entity;
+    if (rendered !== entity) remapped = true;
+    return rendered;
+  });
+  return remapped ? selected : selectedEntities;
 }
 
 function buildEntityLookup(entities, selectedEntities) {
