@@ -1759,11 +1759,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
   `1px` clearance), matching the authoritative oriented vehicle body used for collision and
   click targeting.
-- Terrain: muted grass/field/mud, rock, water, and dark charcoal-brown road tiles with deterministic
+- Terrain: muted grass/field/mud, rock, water, and deep charcoal-brown road tiles with deterministic
   coarse dithering so movement is readable and the map has a PlayStation 1-era low-resolution
-  texture feel. Road uses one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW
-  diagonal tiles with a simple yellow center-line segment. Authors intersperse marked tiles among
-  bare centerline tiles to form dashed markings while bare road tiles fill the surrounding surface.
+  texture feel. Every road side exposed to non-road terrain has a narrow brown earth shoulder with
+  deterministic chips that break up the boundary without softening it into a modern blur. Road uses
+  one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW diagonal tiles with a simple
+  yellow center-line segment. Authors intersperse marked tiles among bare centerline tiles to form
+  dashed markings while bare road tiles fill the surrounding surface.
 - Local lab visual profiles may pass renderer-only static samples to `Renderer.render`. Static
   trench samples draw on the local visual-samples layer, labels draw as world-anchored Pixi text
   above the fog overlay, and neither path writes to `GameState`, snapshots, fog-source entity lists,
