@@ -69,7 +69,7 @@ function checkRegistry() {
   expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown", "game-open"]);
   expectMetadata("startup timeout", "timeoutClass", "startup", ["open", "game-open"]);
   expectMetadata("lifecycle/media timeout", "timeoutClass", "lifecycle-media", [
-    "close", "shutdown", "record-stop", "record-wait", "capture-fixed",
+    "close", "shutdown", "record-stop", "record-wait", "capture-fixed", "game-capture-timelapse",
   ]);
 }
 

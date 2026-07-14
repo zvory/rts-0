@@ -74,6 +74,13 @@ const babylonDriver = new InteractDriver({ workspaceRoot: root, renderer: "babyl
 babylonDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 babylonDriver.workspace = workspace;
 assert.equal(new URL(babylonDriver.launchUrl()).searchParams.get("rtsRenderer"), "babylon", "Interact can launch the explicit Babylon route");
+const spectatorDriver = new InteractDriver({ workspaceRoot: root, mode: "game", spectate: ["ai_2_1", "ai_turtle"] });
+spectatorDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
+spectatorDriver.workspace = workspace;
+const spectatorUrl = new URL(spectatorDriver.launchUrl());
+assert.equal(spectatorUrl.searchParams.get("rtsRole"), "spectator", "AI-vs-AI Interact uses the ordinary spectator launch role");
+assert.deepEqual(spectatorUrl.searchParams.getAll("rtsAi"), ["1:ai_2_1", "2:ai_turtle"], "AI-vs-AI Interact fills exactly two opposing AI seats");
+assert.equal(spectatorUrl.searchParams.has("rtsName"), false, "AI-vs-AI Interact does not create a player seat");
 
 assert.equal(transitionDriverState(DRIVER_STATES.OPENING, "opened"), DRIVER_STATES.OPEN, "driver opens once");
 assert.equal(transitionDriverState(DRIVER_STATES.OPEN, "closing"), DRIVER_STATES.CLOSING, "driver closes from open");

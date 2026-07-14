@@ -1,7 +1,7 @@
 import { validatorFor } from "./command_inputs.ts";
 import type { CommandInput } from "./command_inputs.ts";
 import {
-  RECORDING_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
+  MEDIA_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
 } from "./runtime.ts";
 
 export type CommandScope = "daemon" | "session";
@@ -151,7 +151,7 @@ const COMMAND_RECORDS = Object.freeze({
   "record-wait": descriptor("Wait for the current recording to finalize without blocking other session commands.", "{sessionId:string}", {
     lane: "observation", timeoutClass: "lifecycle-media", recordable: false,
     variants: ["active and finalizing recordings share one completion", "a completed current recording returns its last result", "completion includes the same Tailnet preview URLs as record-stop"],
-    bounds: ["a recording must have been started in the current session", "recording-only IPC timeout is capped at 420 seconds"],
+    bounds: ["a recording must have been started in the current session", "media IPC timeout is capped at 540 seconds"],
     example: { sessionId: "<lab-session-id>" },
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence and return a Tailnet video preview.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
@@ -159,19 +159,20 @@ const COMMAND_RECORDS = Object.freeze({
     defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
-  "capture-cancel": descriptor("Request cancellation of the active fixed-step capture.", "{sessionId:string}", {
+  "capture-cancel": descriptor("Request cancellation of the active fixed-step or time-lapse capture.", "{sessionId:string}", {
     lane: "cancellation", recordable: false,
-    bounds: ["an active fixed capture is required"], example: { sessionId: "<lab-session-id>" },
+    bounds: ["an active fixed or time-lapse capture is required"], example: { sessionId: "<session-id>" },
   }),
-  "game-open": descriptor("Open or recover one isolated normal human-vs-AI match.", "{workspaceRoot?:string,map?:string,opponent?:\"ai_2_1\"|\"ai_turtle\",renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
+  "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
+    variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats"],
     defaults: ["workspaceRoot=current worktree", "map=Default", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab and game", "one local player and one AI opponent", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
-    example: { opponent: "ai_2_1", viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
+    bounds: ["one session across Lab and game", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    example: { spectate: ["ai_2_1", "ai_turtle"], viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
     lane: "observation",
-    defaults: ["ids/kinds=unfiltered", "ownership=owned", "cameraViewport=false", "limit=25"],
+    defaults: ["ids/kinds=unfiltered", "ownership=owned for players and visible for spectators", "cameraViewport=false", "limit=25"],
     bounds: ["0-400 unique ids", "0-32 kinds", "limit 1-400", "only the normal recipient's fog-filtered snapshot is inspectable"],
     example: { sessionId: "<game-session-id>", ownership: "owned", limit: 25 },
   }),
@@ -187,23 +188,30 @@ const COMMAND_RECORDS = Object.freeze({
     example: { sessionId: "<game-session-id>" },
   }),
   "game-camera": descriptor("Set the camera or focus bounded visible entity ids.", "{sessionId:string,camera:game-camera-command}", {
-    variants: ["focus {action,entities,padding?}", "set {action,snapshot:CameraSnapshotV1}"],
+    variants: ["focus {action,entities,padding?}", "overview {action,padding?} fits the whole map and disables auto-spectator camera movement", "set {action,snapshot:CameraSnapshotV1}"],
     defaults: ["focus.padding=32 for one unit, otherwise 48"],
     bounds: ["focus 1-400 unique ids", "padding 0-1024", "snapshot framingScale >0 and <=16"],
     example: { sessionId: "<game-session-id>", camera: { action: "focus", entities: [42] } },
   }),
-  "game-screenshot": descriptor("Capture a readiness-checked match PNG with UI visible by default.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport,subjects?:u32[]}", {
-    variants: ["presentation=normal retains the HUD and overlays", "presentation=clean captures only the rendered battlefield", "response.preview.url is the user-delivery URL"],
-    defaults: ["name=game", "presentation=normal", "viewport=current", "subjects=[]"],
+  "game-screenshot": descriptor("Capture a readiness-checked match PNG with UI visible by default.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,subjects?:u32[]}", {
+    variants: ["region=viewport captures the whole game screen", "region=minimap captures the minimap", "a crop is relative to the game viewport", "presentation=clean captures only the rendered battlefield", "response.preview.url is the user-delivery URL"],
+    defaults: ["name=game", "presentation=normal", "viewport=current", "region=viewport", "subjects=[]"],
     bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
     example: { sessionId: "<game-session-id>", name: "opening-ui", presentation: "normal" },
   }),
-  "game-record-start": descriptor("Start one real-time H.264 recording with match UI visible by default.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:crop,scale?:number,presentation?:\"normal\"|\"clean\"}", {
+  "game-record-start": descriptor("Start one real-time H.264 recording with match UI visible by default.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:crop,region?:\"viewport\"|\"minimap\"|crop,scale?:number,presentation?:\"normal\"|\"clean\"}", {
     recordable: false,
     variants: ["presentation=normal retains the HUD and overlays", "presentation=clean records only the battlefield"],
-    defaults: ["name=game", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1", "presentation=normal"],
+    defaults: ["name=game", "maxDurationMs=10000", "viewport=current", "region=viewport", "scale=1", "presentation=normal"],
     bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
     example: { sessionId: "<game-session-id>", name: "opening-move", maxDurationMs: 10000, presentation: "normal" },
+  }),
+  "game-capture-timelapse": descriptor("Capture sampled AI-vs-AI spectator frames as a compact H.264 time-lapse.", "{sessionId:string,name?:token,maxDurationMs?:int,sampleEveryMs?:int,fps?:int,speed?:number,viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,presentation?:\"normal\"|\"clean\"}", {
+    timeoutClass: "lifecycle-media", recordable: false,
+    variants: ["stops when the match concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use game camera overview first for a whole-map battlefield time-lapse"],
+    defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "region=viewport", "presentation=normal"],
+    bounds: ["AI-vs-AI spectator session only", "duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
+    example: { sessionId: "<game-session-id>", name: "whole-map", maxDurationMs: 120000, sampleEveryMs: 1000, speed: 8, region: "viewport" },
   }),
 });
 
@@ -236,6 +244,8 @@ const NAMESPACE_COMMAND_KEYS = Object.freeze({
     "record-start": "game-record-start",
     "record-stop": "record-stop",
     "record-wait": "record-wait",
+    "capture-timelapse": "game-capture-timelapse",
+    "capture-cancel": "capture-cancel",
     "give-up": "game-give-up",
     shutdown: "shutdown",
   }),
@@ -270,5 +280,5 @@ export function validateCommandInput(command: string, input: unknown) {
 export function requestTimeoutMs(command: string) {
   const definition = commandDefinition(command);
   if (definition?.timeoutClass === "startup") return STARTUP_REQUEST_TIMEOUT_MS;
-  return definition?.timeoutClass === "lifecycle-media" ? RECORDING_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  return definition?.timeoutClass === "lifecycle-media" ? MEDIA_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
 }

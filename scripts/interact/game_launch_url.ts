@@ -4,6 +4,7 @@ export function interactLaunchUrl({
   room,
   map,
   opponent,
+  spectate,
   renderer,
   seed,
   scenario,
@@ -13,6 +14,7 @@ export function interactLaunchUrl({
   room: string;
   map: string;
   opponent: string;
+  spectate?: readonly string[] | null;
   renderer: string;
   seed: string;
   scenario: string;
@@ -29,11 +31,17 @@ export function interactLaunchUrl({
     return url.href;
   }
   const url = new URL("/", baseUrl);
+  const aiPlayers = Array.isArray(spectate) && spectate.length === 2 ? spectate : null;
   url.searchParams.set("rtsLaunch", "match");
   url.searchParams.set("rtsRoom", room);
-  url.searchParams.set("rtsRole", "player");
-  url.searchParams.set("rtsName", "Interact");
-  url.searchParams.set("rtsAi", `2:${opponent}`);
+  url.searchParams.set("rtsRole", aiPlayers ? "spectator" : "player");
+  if (aiPlayers) {
+    url.searchParams.append("rtsAi", `1:${aiPlayers[0]}`);
+    url.searchParams.append("rtsAi", `2:${aiPlayers[1]}`);
+  } else {
+    url.searchParams.set("rtsName", "Interact");
+    url.searchParams.set("rtsAi", `2:${opponent}`);
+  }
   url.searchParams.set("rtsStart", "1");
   if (map && map !== "Default") url.searchParams.set("rtsMap", map);
   if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");

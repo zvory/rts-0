@@ -4,7 +4,7 @@
 import { cmd, isUnit } from "./protocol.js";
 import { INTERACT_BRIDGE_KEY } from "./interact_bridge.js";
 
-export const INTERACT_GAME_BRIDGE_VERSION = 1;
+export const INTERACT_GAME_BRIDGE_VERSION = 2;
 export const INTERACT_GAME_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectKinds: 32,
@@ -25,7 +25,7 @@ export function interactGameLaunchEnabled(locationLike = globalThis.location) {
     return (pathname === "/" || pathname === "") &&
       params.get("interact") === "game" &&
       params.get("rtsLaunch") === "match" &&
-      params.get("rtsRole") === "player" &&
+      ["player", "spectator"].includes(params.get("rtsRole")) &&
       String(params.get("rtsRoom") || "").startsWith(GAME_ROOM_PREFIX);
   } catch {
     return false;
@@ -51,7 +51,6 @@ export class InteractGameBridge {
     const match = this.app?.match || null;
     const websocketConnected = this.app?.net?.ws?.readyState === 1;
     const snapshotApplied = match?.state?.currRecvTime != null;
-    const playerControlled = !!match && !match.state?.spectator;
     const phase = gamePhase(match);
     const launchFailed = this.app?.matchLaunchFailed === true;
     const reason = this.destroyed
@@ -64,9 +63,7 @@ export class InteractGameBridge {
             ? "websocketDisconnected"
             : !match
               ? "waitingForStart"
-              : !playerControlled && phase !== "concluded"
-                ? "playerSeatRequired"
-                : !snapshotApplied
+              : !snapshotApplied
                   ? "waitingForSnapshot"
                   : "ready";
     return {
@@ -80,7 +77,9 @@ export class InteractGameBridge {
       room: this.app?.matchLaunch?.room || "",
       snapshotTick: snapshotApplied ? match.state.tick : null,
       playerId: match?.state?.playerId ?? null,
+      role: match?.state?.spectator ? "spectator" : "player",
       phase,
+      roomTime: projectRoomTime(match?.roomTimeControls?.roomTimeState),
       matchRunId: match?.matchRunId || "",
       camera: projectCamera(match?.camera),
       cameraViewport: projectCameraViewport(match?.camera),
@@ -111,6 +110,7 @@ export class InteractGameBridge {
       case "inspect": return this.inspect(input);
       case "move": return this.move(input);
       case "giveUp": return this.giveUp();
+      case "time": return this.time(input);
       case "camera": return this.camera(input);
       case "presentation": return this.presentation(input);
       case "captureReadiness": return this.captureReadiness(input);
@@ -118,12 +118,14 @@ export class InteractGameBridge {
     }
   }
 
-  session({ activeMatch = false } = {}) {
+  session({ activeMatch = false, playerSeat = false, spectator = false } = {}) {
     const status = this.status();
     if (!status.ready) throw bridgeError(status.reason, `Interact game is not ready: ${status.reason}.`);
     if (activeMatch && status.phase !== "active") {
       throw bridgeError("matchConcluded", "The isolated match has already concluded.");
     }
+    if (playerSeat && status.role !== "player") throw bridgeError("playerSeatRequired", "This command requires the controlled player seat.");
+    if (spectator && status.role !== "spectator") throw bridgeError("spectatorRequired", "This command requires an AI-vs-AI spectator session.");
     return { match: this.app.match, status };
   }
 
@@ -153,7 +155,7 @@ export class InteractGameBridge {
   }
 
   async move(input = {}) {
-    const { match } = this.session({ activeMatch: true });
+    const { match } = this.session({ activeMatch: true, playerSeat: true });
     const units = boundedIds(input.units, "move.units", INTERACT_GAME_LIMITS.moveUnits);
     const x = finiteNumber(input.x, "move.x");
     const y = finiteNumber(input.y, "move.y");
@@ -183,7 +185,7 @@ export class InteractGameBridge {
   }
 
   async giveUp() {
-    const { match } = this.session({ activeMatch: true });
+    const { match } = this.session({ activeMatch: true, playerSeat: true });
     match.requestGiveUp();
     await this.waitFor(() => gamePhase(match) === "concluded", "the authoritative score screen after giving up");
     return {
@@ -213,6 +215,17 @@ export class InteractGameBridge {
         { x: Math.min(...xs) - padding, y: Math.min(...ys) - padding },
         { x: Math.max(...xs) + padding, y: Math.max(...ys) + padding },
       ]);
+    } else if (action === "overview") {
+      const padding = boundedNumber(input.padding ?? 24, "camera.padding", 0, 1024);
+      const tileSize = finiteOrNull(match.state?.map?.tileSize);
+      const width = finiteOrNull(match.state?.map?.width);
+      const height = finiteOrNull(match.state?.map?.height);
+      if (tileSize == null || width == null || height == null) throw bridgeError("mapUnavailable", "The current map bounds are unavailable.");
+      match.setAutoSpectatorEnabled?.(false);
+      match.camera.fitWorldPoints([
+        { x: 0, y: 0 },
+        { x: width * tileSize, y: height * tileSize },
+      ], { paddingCssPx: padding });
     } else {
       throw bridgeError("invalidCamera", "camera.action must be set or focus.");
     }
@@ -221,6 +234,16 @@ export class InteractGameBridge {
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
     };
+  }
+
+  async time(input = {}) {
+    const { match } = this.session({ activeMatch: true, spectator: true });
+    if (input.action !== "speed") throw bridgeError("invalidTime", "AI-vs-AI game time supports only action=speed.");
+    if (match.capabilities?.roomTime?.setSpeed !== true) throw bridgeError("roomTimeUnavailable", "This AI-only room does not expose speed control.");
+    const speed = boundedNumber(input.speed, "time.speed", 0.125, 8);
+    if (match.net?.setRoomTimeSpeed?.(speed) !== true) throw bridgeError("roomTimeRejected", "The room-time speed command was not sent.");
+    await this.waitFor(() => Number(match.roomTimeControls?.roomTimeState?.speed) === speed || gamePhase(match) === "concluded", "AI-only room speed confirmation");
+    return { roomTime: projectRoomTime(match.roomTimeControls?.roomTimeState), snapshotTick: match.state.tick };
   }
 
   async presentation(input = {}) {
@@ -369,6 +392,16 @@ function projectPlayer(player) {
 
 function projectMap(map) {
   return { name: map?.name || "", width: finiteOrNull(map?.width), height: finiteOrNull(map?.height), tileSize: finiteOrNull(map?.tileSize) };
+}
+
+function projectRoomTime(state) {
+  if (!state) return null;
+  return {
+    currentTick: finiteOrNull(state.currentTick),
+    speed: finiteOrNull(state.speed),
+    paused: state.paused === true,
+    ended: state.ended === true,
+  };
 }
 
 function projectUi() {

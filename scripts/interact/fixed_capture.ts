@@ -40,9 +40,12 @@ export async function createFixedCaptureEncoder({
   return {
     write(buffer: Buffer) { return encoder.write(buffer); },
     async abort() { await encoder.abort(); },
-    async finish() {
+    async finish(actualFrameCount = frameCount) {
+      if (!Number.isInteger(actualFrameCount) || actualFrameCount < 1 || actualFrameCount > frameCount) {
+        throw new InteractRecordingError("captureStateInvalid", "Captured frame count is outside the encoder's declared bound.");
+      }
       await encoder.finish(75_000);
-      const selection = [...fixedRepresentativeIndices(frameCount)]
+      const selection = [...fixedRepresentativeIndices(actualFrameCount)]
         .map((index) => `eq(n\\,${index})`)
         .join("+");
       await run(tools.ffmpeg, [
@@ -70,8 +73,8 @@ export async function createFixedCaptureEncoder({
         container: parsed.format?.format_name, width: Number(stream.width), height: Number(stream.height),
         frameRate: stream.r_frame_rate, frameCount: Number(stream.nb_read_frames), durationSeconds: Number(parsed.format?.duration),
       };
-      if (probe.codec !== "h264" || probe.codecTag !== "avc1" || probe.pixelFormat !== "yuv420p" || probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.frameCount !== frameCount || probe.frameRate !== `${fps}/1` || !hasFastStart(outputPath)) {
-        throw new InteractRecordingError("mediaProbeFailed", `Fixed capture media did not preserve mobile H.264 MP4/${fps} FPS/${frameCount} frames.`);
+      if (probe.codec !== "h264" || probe.codecTag !== "avc1" || probe.pixelFormat !== "yuv420p" || probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.frameCount !== actualFrameCount || probe.frameRate !== `${fps}/1` || !hasFastStart(outputPath)) {
+        throw new InteractRecordingError("mediaProbeFailed", `Fixed capture media did not preserve mobile H.264 MP4/${fps} FPS/${actualFrameCount} frames.`);
       }
       const contact = fs.readFileSync(contactSheetPath);
       return {

@@ -11,10 +11,10 @@ export const REQUEST_TIMEOUT_MS = 120_000;
 // A clean worktree may need a full Rust build before browser startup. Keep the
 // client attached beyond the separately bounded Cargo build and readiness work.
 export const STARTUP_REQUEST_TIMEOUT_MS = 600_000;
-// A one-minute wait can be followed by recorder flush, transcode, three auxiliary
-// FFmpeg stages, probes, and browser cleanup. Keep the client deadline beyond the
-// sum of those independently bounded stages so successful cleanup can reply.
-export const RECORDING_REQUEST_TIMEOUT_MS = 420_000;
+// A five-minute time-lapse can be followed by bounded encoder finalization,
+// contact-sheet generation, probing, preview publication, and browser cleanup.
+// Keep the client attached beyond the sum of those independently bounded stages.
+export const MEDIA_REQUEST_TIMEOUT_MS = 540_000;
 export const STARTUP_GRACE_MS = 15_000;
 
 export interface RuntimePaths {

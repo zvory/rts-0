@@ -1,13 +1,11 @@
 // Transport-independent local driver for the Interact browser session.
 // This module owns only the selected worktree, private processes, narrow page bridge,
 // and bounded local diagnostics.
-
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Browser, Page, Viewport } from "puppeteer-core";
-
 import { withAbortSignal as abortable } from "./abort_signal.ts";
 import {
   checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, InteractRecordingError,
@@ -16,6 +14,8 @@ import {
 import {
   createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame,
 } from "./fixed_capture.ts";
+import { resolveCaptureRegion, type CaptureClip, type CaptureRegion } from "./capture_region.ts";
+import { captureGameTimelapse } from "./game_timelapse.ts";
 import { boundedSummary, INTERACT_SUMMARY_LIMITS } from "./manifest_summary.ts";
 import { PrivateServer } from "./private_server.ts";
 import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
@@ -45,7 +45,6 @@ export const DRIVER_STATES = Object.freeze({
 
 type JsonObject = Record<string, unknown>;
 interface WorkspaceInfo { root: string; branch: string; head: string }
-interface CaptureClip { x: number; y: number; width: number; height: number }
 interface BridgeResult extends JsonObject {
   snapshotTick?: number;
   room?: string;
@@ -95,6 +94,7 @@ interface ActiveRecording {
   clip: CaptureClip;
   scale: number;
   presentation: "clean" | "normal";
+  region: JsonObject;
   viewport: Viewport | null;
   originalViewport: Viewport | null;
   maxDurationMs: number;
@@ -125,6 +125,7 @@ interface DriverOptions {
   seed?: string;
   scenario?: string;
   opponent?: string;
+  spectate?: string[] | null;
   renderer?: string;
   viewport?: Viewport;
   timeoutMs?: number;
@@ -201,6 +202,7 @@ export class InteractDriver {
     seed = "",
     scenario = "blank",
     opponent = "ai_2_1",
+    spectate = null,
     renderer = "pixi",
     viewport = DEFAULT_VIEWPORT,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -219,6 +221,7 @@ export class InteractDriver {
       seed,
       scenario,
       opponent,
+      spectate,
       renderer,
       viewport,
       timeoutMs: boundedTimeout(timeoutMs, "timeoutMs", MAX_TIMEOUT_MS),
@@ -463,7 +466,7 @@ export class InteractDriver {
     viewport = null,
     subjectIds = [],
     subjectSummaries = [],
-    request = {},
+    request = {}, region = "viewport",
   }: {
     sessionId?: string;
     name?: string;
@@ -471,7 +474,7 @@ export class InteractDriver {
     viewport?: Viewport | null;
     subjectIds?: number[];
     subjectSummaries?: unknown[];
-    request?: JsonObject;
+    request?: JsonObject; region?: CaptureRegion;
   } = {}) {
     try {
       return await this.captureScreenshot({
@@ -481,7 +484,7 @@ export class InteractDriver {
         viewport,
         subjectIds,
         subjectSummaries,
-        request,
+        request, region,
       });
     } catch (error) {
       throw this.decorateError(error);
@@ -507,7 +510,7 @@ export class InteractDriver {
     name = "recording",
     maxDurationMs = RECORDING_LIMITS.defaultDurationMs,
     viewport = null,
-    crop = null,
+    crop = null, region = null,
     scale = 1,
     resumeSpeed = null,
     presentation = this.options.mode === "game" ? "normal" : "clean",
@@ -516,14 +519,16 @@ export class InteractDriver {
     name?: string;
     maxDurationMs?: number;
     viewport?: Viewport | null;
-    crop?: CaptureClip | null;
+    crop?: CaptureClip | null; region?: CaptureRegion | null;
     scale?: number;
     resumeSpeed?: number | null;
     presentation?: "clean" | "normal";
   } = {}) {
     try {
       if (this.recording) throw new InteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
+      if (crop && region) throw new InteractDriverError("invalidRegion", "recording accepts crop or region, not both.");
       if (presentation !== "clean" && presentation !== "normal") throw new InteractDriverError("invalidPresentation", "recording presentation must be clean or normal.");
+      if (region === "minimap" && presentation === "clean") throw new InteractDriverError("invalidPresentation", "The minimap is hidden in clean presentation; use normal presentation.");
       const tools = await checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
@@ -535,12 +540,8 @@ export class InteractDriver {
         await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
         await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
         await this.waitForCaptureReadiness([]);
-        const viewportClip = await this.page!.evaluate(() => {
-          const rect = document.getElementById("viewport")?.getBoundingClientRect?.();
-          return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
-        });
-        if (!validClip(viewportClip)) throw new InteractDriverError("viewportUnavailable", "The Pixi viewport is not available for recording.");
-        const clip = crop ? normalizeRecordingCrop(crop, viewportClip) : viewportClip;
+        const resolvedRegion = await resolveCaptureRegion(this.page!, region || "viewport");
+        const clip = crop ? normalizeRecordingCrop(crop, resolvedRegion.viewport) : resolvedRegion.clip;
         const artifactName = safeArtifactName(name, "recording");
         const suffix = new Date().toISOString().replace(/[:.]/g, "-");
         recordingDir = path.join(this.workspace!.root, interactArtifactRoot(this.options.mode), normalizedSessionId, "recordings", `${artifactName}-${suffix}`);
@@ -562,7 +563,7 @@ export class InteractDriver {
           name: artifactName, recorder, tools, recordingDir, mp4Path,
           framesDir: path.join(recordingDir, "frames"), contactSheetPath: path.join(recordingDir, `${artifactName}-contact-sheet.png`),
           manifestPath: path.join(recordingDir, `${artifactName}.json`), startedMs, startedAt: new Date(startedMs).toISOString(),
-          startStatus, resumeResult, resumeSpeed, clip, scale, presentation, viewport: normalizedViewport, originalViewport,
+          startStatus, resumeResult, resumeSpeed, clip, scale, presentation, region: resolvedRegion, viewport: normalizedViewport, originalViewport,
           maxDurationMs, finalizing: null, stoppedBy: null, operations: [], operationCount: 0,
           operationsTruncated: false, aliases: [], completion,
         };
@@ -581,7 +582,7 @@ export class InteractDriver {
           ...this.recordingStatus(), clip, scale,
           authoritativeStartTick: startStatus.snapshotTick ?? null,
           authoritativeResumed: resumeSpeed != null,
-          resumeSpeed, presentation,
+          resumeSpeed, presentation, region: resolvedRegion,
         };
       } catch (error) {
         if (recorder) await recorder.abort().catch(() => {});
@@ -736,6 +737,7 @@ export class InteractDriver {
     }
   }
 
+  captureTimelapse(input = {}) { return captureGameTimelapse(this, input); }
   fixedCaptureStatus() {
     if (!this.fixedCapture) return { active: false, last: this.lastFixedCapture };
     const { cancelled, name, fps, frameCount, frameIndex } = this.fixedCapture;
@@ -743,7 +745,7 @@ export class InteractDriver {
   }
 
   cancelFixedCapture() {
-    if (!this.fixedCapture) throw new InteractDriverError("captureInactive", "No fixed capture is active.");
+    if (!this.fixedCapture) throw new InteractDriverError("captureInactive", "No fixed or time-lapse capture is active.");
     this.fixedCapture.cancelled = true;
     this.fixedCapture.abortController?.abort();
     return { cancelling: true };
@@ -837,7 +839,7 @@ export class InteractDriver {
           capture: {
             fps: RECORDING_LIMITS.fps, audio: false, timingAuthority: "monotonicWallClockFrameSlots",
             clip: recording.clip, scale: recording.scale, viewport: recording.viewport,
-            presentation: recording.presentation,
+            region: recording.region, presentation: recording.presentation,
             wallDurationMs, maxDurationMs: recording.maxDurationMs,
             atomicResume: recording.resumeSpeed == null ? null : { speed: recording.resumeSpeed, result: recording.resumeResult },
           },
@@ -930,11 +932,11 @@ export class InteractDriver {
     return result.value as BridgeResult;
   }
 
-  async captureScreenshot({ sessionId, name, presentation, viewport, subjectIds, subjectSummaries, request }: {
+  async captureScreenshot({ sessionId, name, presentation, viewport, region, subjectIds, subjectSummaries, request }: {
     sessionId?: string;
     name: string;
     presentation: string;
-    viewport: Viewport | null;
+    viewport: Viewport | null; region: CaptureRegion;
     subjectIds: number[];
     subjectSummaries: unknown[];
     request: JsonObject;
@@ -956,14 +958,11 @@ export class InteractDriver {
     try {
       if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
       await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
+      if (region === "minimap" && presentation === "clean") throw new InteractDriverError("invalidPresentation", "The minimap is hidden in clean presentation; use normal presentation.");
       await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
       const readiness = await this.waitForCaptureReadiness(requestedSubjectIds);
-      const clip = await this.page!.evaluate(() => {
-        const viewportEl = document.getElementById("viewport");
-        const rect = viewportEl?.getBoundingClientRect?.();
-        return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
-      });
-      if (!validClip(clip)) throw new InteractDriverError("viewportUnavailable", "The Pixi viewport is not available for capture.");
+      const resolvedRegion = await resolveCaptureRegion(this.page!, region);
+      const clip = resolvedRegion.clip;
 
       const captureDir = path.join(this.workspace!.root, interactArtifactRoot(this.options.mode), normalizedSessionId, "captures");
       fs.mkdirSync(captureDir, { recursive: true });
@@ -999,7 +998,7 @@ export class InteractDriver {
         },
         viewport: {
           requested: normalizedViewport,
-          clip,
+          clip, region: resolvedRegion,
           output: dimensions,
         },
         camera: readiness.camera,
@@ -1036,7 +1035,7 @@ export class InteractDriver {
           width: dimensions.width,
           height: dimensions.height,
         },
-        presentation,
+        presentation, region: resolvedRegion,
         readiness: readinessSummary,
       };
     } finally {
@@ -1072,6 +1071,7 @@ export class InteractDriver {
       room: this.options.mode === "game" ? this.gameRoom : generatedRoomId(this.workspace!.head),
       map: this.options.map,
       opponent: this.options.opponent,
+      spectate: this.options.spectate,
       renderer: this.options.renderer,
       seed: this.options.seed,
       scenario: this.options.scenario,

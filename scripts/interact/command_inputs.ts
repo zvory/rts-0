@@ -1,4 +1,5 @@
 import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.ts";
+import { GAME_TIMELAPSE_LIMITS, timelapseFrameBound } from "./game_timelapse.ts";
 import { RECORDING_LIMITS } from "./recording.ts";
 
 export const INTERACT_LIMITS = Object.freeze({
@@ -169,10 +170,16 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
 
 function validateGameNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
   if (command === "game-open") {
-    exact(value, ["workspaceRoot", "map", "opponent", "renderer", "viewport"], "game open");
+    exact(value, ["workspaceRoot", "map", "opponent", "spectate", "renderer", "viewport"], "game open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("game open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) displayName(value.map, "game open.map", 64);
     if (value.opponent != null && !["ai_2_1", "ai_turtle"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1 or ai_turtle");
+    if (value.spectate != null) {
+      array(value.spectate, "game open.spectate", 2, 2, (entry: unknown) => {
+        if (!["ai_2_1", "ai_turtle"].includes(String(entry))) invalid("game open.spectate", "must contain ai_2_1 or ai_turtle profiles");
+      });
+      if (value.opponent != null) invalid("game open", "cannot combine opponent with spectate");
+    }
     if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("game open.renderer", "must be pixi or babylon");
     if (value.viewport != null) viewport(value.viewport, 4096, "game open.viewport");
     return value;
@@ -197,19 +204,33 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     exact(value, ["sessionId", "camera"], "game camera");
     validateGameCamera(value.camera);
   } else if (command === "game-screenshot") {
-    exact(value, ["sessionId", "name", "presentation", "viewport", "subjects"], "game screenshot");
+    exact(value, ["sessionId", "name", "presentation", "viewport", "region", "subjects"], "game screenshot");
     artifactToken(value.name, "game screenshot.name");
     presentation(value.presentation, "game screenshot.presentation");
     if (value.viewport != null) viewport(value.viewport, 2048, "game screenshot.viewport");
+    if (value.region != null) captureRegion(value.region, "game screenshot.region");
     if (value.subjects != null) idArray(value.subjects, "game screenshot.subjects", 0, INTERACT_LIMITS.maxScreenshotSubjects);
   } else if (command === "game-record-start") {
-    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale", "presentation"], "game record-start");
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "region", "scale", "presentation"], "game record-start");
     artifactToken(value.name, "game record-start.name");
     if (value.maxDurationMs != null) integer(value.maxDurationMs, "game record-start.maxDurationMs", 1_000, INTERACT_LIMITS.maxRecordingDurationMs);
     if (value.viewport != null) viewport(value.viewport, 2048, "game record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
+    if (value.region != null) captureRegion(value.region, "game record-start.region");
+    if (value.crop != null && value.region != null) invalid("game record-start", "cannot combine crop with region");
     if (value.scale != null) boundedNumber(value.scale, "game record-start.scale", 0.25, 1);
     presentation(value.presentation, "game record-start.presentation");
+  } else if (command === "game-capture-timelapse") {
+    exact(value, ["sessionId", "name", "maxDurationMs", "sampleEveryMs", "fps", "speed", "viewport", "region", "presentation"], "game capture-timelapse");
+    artifactToken(value.name, "game capture-timelapse.name");
+    const duration = value.maxDurationMs == null ? GAME_TIMELAPSE_LIMITS.defaultDurationMs : integer(value.maxDurationMs, "game capture-timelapse.maxDurationMs", 1_000, GAME_TIMELAPSE_LIMITS.maxDurationMs);
+    const sampleEvery = value.sampleEveryMs == null ? GAME_TIMELAPSE_LIMITS.defaultSampleEveryMs : integer(value.sampleEveryMs, "game capture-timelapse.sampleEveryMs", GAME_TIMELAPSE_LIMITS.minSampleEveryMs, GAME_TIMELAPSE_LIMITS.maxSampleEveryMs);
+    if (timelapseFrameBound(duration, sampleEvery) > GAME_TIMELAPSE_LIMITS.maxFrames) invalid("game capture-timelapse", `may capture at most ${GAME_TIMELAPSE_LIMITS.maxFrames} sampled frames`);
+    if (value.fps != null) integer(value.fps, "game capture-timelapse.fps", GAME_TIMELAPSE_LIMITS.minFps, GAME_TIMELAPSE_LIMITS.maxFps);
+    if (value.speed != null) boundedNumber(value.speed, "game capture-timelapse.speed", GAME_TIMELAPSE_LIMITS.minSpeed, GAME_TIMELAPSE_LIMITS.maxSpeed);
+    if (value.viewport != null) viewport(value.viewport, 2048, "game capture-timelapse.viewport");
+    if (value.region != null) captureRegion(value.region, "game capture-timelapse.region");
+    presentation(value.presentation, "game capture-timelapse.presentation");
   } else {
     throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
   }
@@ -221,6 +242,9 @@ function validateGameCamera(value: unknown) {
   if (value.action === "focus") {
     exact(value, ["action", "entities", "padding"], "game camera");
     idArray(value.entities, "game camera.entities", 1, INTERACT_LIMITS.maxFocusRefs);
+    if (value.padding != null) boundedNumber(value.padding, "game camera.padding", 0, 1024);
+  } else if (value.action === "overview") {
+    exact(value, ["action", "padding"], "game camera");
     if (value.padding != null) boundedNumber(value.padding, "game camera.padding", 0, 1024);
   } else if (value.action === "set") {
     validateCamera(value);
@@ -286,6 +310,16 @@ function recordingCrop(value: unknown) {
   boundedNumber(value.y, "record-start.crop.y", 0, 2048);
   boundedNumber(value.width, "record-start.crop.width", 2, 2048);
   boundedNumber(value.height, "record-start.crop.height", 2, 2048);
+}
+
+function captureRegion(value: unknown, label: string) {
+  if (value === "viewport" || value === "minimap") return;
+  record(value, label);
+  exact(value, ["x", "y", "width", "height"], label);
+  boundedNumber(value.x, `${label}.x`, 0, 2048);
+  boundedNumber(value.y, `${label}.y`, 0, 2048);
+  boundedNumber(value.width, `${label}.width`, 2, 2048);
+  boundedNumber(value.height, `${label}.height`, 2, 2048);
 }
 
 function idArray(value: unknown, label: string, minimum: number, maximum: number) {
