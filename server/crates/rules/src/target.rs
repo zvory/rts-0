@@ -191,7 +191,7 @@ mod tests {
                     is_unit: true,
                     is_building: false,
                     is_resource_node: false,
-                    armor_class: Some(ArmorClass::Hard),
+                    armor_class: Some(ArmorClass::Small),
                     weapon_class: WeaponClass::None,
                     threat_role: TargetThreatRole::SupportWeapon,
                     is_vehicle_body: true,
@@ -458,10 +458,7 @@ mod tests {
             );
             assert_eq!(
                 facts.is_armored,
-                matches!(
-                    expected.armor_class,
-                    Some(ArmorClass::Armored | ArmorClass::Hard)
-                ),
+                expected.armor_class == Some(ArmorClass::Armored),
                 "{kind} armored fact"
             );
             assert_eq!(

@@ -766,8 +766,8 @@ function buttonByLabel(card, label) {
     kind: KIND.COMMAND_CAR,
     x: 96,
     y: 220,
-    hp: 225,
-    maxHp: 225,
+    hp: 150,
+    maxHp: 150,
     state: STATE.IDLE,
   };
   budgetInputState.applySnapshot({

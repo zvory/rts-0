@@ -1320,9 +1320,9 @@ General rules:
   candidates by current weapon facing arc, weapon range, and intended-target direct-fire legality
   without rotating, chasing, or mutating movement state. Unit attackers rank legal unit targets above
   buildings, so buildings remain last-resort cleanup targets unless explicitly ordered or covered by
-  a special obstruction policy. Default small-arms weapons prefer soft targets while keeping armored
-  or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
-  armored/hard units, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
+  a special obstruction policy. Default small-arms weapons prefer soft targets while keeping
+  armored targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
+  armored units, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
   Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
   `services::occupancy` reports that the trap is on the current bounded route segment or forms a
   closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose
