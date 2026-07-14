@@ -44,7 +44,7 @@ src/
   audio.js        # Audio: Web Audio context, buses, one-shots
   audio_spatial.js # renderer-neutral distance, pan, low-pass, and priority profiles
   sound_manifest.js # Stable sound ids and asset URLs
-  hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
+  hud.js          # HUD: resources/supply bar, minimap status row, selected panel, command card
   hud_command_card.js # Command-card descriptors, faction command ids, and grid hotkeys
   hud_train_card_helpers.js # Train/research command-card slotting, affordability, and one-unit limits
   hud_selection_panel.js # Selected-unit strip/details panel
@@ -1339,10 +1339,15 @@ The current derived asset is a first-pass listening placeholder.
 ```js
 export class HUD {
   constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?, controlPolicy?, camera?)
-  update(frameViews?)                    // refresh resources/supply, selected panel, command card
+  update(frameViews?)                    // refresh resources/supply, minimap status, selection, commands
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
 ```
+The minimap status row shares its width between the game timer and an idle-worker tab capped at
+half the minimap width. The tab counts live local Workers whose authoritative activity is `idle`,
+disables when none are available or the command surface is read-only, and selects the current idle
+set through normal command-supply admission when clicked.
+
 The train command card is driven by the first selected production building type, but train clicks
 are issued to the selected completed compatible production buildings in round-robin order so a
 multi-building selection spreads queued units across its producers. Train and production-cancel

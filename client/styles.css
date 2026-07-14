@@ -2931,7 +2931,15 @@ input[type="text"]:focus {
   gap: 6px;
   line-height: normal;
 }
+.minimap-status-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
 .game-timer {
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 24px;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -2945,6 +2953,45 @@ input[type="text"]:focus {
   line-height: 1;
   text-align: center;
   text-shadow: 1px 1px 0 #191710;
+}
+.idle-workers-button {
+  appearance: none;
+  flex: 0 1 50%;
+  max-width: 50%;
+  min-width: 0;
+  min-height: 24px;
+  padding: 3px 6px;
+  border: 1px solid rgba(180, 164, 124, 0.32);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 14, 12, 0.72);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  text-align: center;
+  text-shadow: 1px 1px 0 #191710;
+  cursor: pointer;
+}
+.idle-workers-button:hover:not(:disabled) {
+  border-color: rgba(216, 193, 133, 0.72);
+  background: rgba(35, 32, 25, 0.88);
+}
+.idle-workers-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.idle-workers-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.idle-workers-button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.72;
+}
+.idle-workers-label {
+  display: inline;
 }
 #minimap {
   display: block;
@@ -4961,6 +5008,16 @@ input[type="text"]:focus {
   .game-timer {
     min-height: 26px;
     font-size: 14px;
+  }
+
+  .minimap-status-row {
+    gap: 4px;
+  }
+
+  .idle-workers-button {
+    min-height: 26px;
+    padding: 2px 3px;
+    font-size: 9px;
   }
 
   #selection-area {

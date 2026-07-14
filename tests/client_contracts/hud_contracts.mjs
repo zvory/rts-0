@@ -15,6 +15,7 @@ import {
 } from "../../client/src/config.js";
 import {
   HUD,
+  activeIdleWorkers,
   formatGameTime,
   groupCooldownClocks,
   playerHasCompletedKind,
@@ -73,6 +74,104 @@ function commandCardCtx({
     groupCooldownClocks,
     playerHasCompleteKind: (kind) => playerHasCompletedKind(entities, playerId, kind),
   };
+}
+
+{
+  const workers = [
+    { id: 1, owner: 1, kind: KIND.WORKER, state: STATE.IDLE },
+    { id: 2, owner: 1, kind: KIND.WORKER, state: STATE.MOVE },
+    { id: 3, owner: 1, kind: KIND.WORKER, state: STATE.GATHER },
+    { id: 4, owner: 1, kind: KIND.WORKER, state: STATE.BUILD },
+    { id: 5, owner: 2, kind: KIND.WORKER, state: STATE.IDLE },
+    { id: 6, owner: 1, kind: KIND.RIFLEMAN, state: STATE.IDLE },
+    { id: 7, owner: 1, kind: KIND.WORKER, state: STATE.IDLE, visionOnly: true },
+  ];
+  const state = { playerId: 1, isOwnOwner: (owner) => owner === 1 };
+  assert(
+    activeIdleWorkers(workers, state).map((worker) => worker.id).join(",") === "1",
+    "HUD idle-worker query includes only live own workers with authoritative idle activity",
+  );
+}
+
+{
+  const listeners = new Map();
+  const button = {
+    disabled: true,
+    title: "",
+    addEventListener(type, handler) { listeners.set(type, handler); },
+    removeEventListener(type, handler) {
+      if (listeners.get(type) === handler) listeners.delete(type);
+    },
+    setAttribute(name, value) { this[name] = value; },
+  };
+  const count = { textContent: "0" };
+  const ownIdle = [
+    { id: 11, owner: 1, kind: KIND.WORKER, state: STATE.IDLE },
+    { id: 12, owner: 1, kind: KIND.WORKER, state: STATE.IDLE },
+  ];
+  const entities = ownIdle.concat([
+    { id: 13, owner: 1, kind: KIND.WORKER, state: STATE.GATHER },
+    { id: 14, owner: 2, kind: KIND.WORKER, state: STATE.IDLE },
+  ]);
+  const predictedEntities = entities.map((entity) => (
+    entity.id === 11 ? { ...entity, state: STATE.MOVE, predicted: true } : entity
+  ));
+  let selected = [];
+  let menuClosed = 0;
+  let plannedSelection = [];
+  const state = {
+    playerId: 1,
+    spectator: false,
+    selection: new Set(),
+    isOwnOwner: (owner) => owner === 1,
+    entitiesInterpolated: (_alpha, options = {}) => (
+      options.includePrediction === false ? entities : predictedEntities
+    ),
+    entityById: (id) => entities.find((entity) => entity.id === id) || null,
+    setSelection(ids) {
+      selected = Array.from(ids);
+      this.selection = new Set(selected);
+    },
+  };
+  const intent = {
+    closeCommandCardMenu() { menuClosed += 1; },
+    clearPlannedOrdersOutsideSelection(ids) { plannedSelection = Array.from(ids); },
+  };
+  const root = {
+    querySelector(selector) {
+      if (selector === "#idle-workers") return button;
+      if (selector === "#idle-workers-count") return count;
+      return null;
+    },
+  };
+  const hud = new HUD(root, state, {}, null, null, intent);
+  assert(count.textContent === "2" && button.disabled === false, "HUD shows the active idle-worker count");
+  assert(
+    predictedEntities[0].state === STATE.MOVE,
+    "HUD idle-worker count ignores prediction-overlaid activity until authority confirms it",
+  );
+  assert(button["aria-label"] === "Select 2 idle workers", "HUD exposes the idle-worker selection action accessibly");
+
+  hud.controlPolicy = { canUseCommandSurface: () => false };
+  hud._renderIdleWorkers();
+  assert(
+    count.textContent === "2" && button.disabled === true &&
+      button["aria-label"] === "2 idle workers; selection unavailable",
+    "read-only HUDs preserve the idle-worker count without announcing that no workers exist",
+  );
+  hud.controlPolicy = null;
+  hud._renderIdleWorkers();
+  listeners.get("click")();
+  assert(selected.join(",") === "11,12", "clicking the HUD tab selects every active idle worker");
+  assert(menuClosed === 1 && plannedSelection.join(",") === "11,12", "idle-worker selection reconciles local HUD intent");
+
+  ownIdle[0].state = STATE.MOVE;
+  ownIdle[1].state = STATE.BUILD;
+  hud._renderIdleWorkers();
+  assert(count.textContent === "0" && button.disabled === true, "HUD disables the idle-worker tab when none are idle");
+  hud.destroy();
+  assert(!listeners.has("click"), "HUD teardown removes the idle-worker click listener");
+  assert(button["aria-label"] === "No idle workers", "HUD teardown restores accurate idle-worker text");
 }
 
 function defaultFactionCommandId(family, subject) {

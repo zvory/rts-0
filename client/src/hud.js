@@ -9,7 +9,7 @@
 // effects go through `commandIssuer.issueCommand(...)` or the injected client intent facade.
 
 import { cmd } from "./protocol.js";
-import { ABILITY, STATE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   STATS,
@@ -56,6 +56,19 @@ export function playerHasCompletedKind(entities, playerId, kind) {
   return false;
 }
 
+/** Return live own workers whose authoritative activity is fully idle. */
+export function activeIdleWorkers(entities, state) {
+  const owns = typeof state?.isOwnOwner === "function"
+    ? (owner) => state.isOwnOwner(owner)
+    : (owner) => Number(owner) === Number(state?.playerId);
+  return (entities || []).filter((entity) =>
+    entity?.kind === KIND.WORKER &&
+    entity.state === STATE.IDLE &&
+    !entity.shotReveal &&
+    !entity.visionOnly &&
+    owns(entity.owner));
+}
+
 function frameSelectedEntities(state, frameViews = null) {
   if (Array.isArray(frameViews?.selectedEntities)) return frameViews.selectedEntities;
   return typeof state?.selectedEntities === "function" ? state.selectedEntities() || [] : [];
@@ -64,6 +77,13 @@ function frameSelectedEntities(state, frameViews = null) {
 function frameCurrentEntities(state, frameViews = null) {
   if (Array.isArray(frameViews?.currentEntities)) return frameViews.currentEntities;
   return typeof state?.entitiesInterpolated === "function" ? state.entitiesInterpolated(1) || [] : [];
+}
+
+function frameAuthoritativeEntities(state, frameViews = null) {
+  if (Array.isArray(frameViews?.authoritativeEntities)) return frameViews.authoritativeEntities;
+  return typeof state?.entitiesInterpolated === "function"
+    ? state.entitiesInterpolated(1, { includePrediction: false }) || []
+    : [];
 }
 
 /**
@@ -160,6 +180,10 @@ export class HUD {
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
     this.elGameTimer = rootEl.querySelector("#game-timer");
+    this.elIdleWorkers = rootEl.querySelector("#idle-workers");
+    this.elIdleWorkersCount = rootEl.querySelector("#idle-workers-count");
+    this._onIdleWorkersClick = () => this._selectIdleWorkers();
+    this.elIdleWorkers?.addEventListener?.("click", this._onIdleWorkersClick);
     // Rebuild the static shell once so the top bar, replay rows, and command-card
     // hovers all use the shared resource icon definitions.
     if (this.elHud) {
@@ -185,7 +209,9 @@ export class HUD {
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
     this._gameTimerSig = null;
+    this._idleWorkersSig = null;
     this._renderGameTimer();
+    this._renderIdleWorkers();
   }
 
   /**
@@ -195,6 +221,7 @@ export class HUD {
   update(frameViews = null, { profiler = null } = {}) {
     this._profiler = profiler || null;
     this._renderGameTimer();
+    this._renderIdleWorkers(frameViews);
     this._renderResources();
     this._renderControlGroupTabs(frameViews);
     this._renderSelectedPanel(frameViews);
@@ -214,12 +241,20 @@ export class HUD {
       this.elGameTimer.textContent = "00:00";
       this.elGameTimer.title = "Game time 00:00";
     }
+    this.elIdleWorkers?.removeEventListener?.("click", this._onIdleWorkersClick);
+    if (this.elIdleWorkersCount) this.elIdleWorkersCount.textContent = "0";
+    if (this.elIdleWorkers) {
+      this.elIdleWorkers.disabled = true;
+      this.elIdleWorkers.title = "No idle workers";
+      this.elIdleWorkers.setAttribute?.("aria-label", "No idle workers");
+    }
     this._cardSig = null;
     this._trainRoundRobin.clear();
     this._cancelRoundRobin.clear();
     this._resSig = null;
     this._controlGroupSig = null;
     this._gameTimerSig = null;
+    this._idleWorkersSig = null;
   }
 
   _issueCommand(command, options = {}) {
@@ -242,6 +277,37 @@ export class HUD {
     this.elGameTimer.textContent = text;
     this.elGameTimer.title = `Game time ${text}`;
     this._gameTimerSig = text;
+  }
+
+  _renderIdleWorkers(frameViews = null) {
+    if (!this.elIdleWorkers || !this.elIdleWorkersCount) return;
+    const count = activeIdleWorkers(
+      frameAuthoritativeEntities(this.state, frameViews),
+      this.state,
+    ).length;
+    const canSelect = this._canUseCommandSurface();
+    const enabled = count > 0 && canSelect;
+    const sig = `${count}:${enabled ? 1 : 0}`;
+    if (sig === this._idleWorkersSig) return;
+    this.elIdleWorkersCount.textContent = String(count);
+    this.elIdleWorkers.disabled = !enabled;
+    const workersLabel = `${count} idle worker${count === 1 ? "" : "s"}`;
+    this.elIdleWorkers.title = count === 0
+      ? "No idle workers"
+      : canSelect
+        ? `Select ${workersLabel}`
+        : `${workersLabel}; selection unavailable`;
+    this.elIdleWorkers.setAttribute?.("aria-label", this.elIdleWorkers.title);
+    this._idleWorkersSig = sig;
+  }
+
+  _selectIdleWorkers() {
+    if (!this._canUseCommandSurface() || typeof this.state?.setSelection !== "function") return;
+    const workers = activeIdleWorkers(frameAuthoritativeEntities(this.state), this.state);
+    if (workers.length === 0) return;
+    this._intent()?.closeCommandCardMenu?.();
+    this.state.setSelection(workers.map((worker) => worker.id));
+    this._intent()?.clearPlannedOrdersOutsideSelection?.(this.state.selection || []);
   }
 
   // --- Resource / supply bar -------------------------------------------------
