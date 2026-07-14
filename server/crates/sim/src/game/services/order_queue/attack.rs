@@ -33,7 +33,16 @@ pub(super) fn attack_can_fire_now(
     let Some(stats) = config::unit_stats(attacker.kind) else {
         return false;
     };
-    let dmg = if attacker.kind == EntityKind::Panzerfaust {
+    let uses_loaded_panzerfaust = attacker.kind == EntityKind::Panzerfaust
+        && crate::rules::combat::is_panzerfaust_loaded_shot_target(target.kind)
+        && matches!(
+            attacker
+                .combat
+                .as_ref()
+                .and_then(|combat| combat.panzerfaust),
+            Some(PanzerfaustState::Loaded | PanzerfaustState::Windup { .. })
+        );
+    let dmg = if uses_loaded_panzerfaust {
         config::PANZERFAUST_DAMAGE
     } else {
         stats.dmg
@@ -41,7 +50,7 @@ pub(super) fn attack_can_fire_now(
     if dmg == 0 {
         return false;
     }
-    let range_tiles = if attacker.kind == EntityKind::Panzerfaust {
+    let range_tiles = if uses_loaded_panzerfaust {
         entrenchment_combat::attack_range_tiles(attacker, config::PANZERFAUST_RANGE_TILES as f32)
     } else {
         stats.range_tiles as f32

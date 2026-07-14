@@ -57,3 +57,27 @@ pub(crate) fn active_trench_occupation(entity: &Entity) -> Option<u32> {
     }
     entity.movement.as_ref().and_then(|m| m.occupied_trench_id)
 }
+
+pub(crate) fn convert_panzerfaust_to_rifleman(entity: &mut Entity, completed_target: u32) -> bool {
+    if entity.kind != EntityKind::Panzerfaust {
+        return false;
+    }
+    let Some(stats) = config::unit_stats(EntityKind::Rifleman) else {
+        return false;
+    };
+    let active_order = entity.order();
+    let consumed_direct_attack = active_order.attack_target() == Some(completed_target);
+    let resume_movement_order = matches!(active_order, Order::Move(_) | Order::AttackMove(_));
+    entity.kind = EntityKind::Rifleman;
+    entity.max_hp = stats.hp;
+    entity.hp = entity.hp.min(stats.hp);
+    if let Some(combat) = entity.combat.as_mut() {
+        combat.panzerfaust = None;
+    }
+    if consumed_direct_attack {
+        entity.clear_active_order();
+    } else if resume_movement_order && entity.path_is_empty() {
+        entity.mark_move_phase(MovePhase::AwaitingPath);
+    }
+    true
+}

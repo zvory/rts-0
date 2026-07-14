@@ -174,9 +174,9 @@ pub const UNITS: &[UnitDef] = &[
         kind: EntityKind::Panzerfaust,
         stats: balance::UnitStats {
             hp: 45,
-            dmg: 0,
-            range_tiles: balance::PANZERFAUST_RANGE_TILES,
-            cooldown: 0,
+            dmg: 5,
+            range_tiles: 4,
+            cooldown: 16,
             speed: 1.6,
             sight_tiles: 11,
             cost_steel: 60,
@@ -186,7 +186,7 @@ pub const UNITS: &[UnitDef] = &[
             radius: 9.0,
         },
         armor_class: ArmorClass::Small,
-        weapon: WeaponClass::AntiTank,
+        weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Barracks),
         train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
     },
@@ -728,7 +728,7 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_stats_use_barracks_training_without_default_attack_runtime() {
+    fn panzerfaust_stats_use_rifle_defaults_and_barracks_training() {
         let def = unit_def(EntityKind::Panzerfaust).expect("panzerfaust def");
         let rifleman_speed = unit_def(EntityKind::Rifleman)
             .expect("rifleman def")
@@ -736,9 +736,9 @@ mod tests {
             .speed;
 
         assert_eq!(def.stats.hp, 45);
-        assert_eq!(def.stats.dmg, 0);
-        assert_eq!(def.stats.range_tiles, balance::PANZERFAUST_RANGE_TILES);
-        assert_eq!(def.stats.cooldown, 0);
+        assert_eq!(def.stats.dmg, 5);
+        assert_eq!(def.stats.range_tiles, 4);
+        assert_eq!(def.stats.cooldown, 16);
         assert_eq!(def.stats.speed, rifleman_speed);
         assert_eq!(def.stats.sight_tiles, 11);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (60, 15));
@@ -746,7 +746,7 @@ mod tests {
         assert_eq!(def.stats.build_ticks, 400);
         assert_eq!(def.stats.radius, 9.0);
         assert_eq!(def.armor_class, ArmorClass::Small);
-        assert_eq!(def.weapon, WeaponClass::AntiTank);
+        assert_eq!(def.weapon, WeaponClass::SmallArms);
         assert_eq!(def.trained_at, Some(EntityKind::Barracks));
         assert_eq!(
             def.train_requirement,

@@ -227,7 +227,7 @@ pub struct CombatState {
     #[serde(default)]
     pub(in crate::game) tank_armor_reaction_lock: Option<TankArmorReactionLock>,
     /// Panzerfaust loaded-shot runtime. Only Panzerfaust entities carry this; the projectile is
-    /// hidden while in flight or reloading, then restored when the state returns to Loaded.
+    /// hidden after launch while the spent carrier completes its one-shot lifecycle.
     pub panzerfaust: Option<PanzerfaustState>,
 }
 
@@ -334,6 +334,8 @@ pub enum PanzerfaustState {
         ticks_remaining: u32,
     },
     Recovery {
+        #[serde(default)]
+        target: u32,
         ticks_remaining: u16,
     },
 }

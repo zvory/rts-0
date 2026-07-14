@@ -20,7 +20,6 @@ use crate::game::fog::Fog;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
-use crate::rules::combat as combat_rules;
 use crate::rules::projection;
 use crate::rules::terrain::{self, TerrainKind};
 
@@ -209,9 +208,7 @@ pub(crate) fn unit_explicit_attack_target_valid(
                 fog,
                 teams
             )
-            && smokes.is_none_or(|smokes| !smokes.point_inside(target.pos_x, target.pos_y))
-            && (attacker.kind != EntityKind::Panzerfaust
-                || combat_rules::is_panzerfaust_loaded_shot_target(target.kind)))
+            && smokes.is_none_or(|smokes| !smokes.point_inside(target.pos_x, target.pos_y)))
 }
 
 /// Nearest hostile entity (`is_enemy_targetable`) to `(px, py)` within `radius_px`.

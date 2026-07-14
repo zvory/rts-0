@@ -89,16 +89,21 @@ pub(super) fn apply_damage(
     );
 
     // Resolve weapon-specific accuracy before computing damage. Entrenchment is deterministic
-    // damage reduction, not another miss source.
-    if let Some(v) = entities.get(shot_victim) {
+    // damage reduction, not another miss source. A miss still leaves the shell path live so each
+    // overpenetration candidate can make its own independent accuracy roll.
+    let primary_missed = if let Some(v) = entities.get(shot_victim) {
         let mc = combat_rules::miss_chance_for_weapon(weapon_profile, v.kind)
             .max(extra_miss_chance.clamp(0.0, 1.0));
         if mc > 0.0 && rng.gen::<f32>() < mc {
             emit_miss_event(events, &attack_recipients, shot_victim);
-            return Some(victim_owner);
+            true
+        } else {
+            false
         }
-    }
-    let effective_dmg = match victim_kind {
+    } else {
+        false
+    };
+    let unentrenched_dmg = match victim_kind {
         Some(vk) => combat_rules::effective_damage_with_facing_for_weapon(
             weapon_profile,
             vk,
@@ -112,9 +117,11 @@ pub(super) fn apply_damage(
     };
     let effective_dmg = entities
         .get(shot_victim)
-        .map(|victim| entrenchment_combat::reduce_direct_damage(victim, effective_dmg))
-        .unwrap_or(effective_dmg);
-    let damaged = if let Some(v) = entities.get_mut(shot_victim) {
+        .map(|victim| entrenchment_combat::reduce_direct_damage(victim, unentrenched_dmg))
+        .unwrap_or(unentrenched_dmg);
+    let damaged = if primary_missed {
+        false
+    } else if let Some(v) = entities.get_mut(shot_victim) {
         let attribution = teams.is_enemy_owner(attacker_owner, v.owner).then_some((
             attacker_owner,
             (ax, ay),
@@ -132,26 +139,6 @@ pub(super) fn apply_damage(
                 victim.lock_tank_armor_reaction_source((ax, ay), tick);
             }
         }
-        apply_overpenetration(
-            map,
-            entities,
-            teams,
-            events,
-            fog,
-            smokes,
-            attacker,
-            shot_victim,
-            weapon_profile,
-            victim_entrenched,
-            effective_dmg,
-            attacker_owner,
-            ax,
-            ay,
-            shot_victim_pos.0,
-            shot_victim_pos.1,
-            range_px,
-            tick,
-        );
         push_under_attack_notices_for_visible_attack(
             events,
             fog,
@@ -162,6 +149,33 @@ pub(super) fn apply_damage(
             ay,
             shot_victim_pos.0,
             shot_victim_pos.1,
+        );
+    }
+    if damaged || primary_missed {
+        apply_overpenetration(
+            map,
+            entities,
+            teams,
+            events,
+            fog,
+            smokes,
+            rng,
+            attacker,
+            shot_victim,
+            weapon_profile,
+            damaged && victim_entrenched,
+            if primary_missed {
+                unentrenched_dmg
+            } else {
+                effective_dmg
+            },
+            attacker_owner,
+            ax,
+            ay,
+            shot_victim_pos.0,
+            shot_victim_pos.1,
+            range_px,
+            tick,
         );
     }
     Some(victim_owner)
@@ -175,6 +189,7 @@ fn apply_overpenetration(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
+    rng: &mut impl Rng,
     attacker: u32,
     primary_victim: u32,
     weapon_profile: &combat_rules::WeaponProfile,
@@ -270,6 +285,13 @@ fn apply_overpenetration(
 
     hits.sort_by(|a, b| a.3.total_cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
     for (id, tx, ty, _) in hits {
+        let missed = entities.get(id).is_some_and(|target| {
+            let miss_chance = combat_rules::miss_chance_for_weapon(weapon_profile, target.kind);
+            miss_chance > 0.0 && rng.gen::<f32>() < miss_chance
+        });
+        if missed {
+            continue;
+        }
         let effective_dmg = entities
             .get(id)
             .map(|e| {
