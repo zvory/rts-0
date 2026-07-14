@@ -30,6 +30,7 @@ await import("./client_contracts/match_notice_presenter_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");
 await import("./client_contracts/room_time_controls_contracts.mjs");
 await import("./client_contracts/room_time_panel_contracts.mjs");
+await import("./client_contracts/spectator_controls_panel_contracts.mjs");
 await import("./client_contracts/observation_contracts.mjs");
 await import("./client_contracts/protocol_contracts.mjs");
 await import("./client_contracts/panzerfaust_client_contracts.mjs");

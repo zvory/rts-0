@@ -1002,7 +1002,6 @@ export class Match {
   setAutoSpectatorEnabled(enabled) {
     if (!this.autoSpectator) return;
     this.autoSpectator.setEnabled(enabled);
-    this.syncSettingsToggleUi();
   }
 
   /** Compute world/viewport sizes and push them into the camera. */

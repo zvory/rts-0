@@ -20,6 +20,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "match_settings_context.js": "app-shell",
   "match_settings_toggles.js": "app-shell",
   "match_auto_spectator.js": "app-shell",
+  "spectator_controls_panel.js": "app-shell",
   "auto_spectator.js": "app-shell",
   "match_health.js": "app-shell",
   "frame_profiler.js": "app-shell",
