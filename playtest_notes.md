@@ -1,31 +1,30 @@
 jeffrey playtest 5
-* pause is not interacting well with movement prediction for the player who did not pause
-* select idle worker button 
+- [ ] pause is not interacting well with movement prediction for the player who did not pause
+- [x] select idle worker button (done: PR #936, the HUD shows an authoritative idle-worker count and selects all idle workers)
 
 jeffrey playtest 4
-* units that have move while firing capability, on move command should always move toward the destination and shoot. but on attack move, they shoudl stop once they reach an enemy. 
-* anti tank gun setting up direction is fucked up and doesn't reflect wher ethe mouse is, as in the preview cone is wrong. but it does set up in the right direction
-* open in lab button during replays
-* when machine gunner is running towards a entrenched rifleman, he just sets up outside rifleman range and kills him, so bump rifleman range by 1
-* we do get too much money because we max so fast 
-* workers should bounce to next additional base with free steel
-* make scout car breakthrough aura permanent
-* make pumpjacks way easier to build. 
-* the gun sounds are too constant and loud, I want information I can use and pew pew pew isnt helping me much. if we could have less audio noise and more notifications for minerals running out and stuff like that I think it would be better
+- [x] units that have move while firing capability, on move command should always move toward the destination and shoot. but on attack move, they shoudl stop once they reach an enemy. (done: PR #887, moving-fire units keep Move destinations while Attack Move acquires and stops for enemies)
+- [x] anti tank gun setting up direction is fucked up and doesn't reflect wher ethe mouse is, as in the preview cone is wrong. but it does set up in the right direction (done: PR #891, the setup preview uses the same authoritative direction as execution)
+- [ ] open in lab button during replays
+- [ ] when machine gunner is running towards a entrenched rifleman, he just sets up outside rifleman range and kills him, so bump rifleman range by 1
+- [ ] we do get too much money because we max so fast
+- [ ] workers should bounce to next additional base with free steel
+- [x] make scout car breakthrough aura permanent (done: Command Cars continuously grant a permanent 1.2x speed aura; active Breakthrough remains stronger)
+- [ ] make pumpjacks way easier to build.
+- [ ] the gun sounds are too constant and loud, I want information I can use and pew pew pew isnt helping me much. if we could have less audio noise and more notifications for minerals running out and stuff like that I think it would be better
 
 
 
 jeffrey playtest 3
-* artillery does a quarter the damage and has a quarter the cost, but has the same build time and all other stats
-* get an artillery whizz bang noise
-* setting up and unsetting up an artillery should take twice as long
-* create 1v1 map
-* artillery is just unfun!  
-* 
+- [ ] artillery does a quarter the damage and has a quarter the cost, but has the same build time and all other stats
+- [x] get an artillery whizz bang noise (done: timed incoming-whistle and landing-blast audio reaches the target with the shell impact)
+- [x] setting up and unsetting up an artillery should take twice as long (done: setup and teardown doubled from three to six seconds)
+- [x] create 1v1 map (done: PR #932 updated the default authoritative 1v1 map)
+- [ ] artillery is just unfun!
 
 
 
-- [ ] TODO: Tiger raster pass: hull/turret alignment is off; the turret appears to rotate around an offset point instead of its visual center. Fix the PNG rig pivot/anchor alignment later.
+- [x] TODO: Tiger raster pass: hull/turret alignment is off; the turret appears to rotate around an offset point instead of its visual center. Fix the PNG rig pivot/anchor alignment later. (done: the active Tiger atlas uses a visible-center turret origin with runtime coverage)
 
 - [ ] TODO: download an FW 189 scout plane sound effect
 
@@ -61,7 +60,6 @@ jeffrey playtest
 - [x] MORTAR ANIMATION (done: mortar launch/shell/impact visuals)
 - [x] artillery does not requir AT guns (done: PR #521, Heavy Guns unlocks Artillery alongside AT Guns with no second artillery research)
 - [x] pause button broken (done: live pause UI)
-- [ ]
 - [ ] side paths slowing field that A* is aware of, they are muddy/rocky or something
 - [x] anti tank atack for riflement (done: in-range armored fallback targeting)
 - [x] machine gunners dig in and attacks get change to miss OR increased machine gunner range so one can deter a scout car (done: Entrenchment lets eligible infantry, including Machine Gunners, dig trenches with +1 range, 70% direct miss chance, and 70% area damage reduction)
@@ -153,13 +151,13 @@ luke playtest
 
 - [ ] the riflemen are so slow, that you basically always want to go to the machine gunners, there's no such thing as a rush
 
-- [ ] should be able to attack own buildings
+- [x] should be able to attack own buildings (done: explicit self-attack orders are accepted and resolved, including Panzerfaust impacts)
 
 - [x] cant deconstruct your own tank traps (done: PR #509, workers can deconstruct completed tank traps)
 
 - [x] tanks should prioritize shooting anti tank guns (done: current targeting priority checks in-range AT guns first)
 
-- [ ] reduce artillery range by 5 and, and put little artillery icons ont he minimap when yhey're firing, like use the ltieral exact artillery thing
+- [x] reduce artillery range by 5 and, and put little artillery icons ont he minimap when yhey're firing, like use the ltieral exact artillery thing (done: artillery max range was reduced and firing events draw the artillery rig icon on every player's minimap)
 
 - [ ] make tanks eight supply and doule comand car bonus (partial: tanks now 8 supply; command car bonus increased from 12 to 20, not doubled to 24)
 
@@ -189,7 +187,7 @@ luke playtest
 
 - [ ] the vehicle works should take way longer to build or take longer, or need something more
 
-- [ ] when activating breakthrough on a command car, or when mousing over the ability, it shoudl dislpay the AOE ring, and icnrease the AOE of rbeakthrough by two
+- [x] when activating breakthrough on a command car, or when mousing over the ability, it shoudl dislpay the AOE ring, and icnrease the AOE of rbeakthrough by two (done: Breakthrough increased from 7 to 9 tiles and shows hover and active aura rings)
 
 - [x] engineers should be able to make tank traps that vehicles can't pass through but units can (done: PR #145)
 
@@ -208,7 +206,7 @@ luke playtest
 
 -----
 
-- [ ] make the line shot a deep blue color that leaves a streak
+- [x] make the line shot a deep blue color that leaves a streak (done: Ekat Line Shot renders as a solid dark-blue projectile with a short fading trail)
 
 - [x] command cars should not count towards seleciton limit (done: command budget adds each Command Car's own command weight plus the Command Car cap bonus)
 
@@ -300,4 +298,4 @@ luke playtest
 
 - [x] store all played replays in a database and make them replayable from the lobby (done: match history exists)
 
-- [ ] implement roads that allow faster movement
+- [x] implement roads that allow faster movement (done: five road terrain variants apply a server-authoritative 1.4x movement multiplier and are supported by the map editor)
