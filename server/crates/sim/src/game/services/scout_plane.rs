@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, ScoutPlaneState};
 use crate::game::map::Map;
-use crate::game::services::dist2;
 
 const TWO_PI: f32 = std::f32::consts::PI * 2.0;
 const ORBIT_PHASE_EPS: f32 = 0.001;
@@ -11,7 +10,7 @@ const ORBIT_PHASE_EPS: f32 = 0.001;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScoutPlaneLaunchError {
     Active,
-    NoCityCentre,
+    InvalidLaunch,
 }
 
 pub(crate) fn launch_ability(
@@ -26,7 +25,7 @@ pub(crate) fn launch_ability(
         return Err(ScoutPlaneLaunchError::Active);
     }
     let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
-        return Err(ScoutPlaneLaunchError::NoCityCentre);
+        return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
     let Some((launch_x, launch_y)) = entities
         .get(source_command_car)
@@ -35,27 +34,18 @@ pub(crate) fn launch_ability(
         })
         .map(|source| (source.pos_x, source.pos_y))
     else {
-        return Err(ScoutPlaneLaunchError::NoCityCentre);
+        return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
     let Some((launch_x, launch_y)) = clamp_world_point(map, launch_x, launch_y) else {
-        return Err(ScoutPlaneLaunchError::NoCityCentre);
-    };
-    let Some((return_city_centre, _, _)) =
-        nearest_owned_completed_city_centre(entities, owner, target_x, target_y)
-    else {
-        return Err(ScoutPlaneLaunchError::NoCityCentre);
+        return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
     let spawned = entities
         .spawn_unit(owner, EntityKind::ScoutPlane, launch_x, launch_y)
-        .ok_or(ScoutPlaneLaunchError::NoCityCentre)?;
+        .ok_or(ScoutPlaneLaunchError::InvalidLaunch)?;
     if let Some(plane) = entities.get_mut(spawned) {
         if let Some(state) = plane.scout_plane_state_mut() {
-            *state = ScoutPlaneState::launched_from_command_car(
-                return_city_centre,
-                source_command_car,
-                target_x,
-                target_y,
-            );
+            *state =
+                ScoutPlaneState::launched_from_command_car(source_command_car, target_x, target_y);
         }
     }
     Ok(spawned)
@@ -100,27 +90,6 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
             continue;
         };
 
-        if snapshot.returning {
-            let Some(home) = snapshot.home_position else {
-                removals.push(id);
-                continue;
-            };
-            let step = advance_return(snapshot.flight.x, snapshot.flight.y, home, speed, world_max);
-            if let Some(plane) = entities.get_mut(id) {
-                plane.clear_path();
-                plane.set_path_goal(None);
-                plane.set_position(step.x, step.y);
-                plane.set_movement_delta(step.x - snapshot.flight.x, step.y - snapshot.flight.y);
-                if let Some(facing) = step.facing {
-                    plane.set_facing(facing);
-                }
-            }
-            if step.arrived {
-                removals.push(id);
-            }
-            continue;
-        }
-
         let step = advance_one(snapshot.flight, speed, orbit_radius, world_max);
         let mut station_expired = false;
         if let Some(plane) = entities.get_mut(id) {
@@ -145,18 +114,7 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
         }
 
         if station_expired {
-            match snapshot.home_position {
-                Some(home) => {
-                    if let Some(plane) = entities.get_mut(id) {
-                        if let Some(state) = plane.scout_plane_state_mut() {
-                            state.returning = true;
-                            state.orbiting = false;
-                            state.orbit_center = home;
-                        }
-                    }
-                }
-                None => removals.push(id),
-            }
+            removals.push(id);
         }
     }
 
@@ -200,8 +158,6 @@ fn ensure_state(entities: &mut EntityStore, id: u32) {
 #[derive(Clone, Copy)]
 struct ScoutPlaneRuntimeSnapshot {
     flight: ScoutPlaneSnapshot,
-    home_position: Option<(f32, f32)>,
-    returning: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -230,9 +186,6 @@ fn scout_plane_runtime_snapshot(
     } else {
         0.0
     };
-    let home_position = state
-        .home_city_centre
-        .and_then(|home| home_position(entities, plane.owner, home));
     Some(ScoutPlaneRuntimeSnapshot {
         flight: ScoutPlaneSnapshot {
             x: plane.pos_x,
@@ -241,8 +194,6 @@ fn scout_plane_runtime_snapshot(
             phase,
             orbiting: state.orbiting,
         },
-        home_position,
-        returning: state.returning,
     })
 }
 
@@ -332,77 +283,6 @@ fn advance_one(
         orbiting,
         facing,
     }
-}
-
-#[derive(Clone, Copy)]
-struct ReturnStep {
-    x: f32,
-    y: f32,
-    facing: Option<f32>,
-    arrived: bool,
-}
-
-fn advance_return(x: f32, y: f32, target: (f32, f32), speed: f32, world_max: f32) -> ReturnStep {
-    let x = x.clamp(0.0, world_max);
-    let y = y.clamp(0.0, world_max);
-    let target = (
-        target.0.clamp(0.0, world_max),
-        target.1.clamp(0.0, world_max),
-    );
-    let dx = target.0 - x;
-    let dy = target.1 - y;
-    let dist = (dx * dx + dy * dy).sqrt();
-    if !dist.is_finite() || dist <= speed.max(0.0) + ORBIT_PHASE_EPS {
-        return ReturnStep {
-            x: target.0,
-            y: target.1,
-            facing: (dist > ORBIT_PHASE_EPS).then_some(dy.atan2(dx)),
-            arrived: true,
-        };
-    }
-    let travel = speed.max(0.0);
-    let inv = 1.0 / dist;
-    ReturnStep {
-        x: (x + dx * inv * travel).clamp(0.0, world_max),
-        y: (y + dy * inv * travel).clamp(0.0, world_max),
-        facing: Some(dy.atan2(dx)),
-        arrived: false,
-    }
-}
-
-fn nearest_owned_completed_city_centre(
-    entities: &EntityStore,
-    owner: u32,
-    x: f32,
-    y: f32,
-) -> Option<(u32, f32, f32)> {
-    entities
-        .iter()
-        .filter(|candidate| {
-            candidate.owner == owner
-                && candidate.kind == EntityKind::CityCentre
-                && candidate.hp > 0
-                && !candidate.under_construction()
-        })
-        .map(|candidate| {
-            (
-                candidate.id,
-                candidate.pos_x,
-                candidate.pos_y,
-                dist2(x, y, candidate.pos_x, candidate.pos_y),
-            )
-        })
-        .min_by(|a, b| a.3.total_cmp(&b.3).then_with(|| a.0.cmp(&b.0)))
-        .map(|(id, pos_x, pos_y, _)| (id, pos_x, pos_y))
-}
-
-fn home_position(entities: &EntityStore, owner: u32, home: u32) -> Option<(f32, f32)> {
-    let building = entities.get(home)?;
-    (building.owner == owner
-        && building.kind == EntityKind::CityCentre
-        && building.hp > 0
-        && !building.under_construction())
-    .then_some((building.pos_x, building.pos_y))
 }
 
 fn clamp_world_point(map: &Map, x: f32, y: f32) -> Option<(f32, f32)> {

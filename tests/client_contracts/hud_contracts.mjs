@@ -921,7 +921,7 @@ function fakeHudRootWithoutResourceSpans() {
   const cityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutPlaneCityCentre],
     entities: [scoutPlaneCityCentre],
-    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
   assert(!cityCentreScoutPlaneCard.slots.some((slot) => slot?.label === "Scout Plane"), "City Centre no longer exposes Scout Plane training");
 
@@ -937,7 +937,7 @@ function fakeHudRootWithoutResourceSpans() {
   const commandCarScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar],
     entities: [scoutPlaneCityCentre, commandCar],
-    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
   const scoutPlaneAbility = buttonByLabel(commandCarScoutPlaneCard, "Scout Plane");
   assert(scoutPlaneAbility.slotIndex === 8, "Command Car Scout Plane ability should use the C slot");
@@ -945,23 +945,22 @@ function fakeHudRootWithoutResourceSpans() {
   assert(scoutPlaneAbility.intent.type === "ability", "Scout Plane button should arm an ability target");
   assert(scoutPlaneAbility.intent.targetMode === "worldPoint", "Scout Plane ability should target a world point");
   assert(scoutPlaneAbility.intent.readyIds.join(",") === "74", "Scout Plane ability should use the selected Command Car");
-  assert(scoutPlaneAbility.cost.steel === 50 && scoutPlaneAbility.cost.oil === 50, "Scout Plane ability should show 50/50 cost");
-  assert(scoutPlaneAbility.enabled, "Scout Plane ability should enable with a completed City Centre and resources");
+  assert(scoutPlaneAbility.cost.steel === 50 && scoutPlaneAbility.cost.oil === 75, "Scout Plane ability should show 50/75 cost");
+  assert(scoutPlaneAbility.enabled, "Scout Plane ability should enable with sufficient resources");
 
   const noCityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar],
     entities: [commandCar],
-    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
     playerHasCompleteKind: (kind) => kind === KIND.FACTORY,
   }));
   const noCityCentreScoutPlane = buttonByLabel(noCityCentreScoutPlaneCard, "Scout Plane");
-  assert(!noCityCentreScoutPlane.enabled, "Scout Plane ability should require a completed City Centre");
-  assert(noCityCentreScoutPlane.title === "Requires City Centre", "Scout Plane missing-City-Centre tooltip should name the requirement");
+  assert(noCityCentreScoutPlane.enabled, "Scout Plane ability should not require a completed City Centre");
 
   const oilBlockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar],
     entities: [scoutPlaneCityCentre, commandCar],
-    resources: { steel: 50, oil: 49, supplyUsed: 0, supplyCap: 10 },
+    resources: { steel: 50, oil: 74, supplyUsed: 0, supplyCap: 10 },
   }));
   const oilBlockedScoutPlane = buttonByLabel(oilBlockedScoutPlaneCard, "Scout Plane");
   assert(!oilBlockedScoutPlane.enabled, "Scout Plane ability should disable when oil is short");
@@ -979,7 +978,7 @@ function fakeHudRootWithoutResourceSpans() {
   const activeScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar],
     entities: [scoutPlaneCityCentre, commandCar, activeScoutPlane],
-    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
   const activeBlockedScoutPlane = buttonByLabel(activeScoutPlaneCard, "Scout Plane");
   assert(!activeBlockedScoutPlane.enabled, "Scout Plane ability should disable while that Command Car's plane is active");
@@ -992,7 +991,7 @@ function fakeHudRootWithoutResourceSpans() {
   const mixedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar, secondCommandCar],
     entities: [scoutPlaneCityCentre, commandCar, secondCommandCar, activeScoutPlane],
-    resources: { steel: 50, oil: 50, supplyUsed: 0, supplyCap: 10 },
+    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
   const mixedScoutPlaneAbility = buttonByLabel(mixedScoutPlaneCard, "Scout Plane");
   assert(mixedScoutPlaneAbility.enabled, "another selected Command Car can launch while the first car's plane is active");

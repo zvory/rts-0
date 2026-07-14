@@ -49,18 +49,12 @@ pub(in crate::game) struct ScoutPlaneState {
     pub(in crate::game) orbit_phase: f32,
     /// Whether the plane has reached the orbit area for `orbit_center`.
     pub(in crate::game) orbiting: bool,
-    /// Closest City Centre to the sortie target when launched; the plane returns here.
-    #[serde(default)]
-    pub(in crate::game) home_city_centre: Option<u32>,
     /// Command Car that launched this sortie. Each car may have one active plane.
     #[serde(default)]
     pub(in crate::game) source_command_car: Option<u32>,
     /// Ticks remaining on station after reaching the orbit area.
     #[serde(default = "default_scout_plane_station_ticks")]
     pub(in crate::game) station_ticks_remaining: u16,
-    /// Whether the plane is flying to its assigned return City Centre.
-    #[serde(default)]
-    pub(in crate::game) returning: bool,
 }
 
 impl ScoutPlaneState {
@@ -69,29 +63,19 @@ impl ScoutPlaneState {
             orbit_center: (x, y),
             orbit_phase: 0.0,
             orbiting: false,
-            home_city_centre: None,
             source_command_car: None,
             station_ticks_remaining: config::SCOUT_PLANE_ORBIT_DURATION_TICKS,
-            returning: false,
-        }
-    }
-
-    pub(in crate::game) fn launched_from(home_city_centre: u32, x: f32, y: f32) -> Self {
-        Self {
-            home_city_centre: Some(home_city_centre),
-            ..Self::launched_at(x, y)
         }
     }
 
     pub(in crate::game) fn launched_from_command_car(
-        home_city_centre: u32,
         source_command_car: u32,
         x: f32,
         y: f32,
     ) -> Self {
         Self {
             source_command_car: Some(source_command_car),
-            ..Self::launched_from(home_city_centre, x, y)
+            ..Self::launched_at(x, y)
         }
     }
 

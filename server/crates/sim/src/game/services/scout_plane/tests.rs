@@ -18,12 +18,6 @@ fn test_map(size: u32) -> Map {
     }
 }
 
-fn spawn_city_centre(entities: &mut EntityStore, owner: u32, x: f32, y: f32) -> u32 {
-    entities
-        .spawn_building(owner, EntityKind::CityCentre, x, y, true)
-        .expect("city centre should spawn")
-}
-
 fn spawn_plane(entities: &mut EntityStore, owner: u32, x: f32, y: f32) -> u32 {
     entities
         .spawn_unit(owner, EntityKind::ScoutPlane, x, y)
@@ -53,21 +47,18 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     assert_eq!(def.stats.cooldown, 0);
     assert_eq!(def.stats.sight_tiles, 15);
     assert_eq!(def.stats.cost_steel, 50);
-    assert_eq!(def.stats.cost_oil, 50);
+    assert_eq!(def.stats.cost_oil, 75);
     assert_eq!(def.stats.supply, 0);
     assert_eq!(def.stats.build_ticks, 0);
     assert_eq!(config::SCOUT_PLANE_ORBIT_RADIUS_TILES, 4);
-    assert_eq!(config::SCOUT_PLANE_ORBIT_DURATION_TICKS, 300);
+    assert_eq!(config::SCOUT_PLANE_ORBIT_DURATION_TICKS, 600);
     assert_eq!(config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS, 900);
 }
 
 #[test]
-fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return() {
+fn scout_plane_launches_from_caster_without_a_city_centre() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
-    let far = spawn_city_centre(&mut entities, 1, 96.0, 96.0);
-    let near = spawn_city_centre(&mut entities, 1, 768.0, 768.0);
-    let enemy = spawn_city_centre(&mut entities, 2, 800.0, 800.0);
     let source_command_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 320.0, 448.0)
         .expect("source Command Car should spawn");
@@ -80,7 +71,6 @@ fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return()
     assert_eq!(plane_entity.pos_y, 448.0);
 
     let state = plane_state(&entities, plane);
-    assert_eq!(state.home_city_centre, Some(near));
     assert_eq!(state.source_command_car, Some(source_command_car));
     assert_eq!(state.orbit_center, (790.0, 790.0));
     assert_eq!(
@@ -89,23 +79,20 @@ fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return()
     );
     assert_eq!(
         launch_ability(&map, &mut entities, 3, 77, 128.0, 128.0),
-        Err(ScoutPlaneLaunchError::NoCityCentre)
+        Err(ScoutPlaneLaunchError::InvalidLaunch)
     );
-    assert_eq!(entities.get(far).expect("far cc").owner, 1);
-    assert_eq!(entities.get(enemy).expect("enemy cc").owner, 2);
 }
 
 #[test]
-fn scout_plane_orbit_timer_starts_after_arrival_then_returns_and_despawns() {
+fn scout_plane_orbit_timer_starts_after_arrival_then_plane_disappears() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
-    let home = spawn_city_centre(&mut entities, 1, 256.0, 256.0);
     let plane = spawn_plane(&mut entities, 1, 256.0, 256.0);
     if let Some(state) = entities
         .get_mut(plane)
         .and_then(|plane| plane.scout_plane_state_mut())
     {
-        *state = ScoutPlaneState::launched_from(home, 256.0, 256.0);
+        *state = ScoutPlaneState::launched_at(256.0, 256.0);
         state.station_ticks_remaining = 1;
     }
 
@@ -116,43 +103,10 @@ fn scout_plane_orbit_timer_starts_after_arrival_then_returns_and_despawns() {
         state.station_ticks_remaining, 1,
         "station timer should not decrement on the arrival tick"
     );
-    assert!(!state.returning);
-
-    advance_scout_planes(&map, &mut entities);
-    assert!(
-        plane_state(&entities, plane).returning,
-        "expired station time should start return-to-base"
-    );
-
-    for _ in 0..512 {
-        if entities.get(plane).is_none() {
-            return;
-        }
-        advance_scout_planes(&map, &mut entities);
-    }
-    panic!("returning Scout Plane should despawn on reaching home");
-}
-
-#[test]
-fn scout_plane_disappears_after_orbit_if_home_city_centre_died() {
-    let map = test_map(32);
-    let mut entities = EntityStore::new();
-    let home = spawn_city_centre(&mut entities, 1, 256.0, 256.0);
-    let plane = spawn_plane(&mut entities, 1, 256.0, 256.0);
-    if let Some(state) = entities
-        .get_mut(plane)
-        .and_then(|plane| plane.scout_plane_state_mut())
-    {
-        *state = ScoutPlaneState::launched_from(home, 256.0, 256.0);
-        state.station_ticks_remaining = 1;
-    }
-
-    advance_scout_planes(&map, &mut entities);
-    let _ = entities.remove(home);
     advance_scout_planes(&map, &mut entities);
     assert!(
         entities.get(plane).is_none(),
-        "plane should disappear when station time ends without its return City Centre"
+        "plane should disappear as soon as its station time expires"
     );
 }
 
@@ -173,7 +127,6 @@ fn duplicate_scout_planes_are_cleaned_up_before_extra_mission_processing() {
 fn scout_planes_from_different_command_cars_survive_mission_processing() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
-    let home = spawn_city_centre(&mut entities, 1, 256.0, 256.0);
     let first = spawn_plane(&mut entities, 1, 128.0, 128.0);
     let second = spawn_plane(&mut entities, 1, 160.0, 160.0);
     for (plane, command_car) in [(first, 10), (second, 11)] {
@@ -181,7 +134,7 @@ fn scout_planes_from_different_command_cars_survive_mission_processing() {
             .get_mut(plane)
             .and_then(|plane| plane.scout_plane_state_mut())
         {
-            *state = ScoutPlaneState::launched_from_command_car(home, command_car, 512.0, 512.0);
+            *state = ScoutPlaneState::launched_from_command_car(command_car, 512.0, 512.0);
         }
     }
 

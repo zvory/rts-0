@@ -171,8 +171,8 @@ or regime-specific iconography.
 
 MVP scope:
 - No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Command Car
-  Scout Plane ability. It consumes player oil through a hidden fuel reserve, refills that reserve
-  rapidly when oil is available, and is dismissed manually or automatically when fuel is exhausted.
+  Scout Plane ability. Each sortie flies to a targeted orbit, provides vision for 20 seconds after
+  arrival, and then disappears.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
   early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
@@ -358,16 +358,16 @@ folded into default targeting.
   half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
   cars, and command cars cannot advance while their owner has zero oil.
 - Scout Plane constants for the Command Car Scout Plane ability:
-  `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 50`,
+  `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 75`,
   `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 15`,
   `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.0`, `SCOUT_PLANE_SUPPLY = 0`,
-  `SCOUT_PLANE_ORBIT_RADIUS_TILES = 4`, `SCOUT_PLANE_ORBIT_DURATION_TICKS = 300`,
+  `SCOUT_PLANE_ORBIT_RADIUS_TILES = 4`, `SCOUT_PLANE_ORBIT_DURATION_TICKS = 600`,
   and `SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = 900`. It has no default weapon and a zero-radius
   authoritative movement/collision body, so it neither reserves nor blocks ground pathing. The
   client mirror uses a 48x34 px body and 17 px render size. Command Cars keep Breakthrough and add
-  Scout Plane on the `C` grid slot; the ability requires a completed owned City Centre, launches
-  instantly from the selected Command Car, and admits at most one active Scout Plane per Command
-  Car. Each Command Car tracks its own 30-second cooldown.
+  Scout Plane on the `C` grid slot; the ability launches instantly from the selected Command Car
+  without a City Centre requirement and admits at most one active Scout Plane per Command Car.
+  Each Command Car tracks its own 30-second cooldown.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
   `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; autonomous armor
   reaction, turret aiming, collision shoves, and external pulls do not.
@@ -540,7 +540,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 50  | 0   | 0; launched instantly from the selected Command Car and returns to the owned completed City Centre nearest the target; one active per Command Car; non-combat recon with 4-tile orbit radius, 10-second orbit after arrival, 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from the selected Command Car without a City Centre requirement; one active per Command Car; non-combat recon with 4-tile orbit radius, 20-second orbit after arrival followed by despawn, 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 13    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
@@ -551,7 +551,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains workers; +50 supply; players start with one free; completed owned City Centres are Scout Plane launch anchors |
+| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains workers; +50 supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +50 supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; +8 supply if present |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |

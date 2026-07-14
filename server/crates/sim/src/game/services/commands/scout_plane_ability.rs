@@ -86,9 +86,9 @@ pub(super) fn use_ability(
                 "Scout Plane already active for this Command Car",
             );
         }
-        Err(ScoutPlaneLaunchError::NoCityCentre) => {
+        Err(ScoutPlaneLaunchError::InvalidLaunch) => {
             ps.refund_cost(definition.cost);
-            notice(events, player, "Requires City Centre");
+            notice(events, player, "Unable to launch Scout Plane");
         }
     }
 }
