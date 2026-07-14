@@ -108,6 +108,16 @@ function commandCarCard() {
   );
   assert(
     catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("ability", ABILITY.POINT_FIRE) &&
+        command.slotIndex === 7
+    ) && catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("ability", ABILITY.BLANKET_FIRE) &&
+        command.slotIndex === 8
+    ),
+    "hotkey command catalog keeps lower-priority artillery abilities discoverable",
+  );
+  assert(
+    catalog.commands.some((command) =>
       command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
         command.label === "Heavy Guns" &&
         command.slotIndex === 0
@@ -119,7 +129,13 @@ function commandCarCard() {
 {
   const hotkeys = service();
   assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_GRID)), "Grid preset is immutable");
-  assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_CLASSIC).bindings), "Classic preset bindings are immutable");
+  const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
+  assert(Object.isFrozen(classic.bindings), "Classic preset bindings are immutable");
+  assert.equal(
+    hotkeys.runtimeDiagnostics(classic).ok,
+    true,
+    "Classic preset has no conflicts in any cataloged command-card context",
+  );
   assert.equal(hotkeys.getActiveProfile().id, HOTKEY_PRESET_GRID, "Grid is the default active profile");
   hotkeys.setActiveProfile(HOTKEY_PRESET_CLASSIC);
   assert.equal(

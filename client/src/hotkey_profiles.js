@@ -544,12 +544,23 @@ function buildClassicBindingMaps(catalog) {
 }
 
 function resolveContextConflicts(bindingMaps, catalog) {
+  const commandById = new Map((catalog?.commands || [])
+    .map((command) => [command.commandId, command]));
   for (const context of catalog?.contexts || []) {
     const used = new Set();
     for (const commandId of context.commandIds) {
       const current = bindingForCommand(bindingMaps, commandId);
       if (current && !used.has(current)) {
         used.add(current);
+        continue;
+      }
+      const command = commandById.get(commandId);
+      const gridKey = Number.isInteger(command?.slotIndex)
+        ? gridHotkeyForSlot(command.slotIndex)
+        : "";
+      if (gridKey && !used.has(gridKey)) {
+        setBindingForCommand(bindingMaps, commandId, gridKey);
+        used.add(gridKey);
         continue;
       }
       const next = firstFreeKey(used);

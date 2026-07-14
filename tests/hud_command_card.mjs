@@ -13,6 +13,7 @@ import {
   FIXTURE_FACTION_ID,
   WORKER_BUILDABLE,
   commandCardAbilitiesForFaction,
+  factionCatalog,
   workerBuildablesForFaction,
 } from "../client/src/config.js";
 import { ABILITY, KIND, LAB_ROLE, SETUP, UPGRADE } from "../client/src/protocol.js";
@@ -361,6 +362,56 @@ function buttonSlots(card) {
 }
 
 {
+  const abilitiesByKind = {
+    [KIND.SCOUT_CAR]: [ABILITY.SMOKE],
+    [KIND.MORTAR_TEAM]: [ABILITY.MORTAR_FIRE],
+    [KIND.ARTILLERY]: [ABILITY.POINT_FIRE, ABILITY.BLANKET_FIRE],
+    [KIND.COMMAND_CAR]: [ABILITY.BREAKTHROUGH, ABILITY.SCOUT_PLANE],
+  };
+  const everyKriegsiaUnit = factionCatalog("kriegsia").units.map((kind, index) => ({
+    id: 100 + index,
+    owner: 1,
+    kind,
+    hp: 100,
+    x: index * 32,
+    y: 32,
+    ...(kind === KIND.ANTI_TANK_GUN || kind === KIND.ARTILLERY
+      ? { setupState: SETUP.DEPLOYED }
+      : {}),
+    abilities: (abilitiesByKind[kind] || []).map((ability) => ({
+      ability,
+      cooldownLeft: 0,
+      remainingUses: ability === ABILITY.SMOKE ? 1 : null,
+    })),
+  }));
+  const combinedCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: "kriegsia",
+    selection: everyKriegsiaUnit,
+    entities: everyKriegsiaUnit,
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+
+  assert.deepEqual(buttonSlots(combinedCard), [
+    { commandId: "unit.move", slotIndex: 0, hotkey: "Q" },
+    { commandId: "unit.holdPosition", slotIndex: 1, hotkey: "W" },
+    { commandId: kriegsiaCommandId("ability", ABILITY.BREAKTHROUGH), slotIndex: 2, hotkey: "E" },
+    { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
+    { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
+    { commandId: kriegsiaCommandId("ability", ABILITY.SMOKE), slotIndex: 5, hotkey: "D" },
+    { commandId: "unit.setupSupportWeapon", slotIndex: 6, hotkey: "Z" },
+    { commandId: kriegsiaCommandId("ability", ABILITY.MORTAR_FIRE), slotIndex: 7, hotkey: "X" },
+    { commandId: kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE), slotIndex: 8, hotkey: "C" },
+  ], "mixed ability collisions keep their preferred slots and favor non-artillery abilities");
+  assert(!combinedCard.slots.some((slot) =>
+    slot?.ability === ABILITY.POINT_FIRE || slot?.ability === ABILITY.BLANKET_FIRE
+  ), "Point Fire and Blanket Fire yield their colliding slots in a full Kriegsia selection");
+}
+
+{
   const fixtureWorker = { id: 40, owner: 1, kind: KIND.WORKER };
   const fixtureBuildCard = buildCommandCardDescriptors({
     playerId: 1,
@@ -478,6 +529,7 @@ function buttonSlots(card) {
     "worker-build",
     "mixed-army-support",
     "command-car",
+    "artillery",
     "city-centre-train",
     "barracks-train",
     "factory-train",
