@@ -7,12 +7,11 @@ import { InteractDriver, InteractDriverError } from "./driver.ts";
 import {
   ALIAS_RE, ALL_CATALOG_CATEGORIES, INTERACT_LIMITS,
 } from "./command_inputs.ts";
-import {
-  commandDefinition,
-} from "./command_registry.ts";
+import { commandDefinition } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
 import { captureGameScreenshot } from "./game_screenshot.ts";
 import { gameInspectionOwnership, gameSessionCapabilities, requireGameSpectator } from "./game_session.ts";
+import { defaultMapForMode } from "./session_defaults.ts";
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
 export { INTERACT_LIMITS } from "./command_inputs.ts";
 export { INTERACT_COMMANDS } from "./command_registry.ts";
@@ -190,7 +189,7 @@ export class InteractService {
     const openAbortController = new AbortController();
     this.openAbortController = openAbortController;
     this.openingKind = kind;
-    const map = input.map || (kind === "lab" ? "1v1" : "Default");
+    const map = input.map || defaultMapForMode(kind);
     this.openPromise = (async () => {
       const driver = await this.driverFactory({
         workspaceRoot,
