@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::{Duration, Instant as StdInstant};
 
@@ -15,7 +15,6 @@ use super::super::dev_replay::match_seed;
 use super::super::lab_replay_operations::lab_op_to_replay_operation;
 use super::super::lab_timeline::LabTimeline;
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
-use super::super::live_tick::LabSnapshotProjection;
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
@@ -29,7 +28,7 @@ use crate::lab_scenarios::{
 };
 use crate::protocol::{
     Event, InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
-    LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode, ServerMessage, TeamId,
+    LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode, ServerMessage,
     DEFAULT_FACTION_ID,
 };
 use crate::structured_log::{self, MatchStartedLog};
@@ -163,20 +162,14 @@ impl LabSession {
     }
 }
 
-fn players_on_teams(game: &Game, team_ids: impl IntoIterator<Item = TeamId>) -> Vec<u32> {
-    let teams: HashSet<_> = team_ids.into_iter().collect();
+fn player_ids_for_vision(game: &Game, vision: &LabVisionMode) -> Vec<u32> {
     game.start_payload()
         .players
         .into_iter()
-        .filter(|player| teams.contains(&player.team_id))
-        .map(|player| player.id)
-        .collect()
-}
-
-fn all_player_ids(game: &Game) -> Vec<u32> {
-    game.start_payload()
-        .players
-        .into_iter()
+        .filter(|player| match vision {
+            LabVisionMode::All => true,
+            LabVisionMode::Team { team_id } => player.team_id == *team_id,
+        })
         .map(|player| player.id)
         .collect()
 }
@@ -856,10 +849,10 @@ impl RoomTask {
             .map(|session| session.metadata_for(player_id, god_mode_players))
     }
 
-    pub(super) fn lab_snapshot_projections(
+    pub(super) fn lab_visible_player_ids_by_recipient(
         &self,
         game: &Game,
-    ) -> HashMap<u32, LabSnapshotProjection> {
+    ) -> HashMap<u32, Vec<u32>> {
         let Some(session) = &self.lab_session else {
             return HashMap::new();
         };
@@ -868,15 +861,7 @@ impl RoomTask {
             if !self.players.contains_key(&id) {
                 continue;
             }
-            let projection = match session.vision_for(id) {
-                LabVisionMode::All => LabSnapshotProjection::PlayerUnion {
-                    player_ids: all_player_ids(game),
-                },
-                LabVisionMode::Team { team_id } => LabSnapshotProjection::PlayerUnion {
-                    player_ids: players_on_teams(game, std::iter::once(team_id)),
-                },
-            };
-            projections.insert(id, projection);
+            projections.insert(id, player_ids_for_vision(game, &session.vision_for(id)));
         }
         projections
     }
@@ -896,7 +881,7 @@ impl RoomTask {
             }
         };
         let mut per_player_events: HashMap<u32, Vec<Event>> = HashMap::new();
-        let lab_snapshot_projections = self.lab_snapshot_projections(&game);
+        let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient(&game);
         let recipients = self.order.clone();
         SnapshotFanout::new(
             &self.room,
@@ -907,12 +892,11 @@ impl RoomTask {
             None,
         )
         .send_to_recipients(&mut self.players, recipients, |id, player| {
-            let projection = match lab_snapshot_projections.get(&id) {
-                Some(LabSnapshotProjection::PlayerUnion { player_ids }) => {
-                    projection_policy.selected_perspective_snapshot_for(player_ids.clone())
-                }
-                None => projection_policy.selected_perspective_snapshot_for(all_player_ids(&game)),
-            };
+            let player_ids = lab_visible_player_ids_by_recipient
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| player_ids_for_vision(&game, &LabVisionMode::All));
+            let projection = projection_policy.selected_perspective_snapshot_for(player_ids);
             let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });

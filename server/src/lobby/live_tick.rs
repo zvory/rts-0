@@ -28,11 +28,6 @@ pub(super) enum LiveTickResult {
     },
 }
 
-#[derive(Clone)]
-pub(super) enum LabSnapshotProjection {
-    PlayerUnion { player_ids: Vec<u32> },
-}
-
 pub(super) struct LiveTickDriver<'a> {
     pub(super) room: &'a str,
     pub(super) scheduled: TokioInstant,
@@ -49,7 +44,7 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) pending_recipient_notices: &'a mut HashMap<u32, Vec<Event>>,
     pub(super) slow_tick_count: &'a mut u32,
     pub(super) spectator_visible_players: Vec<u32>,
-    pub(super) lab_snapshot_projections: HashMap<u32, LabSnapshotProjection>,
+    pub(super) lab_visible_player_ids_by_recipient: HashMap<u32, Vec<u32>>,
     pub(super) projection_policy: ProjectionPolicy,
     pub(super) replay_start: Option<&'a ReplayStartComposition>,
 }
@@ -235,7 +230,7 @@ impl LiveTickDriver<'_> {
             .collect();
         let branch_live_seat_by_connection = self.branch_live_seat_by_connection;
         let spectator_visible_players = self.spectator_visible_players.clone();
-        let lab_snapshot_projections = self.lab_snapshot_projections.clone();
+        let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient.clone();
         let pending_recipient_notices = &*self.pending_recipient_notices;
 
         let delivered_recipients = SnapshotFanout::new(
@@ -252,8 +247,8 @@ impl LiveTickDriver<'_> {
             } else {
                 RecipientRole::ActivePlayer
             };
-            let projection = match lab_snapshot_projections.get(&id) {
-                Some(LabSnapshotProjection::PlayerUnion { player_ids }) => self
+            let projection = match lab_visible_player_ids_by_recipient.get(&id) {
+                Some(player_ids) => self
                     .projection_policy
                     .selected_perspective_snapshot_for(player_ids.clone()),
                 None => self.projection_policy.live_snapshot_for(

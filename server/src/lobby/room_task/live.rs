@@ -620,7 +620,7 @@ impl RoomTask {
         let match_run_id = self.match_run_id.as_deref();
         let ai_player_count = self.ai_players.len();
         let spectator_visible_players = self.spectator_visible_player_ids();
-        let lab_snapshot_projections = self.lab_snapshot_projections(&game);
+        let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient(&game);
         let record_lab_timeline = matches!(self.mode, super::types::RoomMode::Lab(_));
         let result = LiveTickDriver {
             room: &self.room,
@@ -638,7 +638,7 @@ impl RoomTask {
             pending_recipient_notices: &mut self.pending_recipient_notices,
             slow_tick_count: &mut self.slow_tick_count,
             spectator_visible_players,
-            lab_snapshot_projections,
+            lab_visible_player_ids_by_recipient,
             projection_policy,
             replay_start: self.replay_start.as_ref(),
         }
