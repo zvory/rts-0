@@ -38,9 +38,7 @@ pub(super) fn use_ability(
         .into_iter()
         .find_map(|unit| {
             if !caster_can_accept_order(entities, player, unit, ability)
-                || !ability_orders::caster_allowed_by_faction(
-                    entities, faction_id, unit, ability,
-                )
+                || !ability_orders::caster_allowed_by_faction(entities, faction_id, unit, ability)
             {
                 return None;
             }
