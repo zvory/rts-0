@@ -13,6 +13,7 @@ const CONTEXT_LABELS = Object.freeze({
   "worker-main": "Worker Commands",
   "worker-build": "Worker Build Menu",
   "mixed-army-support": "Army Abilities",
+  artillery: "Artillery Commands",
   "city-centre-train": "City Centre",
   "factory-train": "Vehicle Works",
   "gun-works-train": "Gun Works",

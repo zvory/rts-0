@@ -41,6 +41,11 @@ import {
 //   Z X C
 export const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
 
+const LOW_PRIORITY_ABILITIES = new Set([
+  ABILITY.POINT_FIRE,
+  ABILITY.BLANKET_FIRE,
+]);
+
 export function gridHotkeyForSlot(slotIndex) {
   return GRID_HOTKEYS[slotIndex] || "";
 }
@@ -187,6 +192,7 @@ export function buildCommandCardContextCatalog() {
     { id: "command-car", card: buildCommandCardDescriptors(ctx([commandCar], {
       entities: allEntities.filter((e) => e.id !== scoutPlane.id),
     })) },
+    { id: "artillery", card: buildCommandCardDescriptors(ctx([artillery])) },
     { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
     { id: "barracks-train", card: buildCommandCardDescriptors(ctx([baseEntities[1]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
@@ -333,16 +339,9 @@ export function buildUnitCard(ctx, selection) {
     slots[4] = stopDescriptor(unitIds);
   }
 
-  let sequentialSlot = 6;
-  const claimSlot = (preferred) => {
-    if (preferred != null && preferred >= 0 && preferred < 9 && slots[preferred] == null) {
-      return preferred;
-    }
-    while (sequentialSlot < 9 && slots[sequentialSlot] != null) sequentialSlot++;
-    return sequentialSlot < 9 ? sequentialSlot++ : -1;
-  };
-
-  for (const affordance of abilityAffordances) {
+  const slotOrderedAbilityAffordances = [...abilityAffordances].sort((left, right) =>
+    abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
+  for (const affordance of slotOrderedAbilityAffordances) {
     const definition = affordance.definition;
     const recastActive = affordance.recastTargetObjectId != null;
     const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
@@ -354,9 +353,10 @@ export function buildUnitCard(ctx, selection) {
       : intentAbilityIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
-    const slot = claimSlot(preferred);
-    if (slot < 0) continue;
-    slots[slot] = {
+    if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
+    // Ability collisions stay in place: later, higher-priority abilities replace lower-priority
+    // occupants instead of moving the losing command to an unrelated grid hotkey.
+    slots[preferred] = {
       id: `ability:${definition.ability}`,
       commandId: factionCommandId(factionId, "ability", definition.ability),
       kind: "button",
@@ -394,8 +394,8 @@ export function buildUnitCard(ctx, selection) {
   }
 
   if (setupGunIds.length > 0) {
-    const setupSlot = claimSlot(null);
-    if (setupSlot >= 0) {
+    const setupSlot = GRID_HOTKEYS.indexOf("Z");
+    if (slots[setupSlot] == null) {
       slots[setupSlot] = {
         id: "unit:setup",
         commandId: "unit.setupSupportWeapon",
@@ -412,6 +412,10 @@ export function buildUnitCard(ctx, selection) {
   }
 
   return card("unit", signature, slots, { abilityAffordances });
+}
+
+function abilitySlotPriority(definition) {
+  return LOW_PRIORITY_ABILITIES.has(definition?.ability) ? 0 : 1;
 }
 
 export function buildTrainCard(ctx, building) {

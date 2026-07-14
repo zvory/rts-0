@@ -910,7 +910,8 @@ into the Kriegsia binding set, preserve structurally valid unavailable faction c
 warnings, ignore unknown non-faction commands with warnings, reject invalid keys and same-context
 duplicates, and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to
 avoid local collisions; targeted imports replace the whole target profile payload instead of
-merging individual bindings.
+merging individual bindings. When the Classic preset's mnemonic key collides within a rendered
+context, conflict resolution prefers that command's grid key before falling back alphabetically.
 
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
@@ -1410,6 +1411,12 @@ them out, so they are unselectable and uncontrollable in live play. While the Sc
 armed, the ground overlay draws an advisory line from the launching Command Car to the cursor and a
 dotted ring around the car for the plane's maximum 20-second travel distance; targets outside that
 ring remain valid and produce sorties that expire before arrival.
+Unit abilities remain on their declared grid slots in mixed selections rather than spilling into an
+unrelated empty hotkey. When abilities collide, Point Fire and Blanket Fire have the lowest command-
+card priority: Mortar Fire replaces Point Fire on `X`, and Scout Plane replaces Blanket Fire on `C`.
+The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns or Artillery are
+present and that slot is available. Artillery-only selections still expose Point Fire, Blanket Fire,
+and Set Up together because those commands do not collide in that context.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.

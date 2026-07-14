@@ -108,6 +108,16 @@ function commandCarCard() {
   );
   assert(
     catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("ability", ABILITY.POINT_FIRE) &&
+        command.slotIndex === 7
+    ) && catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("ability", ABILITY.BLANKET_FIRE) &&
+        command.slotIndex === 8
+    ),
+    "hotkey command catalog keeps lower-priority artillery abilities discoverable",
+  );
+  assert(
+    catalog.commands.some((command) =>
       command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
         command.label === "Heavy Guns" &&
         command.slotIndex === 0
