@@ -283,14 +283,19 @@ function assignRallyPlan(target, fields, index) {
   );
 }
 
-/** Decode owner-only Scout Plane orbit telemetry into `entity.scoutPlane`. */
+/** Decode owner-only Scout Plane sortie telemetry into `entity.scoutPlane`. */
 function assignScoutPlane(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
-  const record = readArray(fields[index], "entity.scoutPlane", 1);
-  if (record.length !== 1) throw new Error("entity.scoutPlane field count mismatch");
+  const record = readArray(fields[index], "entity.scoutPlane", 2);
+  if (record.length < 1 || record.length > 2) {
+    throw new Error("entity.scoutPlane field count mismatch");
+  }
   target.scoutPlane = {};
   if (record[0] != null) {
     target.scoutPlane.orbitCenter = decodeCompactPoint(record[0], "entity.scoutPlane.orbitCenter");
+  }
+  if (record[1] != null) {
+    target.scoutPlane.sourceCommandCar = readU32(record[1], "entity.scoutPlane.sourceCommandCar");
   }
 }
 

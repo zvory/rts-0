@@ -311,7 +311,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         label: "Scout Plane",
         icon: "SP",
         hotkey: Some("C"),
-        title: "Launch a scout plane from the nearest City Centre",
+        title: "Launch this Command Car's scout plane",
         carriers: &[EntityKind::CommandCar],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: None,

@@ -68,8 +68,11 @@ fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return()
     let far = spawn_city_centre(&mut entities, 1, 96.0, 96.0);
     let near = spawn_city_centre(&mut entities, 1, 768.0, 768.0);
     let enemy = spawn_city_centre(&mut entities, 2, 800.0, 800.0);
+    let source_command_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 320.0, 448.0)
+        .expect("source Command Car should spawn");
 
-    let plane = launch_ability(&map, &mut entities, 1, 320.0, 448.0, 790.0, 790.0)
+    let plane = launch_ability(&map, &mut entities, 1, source_command_car, 790.0, 790.0)
         .expect("launch succeeds");
     let plane_entity = entities.get(plane).expect("plane exists");
     assert_eq!(plane_entity.owner, 1);
@@ -78,13 +81,14 @@ fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return()
 
     let state = plane_state(&entities, plane);
     assert_eq!(state.home_city_centre, Some(near));
+    assert_eq!(state.source_command_car, Some(source_command_car));
     assert_eq!(state.orbit_center, (790.0, 790.0));
     assert_eq!(
-        launch_ability(&map, &mut entities, 1, 320.0, 448.0, 128.0, 128.0),
+        launch_ability(&map, &mut entities, 1, source_command_car, 128.0, 128.0,),
         Err(ScoutPlaneLaunchError::Active)
     );
     assert_eq!(
-        launch_ability(&map, &mut entities, 3, 320.0, 448.0, 128.0, 128.0),
+        launch_ability(&map, &mut entities, 3, 77, 128.0, 128.0),
         Err(ScoutPlaneLaunchError::NoCityCentre)
     );
     assert_eq!(entities.get(far).expect("far cc").owner, 1);
@@ -163,6 +167,28 @@ fn duplicate_scout_planes_are_cleaned_up_before_extra_mission_processing() {
 
     assert!(entities.get(first).is_some());
     assert!(entities.get(second).is_none());
+}
+
+#[test]
+fn scout_planes_from_different_command_cars_survive_mission_processing() {
+    let map = test_map(32);
+    let mut entities = EntityStore::new();
+    let home = spawn_city_centre(&mut entities, 1, 256.0, 256.0);
+    let first = spawn_plane(&mut entities, 1, 128.0, 128.0);
+    let second = spawn_plane(&mut entities, 1, 160.0, 160.0);
+    for (plane, command_car) in [(first, 10), (second, 11)] {
+        if let Some(state) = entities
+            .get_mut(plane)
+            .and_then(|plane| plane.scout_plane_state_mut())
+        {
+            *state = ScoutPlaneState::launched_from_command_car(home, command_car, 512.0, 512.0);
+        }
+    }
+
+    advance_scout_planes(&map, &mut entities);
+
+    assert!(entities.get(first).is_some());
+    assert!(entities.get(second).is_some());
 }
 
 #[test]

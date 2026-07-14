@@ -767,8 +767,16 @@ impl Serialize for CompactScoutPlaneState<'_> {
         S: Serializer,
     {
         let state = self.0;
-        let mut seq = serializer.serialize_seq(Some(1))?;
+        let len = if state.source_command_car.is_some() {
+            2
+        } else {
+            1
+        };
+        let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&state.orbit_center)?;
+        if len > 1 {
+            seq.serialize_element(&state.source_command_car)?;
+        }
         seq.end()
     }
 }

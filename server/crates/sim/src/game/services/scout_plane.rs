@@ -18,15 +18,23 @@ pub(crate) fn launch_ability(
     map: &Map,
     entities: &mut EntityStore,
     owner: u32,
-    launch_x: f32,
-    launch_y: f32,
+    source_command_car: u32,
     x: f32,
     y: f32,
 ) -> Result<u32, ScoutPlaneLaunchError> {
-    if active_scout_plane(entities, owner).is_some() {
+    if active_scout_plane_for_command_car(entities, owner, source_command_car).is_some() {
         return Err(ScoutPlaneLaunchError::Active);
     }
     let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
+        return Err(ScoutPlaneLaunchError::NoCityCentre);
+    };
+    let Some((launch_x, launch_y)) = entities
+        .get(source_command_car)
+        .filter(|source| {
+            source.owner == owner && source.kind == EntityKind::CommandCar && source.hp > 0
+        })
+        .map(|source| (source.pos_x, source.pos_y))
+    else {
         return Err(ScoutPlaneLaunchError::NoCityCentre);
     };
     let Some((launch_x, launch_y)) = clamp_world_point(map, launch_x, launch_y) else {
@@ -42,17 +50,31 @@ pub(crate) fn launch_ability(
         .ok_or(ScoutPlaneLaunchError::NoCityCentre)?;
     if let Some(plane) = entities.get_mut(spawned) {
         if let Some(state) = plane.scout_plane_state_mut() {
-            *state = ScoutPlaneState::launched_from(return_city_centre, target_x, target_y);
+            *state = ScoutPlaneState::launched_from_command_car(
+                return_city_centre,
+                source_command_car,
+                target_x,
+                target_y,
+            );
         }
     }
     Ok(spawned)
 }
 
-pub(crate) fn active_scout_plane(entities: &EntityStore, owner: u32) -> Option<u32> {
+pub(crate) fn active_scout_plane_for_command_car(
+    entities: &EntityStore,
+    owner: u32,
+    source_command_car: u32,
+) -> Option<u32> {
     entities
         .iter()
         .filter(|plane| {
-            plane.kind == EntityKind::ScoutPlane && plane.owner == owner && plane.hp > 0
+            plane.kind == EntityKind::ScoutPlane
+                && plane.owner == owner
+                && plane.hp > 0
+                && plane
+                    .scout_plane_state()
+                    .is_some_and(|state| state.source_command_car == Some(source_command_car))
         })
         .map(|plane| plane.id)
         .min()
@@ -144,7 +166,7 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
 }
 
 fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
-    let mut seen_owners = BTreeSet::new();
+    let mut seen_sorties = BTreeSet::new();
     let mut dismissals = Vec::new();
     for id in entities.ids() {
         let Some(plane) = entities.get(id) else {
@@ -153,7 +175,13 @@ fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
         if plane.kind != EntityKind::ScoutPlane {
             continue;
         }
-        if plane.hp == 0 || plane.owner == 0 || !seen_owners.insert(plane.owner) {
+        let source_command_car = plane
+            .scout_plane_state()
+            .and_then(|state| state.source_command_car);
+        if plane.hp == 0
+            || plane.owner == 0
+            || !seen_sorties.insert((plane.owner, source_command_car))
+        {
             dismissals.push(id);
         }
     }

@@ -3,7 +3,7 @@
 //! This module owns what a player is allowed to see. It does not mutate the world; future
 //! last-known-position or partial-reveal rules should grow here.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::ability;
@@ -36,7 +36,6 @@ pub struct EntityProjectionContext<'a> {
     pub active_construction_sites: Option<&'a BTreeSet<u32>>,
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
-    pub owner_ability_cooldowns: Option<&'a BTreeMap<ability::AbilityKind, u16>>,
     pub ability_runtime: Option<&'a AbilityRuntime>,
     pub tick: u32,
 }
@@ -385,9 +384,10 @@ pub fn project_entity(
             private_detail_fog,
             context.smokes,
         );
-        if let Some(orbit_center) = entity.scout_plane_private_details() {
+        if let Some((orbit_center, source_command_car)) = entity.scout_plane_private_details() {
             view.scout_plane = Some(protocol::ScoutPlaneStateView {
                 orbit_center: Some([orbit_center.0, orbit_center.1]),
+                source_command_car,
             });
         }
         let catalog = context
@@ -408,7 +408,7 @@ pub fn project_entity(
             })
             .map(|(kind, cooldown_left)| AbilityCooldownView {
                 ability: kind.to_protocol_str().to_string(),
-                cooldown_left: projected_ability_cooldown(&context, *kind, *cooldown_left),
+                cooldown_left: *cooldown_left,
                 remaining_uses: entity.ability_uses_remaining(*kind),
                 autocast_enabled: entity.autocast_enabled(*kind),
                 active_object_id: active_return_object_id(&context, entity, *kind),
@@ -433,7 +433,7 @@ pub fn project_entity(
             {
                 view.abilities.push(AbilityCooldownView {
                     ability: kind.to_protocol_str().to_string(),
-                    cooldown_left: projected_ability_cooldown(&context, kind, 0),
+                    cooldown_left: 0,
                     remaining_uses: entity.ability_uses_remaining(kind),
                     autocast_enabled: entity.autocast_enabled(kind),
                     active_object_id: active_return_object_id(&context, entity, kind),
@@ -709,22 +709,6 @@ fn debug_path_point(x: f32, y: f32) -> Option<DebugPathPoint> {
     (x.is_finite() && y.is_finite()).then_some(DebugPathPoint { x, y })
 }
 
-fn projected_ability_cooldown(
-    context: &EntityProjectionContext<'_>,
-    ability: ability::AbilityKind,
-    entity_cooldown: u16,
-) -> u16 {
-    if ability != ability::AbilityKind::ScoutPlane {
-        return entity_cooldown;
-    }
-    entity_cooldown.max(
-        context
-            .owner_ability_cooldowns
-            .and_then(|cooldowns| cooldowns.get(&ability).copied())
-            .unwrap_or(0),
-    )
-}
-
 fn active_return_object_id(
     context: &EntityProjectionContext<'_>,
     entity: &Entity,
@@ -869,7 +853,6 @@ mod tests {
                 active_construction_sites,
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
-                owner_ability_cooldowns: None,
                 ability_runtime: None,
                 tick: 0,
             },

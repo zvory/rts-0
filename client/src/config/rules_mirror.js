@@ -284,7 +284,7 @@ export const ABILITIES = Object.freeze({
     label: "Scout Plane",
     icon: "SP",
     hotkey: "C",
-    title: "Launch a scout plane from the nearest City Centre",
+    title: "Launch this Command Car's scout plane",
     carriers: Object.freeze([KIND.COMMAND_CAR]),
     targetMode: "worldPoint",
     rangeTiles: null,
