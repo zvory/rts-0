@@ -7,12 +7,11 @@ import { InteractDriver, InteractDriverError } from "./driver.ts";
 import {
   ALIAS_RE, ALL_CATALOG_CATEGORIES, INTERACT_LIMITS,
 } from "./command_inputs.ts";
-import {
-  commandDefinition,
-} from "./command_registry.ts";
+import { commandDefinition } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
 import { captureGameScreenshot } from "./game_screenshot.ts";
 import { gameInspectionOwnership, gameSessionCapabilities, requireGameSpectator } from "./game_session.ts";
+import { defaultMapForMode } from "./session_defaults.ts";
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
 export { INTERACT_LIMITS } from "./command_inputs.ts";
 export { INTERACT_COMMANDS } from "./command_registry.ts";
@@ -190,11 +189,12 @@ export class InteractService {
     const openAbortController = new AbortController();
     this.openAbortController = openAbortController;
     this.openingKind = kind;
+    const map = input.map || defaultMapForMode(kind);
     this.openPromise = (async () => {
       const driver = await this.driverFactory({
         workspaceRoot,
         mode: kind,
-        map: input.map || "Default",
+        map,
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
         opponent: input.opponent || "ai_2_1",
@@ -213,7 +213,7 @@ export class InteractService {
         sessionId, kind, driver, aliases: new Map<string, number>(), sceneRevision: 0,
         sceneIdentity: {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
-          map: input.map || "Default", seed: kind === "lab" ? input.seed ?? null : null,
+          map, seed: kind === "lab" ? input.seed ?? null : null,
           opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
           spectate: kind === "game" ? input.spectate || null : null, role: kind === "game" ? (input.spectate ? "spectator" : "player") : null,
           renderer: input.renderer || "pixi",

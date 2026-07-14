@@ -13,7 +13,7 @@ pub const MAP_TERRAIN_ROAD_VERTICAL: u8 = 5;
 pub const MAP_TERRAIN_ROAD_DIAGONAL_NW_SE: u8 = 6;
 pub const MAP_TERRAIN_ROAD_DIAGONAL_NE_SW: u8 = 7;
 
-pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.4;
+pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerrainKind {

@@ -40,7 +40,7 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
     if !safe_lab_token(public_id, 40) {
         return None;
     }
-    let mut map_name = "Default".to_string();
+    let mut map_name = "1v1".to_string();
     let mut seed = None;
     let mut scenario = None;
     for part in parts {
@@ -192,6 +192,14 @@ mod tests {
 
     #[test]
     fn room_mode_for_accepts_default_lab_scenario_preset() {
+        match room_mode_for("__lab__:sandbox:scenario=blank") {
+            RoomMode::Lab(config) => {
+                assert_eq!(config.map_name, "1v1");
+                assert_eq!(config.scenario, None);
+            }
+            _ => panic!("blank lab scenario should use the current default map"),
+        }
+
         match room_mode_for("__lab__:sandbox:map=Default:scenario=lategame") {
             RoomMode::Lab(config) => {
                 assert_eq!(config.public_id, "sandbox");

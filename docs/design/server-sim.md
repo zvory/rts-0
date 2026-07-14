@@ -625,7 +625,7 @@ remain on their current schemas until their phases introduce containers around t
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
   authority. Plain `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
-  the No Terrain map, while catalog setups retain their selected maps. Direct lab URLs keep
+  the current default `1v1` map, while catalog setups retain their selected maps. Direct lab URLs keep
   compatibility: `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps
   blank lab startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
   lab setup ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the
@@ -862,7 +862,7 @@ policy is centralized instead of scattered through services.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. `Open`, bare road, and all four marked road orientations project to passable
   `Road` terrain and share combat/visibility defaults, raw stone blocks LOS, and `Road` supplies
-  the authoritative 1.4x movement multiplier sampled from a moving unit's center tile each tick.
+  the authoritative 1.5x movement multiplier sampled from a moving unit's center tile each tick.
   Future forest/hill behavior grows through the same rules seam.
 - `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
   projection support, and event visibility predicates.

@@ -11,9 +11,7 @@ import {
   checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, InteractRecordingError,
   RECORDING_LIMITS, removePartialRecording,
 } from "./recording.ts";
-import {
-  createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame,
-} from "./fixed_capture.ts";
+import { createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices, hashFrame } from "./fixed_capture.ts";
 import { resolveCaptureRegion, type CaptureClip, type CaptureRegion } from "./capture_region.ts";
 import { captureGameTimelapse } from "./game_timelapse.ts";
 import { boundedSummary, INTERACT_SUMMARY_LIMITS } from "./manifest_summary.ts";
@@ -21,6 +19,7 @@ import { PrivateServer } from "./private_server.ts";
 import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
 import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
+import { defaultMapForMode } from "./session_defaults.ts";
 
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 
@@ -198,7 +197,7 @@ export class InteractDriver {
   constructor({
     workspaceRoot,
     mode = "lab",
-    map = "Default",
+    map,
     seed = "",
     scenario = "blank",
     opponent = "ai_2_1",
@@ -217,7 +216,7 @@ export class InteractDriver {
     this.options = {
       workspaceRoot,
       mode,
-      map,
+      map: map || defaultMapForMode(mode),
       seed,
       scenario,
       opponent,

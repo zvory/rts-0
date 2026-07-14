@@ -1,6 +1,5 @@
 const LAB_CATALOG_ENDPOINT = "/api/lab-scenarios";
-const DEFAULT_LAB_MAP = "Default";
-const BLANK_LAB_MAP = "No Terrain";
+const DEFAULT_LAB_MAP = "1v1";
 
 export function normalizeLabScenarioEntry(entry) {
   const id = safeCatalogText(entry?.id, "");
@@ -135,12 +134,12 @@ export class LabCatalogScreen {
   renderBlankRow() {
     return this.renderRow({
       title: "Blank Lab",
-      description: "No-terrain map with the normal two-player lab setup.",
-      map: BLANK_LAB_MAP,
+      description: "Current default 1v1 map with the normal two-player lab setup.",
+      map: DEFAULT_LAB_MAP,
       playerCount: 2,
       tags: ["blank"],
       action: "Start blank",
-      onStart: () => this.start({ scenario: "blank", map: BLANK_LAB_MAP }),
+      onStart: () => this.start({ scenario: "blank", map: DEFAULT_LAB_MAP }),
     });
   }
 

@@ -3,7 +3,7 @@ Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; faction
 buildables, trainables, upgrade ids, and ability carriers live in
 `server/crates/rules/src/faction.rs`; terrain movement/cover/concealment hooks live in
 `server/crates/rules/src/terrain.rs`. Grass, bare road, and all four marked road tiles share open-ground
-passability, cover, concealment, and line-of-sight behavior; road applies a 1.4x movement-speed
+passability, cover, concealment, and line-of-sight behavior; road applies a 1.5x movement-speed
 multiplier.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
@@ -291,7 +291,7 @@ attacks need separate attack profiles and explicit activation/autocast policy in
 folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
-- `ROAD_MOVEMENT_SPEED_MULTIPLIER = 1.4`. Bare road plus horizontal, vertical, NW-SE diagonal, and
+- `ROAD_MOVEMENT_SPEED_MULTIPLIER = 1.5`. Bare road plus horizontal, vertical, NW-SE diagonal, and
   NE-SW diagonal marked road tiles share this rule. A moving unit samples the terrain under its
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
@@ -471,11 +471,11 @@ folded into default targeting.
   visible to the player occupying it.
   Finite uses are the per-car limit, so each Scout Car can create exactly two smoke clouds total.
 - **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
-  owned units within 9 tiles a 1.2x speed multiplier. This passive aura has no smoke interaction,
+  owned units within 9 tiles a 1.4x speed multiplier. This passive aura has no smoke interaction,
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active
-  version: it applies the full 1.4x speed status to owned units currently within that same radius
+  version: it applies the full 1.8x speed status to owned units currently within that same radius
   for 180 ticks (~6s), with a 750-tick (~25s) per-caster cooldown, no resource cost, queueability,
-  and movement during casting. The active status uses the 1.8x multiplier while the affected unit
+  and movement during casting. The active status uses the 2.2x multiplier while the affected unit
   is inside smoke or during the 60-tick (~2s) recent-smoke grace window after leaving it; it
   overrides the passive aura. Multiple active Breakthrough effects do not stack; a shorter refresh
   cannot reduce an active buff. Enemies see the active status only when the affected unit is
