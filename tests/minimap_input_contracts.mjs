@@ -971,7 +971,7 @@ function pointerEvent(canvas, clientX, clientY, {
     call.op === "drawImage" && call.source === resourceLayer.canvas.label,
   );
   const playerDrawIndex = canvas.context.calls.findIndex((call) =>
-    hasCallWithApproxArgs({ calls: [call] }, "fillRect", [5.44, 5.44, 5.12, 5.12]),
+    hasCallWithApproxArgs({ calls: [call] }, "fillRect", [6.72, 6.72, 2.56, 2.56]),
   );
   const outlineDrawIndexes = canvas.context.calls.flatMap((call, index) =>
     call.op === "drawImage" && call.source === maskLayer.canvas.label ? [index] : [],
@@ -984,8 +984,8 @@ function pointerEvent(canvas, clientX, clientY, {
     "foreground player outline is layered between resources and the final blip fill",
   );
   assert(
-    hasCallWithApproxArgs(maskLayer.context, "fillRect", [5.44, 5.44, 5.12, 5.12]),
-    "outline mask uses the scaled player blip footprint",
+    hasCallWithApproxArgs(maskLayer.context, "fillRect", [6.72, 6.72, 2.56, 2.56]),
+    "outline mask uses the supply-scaled player blip footprint",
   );
 }
 
@@ -1040,12 +1040,12 @@ function pointerEvent(canvas, clientX, clientY, {
   }
 
   const visionBlipIndex = canvas.context.calls.findIndex((call) =>
-    hasCallWithApproxArgs({ calls: [call] }, "fillRect", [5.44, 5.44, 5.12, 5.12]),
+    hasCallWithApproxArgs({ calls: [call] }, "fillRect", [6.72, 6.72, 2.56, 2.56]),
   );
   const fogIndex = canvas.context.calls.findIndex((call, index) =>
     index > visionBlipIndex && call.op === "fillRect" && call.args[2] > 10,
   );
-  assert(visionBlipIndex >= 0, "vision-only player intel uses the scaled player blip footprint");
+  assert(visionBlipIndex >= 0, "vision-only player intel uses the supply-scaled player blip footprint");
   assert(fogIndex > visionBlipIndex, "vision-only player intel is drawn before the fog overlay");
   assert(dynamicLayers.length === 0, "vision-only player intel does not create a foreground outline mask");
 }
@@ -1086,13 +1086,13 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   minimap.render();
   assert(
-    hasCallWithApproxArgs(canvas.context, "moveTo", [12.32, 8]),
+    hasCallWithApproxArgs(canvas.context, "moveTo", [10.16, 8]),
     "Scout Plane blip starts an aircraft path at the plane canvas position",
   );
   assert(
-    hasCallWithApproxArgs(canvas.context, "lineTo", [5.12, 4.48])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 8])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [5.12, 11.52]),
+    hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 6.24])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [7.28, 8])
+      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 9.76]),
     "Scout Plane blip draws the expected multi-point aircraft silhouette",
   );
   assert(
@@ -1100,13 +1100,50 @@ function pointerEvent(canvas, clientX, clientY, {
     "Scout Plane blip includes an outline for readability",
   );
   assert(
-    hasCallWithApproxArgs(canvas.context, "fillRect", [9.44, 5.44, 5.12, 5.12]),
+    hasCallWithApproxArgs(canvas.context, "fillRect", [10.72, 6.72, 2.56, 2.56]),
     "ordinary ground units still draw square minimap blips at their canvas position",
   );
   assert(
-    !hasCallWithApproxArgs(canvas.context, "fillRect", [5.44, 5.44, 5.12, 5.12]),
+    !hasCallWithApproxArgs(canvas.context, "fillRect", [6.72, 6.72, 2.56, 2.56]),
     "Scout Plane blips should not also use the ordinary square unit marker",
   );
+  minimap.destroy();
+}
+
+// Player minimap blips scale by unit supply and total building resource cost.
+{
+  installWindowStub();
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
+  const state = {
+    playerId: 1,
+    map: {
+      width: 4,
+      height: 4,
+      tileSize: 1,
+      terrain: new Array(16).fill(TERRAIN.GRASS),
+      resources: [],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [];
+    },
+    players: [],
+  };
+  const minimap = new Minimap(
+    canvas,
+    state,
+    { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 },
+    null,
+    { issueCommand() {} },
+  );
+  assertApprox(minimap._entityBlipScale({ kind: KIND.WORKER }), 0.5, 0.0001, "Worker blip is half size");
+  assertApprox(minimap._entityBlipScale({ kind: KIND.RIFLEMAN }), 0.5, 0.0001, "Rifleman blip is half size");
+  assertApprox(minimap._entityBlipScale({ kind: KIND.TANK }), 1, 0.0001, "Tank keeps the current blip size");
+  assertApprox(minimap._entityBlipScale({ kind: KIND.MACHINE_GUNNER }), 4 / 7, 0.0001, "unit blips interpolate by supply");
+  assertApprox(minimap._entityBlipScale({ kind: KIND.TANK_TRAP }), 0.5, 0.0001, "Tank Trap blip is half size");
+  assertApprox(minimap._entityBlipScale({ kind: KIND.CITY_CENTRE }), 1, 0.0001, "City Centre keeps the current blip size");
   minimap.destroy();
 }
 
