@@ -760,7 +760,7 @@ mod tests {
         let loaded =
             load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
         assert!(loaded.is_checkpoint_backed());
-        let game = loaded
+        let mut game = loaded
             .build_game()
             .expect("lategame scenario should restore through lab APIs");
         let checkpoint_game = loaded
@@ -802,6 +802,7 @@ mod tests {
                 );
             }
         }
+        game.tick();
 
         let render_preview = catalog
             .iter()
