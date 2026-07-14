@@ -1124,6 +1124,10 @@ fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
     if !requires_weapon_setup(e.kind) {
         return;
     }
+    // Replacing a move destination must not restart pack-up and pin the weapon in place.
+    if matches!(e.weapon_setup(), WeaponSetup::TearingDown { .. }) {
+        return;
+    }
     if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
         let ticks = match e.kind {
             EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,

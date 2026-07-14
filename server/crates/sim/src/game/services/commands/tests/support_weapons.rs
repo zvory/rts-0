@@ -628,6 +628,81 @@ fn move_order_tears_down_deployed_anti_tank_guns_before_moving() {
 }
 
 #[test]
+fn replacement_move_preserves_machine_gunner_teardown_progress() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let machine_gunner = entities
+        .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+        .expect("machine gunner should spawn");
+    entities
+        .get_mut(machine_gunner)
+        .expect("machine gunner should exist")
+        .set_weapon_setup(WeaponSetup::Deployed);
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![machine_gunner],
+                x: 220.0,
+                y: 100.0,
+                queued: false,
+            },
+        )],
+    );
+    for _ in 0..5 {
+        entities
+            .get_mut(machine_gunner)
+            .expect("machine gunner should exist")
+            .tick_weapon_setup();
+    }
+    let machine_gunner_state = entities
+        .get(machine_gunner)
+        .expect("machine gunner should exist");
+    let first_goal = machine_gunner_state.path_goal();
+    let remaining_ticks = match machine_gunner_state.weapon_setup() {
+        WeaponSetup::TearingDown { ticks } => ticks,
+        setup => panic!("expected machine gunner to be tearing down, got {setup:?}"),
+    };
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![machine_gunner],
+                x: 260.0,
+                y: 120.0,
+                queued: false,
+            },
+        )],
+    );
+
+    let machine_gunner = entities
+        .get(machine_gunner)
+        .expect("machine gunner should exist");
+    assert_eq!(
+        machine_gunner.weapon_setup(),
+        WeaponSetup::TearingDown {
+            ticks: remaining_ticks
+        },
+        "replacement movement should not restart an in-progress teardown"
+    );
+    assert!(
+        matches!(machine_gunner.order(), Order::Move(_)),
+        "replacement movement should still update the active destination"
+    );
+    assert_ne!(
+        machine_gunner.path_goal(),
+        first_goal,
+        "replacement movement should still update the path goal"
+    );
+}
+
+#[test]
 fn attack_move_order_tears_down_deployed_anti_tank_guns_before_moving() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
