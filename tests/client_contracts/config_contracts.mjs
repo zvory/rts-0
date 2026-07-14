@@ -301,9 +301,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       STATS[KIND.PANZERFAUST].supply === 1 &&
       STATS[KIND.PANZERFAUST].sight === 11 &&
       STATS[KIND.PANZERFAUST].size === 9 &&
-      STATS[KIND.PANZERFAUST].rangeTiles === PANZERFAUST_RANGE_TILES &&
+      STATS[KIND.PANZERFAUST].rangeTiles === 4 &&
       STATS[KIND.PANZERFAUST].buildTicks === 400 &&
-      PANZERFAUST_RANGE_TILES === 3 &&
+      PANZERFAUST_RANGE_TILES === 5 &&
       PANZERFAUST_DAMAGE === 100 &&
       PANZERFAUST_ARMOR_PENETRATION === 0.5 &&
       PANZERFAUST_WINDUP_TICKS === 15 &&
@@ -320,11 +320,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     STATS[KIND.PANZERFAUST].requires === KIND.TRAINING_CENTRE &&
-      STATS[KIND.PANZERFAUST].description.includes("Prioritizes visible Tanks") &&
+      STATS[KIND.PANZERFAUST].description.includes("prioritizes visible Tanks") &&
       STATS[KIND.PANZERFAUST].description.includes("vehicles and buildings") &&
       STATS[KIND.PANZERFAUST].description.includes("50% armor penetration") &&
-      STATS[KIND.PANZERFAUST].description.includes("cannot attack for 2.5 seconds after firing") &&
-      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines shortens windup"),
+      STATS[KIND.PANZERFAUST].description.includes("one disposable 5-tile anti-tank shot") &&
+      STATS[KIND.PANZERFAUST].description.includes("Fights with normal rifle fire") &&
+      STATS[KIND.PANZERFAUST].description.includes("becoming a Rifleman") &&
+      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines improves its rifle fire"),
     "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
   );
   assert(

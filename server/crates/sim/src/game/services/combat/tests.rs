@@ -14,6 +14,7 @@ use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::{rngs::SmallRng, SeedableRng};
+mod accuracy;
 mod anti_tank_acquisition;
 mod coax;
 mod entrenchment;

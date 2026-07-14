@@ -38,11 +38,7 @@ const SCOUT_CAR_RECOVERY_SEARCH_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 fn panzerfaust_movement_locked(e: &Entity) -> bool {
     matches!(
         e.combat.as_ref().and_then(|combat| combat.panzerfaust),
-        Some(
-            PanzerfaustState::Windup { .. }
-                | PanzerfaustState::InFlight { .. }
-                | PanzerfaustState::Recovery { .. }
-        )
+        Some(PanzerfaustState::Windup { .. })
     )
 }
 

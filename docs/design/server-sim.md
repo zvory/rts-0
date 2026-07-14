@@ -1005,13 +1005,15 @@ current weapon range but do not request idle chase paths. Explicit Attack and ot
 remain authoritative and may move or chase the unit out of the trench; command application and lab
 moves clear active occupation before later combat decisions use it.
 
-Incoming direct-fire accuracy is weapon-specific: the Anti-Tank Gun's 65% infantry miss chance
-still resolves normally, while entrenchment adds no miss chance. After a direct hit's normal
+Incoming direct-fire accuracy is weapon-specific: Anti-Tank Gun and Tank cannon shots give each
+infantry body they intersect an independent 50% chance to dodge, while entrenchment adds no miss
+chance. A clump therefore gives one shot multiple independent opportunities to connect even if the
+selected target dodges. After a direct hit's normal
 weapon, armor, and facing calculations, `entrenchment_combat::reduce_direct_damage` reduces damage
 by 50% for actively entrenched eligible infantry. Area effects call
 `entrenchment_combat::reduce_area_damage` after their normal falloff and armor calculations, so
 Mortar and Artillery splash deal 75% of their current post-formula damage to actively entrenched
-eligible infantry. Direct-fire over-penetration stops at
+eligible infantry. Direct-fire over-penetration stops after hitting
 an entrenched primary victim, and actively entrenched secondary candidates are skipped rather than
 taking over-penetration damage or emitting secondary hit feedback.
 
@@ -1336,17 +1338,20 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
-- Spawned Panzerfaust entities use a hidden server-only reload state in combat state:
-  `Loaded -> Windup -> InFlight -> Recovery -> Loaded`. Direct `Attack` commands, queued attack
+- Spawned Panzerfaust entities use a hidden server-only one-shot state in combat state:
+  `Loaded -> Windup -> InFlight -> Recovery -> Rifleman conversion`. Their normal default weapon is
+  the Rifleman rifle. Direct `Attack` commands, queued attack
   promotion, idle acquisition, hold-position acquisition, and attack-move acquisition all share the
   visible-enemy target predicate for vehicle and building targets, while the ranker prioritizes
   visible Tanks before those fallbacks. Plain `Move` does not auto-fire. Windup cancels without
   spending the shot if the order changes or the target stops being legal, visible, in range, or
   fireable; after launch, the shot is spent and recorded as a detached `panzerfaust_shots` impact
   that survives the firing entity's death. Impact applies 100 base damage with 50% armor
-  penetration only to the locked live vehicle/building target. During InFlight and Recovery,
-  snapshots project `panzerfaustLoaded = false` so the client hides the warhead; after 15 travel
-  ticks plus 60 recovery ticks, the same Panzerfaust can fire again.
+  penetration only to the locked live vehicle/building target. During InFlight and Recovery, the
+  unit may move and use its normal rifle, while snapshots project `panzerfaustLoaded = false` so the
+  client hides the warhead. After 15 travel ticks plus 60 recovery ticks, the same entity converts
+  to a Rifleman, preserving surviving HP, queued movement, control-group identity, and active trench
+  occupation while consuming a completed direct launcher attack.
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,

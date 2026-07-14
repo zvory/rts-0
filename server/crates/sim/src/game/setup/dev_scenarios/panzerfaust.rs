@@ -148,10 +148,8 @@ fn panzerfaust_target_death_scenario(seed: u32) -> Result<DevScenarioSetup, Stri
     let boosted_panzerfaust = spawn_panzerfaust(&mut entities, 3, boosted_pos, "boosted ")?;
     let tank = spawn_tank(&mut entities, 2, tank_pos, "low-health target ")?;
     if let Some(tank_entity) = entities.get_mut(tank) {
-        let panzerfaust_tank_damage = crate::rules::combat::effective_damage(
-            EntityKind::Panzerfaust,
+        let panzerfaust_tank_damage = crate::rules::combat::panzerfaust_loaded_shot_damage(
             EntityKind::Tank,
-            config::PANZERFAUST_DAMAGE,
             Some(crate::rules::terrain::TerrainKind::Open),
         );
         let damage = tank_entity.hp.saturating_sub(panzerfaust_tank_damage);

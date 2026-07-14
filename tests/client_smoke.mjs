@@ -398,8 +398,13 @@ try {
   await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
   await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 8, { timeout: 5000 });
   const editorUi = await editorPage.evaluate(() => {
+    const panelWindow = document.querySelector(".map-editor-panel");
     const panel = document.querySelector(".map-editor-panel-body");
     const water = document.querySelector(".map-editor-terrain-button[data-terrain=water]");
+    const dragHandle = panelWindow?.querySelector(".lab-panel-drag-handle");
+    const resizeHandle = panelWindow?.querySelector(".lab-panel-resize-handle");
+    const collapseButton = panelWindow?.querySelector(".lab-panel-collapse");
+    const panelRect = panelWindow?.getBoundingClientRect();
     water?.scrollIntoView({ block: "center" });
     const beforeScrollTop = panel?.scrollTop ?? -1;
     water?.click();
@@ -411,6 +416,12 @@ try {
       terrainPreviews: [...document.querySelectorAll(".map-editor-terrain-icon")]
         .map((icon) => ({ width: icon.width, height: icon.height })),
       header: document.querySelector(".map-editor-header")?.textContent?.trim() || "",
+      floatingChrome: dragHandle?.getAttribute("aria-label") === "Move map editor panel" &&
+        resizeHandle?.getAttribute("aria-label") === "Resize map editor panel" &&
+        Boolean(collapseButton),
+      withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
+      noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
+        .every((node) => node.scrollWidth <= node.clientWidth),
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
@@ -420,10 +431,14 @@ try {
     };
   });
   ok(
-    editorUi.header === "Map Editor" &&
+    editorUi.header.includes("Map Editor") &&
       editorUi.terrainPreviews.length === 8 &&
       editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
     `MAP EDITOR: terrain buttons show eight rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
+  );
+  ok(
+    editorUi.floatingChrome && editorUi.withinViewport && editorUi.noHorizontalOverflow,
+    "MAP EDITOR: accessible floating chrome and terrain/start-base pickers stay within the viewport",
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,

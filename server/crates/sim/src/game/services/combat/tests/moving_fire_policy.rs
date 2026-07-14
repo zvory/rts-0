@@ -356,16 +356,19 @@ fn fully_stationary_tank_can_fire_at_extended_range() {
         tank.set_weapon_facing(0.0);
     }
 
-    run_combat_tick_on_map(
+    let events = run_combat_tick_on_map(
         &mut entities,
         &[player_state(1, false), player_state(2, false)],
         &map,
     );
 
-    let target = entities.get(target_id).expect("target should still exist");
-    assert_eq!(
-        target.hp, 0,
-        "stationary tank should fire at a target inside the 14-tile ramped range"
+    assert!(
+        events
+            .get(&1)
+            .expect("tank owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == tank_id && *to == target_id)),
+        "stationary tank should fire at a target inside the 14-tile ramped range, even when the shell's infantry dodge roll misses"
     );
 }
 

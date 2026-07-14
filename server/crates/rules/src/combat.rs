@@ -82,7 +82,7 @@ impl WeaponKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MissPolicy {
     None,
-    AntiTankGunVsInfantry,
+    DirectAntiTankVsInfantry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -183,7 +183,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 72,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
-        miss_policy: MissPolicy::AntiTankGunVsInfantry,
+        miss_policy: MissPolicy::DirectAntiTankVsInfantry,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.50 },
     },
@@ -227,7 +227,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 72,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
-        miss_policy: MissPolicy::None,
+        miss_policy: MissPolicy::DirectAntiTankVsInfantry,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
     },
@@ -294,15 +294,14 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
-        EntityKind::Rifleman => Some(WeaponKind::RiflemanRifle),
+        EntityKind::Rifleman | EntityKind::Panzerfaust => Some(WeaponKind::RiflemanRifle),
         EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
         EntityKind::MortarTeam => Some(WeaponKind::MortarTeamMortar),
         EntityKind::Artillery => Some(WeaponKind::ArtilleryGun),
         EntityKind::ScoutCar => Some(WeaponKind::ScoutCarMg),
         EntityKind::Tank => Some(WeaponKind::TankCannon),
-        EntityKind::Panzerfaust
-        | EntityKind::ScoutPlane
+        EntityKind::ScoutPlane
         | EntityKind::CommandCar
         | EntityKind::Ekat
         | EntityKind::CityCentre
@@ -322,13 +321,6 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
 
 pub fn default_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile> {
     default_weapon_kind(kind).and_then(weapon_profile)
-}
-
-pub fn damage_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile> {
-    default_weapon_profile(kind).or_else(|| match kind {
-        EntityKind::Panzerfaust => weapon_profile(WeaponKind::PanzerfaustLoadedShot),
-        _ => None,
-    })
 }
 
 pub fn default_target_priority_policy(kind: EntityKind) -> TargetPriorityPolicyId {
@@ -358,7 +350,7 @@ pub fn is_armored(kind: EntityKind) -> bool {
 
 /// Weapons with non-zero armor penetration count as AP threats for target ranking.
 pub fn is_ap(kind: EntityKind) -> bool {
-    damage_weapon_profile(kind).is_some_and(weapon_is_ap)
+    kind == EntityKind::Panzerfaust || default_weapon_profile(kind).is_some_and(weapon_is_ap)
 }
 
 pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
@@ -406,8 +398,8 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
     }
 }
 
-/// Loaded Panzerfaust target filter. The runtime consumes this separately from default weapon
-/// ranking because Panzerfausts do not have a normal default attack profile.
+/// Loaded Panzerfaust target filter. The runtime consumes this separately from the normal rifle
+/// profile so the one disposable anti-armor shot keeps its own target priority.
 pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
     matches!(
         kind,
@@ -442,18 +434,18 @@ pub fn default_weapon_target_fit(
     }
 }
 
-/// Miss probability [0.0, 1.0) for an attack. anti-tank guns have a high miss rate against
-/// infantry-sized targets — the shell flies straight through without finding anyone.
+/// Miss probability [0.0, 1.0) for an attack. Direct anti-tank shells have a 50% miss rate
+/// against infantry-sized targets — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| miss_chance_for_weapon(profile, victim_kind))
         .unwrap_or(0.0)
 }
 
 pub fn miss_chance_for_weapon(profile: &WeaponProfile, victim_kind: EntityKind) -> f32 {
     match profile.miss_policy {
-        MissPolicy::AntiTankGunVsInfantry if anti_tank_gun_miss_target(victim_kind) => 0.65,
+        MissPolicy::DirectAntiTankVsInfantry if direct_anti_tank_miss_target(victim_kind) => 0.50,
         _ => 0.0,
     }
 }
@@ -488,7 +480,7 @@ pub fn area_damage_after_entrenchment(
     ((damage as f32) * multiplier).round().max(0.0) as u32
 }
 
-fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
+fn direct_anti_tank_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::Worker
@@ -506,7 +498,7 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain))
         .unwrap_or_else(|| {
             effective_damage_for_weapon_class(
@@ -516,6 +508,22 @@ pub fn effective_damage(
                 victim_terrain,
             )
         })
+}
+
+pub fn panzerfaust_loaded_shot_damage(
+    victim_kind: EntityKind,
+    victim_terrain: Option<TerrainKind>,
+) -> u32 {
+    weapon_profile(WeaponKind::PanzerfaustLoadedShot)
+        .map(|profile| {
+            effective_damage_for_weapon(
+                profile,
+                victim_kind,
+                crate::balance::PANZERFAUST_DAMAGE,
+                victim_terrain,
+            )
+        })
+        .unwrap_or(0)
 }
 
 pub fn effective_damage_for_weapon(
@@ -595,7 +603,7 @@ pub fn facing_damage_multiplier(
     victim_kind: EntityKind,
     facing: ArmorFacing,
 ) -> f32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| facing_damage_multiplier_for_weapon(profile, victim_kind, facing))
         .unwrap_or(1.0)
 }
@@ -628,7 +636,7 @@ pub fn effective_damage_with_facing(
     victim_pos: (f32, f32),
     attacker_pos: (f32, f32),
 ) -> u32 {
-    damage_weapon_profile(attacker_kind)
+    default_weapon_profile(attacker_kind)
         .map(|profile| {
             effective_damage_with_facing_for_weapon(
                 profile,
@@ -734,9 +742,6 @@ mod tests {
     }
 
     fn defs_attack_profile_and_class(kind: EntityKind) -> (AttackProfile, WeaponClass) {
-        if kind == EntityKind::Panzerfaust {
-            return (AttackProfile::NONE, WeaponClass::None);
-        }
         if let Some(def) = defs::unit_def(kind) {
             (
                 AttackProfile {
@@ -799,7 +804,7 @@ mod tests {
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
-            (EntityKind::Panzerfaust, None),
+            (EntityKind::Panzerfaust, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
             (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
@@ -878,7 +883,10 @@ mod tests {
     fn weapon_profile_metadata_preserves_current_special_damage_policies() {
         let anti_tank_gun = weapon_profile(WeaponKind::AntiTankGun).expect("AT gun profile");
         assert_eq!(anti_tank_gun.armor_penetration, FULL_ARMOR_PENETRATION);
-        assert_eq!(anti_tank_gun.miss_policy, MissPolicy::AntiTankGunVsInfantry);
+        assert_eq!(
+            anti_tank_gun.miss_policy,
+            MissPolicy::DirectAntiTankVsInfantry
+        );
         assert_eq!(
             anti_tank_gun.facing_damage_policy,
             FacingDamagePolicy::TankArmorFacing
@@ -935,10 +943,18 @@ mod tests {
         );
         assert_eq!(panzerfaust.facing_damage_policy, FacingDamagePolicy::None);
         assert_eq!(panzerfaust.overpenetration, OverpenetrationPolicy::None);
-        assert_eq!(default_weapon_profile(EntityKind::Panzerfaust), None);
         assert_eq!(
-            damage_weapon_profile(EntityKind::Panzerfaust),
-            Some(panzerfaust)
+            default_weapon_profile(EntityKind::Panzerfaust),
+            weapon_profile(WeaponKind::RiflemanRifle)
+        );
+        assert_eq!(
+            panzerfaust_loaded_shot_damage(EntityKind::Tank, None),
+            effective_damage_for_weapon(
+                panzerfaust,
+                EntityKind::Tank,
+                crate::balance::PANZERFAUST_DAMAGE,
+                None,
+            )
         );
     }
 
@@ -970,11 +986,11 @@ mod tests {
         );
         assert_eq!(
             miss_chance_for_weapon(anti_tank_gun, EntityKind::Rifleman),
-            0.65
+            0.50
         );
         assert_eq!(
             miss_chance_for_weapon(tank_cannon, EntityKind::Rifleman),
-            0.0
+            0.50
         );
     }
 
@@ -1078,34 +1094,19 @@ mod tests {
             facing_damage_multiplier(EntityKind::Panzerfaust, EntityKind::Tank, ArmorFacing::Rear),
             1.0
         );
+        assert_eq!(panzerfaust_loaded_shot_damage(EntityKind::Tank, None), 63);
         assert_eq!(
             effective_damage(
-                EntityKind::Panzerfaust,
-                EntityKind::Tank,
-                crate::balance::PANZERFAUST_DAMAGE,
-                None
-            ),
-            63
-        );
-        assert_eq!(
-            effective_damage_with_facing(
                 EntityKind::Panzerfaust,
                 EntityKind::Tank,
                 crate::balance::PANZERFAUST_DAMAGE,
                 None,
-                Some(0.0),
-                (100.0, 100.0),
-                (60.0, 100.0),
             ),
-            63
+            25,
+            "kind-based damage must use the Panzerfaust carrier's default rifle profile"
         );
         assert_eq!(
-            effective_damage(
-                EntityKind::Panzerfaust,
-                EntityKind::ScoutCar,
-                crate::balance::PANZERFAUST_DAMAGE,
-                None
-            ),
+            panzerfaust_loaded_shot_damage(EntityKind::ScoutCar, None),
             100
         );
     }
@@ -1311,33 +1312,34 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_miss_chance_applies_only_to_infantry_sized_targets() {
-        assert_eq!(
-            miss_chance(EntityKind::AntiTankGun, EntityKind::Worker),
-            0.65
-        );
-        assert_eq!(
-            miss_chance(EntityKind::AntiTankGun, EntityKind::Golem),
-            0.65
-        );
-        assert_eq!(
-            miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman),
-            0.65
-        );
-        assert_eq!(
-            miss_chance(EntityKind::AntiTankGun, EntityKind::MachineGunner),
-            0.65
-        );
+    fn direct_anti_tank_miss_chance_applies_only_to_infantry_sized_targets() {
+        for attacker in [EntityKind::AntiTankGun, EntityKind::Tank] {
+            for victim in [
+                EntityKind::Worker,
+                EntityKind::Golem,
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::Panzerfaust,
+            ] {
+                assert_eq!(
+                    miss_chance(attacker, victim),
+                    0.50,
+                    "{attacker:?} vs {victim:?}"
+                );
+            }
 
-        assert_eq!(
-            miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar),
-            0.0
-        );
-        assert_eq!(
-            miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun),
-            0.0
-        );
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Tank), 0.0);
+            for victim in [
+                EntityKind::ScoutCar,
+                EntityKind::AntiTankGun,
+                EntityKind::Tank,
+            ] {
+                assert_eq!(
+                    miss_chance(attacker, victim),
+                    0.0,
+                    "{attacker:?} vs {victim:?}"
+                );
+            }
+        }
     }
 
     #[test]

@@ -180,12 +180,7 @@ fn resolve(
         let triggers_tank_armor_reaction =
             combat::weapon_profile(combat::WeaponKind::PanzerfaustLoadedShot)
                 .is_some_and(combat::weapon_triggers_tank_armor_reaction);
-        let damage = combat::effective_damage(
-            EntityKind::Panzerfaust,
-            victim_kind,
-            config::PANZERFAUST_DAMAGE,
-            Some(TerrainKind::Open),
-        );
+        let damage = combat::panzerfaust_loaded_shot_damage(victim_kind, Some(TerrainKind::Open));
         let source_pos = (shot.source_x, shot.source_y);
         let attribution = teams
             .is_enemy_owner(shot.owner, victim_owner)
