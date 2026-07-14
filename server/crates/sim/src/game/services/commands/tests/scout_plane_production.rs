@@ -61,7 +61,7 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
 }
 
 #[test]
-fn command_car_scout_plane_ability_spends_resources_and_uses_nearest_city_centre() {
+fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_city_centre() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let (far_x, far_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
@@ -102,8 +102,8 @@ fn command_car_scout_plane_ability_spends_resources_and_uses_nearest_city_centre
         .find(|entity| entity.kind == EntityKind::ScoutPlane)
         .expect("Scout Plane should spawn");
     assert_eq!(plane.owner, 1);
-    assert_eq!(plane.pos_x, near_x);
-    assert_eq!(plane.pos_y, near_y);
+    assert_eq!(plane.pos_x, 128.0);
+    assert_eq!(plane.pos_y, 128.0);
     let state = plane.scout_plane_state().expect("plane state");
     assert_eq!(state.home_city_centre, Some(near_city_centre));
     assert_eq!(state.orbit_center, (near_x + 16.0, near_y + 16.0));

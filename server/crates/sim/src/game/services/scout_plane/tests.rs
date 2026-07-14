@@ -62,28 +62,29 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
 }
 
 #[test]
-fn scout_plane_launches_from_nearest_owned_completed_city_centre_to_target() {
+fn scout_plane_launches_from_caster_and_assigns_nearest_city_centre_for_return() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
     let far = spawn_city_centre(&mut entities, 1, 96.0, 96.0);
     let near = spawn_city_centre(&mut entities, 1, 768.0, 768.0);
     let enemy = spawn_city_centre(&mut entities, 2, 800.0, 800.0);
 
-    let plane = launch_ability(&map, &mut entities, 1, 790.0, 790.0).expect("launch succeeds");
+    let plane = launch_ability(&map, &mut entities, 1, 320.0, 448.0, 790.0, 790.0)
+        .expect("launch succeeds");
     let plane_entity = entities.get(plane).expect("plane exists");
     assert_eq!(plane_entity.owner, 1);
-    assert_eq!(plane_entity.pos_x, 768.0);
-    assert_eq!(plane_entity.pos_y, 768.0);
+    assert_eq!(plane_entity.pos_x, 320.0);
+    assert_eq!(plane_entity.pos_y, 448.0);
 
     let state = plane_state(&entities, plane);
     assert_eq!(state.home_city_centre, Some(near));
     assert_eq!(state.orbit_center, (790.0, 790.0));
     assert_eq!(
-        launch_ability(&map, &mut entities, 1, 128.0, 128.0),
+        launch_ability(&map, &mut entities, 1, 320.0, 448.0, 128.0, 128.0),
         Err(ScoutPlaneLaunchError::Active)
     );
     assert_eq!(
-        launch_ability(&map, &mut entities, 3, 128.0, 128.0),
+        launch_ability(&map, &mut entities, 3, 320.0, 448.0, 128.0, 128.0),
         Err(ScoutPlaneLaunchError::NoCityCentre)
     );
     assert_eq!(entities.get(far).expect("far cc").owner, 1);
@@ -147,7 +148,7 @@ fn scout_plane_disappears_after_orbit_if_home_city_centre_died() {
     advance_scout_planes(&map, &mut entities);
     assert!(
         entities.get(plane).is_none(),
-        "plane should disappear when station time ends without its launch City Centre"
+        "plane should disappear when station time ends without its return City Centre"
     );
 }
 

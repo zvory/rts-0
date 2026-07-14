@@ -1104,9 +1104,10 @@ entry and a role-matrix justification.
 `services::scout_plane` is a mutation helper for the Scout Plane aerial unit. Command admission
 calls it from the Command Car `scoutPlane` ability after validating a selected owned Command Car,
 player resources, global player cooldown, the one-active-plane limit, and a completed owned City
-Centre launch anchor. The helper spawns the plane at the completed owned City Centre nearest the
-clicked target, flies it to the clicked point, starts the 10-second orbit timer only after arrival,
-then returns it to the launch City Centre and despawns it. If the launch City Centre is gone when
+Centre return anchor. The helper spawns the plane at the selected Command Car, assigns the completed
+owned City Centre nearest the clicked target as its return anchor, flies it to the clicked point,
+starts the 10-second orbit timer only after arrival, then returns it to that City Centre and despawns
+it. If the return City Centre is gone when
 orbiting ends, or dies while the plane is returning, the plane is removed instead of retargeted to a
 new anchor. Live fog recompute stamps Scout Plane sight as team aerial vision that ignores terrain
 and building line-of-sight blockers while still using active smoke clouds as blockers.
@@ -1132,7 +1133,7 @@ Deployed anti-tank guns rank in-field automatic target candidates ahead of out-o
 
 Aggressive automatic acquisition applies the existing priority ranking to currently fireable enemy candidates first and considers enemy chase candidates only when no candidate can be fired on immediately. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. Opportunistic moving-fire acquisition for a plain Move considers only fireable enemy candidates. Chasing units refresh paths whose goals are materially wrong, including direct attacks and all attack-moves.
 
-Command Cars activate Scout Plane on the C grid slot for 50 Steel and 50 Oil. Activation launches immediately from the owned completed City Centre nearest the target, permits one active Scout Plane per player, and starts a 30-second player-global cooldown. Activation does not replace or clear the selected Command Car's active or queued orders. The plane flies to the target, orbits for 10 seconds after arrival, then returns to its launch City Centre or despawns if that anchor is gone. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, or dismissal commands.
+Command Cars activate Scout Plane on the C grid slot for 50 Steel and 50 Oil. Activation launches immediately from the selected Command Car, assigns the owned completed City Centre nearest the target as the return anchor, permits one active Scout Plane per player, and starts a 30-second player-global cooldown. Activation does not replace or clear the selected Command Car's active or queued orders. The plane flies to the target, orbits for 10 seconds after arrival, then returns to its assigned City Centre or despawns if that anchor is gone. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, or dismissal commands.
 
 Group move formation assignment checks cached reachability components before issuing per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. When a preserved offset is locally passable but unreachable, the affected unit searches inward toward the formation center for a reachable replacement; if no useful route exists, its old goal is preserved so normal path processing can report `PathFailed`.
 

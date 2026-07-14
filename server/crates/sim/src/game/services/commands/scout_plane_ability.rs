@@ -34,15 +34,20 @@ pub(super) fn use_ability(
     {
         return;
     }
-    let has_caster = dedupe_cap_units(request.units, request.max_units_per_command)
+    let caster_position = dedupe_cap_units(request.units, request.max_units_per_command)
         .into_iter()
-        .any(|unit| {
-            caster_can_accept_order(entities, player, unit, ability)
-                && ability_orders::caster_allowed_by_faction(entities, faction_id, unit, ability)
+        .find_map(|unit| {
+            if !caster_can_accept_order(entities, player, unit, ability)
+                || !ability_orders::caster_allowed_by_faction(entities, faction_id, unit, ability)
+            {
+                return None;
+            }
+            let caster = entities.get(unit)?;
+            Some((caster.pos_x, caster.pos_y))
         });
-    if !has_caster {
+    let Some((launch_x, launch_y)) = caster_position else {
         return;
-    }
+    };
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return;
     };
@@ -57,7 +62,7 @@ pub(super) fn use_ability(
         );
         return;
     }
-    match scout_plane::launch_ability(map, entities, player, x, y) {
+    match scout_plane::launch_ability(map, entities, player, launch_x, launch_y, x, y) {
         Ok(_) => {
             if definition.cooldown_ticks == 0 {
                 ps.ability_cooldowns.remove(&ability);
