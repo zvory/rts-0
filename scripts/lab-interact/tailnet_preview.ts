@@ -10,17 +10,29 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 
-import { ProcessRunner } from "./process_runner.mjs";
+import { ProcessRunner } from "./process_runner.ts";
 
 export const LAB_INTERACT_PREVIEW_ROUTE = "/lab-interact-preview/";
 export const MAX_TAILNET_PREVIEW_ARTIFACT_BYTES = 64 * 1024 * 1024;
 export const MAX_TAILNET_PREVIEWS = 128;
 
-const MIME_TYPES = new Set(["image/png", "video/mp4"]);
+type PreviewMimeType = "image/png" | "video/mp4";
+const MIME_TYPES = new Set<PreviewMimeType>(["image/png", "video/mp4"]);
 const TOKEN_RE = /^[a-f0-9]{64}$/;
 
+interface ArtifactInfo { realPath: string; size: number; fingerprint: string }
+interface PreviewEntry extends ArtifactInfo { token: string; mimeType: PreviewMimeType }
+interface TailnetPreviewOptions {
+  workspaceRoot?: string;
+  host?: string | null;
+  resolveHost?: () => Promise<string>;
+  onAccess?: () => void;
+  maxArtifacts?: number;
+}
+
 export class LabInteractTailnetPreviewError extends Error {
-  constructor(code, message) {
+  code: string;
+  constructor(code: string, message: string) {
     super(message);
     this.name = "LabInteractTailnetPreviewError";
     this.code = code;
@@ -28,13 +40,24 @@ export class LabInteractTailnetPreviewError extends Error {
 }
 
 export class LabInteractTailnetPreview {
+  fingerprints: Map<string, string>;
+  artifacts: Map<string, PreviewEntry>;
+  starting: Promise<void> | null;
+  baseUrl: string | null;
+  server: http.Server | null;
+  maxArtifacts: number;
+  onAccess: () => void;
+  resolveHost: () => Promise<string>;
+  host: string | null;
+  artifactRoot: string;
+  workspaceRoot: string;
   constructor({
     workspaceRoot = process.cwd(),
     host = null,
     resolveHost = () => resolveTailnetHost(),
     onAccess = () => {},
     maxArtifacts = MAX_TAILNET_PREVIEWS,
-  } = {}) {
+  }: TailnetPreviewOptions = {}) {
     this.workspaceRoot = realDirectory(workspaceRoot, "invalidWorkspace", "Lab Interact workspace does not exist.");
     if (!Number.isInteger(maxArtifacts) || maxArtifacts < 1 || maxArtifacts > MAX_TAILNET_PREVIEWS) {
       throw new LabInteractTailnetPreviewError("invalidPreviewLimit", `Lab preview retention must be an integer from 1 to ${MAX_TAILNET_PREVIEWS}.`);
@@ -51,8 +74,8 @@ export class LabInteractTailnetPreview {
     this.fingerprints = new Map();
   }
 
-  async publish({ filePath, mimeType }) {
-    if (!MIME_TYPES.has(mimeType)) {
+  async publish({ filePath, mimeType }: { filePath: string; mimeType: string }) {
+    if (!MIME_TYPES.has(mimeType as PreviewMimeType)) {
       throw new LabInteractTailnetPreviewError("invalidPreviewMimeType", "Lab preview accepts only PNG images and MP4 videos.");
     }
     const artifact = inspectArtifact(this.artifactRoot, filePath);
@@ -63,7 +86,7 @@ export class LabInteractTailnetPreview {
 
     while (this.artifacts.size >= this.maxArtifacts) this.evictOldest();
     const token = crypto.randomBytes(32).toString("hex");
-    const entry = { token, mimeType, ...artifact };
+    const entry: PreviewEntry = { token, mimeType: mimeType as PreviewMimeType, ...artifact };
     this.artifacts.set(token, entry);
     this.fingerprints.set(artifact.fingerprint, token);
     return this.describe(entry);
@@ -89,10 +112,10 @@ export class LabInteractTailnetPreview {
     this.fingerprints.clear();
     if (!server) return;
     server.closeAllConnections?.();
-    await new Promise((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 
-  describe(entry) {
+  describe(entry: PreviewEntry) {
     return {
       url: `${this.baseUrl}${LAB_INTERACT_PREVIEW_ROUTE}${entry.token}`,
       mimeType: entry.mimeType,
@@ -117,7 +140,7 @@ export class LabInteractTailnetPreview {
     server.on("error", () => {});
     server.keepAliveTimeout = 5_000;
     try {
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         server.once("error", reject);
         server.listen({ host, port: 0, exclusive: true }, () => {
           server.removeListener("error", reject);
@@ -128,7 +151,7 @@ export class LabInteractTailnetPreview {
       try { server.close(); } catch {}
       throw new LabInteractTailnetPreviewError(
         "tailnetPreviewBindFailed",
-        `Lab Interact could not bind an artifact preview on the Tailnet IP (${String(error?.code || "unknown error")}).`,
+        `Lab Interact could not bind an artifact preview on the Tailnet IP (${errorCode(error) || "unknown error"}).`,
       );
     }
     const address = server.address();
@@ -140,7 +163,7 @@ export class LabInteractTailnetPreview {
     this.baseUrl = `http://${urlHost(host)}:${address.port}`;
   }
 
-  handle(request, response) {
+  handle(request: http.IncomingMessage, response: http.ServerResponse<http.IncomingMessage>&{ req: http.IncomingMessage; }) {
     if (!request || !response) return;
     if (!["GET", "HEAD"].includes(request.method || "")) {
       response.writeHead(405, { Allow: "GET, HEAD", "cache-control": "no-store" });
@@ -182,7 +205,7 @@ export class LabInteractTailnetPreview {
       return;
     }
     const length = range.end - range.start + 1;
-    const headers = {
+    const headers: http.OutgoingHttpHeaders = {
       "accept-ranges": "bytes",
       "cache-control": "private, no-store, max-age=0",
       "content-length": String(length),
@@ -237,15 +260,17 @@ export async function resolveTailnetHost({ env = process.env, readStatus = readT
   return host;
 }
 
-export function tailnetHostFromStatus(status) {
+export function tailnetHostFromStatus(status: unknown) {
+  const record = isRecord(status) ? status : {};
+  const self = isRecord(record.Self) ? record.Self : {};
   const values = [
-    ...(Array.isArray(status?.TailscaleIPs) ? status.TailscaleIPs : []),
-    ...(Array.isArray(status?.Self?.TailscaleIPs) ? status.Self.TailscaleIPs : []),
+    ...(Array.isArray(record.TailscaleIPs) ? record.TailscaleIPs : []),
+    ...(Array.isArray(self.TailscaleIPs) ? self.TailscaleIPs : []),
   ];
   return values.find((value) => typeof value === "string" && isTailnetIpv4(value)) || null;
 }
 
-export function isTailnetIpv4(value) {
+export function isTailnetIpv4(value: string) {
   if (net.isIP(value) !== 4) return false;
   const [, second] = value.split(".").map(Number);
   return value.startsWith("100.") && second >= 64 && second <= 127;
@@ -255,10 +280,11 @@ async function readTailnetStatus() {
   const result = await new ProcessRunner({ maxOutputBytes: 1024 * 1024 })
     .run("tailscale", ["status", "--json"], { timeoutMs: 2_000 });
   if (result.status !== 0) throw new Error("tailscale status failed");
-  return JSON.parse(String(result.stdout || ""));
+  const value: unknown = JSON.parse(String(result.stdout || ""));
+  return value;
 }
 
-function inspectArtifact(artifactRoot, filePath) {
+function inspectArtifact(artifactRoot: string, filePath: fs.PathLike): ArtifactInfo {
   if (typeof filePath !== "string" || !filePath) {
     throw new LabInteractTailnetPreviewError("unsafePreviewArtifact", "Lab preview requires a confined artifact file.");
   }
@@ -291,7 +317,7 @@ function inspectArtifact(artifactRoot, filePath) {
   };
 }
 
-function requestToken(rawUrl) {
+function requestToken(rawUrl: string | undefined) {
   let url;
   try {
     url = new URL(rawUrl || "", "http://lab-interact-preview.invalid");
@@ -304,7 +330,8 @@ function requestToken(rawUrl) {
   return TOKEN_RE.test(token) ? token : null;
 }
 
-function parseRange(value, size) {
+type ParsedRange = { start: number; end: number; partial: boolean; invalid: false } | { invalid: true };
+function parseRange(value: string | undefined, size: number): ParsedRange {
   if (!value) return { start: 0, end: size - 1, partial: false, invalid: false };
   const match = /^bytes=(\d*)-(\d*)$/.exec(String(value).trim());
   if (!match) return { invalid: true };
@@ -327,14 +354,14 @@ function parseRange(value, size) {
   return { start, end, partial: true, invalid: false };
 }
 
-function validPreviewHost(host) {
+function validPreviewHost(host: string) {
   return isTailnetIpv4(host) || host === "127.0.0.1" || host === "::1";
 }
 
-function urlHost(host) { return host.includes(":") ? `[${host}]` : host; }
-function previewFilename(mimeType) { return mimeType === "video/mp4" ? "lab-interact-preview.mp4" : "lab-interact-preview.png"; }
-function isWithin(root, target) { return target.startsWith(`${root}${path.sep}`); }
-function realDirectory(value, code, message) {
+function urlHost(host: string) { return host.includes(":") ? `[${host}]` : host; }
+function previewFilename(mimeType: PreviewMimeType) { return mimeType === "video/mp4" ? "lab-interact-preview.mp4" : "lab-interact-preview.png"; }
+function isWithin(root: string, target: string) { return target.startsWith(`${root}${path.sep}`); }
+function realDirectory(value: fs.PathLike, code: string, message: string) {
   try {
     const resolved = fs.realpathSync(value);
     if (!fs.statSync(resolved).isDirectory()) throw new Error("not a directory");
@@ -342,4 +369,12 @@ function realDirectory(value, code, message) {
   } catch {
     throw new LabInteractTailnetPreviewError(code, message);
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function errorCode(error: unknown): string {
+  return isRecord(error) && typeof error.code === "string" ? error.code : "";
 }

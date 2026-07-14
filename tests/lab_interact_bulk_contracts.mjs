@@ -6,8 +6,8 @@ import {
   LabInteractService,
   normalizeError,
   validateCommandInput,
-} from "../scripts/lab-interact/command_service.mjs";
-import { LabInteractDriverError } from "../scripts/lab-interact/driver.mjs";
+} from "../scripts/lab-interact/command_service.ts";
+import { LabInteractDriverError } from "../scripts/lab-interact/driver.ts";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 

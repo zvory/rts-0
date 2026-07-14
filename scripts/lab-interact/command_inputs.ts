@@ -1,5 +1,5 @@
-import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.mjs";
-import { RECORDING_LIMITS } from "./recording.mjs";
+import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.ts";
+import { RECORDING_LIMITS } from "./recording.ts";
 
 export const LAB_INTERACT_LIMITS = Object.freeze({
   maxSessions: 1,
@@ -50,11 +50,13 @@ const COMMAND_FIELDS = Object.freeze({
   setRally: ["c", "building", "x", "y", "kind", "queued"],
 });
 
-export function validatorFor(command) {
-  return (value) => validateCommandInput(command, value);
+export type CommandInput = Record<string, unknown>;
+
+export function validatorFor(command: string): (value: unknown) => CommandInput {
+  return (value: unknown) => validateCommandInput(command, value);
 }
 
-export function validateCommandInput(command, value) {
+export function validateCommandInput(command: string, value: unknown): CommandInput {
   record(value, "input");
   const session = () => sessionId(value.sessionId);
   if (command === "shutdown") return exact(value, [], "shutdown");
@@ -68,7 +70,7 @@ export function validateCommandInput(command, value) {
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) token(value.map, "open.map", 48);
     if (value.scenario != null) token(value.scenario, "open.scenario", 48);
-    if (value.renderer != null && !["pixi", "babylon"].includes(value.renderer)) invalid("open.renderer", "must be pixi or babylon");
+    if (value.renderer != null && (typeof value.renderer !== "string" || !["pixi", "babylon"].includes(value.renderer))) invalid("open.renderer", "must be pixi or babylon");
     if (value.seed != null && !((typeof value.seed === "string" && value.seed.length <= 64) || isInteger(value.seed, 0, U32_MAX))) invalid("open.seed", "must be a bounded string or unsigned integer");
     if (value.viewport != null) viewport(value.viewport, 4096, "open.viewport");
     return value;
@@ -78,7 +80,7 @@ export function validateCommandInput(command, value) {
   if (command === "catalog") {
     exact(value, ["sessionId", "categories"], command);
     if (value.categories != null) array(value.categories, "catalog.categories", 0, ALL_CATALOG_CATEGORIES.length, (entry) => {
-      if (!ALL_CATALOG_CATEGORIES.includes(entry)) invalid("catalog.categories", "contains an unknown category");
+      if (typeof entry !== "string" || !ALL_CATALOG_CATEGORIES.includes(entry)) invalid("catalog.categories", "contains an unknown category");
     });
   } else if (command === "spawn") {
     exact(value, ["sessionId", "spawns", "details"], command);
@@ -112,8 +114,8 @@ export function validateCommandInput(command, value) {
   } else if (command === "inspect") {
     exact(value, ["sessionId", "refs", "kinds", "owners", "cameraViewport", "limit"], command);
     if (value.refs != null) refs(value.refs, "inspect.refs", 0, LAB_INTERACT_LIMITS.maxInspectRefs);
-    if (value.kinds != null) array(value.kinds, "inspect.kinds", 0, 32, (entry) => token(entry, "inspect.kind"));
-    if (value.owners != null) array(value.owners, "inspect.owners", 0, 16, (entry) => u32(entry, "inspect.owner"));
+    if (value.kinds != null) array(value.kinds, "inspect.kinds", 0, 32, (entry: unknown) => token(entry, "inspect.kind"));
+    if (value.owners != null) array(value.owners, "inspect.owners", 0, 16, (entry: unknown) => u32(entry, "inspect.owner"));
     optionalBoolean(value.cameraViewport, "inspect.cameraViewport");
     if (value.limit != null) integer(value.limit, "inspect.limit", 1, LAB_INTERACT_LIMITS.maxInspectResults);
   } else if (command === "camera") {
@@ -121,8 +123,8 @@ export function validateCommandInput(command, value) {
     validateCamera(value.camera);
   } else if (command === "screenshot") {
     exact(value, ["sessionId", "name", "presentation", "viewport", "subjects"], command);
-    if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("screenshot.name", "must be a safe artifact token");
-    if (value.presentation != null && !["clean", "normal"].includes(value.presentation)) invalid("screenshot.presentation", "must be clean or normal");
+    if (value.name != null && (typeof value.name !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(value.name))) invalid("screenshot.name", "must be a safe artifact token");
+    if (value.presentation != null && (typeof value.presentation !== "string" || !["clean", "normal"].includes(value.presentation))) invalid("screenshot.presentation", "must be clean or normal");
     if (value.viewport != null) viewport(value.viewport, 2048, "screenshot.viewport");
     if (value.subjects != null) refs(value.subjects, "screenshot.subjects", 0, LAB_INTERACT_LIMITS.maxScreenshotSubjects);
   } else if (command === "export") {
@@ -142,7 +144,7 @@ export function validateCommandInput(command, value) {
     artifactSelector(value, "artifact-inspect");
   } else if (command === "record-start") {
     exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "scale", "resumeSpeed"], command);
-    if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("record-start.name", "must be a safe artifact token");
+    if (value.name != null && (typeof value.name !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(value.name))) invalid("record-start.name", "must be a safe artifact token");
     if (value.maxDurationMs != null) integer(value.maxDurationMs, "record-start.maxDurationMs", 1_000, LAB_INTERACT_LIMITS.maxRecordingDurationMs);
     if (value.viewport != null) viewport(value.viewport, 2048, "record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
@@ -152,7 +154,7 @@ export function validateCommandInput(command, value) {
     exact(value, ["sessionId"], command);
   } else if (command === "capture-fixed") {
     exact(value, ["sessionId", "name", "fps", "frameCount", "viewport"], command);
-    if (value.name != null && !/^[A-Za-z0-9_-]{1,48}$/.test(value.name)) invalid("capture-fixed.name", "must be a safe artifact token");
+    if (value.name != null && (typeof value.name !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(value.name))) invalid("capture-fixed.name", "must be a safe artifact token");
     if (value.fps != null) integer(value.fps, "capture-fixed.fps", FIXED_CAPTURE_LIMITS.minFps, FIXED_CAPTURE_LIMITS.maxFps);
     if (value.frameCount != null) integer(value.frameCount, "capture-fixed.frameCount", 1, FIXED_CAPTURE_LIMITS.maxFrames);
     if (value.viewport != null) viewport(value.viewport, 2048, "capture-fixed.viewport");
@@ -164,15 +166,16 @@ export function validateCommandInput(command, value) {
   return value;
 }
 
-function validateUpdate(value) {
+function validateUpdate(value: unknown) {
   record(value, "update");
   const operation = value.operation;
-  const allowed = {
+  const fieldsByOperation: Record<string, readonly string[]> = {
     move: ["operation", "entity", "x", "y"], owner: ["operation", "entity", "owner"],
     resources: ["operation", "playerId", "steel", "oil"], research: ["operation", "playerId", "upgrade", "completed"],
     godMode: ["operation", "playerId", "enabled"],
-  }[operation];
-  if (!allowed) invalid("update.operation", "is unsupported");
+  };
+  const allowed = typeof operation === "string" ? fieldsByOperation[operation] : undefined;
+  if (!allowed || typeof operation !== "string") invalid("update.operation", "is unsupported");
   exact(value, allowed, "update");
   if (["move", "owner"].includes(operation)) entityRef(value.entity, "update.entity");
   if (operation === "move") { finite(value.x, "update.x"); finite(value.y, "update.y"); }
@@ -183,9 +186,10 @@ function validateUpdate(value) {
   if (operation === "godMode") optionalBoolean(value.enabled, "update.enabled");
 }
 
-function validateTime(value) {
+function validateTime(value: unknown) {
   record(value, "time.control");
-  const allowed = { pause: ["action"], resume: ["action", "speed"], speed: ["action", "speed"], step: ["action", "ticks"], seek: ["action", "tick"] }[value.action];
+  const fieldsByAction: Record<string, readonly string[]> = { pause: ["action"], resume: ["action", "speed"], speed: ["action", "speed"], step: ["action", "ticks"], seek: ["action", "tick"] };
+  const allowed = typeof value.action === "string" ? fieldsByAction[value.action] : undefined;
   if (!allowed) invalid("time.action", "is unsupported");
   exact(value, allowed, "time.control");
   if (value.action === "resume" && value.speed != null) boundedNumber(value.speed, "time.speed", 0.01, 16);
@@ -194,7 +198,7 @@ function validateTime(value) {
   if (value.action === "seek") integer(value.tick, "time.tick", 0, 1_000_000);
 }
 
-function validateCamera(value) {
+function validateCamera(value: unknown) {
   record(value, "camera.camera");
   if (value.action === "focus") {
     exact(value, ["action", "refs", "padding"], "camera");
@@ -214,7 +218,7 @@ function validateCamera(value) {
   } else invalid("camera.action", "is unsupported");
 }
 
-function recordingCrop(value) {
+function recordingCrop(value: unknown) {
   record(value, "record-start.crop");
   exact(value, ["x", "y", "width", "height"], "record-start.crop");
   boundedNumber(value.x, "record-start.crop.x", 0, 2048);
@@ -223,9 +227,9 @@ function recordingCrop(value) {
   boundedNumber(value.height, "record-start.crop.height", 2, 2048);
 }
 
-function validateGameCommand(value) {
+function validateGameCommand(value: unknown) {
   record(value, "order.command");
-  const allowed = COMMAND_FIELDS[value.c];
+  const allowed = typeof value.c === "string" ? COMMAND_FIELDS[value.c as keyof typeof COMMAND_FIELDS] : undefined;
   if (!allowed) invalid("order.command.c", "is unsupported");
   exact(value, allowed, "order.command");
   if (allowed.includes("units")) refs(value.units, "order.command.units", 1, LAB_INTERACT_LIMITS.maxCommandUnits);
@@ -244,32 +248,33 @@ function validateGameCommand(value) {
   }
   if (value.targetObjectId != null) u32(value.targetObjectId, "order.command.targetObjectId");
   if (allowed.includes("delta") && value.delta !== -1 && value.delta !== 1) invalid("order.command.delta", "must be -1 or 1");
-  if (value.kind != null && !["move", "attackMove", "attack", "gather", "build"].includes(value.kind)) invalid("order.command.kind", "is unsupported");
+  if (value.kind != null && (typeof value.kind !== "string" || !["move", "attackMove", "attack", "gather", "build"].includes(value.kind))) invalid("order.command.kind", "is unsupported");
   optionalBoolean(value.queued, "order.command.queued");
   if (allowed.includes("enabled")) optionalBoolean(value.enabled, "order.command.enabled", false);
 }
 
-function artifactKind(value, label) { if (!["setup", "replay"].includes(value)) invalid(label, "must be setup or replay"); }
-function artifactSelector(value, label) {
+function artifactKind(value: unknown, label: string) { if (typeof value !== "string" || !["setup", "replay"].includes(value)) invalid(label, "must be setup or replay"); }
+function artifactSelector(value: unknown, label: string) {
+  record(value, label);
   const count = Number(value.artifactId != null) + Number(value.path != null);
   if (count !== 1) invalid(label, "must provide exactly one of artifactId or path");
   if (value.artifactId != null && (typeof value.artifactId !== "string" || !/^artifact_[a-f0-9]{32}$/.test(value.artifactId))) invalid(`${label}.artifactId`, "is invalid");
   if (value.path != null && (typeof value.path !== "string" || !value.path || value.path.length > 1024)) invalid(`${label}.path`, "must be a bounded path string");
 }
 
-function exact(value, allowed, label) { const extras = Object.keys(value).filter((key) => !allowed.includes(key)); if (extras.length) invalid(label, `contains unexpected field ${JSON.stringify(extras[0])}`); return value; }
-function record(value, label) { if (!value || typeof value !== "object" || Array.isArray(value)) invalid(label, "must be a JSON object"); }
-function array(value, label, minimum, maximum, validate) { if (!Array.isArray(value) || value.length < minimum || value.length > maximum) invalid(label, `must contain ${minimum}-${maximum} items`); value.forEach(validate); }
-function refs(value, label, minimum, maximum) { array(value, label, minimum, maximum, (entry) => entityRef(entry, label)); }
-function entityRef(value, label) { if (typeof value === "string") alias(value); else u32(value, label); }
-function alias(value) { if (typeof value !== "string" || !ALIAS_RE.test(value)) invalid("alias", "must start with a letter and contain only letters, digits, _ or -"); }
-function sessionId(value) { if (typeof value !== "string" || !SESSION_RE.test(value)) invalid("sessionId", "must be a Lab Interact session id"); }
-function token(value, label, maximum = 64) { if (typeof value !== "string" || !TOKEN_RE.test(value) || value.length > maximum) invalid(label, "must be a safe protocol token"); }
-function finite(value, label) { if (!Number.isFinite(value)) invalid(label, "must be a finite number"); }
-function boundedNumber(value, label, minimum, maximum) { finite(value, label); if (value < minimum || value > maximum) invalid(label, `must be from ${minimum} to ${maximum}`); }
-function isInteger(value, minimum, maximum) { return Number.isInteger(value) && value >= minimum && value <= maximum; }
-function integer(value, label, minimum, maximum) { if (!isInteger(value, minimum, maximum)) invalid(label, `must be an integer from ${minimum} to ${maximum}`); return value; }
-function u32(value, label) { return integer(value, label, 1, U32_MAX); }
-function optionalBoolean(value, label, optional = true) { if (value == null && optional) return; if (typeof value !== "boolean") invalid(label, "must be a boolean"); }
-function viewport(value, maximum, label) { record(value, label); exact(value, ["width", "height", "deviceScaleFactor"], label); integer(value.width, `${label}.width`, 320, maximum); integer(value.height, `${label}.height`, 240, maximum); if (value.deviceScaleFactor != null) boundedNumber(value.deviceScaleFactor, `${label}.deviceScaleFactor`, Number.MIN_VALUE, 4); }
-function invalid(label, message) { throw Object.assign(new Error(`${label} ${message}.`), { code: "invalidInput" }); }
+function exact(value: CommandInput, allowed: readonly string[], label: string) { const extras = Object.keys(value).filter((key) => !allowed.includes(key)); if (extras.length) invalid(label, `contains unexpected field ${JSON.stringify(extras[0])}`); return value; }
+function record(value: unknown, label: string): asserts value is CommandInput { if (!value || typeof value !== "object" || Array.isArray(value)) invalid(label, "must be a JSON object"); }
+function array(value: unknown, label: string, minimum: number, maximum: number, validate: (entry: unknown, index: number) => void): asserts value is unknown[] { if (!Array.isArray(value) || value.length < minimum || value.length > maximum) invalid(label, `must contain ${minimum}-${maximum} items`); value.forEach(validate); }
+function refs(value: unknown, label: string, minimum: number, maximum: number) { array(value, label, minimum, maximum, (entry) => entityRef(entry, label)); }
+function entityRef(value: unknown, label: string) { if (typeof value === "string") alias(value); else u32(value, label); }
+function alias(value: unknown): asserts value is string { if (typeof value !== "string" || !ALIAS_RE.test(value)) invalid("alias", "must start with a letter and contain only letters, digits, _ or -"); }
+function sessionId(value: unknown): asserts value is string { if (typeof value !== "string" || !SESSION_RE.test(value)) invalid("sessionId", "must be a Lab Interact session id"); }
+function token(value: unknown, label: string, maximum = 64): asserts value is string { if (typeof value !== "string" || !TOKEN_RE.test(value) || value.length > maximum) invalid(label, "must be a safe protocol token"); }
+function finite(value: unknown, label: string): asserts value is number { if (typeof value !== "number" || !Number.isFinite(value)) invalid(label, "must be a finite number"); }
+function boundedNumber(value: unknown, label: string, minimum: number, maximum: number): asserts value is number { finite(value, label); if (value < minimum || value > maximum) invalid(label, `must be from ${minimum} to ${maximum}`); }
+function isInteger(value: unknown, minimum: number, maximum: number): value is number { return typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum; }
+function integer(value: unknown, label: string, minimum: number, maximum: number): number { if (!isInteger(value, minimum, maximum)) invalid(label, `must be an integer from ${minimum} to ${maximum}`); return value; }
+function u32(value: unknown, label: string) { return integer(value, label, 1, U32_MAX); }
+function optionalBoolean(value: unknown, label: string, optional = true) { if (value == null && optional) return; if (typeof value !== "boolean") invalid(label, "must be a boolean"); }
+function viewport(value: unknown, maximum: number, label: string) { record(value, label); exact(value, ["width", "height", "deviceScaleFactor"], label); integer(value.width, `${label}.width`, 320, maximum); integer(value.height, `${label}.height`, 240, maximum); if (value.deviceScaleFactor != null) boundedNumber(value.deviceScaleFactor, `${label}.deviceScaleFactor`, Number.MIN_VALUE, 4); }
+function invalid(label: string, message: string): never { throw Object.assign(new Error(`${label} ${message}.`), { code: "invalidInput" }); }

@@ -2,23 +2,61 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import type { ChildProcess, SpawnOptions } from "node:child_process";
 import { once } from "node:events";
 
-import { ProcessRunner, ProcessRunnerError } from "./process_runner.mjs";
+import { ProcessRunner, ProcessRunnerError } from "./process_runner.ts";
 
 const HEALTH_POLL_MS = 150;
 const SERVER_TERM_GRACE_MS = 1_000;
 
 export class PrivateServerError extends Error {
-  constructor(code, message) {
+  code: string;
+  constructor(code: string, message: string) {
     super(message);
     this.name = "PrivateServerError";
     this.code = code;
   }
 }
 
+interface WorkspaceInfo { root: string; head: string }
+interface PrivateServerBuild { reused: boolean; binary: string | null; head: string; modifiedAt?: string }
+type SpawnServer = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
+interface PrivateServerOptions {
+  workspace: WorkspaceInfo;
+  sessionDir: string;
+  startupTimeoutMs: number;
+  baseUrl?: string;
+  artifactCapability: string;
+  signal?: AbortSignal;
+  processRunner?: ProcessRunner;
+  spawnServer?: SpawnServer;
+  fetchHealth?: (baseUrl: string, signal?: AbortSignal) => Promise<boolean>;
+  allocatePrivatePort?: (signal?: AbortSignal) => Promise<number>;
+  serverTermGraceMs?: number;
+}
+
 export class PrivateServer {
-  static async open(options) {
+  closePromise: Promise<void> | null;
+  logFd: number | null;
+  serverSpawnError: Error | null;
+  child: ChildProcess | null;
+  build: PrivateServerBuild | null;
+  logPath: string;
+  reused: boolean;
+  baseUrl: string;
+  serverTermGraceMs: number;
+  allocatePrivatePort: (signal?: AbortSignal) => Promise<number>;
+  fetchHealth: (baseUrl: string, signal?: AbortSignal) => Promise<boolean>;
+  spawnServer: SpawnServer;
+  processRunner: ProcessRunner;
+  signal?: AbortSignal;
+  artifactCapability: string;
+  requestedBaseUrl: string;
+  startupTimeoutMs: number;
+  sessionDir: string;
+  workspace: WorkspaceInfo;
+  static async open(options: PrivateServerOptions) {
     const server = new PrivateServer(options);
     try {
       await server.open();
@@ -41,7 +79,7 @@ export class PrivateServer {
     fetchHealth = isHealthy,
     allocatePrivatePort = allocatePort,
     serverTermGraceMs = SERVER_TERM_GRACE_MS,
-  }) {
+  }: PrivateServerOptions) {
     this.workspace = workspace;
     this.sessionDir = sessionDir;
     this.startupTimeoutMs = startupTimeoutMs;
@@ -111,8 +149,9 @@ export class PrivateServer {
       shell: false,
       stdio: ["ignore", this.logFd, this.logFd],
     });
-    this.child.once("error", (error) => { this.serverSpawnError = error; });
-    this.child.once("exit", () => this.closeLog());
+    const child = this.child;
+    child.once("error", (error) => { this.serverSpawnError = error; });
+    child.once("exit", () => this.closeLog());
     this.baseUrl = `http://127.0.0.1:${port}/`;
     const deadline = Date.now() + this.startupTimeoutMs;
     while (Date.now() < deadline) {
@@ -120,7 +159,7 @@ export class PrivateServer {
       if (this.serverSpawnError) {
         throw new PrivateServerError("serverSpawnFailed", `Private server could not start: ${String(this.serverSpawnError.message || this.serverSpawnError).slice(-800)}`);
       }
-      if (this.child.exitCode != null || this.child.signalCode != null) {
+      if (child.exitCode != null || child.signalCode != null) {
         throw new PrivateServerError("serverExited", `Private server exited during startup; see ${this.logPath}`);
       }
       if (await this.fetchHealth(this.baseUrl, this.signal)) {
@@ -165,7 +204,7 @@ export class PrivateServer {
   }
 }
 
-export function privateLoopbackUrl(value) {
+export function privateLoopbackUrl(value: string|URL) {
   let url;
   try { url = new URL(value); } catch {
     throw new PrivateServerError("invalidServerUrl", "baseUrl must be a valid loopback URL.");
@@ -177,7 +216,7 @@ export function privateLoopbackUrl(value) {
   return url.href;
 }
 
-async function isHealthy(baseUrl, signal) {
+async function isHealthy(baseUrl: string, signal?: AbortSignal) {
   try {
     const response = await fetch(baseUrl, {
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(500)]) : AbortSignal.timeout(500),
@@ -186,11 +225,11 @@ async function isHealthy(baseUrl, signal) {
   } catch { return false; }
 }
 
-async function allocatePort(signal) {
+async function allocatePort(signal?: AbortSignal): Promise<number> {
   throwIfAborted(signal);
   const server = net.createServer();
   server.unref();
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const onAbort = () => {
       server.close();
       reject(abortedError());
@@ -208,29 +247,30 @@ async function allocatePort(signal) {
   });
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : 0;
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   if (!port) throw new PrivateServerError("portAllocation", "Could not allocate a private loopback port.");
   return port;
 }
 
-function abortableDelay(ms, signal) {
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
   if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
-  return new Promise((resolve, reject) => {
+  const abortSignal = signal;
+  return new Promise<void>((resolve, reject) => {
     const timer = setTimeout(done, ms);
     const onAbort = () => {
       clearTimeout(timer);
-      signal.removeEventListener("abort", onAbort);
+      abortSignal.removeEventListener("abort", onAbort);
       reject(abortedError());
     };
     function done() {
-      signal.removeEventListener("abort", onAbort);
+      abortSignal.removeEventListener("abort", onAbort);
       resolve();
     }
-    signal.addEventListener("abort", onAbort, { once: true });
+    abortSignal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
-function throwIfAborted(signal) {
+function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw abortedError();
 }
 
@@ -238,14 +278,15 @@ function abortedError() {
   return new PrivateServerError("sessionClosed", "Lab Interact driver was closed during server startup.");
 }
 
-function normalizePrivateServerError(error) {
+function normalizePrivateServerError(error: unknown) {
   if (error instanceof PrivateServerError) return error;
-  return new PrivateServerError(error?.code || "serverStartFailed", String(error?.message || error || "Private server startup failed."));
+  const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "serverStartFailed";
+  return new PrivateServerError(code, error instanceof Error ? error.message : String(error || "Private server startup failed."));
 }
 
-function conciseProcessFailure(prefix, error) {
-  const result = error?.result;
-  const detail = String(result?.stderr || result?.stdout || error?.message || "unknown failure")
+function conciseProcessFailure(prefix: string, error: unknown) {
+  const result = error instanceof ProcessRunnerError ? error.result : null;
+  const detail = String(result?.stderr || result?.stdout || (error instanceof Error ? error.message : "unknown failure"))
     .trim().split("\n").slice(-4).join("; ").slice(0, 800);
   return `${prefix}: ${detail}`;
 }

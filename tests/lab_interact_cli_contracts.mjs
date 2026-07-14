@@ -10,9 +10,9 @@ import {
   DEFAULT_IDLE_MS, IPC_VERSION, STARTUP_GRACE_MS, configuredIdleMs, prepareRuntime,
   processAlive, readStartupLock, readState, reclaimStaleStartupLock,
   runtimePaths, sleep, startupLockStale,
-} from "../scripts/lab-interact/runtime.mjs";
-import { LAB_INTERACT_COMMANDS } from "../scripts/lab-interact/command_service.mjs";
-import { LAB_INTERACT_COMMAND_HELP } from "../scripts/lab-interact/command_help.mjs";
+} from "../scripts/lab-interact/runtime.ts";
+import { LAB_INTERACT_COMMANDS } from "../scripts/lab-interact/command_service.ts";
+import { LAB_INTERACT_COMMAND_HELP } from "../scripts/lab-interact/command_help.ts";
 import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -402,7 +402,7 @@ try {
   prepareRuntime(paths);
   const lateNonce = "a".repeat(32);
   fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: lateNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`, { mode: 0o600 });
-  const lateChild = spawn(process.execPath, [path.join(root, "scripts/lab-interact/daemon.mjs"), root, lateNonce], {
+  const lateChild = spawn(process.execPath, [path.join(root, "scripts/lab-interact/daemon.ts"), root, lateNonce], {
     cwd: root,
     env: { ...baseEnv, RTS_LAB_INTERACT_TEST_PREBIND_DELAY_MS: "250" },
     stdio: ["ignore", "pipe", "pipe"],
@@ -421,7 +421,7 @@ try {
   const winningState = JSON.parse(fs.readFileSync(paths.state, "utf8"));
   const duplicateNonce = "c".repeat(32);
   fs.writeFileSync(paths.lock, `${JSON.stringify({ nonce: duplicateNonce, role: "cli", pid: process.pid, createdAt: Date.now() })}\n`, { mode: 0o600 });
-  const duplicate = spawnSync(process.execPath, [path.join(root, "scripts/lab-interact/daemon.mjs"), root, duplicateNonce], {
+  const duplicate = spawnSync(process.execPath, [path.join(root, "scripts/lab-interact/daemon.ts"), root, duplicateNonce], {
     cwd: root, env: baseEnv, encoding: "utf8", timeout: 2000,
   });
   assert.notEqual(duplicate.status, 0, "a duplicate daemon cannot bind the owned worktree socket");

@@ -178,7 +178,7 @@ jobs:
         if: needs.changed-files.outputs.run_rust == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.18.0"
 
       - name: Cache Cargo registry and target
         if: needs.changed-files.outputs.run_rust == 'true'
@@ -228,7 +228,7 @@ jobs:
         if: needs.changed-files.outputs.run_rust == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.18.0"
 
       - name: Cache Cargo registry and target
         if: needs.changed-files.outputs.run_rust == 'true'
@@ -300,7 +300,7 @@ jobs:
         if: needs.changed-files.outputs.run_live_node == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.18.0"
 
       - name: Download server binary
         if: needs.changed-files.outputs.run_live_node == 'true'
@@ -354,7 +354,7 @@ jobs:
         if: needs.changed-files.outputs.run_browser == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.18.0"
 
       - name: Download server binary
         if: needs.changed-files.outputs.run_browser == 'true'

@@ -4,14 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.mjs";
+import { LabInteractService, validateCommandInput } from "../scripts/lab-interact/command_service.ts";
 import {
   createFixedCaptureEncoder, FIXED_CAPTURE_LIMITS, fixedFrameTick, fixedRepresentativeIndices,
-} from "../scripts/lab-interact/fixed_capture.mjs";
-import { checkMediaCapabilities } from "../scripts/lab-interact/recording.mjs";
+} from "../scripts/lab-interact/fixed_capture.ts";
+import { checkMediaCapabilities } from "../scripts/lab-interact/recording.ts";
 import { openLabInteractDriver } from "./fixtures/lab_interact_fake_driver.mjs";
 import { LabInteractTestArtifacts } from "./fixtures/lab_interact_test_artifacts.mjs";
-import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.mjs";
+import { boundedSummary, LAB_INTERACT_SUMMARY_LIMITS } from "../scripts/lab-interact/manifest_summary.ts";
 
 const sessionId = `lab_${"a".repeat(32)}`;
 const root = process.cwd();
@@ -19,10 +19,10 @@ const testArtifacts = new LabInteractTestArtifacts(root);
 let service;
 
 try {
-  const driverSource = fs.readFileSync(new URL("../scripts/lab-interact/driver.mjs", import.meta.url), "utf8");
+  const driverSource = fs.readFileSync(new URL("../scripts/lab-interact/driver.ts", import.meta.url), "utf8");
   assert.match(
     driverSource,
-    /import\s*\{[^}]*FIXED_CAPTURE_LIMITS[^}]*\}\s*from\s*"\.\/fixed_capture\.mjs"/s,
+    /import\s*\{[^}]*FIXED_CAPTURE_LIMITS[^}]*\}\s*from\s*"\.\/fixed_capture\.ts"/s,
     "the real fixed-capture driver imports the limits it enforces at runtime",
   );
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }), (error) => error?.code === "invalidInput");
