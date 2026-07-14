@@ -25,9 +25,7 @@ pub(super) fn refresh_world(game: &mut Game) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
 }
 
 pub(super) fn spawn_unit_on_tile(
@@ -51,8 +49,12 @@ pub(super) fn spawn_building_on_tile(
     tile_x: u32,
     tile_y: u32,
 ) -> u32 {
-    let pos =
-        crate::game::services::occupancy::footprint_center(&game.state.map, kind, tile_x, tile_y);
+    let pos = crate::game::services::occupancy::footprint_center(
+        &game.state.map,
+        kind,
+        tile_x,
+        tile_y,
+    );
     game.state
         .entities
         .spawn_building(owner, kind, pos.0, pos.1, true)
@@ -107,8 +109,7 @@ fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
 }
 
 fn panzerfaust_state_of(game: &Game, id: u32) -> Option<PanzerfaustState> {
-    game.state
-        .entities
+    game.state.entities
         .get(id)
         .and_then(|entity| entity.combat.as_ref())
         .and_then(|combat| combat.panzerfaust)
@@ -174,9 +175,7 @@ fn spawned_panzerfaust_direct_attack_damages_tank_reloads_and_fires_again() {
         tank_hp_on_impact,
         Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
-    let reloading = game
-        .state
-        .entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert_eq!(reloading.kind, EntityKind::Panzerfaust);
@@ -232,9 +231,9 @@ fn panzerfaust_direct_attack_can_damage_owned_tank_targets() {
         if impact_this_tick && tank_hp_on_impact.is_none() {
             tank_hp_on_impact = game.state.entities.get(tank).map(|tank| tank.hp);
         }
-        owner_saw_under_attack_notice |= owner_events
-            .iter()
-            .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"));
+        owner_saw_under_attack_notice |= owner_events.iter().any(
+            |event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"),
+        );
     }
 
     assert!(owner_saw_launch);
@@ -251,9 +250,7 @@ fn panzerfaust_direct_attack_can_damage_owned_tank_targets() {
 #[test]
 fn direct_attack_reload_keeps_attack_order_and_delays_queued_move() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let start = game
-        .state
-        .entities
+    let start = game.state.entities
         .get(panzerfaust)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("panzerfaust exists");
@@ -273,9 +270,7 @@ fn direct_attack_reload_keeps_attack_order_and_delays_queued_move() {
         game.tick();
     }
 
-    let reloading = game
-        .state
-        .entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert_eq!(reloading.kind, EntityKind::Panzerfaust);
@@ -309,18 +304,11 @@ fn spawned_panzerfaust_rejects_direct_attack_on_non_loaded_shot_target() {
     enqueue_attack(&mut game, panzerfaust, rifleman, false);
     let events = game.tick();
 
-    let panzerfaust_entity = game
-        .state
-        .entities
-        .get(panzerfaust)
-        .expect("panzerfaust exists");
+    let panzerfaust_entity = game.state.entities.get(panzerfaust).expect("panzerfaust exists");
     assert_eq!(panzerfaust_entity.kind, EntityKind::Panzerfaust);
     assert_eq!(panzerfaust_entity.order(), Order::Idle);
     assert_eq!(panzerfaust_entity.target_id(), None);
-    assert_eq!(
-        game.state.entities.get(rifleman).expect("target exists").hp,
-        45
-    );
+    assert_eq!(game.state.entities.get(rifleman).expect("target exists").hp, 45);
     assert!(player_events(&events, 1)
         .iter()
         .all(|event| !matches!(event, Event::PanzerfaustLaunch { .. })));
@@ -363,9 +351,7 @@ fn spawned_panzerfaust_direct_attack_damages_scout_car_and_reloads() {
         game.state.entities.get(scout).is_none(),
         "Scout Car should be a legal Panzerfaust target and die to the hit"
     );
-    let reloading = game
-        .state
-        .entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert_eq!(reloading.kind, EntityKind::Panzerfaust);
@@ -378,8 +364,7 @@ fn methamphetamines_shortens_windup_but_not_reload_timing() {
     fn launch_tick(has_methamphetamines: bool) -> u32 {
         let (mut game, panzerfaust, tank) = panzerfaust_fixture();
         if has_methamphetamines {
-            game.state
-                .players
+            game.state.players
                 .iter_mut()
                 .find(|player| player.id == 1)
                 .expect("player exists")
@@ -418,20 +403,17 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     let (mut outside_game, outside_panzerfaust, outside_tank) =
         panzerfaust_fixture_at_tank_tile(12);
     let outside_start = outside_game
-        .state
-        .entities
+        .state.entities
         .get(outside_panzerfaust)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("panzerfaust exists");
     let outside_tank_hp = outside_game
-        .state
-        .entities
+        .state.entities
         .get(outside_tank)
         .expect("tank exists")
         .hp;
     outside_game
-        .state
-        .entities
+        .state.entities
         .get_mut(outside_panzerfaust)
         .expect("panzerfaust exists")
         .hold_position();
@@ -443,8 +425,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
             .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
     }
     let outside_panzerfaust_entity = outside_game
-        .state
-        .entities
+        .state.entities
         .get(outside_panzerfaust)
         .expect("panzerfaust exists");
     assert_eq!(
@@ -456,8 +437,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     );
     assert_eq!(
         outside_game
-            .state
-            .entities
+            .state.entities
             .get(outside_tank)
             .expect("tank exists")
             .hp,
@@ -468,14 +448,12 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
     let (mut entrenched_game, entrenched_panzerfaust, entrenched_tank) =
         panzerfaust_fixture_at_tank_tile(12);
     let entrenched_tank_hp = entrenched_game
-        .state
-        .entities
+        .state.entities
         .get(entrenched_tank)
         .expect("tank exists")
         .hp;
     let trench_pos = entrenched_game
-        .state
-        .entities
+        .state.entities
         .get(entrenched_panzerfaust)
         .map(|panzerfaust| (panzerfaust.pos_x, panzerfaust.pos_y))
         .expect("panzerfaust exists");
@@ -484,8 +462,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
         .expect("trench should seed");
     {
         let panzerfaust = entrenched_game
-            .state
-            .entities
+            .state.entities
             .get_mut(entrenched_panzerfaust)
             .expect("panzerfaust exists");
         panzerfaust.hold_position();
@@ -504,8 +481,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
             .any(|event| matches!(event, Event::PanzerfaustImpact { .. }));
         if impact_this_tick && entrenched_impact_hp.is_none() {
             entrenched_impact_hp = entrenched_game
-                .state
-                .entities
+                .state.entities
                 .get(entrenched_tank)
                 .map(|tank| tank.hp);
         }
@@ -518,8 +494,7 @@ fn hold_position_uses_only_current_entrenched_panzerfaust_range() {
         Some(entrenched_tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
     let reloading = entrenched_game
-        .state
-        .entities
+        .state.entities
         .get(entrenched_panzerfaust)
         .expect("entrenched Panzerfaust should keep the same id");
     assert!(!saw_entrenched_conversion);
@@ -559,13 +534,9 @@ fn replacing_order_during_windup_cancels_without_spending_shot() {
             .any(|event| matches!(event, Event::PanzerfaustLaunch { .. }));
     }
 
+    assert_eq!(game.state.entities.get(tank).expect("tank exists").hp, tank_hp);
     assert_eq!(
-        game.state.entities.get(tank).expect("tank exists").hp,
-        tank_hp
-    );
-    assert_eq!(
-        game.state
-            .entities
+        game.state.entities
             .get(panzerfaust)
             .expect("panzerfaust exists")
             .kind,
@@ -580,8 +551,7 @@ fn target_death_during_windup_cancels_without_spending_shot() {
     enqueue_attack(&mut game, panzerfaust, tank, false);
     game.tick();
 
-    game.state
-        .entities
+    game.state.entities
         .get_mut(tank)
         .expect("tank exists")
         .apply_damage(u32::MAX, None);
@@ -594,9 +564,7 @@ fn target_death_during_windup_cancels_without_spending_shot() {
     }
 
     assert!(game.state.entities.get(tank).is_none());
-    let panzerfaust_entity = game
-        .state
-        .entities
+    let panzerfaust_entity = game.state.entities
         .get(panzerfaust)
         .expect("panzerfaust should survive with its shot still loaded");
     assert_eq!(panzerfaust_entity.kind, EntityKind::Panzerfaust);
@@ -606,8 +574,7 @@ fn target_death_during_windup_cancels_without_spending_shot() {
 #[test]
 fn panzerfaust_killed_during_windup_does_not_launch() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    game.state
-        .entities
+    game.state.entities
         .get_mut(panzerfaust)
         .expect("panzerfaust exists")
         .set_invulnerable(false);
@@ -618,8 +585,7 @@ fn panzerfaust_killed_during_windup_does_not_launch() {
         Some(PanzerfaustState::Windup { .. })
     ));
 
-    game.state
-        .entities
+    game.state.entities
         .get_mut(panzerfaust)
         .expect("panzerfaust exists")
         .apply_damage(u32::MAX, None);
@@ -659,9 +625,7 @@ fn panzerfaust_killed_during_windup_does_not_launch() {
 fn panzerfaust_killed_during_reload_does_not_emit_conversion_after_death() {
     let (mut game, panzerfaust, _tank) = panzerfaust_fixture();
     {
-        let entity = game
-            .state
-            .entities
+        let entity = game.state.entities
             .get_mut(panzerfaust)
             .expect("panzerfaust exists");
         entity.set_invulnerable(false);
@@ -696,9 +660,7 @@ fn panzerfaust_killed_during_reload_does_not_emit_conversion_after_death() {
 #[test]
 fn replacing_order_after_launch_spends_shot_and_resumes_movement_during_reload() {
     let (mut game, panzerfaust, tank) = panzerfaust_fixture();
-    let start = game
-        .state
-        .entities
+    let start = game.state.entities
         .get(panzerfaust)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("panzerfaust exists");
@@ -751,9 +713,7 @@ fn replacing_order_after_launch_spends_shot_and_resumes_movement_during_reload()
         impact_hp,
         Some(tank_hp.saturating_sub(panzerfaust_damage_to(EntityKind::Tank)))
     );
-    let reloading = game
-        .state
-        .entities
+    let reloading = game.state.entities
         .get(panzerfaust)
         .expect("same entity id should remain");
     assert!(!saw_conversion);
@@ -844,8 +804,7 @@ fn target_death_during_travel_spends_shot_and_reloads() {
         saw_launch,
         "test setup should reach launch before killing target"
     );
-    game.state
-        .entities
+    game.state.entities
         .get_mut(tank)
         .expect("tank exists")
         .apply_damage(u32::MAX, None);
@@ -864,8 +823,7 @@ fn target_death_during_travel_spends_shot_and_reloads() {
 
     assert!(game.state.entities.get(tank).is_none());
     assert_eq!(
-        game.state
-            .entities
+        game.state.entities
             .get(panzerfaust)
             .expect("panzerfaust id should remain")
             .kind,
