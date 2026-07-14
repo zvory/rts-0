@@ -385,6 +385,10 @@ export class GameState extends VisualEffectBackedState {
     return this.progressExtrapolator.diagnostics();
   }
 
+  setProgressPredictionPaused(paused) {
+    this.progressExtrapolator.setPaused(paused === true, this.visualNow());
+  }
+
   applyPredictionDisplayOverlay(overlay = null) {
     if (!overlay || typeof overlay !== "object") {
       this._applyOptimisticCommandOverlay(null);

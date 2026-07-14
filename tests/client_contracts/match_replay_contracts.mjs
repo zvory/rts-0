@@ -19,6 +19,7 @@ import { ClientIntent } from "../../client/src/client_intent.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { ReplayCameraInput } from "../../client/src/replay_camera_input.js";
 import { LivePauseOverlay } from "../../client/src/live_pause_overlay.js";
+import { notePredictionAuthoritativeSnapshot } from "../../client/src/match_live_pause.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
 {
@@ -725,12 +726,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
   const livePauseStateMatch = Object.create(Match.prototype);
   const livePauseOverlays = [];
+  const progressPauseStates = [];
   livePauseStateMatch.livePauseState = { paused: false };
   livePauseStateMatch.predictionVisualSuspended = false;
   livePauseStateMatch.predictionAdapter = { pauseVisualClock() {} };
   livePauseStateMatch.state = {
     applyPredictionDisplayOverlay(overlay) {
       livePauseOverlays.push(overlay);
+    },
+    setProgressPredictionPaused(paused) {
+      progressPauseStates.push(paused);
     },
   };
   livePauseStateMatch.publishPredictionDebug = () => {};
@@ -743,12 +748,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
   assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
   assert(livePauseOverlays.at(-1)?.predictedSnapshot === null, "entering live pause drops any predicted movement frame");
+  assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");
   livePauseStateMatch.applyLivePauseState({ paused: false, canPause: true, canUnpause: false });
   assert(
     livePauseStateMatch.predictionVisualSuspended,
     "leaving live pause keeps prediction suspended until the next authoritative snapshot",
   );
+  assert(progressPauseStates.at(-1) === true, "unpause keeps progress frozen until an authoritative snapshot");
+  notePredictionAuthoritativeSnapshot(livePauseStateMatch);
+  assert(progressPauseStates.at(-1) === false, "the first post-unpause snapshot resumes progress prediction");
 
   livePauseStateMatch.roomTimeControls = { applyRoomTimeState() {} };
   livePauseStateMatch.applyRoomTimeState({ currentTick: 90, durationTicks: 600, speed: 0, paused: true });
