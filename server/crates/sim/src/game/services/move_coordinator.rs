@@ -863,7 +863,6 @@ impl<'a> MoveCoordinator<'a> {
     // -------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------
-
     /// Direct path request without throttle check. Updates budget, entity path, and phase.
     fn request_path(
         &mut self,
@@ -885,8 +884,9 @@ impl<'a> MoveCoordinator<'a> {
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         if sx == gx && sy == gy {
+            let gather_goal = (source == PathingRequestSource::Gather).then_some(goal);
             if let Some(e) = entities.get_mut(id) {
-                e.set_path(Vec::new());
+                e.set_path(gather_goal.into_iter().collect());
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
                 if matches!(
