@@ -174,7 +174,7 @@ function isLabPath(pathname) {
 
 export function buildLabLaunchConfig({ room, map, seed = "", scenario = "", visualProfile = "" } = {}) {
   const publicRoom = safeLabToken(room, "default", 40);
-  const mapName = safeLabToken(map, "Default", 48);
+  const mapName = safeLabToken(map, "1v1", 48);
   const seedPart = safeLabSeed(seed);
   const scenarioId = safeLabToken(scenario, "", 48);
   const visualProfileResult = safeLabVisualProfile(visualProfile);

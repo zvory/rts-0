@@ -109,6 +109,7 @@ export async function openInteractDriver(options) {
     async status() {
       return {
         ready: !closed, reason: closed ? "closed" : "ready", mode: options.mode || "lab",
+        map: options.map,
         snapshotTick: tick, room: options.mode === "game" ? "interact-game-fixture" : "interact-lab-fixture",
         phase: options.mode === "game" ? gamePhase : undefined,
         role: options.spectate ? "spectator" : "player",
