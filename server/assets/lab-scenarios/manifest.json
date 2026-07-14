@@ -5,7 +5,7 @@
       "title": "Lategame Arsenal",
       "description": "Two-player late-game lab with full tech, large armies, and maximum resources.",
       "tags": ["two-player", "lategame", "full-tech"],
-      "map": "Default",
+      "map": "1v1",
       "playerCount": 2,
       "filename": "lategame.json"
     },
@@ -14,7 +14,7 @@
       "title": "Render Preview",
       "description": "Imported two-player lab setup for checking exported render coverage.",
       "tags": ["two-player", "render-preview", "imported"],
-      "map": "Default",
+      "map": "1v1",
       "playerCount": 2,
       "filename": "render-preview.json"
     }

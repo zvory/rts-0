@@ -753,7 +753,7 @@ mod tests {
             .iter()
             .find(|entry| entry.id == "lategame")
             .expect("lategame catalog row");
-        assert_eq!(lategame.map, "Default");
+        assert_eq!(lategame.map, "1v1");
         assert_eq!(lategame.player_count, 2);
         assert_eq!(lategame.filename, "lategame.json");
 
@@ -807,7 +807,7 @@ mod tests {
             .iter()
             .find(|entry| entry.id == "render-preview")
             .expect("render-preview catalog row");
-        assert_eq!(render_preview.map, "Default");
+        assert_eq!(render_preview.map, "1v1");
         assert_eq!(render_preview.player_count, 2);
         assert_eq!(render_preview.filename, "render-preview.json");
 
@@ -931,7 +931,7 @@ mod tests {
 
         assert_eq!(preview.filename, "fresh-lab-scenario.json");
         assert_eq!(preview.manifest_entry.id, "fresh-lab-scenario");
-        assert_eq!(preview.manifest_entry.map, "Default");
+        assert_eq!(preview.manifest_entry.map, "1v1");
         assert_eq!(preview.manifest_entry.player_count, 2);
         assert!(preview
             .scenario_json
