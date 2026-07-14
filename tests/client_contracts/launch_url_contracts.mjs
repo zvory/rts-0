@@ -16,7 +16,7 @@ async function testDevWatchScenarioConfig() {
     localStorage: { getItem: () => null },
   };
   try {
-    const { devWatchConfig } = await import("../../client/src/bootstrap.js");
+    const { devWatchConfig, snapshotStreamLaunchConfig } = await import("../../client/src/bootstrap.js");
     let config = devWatchConfig();
     assert(config, "vehicle_small_block_baseline dev scenario should be recognized");
     assert(config.kind === "scenario", "dev scenario should set scenario kind");
@@ -62,6 +62,17 @@ async function testDevWatchScenarioConfig() {
     );
     config = devWatchConfig();
     assert(config === null, "dev scenario parser should reject unsafe scenario ids");
+
+    globalThis.window.location = new URL(
+      "http://localhost/?snapshotStream=supply-300-hellhole",
+    );
+    const snapshotStream = snapshotStreamLaunchConfig();
+    assert(
+      snapshotStream?.id === "supply-300-hellhole",
+      "snapshot stream launch recognizes a safe static artifact id",
+    );
+    globalThis.window.location = new URL("http://localhost/?snapshotStream=bad/path");
+    assert(snapshotStreamLaunchConfig() === null, "snapshot stream launch rejects unsafe paths");
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;

@@ -3,6 +3,17 @@ export function wsUrl() {
   return `${scheme}://${window.location.host}/ws`;
 }
 
+export function snapshotStreamLaunchConfig() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("snapshotStream")) return null;
+  const id = (params.get("snapshotStream") || "").trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
+  return {
+    id,
+    banner: `offline snapshot stream · ${id} · no WebSocket or live simulation`,
+  };
+}
+
 function diagnosticsEnabled() {
   try {
     const params = new URLSearchParams(window.location.search);

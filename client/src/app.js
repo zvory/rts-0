@@ -94,9 +94,10 @@ export function shouldWarnBeforeUnload({
  * same Net connection.
  */
 export class App {
-  constructor({ rendererBackendBundle = null } = {}) {
+  constructor({ rendererBackendBundle = null, net = null, snapshotStreamLaunch = null } = {}) {
     /** @type {Net} persistent connection across lobby + matches. */
-    this.net = new Net(wsUrl(), diagnostics);
+    this.net = net || new Net(wsUrl(), diagnostics);
+    this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.devWatch = devWatchConfig();
     this.labCatalogLaunch = labCatalogRouteConfig();
     this.labHandoffLaunch = labHandoffLaunchConfig();
@@ -243,6 +244,11 @@ export class App {
 
   applyDevBanner() {
     if (!dom.devBanner) return;
+    if (this.snapshotStreamLaunch) {
+      dom.devBanner.textContent = this.snapshotStreamLaunch.banner;
+      dom.devBanner.hidden = false;
+      return;
+    }
     if (!this.devWatch) {
       dom.devBanner.hidden = true;
       return;
@@ -433,7 +439,9 @@ export class App {
   onOpen() {
     this.hasConnected = true;
     this.stopHeartbeat();
-    this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
+    if (!this.net.offline) {
+      this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
+    }
     this.labCatalog?.setConnected(true);
   }
 
@@ -476,7 +484,7 @@ export class App {
     const labMetadata = payload?.lab || null;
     const visualProfile = labMetadata ? this.labVisualProfileState?.profile || null : null;
     const visualProfileError = labMetadata ? this.labVisualProfileState?.error || null : null;
-    const scenarioInitialCamera = labMetadata?.initialCamera || null;
+    const scenarioInitialCamera = labMetadata?.initialCamera || payload?.snapshotStream?.initialCamera || null;
 
     const carriedCamera = selectInitialCameraView({
       currentView: this.takeMatchCameraView(),
@@ -755,7 +763,7 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
-    if (this.replayLaunch || this.labLaunch || this.matchLaunch) {
+    if (this.replayLaunch || this.labLaunch || this.matchLaunch || this.snapshotStreamLaunch) {
       if (this.match) {
         this.match.destroy();
         this.match = null;

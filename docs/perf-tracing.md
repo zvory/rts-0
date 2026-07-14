@@ -237,13 +237,20 @@ node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
+node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
 points at an already-healthy server. It drives headless Chrome with the repository-root
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
-under `target/client-perf/<workload>/<timestamp>/`. The current checked-in workload set uses
-dev-scenario URLs only: `vehicle-wall-stress` and `selected-unit-hud-stress`. Preserved schema 2
+under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
+`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios plus
+`supply-300-hellhole-stream`, a client-only isolation lane. The latter fetches the generated
+`client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
+MessagePack snapshots into the normal decoder and renderer at 30 Hz. Its setup assertion fails unless
+the page reports no WebSocket and no live simulation. Regenerate the thirty-second, 900-frame artifact
+with `cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream`.
+Preserved schema 2
 incident replays are analysis evidence only and are not replay-harness workloads. The
 `--render-lag-suite` path runs the current workload set, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes

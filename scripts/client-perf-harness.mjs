@@ -9,6 +9,7 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
+import { initializeWorkloadSetup } from "./client-perf/snapshot_stream_setup.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1241,9 +1242,8 @@ async function collectPageSummary(page) {
 
 async function applyWorkloadSetup(page, workload) {
   const setup = workload.setup || null;
-  if (!setup) return null;
-  const result = { actions: [] };
-
+  const result = await initializeWorkloadSetup(page, setup);
+  if (!result) return null;
   if (setup.visionSelectionPlayerIndex != null || setup.visionSelectionPlayerId != null) {
     const action = await page.evaluate((replaySetup) => {
       const match = window.__rts?.match;
