@@ -7,6 +7,8 @@ export class ProgressExtrapolator {
   constructor({ playerId }) {
     this.playerId = playerId;
     this.active = new Map();
+    this.pausedAt = null;
+    this.accumulatedPausedMs = 0;
     this.correctionCount = 0;
     this.totalCorrection = 0;
     this.maxCorrection = 0;
@@ -14,9 +16,10 @@ export class ProgressExtrapolator {
   }
 
   updateFromSnapshot(entities, recvTime) {
+    const activeRecvTime = this._activeTime(recvTime);
     const next = new Map();
     for (const entity of entities || []) {
-      const baseline = this._baselineFor(entity, recvTime);
+      const baseline = this._baselineFor(entity, activeRecvTime);
       if (!baseline) continue;
       const prior = this.active.get(entity.id);
       if (prior && prior.identity === baseline.identity) {
@@ -36,7 +39,7 @@ export class ProgressExtrapolator {
   progressFor(entity, now) {
     const baseline = this.active.get(entity?.id);
     if (!baseline || !this._matches(entity, baseline)) return safeProgress(currentProgress(entity, baseline));
-    const elapsedMs = Math.max(0, now - baseline.recvTime);
+    const elapsedMs = Math.max(0, this._activeTime(now) - baseline.recvTime);
     const durationMs = Math.max(1, (baseline.durationTicks / TICK_HZ) * 1000);
     const progress = baseline.progress + elapsedMs / durationMs;
     return Math.min(PROGRESS_EXTRAPOLATION_MAX, Math.max(baseline.progress, progress));
@@ -53,6 +56,17 @@ export class ProgressExtrapolator {
     return { ...entity, prodProgress: progress, progressPredicted: true };
   }
 
+  setPaused(paused, now) {
+    const wallTime = finiteTime(now);
+    if (paused) {
+      if (this.pausedAt == null) this.pausedAt = wallTime;
+      return;
+    }
+    if (this.pausedAt == null) return;
+    this.accumulatedPausedMs += Math.max(0, wallTime - this.pausedAt);
+    this.pausedAt = null;
+  }
+
   diagnostics() {
     let productionBars = 0;
     let constructionBars = 0;
@@ -62,6 +76,7 @@ export class ProgressExtrapolator {
     }
     return {
       activeBars: this.active.size,
+      paused: this.pausedAt != null,
       productionBars,
       constructionBars,
       correctionCount: this.correctionCount,
@@ -87,6 +102,12 @@ export class ProgressExtrapolator {
     const durationTicks = durationTicksFor(identity);
     if (!(durationTicks > 0)) return null;
     return { id: entity.id, type: "production", identity, queue, progress, durationTicks, recvTime };
+  }
+
+  _activeTime(now) {
+    const wallTime = finiteTime(now);
+    const effectiveWallTime = this.pausedAt == null ? wallTime : Math.min(wallTime, this.pausedAt);
+    return effectiveWallTime - this.accumulatedPausedMs;
   }
 
   _matches(entity, baseline) {
@@ -146,6 +167,10 @@ function durationTicksFor(identity) {
 
 function finiteTicks(value) {
   return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function finiteTime(value) {
+  return Number.isFinite(value) ? value : 0;
 }
 
 function finitePositiveInt(value) {

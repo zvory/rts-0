@@ -21,8 +21,6 @@ export function buildMatchSettingsContextForMatch(match) {
     onPointerLockToggle: match.onPointerLockToggle,
     onDebugPathToggle: match.onDebugPathToggle,
     onUnitRangeToggle: match.onUnitRangeToggle,
-    autoSpectator: match.autoSpectator,
-    onAutoSpectatorToggle: () => match.setAutoSpectatorEnabled(!match.autoSpectator?.enabled),
     livePauseActionLabel: () => match.livePauseActionLabel(),
     livePauseActionTitle: () => match.livePauseActionTitle(),
   });
@@ -47,8 +45,6 @@ export function buildMatchSettingsContext({
   onPointerLockToggle,
   onDebugPathToggle,
   onUnitRangeToggle,
-  autoSpectator,
-  onAutoSpectatorToggle,
   livePauseActionLabel,
   livePauseActionTitle,
 }) {
@@ -121,13 +117,6 @@ export function buildMatchSettingsContext({
         }),
         onToggle: onDebugPathToggle,
       },
-      replayControls: !lab && spectator && autoSpectator ? {
-        state: () => ({
-          available: !!autoSpectator,
-          enabled: !!autoSpectator?.enabled,
-        }),
-        onToggle: onAutoSpectatorToggle,
-      } : null,
     }),
   };
 }

@@ -5,7 +5,6 @@ export function buildSettingsTabs({
   hotkeyProfiles = null,
   game = null,
   debug = null,
-  replayControls = null,
 } = {}) {
   return [
     {
@@ -24,41 +23,12 @@ export function buildSettingsTabs({
       render: (root) => renderAudioPanel(root, audio),
     },
     {
-      id: "replay-controls",
-      label: "Replay Controls",
-      visible: !!replayControls,
-      render: (root) => renderReplayControlsPanel(root, replayControls),
-    },
-    {
       id: "debug",
       label: "Debug",
       visible: !!debug?.available,
       render: (root) => renderDebugPanel(root, debug),
     },
   ];
-}
-
-function renderReplayControlsPanel(root, replayControls) {
-  const button = document.createElement("button");
-  button.id = "auto-spectator-toggle";
-  button.type = "button";
-  button.className = "settings-toggle";
-  button.setAttribute("role", "switch");
-  button.addEventListener("click", () => {
-    replayControls.onToggle?.();
-    sync();
-  });
-  root.appendChild(button);
-
-  function sync() {
-    const state = replayControls.state?.() || {};
-    const enabled = !!state.enabled;
-    button.disabled = state.available === false;
-    button.setAttribute("aria-checked", String(enabled));
-    button.textContent = enabled ? "Enable Auto Spectator: on" : "Enable Auto Spectator: off";
-    button.title = "Automatically frame active battles and show the whole map when combat is quiet.";
-  }
-  sync();
 }
 
 export function buildGiveUpAction({ visible, onOpen }) {

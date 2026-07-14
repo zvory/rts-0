@@ -30,6 +30,7 @@ src/
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
   auto_spectator_settings.js # persisted opt-in preference for automatic spectator framing
+  spectator_controls_panel.js # floating live-spectator/replay camera controls
   match_auto_spectator.js # Match availability, camera-limit, and director-construction wiring
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
@@ -942,6 +943,7 @@ export class GameState {
   setSelection(ids), addToSelection(ids), clearSelection()
   selectedEntities()                     // resolved entity objects from current snapshot
   entityById(id)
+  setProgressPredictionPaused(paused)    // freezes/resumes wall-clock progress display prediction
   // control groups (client-only):
   controlGroups                          // ten budget-admitted Array<entityId> slots; slot 9 maps to key 0
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
@@ -1115,9 +1117,10 @@ export class AutoSpectatorDirector {
 }
 ```
 
-Replay viewers and ordinary live spectators receive a dedicated **Replay Controls** settings tab
-with one persisted, default-off `Enable Auto Spectator` switch. Lab sessions do not mount the
-director. While enabled, the director retains three simulated seconds of attack, death, and
+Replay viewers and ordinary live spectators receive a floating, draggable **Spectator Controls**
+panel with one persisted, default-off `Follow active fights` switch. The control is deliberately
+kept out of the gear-menu settings. Lab sessions do not mount the director. While enabled, the
+director retains three simulated seconds of attack, death, and
 positioned-impact activity, groups samples within ten tiles, and frames the highest-weight group;
 deaths count as four attacks, impacts as two, and the current fight receives a small stickiness
 bonus. When combat activity expires, the director prefers a likely contact between opposing-team
@@ -1779,8 +1782,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate
   `buildProgress` only while the latest authoritative snapshot marks them `buildActive`; the display
   clamps below completion and never unlocks supply, tech, production, pathing, or command behavior
-  before the server snapshot. Completed damaged/selected buildings use the same HP-layer bar for
-  normal health.
+  before the server snapshot. Live pause state freezes both construction and production progress
+  extrapolation for every recipient, and the active display clock resumes from the first
+  authoritative post-unpause snapshot without counting paused wall time. Completed damaged/selected
+  buildings use the same HP-layer bar for normal health.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre

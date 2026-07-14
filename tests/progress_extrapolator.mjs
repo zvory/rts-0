@@ -33,6 +33,25 @@ function building(extra = {}) {
 
 {
   const ex = new ProgressExtrapolator({ playerId: 1 });
+  const entity = building();
+  ex.updateFromSnapshot([entity], 1000);
+  ex.setPaused(true, 1500);
+  const atPause = ex.apply(entity, 1500).prodProgress;
+  const whilePaused = ex.apply(entity, 30_000).prodProgress;
+  approx(whilePaused, atPause, 0.0001, "another player's live pause freezes production progress");
+  assert(ex.diagnostics().paused === true, "progress diagnostics report the frozen display clock");
+
+  ex.updateFromSnapshot([building({ prodProgress: 0.3 })], 30_000);
+  ex.setPaused(false, 30_000);
+  const atResume = ex.apply(building({ prodProgress: 0.3 }), 30_000).prodProgress;
+  const afterResume = ex.apply(building({ prodProgress: 0.3 }), 30_500).prodProgress;
+  approx(atResume, 0.3, 0.0001, "post-unpause snapshot rebases progress without paused-time catch-up");
+  assert(afterResume > atResume, "progress resumes after the authoritative post-unpause baseline");
+  assert(ex.diagnostics().paused === false, "progress diagnostics report the resumed display clock");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
   const entity = building({
     kind: KIND.RESEARCH_COMPLEX,
     prodKind: undefined,
@@ -68,6 +87,33 @@ function building(extra = {}) {
   assert(out.buildProgress > 0.25, "active construction advances after authoritative baseline");
   assert(out.buildProgressPredicted === true, "construction is marked as extrapolated separately");
   assert(out.progressPredicted === true, "construction participates in generic progress diagnostics");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  const scaffold = building({
+    kind: KIND.BARRACKS,
+    state: STATE.CONSTRUCT,
+    prodKind: undefined,
+    prodQueue: undefined,
+    prodProgress: undefined,
+    buildProgress: 0.25,
+    buildActive: true,
+  });
+  ex.updateFromSnapshot([scaffold], 0);
+  ex.setPaused(true, 500);
+  const atPause = ex.apply(scaffold, 500).buildProgress;
+  approx(
+    ex.apply(scaffold, 10_000).buildProgress,
+    atPause,
+    0.0001,
+    "live pause freezes construction progress",
+  );
+  ex.setPaused(false, 10_000);
+  assert(
+    ex.apply(scaffold, 10_500).buildProgress > atPause,
+    "construction progress resumes without counting paused wall time",
+  );
 }
 
 {

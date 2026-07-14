@@ -44,11 +44,14 @@ export function predictionVisualsPaused(match) {
 }
 
 export function notePredictionAuthoritativeSnapshot(match) {
-  if (!match.livePauseState.paused) match.predictionVisualSuspended = false;
+  if (match.livePauseState.paused) return;
+  match.predictionVisualSuspended = false;
+  match.state?.setProgressPredictionPaused?.(false);
 }
 
 export function pausePredictionVisualClock(match) {
   match.predictionAdapter?.pauseVisualClock?.();
+  match.state?.setProgressPredictionPaused?.(true);
 }
 
 export function suspendPredictionVisuals(match) {

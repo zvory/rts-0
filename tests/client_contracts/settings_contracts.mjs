@@ -87,28 +87,14 @@ function hotkeyService() {
   }).filter((tab) => tab.visible !== false);
   assert(debugTabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio,debug", "settings: debug tab is conditional");
 
-  withFakeSettingsDocument(() => {
-    let enabled = false;
-    const tabs = buildSettingsTabs({
-      audio: {},
-      game: { kind: "replay" },
-      replayControls: {
-        state: () => ({ available: true, enabled }),
-        onToggle: () => { enabled = !enabled; },
-      },
-    }).filter((tab) => tab.visible !== false);
-    assert(
-      tabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio,replay-controls",
-      "settings: spectator and replay contexts expose a dedicated Replay Controls tab",
-    );
-    const root = document.createElement("div");
-    tabs.find((tab) => tab.id === "replay-controls").render(root);
-    const toggle = root.children[0];
-    assert(toggle.textContent === "Enable Auto Spectator: off", "settings: auto spectator defaults off");
-    toggle.listeners.click();
-    assert(toggle.textContent === "Enable Auto Spectator: on", "settings: Replay Controls toggles auto spectator");
-    assert(toggle.getAttribute("aria-checked") === "true", "settings: auto spectator exposes switch state");
-  });
+  const replayTabs = buildSettingsTabs({
+    audio: {},
+    game: { kind: "replay" },
+  }).filter((tab) => tab.visible !== false);
+  assert(
+    replayTabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio",
+    "settings: replay camera controls stay out of the gear menu",
+  );
 
   withFakeSettingsDocument(() => {
     let giveUpOpened = false;
