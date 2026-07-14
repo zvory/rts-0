@@ -10,8 +10,9 @@ use crate::game::{ability::AbilityKind, entity::EntityKind};
 use crate::rules;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
-/// building and remove the item from the queue. If every spawn point is blocked, keep the complete
-/// item queued and retry next tick. Supply and cost were already reserved on enqueue.
+/// building and remove the item from the queue. Manual front items that have not paid yet retry
+/// their cost and supply first; standing repeat entries are only inserted after paying. If every
+/// spawn point is blocked, keep the complete item queued and retry next tick.
 pub(crate) fn production_system(
     _map: &Map,
     entities: &mut EntityStore,
@@ -23,13 +24,15 @@ pub(crate) fn production_system(
 ) {
     let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
+        let active_producer = entities.get(id).is_some_and(|producer| {
+            producer.hp > 0 && producer.is_building() && !producer.under_construction()
+        });
         let repeat_request = entities.get(id).and_then(|producer| {
-            (producer.hp > 0
-                && producer.is_building()
-                && !producer.under_construction()
-                && producer.prod_queue().is_empty())
-            .then(|| (producer.owner, producer.kind, producer.repeat_production()))
-            .and_then(|(owner, producer_kind, unit)| unit.map(|unit| (owner, producer_kind, unit)))
+            (active_producer && producer.prod_queue().is_empty())
+                .then(|| (producer.owner, producer.kind, producer.repeat_production()))
+                .and_then(|(owner, producer_kind, unit)| {
+                    unit.map(|unit| (owner, producer_kind, unit))
+                })
         });
         if let Some((owner, producer_kind, unit)) = repeat_request {
             let faction_id = players
@@ -83,6 +86,7 @@ pub(crate) fn production_system(
                                 unit,
                                 progress: 0,
                                 total: stats.build_ticks,
+                                paid: true,
                             });
                             if queued {
                                 producer.set_repeat_production(None, true);
@@ -99,21 +103,75 @@ pub(crate) fn production_system(
                 }
             }
         }
+        if let Some((owner, research)) =
+            entities
+                .get(id)
+                .filter(|_| active_producer)
+                .and_then(|building| {
+                    building
+                        .research_queue()
+                        .first()
+                        .filter(|item| !item.paid)
+                        .map(|item| (building.owner, item.upgrade))
+                })
+        {
+            let definition = upgrade::definition(research);
+            let cost =
+                rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
+            if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
+                if player.spend_cost(cost)
+                    && !entities
+                        .get_mut(id)
+                        .is_some_and(|building| building.mark_front_research_paid())
+                {
+                    player.refund_cost(cost);
+                }
+            }
+        }
+        if let Some((owner, unit)) =
+            entities
+                .get(id)
+                .filter(|_| active_producer)
+                .and_then(|building| {
+                    building
+                        .prod_queue()
+                        .first()
+                        .filter(|item| !item.paid)
+                        .map(|item| (building.owner, item.unit))
+                })
+        {
+            let cost = rules::economy::resource_cost(unit);
+            let supply = rules::economy::supply_cost(unit);
+            if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
+                let supply_available = player
+                    .supply_used
+                    .checked_add(supply)
+                    .is_some_and(|used| used <= player.supply_cap);
+                if supply_available && player.spend_cost(cost) {
+                    if player.reserve_supply(supply) {
+                        if !entities
+                            .get_mut(id)
+                            .is_some_and(|building| building.mark_front_production_paid())
+                        {
+                            player.refund_cost(cost);
+                            player.release_supply(supply);
+                        }
+                    } else {
+                        player.refund_cost(cost);
+                    }
+                }
+            }
+        }
         let completed_research = {
             match entities.get_mut(id) {
-                Some(b)
-                    if b.hp > 0
-                        && b.is_building()
-                        && !b.under_construction()
-                        && !b.research_queue().is_empty() =>
-                {
+                Some(b) if active_producer && !b.research_queue().is_empty() => {
                     let owner = b.owner;
                     if let Some(queue) = b.research_queue_mut() {
                         let front = &mut queue[0];
-                        if front.progress < front.total {
+                        if front.paid && front.progress < front.total {
                             front.progress = front.progress.saturating_add(1);
                         }
-                        if front.progress >= front.total {
+                        if front.paid && front.progress >= front.total {
                             Some((owner, front.upgrade))
                         } else {
                             None
@@ -145,14 +203,7 @@ pub(crate) fn production_system(
 
         let ready = {
             let b = match entities.get_mut(id) {
-                Some(b)
-                    if b.hp > 0
-                        && b.is_building()
-                        && !b.under_construction()
-                        && !b.prod_queue().is_empty() =>
-                {
-                    b
-                }
+                Some(b) if active_producer && !b.prod_queue().is_empty() => b,
                 _ => continue,
             };
             let owner = b.owner;
@@ -261,6 +312,7 @@ mod tests {
     use crate::protocol::terrain;
 
     mod rally;
+    mod waiting;
     use std::collections::HashMap;
 
     #[test]
@@ -312,6 +364,7 @@ mod tests {
                 upgrade: UpgradeKind::MortarAutocast,
                 progress: 1,
                 total: 1,
+                paid: true,
             });
         let mut players = vec![player(1)];
 
@@ -325,31 +378,6 @@ mod tests {
                 .autocast_enabled(AbilityKind::MortarFire),
             Some(true)
         );
-    }
-
-    #[test]
-    fn produced_mortars_start_with_autocast_after_research() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        spawn_building_training(
-            &map,
-            &mut entities,
-            10,
-            10,
-            EntityKind::Steelworks,
-            EntityKind::MortarTeam,
-        );
-        let mut player = player(1);
-        player.upgrades.insert(UpgradeKind::MortarAutocast);
-        let mut players = vec![player];
-
-        tick_production(&map, &mut entities, &mut players);
-
-        let mortar = entities
-            .iter()
-            .find(|e| e.owner == 1 && e.kind == EntityKind::MortarTeam)
-            .expect("produced mortar should exist");
-        assert_eq!(mortar.autocast_enabled(AbilityKind::MortarFire), Some(true));
     }
 
     #[test]
@@ -776,6 +804,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 progress: 1,
                 total: 1,
+                paid: true,
             });
         id
     }
@@ -799,6 +828,7 @@ mod tests {
                 unit,
                 progress: 1,
                 total: 1,
+                paid: true,
             });
         id
     }

@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
+/// Maximum number of explicit unit or research entries stored on one production building.
+/// Unpaid manual entries need an authority-side cap because resources no longer bound queue size.
+pub(crate) const MAX_PRODUCTION_QUEUE: usize = 8;
+
 /// A queued production order on a building.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProdItem {
@@ -16,6 +20,9 @@ pub struct ProdItem {
     pub progress: u32,
     /// Total ticks required to finish this item.
     pub total: u32,
+    /// Cost and supply have been committed. Unpaid manual entries wait at the front of the queue.
+    #[serde(default = "queue_item_paid_default")]
+    pub(crate) paid: bool,
 }
 
 /// A queued research order on a tech building.
@@ -24,6 +31,13 @@ pub struct ResearchItem {
     pub upgrade: UpgradeKind,
     pub progress: u32,
     pub total: u32,
+    /// Cost has been committed. Unpaid manual entries wait at the front of the queue.
+    #[serde(default = "queue_item_paid_default")]
+    pub(crate) paid: bool,
+}
+
+fn queue_item_paid_default() -> bool {
+    true
 }
 
 /// Authoritative runtime carried by an active Scout Plane.

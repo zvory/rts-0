@@ -93,6 +93,7 @@ export class ProgressExtrapolator {
     const construction = constructionBaseline(entity, recvTime);
     if (construction) return construction;
     if (entity.state === STATE.CONSTRUCT || entity.buildProgress != null) return null;
+    if (entity.prodWaiting === true) return null;
     const queue = finitePositiveInt(entity.prodQueue);
     if (queue == null) return null;
     const progress = safeProgress(entity.prodProgress);
@@ -117,6 +118,7 @@ export class ProgressExtrapolator {
       isBuilding(entity.kind) &&
       entity.state !== STATE.CONSTRUCT &&
       entity.buildProgress == null &&
+      entity.prodWaiting !== true &&
       finitePositiveInt(entity.prodQueue) === baseline.queue &&
       safeProgress(entity.prodProgress) < 1 &&
       activeIdentity(entity) === baseline.identity;

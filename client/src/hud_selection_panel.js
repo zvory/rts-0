@@ -281,10 +281,15 @@ export class HudSelectionPanel {
         e.prodKind ||
         "";
       const queued = queue > 1 ? ` (+${queue - 1})` : "";
-      const pending = e.optimisticProduction ? ` <span class="sel-prod-pending">pending</span>` : "";
+      const pending = e.prodWaiting
+        ? ` <span class="sel-prod-waiting">waiting for resources / supply</span>`
+        : e.optimisticProduction
+          ? ` <span class="sel-prod-pending">pending</span>`
+          : "";
       prodHtml =
         `<div class="sel-prod-label">${kindLabel}${queued}${pending}</div>` +
-        `<div class="sel-prod-bar${e.optimisticProduction ? " optimistic" : ""}">` +
+        `<div class="sel-prod-bar${e.optimisticProduction ? " optimistic" : ""}` +
+        `${e.prodWaiting ? " waiting" : ""}">` +
         `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
     }
 
@@ -373,6 +378,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.prodKind),
     sigValue(entity.prodUpgrade),
     productionPct,
+    entity.prodWaiting ? 1 : 0,
     entity.optimisticProduction ? 1 : 0,
   ].join(":");
 }

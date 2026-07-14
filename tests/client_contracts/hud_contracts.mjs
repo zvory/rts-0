@@ -526,6 +526,42 @@ function fakeHudRootWithoutResourceSpans() {
         return selector === "#selected-panel" ? panel : null;
       },
     };
+    const selected = {
+      id: 2306,
+      owner: 1,
+      kind: KIND.BARRACKS,
+      hp: 500,
+      maxHp: 500,
+      prodQueue: 1,
+      prodKind: KIND.RIFLEMAN,
+      prodProgress: 0,
+      prodWaiting: true,
+    };
+    const state = {
+      playerId: 1,
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return [selected];
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    assert(panel.children[0].innerHTML.includes("waiting for resources / supply"), "HUD labels unpaid production");
+    const waitingNode = panel.children[0];
+
+    selected.prodWaiting = false;
+    hud._renderSelectedPanel();
+    assert(panel.children[0] !== waitingNode, "HUD selected detail refreshes when production pays before rounded progress changes");
+    assert(!panel.children[0].innerHTML.includes("waiting for resources / supply"), "HUD removes the waiting label after payment");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
     const selectedEntities = [
       { id: 2100, owner: 1, kind: KIND.WORKER },
       { id: 2101, owner: 1, kind: KIND.WORKER },
@@ -707,6 +743,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(buildCard.slots[0].label === "City Centre", "worker build first slot should stay City Centre");
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
   assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
+  assert(buildCard.slots[0].enabled, "unaffordable build buttons enter placement and wait at the site");
   assert(buildCard.slots[1] == null, "worker build menu keeps the former Supply Depot W slot empty");
   assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
   assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
@@ -845,17 +882,17 @@ function fakeHudRootWithoutResourceSpans() {
     entities: [cityCentre, barracks, completedTrainingCentre],
     resources: { steel: 60, oil: 14, supplyUsed: 0, supplyCap: 10 },
   }));
-  assert(!oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when oil is short");
+  assert(oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should queue when oil is short");
   assert(oilBlockedPanzerfaustCard.slots[2].unaffordable, "resource-blocked Panzerfaust should stay clickable for feedback");
-  assert(oilBlockedPanzerfaustCard.slots[2].title.startsWith("Not enough resources"), "Panzerfaust resource-blocked tooltip should name resources");
+  assert(oilBlockedPanzerfaustCard.slots[2].title.startsWith("Queue now; production waits for resources"), "Panzerfaust resource-blocked tooltip should explain waiting");
 
   const supplyBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks],
     entities: [cityCentre, barracks, completedTrainingCentre],
     resources: { steel: 60, oil: 15, supplyUsed: 10, supplyCap: 10 },
   }));
-  assert(!supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should disable when supply is capped");
-  assert(supplyBlockedPanzerfaustCard.slots[2].title.startsWith("Not enough supply"), "Panzerfaust supply-blocked tooltip should name supply");
+  assert(supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should queue when supply is capped");
+  assert(supplyBlockedPanzerfaustCard.slots[2].title.startsWith("Queue now; production waits for supply"), "Panzerfaust supply-blocked tooltip should explain waiting");
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [cityCentre],
@@ -863,9 +900,9 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 100, oil: 0, supplyUsed: 9, supplyCap: 10 },
     optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
-  assert(!supplyReservedTrainCard.slots[0].enabled, "pending train optimism should reserve supply for train buttons");
+  assert(supplyReservedTrainCard.slots[0].enabled, "pending train optimism should still permit another manual queue entry");
   assert(supplyReservedTrainCard.slots[0].unaffordable, "supply-blocked train button should stay clickable for feedback");
-  assert(supplyReservedTrainCard.slots[0].title.startsWith("Not enough supply"), "supply-blocked train tooltip should name supply");
+  assert(supplyReservedTrainCard.slots[0].title.startsWith("Queue now; production waits for supply"), "supply-blocked train tooltip should explain waiting");
   assert(
     supplyReservedTrainCard.slots[0].onUnavailableIntent.supply === STATS[KIND.WORKER].supply,
     "supply-blocked train button should carry supply for unavailable feedback",
@@ -877,8 +914,8 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 75, oil: 0, supplyUsed: 4, supplyCap: 10 },
     optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
-  assert(!steelReservedTrainCard.slots[0].enabled, "pending train optimism should reserve steel for train buttons");
-  assert(steelReservedTrainCard.slots[0].title.startsWith("Not enough resources"), "resource-blocked train tooltip should name resources");
+  assert(steelReservedTrainCard.slots[0].enabled, "pending train optimism should still permit another manual queue entry");
+  assert(steelReservedTrainCard.slots[0].title.startsWith("Queue now; production waits for resources"), "resource-blocked train tooltip should explain waiting");
 
   const scoutPlaneCityCentre = { id: 70, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
   const cityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({

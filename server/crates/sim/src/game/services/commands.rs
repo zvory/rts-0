@@ -526,32 +526,24 @@ pub(in crate::game) fn apply_commands(
                 }
                 let cost =
                     rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
-                if !ps.can_afford(cost.steel, cost.oil) {
-                    notice(
-                        events,
-                        player,
-                        rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
-                    );
-                    continue;
-                }
-                if !ps.spend_cost(cost) {
-                    notice(
-                        events,
-                        player,
-                        rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
-                    );
-                    continue;
-                }
+                let queue_empty = entities
+                    .get(building)
+                    .is_some_and(|b| b.research_queue().is_empty());
+                let paid = queue_empty && ps.spend_cost(cost);
 
                 let queued = entities.get_mut(building).is_some_and(|b| {
                     b.push_research(ResearchItem {
                         upgrade,
                         progress: 0,
                         total: definition.research_ticks,
+                        paid,
                     })
                 });
                 if !queued {
-                    ps.refund_cost(cost);
+                    if paid {
+                        ps.refund_cost(cost);
+                    }
+                    notice(events, player, "Production queue full");
                 }
             }
             SimCommand::Cancel { building } => {
@@ -1728,7 +1720,10 @@ fn order_build(
     }
 }
 
-/// Queue a unit at a production building. Reserves cost + supply on enqueue.
+/// Queue a manually requested unit at a production building. The front item pays immediately when
+/// possible; otherwise it remains visibly queued and waits for resources and supply. Items behind
+/// existing production never prepay. Standing repeat production retains its separate policy and
+/// only creates an item after it can pay in full.
 fn order_train(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
@@ -1771,34 +1766,20 @@ fn order_train(
     }
     let cost = rules::economy::resource_cost(unit);
     let supply = rules::economy::supply_cost(unit);
-    if !ps.can_afford(cost.steel, cost.oil) {
-        notice(
-            events,
-            player,
-            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
-        );
-        return;
-    }
-    if ps
+    let queue_empty = entities
+        .get(building)
+        .is_some_and(|producer| producer.prod_queue().is_empty());
+    let can_reserve_supply = ps
         .supply_used
         .checked_add(supply)
-        .is_none_or(|used| used > ps.supply_cap)
-    {
-        notice(events, player, "Not enough supply");
-        return;
-    }
-    if !ps.spend_cost(cost) {
-        notice(
-            events,
-            player,
-            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
-        );
-        return;
-    }
-    if !ps.reserve_supply(supply) {
-        ps.refund_cost(cost);
-        notice(events, player, "Not enough supply");
-        return;
+        .is_some_and(|used| used <= ps.supply_cap);
+    let mut paid = false;
+    if queue_empty && can_reserve_supply && ps.spend_cost(cost) {
+        if ps.reserve_supply(supply) {
+            paid = true;
+        } else {
+            ps.refund_cost(cost);
+        }
     }
 
     let queued = entities.get_mut(building).is_some_and(|b| {
@@ -1806,13 +1787,17 @@ fn order_train(
             unit,
             progress: 0,
             total: stats.build_ticks,
+            paid,
         })
     });
     if !queued {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-            ps.refund_cost(cost);
-            ps.release_supply(supply);
+            if paid {
+                ps.refund_cost(cost);
+                ps.release_supply(supply);
+            }
         }
+        notice(events, player, "Production queue full");
     }
 }
 
@@ -1851,8 +1836,8 @@ fn order_cancel(
     building: u32,
 ) {
     enum Cancelled {
-        Unit(EntityKind),
-        Upgrade(UpgradeKind),
+        Unit(ProdItem),
+        Upgrade(ResearchItem),
     }
 
     let cancelled = {
@@ -1862,21 +1847,21 @@ fn order_cancel(
         };
         b.set_repeat_production(None, false);
         if let Some(item) = b.pop_last_research() {
-            Cancelled::Upgrade(item.upgrade)
+            Cancelled::Upgrade(item)
         } else if let Some(item) = b.pop_last_production() {
-            Cancelled::Unit(item.unit)
+            Cancelled::Unit(item)
         } else {
             return;
         }
     };
     if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
         match cancelled {
-            Cancelled::Unit(unit) if config::unit_stats(unit).is_some() => {
-                ps.refund_cost(rules::economy::resource_cost(unit));
-                ps.release_supply(rules::economy::supply_cost(unit));
+            Cancelled::Unit(item) if item.paid && config::unit_stats(item.unit).is_some() => {
+                ps.refund_cost(rules::economy::resource_cost(item.unit));
+                ps.release_supply(rules::economy::supply_cost(item.unit));
             }
-            Cancelled::Upgrade(upgrade) => {
-                let definition = upgrade::definition(upgrade);
+            Cancelled::Upgrade(item) if item.paid => {
+                let definition = upgrade::definition(item.upgrade);
                 ps.refund_cost(rules::economy::ResourceCost::new(
                     definition.cost_steel,
                     definition.cost_oil,

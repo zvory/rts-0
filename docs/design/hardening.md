@@ -24,6 +24,11 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   Phase 6 kept this cap at eight because no playtest evidence in the repo justified a larger
   command buffer; mixed ability/setup replay coverage now guards the current cap and command-log
   shapes.
+- **Production queue caps** (`entity/state.rs` `MAX_PRODUCTION_QUEUE = 8`): each production
+  building stores at most eight explicit unit entries and eight research entries. Manual entries
+  may be unpaid, so this authority-side limit prevents free command spam from growing durable
+  entity/checkpoint state without an economic bound. Standing repeat lists remain catalog-bounded
+  and do not create an item until payment succeeds.
 - **Building rally cap** (`services/commands.rs` `MAX_RALLY_STAGES = 4`): each production building
   stores at most four move/attack-move rally stages. Non-queued `setRally` replaces the plan; queued
   `setRally` appends until the cap and ignores further stages.

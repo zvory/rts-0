@@ -1203,10 +1203,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(factoryButton?.disabled, "tech-locked build button stays hard-disabled");
 
     barracksButton.click();
-    assert(placements === 0, "clicking an unaffordable build button should not enter placement");
     assert(
-      playedNotices[0] === "notice_steel",
-      "clicking an unaffordable build button plays the missing-steel voice line",
+      shortResourceHud.clientIntent.placement?.building === KIND.BARRACKS,
+      "clicking an unaffordable build button enters placement",
+    );
+    assert(
+      playedNotices.length === 0,
+      "clicking an unaffordable build button creates intent instead of shortage feedback",
     );
 
     globalThis.document.getElementById = (id) => {
@@ -1225,8 +1228,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       repeat: false,
       preventDefault() {},
     });
-    assert(placements === 0, "unaffordable build hotkey should not enter placement");
-    assert(playedNotices[1] === "notice_steel", "unaffordable build hotkey plays the missing-steel voice line");
+    assert(
+      shortResourceHud.clientIntent.placement?.building === KIND.BARRACKS,
+      "unaffordable build hotkey enters placement",
+    );
+    assert(playedNotices.length === 0, "unaffordable build hotkey does not play a shortage voice line");
 
     assert(
       shortResourceHud._missingResourceSoundId(

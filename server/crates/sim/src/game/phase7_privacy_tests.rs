@@ -25,8 +25,12 @@ fn refresh_world(game: &mut Game) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
 }
 
 fn phase7_players() -> [PlayerInit; 3] {
@@ -59,7 +63,9 @@ fn phase7_players() -> [PlayerInit; 3] {
 }
 
 fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) {
-    let unit = game.state.entities
+    let unit = game
+        .state
+        .entities
         .get_mut(artillery)
         .expect("artillery should exist");
     let facing = (target.1 - unit.pos_y).atan2(target.0 - unit.pos_x);
@@ -71,7 +77,8 @@ fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) 
 #[test]
 fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
     let mut game = empty_flat_game(&phase7_players());
-    game.state.players
+    game.state
+        .players
         .iter_mut()
         .find(|player| player.id == 2)
         .expect("ally player should exist")
@@ -79,7 +86,8 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
         .insert(upgrade::UpgradeKind::Methamphetamines);
     for (owner, tile) in [(1, (2, 2)), (2, (5, 2)), (3, (55, 55))] {
         let pos = game.state.map.tile_center(tile.0, tile.1);
-        game.state.entities
+        game.state
+            .entities
             .spawn_building(owner, EntityKind::CityCentre, pos.0, pos.1, true)
             .expect("city centre should spawn");
     }
@@ -106,16 +114,20 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             unit: EntityKind::Worker,
             progress: 30,
             total: 120,
+            paid: true,
         });
         building.push_production(ProdItem {
             unit: EntityKind::ScoutPlane,
             progress: 0,
             total: 600,
+            paid: true,
         });
     }
 
     let barracks_pos = game.state.map.tile_center(7, 2);
-    let barracks = game.state.entities
+    let barracks = game
+        .state
+        .entities
         .spawn_building(
             2,
             EntityKind::Barracks,
@@ -125,16 +137,22 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
         )
         .expect("ally barracks should spawn");
     {
-        let building = game.state.entities.get_mut(barracks).expect("barracks exists");
+        let building = game
+            .state
+            .entities
+            .get_mut(barracks)
+            .expect("barracks exists");
         building.push_production(ProdItem {
             unit: EntityKind::Rifleman,
             progress: 30,
             total: 120,
+            paid: true,
         });
         building.push_production(ProdItem {
             unit: EntityKind::MachineGunner,
             progress: 0,
             total: 180,
+            paid: true,
         });
         building.set_rally_point(Some(RallyIntent::new(
             RallyKind::AttackMove,
@@ -144,7 +162,9 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
     }
 
     let research_pos = game.state.map.tile_center(9, 2);
-    let research = game.state.entities
+    let research = game
+        .state
+        .entities
         .spawn_building(
             2,
             EntityKind::ResearchComplex,
@@ -153,30 +173,39 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             true,
         )
         .expect("ally research complex should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(research)
         .expect("research complex exists")
         .push_research(ResearchItem {
             upgrade: upgrade::UpgradeKind::TankUnlock,
             progress: 60,
             total: 600,
+            paid: true,
         });
 
     let scaffold_pos = game.state.map.tile_center(11, 2);
-    let scaffold = game.state.entities
+    let scaffold = game
+        .state
+        .entities
         .spawn_building(2, EntityKind::Depot, scaffold_pos.0, scaffold_pos.1, false)
         .expect("ally scaffold should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(scaffold)
         .expect("scaffold exists")
         .set_construction_progress(10);
 
     let mortar_pos = game.state.map.tile_center(13, 2);
     let target_pos = game.state.map.tile_center(55, 50);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("ally mortar should spawn");
-    let hidden_enemy = game.state.entities
+    let hidden_enemy = game
+        .state
+        .entities
         .spawn_unit(3, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("hidden enemy should spawn");
     {
@@ -251,12 +280,15 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
 fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
     let mut game = empty_flat_game(&phase7_players());
     let observer_pos = game.state.map.tile_center(10, 10);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(1, EntityKind::Worker, observer_pos.0, observer_pos.1)
         .expect("observer worker should spawn");
 
     let barracks_pos = game.state.map.tile_center(12, 10);
-    let barracks = game.state.entities
+    let barracks = game
+        .state
+        .entities
         .spawn_building(
             3,
             EntityKind::Barracks,
@@ -266,23 +298,29 @@ fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
         )
         .expect("enemy barracks should spawn");
     let rally = game.state.map.tile_center(16, 10);
-    game.state.entities
+    game.state
+        .entities
         .get_mut(barracks)
         .expect("enemy barracks should exist")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
 
     let rifle_pos = game.state.map.tile_center(22, 12);
-    let rifle = game.state.entities
+    let rifle = game
+        .state
+        .entities
         .spawn_unit(3, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
         .expect("enemy rifleman should spawn");
     let move_goal = game.state.map.tile_center(16, 12);
-    game.state.entities
+    game.state
+        .entities
         .get_mut(rifle)
         .expect("enemy rifleman should exist")
         .set_order(Order::move_to(move_goal.0, move_goal.1));
 
     let gun_pos = game.state.map.tile_center(24, 14);
-    let gun = game.state.entities
+    let gun = game
+        .state
+        .entities
         .spawn_unit(3, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
         .expect("enemy anti-tank gun should spawn");
     let gun_facing = 1.125;
@@ -345,7 +383,9 @@ fn artillery_target_marker_is_visible_to_allies_not_hidden_enemies() {
     let mut game = empty_flat_game(&phase7_players());
     let pos = game.state.map.tile_center(10, 10);
     let target = game.state.map.tile_center(26, 10);
-    let artillery = game.state.entities
+    let artillery = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
     deploy_artillery_toward(&mut game, artillery, target);
@@ -385,14 +425,18 @@ fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
     let mut game = empty_flat_game(&phase7_players());
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(17, 8);
-    let mortar = game.state.entities
+    let mortar = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
-    game.state.entities
+    game.state
+        .entities
         .get_mut(mortar)
         .expect("mortar should exist")
         .set_weapon_setup(WeaponSetup::Deployed);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(3, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     refresh_world(&mut game);

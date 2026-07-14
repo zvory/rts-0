@@ -25,7 +25,7 @@ fn players() -> [PlayerInit; 2] {
 }
 
 #[test]
-fn destroyed_producer_refunds_in_progress_and_queued_units() {
+fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
     let mut game =
         Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0001);
     let city_centre = game
@@ -63,15 +63,17 @@ fn destroyed_producer_refunds_in_progress_and_queued_units() {
         .expect("city centre should survive production tick");
     assert_eq!(producer.prod_queue().len(), 2);
     assert!(producer.prod_queue()[0].progress > 0);
+    assert!(producer.prod_queue()[0].paid);
+    assert!(!producer.prod_queue()[1].paid);
     let player = game
         .state
         .players
         .iter()
         .find(|player| player.id == 1)
         .expect("player one should exist");
-    assert_eq!(player.steel, starting_steel - 2 * worker_cost.steel);
-    assert_eq!(player.oil, starting_oil - 2 * worker_cost.oil);
-    assert_eq!(player.supply_used, starting_supply + 2 * worker_supply);
+    assert_eq!(player.steel, starting_steel - worker_cost.steel);
+    assert_eq!(player.oil, starting_oil - worker_cost.oil);
+    assert_eq!(player.supply_used, starting_supply + worker_supply);
 
     {
         let entity = game

@@ -100,7 +100,7 @@ impl Game {
                     if catalog.is_some_and(|catalog| catalog.allows_building(e.kind)) {
                         expected_cap += rules::economy::supply_provided(e.kind);
                     }
-                    for item in e.prod_queue() {
+                    for item in e.prod_queue().iter().filter(|item| item.paid) {
                         if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
                             expected_used += rules::economy::supply_cost(item.unit);
                         }

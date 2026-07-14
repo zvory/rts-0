@@ -634,6 +634,9 @@ impl Serialize for CompactEntity<'_> {
         if !entity.prod_repeat_kinds.is_empty() {
             len = 37;
         }
+        if entity.prod_waiting {
+            len = 38;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -754,6 +757,9 @@ impl Serialize for CompactEntity<'_> {
                     .map(|kind| kind_code(kind))
                     .collect::<Vec<_>>(),
             )?;
+        }
+        if len > 37 {
+            seq.serialize_element(&entity.prod_waiting)?;
         }
         seq.end()
     }
