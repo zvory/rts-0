@@ -885,8 +885,17 @@ impl<'a> MoveCoordinator<'a> {
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         if sx == gx && sy == gy {
+            // A gatherer can share the resource node's navigation tile while still sitting just
+            // outside its interaction radius. Keep a local final approach in that case: the
+            // economy service will clear it as soon as the worker can latch or redirect. Other
+            // orders retain their existing same-tile arrival semantics.
+            let same_tile_path = if source == PathingRequestSource::Gather {
+                vec![goal]
+            } else {
+                Vec::new()
+            };
             if let Some(e) = entities.get_mut(id) {
-                e.set_path(Vec::new());
+                e.set_path(same_tile_path);
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
                 if matches!(
