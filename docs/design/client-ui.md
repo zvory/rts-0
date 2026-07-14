@@ -901,12 +901,17 @@ export class HotkeyEditor {
 Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
 `description`, `createdWithBuild`, `basePreset`, `bindings`, and `factionBindings`. Direct-mode
 `bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.holdPosition`,
-`unit.stop`, `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
+`unit.stop`, `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Grid
+profiles compute command-card bindings from slots but store standalone HUD actions such as
+`hud.selectIdleWorkers` in `bindings`. Faction catalog
 actions are stored under `factionBindings[factionId]` with namespaced command ids shaped as
 `kriegsia.build.<kind>`, `kriegsia.train.<kind>`, `kriegsia.research.<upgrade>`, and
 `kriegsia.ability.<ability>`. Ekat uses the same `ekat.*` namespace for its exposed ability
 commands, currently `ekat.ability.ekatTeleport`, `ekat.ability.ekatLineShot`, and
-`ekat.ability.ekatMagicAnchor`. Imports migrate old flat Kriegsia ids like `build.city_centre`
+`ekat.ability.ekatMagicAnchor`. The always-active `hud.selectIdleWorkers` action appears in the HUD
+Shortcuts editor context and participates in conflict checks against every command-card context.
+Grid binds it to `T`; Classic RTS binds it to `I` because `T` is already assigned to training-centre,
+tank, and tank-research actions. Imports migrate old flat Kriegsia ids like `build.city_centre`
 into the Kriegsia binding set, preserve structurally valid unavailable faction commands with
 warnings, ignore unknown non-faction commands with warnings, reject invalid keys and same-context
 duplicates, and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to
@@ -1375,10 +1380,11 @@ export class HUD {
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
 ```
-The minimap status row shares its width between the game timer and an idle-worker tab capped at
-half the minimap width. The tab counts live local Workers whose authoritative activity is `idle`,
-disables when none are available or the command surface is read-only, and selects the current idle
-set through normal command-supply admission when clicked.
+The minimap status row shares its width between the game timer and an idle-worker status capped at
+half the minimap width. The status counts live local Workers whose authoritative activity is `idle`,
+shows the active profile's selection hotkey in parentheses, and remains pointer-disabled. Pressing
+the configured hotkey selects the current idle set through normal command-supply admission when the
+command surface is writable.
 
 The train command card is driven by the first selected production building type, but train clicks
 are issued to the selected completed compatible production buildings in round-robin order so a

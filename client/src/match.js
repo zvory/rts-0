@@ -191,7 +191,7 @@ export class Match {
     this.desktopCursorAutoLockFailures = 0;
     this.onDesktopCursorAutoLockSignal = this.handleDesktopCursorAutoLockSignal.bind(this);
 
-    // --- Build the module graph. ---
+    // Module graph.
     this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);
     this.state.controlPolicy = this.labControlPolicy;
@@ -282,6 +282,7 @@ export class Match {
             consumeBoxSelection: (event) => this.consumeLabToolBoxSelection(event),
             cancel: (reason) => this.cancelLabTool(reason),
           },
+          this.hud.hotkeyActions(),
         ),
     );
 

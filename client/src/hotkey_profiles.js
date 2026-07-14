@@ -11,6 +11,7 @@ export const HOTKEY_STORAGE_PROFILES_KEY = "rts.hotkeyProfiles.v1";
 export const HOTKEY_STORAGE_ACTIVE_KEY = "rts.activeHotkeyProfile.v1";
 export const HOTKEY_PRESET_GRID = "preset.grid";
 export const HOTKEY_PRESET_CLASSIC = "preset.classicRts";
+export const HOTKEY_COMMAND_SELECT_IDLE_WORKERS = "hud.selectIdleWorkers";
 
 const VALID_KEY_RE = /^[A-Z]$/;
 const DEFAULT_EXPORT_BUILD = "unknown";
@@ -24,6 +25,25 @@ const CORE_CLASSIC_BINDINGS = Object.freeze({
   "worker.return": "W",
 });
 
+const GLOBAL_HOTKEY_CONTEXTS = Object.freeze([Object.freeze({
+  id: "hud-shortcuts",
+  label: "HUD Shortcuts",
+  global: true,
+  card: Object.freeze({
+    kind: "hotkeys",
+    signature: "hotkeys:hud-shortcuts",
+    slots: Object.freeze([Object.freeze({
+      commandId: HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
+      slotIndex: 0,
+      icon: "IDLE",
+      label: "Select Idle Workers",
+      title: "Select all idle workers",
+      gridHotkey: "T",
+      classicHotkey: "I",
+    })]),
+  }),
+})]);
+
 export function normalizeHotkey(value) {
   if (typeof value !== "string") return "";
   const key = value.trim().toUpperCase();
@@ -33,7 +53,7 @@ export function normalizeHotkey(value) {
 export function buildHotkeyCommandCatalog(cards = []) {
   const commands = new Map();
   const contexts = [];
-  for (const entry of cards || []) {
+  for (const entry of [...(cards || []), ...GLOBAL_HOTKEY_CONTEXTS]) {
     const card = entry?.card || entry;
     const contextId = entry?.id || card?.signature || `context-${contexts.length}`;
     const contextLabel = entry?.label || labelFromContextId(contextId);
@@ -46,10 +66,13 @@ export function buildHotkeyCommandCatalog(cards = []) {
           commandId: slot.commandId,
           label: slot.label || slot.commandId,
           slotIndex: Number.isInteger(slot.slotIndex) ? slot.slotIndex : null,
+          gridHotkey: normalizeHotkey(slot.gridHotkey),
+          classicHotkey: normalizeHotkey(slot.classicHotkey),
+          global: !!entry?.global,
         });
       }
     }
-    contexts.push({ id: contextId, label: contextLabel, card, commandIds });
+    contexts.push({ id: contextId, label: contextLabel, card, commandIds, global: !!entry?.global });
   }
   return Object.freeze({
     commands: Object.freeze([...commands.values()].map(Object.freeze)),
@@ -58,11 +81,16 @@ export function buildHotkeyCommandCatalog(cards = []) {
       label: ctx.label,
       card: ctx.card,
       commandIds: Object.freeze([...ctx.commandIds]),
+      global: ctx.global,
     }))),
   });
 }
 
-export function createGridPreset() {
+export function createGridPreset(catalog = buildHotkeyCommandCatalog([])) {
+  const bindings = {};
+  for (const command of catalog?.commands || []) {
+    if (command.gridHotkey) bindings[command.commandId] = command.gridHotkey;
+  }
   return freezeProfile({
     schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
     id: HOTKEY_PRESET_GRID,
@@ -70,7 +98,7 @@ export function createGridPreset() {
     mode: "grid",
     name: "Grid",
     description: "Command-card hotkeys follow the rendered QWE/ASD/ZXC grid.",
-    bindings: {},
+    bindings,
     factionBindings: {},
   });
 }
@@ -98,7 +126,7 @@ export class HotkeyProfileService {
     this.catalog = catalog;
     this.profilesKey = profilesKey;
     this.activeKey = activeKey;
-    this.presets = Object.freeze([createGridPreset(), createClassicPreset(catalog)]);
+    this.presets = Object.freeze([createGridPreset(catalog), createClassicPreset(catalog)]);
     this.customProfiles = [];
     this.activeProfileId = HOTKEY_PRESET_GRID;
     this.revision = 0;
@@ -351,6 +379,8 @@ export class HotkeyProfileService {
         }
       }
       this._appendConflictErrors(bindingMaps, errors);
+    } else if (mode === "grid") {
+      this._appendGridGlobalConflictErrors(bindingMaps, errors);
     }
 
     const profile = {
@@ -381,10 +411,24 @@ export class HotkeyProfileService {
   }
 
   resolveSlot(slot, profile = this.getActiveProfile()) {
+    const gridHotkey = normalizeHotkey(slot.gridHotkey);
     const hotkey = profile?.mode === "direct"
       ? normalizeHotkey(profileBindingForCommand(profile, slot.commandId)) || this._fallbackKeyForCommand(slot)
-      : gridHotkeyForSlot(slot.slotIndex);
+      : gridHotkey
+        ? normalizeHotkey(profileBindingForCommand(profile, slot.commandId)) || gridHotkey
+        : gridHotkeyForSlot(slot.slotIndex);
     return { ...slot, hotkey };
+  }
+
+  hotkeyForCommand(commandId, profile = this.getActiveProfile()) {
+    const command = (this.catalog.commands || []).find((entry) => entry.commandId === commandId);
+    if (!command) return "";
+    const bound = normalizeHotkey(profileBindingForCommand(profile, commandId));
+    if (bound) return bound;
+    if (profile?.mode === "grid") {
+      return command.gridHotkey || gridHotkeyForSlot(command.slotIndex);
+    }
+    return this._fallbackKeyForCommand(command);
   }
 
   _readStoredProfiles() {
@@ -448,6 +492,8 @@ export class HotkeyProfileService {
   }
 
   _fallbackKeyForCommand(command) {
+    const classicKey = normalizeHotkey(command.classicHotkey);
+    if (classicKey) return classicKey;
     const slotKey = Number.isInteger(command.slotIndex) ? gridHotkeyForSlot(command.slotIndex) : "";
     if (slotKey) return slotKey;
     return normalizeHotkey((command.label || "").trim().charAt(0));
@@ -456,8 +502,12 @@ export class HotkeyProfileService {
   _fallbackKeyForMissingCommand(command, bindingMaps) {
     const preferred = this._fallbackKeyForCommand(command);
     const used = new Set();
+    const globalCommandIds = new Set((this.catalog.contexts || [])
+      .filter((context) => context.global)
+      .flatMap((context) => context.commandIds));
+    const commandIsGlobal = globalCommandIds.has(command.commandId);
     for (const context of this.catalog.contexts || []) {
-      if (!context.commandIds.includes(command.commandId)) continue;
+      if (!commandIsGlobal && !context.commandIds.includes(command.commandId) && !context.global) continue;
       for (const contextCommandId of context.commandIds) {
         if (contextCommandId === command.commandId) continue;
         const key = bindingForCommand(bindingMaps, contextCommandId);
@@ -479,6 +529,56 @@ export class HotkeyProfileService {
           errors.push({ code: "duplicateKey", contextId: context.id, key, commandIds: [prior, commandId] });
         } else {
           byKey.set(key, commandId);
+        }
+      }
+    }
+
+    const globalCommandIds = new Set((this.catalog.contexts || [])
+      .filter((context) => context.global)
+      .flatMap((context) => context.commandIds));
+    for (const globalCommandId of globalCommandIds) {
+      const globalKey = bindingForCommand(bindingMaps, globalCommandId);
+      if (!globalKey) continue;
+      for (const context of this.catalog.contexts || []) {
+        if (context.global) continue;
+        for (const commandId of context.commandIds) {
+          if (bindingForCommand(bindingMaps, commandId) !== globalKey) continue;
+          errors.push({
+            code: "duplicateKey",
+            contextId: context.id,
+            key: globalKey,
+            commandIds: [globalCommandId, commandId],
+          });
+        }
+      }
+    }
+  }
+
+  _appendGridGlobalConflictErrors(bindingMaps, errors) {
+    const commandById = new Map((this.catalog.commands || [])
+      .map((command) => [command.commandId, command]));
+    const globalCommandIds = new Set((this.catalog.contexts || [])
+      .filter((context) => context.global)
+      .flatMap((context) => context.commandIds));
+    const globalKeys = new Map();
+    for (const commandId of globalCommandIds) {
+      const command = commandById.get(commandId);
+      const key = bindingForCommand(bindingMaps, commandId) || command?.gridHotkey || "";
+      if (key) globalKeys.set(commandId, key);
+    }
+    for (const context of this.catalog.contexts || []) {
+      if (context.global) continue;
+      for (const commandId of context.commandIds) {
+        const command = commandById.get(commandId);
+        const key = command?.gridHotkey || gridHotkeyForSlot(command?.slotIndex);
+        for (const [globalCommandId, globalKey] of globalKeys) {
+          if (!key || key !== globalKey) continue;
+          errors.push({
+            code: "duplicateKey",
+            contextId: context.id,
+            key,
+            commandIds: [globalCommandId, commandId],
+          });
         }
       }
     }
@@ -537,6 +637,7 @@ function buildClassicBindingMaps(catalog) {
   for (const command of catalog?.commands || []) {
     setBindingForCommand(bindingMaps, command.commandId,
       CORE_CLASSIC_BINDINGS[command.commandId] ||
+      command.classicHotkey ||
       normalizeHotkey((command.label || "").trim().charAt(0)) ||
       (Number.isInteger(command.slotIndex) ? GRID_HOTKEYS[command.slotIndex] : ""));
   }
@@ -547,6 +648,7 @@ function resolveContextConflicts(bindingMaps, catalog) {
   const commandById = new Map((catalog?.commands || [])
     .map((command) => [command.commandId, command]));
   for (const context of catalog?.contexts || []) {
+    if (context.global) continue;
     const used = new Set();
     for (const commandId of context.commandIds) {
       const current = bindingForCommand(bindingMaps, commandId);
@@ -569,6 +671,22 @@ function resolveContextConflicts(bindingMaps, catalog) {
         used.add(next);
       }
     }
+  }
+  const globalCommandIds = new Set((catalog?.contexts || [])
+    .filter((context) => context.global)
+    .flatMap((context) => context.commandIds));
+  const globallyUsed = new Set((catalog?.commands || [])
+    .filter((command) => !globalCommandIds.has(command.commandId))
+    .map((command) => bindingForCommand(bindingMaps, command.commandId))
+    .filter(Boolean));
+  for (const commandId of globalCommandIds) {
+    const preferred = bindingForCommand(bindingMaps, commandId);
+    const key = preferred && !globallyUsed.has(preferred)
+      ? preferred
+      : firstFreeKey(globallyUsed);
+    if (!key) continue;
+    setBindingForCommand(bindingMaps, commandId, key);
+    globallyUsed.add(key);
   }
   return bindingMaps;
 }

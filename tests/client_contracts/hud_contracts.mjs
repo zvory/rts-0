@@ -41,6 +41,7 @@ import {
   cmd,
 } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import { _handleKeyDown } from "../../client/src/input/camera_controls.js";
 
 function commandCardCtx({
   selection = [],
@@ -98,12 +99,14 @@ function commandCardCtx({
   const button = {
     disabled: true,
     title: "",
+    dataset: {},
     addEventListener(type, handler) { listeners.set(type, handler); },
     removeEventListener(type, handler) {
       if (listeners.get(type) === handler) listeners.delete(type);
     },
     setAttribute(name, value) { this[name] = value; },
   };
+  const label = { textContent: "Idle workers (T):" };
   const count = { textContent: "0" };
   const ownIdle = [
     { id: 11, owner: 1, kind: KIND.WORKER, state: STATE.IDLE },
@@ -140,17 +143,25 @@ function commandCardCtx({
   const root = {
     querySelector(selector) {
       if (selector === "#idle-workers") return button;
+      if (selector === ".idle-workers-label") return label;
       if (selector === "#idle-workers-count") return count;
       return null;
     },
   };
-  const hud = new HUD(root, state, {}, null, null, intent);
-  assert(count.textContent === "2" && button.disabled === false, "HUD shows the active idle-worker count");
+  let idleHotkey = "T";
+  const hotkeys = { hotkeyForCommand: () => idleHotkey };
+  const hud = new HUD(root, state, {}, null, hotkeys, intent);
+  assert(
+    count.textContent === "2" && button.disabled === true && button.dataset.selectable === "true",
+    "HUD shows the active idle-worker count while keeping its pointer control disabled",
+  );
+  assert(!listeners.has("click"), "HUD idle-worker status does not install a click action");
+  assert(label.textContent === "Idle workers (T):", "HUD shows the resolved idle-worker hotkey in its text");
   assert(
     predictedEntities[0].state === STATE.MOVE,
     "HUD idle-worker count ignores prediction-overlaid activity until authority confirms it",
   );
-  assert(button["aria-label"] === "Select 2 idle workers", "HUD exposes the idle-worker selection action accessibly");
+  assert(button["aria-label"] === "Press T to select 2 idle workers", "HUD exposes the idle-worker hotkey accessibly");
 
   hud.controlPolicy = { canUseCommandSurface: () => false };
   hud._renderIdleWorkers();
@@ -161,16 +172,29 @@ function commandCardCtx({
   );
   hud.controlPolicy = null;
   hud._renderIdleWorkers();
-  listeners.get("click")();
-  assert(selected.join(",") === "11,12", "clicking the HUD tab selects every active idle worker");
+  idleHotkey = "K";
+  hud._renderIdleWorkers();
+  let prevented = false;
+  _handleKeyDown.call({
+    hotkeyProfiles: hotkeys,
+    globalHotkeyActions: [{ commandId: "hud.selectIdleWorkers", activate: () => hud.selectIdleWorkers() }],
+  }, {
+    code: "KeyK",
+    key: "k",
+    repeat: false,
+    target: null,
+    preventDefault() { prevented = true; },
+  });
+  assert(label.textContent === "Idle workers (K):", "HUD refreshes the hint after a hotkey profile change");
+  assert(prevented && selected.join(",") === "11,12", "the configured hotkey selects every active idle worker");
   assert(menuClosed === 1 && plannedSelection.join(",") === "11,12", "idle-worker selection reconciles local HUD intent");
 
   ownIdle[0].state = STATE.MOVE;
   ownIdle[1].state = STATE.BUILD;
   hud._renderIdleWorkers();
-  assert(count.textContent === "0" && button.disabled === true, "HUD disables the idle-worker tab when none are idle");
+  assert(count.textContent === "0" && button.disabled === true, "HUD keeps the idle-worker status disabled when none are idle");
   hud.destroy();
-  assert(!listeners.has("click"), "HUD teardown removes the idle-worker click listener");
+  assert(!listeners.has("click"), "HUD teardown leaves no idle-worker click listener");
   assert(button["aria-label"] === "No idle workers", "HUD teardown restores accurate idle-worker text");
 }
 

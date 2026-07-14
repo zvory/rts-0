@@ -162,6 +162,7 @@ export class Input {
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
    * @param {import("../client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    * @param {object} [labToolController] active lab setup tool callback seam.
+   * @param {{commandId:string,activate:()=>boolean}[]} [globalHotkeyActions] injected non-command-card actions.
    * @param {object} [desktopCursor] optional native desktop cursor bridge injected by the shell.
    */
   constructor(
@@ -176,6 +177,7 @@ export class Input {
     hotkeyProfiles = null,
     clientIntent = null,
     labToolController = null,
+    globalHotkeyActions = [],
     desktopCursor = null,
   ) {
     this.dom = domElement;
@@ -191,6 +193,7 @@ export class Input {
     this.clientIntent = clientIntent;
     this.labToolController = labToolController;
     this.desktopCursor = desktopCursor || nativeDesktopCursorBridge();
+    this.globalHotkeyActions = Array.isArray(globalHotkeyActions) ? globalHotkeyActions : [];
 
     this.cameraNavigation = new CameraNavigationInput(domElement, camera);
     this.keys = this.cameraNavigation.keys;
