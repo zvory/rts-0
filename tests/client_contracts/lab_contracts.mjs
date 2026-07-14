@@ -403,7 +403,7 @@ await withFakeDocument(() => {
   assert(policy.kind === "lab" && policy.canIssueAs(1), "lab control policy gates issue-as to operator");
   const state = {
     playerId: 1,
-    resources: { steel: 999, oil: 999, supplyUsed: 1, supplyCap: 99 },
+    resources: { steel: 75, oil: 0, supplyUsed: 1, supplyCap: 10 },
     upgrades: [UPGRADE.TANK_UNLOCK],
     playerResources: [
       { id: 1, steel: 999, oil: 999, supplyUsed: 1, supplyCap: 99 },
@@ -429,6 +429,16 @@ await withFakeDocument(() => {
   assert(!policy.isFeedbackOwner(1, state), "lab control policy does not treat the raw local player id as feedback owner");
   assert(policy.commandOwner(state) === 2, "lab control policy exposes the selected command owner");
   assert(policy.commandResources(state).steel === 125, "lab command resources resolve from the selected owner row");
+  const blueState = {
+    ...state,
+    selectedEntities() {
+      return [{ id: 10, owner: 1, kind: KIND.COMMAND_CAR }];
+    },
+  };
+  assert(
+    policy.commandResources(blueState).oil === 999 && policy.commandResources(blueState).supplyCap === 99,
+    "lab command resources prefer the authoritative blue-player row over spectator-shaped top-level resources",
+  );
   assert(policy.commandFactionId(state) === "ekat", "lab command faction resolves from the selected owner");
   assertDeepEqual(
     policy.commandUpgrades(state),

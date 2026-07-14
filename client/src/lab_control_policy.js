@@ -257,9 +257,10 @@ function emptyResources() {
 function resourcesForOwner(state, owner) {
   const ownerId = positiveOwner(owner);
   if (ownerId == null) return emptyResources();
-  if (Number(state?.playerId) === ownerId && state?.resources) return state.resources;
   const row = rowForOwner(state?.playerResources, ownerId);
-  return row || emptyResources();
+  if (row) return row;
+  if (Number(state?.playerId) === ownerId && state?.resources) return state.resources;
+  return emptyResources();
 }
 
 function factionIdForOwner(state, owner) {
