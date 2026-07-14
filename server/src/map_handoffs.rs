@@ -275,7 +275,7 @@ mod tests {
             materialized_map: LabMapDraft {
                 name: "No Terrain".to_string(),
                 size: 126,
-                terrain: vec![0; 126 * 126],
+                terrain: vec![terrain::GRASS; 126 * 126],
                 starts,
                 base_sites,
             },
@@ -295,6 +295,16 @@ mod tests {
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
             .contains("do not match"));
+    }
+
+    #[test]
+    fn handoff_validation_rejects_materialized_terrain_mismatch() {
+        let mut request = valid_request();
+        request.materialized_map.terrain[0] = terrain::ROCK;
+
+        assert!(validate_request(&request)
+            .expect_err("mismatched materialization must fail")
+            .contains("terrain do not match"));
     }
 
     #[test]
