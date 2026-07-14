@@ -189,6 +189,7 @@ pub(super) enum VisibilityPolicy {
     LobbyState,
     LiveFog,
     SelectablePerspective,
+    LabPerspective,
     BranchStagingState,
     FullWorldProjection,
 }
@@ -556,7 +557,7 @@ impl SessionPolicy {
                 policy.clock = ClockCapability::LAB;
                 policy.authority = AuthorityPolicy::LabOperator;
                 policy.mutation = MutationPolicy::LabPrivilegedOps;
-                policy.visibility = VisibilityPolicy::FullWorldProjection;
+                policy.visibility = VisibilityPolicy::LabPerspective;
                 policy.diagnostics = DiagnosticPolicy::NONE;
                 policy.export = ExportPolicy::LAB_SCENARIO;
                 policy.affordance = AffordancePolicy::Lab;
@@ -966,7 +967,7 @@ mod tests {
                 join: JoinPolicy::LabRoom,
                 clock: ClockCapability::LAB,
                 authority: AuthorityPolicy::LabOperator,
-                visibility: VisibilityPolicy::FullWorldProjection,
+                visibility: VisibilityPolicy::LabPerspective,
                 mutation: MutationPolicy::LabPrivilegedOps,
                 diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::LAB_SCENARIO,
@@ -983,7 +984,7 @@ mod tests {
                 join: JoinPolicy::LabRoom,
                 clock: ClockCapability::LAB,
                 authority: AuthorityPolicy::LabOperator,
-                visibility: VisibilityPolicy::FullWorldProjection,
+                visibility: VisibilityPolicy::LabPerspective,
                 mutation: MutationPolicy::LabPrivilegedOps,
                 diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::LAB_SCENARIO,
@@ -1242,13 +1243,13 @@ mod tests {
     }
 
     #[test]
-    fn session_policy_classifies_lab_as_full_world_room_mode() {
+    fn session_policy_classifies_lab_as_selectable_team_perspective() {
         let lab_lobby = SessionPolicy::new(SessionMode::Lab, SessionPhase::Lobby);
         assert_eq!(lab_lobby.state_source, StateSource::LabGame);
         assert_eq!(lab_lobby.join, JoinPolicy::LabRoom);
         assert_eq!(lab_lobby.clock, ClockCapability::LAB);
         assert_eq!(lab_lobby.authority, AuthorityPolicy::LabOperator);
-        assert_eq!(lab_lobby.visibility, VisibilityPolicy::FullWorldProjection);
+        assert_eq!(lab_lobby.visibility, VisibilityPolicy::LabPerspective);
         assert_eq!(lab_lobby.mutation, MutationPolicy::LabPrivilegedOps);
         assert_eq!(lab_lobby.persistence, PersistencePolicy::LAB_ROOM_LOCAL);
         assert_eq!(lab_lobby.start_payload, StartPayloadPolicy::Lab);
@@ -1259,7 +1260,7 @@ mod tests {
         let lab_live = SessionPolicy::new(SessionMode::Lab, SessionPhase::LiveMatch);
         assert_eq!(lab_live.state_source, StateSource::LabGame);
         assert_eq!(lab_live.join, JoinPolicy::LabRoom);
-        assert_eq!(lab_live.visibility, VisibilityPolicy::FullWorldProjection);
+        assert_eq!(lab_live.visibility, VisibilityPolicy::LabPerspective);
         assert_eq!(lab_live.start_payload, StartPayloadPolicy::Lab);
     }
 }

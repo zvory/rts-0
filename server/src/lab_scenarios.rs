@@ -540,7 +540,7 @@ fn validate_lab_scenario_vision(
     players: &[(u32, TeamId)],
 ) -> Result<(), String> {
     match vision {
-        LabVisionMode::FullWorld => Ok(()),
+        LabVisionMode::All => Ok(()),
         LabVisionMode::Team { team_id } => {
             if players
                 .iter()
@@ -550,24 +550,6 @@ fn validate_lab_scenario_vision(
             } else {
                 Err("unknown setup lab team id".to_string())
             }
-        }
-        LabVisionMode::Teams { team_ids } => {
-            if team_ids.is_empty() {
-                return Err("teamIds must not be empty".to_string());
-            }
-            let mut seen = HashSet::new();
-            for team_id in team_ids {
-                if !seen.insert(*team_id) {
-                    return Err("teamIds must not contain duplicates".to_string());
-                }
-                if !players
-                    .iter()
-                    .any(|(_, player_team_id)| player_team_id == team_id)
-                {
-                    return Err("unknown setup lab team id".to_string());
-                }
-            }
-            Ok(())
         }
     }
 }
@@ -1062,7 +1044,7 @@ mod tests {
               "map": {"name": "Default", "schemaVersion": 2, "contentHash": "legacy"},
               "players": [],
               "entities": [],
-              "metadata": {"exportedTick": 0, "lab": {"vision": {"mode": "fullWorld"}}}
+              "metadata": {"exportedTick": 0, "lab": {"vision": {"mode": "all"}}}
             }"#,
         )
         .unwrap();

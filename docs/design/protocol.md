@@ -452,7 +452,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     room: string,                // safe public lab id, not the hidden internal room prefix
     operatorId: u32,
     role: "operator"|"readOnly",
-    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] }, // recipient's lab vision
+    vision: { mode: "all" } | { mode: "team", teamId: u32 }, // recipient's lab vision
     godModePlayers?: u32[],
     initialCamera?: { centerX: u32, centerY: u32 }, // optional world-pixel camera center from the selected setup
     dirty: bool,
@@ -618,7 +618,7 @@ observer `playerResources`, compact `"s"`, compact `"pr"`, start-map resources, 
 observer analysis remain on the current Steel/Oil/Supply schema; faction-specific or arbitrary
 resource vectors are deferred to a separate generic-resource migration. Replay, live spectator, and
 lab team/all-team snapshots include `playerResources` rows only for the real player ids selected by
-that view; all-player replay/live-spectator and full-world lab/dev projections therefore expose all
+that view; all-player replay/live-spectator, all-team Lab, and full-world dev projections expose all
 active player rows, while one-player replay and lab team vision expose only that player/team.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
@@ -841,7 +841,7 @@ buildable entities, and do not carry an owner field. The `id` is stable for the 
 slotting and rendering code. Normal active-player snapshots include trenches whose footprint is in
 that recipient's current living-team fog, plus trench terrain the recipient has already discovered.
 Spectator, replay, and lab selected-perspective snapshots use the selected real players' current
-fog and discovered terrain memory; full-world dev/lab snapshots include every trench. Remembered
+fog and discovered terrain memory; full-world dev snapshots include every trench. Remembered
 trench terrain is terrain-only: it exposes no creator, owner, occupant, or current hidden unit
 state. Clients treat each snapshot's `trenches` field as the complete current trench-terrain set
 for that recipient; a missing or empty field clears prior client trench terrain. Rendering uses the
@@ -986,7 +986,7 @@ weapon ids by falling back to the legacy attacker-kind feedback path. Overpenetr
 sent for secondary entities damaged behind the primary target. They carry only the damaged entity id
 and do not imply a separate fired shot, muzzle flash, tracer, shooter reveal, weapon recoil, or
 attack sound.
-Full-world room projections, including dev watch and full-world lab vision, attach a deterministic
+Full-world dev-watch projections attach a deterministic
 deduplicated union of the per-player event buckets so transient effects match the exposed world
 state. Normal active-player views keep player-only event delivery. Live spectators and selected
 player/team replay or lab views union only the real-player buckets selected by the view. Live
@@ -1056,11 +1056,11 @@ rally plans exact-owner-only. Lab operator command surfaces are the exception on
 they are still spectator-shaped projections, but `issueCommandAs` names the selected real player as
 the authoritative command issuer and rejects mixed-owner selections.
 
-Replay, live spectator, and lab team/teams views pass selected real player ids through one
+Replay, live spectator, and Lab team/all-team views pass selected real player ids through one
 projection seam. The same selected ids drive `visibleTiles`, visible entities, remembered-building
 memory, `playerResources`, and event unions; switching a replay viewer from all-player vision to
 one player therefore replaces both current fog and stale memory with that player's projection.
-Full-world lab/dev projections use full-world snapshots plus full-world event unions, not a fake
+Full-world dev projections use full-world snapshots plus full-world event unions, not a fake
 viewer id; per-entity private planning fields are evaluated against each entity's real owner.
 `artilleryFiring` remains an intentionally global visual event for minimap firing
 markers, while artillery's actionable world reveal is modeled separately as temporary live fog on
@@ -1170,17 +1170,16 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
 { op: "submitScenario", metadata: LabScenarioAuthoringMetadata }
 ```
-`LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
-`{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
-room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
-Lab vision is server-owned per operator, so one operator can inspect full world while another uses
+`LabVisionMode` is `{ mode: "all" }` or `{ mode: "team", teamId }`. `all` is translated to every
+current real player id and projects the union of their authoritative fog; `team` is translated to
+the current real player ids on that team. Unknown team selections are rejected.
+Lab vision is server-owned per operator, so one operator can inspect all-team fog while another uses
 team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
 Lab snapshot projection keeps snapshot body visibility and transient event visibility aligned but
-separate: full-world lab vision receives the full-world snapshot body, including per-owner planning
-details for all projected entities, plus the union of event buckets for all active lab players,
-while team and teams lab vision receive spectator-style snapshot bodies, event unions, remembered
-building memory, and `playerResources` rows for only the selected
-real players.
+separate: all-team and single-team Lab vision receive spectator-style snapshot bodies, event
+unions, remembered building memory, and `playerResources` rows for the selected real players.
+There is no omniscient/no-fog Lab projection; tiles and entities outside every selected player's
+current fog remain hidden.
 Plural mutation arrays contain 1–400 items and commit atomically. Success returns
 `outcome.items: [{index, outcome}]` in input order, with each nested `outcome` retaining the
 corresponding singular shape. Rejection returns `failedIndex`; placement rejection also returns

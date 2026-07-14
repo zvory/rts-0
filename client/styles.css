@@ -2072,21 +2072,6 @@ input[type="text"]:focus {
   border-color: var(--accent);
   background: rgba(64, 89, 76, 0.9);
 }
-.lab-team-union {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  width: 100%;
-}
-.lab-team-union label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ink-dim);
-  font-size: 12px;
-}
 .lab-active-tool {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

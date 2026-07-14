@@ -98,7 +98,7 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     assert_eq!(lab.room, "sandbox");
     assert_eq!(lab.operator_id, 99);
     assert_eq!(lab.role, LabStartRole::Operator);
-    assert_eq!(lab.vision, LabVisionMode::FullWorld);
+    assert_eq!(lab.vision, LabVisionMode::All);
     assert!(!lab.dirty);
     assert_eq!(lab.operation_count, 0);
 }
@@ -186,7 +186,7 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     assert_eq!(starts[0].players[0].name, "Lab Alpha");
     assert_eq!(starts[0].players[1].name, "Lab Bravo");
     let lab = starts[0].lab.as_ref().expect("lab metadata");
-    assert_eq!(lab.vision, LabVisionMode::FullWorld);
+    assert_eq!(lab.vision, LabVisionMode::All);
     assert!(!lab.dirty);
     assert_eq!(lab.operation_count, 0);
     let Phase::InGame(game) = &task.phase else {
@@ -576,7 +576,7 @@ fn lab_start_payload_additional_joiner_uses_policy_metadata() {
     let lab = payload.lab.as_ref().expect("lab metadata");
     assert_eq!(lab.operator_id, 99);
     assert_eq!(lab.role, LabStartRole::Operator);
-    assert_eq!(lab.vision, LabVisionMode::FullWorld);
+    assert_eq!(lab.vision, LabVisionMode::All);
 }
 
 #[test]
@@ -645,7 +645,7 @@ fn running_lab_room_collaborator_can_join_during_drain() {
 }
 
 #[test]
-fn lab_room_snapshot_uses_full_world_projection() {
+fn lab_room_full_vision_uses_all_player_fog_union() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Default".to_string(),
         RoomMode::Lab(lab_config()),
@@ -664,10 +664,10 @@ fn lab_room_snapshot_uses_full_world_projection() {
     let Phase::InGame(game) = &task.phase else {
         panic!("lab should remain live");
     };
-    let mut expected = game.snapshot_full_for(LAB_PLAYER_ONE_ID);
+    let mut expected = game.snapshot_for_spectator(&[LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID]);
     compact_snapshot_for_wire(&mut expected);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
-    assert!(snapshot.visible_tiles.is_empty());
+    assert!(!snapshot.visible_tiles.is_empty());
     assert_eq!(snapshot.entities.len(), expected.entities.len());
     assert_eq!(snapshot.player_resources, expected.player_resources);
     assert_eq!(snapshot.net_status.prediction_version, 0);
@@ -823,7 +823,7 @@ fn prepare_player_two_lab_mortar(
 }
 
 #[test]
-fn lab_full_world_operator_receives_player_two_mortar_launch_event() {
+fn lab_all_team_operator_receives_player_two_mortar_launch_event() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Default".to_string(),
         RoomMode::Lab(lab_config()),
@@ -859,11 +859,11 @@ fn lab_full_world_operator_receives_player_two_mortar_launch_event() {
             return;
         }
     }
-    panic!("default full-world lab operator should receive P2 mortarLaunch");
+    panic!("default all-team lab operator should receive P2 mortarLaunch");
 }
 
 #[test]
-fn multiple_lab_full_world_viewers_receive_same_mortar_launch_event() {
+fn multiple_lab_all_team_viewers_receive_same_mortar_launch_event() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Default".to_string(),
         RoomMode::Lab(lab_config()),
@@ -923,12 +923,12 @@ fn multiple_lab_full_world_viewers_receive_same_mortar_launch_event() {
         if operator_launch.is_some() || viewer_launch.is_some() {
             assert_eq!(
                 operator_launch, viewer_launch,
-                "full-world lab viewers should receive identical launch events"
+                "all-team lab viewers should receive identical launch events"
             );
             return;
         }
     }
-    panic!("both full-world lab viewers should receive P2 mortarLaunch");
+    panic!("both all-team lab viewers should receive P2 mortarLaunch");
 }
 
 #[test]
@@ -1403,7 +1403,7 @@ fn normal_room_rejects_lab_request() {
         1,
         9,
         LabClientOp::SetVision {
-            vision: LabVisionMode::FullWorld,
+            vision: LabVisionMode::All,
         },
     );
     let normal_results = lab_results(&mut normal_writer);

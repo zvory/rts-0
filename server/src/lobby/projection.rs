@@ -332,18 +332,15 @@ mod tests {
     }
 
     #[test]
-    fn projection_policy_classifies_lab_as_full_world_without_analysis() {
-        let lab = ProjectionPolicy::new(
-            VisibilityPolicy::FullWorldProjection,
-            DiagnosticPolicy::NONE,
-        );
+    fn projection_policy_classifies_lab_as_fog_union_without_analysis() {
+        let lab = ProjectionPolicy::new(VisibilityPolicy::LabPerspective, DiagnosticPolicy::NONE);
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
-            SnapshotProjection::full_world(1, SnapshotOptions::default())
+            SnapshotProjection::spectator_union(vec![1, 2], SnapshotOptions::default())
         );
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::ActivePlayer, 99, None, &[1, 2]),
-            SnapshotProjection::full_world(99, SnapshotOptions::default())
+            SnapshotProjection::player_fog(99, SnapshotOptions::default())
         );
         assert_eq!(
             lab.observer_analysis_audience(),

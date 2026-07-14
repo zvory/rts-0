@@ -370,7 +370,7 @@ function checkpointScenario(name, tick, entities) {
   return {
     schemaVersion: 1, kind: "labCheckpointScenario", name: name || "Fixture setup", seed: 1,
     map: { name: "Default", schemaVersion: 1, contentHash: "content", materializedHash: "materialized", data: { size: 64, terrain: [], starts: [], baseSites: [] } },
-    metadata: { exportedTick: tick, lab: { vision: { mode: "fullWorld" } }, sourceEntityIdMap: entities.map((entity) => ({ oldId: entity.id, newId: entity.id })) },
+    metadata: { exportedTick: tick, lab: { vision: { mode: "all" } }, sourceEntityIdMap: entities.map((entity) => ({ oldId: entity.id, newId: entity.id })) },
     checkpointPayload: JSON.stringify({ entities }),
   };
 }

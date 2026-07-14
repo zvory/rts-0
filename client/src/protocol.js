@@ -259,9 +259,8 @@ export const msg = Object.freeze({
     t: C.SET_VISION_SELECTION,
     selection: { mode: VISION_SELECTION.PLAYERS, playerIds },
   }),
-  labVisionFullWorld: () => ({ mode: LAB_VISION.FULL_WORLD }),
+  labVisionAll: () => ({ mode: LAB_VISION.ALL }),
   labVisionTeam: (teamId) => ({ mode: LAB_VISION.TEAM, teamId }),
-  labVisionTeams: (teamIds) => ({ mode: LAB_VISION.TEAMS, teamIds }),
   // Lobby map catalog rows are {name, description, minPlayers, maxPlayers}.
   selectMap: (map) => ({ t: C.SELECT_MAP, map }),
 });
