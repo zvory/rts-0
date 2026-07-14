@@ -59,6 +59,19 @@ pub struct Map {
     pub base_sites: Vec<(u32, u32)>,
 }
 
+/// Canonical materialization of an authored-map document before player starts are assigned.
+///
+/// HTTP/session boundaries use this to bind an untrusted authored document to an equivalent
+/// wire-format draft without maintaining a second copy of the authored-map decoder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredMapData {
+    pub name: String,
+    pub size: u32,
+    pub terrain: Vec<u8>,
+    pub starts: Vec<(u32, u32)>,
+    pub base_sites: Vec<(u32, u32)>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MapMetadata {
@@ -142,10 +155,14 @@ impl Map {
         Self::from_authored_json_with_name_for_players(players, &name, &json, seed)
     }
 
-    /// Validate an untrusted authored-map document against the same parser and location rules used
-    /// by bundled maps. HTTP/session callers use this before accepting Map Editor handoffs.
-    pub fn validate_authored_json(json: &str, player_count: usize) -> Result<(), String> {
-        authored::load(player_count, json, 0).map(|_| ())
+    /// Validate and materialize an untrusted authored-map document with the same parser and
+    /// location rules used by bundled maps. Starts remain in authored order; live map loading
+    /// assigns them to players separately.
+    pub fn materialize_authored_json(
+        json: &str,
+        player_count: usize,
+    ) -> Result<AuthoredMapData, String> {
+        authored::materialize(player_count, json)
     }
 
     pub fn metadata_for_name(map_name: &str) -> Result<MapMetadata, String> {

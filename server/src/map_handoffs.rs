@@ -8,9 +8,9 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use rts_server::protocol::{terrain, LabMapDraft};
+use rts_server::protocol::LabMapDraft;
 use rts_sim::game::lab::LabOp;
-use rts_sim::game::map::Map;
+use rts_sim::game::map::{AuthoredMapData, Map};
 use rts_sim::game::{Game, PlayerInit};
 
 use crate::AppState;
@@ -176,9 +176,9 @@ fn validate_request(request: &CreateMapHandoffRequest) -> Result<(), String> {
     if !(1..=4).contains(&player_count) {
         return Err("Map handoffs require one to four player starts.".to_string());
     }
-    Map::validate_authored_json(&authored_json, player_count)
+    let authored_map = Map::materialize_authored_json(&authored_json, player_count)
         .map_err(|error| format!("Authored map is invalid: {error}"))?;
-    validate_materialized_binding(request)?;
+    validate_materialized_binding(&authored_map, &request.materialized_map)?;
     validate_materialized_map(&request.materialized_map, player_count)?;
     Ok(())
 }
@@ -204,79 +204,36 @@ fn validate_materialized_map(draft: &LabMapDraft, player_count: usize) -> Result
     Ok(())
 }
 
-fn validate_materialized_binding(request: &CreateMapHandoffRequest) -> Result<(), String> {
-    let map = request
-        .authored_map
-        .as_object()
-        .ok_or_else(|| "Authored map must be an object.".to_string())?;
-    if map.get("name").and_then(|value| value.as_str()) != Some(&request.materialized_map.name) {
+fn validate_materialized_binding(
+    authored: &AuthoredMapData,
+    materialized: &LabMapDraft,
+) -> Result<(), String> {
+    if authored.name != materialized.name {
         return Err("Authored and materialized map names do not match.".to_string());
     }
-    let terrain = map
-        .get("terrain")
-        .and_then(|value| value.as_array())
-        .ok_or_else(|| "Authored map terrain is missing.".to_string())?;
-    if terrain.len() != request.materialized_map.size as usize {
+    if authored.size != materialized.size {
         return Err("Authored and materialized map sizes do not match.".to_string());
     }
-    let terrain_codes = terrain
-        .iter()
-        .flat_map(|row| row.as_str().unwrap_or("").bytes())
-        .map(|byte| match byte {
-            b'.' => terrain::GRASS,
-            b'#' => terrain::ROCK,
-            b'~' => terrain::WATER,
-            b'=' => terrain::ROAD_BARE,
-            b'-' => terrain::ROAD_HORIZONTAL,
-            b'|' => terrain::ROAD_VERTICAL,
-            b'\\' => terrain::ROAD_DIAGONAL_NW_SE,
-            b'/' => terrain::ROAD_DIAGONAL_NE_SW,
-            _ => u8::MAX,
-        })
-        .collect::<Vec<_>>();
-    if terrain_codes != request.materialized_map.terrain {
+    if authored.terrain != materialized.terrain {
         return Err("Authored and materialized terrain do not match.".to_string());
     }
-
-    let starts = authored_locations(map, "startLocations")?;
-    let base_sites = authored_locations(map, "baseSites")?;
-    if starts != request.materialized_map.starts
-        || base_sites != request.materialized_map.base_sites
+    if !locations_match(&authored.starts, &materialized.starts)
+        || !locations_match(&authored.base_sites, &materialized.base_sites)
     {
         return Err("Authored map locations do not match the materialized map.".to_string());
     }
     Ok(())
 }
 
-fn authored_locations(
-    map: &serde_json::Map<String, serde_json::Value>,
-    field: &str,
-) -> Result<Vec<rts_server::protocol::LabMapTile>, String> {
-    let values = map
-        .get(field)
-        .and_then(|value| value.as_array())
-        .ok_or_else(|| format!("Authored map {field} are missing."))?;
-    values
-        .iter()
-        .enumerate()
-        .map(|(index, value)| {
-            let x = value
-                .get("x")
-                .and_then(|value| value.as_u64())
-                .and_then(|value| u32::try_from(value).ok())
-                .ok_or_else(|| {
-                    format!("Authored map {field}[{index}] has an invalid x coordinate.")
-                })?;
-            let y = value
-                .get("y")
-                .and_then(|value| value.as_u64())
-                .and_then(|value| u32::try_from(value).ok())
-                .ok_or_else(|| {
-                    format!("Authored map {field}[{index}] has an invalid y coordinate.")
-                })?;
-            Ok(rts_server::protocol::LabMapTile { x, y })
-        })
-        .collect()
+fn locations_match(
+    authored: &[(u32, u32)],
+    materialized: &[rts_server::protocol::LabMapTile],
+) -> bool {
+    authored.len() == materialized.len()
+        && authored
+            .iter()
+            .zip(materialized)
+            .all(|(&(x, y), tile)| x == tile.x && y == tile.y)
 }
 
 fn safe_handoff_id(value: &str) -> bool {
@@ -290,7 +247,7 @@ fn error_response(status: StatusCode, error: String) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_server::protocol::LabMapTile;
+    use rts_server::protocol::{terrain, LabMapTile};
 
     fn valid_request() -> CreateMapHandoffRequest {
         let authored_map: serde_json::Value =

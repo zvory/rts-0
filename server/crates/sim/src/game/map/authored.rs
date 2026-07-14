@@ -5,8 +5,8 @@ use serde::Deserialize;
 mod assignment;
 
 use super::{
-    Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, BASE_SITE_PROTECTION_RADIUS_TILES,
-    CURRENT_MAP_VERSION,
+    AuthoredMapData, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
+    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
 
@@ -54,6 +54,18 @@ pub(super) fn load_for_players(
     json: &str,
     seed: u32,
 ) -> Result<Map, String> {
+    let materialized = materialize(players.len(), json)?;
+    let starts = assignment::assign_start_locations(&materialized.starts, players, seed)?;
+
+    Ok(Map {
+        size: materialized.size,
+        terrain: materialized.terrain,
+        starts,
+        base_sites: materialized.base_sites,
+    })
+}
+
+pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMapData, String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
     if authored.version != CURRENT_MAP_VERSION {
@@ -66,7 +78,7 @@ pub(super) fn load_for_players(
     let start_locations = parse_locations(size, &authored.start_locations, "startLocations")?;
     let base_sites = parse_locations(size, &authored.base_sites, "baseSites")?;
 
-    if players.is_empty() {
+    if player_count == 0 {
         return Err("player_count must be at least 1".to_string());
     }
     if start_locations.is_empty() || start_locations.len() > MAX_START_LOCATIONS {
@@ -79,11 +91,11 @@ pub(super) fn load_for_players(
             "baseSites must contain 1 to {MAX_BASE_SITES} locations"
         ));
     }
-    if players.len() > start_locations.len() {
+    if player_count > start_locations.len() {
         return Err(format!(
             "map has {} start locations but needs {} players",
             start_locations.len(),
-            players.len()
+            player_count
         ));
     }
 
@@ -97,12 +109,11 @@ pub(super) fn load_for_players(
         }
     }
     validate_base_clearance(size, &terrain, &start_locations, &base_sites)?;
-    let starts = assignment::assign_start_locations(&start_locations, players, seed)?;
-
-    Ok(Map {
+    Ok(AuthoredMapData {
+        name: authored.name,
         size,
         terrain,
-        starts,
+        starts: start_locations,
         base_sites,
     })
 }
@@ -111,7 +122,6 @@ pub(super) fn load_for_players(
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AuthoredMap {
     version: u32,
-    #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
     description: String,
