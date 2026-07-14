@@ -35,13 +35,13 @@ pub(in crate::game) struct ScoutPlaneState {
     pub(in crate::game) orbit_phase: f32,
     /// Whether the plane has reached the orbit area for `orbit_center`.
     pub(in crate::game) orbiting: bool,
-    /// City Centre this sortie should return to after station time expires.
+    /// Closest City Centre to the sortie target when launched; the plane returns here.
     #[serde(default)]
     pub(in crate::game) home_city_centre: Option<u32>,
     /// Ticks remaining on station after reaching the orbit area.
     #[serde(default = "default_scout_plane_station_ticks")]
     pub(in crate::game) station_ticks_remaining: u16,
-    /// Whether the plane is flying back to its launch City Centre.
+    /// Whether the plane is flying to its assigned return City Centre.
     #[serde(default)]
     pub(in crate::game) returning: bool,
 }

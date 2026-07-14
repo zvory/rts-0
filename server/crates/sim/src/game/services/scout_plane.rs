@@ -18,6 +18,8 @@ pub(crate) fn launch_ability(
     map: &Map,
     entities: &mut EntityStore,
     owner: u32,
+    launch_x: f32,
+    launch_y: f32,
     x: f32,
     y: f32,
 ) -> Result<u32, ScoutPlaneLaunchError> {
@@ -27,7 +29,10 @@ pub(crate) fn launch_ability(
     let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
         return Err(ScoutPlaneLaunchError::NoCityCentre);
     };
-    let Some((home_id, launch_x, launch_y)) =
+    let Some((launch_x, launch_y)) = clamp_world_point(map, launch_x, launch_y) else {
+        return Err(ScoutPlaneLaunchError::NoCityCentre);
+    };
+    let Some((return_city_centre, _, _)) =
         nearest_owned_completed_city_centre(entities, owner, target_x, target_y)
     else {
         return Err(ScoutPlaneLaunchError::NoCityCentre);
@@ -37,7 +42,7 @@ pub(crate) fn launch_ability(
         .ok_or(ScoutPlaneLaunchError::NoCityCentre)?;
     if let Some(plane) = entities.get_mut(spawned) {
         if let Some(state) = plane.scout_plane_state_mut() {
-            *state = ScoutPlaneState::launched_from(home_id, target_x, target_y);
+            *state = ScoutPlaneState::launched_from(return_city_centre, target_x, target_y);
         }
     }
     Ok(spawned)
