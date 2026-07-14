@@ -26,7 +26,7 @@ export const ALL_CATALOG_CATEGORIES = Object.freeze([
 ]);
 export const ALIAS_RE = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
 
-const TOKEN_RE = /^[A-Za-z0-9_]{1,64}$/;
+const TOKEN_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const SESSION_RE = /^(?:lab|game)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({

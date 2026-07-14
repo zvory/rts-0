@@ -137,7 +137,7 @@ try {
   call("shutdown", {}, failedOpenEnv);
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "failed-open daemon shuts down cleanly");
 
-  const coldOpen = call("open");
+  const coldOpen = call("open", { scenario: "supply-300-hellhole" });
   assert.match(coldOpen.result.sessionId, /^lab_[a-f0-9]{32}$/, "a cold first open returns one complete JSON envelope");
   assert.equal(coldOpen.result.status.map, "1v1", "a blank Lab open uses the current default 1v1 map");
   assert.equal(call("status").result.daemonCheckout.matches, true, "matching checkout status is explicit");

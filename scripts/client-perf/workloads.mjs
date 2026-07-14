@@ -22,6 +22,17 @@ export function buildClientPerfWorkloads(env = process.env) {
         minSelectedCount: 1,
       },
     },
+    {
+      id: "supply-300-hellhole-stream",
+      description: "Client-only playback of 300 Hellhole snapshots at the authored 30 Hz cadence.",
+      kind: "snapshotStream",
+      url: "/?snapshotStream=supply-300-hellhole",
+      setup: {
+        snapshotStreamId: "supply-300-hellhole",
+        waitForMinEntities: 380,
+        resetPerfAfterSetup: true,
+      },
+    },
     ...(incidentReplaySource ? [{
       id: "incident-120-commander-endgame",
       description: "Paused Commander-perspective replay at the 244-entity late-game render incident.",

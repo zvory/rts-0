@@ -16,6 +16,7 @@ src/
   config.js       # PINNED — stable public facade for render/UI constants and balance mirrors
   config/         # timing.js, presentation.js, rules_mirror.js, factions.js
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
+  snapshot_stream_net.js # Offline static snapshot-frame clock using Net's normal decoder/events
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   prediction_compatibility.js # server/client prediction-build compatibility guard
@@ -1507,7 +1508,15 @@ The replay lobby UI is group-watch only: future playable resume work needs separ
 controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
-`window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds
+`window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. A bounded
+`?snapshotStream=<id>` developer launch injects `SnapshotStreamNet` instead: it fetches a same-origin
+`.rtsstream` artifact, emits its static start payload, and clocks the contained exact MessagePack
+snapshot frames through `Net._onMessage` without constructing a WebSocket. This local benchmark lane
+therefore keeps the normal decode, `GameState`, `Match`, Pixi, HUD, minimap, audio, and rAF paths while
+explicitly excluding live server simulation and delivery. Its header is a local artifact contract,
+not an extension of the server wire protocol.
+
+`match.js` builds
 `GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,
 `MatchNoticePresenter`, `Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,

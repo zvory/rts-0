@@ -1244,6 +1244,40 @@ async function applyWorkloadSetup(page, workload) {
   if (!setup) return null;
   const result = { actions: [] };
 
+  if (setup.snapshotStreamId) {
+    try {
+      await page.waitForFunction(
+        (id) => window.__rtsSnapshotStream?.id === id &&
+          window.__rtsSnapshotStream?.frameCount > 0,
+        { timeout: Number(setup.snapshotStreamWaitTimeoutMs) || 12000 },
+        setup.snapshotStreamId,
+      );
+      const action = await page.evaluate((id) => {
+        const stream = window.__rtsSnapshotStream;
+        const net = window.__rts?.net;
+        const isolated = stream?.id === id && stream?.offline === true &&
+          stream?.serverSimulation === false && stream?.websocket === false &&
+          net?.offline === true && net?.ws == null;
+        return {
+          action: "verifySnapshotStreamIsolation",
+          id,
+          frameCount: Number(stream?.frameCount) || 0,
+          tickRateHz: Number(stream?.tickRateHz) || 0,
+          offline: !!stream?.offline,
+          serverSimulation: !!stream?.serverSimulation,
+          websocket: !!stream?.websocket,
+          error: isolated ? undefined : "snapshot stream is not isolated from WebSocket/live simulation",
+        };
+      }, setup.snapshotStreamId);
+      result.actions.push(action);
+      if (action.error) result.error = action.error;
+    } catch (err) {
+      const message = `timed out waiting for offline snapshot stream ${setup.snapshotStreamId}: ${err.message}`;
+      result.actions.push({ action: "verifySnapshotStreamIsolation", id: setup.snapshotStreamId, error: message });
+      result.error = message;
+    }
+  }
+
   if (setup.visionSelectionPlayerIndex != null || setup.visionSelectionPlayerId != null) {
     const action = await page.evaluate((replaySetup) => {
       const match = window.__rts?.match;
