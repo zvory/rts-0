@@ -120,8 +120,8 @@ import { textWithin } from "./dom_text.mjs";
     if (filename === "render-preview.json") {
       assertDeepEqual(
         scenario.metadata?.lab?.initialCamera,
-        { centerX: 2016, centerY: 2016 },
-        "render-preview lab setup starts the camera at the map center",
+        { centerX: 2016, centerY: 2784 },
+        "render-preview lab setup starts the camera on the formation south of the lake",
       );
     }
     const checkpoint = JSON.parse(scenario.checkpointPayload);
