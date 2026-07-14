@@ -104,7 +104,7 @@ export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 1.35;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 20;
 export const SCOUT_PLANE_ORBIT_RADIUS_TILES = 4;
-export const SCOUT_PLANE_ORBIT_DURATION_TICKS = TICK_HZ * 10;
+export const SCOUT_PLANE_ORBIT_DURATION_TICKS = TICK_HZ * 20;
 export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
@@ -140,7 +140,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 15, body: SCOUT_PLANE_BODY,
     blocksGroundPlacement: false,
-    rangeTiles: 0, cost: { steel: 50, oil: 50 }, supply: 0, buildTicks: 0 },
+    rangeTiles: 0, cost: { steel: 50, oil: 75 }, supply: 0, buildTicks: 0 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 9, body: TANK_BODY,
     rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
@@ -289,9 +289,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: null,
     cooldownTicks: SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
-    cost: Object.freeze({ steel: 50, oil: 50 }),
-    techRequirement: KIND.CITY_CENTRE,
-    requires: KIND.CITY_CENTRE,
+    cost: Object.freeze({ steel: 50, oil: 75 }),
     radiusTiles: SCOUT_PLANE_ORBIT_RADIUS_TILES,
     durationTicks: SCOUT_PLANE_ORBIT_DURATION_TICKS,
     queued: true,

@@ -185,7 +185,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     STATS[KIND.SCOUT_PLANE].cost.steel === 50 &&
-      STATS[KIND.SCOUT_PLANE].cost.oil === 50 &&
+      STATS[KIND.SCOUT_PLANE].cost.oil === 75 &&
       STATS[KIND.SCOUT_PLANE].supply === 0 &&
       STATS[KIND.SCOUT_PLANE].buildTicks === 0 &&
       STATS[KIND.SCOUT_PLANE].body.length === 48 &&
@@ -197,9 +197,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       !configExports.trainableUnitsForFaction("kriegsia", KIND.CITY_CENTRE).includes(KIND.SCOUT_PLANE) &&
       ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.COMMAND_CAR) &&
       ABILITIES[ABILITY.SCOUT_PLANE].hotkey === "C" &&
-      ABILITIES[ABILITY.SCOUT_PLANE].requires === KIND.CITY_CENTRE &&
+      ABILITIES[ABILITY.SCOUT_PLANE].requires == null &&
       ABILITIES[ABILITY.SCOUT_PLANE].cost.steel === 50 &&
-      ABILITIES[ABILITY.SCOUT_PLANE].cost.oil === 50,
+      ABILITIES[ABILITY.SCOUT_PLANE].cost.oil === 75 &&
+      ABILITIES[ABILITY.SCOUT_PLANE].durationTicks === 600,
     "Command Car command card exposes Scout Plane as the C-slot ability",
   );
   assert(

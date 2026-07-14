@@ -61,17 +61,9 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
 }
 
 #[test]
-fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_city_centre() {
+fn command_car_scout_plane_ability_launches_from_caster_without_a_city_centre() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (far_x, far_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
-    entities
-        .spawn_building(1, EntityKind::CityCentre, far_x, far_y, true)
-        .expect("far city centre should spawn");
-    let (near_x, near_y) = footprint_center(&map, EntityKind::CityCentre, 18, 18);
-    let near_city_centre = entities
-        .spawn_building(1, EntityKind::CityCentre, near_x, near_y, true)
-        .expect("near city centre should spawn");
     let command_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("command car should spawn");
@@ -81,14 +73,11 @@ fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_c
         &map,
         &mut entities,
         &mut players,
-        vec![(
-            1,
-            scout_plane_command(vec![command_car], near_x + 16.0, near_y + 16.0),
-        )],
+        vec![(1, scout_plane_command(vec![command_car], 592.0, 592.0))],
     );
 
     assert_eq!(players[0].steel, 950);
-    assert_eq!(players[0].oil, 950);
+    assert_eq!(players[0].oil, 925);
     assert_eq!(
         entities
             .get(command_car)
@@ -104,9 +93,8 @@ fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_c
     assert_eq!(plane.pos_x, 128.0);
     assert_eq!(plane.pos_y, 128.0);
     let state = plane.scout_plane_state().expect("plane state");
-    assert_eq!(state.home_city_centre, Some(near_city_centre));
     assert_eq!(state.source_command_car, Some(command_car));
-    assert_eq!(state.orbit_center, (near_x + 16.0, near_y + 16.0));
+    assert_eq!(state.orbit_center, (592.0, 592.0));
     assert_notice(&events, 1, "Scout Plane");
 }
 
@@ -114,10 +102,6 @@ fn command_car_scout_plane_ability_launches_from_caster_and_returns_to_nearest_c
 fn each_command_car_can_launch_its_own_scout_plane() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
-    entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
     let first_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("first command car should spawn");
@@ -136,7 +120,7 @@ fn each_command_car_can_launch_its_own_scout_plane() {
         ],
     );
 
-    assert_eq!((players[0].steel, players[0].oil), (900, 900));
+    assert_eq!((players[0].steel, players[0].oil), (900, 850));
     let mut source_cars = entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
@@ -160,10 +144,6 @@ fn each_command_car_can_launch_its_own_scout_plane() {
 fn command_car_scout_plane_ability_does_not_interrupt_caster_orders() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
-    entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
     let command_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("command car should spawn");
@@ -202,10 +182,6 @@ fn command_car_scout_plane_ability_does_not_interrupt_caster_orders() {
 fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
-    entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
     let command_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("command car should spawn");
@@ -248,10 +224,6 @@ fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
 fn scout_plane_command_skips_selected_car_with_active_plane() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 8, 8);
-    entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
     let active_car = entities
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("active command car should spawn");
@@ -280,7 +252,7 @@ fn scout_plane_command_skips_selected_car_with_active_plane() {
         )],
     );
 
-    assert_eq!((players[0].steel, players[0].oil), (900, 900));
+    assert_eq!((players[0].steel, players[0].oil), (900, 850));
     let mut source_cars = entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)

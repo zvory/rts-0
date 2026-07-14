@@ -1402,8 +1402,8 @@ Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. The Scout Plane affordance
 is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It costs 50 steel
-and 50 oil, requires a completed owned City Centre, disables while the player has an active Scout
-Plane or the global 30-second cooldown is running, and issues immediately rather than entering a
+and 75 oil, has no City Centre requirement, disables while that Command Car has an active Scout
+Plane or its 30-second cooldown is running, and issues immediately rather than entering a
 building production queue. Scout Planes are hit-testable for hover/readout purposes but normal
 selection, box selection, control groups, right-click commands, and command-card descriptors filter
 them out, so they are unselectable and uncontrollable in live play.

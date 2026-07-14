@@ -322,7 +322,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
             balance::SCOUT_PLANE_COST_STEEL,
             balance::SCOUT_PLANE_COST_OIL,
         ),
-        tech_requirement: Some(EntityKind::CityCentre),
+        tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
