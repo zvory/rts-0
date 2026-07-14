@@ -44,7 +44,7 @@ fn pending_tracker_start_payload() -> StartPayload {
 fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot {
     Snapshot {
         tick,
-        world_combat_active: false,
+        world_combat_position: None,
         steel: 0,
         oil: 0,
         supply_used: 1,

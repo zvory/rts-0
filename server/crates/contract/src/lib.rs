@@ -303,9 +303,9 @@ pub struct PlayerScore {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub tick: u32,
-    /// Coarse, position-free world combat activity shared identically with every recipient.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub world_combat_active: bool,
+    /// Coarse world combat area shared identically with every recipient for directional ambience.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world_combat_position: Option<[f32; 2]>,
     pub steel: u32,
     pub oil: u32,
     pub supply_used: u32,

@@ -208,7 +208,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       ],
     ],
     tr: [[80, 448, 480, 0.375]],
-    wc: true,
+    wc: [1024, 2048],
     u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
     fg: [1, 2, 3, 1],
     ev: [
@@ -233,7 +233,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.upgrades[0] === UPGRADE.METHAMPHETAMINES, "compact upgrades decode");
   assert(decoded.upgrades[1] === UPGRADE.ARTILLERY_UNLOCK, "compact artillery upgrade decodes");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
-  assert(decoded.worldCombatActive === true, "compact world combat activity decodes");
+  assert(
+    decoded.worldCombatPosition.join(",") === "1024,2048",
+    "compact world combat position decodes",
+  );
   assert(decoded.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact prediction version decodes");
   assert(decoded.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client sequence decodes");
   assert(decoded.netStatus.lastSimConsumedClientTick === 42, "compact consumed client tick decodes");
@@ -352,8 +355,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     n: [0, 0, 0, 0, 0],
   });
   assert(
-    weaponEventDecoded.worldCombatActive === false,
-    "missing compact world combat activity defaults to false",
+    weaponEventDecoded.worldCombatPosition === null,
+    "missing compact world combat position defaults to null",
   );
   assert(
     weaponEventDecoded.events[0].weaponKind === WEAPON_KIND.TANK_CANNON,

@@ -276,8 +276,11 @@ impl Game {
         world_combat::record_activity(
             &events,
             self.state.tick,
+            self.state.map.world_size_px(),
             &mut self.state.last_world_combat_tick,
+            &mut self.state.last_world_combat_position,
             &mut self.state.world_combat_active_through_tick,
+            &mut self.state.world_combat_position,
         );
 
         // Live fog last, from the post-systems world state. Lingering death vision is stamped as

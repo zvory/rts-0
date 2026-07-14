@@ -1274,10 +1274,11 @@ export class Audio {
                                           // create/resume AudioContext from a user gesture
   isUnlocked() -> boolean                 // true when the AudioContext is running
   onUnlockChange(fn) -> unsubscribe       // notify settings UI after first successful unlock
-  play(id, {x?, y?, priority?, category?, pitchVariance?, gain?, duck?, key?, loop?, fadeInMs?})
-                                           // x/y present -> StereoPanner + lowpass + distance gain
+  play(id, {x?, y?, directionalOnly?, priority?, category?, pitchVariance?, gain?, duck?, key?, loop?, fadeInMs?})
+                                           // x/y spatialize; directionalOnly omits distance gain
   playUI(id, opts)                        // non-spatial ui category convenience
   stopByKey(key, {fadeOutMs?}?) -> number // stop or fade tagged sustained/abortable voices
+  setVoicePosition(key, x, y) -> number   // repan active keyed spatial voices without restart
   setListener({x,y,referenceDistancePx})   // consumes semantic AudioListenerV1
   pickVariant(ids) -> id|null             // seeded RNG variant choice
   setMasterVolume(v), getMasterVolume()
@@ -1319,12 +1320,14 @@ penalty both advance from `0.4a` to the `1.2a` hard-drop boundary. Active voices
 category so camera updates recompute the same profile with the existing 30 ms ramps. Non-combat
 spatial voices retain the original renderer-relative envelope.
 
-The authoritative snapshot's position-free `worldCombatActive` bit gates one fixed, non-spatial
-`combat_distant_bed_01` loop on the `combat_other` bus. It plays at 0.035 gain with no pitch
-variation, fades in over 750 ms, and fades out over 2500 ms. One stable key prevents voice-pool
-multiplication; pause, ended-room-time, teardown, and match replacement stop it. The fixed loop
-reveals no direction, weapon mix, cadence, ownership, or number of fights beyond the server's
-coarse activity bit. The current derived asset is a first-pass listening placeholder.
+The authoritative snapshot's 32-tile-quantized `worldCombatPosition` gates one fixed
+`combat_distant_bed_01` loop on the `combat_other` bus. Its direction-only spatial profile pans
+toward that coarse world point while holding distance gain at 1.0, so camera zoom and map distance
+never change its 0.035 voice gain. It has no pitch variation, fades in over 750 ms, and fades out
+over 2500 ms. One stable key prevents voice-pool multiplication and allows 30 ms repanning without
+restarting; pause, ended-room-time, teardown, and match replacement stop it. The fixed loop reveals
+broad battle direction but not exact position, weapon mix, cadence, ownership, or number of fights.
+The current derived asset is a first-pass listening placeholder.
 
 `hud.js`
 ```js
@@ -1645,10 +1648,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Spatial combat audio caps its acoustic reference distance at 1280 world pixels so extreme
   zoom-out cannot expand the foreground mix. It stays full volume through 0.4 acoustic reference
   distances, attenuates and muffles toward a hard drop at 1.2 distances, and receives a monotonic
-  distance-priority penalty outside the near region. A separate global, position-free snapshot bit
-  gates one quiet generic combat-bed loop, so distant activity remains perceptible without
-  preserving event direction or composition. Non-combat spatial behavior and the global 48-voice
-  pool remain unchanged.
+  distance-priority penalty outside the near region. A separate global, 32-tile-quantized combat
+  point gates and pans one quiet generic combat-bed loop at constant gain, so distant activity
+  remains perceptible and broadly directional without preserving exact event location or
+  composition. Non-combat spatial behavior and the global 48-voice pool remain unchanged.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
   buckets; generic Panzerfaust attack events, projectile travel, reload, and legacy conversion
   events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered

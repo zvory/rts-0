@@ -111,13 +111,19 @@ export class MatchCombatAudio {
     this.worldCombatBedPlaying = false;
   }
 
-  updateWorldCombatBed(active) {
+  updateWorldCombatBed(position) {
     if (!this.audio) return;
+    const x = Number(position?.[0]);
+    const y = Number(position?.[1]);
+    const active = Number.isFinite(x) && Number.isFinite(y);
     if (active) {
       if (
         this.worldCombatBedPlaying
         && this.audio.hasVoiceKey?.(WORLD_COMBAT_BED_KEY) !== false
-      ) return;
+      ) {
+        this.audio.setVoicePosition?.(WORLD_COMBAT_BED_KEY, x, y);
+        return;
+      }
       // A prior fade-out may still own the key when combat resumes.
       this.audio.stopByKey(WORLD_COMBAT_BED_KEY);
       this.worldCombatBedPlaying = this.audio.play(WORLD_COMBAT_BED_ID, {
@@ -126,6 +132,9 @@ export class MatchCombatAudio {
         gain: WORLD_COMBAT_BED_GAIN,
         key: WORLD_COMBAT_BED_KEY,
         loop: true,
+        x,
+        y,
+        directionalOnly: true,
         fadeInMs: WORLD_COMBAT_BED_FADE_IN_MS,
         pitchVariance: 0,
         cooldownMs: 0,

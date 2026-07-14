@@ -323,11 +323,13 @@ export class Match {
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.roomTimeControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
-      this.combatAudio?.updateWorldCombatBed(worldCombatBedAllowed(
-        m?.worldCombatActive,
-        this.livePauseState,
-        this.roomTimeControls?.roomTimeState,
-      ));
+      this.combatAudio?.updateWorldCombatBed(
+        worldCombatBedAllowed(
+          Array.isArray(m?.worldCombatPosition),
+          this.livePauseState,
+          this.roomTimeControls?.roomTimeState,
+        ) ? m.worldCombatPosition : null,
+      );
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);

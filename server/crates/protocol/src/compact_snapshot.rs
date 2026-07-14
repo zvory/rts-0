@@ -78,8 +78,8 @@ impl Serialize for CompactSnapshot<'_> {
                 snapshot.supply_cap,
             ],
         )?;
-        if snapshot.world_combat_active {
-            map.serialize_entry("wc", &true)?;
+        if let Some(position) = snapshot.world_combat_position {
+            map.serialize_entry("wc", &position)?;
         }
         map.serialize_entry(
             "e",

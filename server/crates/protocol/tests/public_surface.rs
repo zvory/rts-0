@@ -160,7 +160,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 37);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 38);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
@@ -209,7 +209,7 @@ fn compact_snapshot_encodes_scout_plane_owner_state() {
 
     let snapshot = Snapshot {
         tick: 1,
-        world_combat_active: false,
+        world_combat_position: None,
         steel: 0,
         oil: 0,
         supply_used: 0,
