@@ -15,6 +15,9 @@ This is the final measured checkpoint. Consume the exact active-player 200/300 w
 in Phase 1 and report whether the complete client frame clears the proposed 60 FPS gate after all
 five priorities have landed.
 
+Rerun Phase 0's unchanged Lab hellhole once as a coarse end-to-end stress comparison before the
+serious active-player matrix; do not use its prediction-free Lab result as the release gate.
+
 ## Constraints and Non-Goals
 
 - Preserve server-authoritative current visibility and client explored history. No fog rule,
@@ -163,7 +166,13 @@ session and include only the returned Tailnet Preview URL in the handoff.
 
 ## Final 200/300 Measurement Checkpoint
 
-Run the exact Phase 1 workloads with fixed composition and seed. First run the serious repeated
+First rerun the canonical Phase 0 workload at default settings:
+
+```bash
+node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
+```
+
+Then run the exact Phase 1 workloads with fixed composition and seed. Run the serious repeated
 matrix without traces, then capture a trace for the first failing or worst representative cell:
 
 ```bash
@@ -208,7 +217,8 @@ client headroom; completing the code does not itself authorize the cap change.
 - Run `scripts/agent-pr.sh --verification "<focused checks, Interact review, and final matrix passed>"`,
   then `scripts/wait-pr.sh <pr>` and verify the phase head is reachable from `origin/main`.
 - The handoff must include cache invalidation contracts, exact structural counter results, the
-  Interact Preview URL, all matrix/trace artifact paths, before/after margins, the first failing cell
-  if any, and a direct recommendation to keep 200 or proceed to a separate cap-change decision.
+  Interact Preview URL, the unchanged Lab hellhole comparison, all matrix/trace artifact paths,
+  before/after margins, the first failing cell if any, and a direct recommendation to keep 200 or
+  proceed to a separate cap-change decision.
 - When this phase marks all phase files Done, allow the PR helper to archive the plan as required by
   repository policy.
