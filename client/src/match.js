@@ -207,7 +207,7 @@ export class Match {
     }));
     this.autoSpectator = this._timeInit(
       "match.autoSpectator",
-      () => createMatchAutoSpectator(this, payload, options),
+      () => createMatchAutoSpectator(this, payload, options, dom.gameScreen),
     );
     this.renderer = this._timeInit("match.renderer", () => this.rendererBackendBundle.createRenderer(dom.viewport, {
       renderClock: this.renderClock,

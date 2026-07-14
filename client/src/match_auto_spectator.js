@@ -1,5 +1,4 @@
 import { AUTO_SPECTATOR_MIN_ZOOM, AutoSpectatorDirector } from "./auto_spectator.js";
-import { dom } from "./bootstrap.js";
 import { SpectatorControlsPanel } from "./spectator_controls_panel.js";
 
 function availableForMatch(match, payload) {
@@ -10,13 +9,13 @@ export function autoSpectatorCameraMinZoom(match, payload) {
   return availableForMatch(match, payload) ? AUTO_SPECTATOR_MIN_ZOOM : undefined;
 }
 
-export function createMatchAutoSpectator(match, payload, options = {}) {
+export function createMatchAutoSpectator(match, payload, options = {}, controlsRoot = null) {
   if (!availableForMatch(match, payload)) return null;
-  return new MatchAutoSpectator(match, options);
+  return new MatchAutoSpectator(match, options, controlsRoot);
 }
 
 class MatchAutoSpectator {
-  constructor(match, options) {
+  constructor(match, options, controlsRoot) {
     this.director = new AutoSpectatorDirector({
       camera: match.camera,
       state: match.state,
@@ -24,7 +23,7 @@ class MatchAutoSpectator {
       onEnabledChange: options.onAutoSpectatorEnabledChange,
     });
     this.panel = new SpectatorControlsPanel({
-      root: dom.gameScreen,
+      root: controlsRoot,
       state: () => ({ available: true, enabled: this.director.enabled }),
       onToggle: (enabled) => this.setEnabled(enabled),
     });

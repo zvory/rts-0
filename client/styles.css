@@ -5259,6 +5259,13 @@ input[type="text"]:focus {
     max-height: calc(100vh - var(--mobile-debug-top) - var(--mobile-debug-bottom) - 142px);
   }
 
+  .spectator-controls-panel {
+    right: auto;
+    left: var(--mobile-debug-left);
+    bottom: var(--mobile-debug-bottom);
+    width: min(292px, calc(42vw - var(--mobile-debug-left)));
+  }
+
   #minimap-wrap {
     left: calc(44vw + var(--mobile-debug-left));
   }
