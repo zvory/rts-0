@@ -864,7 +864,11 @@ box-selection, and teardown paths. Starting ordinary placement, command targetin
 build menus cancels the active lab tool so setup tools do not share state with gameplay command
 modes. Unit and building spawning are lab panel palettes backed by the client faction catalog mirror
 and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
-clicking or dragging sends the chosen world positions through `LabClient` until cancelled. The lab does
+clicking or dragging sends the chosen world positions through `LabClient` until cancelled. Changing
+the target player while a spawn tool is armed immediately retargets that tool, including its cursor
+preview and subsequent placements, without requiring the operator to select the unit or building again.
+Target-player changes re-render the complete Tools surface from that player's authoritative resources,
+god mode, and completed research instead of incrementally patching only the player colors. The lab does
 not expose a secondary advanced spawn fallback; the panel spawn affordance is limited to playable
 faction unit and building palettes. The visible map-editing surface is limited to the remove tool:
 it arms a persistent `removeSelectableUnits` setup tool; clicking deletes the selectable unit or

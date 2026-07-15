@@ -683,7 +683,10 @@ await withFakeDocument(async () => {
     state: {
       map: { width: 64, height: 64 },
       playerId: 1,
-      playerResources: [{ id: 1, steel: 500, oil: 200 }],
+      playerResources: [
+        { id: 1, steel: 500, oil: 200 },
+        { id: 2, steel: 700, oil: 100 },
+      ],
       upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
       playerUpgrades: [
         { id: 2, upgrades: [] },
@@ -730,6 +733,7 @@ await withFakeDocument(async () => {
     operatorId: 1,
     role: LAB_ROLE.OPERATOR,
     vision: labVision.all(),
+    godModePlayers: [1],
     dirty: false,
     operationCount: 0,
   });
@@ -826,7 +830,10 @@ await withFakeDocument(async () => {
     { steel: 0, oil: 0 },
     "LabPanel does not borrow another visible player's resource row for the target player",
   );
-  match.state.playerResources = [{ id: 1, steel: 500, oil: 200 }];
+  match.state.playerResources = [
+    { id: 1, steel: 500, oil: 200 },
+    { id: 2, steel: 700, oil: 100 },
+  ];
   assert(
     playerButtons().length === 2 &&
       playerButtonById(1)?.dataset.color === "#2255aa" &&
@@ -965,7 +972,40 @@ await withFakeDocument(async () => {
       spawnPanel("buildings")?.dataset.targetColor === "#bb4422",
     "LabPanel retints spawn panels when the target player changes",
   );
+  assert(
+    panel.fields.get("resource-steel").value === "700" &&
+      panel.fields.get("resource-oil").value === "100",
+    "LabPanel refreshes resource fields from the newly selected player",
+  );
+  assert(
+    buttonByText("Medium Guns")?.dataset.researched === "false" &&
+      buttonByText("Medium Guns")?.["aria-pressed"] === "false",
+    "LabPanel refreshes completed research for the newly selected player",
+  );
+  assert(
+    panel.fields.get("player-god-mode").checked === false,
+    "LabPanel refreshes god mode state for the newly selected player",
+  );
+  playerButtonById(1).listeners.click();
+  assert(
+    panel.fields.get("resource-steel").value === "500" &&
+      panel.fields.get("resource-oil").value === "200" &&
+      buttonByText("Medium Guns")?.dataset.researched === "true" &&
+      panel.fields.get("player-god-mode").checked === true,
+    "LabPanel restores every player-specific control when switching back",
+  );
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
+  assert(
+    armedTool?.kind === "spawnEntity" && armedTool.payload.owner === 1,
+    "LabPanel initially arms the spawn tool for the selected target player",
+  );
+  playerButtonById(2).listeners.click();
+  assert(
+    armedTool?.kind === "spawnEntity" &&
+      armedTool.payload.owner === 2 &&
+      match.clientIntent.activeLabTool?.payload?.owner === 2,
+    "LabPanel retargets an already armed spawn tool when the target player changes",
+  );
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
   assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
   assert(armedTool?.paintOnDrag === true, "LabPanel unit palette enables persistent drag painting");
@@ -1122,11 +1162,11 @@ await withFakeDocument(async () => {
   assert(
     panel.fields.get("lab-player").value === "2" &&
       playerButtonById(2)?.dataset.selected === "true" &&
-      panel.fields.get("resource-steel").value === "900" &&
-      panel.fields.get("resource-oil").value === "300" &&
+      panel.fields.get("resource-steel").value === "700" &&
+      panel.fields.get("resource-oil").value === "100" &&
       buttonByText("Tank Production")?.dataset.researched === "true" &&
       buttonByText("Tank Production")?.["aria-pressed"] === "true",
-    "LabPanel preserves resource values and depresses completed research after set-research results re-render the panel",
+    "LabPanel keeps the selected player's resources and depresses completed research after result re-rendering",
   );
   const clearResearchPromise = buttonByText("Tank Production").listeners.click();
   assert(
