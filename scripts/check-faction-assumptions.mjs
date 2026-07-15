@@ -339,6 +339,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/src/lobby/lab_scenario_driver.rs",
   "server/src/lobby/room_task.rs",
   "server/src/protocol.rs",
+  // Deterministic Hellhole stress fixtures intentionally construct the current Kriegsia roster.
+  "server/src/tools/hellhole_spec.rs",
   // Server-rendered wiki examples intentionally cite current catalog kinds.
   "server/src/wiki.rs",
 ]);
