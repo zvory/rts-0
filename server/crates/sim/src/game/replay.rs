@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use super::replay_artifact::REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
 pub use super::replay_artifact::{
-    is_supported_replay_artifact_schema, CommandLogEntry, ReplayArtifactV1, ReplayStartComposition,
-    ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
+    is_supported_replay_artifact_schema, CommandLogEntry, ReplayArtifactV1,
+    ReplayStartComposition, ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
 use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;
@@ -34,11 +34,11 @@ impl ReplayArtifactV1 {
         map_metadata: MapMetadata,
     ) -> Result<Game, ReplayValidationError> {
         match &self.start_state {
-            Some(start_state)
-                if self.artifact_schema_version == REPLAY_ARTIFACT_SCHEMA_VERSION_V3 =>
-            {
+            Some(start_state) if self.artifact_schema_version == REPLAY_ARTIFACT_SCHEMA_VERSION_V3 => {
                 if start_state.map_name != self.map_name {
-                    return Err(ReplayValidationError::StartStateMismatch { field: "mapName" });
+                    return Err(ReplayValidationError::StartStateMismatch {
+                        field: "mapName",
+                    });
                 }
                 if start_state.map_schema_version != self.map_schema_version {
                     return Err(ReplayValidationError::StartStateMismatch {
@@ -123,7 +123,9 @@ impl ReplayArtifactV1 {
         }
         if let Some(start_state) = &self.start_state {
             if start_state.map_name != self.map_name {
-                return Err(ReplayValidationError::StartStateMismatch { field: "mapName" });
+                return Err(ReplayValidationError::StartStateMismatch {
+                    field: "mapName",
+                });
             }
             if start_state.map_schema_version != self.map_schema_version {
                 return Err(ReplayValidationError::StartStateMismatch {
