@@ -12,7 +12,8 @@ path = "junit.xml"
 
 [[profile.default.overrides]]
 # This benchmark deliberately advances a dense 224-entity fight through 60
-# seconds of authoritative simulation. It takes about 80 seconds alone and can
-# cross the default 120-second ceiling when the CI shard runs tests in parallel.
+# seconds of authoritative simulation. It takes about 80 seconds alone but can
+# exceed four minutes when the CI shard contends with hundreds of parallel tests.
 filter = "test(supply_300_hellhole_lab_scenario_is_structurally_stable)"
+threads-required = "num-test-threads"
 slow-timeout = { period = "60s", terminate-after = 4 }
