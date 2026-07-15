@@ -1045,8 +1045,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       "production buttons expose their allocation context action to the hotkey layer",
     );
     assert(
-      commandCarButton?.dataset.contextHotkeyModifiers === "ctrl shift",
-      "production buttons expose Ctrl and Shift as their allocation hotkey modifiers",
+      commandCarButton?.dataset.contextHotkeyModifiers === "alt ctrl shift",
+      "production buttons expose Alt, Ctrl, and Shift as their allocation hotkey modifiers",
     );
     globalThis.document.getElementById = () => ({
       querySelectorAll() {
@@ -1093,7 +1093,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         return [scoutCarButton];
       },
     });
-    const altTrainEv = {
+    const altAddEv = {
       code: "KeyQ",
       altKey: true,
       ctrlKey: false,
@@ -1102,12 +1102,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       repeat: false,
       preventDefault() { this.prevented = true; },
     };
-    const altTrainResult = input._activateCommandHotkey(altTrainEv);
-    const altTrainCommand = sent[sent.length - 1];
+    const altAddResult = input._activateCommandHotkey(altAddEv);
+    const altAddCommand = sent[sent.length - 1];
     assert(
-      altTrainResult?.contextAction === false && altTrainEv.prevented &&
-        altTrainCommand?.c === "train" && altTrainCommand.unit === KIND.SCOUT_CAR,
-      "Alt+production hotkeys use the normal training action instead of adjusting auto-build",
+      altAddResult?.contextAction === true && altAddEv.prevented &&
+        altAddCommand?.c === "adjustProductionRepeat" && altAddCommand.delta === 1 &&
+        altAddCommand.unit === KIND.SCOUT_CAR && altAddCommand.buildings[0] === selectedFactory.id,
+      "Alt+production hotkeys dispatch one signed addition through the context-action path",
     );
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
