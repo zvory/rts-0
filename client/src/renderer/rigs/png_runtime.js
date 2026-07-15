@@ -1,7 +1,11 @@
 import { hexToInt, lightenColor } from "../shared.js";
 import { sampleRigAnimation } from "./animation.js";
+import { isImmutablePartSelection, normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
+const ATLAS_SPRITES_CACHE = new WeakMap();
+const ROUTE_COVERAGE_CACHE = new WeakMap();
+const ALL_ROUTE_PARTS = Object.freeze({});
 
 export function renderPngUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   const atlas = options.atlas;
@@ -11,11 +15,11 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
   const rendered = [];
   for (const route of options.routes || []) {
-    if (!pngAtlasCanRenderRoute(definition, atlas, route)) continue;
+    if (!options.routesCovered && !pngAtlasCanRenderRoute(definition, atlas, route)) continue;
     const pool = renderer._liveRigPools?.[route.poolName];
     if (!pool) continue;
     let instance = pool.get(entity.id);
-    if (instance && !instance.matchesPngAtlasRig?.(entity.kind, definition, atlas, atlasTexture)) {
+    if (instance && !instance.matchesPngAtlasRig?.(entity.kind, definition, atlas, atlasTexture, route.parts)) {
       instance.destroy?.();
       pool.delete(entity.id);
       instance = null;
@@ -27,7 +31,8 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
         definition,
         atlas,
         atlasTexture,
-        renderer._rigPixiFactory ?? createDefaultPngPixiFactory()
+        renderer._rigPixiFactory ?? createDefaultPngPixiFactory(),
+        { includeParts: route.parts },
       );
       renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.created.${route.poolName}`);
       renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigContainer");
@@ -40,7 +45,7 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
     const layer = renderer.layers[route.layerName];
     if (!instance.container.parent && layer) layer.addChild(instance.container);
     instance.update(entity, context, {
-      includeParts: route.parts,
+      sampledAnimation: options.sampledAnimation,
       diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
     });
     rendered.push(instance);
@@ -63,19 +68,34 @@ export function pngAtlasRouteCoverage(definition, atlas, route) {
     return {
       coveredParts: [],
       missingParts: includeParts ? [...includeParts] : [],
+      animationParts: [],
     };
   }
+  const cacheKey = includeParts
+    ? (isImmutablePartSelection(route?.parts) ? route.parts : null)
+    : ALL_ROUTE_PARTS;
+  const cached = cacheKey ? cachedRouteCoverage(definition, atlas, cacheKey) : null;
+  if (cached) return cached;
   const sprites = atlasSprites(definition, atlas);
   const coveredParts = new Set();
+  const animationParts = new Set();
   for (const sprite of sprites) {
+    let covered = false;
     for (const partId of sprite.sourceParts) {
-      if (!includeParts || includeParts.has(partId)) coveredParts.add(partId);
+      if (!includeParts || includeParts.has(partId)) {
+        coveredParts.add(partId);
+        covered = true;
+      }
     }
+    if (covered && sprite.animationPart) animationParts.add(sprite.animationPart);
   }
-  return {
-    coveredParts: [...coveredParts],
-    missingParts: includeParts ? [...includeParts].filter((partId) => !coveredParts.has(partId)) : [],
-  };
+  const coverage = Object.freeze({
+    coveredParts: Object.freeze([...coveredParts]),
+    missingParts: Object.freeze(includeParts ? [...includeParts].filter((partId) => !coveredParts.has(partId)) : []),
+    animationParts: Object.freeze([...animationParts]),
+  });
+  if (cacheKey) cacheRouteCoverage(definition, atlas, cacheKey, coverage);
+  return coverage;
 }
 
 function createDefaultPngPixiFactory(pixi = globalThis.PIXI) {
@@ -88,7 +108,7 @@ function createDefaultPngPixiFactory(pixi = globalThis.PIXI) {
 }
 
 class PngAtlasRigInstance {
-  constructor(kind, definition, atlas, atlasTexture, pixiFactory) {
+  constructor(kind, definition, atlas, atlasTexture, pixiFactory, options = {}) {
     this.kind = kind;
     this.definition = definition;
     this.atlas = atlas;
@@ -96,10 +116,14 @@ class PngAtlasRigInstance {
     this._pixiFactory = pixiFactory;
     this.container = pixiFactory.createContainer();
     this.parts = new Map();
+    const routeParts = normalizedPartSet(options.includeParts);
+    this._routeParts = routeParts ? new Set(routeParts) : null;
+    this._routePartKey = partSelectionKey(this._routeParts);
     this._destroyed = false;
 
     const baseTexture = atlasTexture.baseTexture ?? atlasTexture;
     for (const sprite of atlasSprites(definition, atlas)) {
+      if (!spriteMatchesRoute(sprite, this._routeParts)) continue;
       const frame = sprite.frame;
       if (!frame) continue;
       const baseFrame = createFrameRecord(frame, baseTexture, pixiFactory);
@@ -112,12 +136,13 @@ class PngAtlasRigInstance {
     }
   }
 
-  matchesPngAtlasRig(kind, definition, atlas, atlasTexture) {
+  matchesPngAtlasRig(kind, definition, atlas, atlasTexture, includeParts = null) {
     return (
       this.kind === kind &&
       this.definition === definition &&
       this.atlas === atlas &&
-      this.atlasTexture === atlasTexture
+      this.atlasTexture === atlasTexture &&
+      this._routePartKey === partSelectionKey(includeParts)
     );
   }
 
@@ -130,14 +155,13 @@ class PngAtlasRigInstance {
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 
-    const sampled = sampleRigAnimation(this.definition, entity, renderContext);
-    const includeParts = normalizedPartSet(options.includeParts);
+    const sampled = options.sampledAnimation ?? sampleRigAnimation(
+      this.definition,
+      entity,
+      renderContext,
+      { includeParts: animationPartIds(this.parts) },
+    );
     for (const [spriteId, rec] of this.parts) {
-      if (!spriteMatchesRoute(rec.sprite, includeParts)) {
-        rec.display.visible = false;
-        options.diagnostics?.("renderer.pngRig.redraw.skipped.hidden");
-        continue;
-      }
       const partState = sampled.parts[rec.sprite.animationPart];
       if (!partState) {
         rec.display.visible = false;
@@ -203,8 +227,11 @@ function applySpriteState(display, part, frame, state, context, diagnostics = nu
 }
 
 function atlasSprites(definition, atlas) {
+  const cached = cachedAtlasSprites(definition, atlas);
+  if (cached) return cached;
+  let sprites;
   if (Array.isArray(atlas?.sprites) && atlas.sprites.length > 0) {
-    return atlas.sprites
+    sprites = atlas.sprites
       .filter((sprite) => sprite?.frame)
       .map((sprite) => ({
         id: sprite.id,
@@ -223,18 +250,57 @@ function atlasSprites(definition, atlas) {
         drawOrder: sprite.drawOrder ?? 0,
       }))
       .sort((a, b) => a.drawOrder - b.drawOrder || a.id.localeCompare(b.id));
+  } else {
+    sprites = (definition.parts || [])
+      .map((part) => ({
+        id: part.id,
+        animationPart: part.id,
+        sourceParts: [part.id],
+        tintSlot: part.tintSlot,
+        frame: atlas.frames?.[part.id],
+        paletteFrames: atlas.paletteFrames?.[part.id],
+        drawOrder: part.drawOrder ?? 0,
+      }))
+      .filter((sprite) => sprite.frame);
   }
-  return (definition.parts || [])
-    .map((part) => ({
-      id: part.id,
-      animationPart: part.id,
-      sourceParts: [part.id],
-      tintSlot: part.tintSlot,
-      frame: atlas.frames?.[part.id],
-      paletteFrames: atlas.paletteFrames?.[part.id],
-      drawOrder: part.drawOrder ?? 0,
-    }))
-    .filter((sprite) => sprite.frame);
+  const frozen = Object.freeze(sprites.map((sprite) => Object.freeze(sprite)));
+  cacheAtlasSprites(definition, atlas, frozen);
+  return frozen;
+}
+
+function cachedAtlasSprites(definition, atlas) {
+  return ATLAS_SPRITES_CACHE.get(definition)?.get(atlas) ?? null;
+}
+
+function cacheAtlasSprites(definition, atlas, sprites) {
+  let byAtlas = ATLAS_SPRITES_CACHE.get(definition);
+  if (!byAtlas) {
+    byAtlas = new WeakMap();
+    ATLAS_SPRITES_CACHE.set(definition, byAtlas);
+  }
+  byAtlas.set(atlas, sprites);
+}
+
+function cachedRouteCoverage(definition, atlas, routeParts) {
+  return ROUTE_COVERAGE_CACHE.get(definition)?.get(atlas)?.get(routeParts) ?? null;
+}
+
+function cacheRouteCoverage(definition, atlas, routeParts, coverage) {
+  let byAtlas = ROUTE_COVERAGE_CACHE.get(definition);
+  if (!byAtlas) {
+    byAtlas = new WeakMap();
+    ROUTE_COVERAGE_CACHE.set(definition, byAtlas);
+  }
+  let byRoute = byAtlas.get(atlas);
+  if (!byRoute) {
+    byRoute = new WeakMap();
+    byAtlas.set(atlas, byRoute);
+  }
+  byRoute.set(routeParts, coverage);
+}
+
+function animationPartIds(parts) {
+  return new Set([...parts.values()].map((rec) => rec.sprite.animationPart));
 }
 
 function spriteMatchesRoute(sprite, includeParts) {
@@ -330,11 +396,6 @@ function rotateOffset(offset, rotation) {
     x: offset.x * cos - offset.y * sin,
     y: offset.x * sin + offset.y * cos,
   };
-}
-
-function normalizedPartSet(parts) {
-  if (!Array.isArray(parts)) return null;
-  return new Set(parts);
 }
 
 function setPoint(point, x, y) {

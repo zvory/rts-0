@@ -1,6 +1,7 @@
 import { STATS } from "../../config.js";
 import { KIND, SETUP, STATE } from "../../protocol.js";
 import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
+import { normalizedPartSet } from "./part_selection.js";
 
 const TRANSFORM_PROPERTIES = new Set([
   "transform.x",
@@ -150,7 +151,7 @@ function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
   };
 }
 
-export function sampleRigAnimation(definition, entity, renderContext = {}) {
+export function sampleRigAnimation(definition, entity, renderContext = {}, options = {}) {
   const inputContext = renderContext || {};
   const context = inputContext[RIG_CONTEXT_READY]
     ? inputContext
@@ -159,7 +160,9 @@ export function sampleRigAnimation(definition, entity, renderContext = {}) {
       ...inputContext,
     };
   const parts = {};
+  const includeParts = normalizedPartSet(options.includeParts);
   for (const part of definition.parts || []) {
+    if (includeParts && !includeParts.has(part.id)) continue;
     parts[part.id] = {
       id: part.id,
       transform: { ...part.transform },

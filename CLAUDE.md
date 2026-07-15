@@ -150,6 +150,10 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   read the hottest functions before writing phases. Use `supply-300-hellhole-stream` for the
   repeatable renderer-isolation baseline and an active-player workload when making production-cap
   claims; neither substitutes for the other.
+- Rendering optimization parity: sample at least 12 randomly selected deterministic ticks and
+  capture each tick before and after with identical state, viewport, DPR, render clock, and ready
+  assets. Compare decoded pixels exactly; any changed pixel must fail the check unless the visual
+  change is intentional, reviewed, and documented.
 - Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.
   For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
   so debug-only simulation invariants do not interrupt play; use a replay only when requested or
