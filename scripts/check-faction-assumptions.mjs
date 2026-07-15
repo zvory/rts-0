@@ -289,6 +289,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/economy/pump_jack.rs",
   "server/crates/sim/src/game/services/geometry.rs",
   "server/crates/sim/src/game/services/move_coordinator.rs",
+  // Support-weapon movement owns current-roster setup transitions until catalog combat roles exist.
+  "server/crates/sim/src/game/services/move_coordinator/support_weapon.rs",
   "server/crates/sim/src/game/services/movement/mod.rs",
   // Armor-reaction runtime eligibility is rules-routed; focused inline tests use the Tank entry.
   "server/crates/sim/src/game/services/movement/armor_reaction.rs",
