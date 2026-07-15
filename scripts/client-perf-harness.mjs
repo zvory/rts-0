@@ -9,7 +9,11 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
-import { initializeWorkloadSetup, labHellholeSampleErrors } from "./client-perf/workload_setup.mjs";
+import {
+  initializeWorkloadSetup,
+  labHellholeSampleErrors,
+  validateActiveSupplyStressSample,
+} from "./client-perf/workload_setup.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1453,6 +1457,10 @@ function workloadSetupErrors(workload, setupResult, summary = null) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
   errors.push(...labHellholeSampleErrors(workload.setup, setupResult, summary));
+  errors.push(...validateActiveSupplyStressSample(
+    setupResult.activeSupplyStress,
+    workload.setup?.activeSupplyStress,
+  ));
   return errors;
 }
 
@@ -1627,7 +1635,9 @@ async function loadPuppeteer() {
 }
 
 function selectedWorkloads(args) {
-  const ids = args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
+  const ids = args.activeSupplyPair
+    ? ["supply-200-active", "supply-300-active"]
+    : args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
   if (ids.length === 0) return WORKLOADS;
   const byId = new Map(WORKLOADS.map((workload) => [workload.id, workload]));
   return ids.map((id) => {
@@ -1641,6 +1651,7 @@ function parseArgs(argv) {
   const args = {
     list: false,
     renderLagSuite: false,
+    activeSupplyPair: false,
     workloads: [],
     durationMs: DEFAULT_DURATION_MS,
     outputRoot: DEFAULT_OUTPUT_ROOT,
@@ -1671,6 +1682,7 @@ function parseArgs(argv) {
     };
     if (arg === "--list") args.list = true;
     else if (arg === "--render-lag-suite") args.renderLagSuite = true;
+    else if (arg === "--active-supply-pair") args.activeSupplyPair = true;
     else if (arg === "--stress-matrix") args.stressMatrix = true;
     else if (arg === "--trace") args.trace = true;
     else if (arg === "--snapshot-codec-bakeoff") args.snapshotCodecBakeoff = true;
@@ -1715,6 +1727,9 @@ function parseArgs(argv) {
   if (args.renderLagSuite && args.workloads.length > 0) {
     throw new Error("--render-lag-suite cannot be combined with --workload");
   }
+  if (args.activeSupplyPair && (args.renderLagSuite || args.workloads.length > 0)) {
+    throw new Error("--active-supply-pair cannot be combined with --render-lag-suite or --workload");
+  }
   return args;
 }
 
@@ -1724,6 +1739,7 @@ function printHelp() {
 Options:
   --list                         List available workloads.
   --render-lag-suite             Run the full render-lag comparison workload set.
+  --active-supply-pair           Run exact active-player 200/300 workloads with identical settings.
   --stress-matrix                Run workloads across CPU, viewport, DPR, and repeat matrix cells.
   --workload <id>                Run one workload; repeatable. Defaults to all workloads.
   --seconds <n>                  Browser collection time per workload. Default: ${DEFAULT_DURATION_MS / 1000}.

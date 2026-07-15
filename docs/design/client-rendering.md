@@ -9,8 +9,9 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 
 - There is one JavaScript client, one `Match`, one state/interpolation pipeline, and one active
   world renderer per match. Pixi is the default.
-- `Match` owns the only `requestAnimationFrame` loop and visual clock. A backend renders only when
-  Match calls it; Babylon never calls `runRenderLoop()`.
+- During a match, `Match` owns the only `requestAnimationFrame` loop and visual clock. Pixi is
+  constructed with `autoStart:false`; no normal, capture, or teardown path starts its ticker. A
+  backend updates and presents only when Match calls it; Babylon never calls `runRenderLoop()`.
 - Server/application coordinates remain two-dimensional world pixels. Scene axes, scale, height,
   and facing are backend-private presentation conversions.
 - Input and commands use semantic projection and selection data. Meshes, asset bounds, LODs,
@@ -174,7 +175,12 @@ namespaced metadata but cannot rename/reorder layers or weaken visibility policy
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
 pending ground decals, assembles one frame, and calls `renderer.render(frame)`. Only after a
-successful presentation does Match publish the matching `SelectionSceneV1`.
+successful presentation does Match publish the matching `SelectionSceneV1` and acknowledge its
+reconciled ground decals. Each adapter call first updates backend scene state, then synchronously
+presents exactly once. Pixi presentation is one `PIXI.Application.render()` call; Babylon
+presentation is one `Scene.render()` call. Update or present failure returns `presented:false`, does
+not advance the successful renderer-frame count, and cannot prevent Match from scheduling its next
+RAF.
 
 The `PixiPresentationAdapter` is the sole bridge to existing Pixi helpers. Its exact private-read
 allowlist uses `{id, reviewTrigger}` records: a trigger is a concrete reason to reconsider a read,

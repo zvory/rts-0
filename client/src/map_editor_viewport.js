@@ -361,6 +361,7 @@ export class MapEditorViewport {
     this.camera.update(dt, { keys: this.keys, mouse: null });
     this.renderer.world.position.set(-this.camera.x * this.camera.zoom, -this.camera.y * this.camera.zoom);
     this.renderer.world.scale.set(this.camera.zoom);
+    this.renderer.present();
     this.frame = requestAnimationFrame((next) => this.tick(next));
   }
 

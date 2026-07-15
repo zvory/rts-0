@@ -65,29 +65,34 @@ export class PixiPresentationAdapter {
   }
 
   render(frame) {
+    const profiler = this._sources?.profiler?.() || null;
+    const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     try {
       if (!frame || frame.version !== 1) throw new TypeError("Pixi requires PresentationFrameV1.");
-      this._ensureStaticMap(frame);
-      const repeated = frame === this._lastFrame;
-      const view = repeated ? this._lastView : this._buildView(frame);
-      if (!repeated) {
-        this._lastFrame = frame;
-        this._lastView = view;
-      }
-      const frameKey = `${frame.generation}:${frame.frameId}`;
-      const groundDecals = frameKey === this._decalFrameKey ? [] : view.groundDecals;
-      this._decalFrameKey = frameKey;
-      this._renderer.render(view.state, view.camera, view.fog, view.alpha, {
-        frameViews: view.frameViews,
-        profiler: view.profiler,
-        visualSamples: view.visualSamples,
-        visualUnitOverrides: view.visualUnitOverrides,
-        visualFrameStripOverrides: view.visualFrameStripOverrides,
-        observerMapAnalysis: view.observerMapAnalysis,
-        feedbackView: view.feedback,
-        reconciledGroundDecals: groundDecals,
+      time("renderer.update", () => {
+        this._ensureStaticMap(frame);
+        const repeated = frame === this._lastFrame;
+        const view = repeated ? this._lastView : this._buildView(frame);
+        if (!repeated) {
+          this._lastFrame = frame;
+          this._lastView = view;
+        }
+        const frameKey = `${frame.generation}:${frame.frameId}`;
+        const groundDecals = frameKey === this._decalFrameKey ? [] : view.groundDecals;
+        this._decalFrameKey = frameKey;
+        this._renderer.render(view.state, view.camera, view.fog, view.alpha, {
+          frameViews: view.frameViews,
+          profiler: view.profiler,
+          visualSamples: view.visualSamples,
+          visualUnitOverrides: view.visualUnitOverrides,
+          visualFrameStripOverrides: view.visualFrameStripOverrides,
+          observerMapAnalysis: view.observerMapAnalysis,
+          feedbackView: view.feedback,
+          reconciledGroundDecals: groundDecals,
+        });
+        this._renderer.drawSelectionBox(view.marquee);
       });
-      this._renderer.drawSelectionBox(view.marquee);
+      time("renderer.present", () => this._present());
       return Object.freeze({ presented: true });
     } catch (err) {
       this._renderer?._recordRenderError?.("pixiPresentationFrame", err);
@@ -101,10 +106,6 @@ export class PixiPresentationAdapter {
 
   enterFixedCapture(renderClock) {
     this._renderer.enterFixedCapture(renderClock);
-  }
-
-  presentFixedCaptureFrame() {
-    this._renderer.presentFixedCaptureFrame();
   }
 
   exitFixedCapture(renderClock) {
@@ -138,6 +139,10 @@ export class PixiPresentationAdapter {
     this._lastView = null;
     this._sources = null;
     this._renderer.destroy();
+  }
+
+  _present() {
+    this._renderer.present();
   }
 
   _ensureStaticMap(frame) {

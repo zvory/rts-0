@@ -213,10 +213,22 @@ pub fn log_client_net_report(
         report.frame_unattributed_p95_ms
     );
     field!("slow_frame_count", report.slow_frame_count);
+    field!(
+        "frame_work_budget_miss_count",
+        report.frame_work_budget_miss_count
+    );
+    field!(
+        "present_budget_miss_count",
+        report.present_budget_miss_count
+    );
     text_field!("worst_frame_phase", &report.worst_frame_phase);
     field!("worst_frame_phase_ms", report.worst_frame_phase_ms);
     field!("renderer_max_ms", report.renderer_max_ms);
     field!("renderer_p95_ms", report.renderer_p95_ms);
+    field!("renderer_update_max_ms", report.renderer_update_max_ms);
+    field!("renderer_update_p95_ms", report.renderer_update_p95_ms);
+    field!("renderer_present_max_ms", report.renderer_present_max_ms);
+    field!("renderer_present_p95_ms", report.renderer_present_p95_ms);
     text_field!("top_renderer_phase", &report.top_renderer_phase);
     field!("top_renderer_phase_ms", report.top_renderer_phase_ms);
     text_field!(
@@ -758,7 +770,13 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.frame_raf_dispatch_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
         || report.frame_unattributed_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
         || report.frame_unattributed_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+        || report.frame_work_budget_miss_count > 0
+        || report.present_budget_miss_count > 0
         || report.slow_frame_count > 0
+        || report.renderer_update_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
+        || report.renderer_update_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
+        || report.renderer_present_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
+        || report.renderer_present_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
         || report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
         || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
@@ -874,6 +892,15 @@ pub fn classify_client_net_report(
         || report.snapshot_parse_p95_ms >= NET_REPORT_SNAPSHOT_PARSE_P95_ISSUE_MS
     {
         "client_snapshot_parse"
+    } else if report.present_budget_miss_count > 0
+        || report.renderer_present_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
+        || report.renderer_present_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
+    {
+        "client_renderer_present"
+    } else if report.renderer_update_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
+        || report.renderer_update_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
+    {
+        "client_renderer_update"
     } else if report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
     {
@@ -886,6 +913,8 @@ pub fn classify_client_net_report(
         || report.frame_unattributed_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
     {
         "client_frame_unattributed"
+    } else if report.frame_work_budget_miss_count > 0 {
+        "client_frame_work_budget"
     } else if report.frame_work_max_ms >= NET_REPORT_FRAME_WORK_ISSUE_MS
         || report.frame_work_p95_ms >= NET_REPORT_FRAME_WORK_P95_ISSUE_MS
     {
@@ -1117,10 +1146,16 @@ mod tests {
             frame_unattributed_max_ms: 4,
             frame_unattributed_p95_ms: 2,
             slow_frame_count: 0,
+            frame_work_budget_miss_count: 0,
+            present_budget_miss_count: 0,
             worst_frame_phase: String::new(),
             worst_frame_phase_ms: 0,
             renderer_max_ms: 6,
             renderer_p95_ms: 4,
+            renderer_update_max_ms: 4,
+            renderer_update_p95_ms: 3,
+            renderer_present_max_ms: 2,
+            renderer_present_p95_ms: 1,
             top_renderer_phase: String::new(),
             top_renderer_phase_ms: 0,
             top_render_diagnostic_group: String::new(),
@@ -1281,6 +1316,24 @@ mod tests {
         report.frame_unattributed_p95_ms = NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS;
         assert!(notable(&report));
         assert_eq!(classify(&report), "client_frame_unattributed");
+    }
+
+    #[test]
+    fn net_report_classifies_update_present_and_work_budget_pressure() {
+        let mut report = clean_report();
+        report.renderer_update_max_ms = NET_REPORT_RENDERER_ISSUE_MS;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_renderer_update");
+
+        let mut report = clean_report();
+        report.present_budget_miss_count = 1;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_renderer_present");
+
+        let mut report = clean_report();
+        report.frame_work_budget_miss_count = 1;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_frame_work_budget");
     }
 
     #[test]

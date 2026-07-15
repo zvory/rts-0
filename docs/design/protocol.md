@@ -199,10 +199,16 @@ in a match:
   frameUnattributedMaxMs: u16, // max frame work not covered by top-level match.* phases
   frameUnattributedP95Ms: u16,
   slowFrameCount: u32,      // frames whose gap or work crossed the slow-frame threshold
+  frameWorkBudgetMissCount: u32, // frames whose complete JS work exceeded 1000/60 ms
+  presentBudgetMissCount: u32, // actual presents whose synchronous work exceeded 1000/60 ms
   worstFramePhase: string,  // bounded profiler label most often worst in this report window
   worstFramePhaseMs: u16,   // max duration for worstFramePhase
   rendererMaxMs: u16,       // largest measured match.renderer duration
   rendererP95Ms: u16,       // bucketed p95 match.renderer duration
+  rendererUpdateMaxMs: u16, // max backend scene translation/update duration
+  rendererUpdateP95Ms: u16, // bucketed p95 backend scene translation/update duration
+  rendererPresentMaxMs: u16, // max synchronous Pixi/Babylon present duration
+  rendererPresentP95Ms: u16, // bucketed p95 synchronous Pixi/Babylon present duration
   topRendererPhase: string, // allowlisted top renderer.* phase label for this report window
   topRendererPhaseMs: u16,
   topRenderDiagnosticGroup: string, // allowlisted grouped render/minimap/HUD diagnostic counter
@@ -306,13 +312,19 @@ exemplars by `clientSeq`, stable command family, stage, and duration; it never i
 targets, positions, raw command payloads, or raw timestamp arrays. The
 frame-work and renderer fields come from the browser's bounded frame-profiler report window; the
 local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
-recent frames are not uploaded. `commandsIssued` is the report-window total and catches sustained
+recent frames are not uploaded. Durations are integer milliseconds after bounded rounding for the
+wire. `rendererUpdate*` and `rendererPresent*` are stable scalars even when their nested phase rows
+fall outside a capped top-five list. They are nested inside `match.renderer` and must not be added
+to `frameWork*`. The two budget-miss counts use strict `> 1000/60 ms`; they reset after each report
+upload, while the local profiler remains cumulative until explicitly reset. The existing 33 ms
+`slowFrameCount` meaning is unchanged. `commandsIssued` is the report-window total and catches sustained
 rapid input that may not reach the fixed 250 ms `commandBurstMax` threshold. Command burst fields
 only count commands accepted by the browser WebSocket send path after local command-budget checks. Prediction
 disable reason fields are stable buckets; detailed WASM loader errors stay local. The server logs
 this message only when the aggregate contains
-notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure, packet-budget
-pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
+notable lag, jitter, browser frame stalls, 60 FPS work-budget misses, local JS frame work,
+large-payload pressure, packet-budget pressure, snapshot parse/decode/apply cost,
+snapshot cadence/burst issues, renderer update/present cost, WebSocket
 backlog, server tick/scheduler pressure, sustained or bursty command density, command milestone delay/rejection, or prediction
 correction/fallback signals, alongside the connection's `player_id`, room name, and reported
 `match_run_id`. The same structured row also includes server-observed counters for the report
@@ -537,7 +549,9 @@ not become valid `setFaction`, AI-seat, replay-branch, or post-match replay ids 
 `docs/design/faction-architecture-inventory.md`, the lifecycle validator, and protocol parity in
 the same change.
 
-Prediction start compatibility metadata is present only for live active players. Clients MUST keep
+Prediction start compatibility metadata is present for live active players and for the bounded
+local-only active `supply_stress_active` dev recipient used by the frame-budget harness. Spectator,
+replay-viewer, Lab, and ordinary dev-watch recipients omit it. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
 and, when both sides know a build id, `predictionBuildId` matches the client bundle id. Mismatches
 fall back to authoritative snapshots/tracking instead of running local visual reconciliation.

@@ -20,7 +20,13 @@ time, slow sample count, and worst-phase counts for match phases such as camera,
 visual advance, fog, renderer, HUD, minimap, observer analysis, and health publish. Renderer
 sub-phases cover entity preparation, feedback view building, resources/buildings, units,
 selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement. The profiler
-also records `frame.rafDispatch`, the browser callback dispatch delay between the RAF timestamp and
+also records `renderer.update` for backend scene translation and `renderer.present` for the one
+synchronous Pixi/Babylon presentation. Both are nested inside `match.renderer` and must not be
+added back into `frame.work`. The renderer frame counter advances only after a successful present.
+The profiler counts complete frame work and actual present work strictly above `1000 / 60` ms;
+these 60 FPS counters do not change the existing 33 ms slow-frame definition. Its histogram has a
+17 ms boundary so near-budget p95 values remain visible. The profiler also records
+`frame.rafDispatch`, the browser callback dispatch delay between the RAF timestamp and
 actual JavaScript entry, and `frame.unattributed`, which is `frame.work` minus top-level `match.*`
 phase time for the same frame. High `frame.rafDispatch` p95 points at scheduling pressure before the
 frame callback starts. High `frame.unattributed` p95 means the benchmark has found frame work that
@@ -67,7 +73,9 @@ default and emits structured `tracing` logs under the `server::perf` target when
 Every `ClientNetReport` upload includes a bounded report-window summary from the same profiler:
 `frameWorkMaxMs`, `frameWorkP95Ms`, `slowFrameCount`, `worstFramePhase`, `worstFramePhaseMs`,
 `frameRafDispatchMaxMs`, `frameRafDispatchP95Ms`, `frameUnattributedMaxMs`,
-`frameUnattributedP95Ms`, `rendererMaxMs`, `rendererP95Ms`, `topRendererPhase`,
+`frameUnattributedP95Ms`, `frameWorkBudgetMissCount`, `presentBudgetMissCount`, `rendererMaxMs`,
+`rendererP95Ms`, `rendererUpdateMaxMs`, `rendererUpdateP95Ms`, `rendererPresentMaxMs`,
+`rendererPresentP95Ms`, `topRendererPhase`,
 `topRendererPhaseMs`, `topRenderDiagnosticGroup`, `topRenderDiagnosticGroupCount`,
 `clientFramePhases`, `rendererFramePhases`, `renderDiagnosticCounters`, `entityCount`,
 `selectedCount`, `visibleTileCount`, `viewportWidth`, `viewportHeight`, and
@@ -77,7 +85,9 @@ such as `renderer.pixi.displayObject`, `renderer.rig.redraw`, `renderer.graphics
 `renderer.redraw`, `renderer.groundDecals`, `minimap.cache`, `minimap.invalidate`, `hud.dirty`,
 `observer.dirty`, and `entityViews.*`; raw per-frame rows and unrecognized local labels stay
 local-only. Report-window profiler counters reset after each upload; the `window.__rtsPerf` debug
-summary remains cumulative until `reset()` is called.
+summary remains cumulative until `reset()` is called. Uploaded durations are rounded and clamped to
+integer milliseconds; update/present max and p95 remain stable scalars even when their phase rows
+are displaced from the capped top-five arrays.
 HUD `jit` in the live health readout is snapshot arrival jitter; it is not JavaScript compiler/JIT
 time.
 
@@ -237,6 +247,7 @@ node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
+node scripts/client-perf-harness.mjs --active-supply-pair --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
@@ -246,7 +257,19 @@ points at an already-healthy server. It drives headless Chrome with the reposito
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
 under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
 `vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios,
-`supply-300-lab-hellhole`, and `supply-300-hellhole-stream`. The live Hellhole workload starts the
+the active-player `supply-200-active`/`supply-300-active` pair, `supply-300-lab-hellhole`, and
+`supply-300-hellhole-stream`. The active pair uses the same fixed local seed (`0x5a000300`),
+viewport, DPR, CPU throttle, duration, and repeat settings. Both measured browsers join as player 1
+with compatible WASM prediction enabled; sampling fails for spectator/disabled prediction,
+client-mutated setup, wrong supply/cap/composition, or wrong projected regular-entity count. The
+authoritative per-player 200-supply mix is worker/rifleman/machine gunner/panzerfaust/anti-tank
+gun/mortar/artillery/scout car/tank/command car = `7/7/7/7/7/7/6/7/6/6`, with 135 regular entities
+in player 1's projection. The 300-supply mix is `12/10/10/10/10/10/10/10/9/9`, with 201 projected
+regular entities. Both preserve the normal production supply cap of 50; the fixture bypasses no
+production rule because simulation setup creates the units directly. Assertions complete before
+the profiler/report windows reset, then two successful explicit presents must occur before sampling.
+
+The live Hellhole workload starts the
 bundled setup through the ordinary Lab room path and rejects sampling unless scenario/map identity,
 both 300-supply compositions, god mode, full-world projection, MessagePack delivery, rendered
 frames, stable entity count, and continuing combat all match its checked-in descriptor. It is a
@@ -316,6 +339,10 @@ p95 from 12 ms to 6 ms roughly doubles measured p95 work headroom on that machin
 it as adding a fixed number of FPS for players. Relative improvement on the same machine and
 workload is more useful evidence than projecting the same millisecond or FPS delta onto weaker
 laptops.
+
+CPU-throttle results are synthetic scheduling-pressure evidence on the machine running Chrome, not
+real-device certification. In particular, neither active 300 supply nor the Lab full-world baseline
+claims that 300 supply is safe on player hardware.
 
 Recurring top-level `match.*` phases above 1-2 ms p95 are advisory follow-up candidates;
 `match.renderer` and `match.minimap` are top-level phases, while `renderer.*` rows are nested
@@ -518,7 +545,8 @@ can see which fields triggered or argued against a diagnosis.
 - Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
   stale/duplicate/skipped snapshot counters, and burst counters.
 - Browser processing pressure uses payload size, packet-budget p95/rate, frame parse, compact decode,
-  snapshot apply, prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
+  snapshot apply, prediction apply, frame work, 60 FPS budget misses, distinct renderer
+  update/present timing, RAF dispatch, unattributed work, frame gaps, and FPS estimates.
 - Command path pressure uses legacy acknowledged-command latency when that is all an old log has, and
   uses the newer client-send, upload/server-receipt, server room queue/handling, receipt-send,
   sim-ack, and downstream-apply milestones when present.
@@ -572,6 +600,10 @@ architecture policy gate.
 
 `client_net_report` issue classification uses stable buckets:
 
+- `client_renderer_present`: any present-budget miss, `rendererPresentMaxMs >= 33`, or
+  `rendererPresentP95Ms >= 16`; distinguishes actual Pixi/Babylon presentation from scene update.
+- `client_renderer_update`: `rendererUpdateMaxMs >= 33` or `rendererUpdateP95Ms >= 16`; points at
+  backend scene translation/drawing preparation before the actual present.
 - `client_renderer`: `rendererMaxMs >= 33` or `rendererP95Ms >= 16`; inspect `worstFramePhase`,
   entity count, visible tiles, viewport size, and DPR to separate paint-heavy scenes from network
   lag.
@@ -590,6 +622,10 @@ architecture policy gate.
   snapshot into `GameState` or reconciling prediction overlays.
 - `client_frame_work`: `frameWorkMaxMs >= 33` or `frameWorkP95Ms >= 24`; points at local browser
   work outside pure renderer cost.
+- `client_frame_work_budget`: at least one `frameWorkBudgetMissCount`; exposes misses above the
+  16.67 ms 60 FPS work budget without redefining the legacy 33 ms slow-frame threshold.
+- `client_raf_dispatch` and `client_frame_unattributed` distinguish pre-callback scheduling pressure
+  from work inside the RAF that is not yet covered by top-level `match.*` phases.
 - `client_frame_stall`: `frameGapMaxMs >= 100`, or `slowFrameCount > 0` when frame-work thresholds
   were not crossed; points at requestAnimationFrame gaps even when measured frame work was not the
   dominant issue.

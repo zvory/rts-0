@@ -133,6 +133,30 @@ try {
   rmSync(packetDir, { recursive: true, force: true });
 }
 
+const frameBudgetDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-frame-budget-"));
+try {
+  const frameBudgetLog = path.join(frameBudgetDir, "frame-budget.log");
+  writeFileSync(
+    frameBudgetLog,
+    [
+      '2026-07-14T02:00:00Z INFO event="client_net_report" match_run_id="frame-budget-1" player_id=1 primary_issue="client_renderer_present" frame_gap_max_ms=22 frame_work_max_ms=21 frame_work_p95_ms=17 frame_work_budget_miss_count=9 present_budget_miss_count=4 renderer_max_ms=20 renderer_p95_ms=17 renderer_update_max_ms=13 renderer_update_p95_ms=8 renderer_present_max_ms=18 renderer_present_p95_ms=17 frame_raf_dispatch_max_ms=3 frame_raf_dispatch_p95_ms=2 frame_unattributed_max_ms=2 frame_unattributed_p95_ms=1 fps_estimate=58 server_tick_ms=4 server_lag_ms=0 "client network report"',
+    ].join("\n") + "\n"
+  );
+  const frameBudgetParsed = JSON.parse(run(["--format", "json", frameBudgetLog]));
+  const frameBudgetMatch = frameBudgetParsed.matches.find((match) => match.matchRunId === "frame-budget-1");
+  assert.ok(frameBudgetMatch, "expected synthetic frame-budget match summary");
+  const frameBudgetPlayer = frameBudgetMatch.players.find((player) => player.playerId === "1");
+  assert.equal(frameBudgetPlayer.metrics.frame_work_budget_miss_count.max, 9);
+  assert.equal(frameBudgetPlayer.metrics.present_budget_miss_count.max, 4);
+  assert.equal(frameBudgetPlayer.metrics.renderer_update_p95_ms.max, 8);
+  assert.equal(frameBudgetPlayer.metrics.renderer_present_p95_ms.max, 17);
+  const frameBudgetMarkdown = run([frameBudgetLog]);
+  assert.match(frameBudgetMarkdown, /60 FPS work-budget misses/);
+  assert.match(frameBudgetMarkdown, /renderer present max\/p95/);
+} finally {
+  rmSync(frameBudgetDir, { recursive: true, force: true });
+}
+
 const snapshotPayloadDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-snapshot-payload-"));
 try {
   const snapshotPayloadLog = path.join(snapshotPayloadDir, "snapshot-payload.log");

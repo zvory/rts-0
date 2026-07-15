@@ -8,8 +8,8 @@ export function createBabylonBackendBundle({ Babylon }) {
     createCamera(options = {}) {
       return new FixedPerspectiveCamera(0, 0, options);
     },
-    createRenderer(canvasParent) {
-      return new BabylonPresentationAdapter(canvasParent, { Babylon });
+    createRenderer(canvasParent, sources) {
+      return new BabylonPresentationAdapter(canvasParent, { Babylon, sources });
     },
   });
 }

@@ -491,7 +491,11 @@ projection, one visual time, one renderer feedback view, and one observer/screen
 the frame; the same projection drives `SelectionSceneV1`. Match then makes exactly one
 `renderer.render(presentationFrame)` call. `PixiPresentationAdapter` reconstructs only its
 ratcheted frame-local compatibility facade, copies static/fog grids into Pixi-owned staging, and
-does not expose its adapter to another backend. The sidecar contains no mutable state/intent,
+times that work as `renderer.update`, then times exactly one actual `app.render()` as
+`renderer.present`. The outer `match.renderer` phase includes both nested phases. A frame is counted
+and its selection/decal state is published only after the present succeeds. Babylon follows the
+same update/present attribution with one `scene.render()`. Neither backend owns an animation loop.
+The sidecar contains no mutable state/intent,
 selection proxy, mutable typed array, Pixi object, or transport record. Static terrain/resource
 locations are separately revisioned; visible/explored grids reuse opaque snapshots by revision.
 `settings_container.js`
@@ -1167,6 +1171,7 @@ export class Renderer {
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
   render(stateFacade, cameraFacade, fogFacade, alpha, options?) // Pixi-private engine seam
+  present()                              // one synchronous app.render(); increments on success
   captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Interact capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // Pixi implementation used by PixiPresentationAdapter's screenOverlay reconciliation:
@@ -1180,12 +1185,16 @@ export const PIXI_LEGACY_READ_ALLOWLIST // frozen ids plus concrete review trigg
 export class PixiPresentationAdapter {
   constructor(canvasParent, {renderClock,state,profiler,visualProfile,staticMap})
   render(presentationFrame) -> {presented:boolean}
-  resize(w,h), enterFixedCapture(clock), presentFixedCaptureFrame(), exitFixedCapture(clock)
+  resize(w,h), enterFixedCapture(clock), exitFixedCapture(clock)
   captureReadiness(query), destroy()
 }
 ```
 Normal Match rendering uses this adapter. The direct `Renderer` surface remains Pixi-private and
-is also owned separately by Map Editor, which has no Match or simulation frame.
+is also owned separately by Map Editor, which has no Match or simulation frame. Pixi applications
+use `autoStart:false`. Fixed capture drives the ordinary adapter once per requested capture frame
+and resumes one Match RAF; it never stops or restarts a ticker. Map Editor owns its separate RAF and
+calls `Renderer.present()` exactly once after each editor scene/camera update. Both owners cancel
+their RAFs during teardown, and renderer destruction is idempotent.
 
 `fog.js`
 ```js

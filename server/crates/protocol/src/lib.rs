@@ -776,10 +776,16 @@ mod tests {
                 "frameUnattributedMaxMs":19,
                 "frameUnattributedP95Ms":12,
                 "slowFrameCount":2,
+                "frameWorkBudgetMissCount":7,
+                "presentBudgetMissCount":3,
                 "worstFramePhase":"match.renderer",
                 "worstFramePhaseMs":22,
                 "rendererMaxMs":20,
                 "rendererP95Ms":16,
+                "rendererUpdateMaxMs":17,
+                "rendererUpdateP95Ms":12,
+                "rendererPresentMaxMs":6,
+                "rendererPresentP95Ms":4,
                 "topRendererPhase":"renderer.units",
                 "topRendererPhaseMs":15,
                 "topRenderDiagnosticGroup":"renderer.pixi.displayObject",
@@ -876,7 +882,13 @@ mod tests {
                 assert_eq!(report.frame_work_max_ms, 42);
                 assert_eq!(report.frame_raf_dispatch_max_ms, 17);
                 assert_eq!(report.frame_unattributed_p95_ms, 12);
+                assert_eq!(report.frame_work_budget_miss_count, 7);
+                assert_eq!(report.present_budget_miss_count, 3);
                 assert_eq!(report.worst_frame_phase, "match.renderer");
+                assert_eq!(report.renderer_update_max_ms, 17);
+                assert_eq!(report.renderer_update_p95_ms, 12);
+                assert_eq!(report.renderer_present_max_ms, 6);
+                assert_eq!(report.renderer_present_p95_ms, 4);
                 assert_eq!(report.top_renderer_phase, "renderer.units");
                 assert_eq!(
                     report.top_render_diagnostic_group,
@@ -954,6 +966,12 @@ mod tests {
                 assert_eq!(report.frame_unattributed_p95_ms, 0);
                 assert_eq!(report.worst_frame_phase, "");
                 assert_eq!(report.renderer_p95_ms, 0);
+                assert_eq!(report.frame_work_budget_miss_count, 0);
+                assert_eq!(report.present_budget_miss_count, 0);
+                assert_eq!(report.renderer_update_max_ms, 0);
+                assert_eq!(report.renderer_update_p95_ms, 0);
+                assert_eq!(report.renderer_present_max_ms, 0);
+                assert_eq!(report.renderer_present_p95_ms, 0);
                 assert_eq!(report.top_renderer_phase, "");
                 assert!(report.client_frame_phases.is_empty());
                 assert!(report.renderer_frame_phases.is_empty());

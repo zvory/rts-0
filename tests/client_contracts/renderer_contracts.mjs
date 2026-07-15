@@ -255,6 +255,13 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       },
     };
     const renderer = new Renderer(parent);
+    assert(renderer.app.options.autoStart === false, "Pixi application construction disables the automatic ticker");
+    assert(renderer.app.ticker.started === false && renderer.app.ticker.startCalls === 0, "Pixi ticker never starts during construction");
+    renderer.present();
+    assert(renderer.app.renderCalls === 1 && renderer._renderFrameCount === 1, "one explicit Pixi present advances one successful renderer frame");
+    renderer.enterFixedCapture({ now: () => 0 });
+    renderer.exitFixedCapture({ now: () => 1 });
+    assert(renderer.app.ticker.startCalls === 0, "fixed capture enter and exit never restart the Pixi ticker");
     const adjustedTexture = PIXI.Texture.from("adjusted-atlas");
     adjustedTexture.rtsRendererOwnedTexture = true;
     const rawTexture = PIXI.Texture.from("raw-strip");

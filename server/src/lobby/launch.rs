@@ -109,7 +109,9 @@ impl<'a> StartPayloadBuilder<'a> {
         let (prediction_build_id, prediction_version) =
             match (self.policy.start_payload, recipient.prediction) {
                 (
-                    StartPayloadPolicy::LiveMatch | StartPayloadPolicy::ReplayBranchLive,
+                    StartPayloadPolicy::LiveMatch
+                    | StartPayloadPolicy::ReplayBranchLive
+                    | StartPayloadPolicy::DevWatch,
                     LaunchPrediction::Enabled,
                 ) => (
                     Some(crate::build_info::build_id().to_string()),

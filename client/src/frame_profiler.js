@@ -1,6 +1,7 @@
-const DEFAULT_BUCKETS_MS = Object.freeze([1, 2, 4, 8, 12, 16, 24, 33, 50, 75, 100, 150, 250, 500, 1000]);
+const DEFAULT_BUCKETS_MS = Object.freeze([1, 2, 4, 8, 12, 16, 17, 24, 33, 50, 75, 100, 150, 250, 500, 1000]);
 const DEFAULT_SLOW_FRAME_MS = 33;
 const DEFAULT_SLOW_PHASE_MS = 8;
+const FRAME_WORK_BUDGET_MS = 1000 / 60;
 const MAX_RECENT_FRAMES = 12;
 const MAX_RECENT_LONG_FRAMES = 8;
 const MAX_LABEL_LENGTH = 64;
@@ -30,6 +31,8 @@ const REPORT_FRAME_PHASE_LABELS = new Set([
 ]);
 
 const REPORT_RENDERER_PHASE_LABELS = new Set([
+  "renderer.update",
+  "renderer.present",
   "renderer.entityPrep",
   "renderer.feedbackView",
   "renderer.groundDecals",
@@ -83,6 +86,10 @@ export class FrameProfiler {
     this.slowFrameCount = 0;
     this.reportFrameCount = 0;
     this.reportSlowFrameCount = 0;
+    this.frameWorkBudgetMissCount = 0;
+    this.presentBudgetMissCount = 0;
+    this.reportFrameWorkBudgetMissCount = 0;
+    this.reportPresentBudgetMissCount = 0;
     this.worstPhaseCounts = new Map();
     this.reportWorstPhaseCounts = new Map();
     this.recentFrames = [];
@@ -129,6 +136,10 @@ export class FrameProfiler {
     if (ms == null) return;
     this.aggregateFor(safeLabel).add(ms, slowMs);
     this.aggregateFor(safeLabel, this.reportPhases).add(ms, slowMs);
+    if (safeLabel === "renderer.present" && ms > FRAME_WORK_BUDGET_MS) {
+      this.presentBudgetMissCount += 1;
+      this.reportPresentBudgetMissCount += 1;
+    }
     if (includeInWorst && this.activeFrame) {
       this.activeFrame.phaseMs.set(safeLabel, (this.activeFrame.phaseMs.get(safeLabel) || 0) + ms);
       if (ms >= this.activeFrame.worstPhaseMs) {
@@ -164,6 +175,10 @@ export class FrameProfiler {
     this.activeFrame = null;
     this.frameCount += 1;
     this.reportFrameCount += 1;
+    if (totalWorkMs > FRAME_WORK_BUDGET_MS) {
+      this.frameWorkBudgetMissCount += 1;
+      this.reportFrameWorkBudgetMissCount += 1;
+    }
     const slow = (Number.isFinite(frame.frameGapMs) && frame.frameGapMs >= this.slowFrameMs)
       || totalWorkMs >= this.slowFrameMs;
     if (slow) {
@@ -224,6 +239,9 @@ export class FrameProfiler {
       slowFrameCount: this.slowFrameCount,
       slowFrameMs: this.slowFrameMs,
       slowPhaseMs: this.slowPhaseMs,
+      frameWorkBudgetMs: round1(FRAME_WORK_BUDGET_MS),
+      frameWorkBudgetMissCount: this.frameWorkBudgetMissCount,
+      presentBudgetMissCount: this.presentBudgetMissCount,
       worstPhase: worstPhaseFrom(this.worstPhaseCounts),
       context: this.latestContext,
       phases: phaseRowsFrom(this.phases),
@@ -238,6 +256,8 @@ export class FrameProfiler {
     const frameUnattributed = this.reportPhases.get(FRAME_UNATTRIBUTED_LABEL);
     const frameRafDispatch = this.reportPhases.get("frame.rafDispatch");
     const renderer = this.reportPhases.get("match.renderer");
+    const rendererUpdate = this.reportPhases.get("renderer.update");
+    const rendererPresent = this.reportPhases.get("renderer.present");
     const worstFramePhase = reportWorstPhaseFrom(this.reportWorstPhaseCounts);
     const worstAggregate = worstFramePhase ? this.reportPhases.get(worstFramePhase.label) : null;
     const rendererFramePhases = reportPhaseRowsFrom(this.reportPhases, REPORT_RENDERER_PHASE_LABELS);
@@ -249,6 +269,9 @@ export class FrameProfiler {
       schemaVersion: 1,
       frameCount: this.reportFrameCount,
       slowFrameCount: this.reportSlowFrameCount,
+      frameWorkBudgetMs: round1(FRAME_WORK_BUDGET_MS),
+      frameWorkBudgetMissCount: this.reportFrameWorkBudgetMissCount,
+      presentBudgetMissCount: this.reportPresentBudgetMissCount,
       frameWorkMaxMs: aggregateMaxMs(frameWork),
       frameWorkP95Ms: aggregatePercentileMs(frameWork, 0.95),
       frameUnattributedMaxMs: aggregateMaxMs(frameUnattributed),
@@ -259,6 +282,10 @@ export class FrameProfiler {
       worstFramePhaseMs: aggregateMaxMs(worstAggregate),
       rendererMaxMs: aggregateMaxMs(renderer),
       rendererP95Ms: aggregatePercentileMs(renderer, 0.95),
+      rendererUpdateMaxMs: aggregateMaxMs(rendererUpdate),
+      rendererUpdateP95Ms: aggregatePercentileMs(rendererUpdate, 0.95),
+      rendererPresentMaxMs: aggregateMaxMs(rendererPresent),
+      rendererPresentP95Ms: aggregatePercentileMs(rendererPresent, 0.95),
       context: this.latestContext,
       clientFramePhases: reportPhaseRowsFrom(this.reportPhases, REPORT_FRAME_PHASE_LABELS),
       rendererFramePhases,
@@ -324,6 +351,10 @@ export class FrameProfiler {
     this.slowFrameCount = 0;
     this.reportFrameCount = 0;
     this.reportSlowFrameCount = 0;
+    this.frameWorkBudgetMissCount = 0;
+    this.presentBudgetMissCount = 0;
+    this.reportFrameWorkBudgetMissCount = 0;
+    this.reportPresentBudgetMissCount = 0;
     this.worstPhaseCounts.clear();
     this.reportWorstPhaseCounts.clear();
     this.recentFrames = [];
@@ -337,6 +368,8 @@ export class FrameProfiler {
     this.reportPhases.clear();
     this.reportFrameCount = 0;
     this.reportSlowFrameCount = 0;
+    this.reportFrameWorkBudgetMissCount = 0;
+    this.reportPresentBudgetMissCount = 0;
     this.reportWorstPhaseCounts.clear();
     this.reportDiagnosticCounters.clear();
   }

@@ -115,7 +115,7 @@ impl RoomTask {
     ) {
         let policy = self.session_policy();
         if policy.is_dev_watch() {
-            self.on_join_dev_watch(player_id, name, msg_tx, ack);
+            self.on_join_dev_watch(player_id, name, spectator, msg_tx, ack);
             return;
         }
         if policy.uses_replay_lobby_join() {

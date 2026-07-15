@@ -4,6 +4,7 @@ use crate::game::state::TrackedRng;
 mod factory_wall_rally_spawn;
 mod layouts;
 mod panzerfaust;
+mod supply_stress;
 mod tank_coax;
 
 use layouts::*;
