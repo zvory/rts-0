@@ -296,7 +296,13 @@ canary runs own a private server; the browser shard passes its existing loopback
   Render-lag summaries report advisory 60/120/240/480 FPS frame-work budget targets, p95 margin,
   next missed headroom budget, grouped render diagnostics, and long-frame context from local
   evidence instead of portable RAF FPS claims. `ClientNetReport` uploads are unchanged by these local
-  artifacts.
+  artifacts. The actual client target is 240 FPS/4.17 ms on the reference machine because it is a
+  planning proxy for approximately 60 FPS/16.67 ms on hardware with one quarter of the performance;
+  it is not a literal portable FPS certification. Comparisons must preserve the workload's complete
+  per-frame presentation semantics and cadence. Reduced entity/fog/animation/overlay update rates,
+  intentional staleness, cross-frame staggering, or unmeasured relocation of main-thread work do not
+  satisfy the target. Exact redundant-work elimination remains valid when the same state is reflected
+  without added latency and deterministic pixel parity is preserved.
 - Hellhole server performance: run `scripts/hellhole-perf-harness.sh --ticks 900` in release mode.
   This direct API-in/API-out lane includes simulation, full-world projection, compaction, and
   MessagePack encoding but no room task, network transport, browser, or wall-clock pacing. Use
