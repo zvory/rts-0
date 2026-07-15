@@ -8,11 +8,11 @@ const TILE: f32 = 32.0;
 const CENTER_TILE: f32 = 63.0;
 const SHUTTLE_OFFSET_TILES: f32 = 18.0;
 
-pub(super) fn lab_scenario_driver_for(scenario_id: &str) -> Option<LabScenarioDriver> {
+pub(crate) fn lab_scenario_driver_for(scenario_id: &str) -> Option<LabScenarioDriver> {
     (scenario_id == SUPPLY_300_HELLHOLE_ID).then(LabScenarioDriver::supply_300_hellhole)
 }
 
-pub(super) struct LabScenarioDriver {
+pub(crate) struct LabScenarioDriver {
     shuttles: [DiagonalShuttle; 2],
     last_issued_tick: Option<u32>,
 }
@@ -36,7 +36,7 @@ impl LabScenarioDriver {
         }
     }
 
-    pub(super) fn commands_for_tick(&mut self, game: &Game) -> Vec<LabScenarioCommand> {
+    pub(crate) fn commands_for_tick(&mut self, game: &Game) -> Vec<LabScenarioCommand> {
         let tick = game.tick_count();
         if !tick.is_multiple_of(LEG_TICKS) || self.last_issued_tick == Some(tick) {
             return Vec::new();
@@ -111,11 +111,11 @@ impl DiagonalShuttle {
     }
 }
 
-pub(super) struct LabScenarioCommand {
-    pub(super) request_id: u32,
-    pub(super) player_id: u32,
-    pub(super) command: Command,
-    pub(super) options: LabCommandOptions,
+pub(crate) struct LabScenarioCommand {
+    pub(crate) request_id: u32,
+    pub(crate) player_id: u32,
+    pub(crate) command: Command,
+    pub(crate) options: LabCommandOptions,
 }
 
 fn shuttle_endpoint(x_dir: f32, y_dir: f32) -> (f32, f32) {

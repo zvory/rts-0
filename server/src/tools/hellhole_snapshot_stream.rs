@@ -2,21 +2,19 @@
 
 use std::path::Path;
 
-use rts_sim::game::lab::LabCommandOptions;
 use serde_json::json;
 
 use crate::lab_scenarios::load_lab_scenario_by_id;
-use crate::protocol::{serialize_messagepack_compact_snapshot, Command, Event};
+use crate::lobby::lab_scenario_driver::{lab_scenario_driver_for, LabScenarioDriver};
+use crate::protocol::{serialize_messagepack_compact_snapshot, Event};
 
 pub const STREAM_ID: &str = "supply-300-hellhole";
 pub const DEFAULT_FRAME_COUNT: u32 = 900;
 pub const TICK_RATE_HZ: u32 = 30;
 pub const MAGIC: &[u8; 8] = b"RTSSTRM1";
-pub(crate) const SHUTTLE_LEG_TICKS: u32 = 900;
 
 const TILE: f32 = 32.0;
 const CENTER_TILE: f32 = 63.0;
-const SHUTTLE_OFFSET_TILES: f32 = 18.0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotStreamSummary {
@@ -49,7 +47,7 @@ pub fn generate_hellhole_snapshot_stream(
         return Err("frame count must be between 1 and 10,000".to_string());
     }
 
-    let mut game = build_hellhole_game()?;
+    let (mut game, mut driver) = build_hellhole_game()?;
 
     let initial_entity_count = game.snapshot_full_for(1).entities.len();
     let mut start = serde_json::to_value(game.start_payload())
@@ -77,6 +75,7 @@ pub fn generate_hellhole_snapshot_stream(
     let mut first_tick = 0;
     let mut last_tick = 0;
     for index in 0..frame_count {
+        enqueue_hellhole_shuttles(&mut game, &mut driver)?;
         let event_sets = game.tick();
         let mut snapshot = game.snapshot_full_for(1);
         snapshot.events = union_events(event_sets.iter().map(|(_, events)| events));
@@ -131,39 +130,22 @@ pub fn generate_hellhole_snapshot_stream(
     Ok((bytes, summary))
 }
 
-pub(crate) fn build_hellhole_game() -> Result<rts_sim::game::Game, String> {
+pub(crate) fn build_hellhole_game() -> Result<(rts_sim::game::Game, LabScenarioDriver), String> {
     let scenario = load_lab_scenario_by_id(STREAM_ID)?;
-    let mut game = scenario.build_game()?;
-    enqueue_hellhole_shuttles(&mut game, 0)?;
-    Ok(game)
+    let game = scenario.build_game()?;
+    let driver = lab_scenario_driver_for(STREAM_ID)
+        .ok_or_else(|| format!("missing Lab scenario driver for {STREAM_ID}"))?;
+    Ok((game, driver))
 }
 
 pub(crate) fn enqueue_hellhole_shuttles(
     game: &mut rts_sim::game::Game,
-    phase: u32,
+    driver: &mut LabScenarioDriver,
 ) -> Result<(), String> {
-    let directions = if phase.is_multiple_of(2) {
-        [(3, -1.0, 1.0), (4, 1.0, 1.0)]
-    } else {
-        [(3, 1.0, -1.0), (4, -1.0, -1.0)]
-    };
-    for (player_id, x_dir, y_dir) in directions {
-        let units = game.lab_owned_unit_ids(player_id).map_err(|err| {
-            format!("failed to collect player {player_id} shuttle units: {err:?}")
-        })?;
-        game.issue_lab_command_as(
-            player_id,
-            Command::Move {
-                units,
-                x: (CENTER_TILE + x_dir * SHUTTLE_OFFSET_TILES) * TILE,
-                y: (CENTER_TILE + y_dir * SHUTTLE_OFFSET_TILES) * TILE,
-                queued: false,
-            },
-            LabCommandOptions {
-                ignore_command_limits: true,
-            },
-        )
-        .map_err(|err| format!("failed to enqueue player {player_id} shuttle: {err:?}"))?;
+    for command in driver.commands_for_tick(game) {
+        let player_id = command.player_id;
+        game.issue_lab_command_as(player_id, command.command, command.options)
+            .map_err(|err| format!("failed to enqueue player {player_id} shuttle: {err:?}"))?;
     }
     Ok(())
 }
