@@ -35,7 +35,7 @@ fn hellhole_scripted_combat_orders_are_recorded_once_and_replayable() {
                     cmd: Command::AttackMove { units, .. },
                     ignore_command_limits,
                 } => {
-                    assert_eq!(units.len(), 111);
+                    assert_eq!(units.len(), 100);
                     assert!(*ignore_command_limits);
                     *player_id
                 }
@@ -49,7 +49,7 @@ fn hellhole_scripted_combat_orders_are_recorded_once_and_replayable() {
     task.lab_driver
         .as_mut()
         .expect("hellhole driver")
-        .sync_to_tick(0, &recorded_entries);
+        .sync_to_tick(1, &recorded_entries);
     task.enqueue_lab_scenario_commands();
     assert_eq!(
         task.lab_timeline.as_ref().unwrap().replay_entry_count(),

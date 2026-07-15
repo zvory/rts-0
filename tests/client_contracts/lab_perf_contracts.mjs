@@ -7,6 +7,7 @@ import {
   buildClientPerfWorkloads,
   SUPPLY_300_LAB_HELLHOLE,
 } from "../../scripts/client-perf/workloads.mjs";
+import { labHellholeSampleErrors } from "../../scripts/client-perf/workload_setup.mjs";
 
 const descriptor = SUPPLY_300_LAB_HELLHOLE;
 const validFacts = {
@@ -45,7 +46,7 @@ for (const [label, patch] of [
 }
 
 {
-  const errors = validateLabHellholeSample({
+  const sample = {
     setupResult: { initialRenderedFrames: 20 },
     monitor: {
       snapshotCount: 10,
@@ -57,8 +58,14 @@ for (const [label, patch] of [
       lastCombatTick: 590,
     },
     finalFrameCount: 40,
-  }, descriptor);
+  };
+  const errors = validateLabHellholeSample(sample, descriptor);
   assert(errors.length === 0, "Hellhole sampling accepts stable, rendered, continuing combat");
+  assert(labHellholeSampleErrors(
+    { labHellhole: descriptor },
+    { labHellhole: sample.setupResult },
+    { labHellholeMonitor: sample.monitor, perf: { summary: { frameCount: sample.finalFrameCount } } },
+  ).length === 0, "Hellhole workload setup accepts the valid live sample");
 }
 
 {

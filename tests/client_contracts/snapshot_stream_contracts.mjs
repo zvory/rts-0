@@ -2,7 +2,7 @@ import fs from "node:fs";
 
 import { assert, assertThrows } from "./assertions.mjs";
 import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
-import { initializeWorkloadSetup } from "../../scripts/client-perf/snapshot_stream_setup.mjs";
+import { initializeWorkloadSetup } from "../../scripts/client-perf/workload_setup.mjs";
 import { COMPACT_SNAPSHOT_VERSION, S } from "../../client/src/protocol.js";
 import {
   SnapshotStreamNet,

@@ -991,7 +991,7 @@ mod tests {
         assert_eq!(game.seed(), 0x5a00_0300);
         assert_eq!(game.start_payload().players.len(), 2);
         assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
-        assert_eq!(game.perf_entity_counts().entities, 224);
+        assert_eq!(game.perf_entity_counts().entities, 202);
         assert_eq!(game.perf_entity_counts().buildings, 2);
 
         let snapshot = game.snapshot_full_for(1);
@@ -1013,7 +1013,6 @@ mod tests {
             ("anti_tank_gun".to_string(), 10),
             ("artillery".to_string(), 10),
             ("command_car".to_string(), 9),
-            ("golem".to_string(), 11),
             ("machine_gunner".to_string(), 10),
             ("mortar_team".to_string(), 10),
             ("panzerfaust".to_string(), 10),
@@ -1022,9 +1021,15 @@ mod tests {
             ("tank".to_string(), 9),
             ("worker".to_string(), 11),
         ]);
+        let faction_catalog = rts_rules::faction::catalog_for(crate::protocol::DEFAULT_FACTION_ID)
+            .expect("default faction catalog");
         let required_kinds: HashSet<_> = rts_rules::EntityKind::ALL
             .into_iter()
-            .filter(|kind| kind.is_unit() && rts_rules::economy::supply_cost(*kind) > 0)
+            .filter(|kind| {
+                kind.is_unit()
+                    && rts_rules::economy::supply_cost(*kind) > 0
+                    && faction_catalog.allows_unit(*kind)
+            })
             .map(|kind| kind.to_string())
             .collect();
         let mut counts_by_owner = BTreeMap::<u32, BTreeMap<String, usize>>::new();

@@ -9,8 +9,7 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
-import { initializeWorkloadSetup } from "./client-perf/snapshot_stream_setup.mjs";
-import { validateLabHellholeSample } from "./client-perf/lab_hellhole_setup.mjs";
+import { initializeWorkloadSetup, labHellholeSampleErrors } from "./client-perf/workload_setup.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1178,13 +1177,11 @@ function formatSignedMs(value) {
 }
 
 function formatCount(value) {
-  if (!Number.isFinite(value)) return "n/a";
-  return String(Math.round(value * 10) / 10);
+  return Number.isFinite(value) ? String(Math.round(value * 10) / 10) : "n/a";
 }
 
 function formatPercent(value) {
-  if (!Number.isFinite(value)) return "n/a";
-  return `${Math.round(value * 10) / 10}%`;
+  return Number.isFinite(value) ? `${Math.round(value * 10) / 10}%` : "n/a";
 }
 
 async function collectPageSummary(page) {
@@ -1237,9 +1234,7 @@ async function collectPageSummary(page) {
       health: healthSnapshot,
       perf: perfSnapshot,
       clientNetReport,
-      labHellholeMonitor: window.__rtsLabHellholeMonitor
-        ? JSON.parse(JSON.stringify(window.__rtsLabHellholeMonitor))
-        : null,
+      labHellholeMonitor: JSON.parse(JSON.stringify(window.__rtsLabHellholeMonitor || null)),
     };
   });
 }
@@ -1457,13 +1452,7 @@ function workloadSetupErrors(workload, setupResult, summary = null) {
   if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
-  if (workload.setup?.labHellhole && setupResult?.labHellhole) {
-    errors.push(...validateLabHellholeSample({
-      setupResult: setupResult.labHellhole,
-      monitor: summary?.labHellholeMonitor,
-      finalFrameCount: summary?.perf?.summary?.frameCount,
-    }, workload.setup.labHellhole));
-  }
+  errors.push(...labHellholeSampleErrors(workload.setup, setupResult, summary));
   return errors;
 }
 

@@ -1,4 +1,4 @@
-import { applyLabHellholeSetup } from "./lab_hellhole_setup.mjs";
+import { applyLabHellholeSetup, validateLabHellholeSample } from "./lab_hellhole_setup.mjs";
 
 export async function initializeWorkloadSetup(page, setup) {
   if (!setup) return null;
@@ -6,6 +6,15 @@ export async function initializeWorkloadSetup(page, setup) {
   await applySnapshotStreamSetup(page, setup, result);
   await applyLabHellholeSetup(page, setup, result);
   return result;
+}
+
+export function labHellholeSampleErrors(setup, setupResult, summary) {
+  if (!setup?.labHellhole || !setupResult?.labHellhole) return [];
+  return validateLabHellholeSample({
+    setupResult: setupResult.labHellhole,
+    monitor: summary?.labHellholeMonitor,
+    finalFrameCount: summary?.perf?.summary?.frameCount,
+  }, setup.labHellhole);
 }
 
 async function applySnapshotStreamSetup(page, setup, result) {
