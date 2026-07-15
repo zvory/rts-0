@@ -1,5 +1,6 @@
 import { assert } from "./assertions.mjs";
 import {
+  applyLabHellholeSetup,
   validateLabHellholeFacts,
   validateLabHellholeSample,
 } from "../../scripts/client-perf/lab_hellhole_setup.mjs";
@@ -16,6 +17,7 @@ const validFacts = {
   labMode: true,
   visionMode: "all",
   playerIds: [1, 2],
+  teamByPlayer: { 1: 1, 2: 2 },
   godModePlayers: [1, 2],
   supplyByOwner: { 1: 300, 2: 300 },
   countsByOwner: descriptor.countsByOwner,
@@ -33,10 +35,74 @@ const validFacts = {
     "Hellhole descriptor accepts the exact live Lab contract");
 }
 
+{
+  const previousWindow = globalThis.window;
+  const entities = new Map([
+    [1, { owner: 1, kind: "city_centre" }],
+    [2, { owner: 2, kind: "city_centre" }],
+  ]);
+  let entityId = 3;
+  for (const playerId of descriptor.playerIds) {
+    for (const [kind, count] of Object.entries(descriptor.countsByOwner[playerId])) {
+      for (let index = 0; index < count; index += 1) {
+        entities.set(entityId, { owner: playerId, kind });
+        entityId += 1;
+      }
+    }
+  }
+  globalThis.window = {
+    __rts: {
+      labLaunch: { scenario: descriptor.scenarioId },
+      match: {
+        labMetadata: { vision: { mode: "all" }, godModePlayers: [1, 2] },
+        predictionStartInfo: {
+          map: { name: descriptor.map },
+          players: [
+            { id: 1, teamId: 1 },
+            { id: 2, teamId: 2 },
+          ],
+        },
+        state: {
+          _curById: entities,
+          playerResources: [
+            { id: 1, supplyUsed: 300 },
+            { id: 2, supplyUsed: 300 },
+          ],
+        },
+        net: {
+          snapshotReportStats: {
+            snapshotCodec: "messagepack-compact",
+            snapshotFrameKind: "binary",
+            messageCount: 2,
+          },
+          on() {},
+        },
+      },
+    },
+    __rtsPerf: { summary: () => ({ frameCount: 10 }) },
+  };
+  const result = { actions: [] };
+  try {
+    await applyLabHellholeSetup({
+      waitForFunction: async () => {},
+      evaluate: async (fn, argument) => fn(argument),
+    }, { labHellhole: descriptor }, result);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+  assert(!result.error, `Hellhole setup reads the authoritative start state: ${result.error || "ok"}`);
+  assert(result.labHellhole?.facts?.map === descriptor.map,
+    "Hellhole setup reads the map from the server start payload");
+  assert(result.labHellhole?.facts?.teamByPlayer?.[2] === 2,
+    "Hellhole setup reads opposing teams from the server start payload");
+}
+
 for (const [label, patch] of [
   ["scenario", { scenarioId: "lategame" }],
   ["map", { map: "No Terrain" }],
   ["supply", { supplyByOwner: { 1: 299, 2: 300 } }],
+  ["teams", { teamByPlayer: { 1: 1, 2: 1 } }],
   ["unit counts", { countsByOwner: { ...descriptor.countsByOwner, 1: { ...descriptor.countsByOwner[1], tank: 8 } } }],
   ["god mode", { godModePlayers: [1] }],
   ["codec", { snapshotCodec: "json", snapshotFrameKind: "text" }],

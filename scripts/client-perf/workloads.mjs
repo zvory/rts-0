@@ -4,6 +4,7 @@ export const SUPPLY_300_LAB_HELLHOLE = Object.freeze({
   scenarioId: "supply-300-hellhole",
   map: "1v1",
   playerIds: Object.freeze([1, 2]),
+  teamByPlayer: Object.freeze({ 1: 1, 2: 2 }),
   godModePlayers: Object.freeze([1, 2]),
   supplyUsed: 300,
   projectedEntityCount: 224,

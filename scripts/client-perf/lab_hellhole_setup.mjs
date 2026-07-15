@@ -22,6 +22,9 @@ export function validateLabHellholeFacts(facts, descriptor) {
   if (stableJson(sortedNumbers(facts?.playerIds)) !== stableJson(sortedNumbers(descriptor.playerIds))) {
     errors.push(`players ${stableJson(facts?.playerIds)} do not match ${stableJson(descriptor.playerIds)}`);
   }
+  if (stableJson(facts?.teamByPlayer) !== stableJson(descriptor.teamByPlayer)) {
+    errors.push(`teams ${stableJson(facts?.teamByPlayer)} do not match ${stableJson(descriptor.teamByPlayer)}`);
+  }
   if (stableJson(sortedNumbers(facts?.godModePlayers)) !== stableJson(sortedNumbers(descriptor.godModePlayers))) {
     errors.push(`god mode ${stableJson(facts?.godModePlayers)} does not match ${stableJson(descriptor.godModePlayers)}`);
   }
@@ -98,6 +101,9 @@ export async function applyLabHellholeSetup(page, setup, result) {
       const supplyByOwner = Object.fromEntries(
         (state?.playerResources || []).map((player) => [player.id, player.supplyUsed]),
       );
+      const teamByPlayer = Object.fromEntries(
+        (match?.predictionStartInfo?.players || []).map((player) => [player.id, player.teamId]),
+      );
       const stats = match?.net?.snapshotReportStats || {};
       const initialRenderedFrames = Number(window.__rtsPerf?.summary?.()?.frameCount) || 0;
       const monitor = {
@@ -129,16 +135,16 @@ export async function applyLabHellholeSetup(page, setup, result) {
         }
       });
       window.__rtsLabHellholeMonitor = monitor;
-      const params = new URL(window.location.href).searchParams;
       return {
         action: "verifyLabHellhole",
         initialRenderedFrames,
         facts: {
-          scenarioId: params.get("scenario") || "",
-          map: params.get("map") || "",
+          scenarioId: window.__rts?.labLaunch?.scenario || "",
+          map: match?.predictionStartInfo?.map?.name || "",
           labMode: !!match?.labMetadata,
           visionMode: match?.labMetadata?.vision?.mode || "",
           playerIds: (match?.predictionStartInfo?.players || []).map((player) => player.id),
+          teamByPlayer,
           godModePlayers: match?.labMetadata?.godModePlayers || [],
           supplyByOwner,
           countsByOwner,

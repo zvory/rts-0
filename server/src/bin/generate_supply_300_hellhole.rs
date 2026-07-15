@@ -223,15 +223,28 @@ fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
     let mut out = required.to_vec();
     let mut supply = supply_for(&out)?;
     let mut index = 0;
+    let mut attempts_without_supply = 0;
     while supply < TARGET_SUPPLY {
         let kind = required[index % required.len()];
         index += 1;
         let cost = supply_of(kind)?;
-        if supply + cost > TARGET_SUPPLY {
-            continue;
+        let next_supply = supply
+            .checked_add(cost)
+            .ok_or_else(|| format!("supply overflow while adding {kind}"))?;
+        if next_supply <= TARGET_SUPPLY {
+            out.push(kind);
+            supply = next_supply;
         }
-        out.push(kind);
-        supply += cost;
+        if cost > 0 && next_supply <= TARGET_SUPPLY {
+            attempts_without_supply = 0;
+        } else {
+            attempts_without_supply += 1;
+        }
+        if attempts_without_supply >= required.len() {
+            return Err(format!(
+                "cannot reach exactly {TARGET_SUPPLY} supply from {supply} with the Lab unit catalog"
+            ));
+        }
     }
     Ok(out)
 }
