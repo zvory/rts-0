@@ -2,7 +2,7 @@ use super::support::*;
 use crate::lobby::lab_scenario_driver::{LabScenarioAction, LabScenarioDriver};
 use crate::lobby::room_task::types::LabSeekTarget;
 use rts_sim::game::entity::EntityKind;
-use rts_sim::game::lab::{LabOp, LabSpawnEntity};
+use rts_sim::game::lab::{LabCommandOptions, LabOp, LabSpawnEntity};
 
 #[test]
 fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
@@ -131,4 +131,66 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
         .expect("scripted spawn replay should rebuild");
     assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
     assert!(task.lab_driver.is_none());
+}
+
+#[test]
+fn scripted_action_batch_rebases_before_crossing_timeline_cap() {
+    let mut config = lab_config();
+    config.scenario = Some("supply-300-hellhole".to_string());
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        RoomMode::Lab(config),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, _writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+
+    let timeline = task.lab_timeline.as_mut().expect("lab timeline");
+    for request_id in 0..(crate::lobby::lab_timeline::LabTimeline::MAX_ENTRIES - 1) {
+        timeline.record_issue_command_as(
+            0,
+            u32::try_from(request_id).unwrap(),
+            99,
+            1,
+            crate::protocol::Command::Move {
+                units: vec![1],
+                x: 0.0,
+                y: 0.0,
+                queued: false,
+            },
+            LabCommandOptions::default(),
+        );
+    }
+
+    let initial_entity_count = lab_snapshot(&task).entities.len();
+    let spawn_action = |request_id, x| LabScenarioAction::LabOperation {
+        request_id,
+        op: LabOp::SpawnEntities(vec![LabSpawnEntity {
+            owner: 1,
+            kind: EntityKind::Rifleman,
+            x,
+            y: 10.0 * 32.0,
+            completed: true,
+        }]),
+    };
+    task.lab_driver = Some(LabScenarioDriver::scripted_actions_for_test(
+        0,
+        vec![
+            spawn_action(7001, 10.0 * 32.0),
+            spawn_action(7002, 12.0 * 32.0),
+        ],
+    ));
+
+    task.apply_lab_scenario_actions();
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 2);
+    assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 2);
+
+    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
+    task.apply_lab_scenario_actions();
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 2);
+    assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 2);
 }

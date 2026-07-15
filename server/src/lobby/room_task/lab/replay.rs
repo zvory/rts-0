@@ -84,6 +84,9 @@ impl RoomTask {
         let Some(operator_id) = self.lab_session.as_ref().map(|session| session.operator_id) else {
             return;
         };
+        if let Some(timeline) = &mut self.lab_timeline {
+            timeline.reserve_entries(actions.len());
+        }
         for action in actions {
             let result = match action {
                 LabScenarioAction::Command(command) => self.apply_lab_issue_command(
@@ -221,12 +224,12 @@ impl RoomTask {
     }
 
     pub(super) fn lab_timeline_entry_cap_reset(
-        &self,
+        &mut self,
     ) -> Result<Option<(Game, LabCheckpointScenarioV1)>, String> {
         if !self
             .lab_timeline
-            .as_ref()
-            .is_some_and(LabTimeline::is_entry_cap_reached)
+            .as_mut()
+            .is_some_and(LabTimeline::take_entry_cap_reset_required)
         {
             return Ok(None);
         }

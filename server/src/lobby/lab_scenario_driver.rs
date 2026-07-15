@@ -86,9 +86,17 @@ impl LabScenarioDriver {
 
     #[cfg(test)]
     pub(crate) fn scripted_for_test(tick: u32, action: LabScenarioAction) -> Self {
+        Self::scripted_actions_for_test(tick, vec![action])
+    }
+
+    #[cfg(test)]
+    pub(crate) fn scripted_actions_for_test(tick: u32, actions: Vec<LabScenarioAction>) -> Self {
         Self {
             shuttles: Vec::new(),
-            scheduled_actions: vec![ScheduledAction { tick, action }],
+            scheduled_actions: actions
+                .into_iter()
+                .map(|action| ScheduledAction { tick, action })
+                .collect(),
             last_processed_tick: None,
             retained_entries_at_tick: Vec::new(),
         }

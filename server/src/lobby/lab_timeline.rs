@@ -16,6 +16,7 @@ pub(super) struct LabTimeline {
     entries: Vec<LabTimelineEntry>,
     replay_entries: Vec<LabReplayOperationEntry>,
     next_sequence: u64,
+    pending_entry_reservation: usize,
     last_seek_at: Option<StdInstant>,
 }
 
@@ -67,6 +68,7 @@ impl LabTimeline {
             entries: Vec::new(),
             replay_entries: Vec::new(),
             next_sequence: 0,
+            pending_entry_reservation: 0,
             last_seek_at: None,
         };
         timeline.push_keyframe(game);
@@ -79,6 +81,7 @@ impl LabTimeline {
         self.entries.clear();
         self.replay_entries.clear();
         self.next_sequence = 0;
+        self.pending_entry_reservation = 0;
         self.last_seek_at = None;
         self.push_keyframe(game);
     }
@@ -199,8 +202,16 @@ impl LabTimeline {
             .fold(current_tick, u32::max)
     }
 
-    pub(super) fn is_entry_cap_reached(&self) -> bool {
-        self.entries.len() >= Self::MAX_ENTRIES || self.replay_entries.len() >= Self::MAX_ENTRIES
+    /// Keep one bounded scripted tick on the same side of an entry-cap rebase.
+    pub(super) fn reserve_entries(&mut self, additional_entries: usize) {
+        self.pending_entry_reservation = additional_entries;
+    }
+
+    pub(super) fn take_entry_cap_reset_required(&mut self) -> bool {
+        let additional_entries = self.pending_entry_reservation.max(1);
+        self.pending_entry_reservation = self.pending_entry_reservation.saturating_sub(1);
+        self.entries.len().saturating_add(additional_entries) > Self::MAX_ENTRIES
+            || self.replay_entries.len().saturating_add(additional_entries) > Self::MAX_ENTRIES
     }
 
     pub(super) fn truncate_future(&mut self, current_tick: u32) -> bool {

@@ -1277,6 +1277,10 @@ impl RoomTask {
         op_kind: String,
         lab_op: LabOp,
     ) -> LabResult {
+        let timeline_capacity_reset = match self.lab_timeline_entry_cap_reset() {
+            Ok(reset) => reset,
+            Err(err) => return lab_result_error(request_id, op_kind, &err),
+        };
         let timeline_op = lab_op.clone();
         let Some(replay_op) = lab_op_to_replay_operation(&timeline_op) else {
             return lab_result_error(
@@ -1286,10 +1290,6 @@ impl RoomTask {
             );
         };
         let log_operations = self.session_policy().logs_lab_operations();
-        let timeline_capacity_reset = match self.lab_timeline_entry_cap_reset() {
-            Ok(reset) => reset,
-            Err(err) => return lab_result_error(request_id, op_kind, &err),
-        };
         let (tick, outcome) = {
             let Some(game) = self.live_game_mut() else {
                 return lab_result_error(request_id, op_kind, "lab game is not running");
