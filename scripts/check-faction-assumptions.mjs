@@ -329,6 +329,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/protocol.rs",
   "server/crates/sim/src/rules/projection.rs",
   "server/src/dev_scenarios.rs",
+  // This catalog entry is an intentionally Kriegsia-specific Command Car corner fixture; public
+  // faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/src/dev_scenarios/command_car_corner.rs",
   // The frame-budget hellhole generator deliberately materializes a fixed current-roster Kriegsia
   // Lab checkpoint for benchmarking; runtime faction admission remains outside this offline tool.
   "server/src/bin/generate_supply_300_hellhole.rs",

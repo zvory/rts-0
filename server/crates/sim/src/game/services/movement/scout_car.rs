@@ -115,7 +115,12 @@ pub(super) fn plan_scout_car_motion(
     let mut best_score = f32::INFINITY;
 
     if step_budget > 0.01 {
-        for primitive in scout_car_primitives(route.reverse_waypoint.is_some()) {
+        // A behind-the-car intermediate route point is often the pathfinder telling the car to
+        // back out of a pocket before continuing. Keep distant final clicks on the established
+        // forward-turn behavior, but let reverse compete with forward arcs for this local exit.
+        let waypoint_behind =
+            route.next_index > 0 && waypoint_is_behind(e.facing(), route.target, current);
+        for primitive in scout_car_primitives(route.reverse_waypoint.is_some(), waypoint_behind) {
             let travel_distance =
                 primitive_travel_distance(current, &route, primitive, step_budget, e.facing());
             if travel_distance <= 0.01 {
@@ -156,10 +161,15 @@ pub(super) fn plan_scout_car_motion(
     };
 
     let (pos, post_pop_count) = scout_car_post_motion_waypoint_pops(map, occ, e, &route, candidate);
+    let reverse_waypoint = if candidate.primitive.travel_sign < 0.0 {
+        Some(route.target)
+    } else {
+        route.reverse_waypoint
+    };
     Some(ScoutCarMotionPlan {
         pos,
         facing: Some(candidate.facing),
-        reverse_waypoint: route.reverse_waypoint.filter(|wp| {
+        reverse_waypoint: reverse_waypoint.filter(|wp| {
             route.pre_pop_count + post_pop_count == 0
                 || e.movement
                     .as_ref()
@@ -317,6 +327,15 @@ fn vehicle_route_context(
     let route_dir = unit_direction(current, lookahead)
         .or_else(|| unit_direction(current, target))
         .or_else(|| unit_direction(current, final_goal))?;
+    let reverse_waypoint =
+        if pre_pop_count == 0 && matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
+            scout_car_reverse_waypoint(e, current.0, current.1)
+        } else {
+            // A reverse latch always belongs to the entity's current next waypoint. If route
+            // acceptance advanced past that waypoint before motion, do not spend one more tick
+            // reversing away from the newly active target.
+            None
+        };
     Some(RouteContext {
         next_index,
         pre_pop_count,
@@ -324,11 +343,7 @@ fn vehicle_route_context(
         lookahead,
         route_dir,
         final_goal,
-        reverse_waypoint: if matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
-            scout_car_reverse_waypoint(e, current.0, current.1)
-        } else {
-            None
-        },
+        reverse_waypoint,
     })
 }
 
@@ -339,7 +354,7 @@ fn vehicle_route_lookahead_px(kind: EntityKind) -> f32 {
     }
 }
 
-fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
+fn scout_car_primitives(reverse_only: bool, allow_reverse: bool) -> Vec<Primitive> {
     if reverse_only {
         return vec![Primitive {
             curvature: 0.0,
@@ -349,7 +364,7 @@ fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
     }
 
     let max = 1.0 / SCOUT_CAR_MIN_TURN_RADIUS_PX;
-    [
+    let mut primitives: Vec<_> = [
         0.0,
         max * 0.35,
         -max * 0.35,
@@ -365,7 +380,15 @@ fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
         travel_sign: 1.0,
         ordinal: ordinal as u8,
     })
-    .collect()
+    .collect();
+    if allow_reverse {
+        primitives.push(Primitive {
+            curvature: 0.0,
+            travel_sign: -1.0,
+            ordinal: primitives.len() as u8,
+        });
+    }
+    primitives
 }
 
 fn primitive_travel_distance(
@@ -601,7 +624,10 @@ fn score_candidate(
     } else {
         0.0
     };
-    let blocked_front_penalty = if front_blocked && candidate.primitive.curvature.abs() <= 1.0e-5 {
+    let blocked_front_penalty = if front_blocked
+        && candidate.primitive.travel_sign > 0.0
+        && candidate.primitive.curvature.abs() <= 1.0e-5
+    {
         6.0
     } else {
         0.0
@@ -942,4 +968,58 @@ fn body_tile_range(body: UnitBody) -> impl Iterator<Item = (i32, i32)> {
     let max_ty = ((aabb.max_y + eps) / ts).ceil() as i32 - 1;
 
     (min_ty..=max_ty).flat_map(move |ty| (min_tx..=max_tx).map(move |tx| (tx, ty)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn consumed_reverse_latch_does_not_apply_to_following_waypoint() {
+        let mut map = Map::generate(1, 0xC0FF_EE01);
+        for terrain in &mut map.terrain {
+            *terrain = crate::protocol::terrain::GRASS;
+        }
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let intermediate = (sx - config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX + 2.0, sy);
+        let goal = (sx + config::TILE_SIZE as f32 * 4.0, sy);
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+            .expect("scout car should spawn");
+        let entity = entities.get_mut(scout).expect("scout car should exist");
+        entity.set_facing(0.0);
+        entity.set_path(vec![goal, intermediate]);
+        entity.set_path_goal(Some(goal));
+        entity
+            .movement
+            .as_mut()
+            .expect("scout car should have movement state")
+            .scout_car_reverse_waypoint = Some(intermediate);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let entity = entities
+            .get(scout)
+            .expect("scout car should still exist")
+            .clone();
+        let plan = plan_scout_car_motion(
+            &map,
+            &occ,
+            &entities,
+            &spatial,
+            scout,
+            &entity,
+            (sx, sy),
+            1.0,
+        )
+        .expect("scout car should produce a movement plan");
+
+        assert_eq!(plan.pop_waypoints, 1);
+        assert!(
+            plan.pos.0 > sx,
+            "consuming the latched intermediate should resume toward the next waypoint"
+        );
+        assert_eq!(plan.reverse_waypoint, None);
+    }
 }
