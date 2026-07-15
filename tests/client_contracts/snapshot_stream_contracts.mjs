@@ -79,14 +79,18 @@ function snapshotFrame(tick) {
     "checked-in Hellhole snapshot stream contains the expected 30 seconds at 30 Hz",
   );
   assert(
-    checkedArtifact.header.initialEntityCount === 380 &&
+    checkedArtifact.header.initialEntityCount === 295 &&
+      checkedArtifact.header.start?.playerId === 1 &&
+      checkedArtifact.header.start?.spectator === false &&
       checkedArtifact.header.start?.players?.length === 4 &&
-      checkedArtifact.header.start.players.every((player, index) => player.teamId === index + 1) &&
+      checkedArtifact.header.start.players.every(
+        (player, index) => player.teamId === [1, 2, 1, 2][index],
+      ) &&
       checkedArtifact.header.start?.map?.width === 126 &&
       checkedArtifact.header.start?.map?.height === 126 &&
       checkedArtifact.header.start.map.terrain.filter((tile) => tile === 1).length === 470 &&
       checkedArtifact.header.start?.snapshotStream?.sourceScenario === "supply-300-hellhole",
-    "checked-in Hellhole snapshot stream matches the canonical four-player 470-stone scenario",
+    "checked-in Hellhole snapshot stream matches the canonical Player 1 2v2 projection",
   );
 }
 

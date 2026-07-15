@@ -168,25 +168,53 @@ async function applySnapshotStreamSetup(page, setup, result) {
 
   try {
     const expectedFrameCount = Number(setup.snapshotStreamFrameCount) || 0;
+    const expectedVisibilityTileCount = Number(setup.snapshotStreamVisibilityTileCount) || 0;
     await page.waitForFunction(
       (id) => window.__rtsSnapshotStream?.id === id &&
         window.__rtsSnapshotStream?.frameCount > 0,
       { timeout: Number(setup.snapshotStreamWaitTimeoutMs) || 12000 },
       setup.snapshotStreamId,
     );
-    const action = await page.evaluate(({ id, expectedFrameCount }) => {
+    if (expectedVisibilityTileCount > 0) {
+      await page.waitForFunction(
+        (count) => window.__rts?.match?.state?.visibleTiles?.length === count,
+        { timeout: Number(setup.snapshotStreamWaitTimeoutMs) || 12000 },
+        expectedVisibilityTileCount,
+      );
+    }
+    const action = await page.evaluate(({
+      id,
+      expectedFrameCount,
+      expectedPlayerId,
+      expectedSpectator,
+      expectedTeamIds,
+      expectedVisibilityTileCount,
+    }) => {
       const stream = window.__rtsSnapshotStream;
       const net = window.__rts?.net;
+      const state = window.__rts?.match?.state;
       const frameCount = Number(stream?.frameCount) || 0;
       const isolated = stream?.id === id && stream?.offline === true &&
         stream?.serverSimulation === false && stream?.websocket === false &&
         net?.offline === true && net?.ws == null;
       const expectedArtifact = expectedFrameCount <= 0 || frameCount === expectedFrameCount;
+      const playerId = Number(state?.playerId) || 0;
+      const spectator = state?.spectator === true;
+      const teamIds = Array.isArray(state?.players)
+        ? state.players.map((player) => Number(player?.teamId) || 0)
+        : [];
+      const visibilityTileCount = Number(state?.visibleTiles?.length) || 0;
+      const expectedRecipient = (expectedPlayerId <= 0 || playerId === expectedPlayerId) &&
+        (expectedSpectator == null || spectator === expectedSpectator) &&
+        (!Array.isArray(expectedTeamIds) || JSON.stringify(teamIds) === JSON.stringify(expectedTeamIds)) &&
+        (expectedVisibilityTileCount <= 0 || visibilityTileCount === expectedVisibilityTileCount);
       let error;
       if (!isolated) {
         error = "snapshot stream is not isolated from WebSocket/live simulation";
       } else if (!expectedArtifact) {
         error = `snapshot stream has ${frameCount} frames; expected ${expectedFrameCount}`;
+      } else if (!expectedRecipient) {
+        error = "snapshot stream recipient does not match the expected active-player projection";
       }
       return {
         action: "verifySnapshotStreamIsolation",
@@ -197,9 +225,22 @@ async function applySnapshotStreamSetup(page, setup, result) {
         offline: !!stream?.offline,
         serverSimulation: !!stream?.serverSimulation,
         websocket: !!stream?.websocket,
+        playerId,
+        spectator,
+        teamIds,
+        visibilityTileCount,
         error,
       };
-    }, { id: setup.snapshotStreamId, expectedFrameCount });
+    }, {
+      id: setup.snapshotStreamId,
+      expectedFrameCount,
+      expectedPlayerId: Number(setup.snapshotStreamPlayerId) || 0,
+      expectedSpectator: typeof setup.snapshotStreamSpectator === "boolean"
+        ? setup.snapshotStreamSpectator
+        : null,
+      expectedTeamIds: setup.snapshotStreamTeamIds || null,
+      expectedVisibilityTileCount,
+    });
     result.actions.push(action);
     if (action.error) result.error = action.error;
   } catch (err) {

@@ -250,7 +250,8 @@ scripts/hellhole-perf-harness.sh --ticks 900
 node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 30
 ```
 
-The server command restores the canonical four-player scenario and measures each direct API round
+The server command restores the canonical four-player 2v2 scenario (Players 1 and 3 versus Players
+2 and 4) and measures each direct API round
 trip as `Game::tick()` plus one full-world snapshot, production compaction, and MessagePack
 encoding. Before each tick it also measures deterministic Hellhole driver work: one 43-of-85 move
 command per shuttle player every 30 ticks and a bounded nearest-center respawn batch for missing
@@ -303,7 +304,7 @@ git fetch origin main
 node scripts/client-flamegraph.mjs --preview
 ```
 
-The flame-graph command runs the deterministic `supply-300-hellhole-stream` workload for 15 seconds
+The flame-graph command runs Player 1's deterministic 2v2 `supply-300-hellhole-stream` projection for 15 seconds
 at the default viewport, DPR 1, CPU throttle 1, and a 500 microsecond V8 sampling interval. The
 harness completes workload assertions, resets its local performance window, and observes at least
 30 rendered frames before CPU sampling begins, so module loading and setup do not dominate the
@@ -353,16 +354,21 @@ the profiler/report windows reset, then two successful explicit presents must oc
 
 The snapshot-stream workload is the client-only isolation lane. It fetches the generated
 `client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
-MessagePack snapshots into the normal decoder and renderer at 30 Hz. Its setup assertion fails unless
-the page reports no WebSocket and no live simulation. Regenerate the thirty-second, 900-frame artifact
+MessagePack snapshots into the normal decoder and renderer at 30 Hz. The stream is the ordinary
+fog-filtered projection for active Player 1 on the 1+3 team, including the server-authored 126x126
+visibility grid and only Player 1's recipient event bucket. It starts with 295 projected entities
+and retains at least 288 through the deterministic death/respawn churn. Its setup assertion fails
+unless the page reports Player 1, non-spectator mode, team ids `[1,2,1,2]`, the complete visibility
+grid, no WebSocket, and no live simulation. Regenerate the thirty-second, 900-frame artifact
 with `cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream`.
 The canonical checkpoint materializes 470 deterministic isolated stone occluders across the No
 Terrain base map, including the central scrum and two diagonal shuttle lanes. Two formations are
 dense and interleaved around the central stones by a deterministic body-aware compact packer; the
 other two repeatedly shuttle diagonally through the obstructed field. Only the minimum shuttle
 collision footprints and building footprints needed for a valid tick-zero setup are excluded before
-terrain selection. The rocks make fallback fog and line-of-sight work representative while also
-forcing the scripted formations through pathfinding obstacles.
+terrain selection. The rocks shape authoritative team visibility and force the scripted formations
+through pathfinding obstacles; the client benchmark consumes the resulting server visibility grid
+rather than reconstructing spectator fog locally.
 Preserved schema 2
 incident replays are analysis evidence only and are not replay-harness workloads. The
 `--render-lag-suite` path runs the current workload set, then writes a rollup at

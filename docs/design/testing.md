@@ -288,7 +288,8 @@ canary runs own a private server; the browser shard passes its existing loopback
   performance workloads, stress-matrix dimensions, CPU/flame-graph capture, harness script, or
   documented performance workflow. Workload execution uses local headless Chrome by default and
   writes bounded JSON summaries under `target/client-perf`; it is measurement-only and does not add
-  FPS gates. The offline Hellhole stream remains in the default workload set, while the live
+  FPS gates. The offline Hellhole stream remains in the default workload set as active Player 1's
+  fog-filtered 2v2 projection, while the live
   server/client Hellhole is opt-in and requires an explicit workload id. The integrated launcher
   exposes its controlled Chrome window for visual inspection without changing workload identity.
   Stress-matrix runs vary CPU throttle, viewport, DPR, and repeat count, then write JSON and
@@ -314,7 +315,9 @@ canary runs own a private server; the browser shard passes its existing loopback
   client need to be inspected together; do not use its timings as isolated server evidence. The
   old static fixture's `realtime_factor >= 8.0` target is not a gate for the new command/death churn
   workload. Compare the full counter shape and timings like-for-like on the reference machine until
-  a repeated churn baseline establishes a new headroom target.
+  a repeated churn baseline establishes a new headroom target. The canonical scenario is 2v2
+  (`1+3` versus `2+4`); the server lane keeps its full-world serialization pressure while the
+  checked-in client stream uses Player 1's normal team-fog projection.
 - Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
   when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
   change. The harness compares Worker and Tank part and composition samples.

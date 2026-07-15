@@ -610,7 +610,9 @@ movement commands through the public Lab command seam, replenishes missing centr
 single replayable `SpawnEntities` batch before the next tick, calls `tick()`, and produces one
 full-world snapshot through the normal compaction and MessagePack encoding path for every tick. It starts no
 HTTP listener, WebSocket, or browser and does not pace itself from wall time, so a slow renderer
-cannot become its bottleneck. The separate checked-in snapshot stream is the client-only lane. A
+cannot become its bottleneck. The scenario is one coherent 2v2 match: Players 1 and 3 share a team,
+as do Players 2 and 4. The separate checked-in snapshot stream is the client-only lane and records
+Player 1's normal fog-filtered body and recipient events, including shared team visibility. A
 live Lab server and Pixi client may be run together only through the explicit `--integrated` mode
 for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
