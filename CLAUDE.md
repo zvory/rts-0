@@ -127,6 +127,7 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
 ## Specialized workflows
 
+- Never use the in-app browser skill.
 - Balance or gameplay changes: collect factual patch-note bullets covering changed stats, economy,
   combat behavior, UI affordances, and what should be watched in playtests.
 - New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
