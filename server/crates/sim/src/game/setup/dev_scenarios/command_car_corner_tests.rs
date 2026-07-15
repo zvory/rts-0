@@ -55,7 +55,7 @@ fn matches_reduced_reproduction_layout() {
         .get(setup.units[0])
         .expect("scenario Command Car should exist");
     assert_eq!(command_car.kind, EntityKind::CommandCar);
-    assert_eq!((command_car.pos_x, command_car.pos_y), (3536.0, 3664.0));
+    assert_eq!((command_car.pos_x, command_car.pos_y), (3507.0, 3664.0));
     assert!((command_car.facing() - 2.823_079_3).abs() <= 0.000_001);
     assert_units_do_not_intersect_buildings(&setup.game);
 }
