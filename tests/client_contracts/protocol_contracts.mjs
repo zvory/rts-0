@@ -475,6 +475,11 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       buildCommand.queued === true,
     "build command builder emits selected-worker wire shape",
   );
+  assert(
+    JSON.stringify(cmd.cancelConstruction(91)) ===
+      JSON.stringify({ c: "cancel", building: 91, construction: true }),
+    "construction cancel builder emits an explicit scope distinct from production cancel",
+  );
   const deconstructCommand = cmd.deconstruct([7, 8], 55, true);
   assert(
     deconstructCommand.c === "deconstruct" &&

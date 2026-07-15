@@ -1414,7 +1414,10 @@ Cancel clears the affected producer's repeat state. Standing repeat controls nev
 queue entries; their swirl remains a policy indicator until a fully funded item is admitted.
 Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
-buildings in reverse round-robin order for the displayed producer type. The Scout Plane affordance
+buildings in reverse round-robin order for the displayed producer type. Selecting an owned building
+under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot;
+click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
+construction cost. The Scout Plane affordance
 is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It costs 50 steel
 and 75 oil, has no City Centre requirement, disables while that Command Car has an active Scout
 Plane or its 30-second cooldown is running, and issues immediately rather than entering a

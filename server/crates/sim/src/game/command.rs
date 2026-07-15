@@ -88,6 +88,8 @@ pub enum SimCommand {
     },
     Cancel {
         building: u32,
+        #[serde(default)]
+        construction: bool,
     },
     Stop {
         units: Vec<u32>,
@@ -294,7 +296,13 @@ impl SimCommand {
                     },
                 }
             }
-            protocol::Command::Cancel { building } => SimCommand::Cancel { building },
+            protocol::Command::Cancel {
+                building,
+                construction,
+            } => SimCommand::Cancel {
+                building,
+                construction,
+            },
             protocol::Command::Stop { units } => SimCommand::Stop { units },
             protocol::Command::HoldPosition { units, queued } => {
                 SimCommand::HoldPosition { units, queued }
@@ -448,8 +456,12 @@ impl SimCommand {
                 building: *building,
                 upgrade: upgrade.to_protocol_str().to_string(),
             },
-            SimCommand::Cancel { building } => protocol::Command::Cancel {
+            SimCommand::Cancel {
+                building,
+                construction,
+            } => protocol::Command::Cancel {
                 building: *building,
+                construction: *construction,
             },
             SimCommand::Stop { units } => protocol::Command::Stop {
                 units: units.clone(),

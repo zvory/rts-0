@@ -143,6 +143,7 @@ impl Entity {
             construction: (!finished).then_some(ConstructionState {
                 progress: 0,
                 total: s.build_ticks,
+                cost_paid: false,
             }),
             worker: None,
             resource_node: None,
@@ -1056,6 +1057,20 @@ impl Entity {
 
     pub fn under_construction(&self) -> bool {
         self.construction.is_some()
+    }
+
+    pub(crate) fn construction_cost_paid(&self) -> bool {
+        self.construction
+            .as_ref()
+            .is_some_and(|construction| construction.cost_paid)
+    }
+
+    pub(crate) fn mark_construction_cost_paid(&mut self) -> bool {
+        let Some(construction) = self.construction.as_mut() else {
+            return false;
+        };
+        construction.cost_paid = true;
+        true
     }
 
     pub fn build_progress_fraction(&self) -> Option<f32> {

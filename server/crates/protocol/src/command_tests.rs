@@ -20,3 +20,31 @@ fn command_messages_require_client_sequence_envelope() {
     );
     assert!(missing_seq.is_err());
 }
+
+#[test]
+fn cancel_command_distinguishes_construction_from_legacy_production_scope() {
+    let production: Command =
+        serde_json::from_str(r#"{"c":"cancel","building":7}"#).expect("production cancel");
+    assert!(matches!(
+        production,
+        Command::Cancel {
+            building: 7,
+            construction: false,
+        }
+    ));
+
+    let construction: Command =
+        serde_json::from_str(r#"{"c":"cancel","building":7,"construction":true}"#)
+            .expect("construction cancel");
+    assert!(matches!(
+        construction,
+        Command::Cancel {
+            building: 7,
+            construction: true,
+        }
+    ));
+    assert_eq!(
+        serde_json::to_string(&construction).expect("serialize construction cancel"),
+        r#"{"c":"cancel","building":7,"construction":true}"#
+    );
+}

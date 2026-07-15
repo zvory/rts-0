@@ -312,6 +312,7 @@ export const cmd = Object.freeze({
   }),
   research: (building, upgrade) => ({ c: CMD.RESEARCH, building, upgrade }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
+  cancelConstruction: (building) => ({ c: CMD.CANCEL, building, construction: true }),
   stop: (units) => ({ c: CMD.STOP, units }),
   holdPosition: (units, queued = false) =>
     withQueued({ c: CMD.HOLD_POSITION, units }, queued),

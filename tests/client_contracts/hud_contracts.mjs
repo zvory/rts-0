@@ -316,6 +316,24 @@ function fakeHudRootWithoutResourceSpans() {
       issued.push(command);
     },
   };
+  HUD.prototype._dispatchCommandIntent.call(
+    hud,
+    { type: "cancelConstruction", buildingId: 91 },
+  );
+  assert(
+    issued.length === 1 && issued[0].c === "cancel" && issued[0].building === 91 &&
+      issued[0].construction === true,
+    "construction cancellation should issue the authoritative building cancel command",
+  );
+}
+
+{
+  const issued = [];
+  const hud = {
+    _issueCommand(command) {
+      issued.push(command);
+    },
+  };
   const intent = {
     type: "adjustProductionRepeat",
     buildingIds: [20, 21, 22],
@@ -801,6 +819,31 @@ function fakeHudRootWithoutResourceSpans() {
   assert(buildCard.slots[7].title === "Requires Training Centre", "Tank Trap tooltip should explain its requirement");
   assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
   assert(buildCard.slots[8].commandId === "worker.return", "worker return should expose stable command identity");
+
+  const unfinishedDepot = {
+    id: 17,
+    owner: 1,
+    kind: KIND.DEPOT,
+    buildProgress: 0.45,
+  };
+  const constructionCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [unfinishedDepot],
+    entities: [unfinishedDepot],
+  }));
+  assert(constructionCard.kind === "construction", "unfinished buildings should use the construction card");
+  assert(commandButtons(constructionCard).length === 1, "construction card should expose only cancellation");
+  assert(constructionCard.slots[8].label === "Cancel", "construction cancel should occupy the bottom-right slot");
+  assert(constructionCard.slots[8].hotkey === "C", "construction cancel should use the bottom-right C hotkey");
+  assert(constructionCard.slots[8].commandId === "construction.cancel", "construction cancel should have a stable command identity");
+  assert(
+    constructionCard.slots[8].intent.type === "cancelConstruction" &&
+      constructionCard.slots[8].intent.buildingId === unfinishedDepot.id,
+    "construction cancel should target the selected scaffold",
+  );
+  assert(
+    constructionCard.slots[8].title.includes("full refund"),
+    "construction cancel should explain its refund behavior",
+  );
 
   const scoutPlane = { id: 18, owner: 1, kind: KIND.SCOUT_PLANE };
   const scoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({

@@ -512,6 +512,14 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         .find(|entity| entity.kind == EntityKind::CityCentre && entity.under_construction())
         .map(|entity| entity.id)
         .expect("build command should spawn a scaffold before checkpoint");
+    assert!(
+        baseline
+            .state
+            .entities
+            .get(scaffold)
+            .is_some_and(|entity| entity.construction_cost_paid()),
+        "the economy-backed scaffold should carry its refund receipt into the checkpoint"
+    );
     assert!(baseline.state.active_construction_sites.contains(&scaffold));
     assert_eq!(
         baseline
@@ -533,6 +541,14 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
     let mut restored = restore_checkpoint_and_assert_equivalent(
         &baseline,
         "construction/deconstruction checkpoint import",
+    );
+    assert!(
+        restored
+            .state
+            .entities
+            .get(scaffold)
+            .is_some_and(|entity| entity.construction_cost_paid()),
+        "checkpoint import should preserve the scaffold refund receipt"
     );
     let finish_ticks = config::building_stats(EntityKind::CityCentre)
         .expect("city centre stats")

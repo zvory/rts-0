@@ -413,6 +413,10 @@ pub struct ConstructionState {
     pub progress: u32,
     /// Total ticks of construction required (`building_stats.build_ticks`).
     pub total: u32,
+    /// Whether the owner paid the building cost when this site was created. Authored/Lab
+    /// scaffolds are intentionally unpaid and must not mint resources when cancelled.
+    #[serde(default)]
+    pub(crate) cost_paid: bool,
 }
 
 /// Worker-only economy state.

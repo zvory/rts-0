@@ -1340,7 +1340,7 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         Command::AdjustProductionRepeat { buildings, .. } => buildings.clone(),
         Command::Train { building, .. }
         | Command::Research { building, .. }
-        | Command::Cancel { building }
+        | Command::Cancel { building, .. }
         | Command::SetRally { building, .. } => vec![*building],
     }
 }

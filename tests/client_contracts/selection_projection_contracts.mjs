@@ -182,6 +182,33 @@ function scene(entities, projection = orthographic(), options = {}) {
 }
 
 {
+  const builder = { id: 61, owner: 1, kind: KIND.WORKER, x: 160, y: 160 };
+  const scaffold = {
+    id: 62,
+    owner: 1,
+    kind: KIND.DEPOT,
+    x: 160,
+    y: 160,
+    buildProgress: 0.25,
+  };
+  const input = Object.create(Input.prototype);
+  input.state = {
+    playerId: 1,
+    selection: new Set(),
+    isOwnOwner: (owner) => owner === 1,
+    setSelection(ids) {
+      this.selection = new Set(ids);
+    },
+  };
+  input.selectionScene = scene([builder, scaffold]);
+  input._commitClickSelection({ x: scaffold.x, y: scaffold.y }, false, false);
+  assert(
+    Array.from(input.state.selection).join(",") === String(scaffold.id),
+    "click selection prefers an unfinished building over its overlapping builder",
+  );
+}
+
+{
   const projection = fakePerspective();
   const input = Object.create(Input.prototype);
   input.state = { map: { width: 32, height: 32, tileSize: 32 } };

@@ -47,6 +47,7 @@ const MAX_UNITS_PER_COMMAND: usize = 256;
 const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
 mod artillery_scatter;
+mod cancel;
 mod guards;
 mod planner_facts;
 mod production_repeat;
@@ -546,8 +547,11 @@ pub(in crate::game) fn apply_commands(
                     notice(events, player, "Production queue full");
                 }
             }
-            SimCommand::Cancel { building } => {
-                order_cancel(entities, players, player, building);
+            SimCommand::Cancel {
+                building,
+                construction,
+            } => {
+                order_cancel(entities, players, player, building, construction);
             }
             SimCommand::Stop { units } => {
                 let Some(units) =
@@ -1824,47 +1828,36 @@ fn order_set_rally(
     }
 }
 
-/// Cancel the latest item in a building's production queue, refunding its cost + supply.
 fn order_cancel(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     player: u32,
     building: u32,
+    construction: bool,
 ) {
-    enum Cancelled {
-        Unit(ProdItem),
-        Upgrade(ResearchItem),
-    }
-
-    let cancelled = {
-        let b = match entities.get_mut(building) {
-            Some(b) if b.owner == player && b.is_building() => b,
-            _ => return,
-        };
-        b.set_repeat_production(None, false);
-        if let Some(item) = b.pop_last_research() {
-            Cancelled::Upgrade(item)
-        } else if let Some(item) = b.pop_last_production() {
-            Cancelled::Unit(item)
-        } else {
-            return;
-        }
+    let Some(ps) = players.iter_mut().find(|candidate| candidate.id == player) else {
+        return;
     };
-    if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-        match cancelled {
-            Cancelled::Unit(item) if item.paid && config::unit_stats(item.unit).is_some() => {
-                ps.refund_cost(rules::economy::resource_cost(item.unit));
-                ps.release_supply(rules::economy::supply_cost(item.unit));
-            }
-            Cancelled::Upgrade(item) if item.paid => {
-                let definition = upgrade::definition(item.upgrade);
-                ps.refund_cost(rules::economy::ResourceCost::new(
-                    definition.cost_steel,
-                    definition.cost_oil,
-                ));
-            }
-            _ => {}
+    let Some(cancelled) = cancel::apply(entities, player, building, construction) else {
+        return;
+    };
+    match cancelled {
+        cancel::Cancelled::Construction { kind, cost_paid } if cost_paid => {
+            ps.refund_cost(rules::economy::resource_cost(kind));
+            ps.record_construction_cancelled(kind);
         }
+        cancel::Cancelled::Unit(item) if item.paid && config::unit_stats(item.unit).is_some() => {
+            ps.refund_cost(rules::economy::resource_cost(item.unit));
+            ps.release_supply(rules::economy::supply_cost(item.unit));
+        }
+        cancel::Cancelled::Upgrade(item) if item.paid => {
+            let definition = upgrade::definition(item.upgrade);
+            ps.refund_cost(rules::economy::ResourceCost::new(
+                definition.cost_steel,
+                definition.cost_oil,
+            ));
+        }
+        _ => {}
     }
 }
 

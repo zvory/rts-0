@@ -16,6 +16,7 @@ mod abilities;
 mod artillery_point_fire_queue;
 mod build;
 mod command_budget;
+mod construction_cancel;
 mod orders;
 mod production;
 mod production_repeat;

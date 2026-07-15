@@ -212,6 +212,9 @@ export function buildCommandCardDescriptors(ctx) {
   if (ctx.commandCardMode === "workerBuild" && workerOnlySelection(ctx, selection)) {
     return buildWorkerBuildCard(ctx);
   }
+  if (underConstructionBuilding(ctx, primary)) {
+    return buildConstructionCard(primary);
+  }
   if (selectedOwnUnits(ctx, selection).length > 0) {
     return buildUnitCard(ctx, selection);
   }
@@ -227,9 +230,28 @@ export function commandSubject(ctx, selection) {
   for (const e of selection || []) {
     if (!isOwn(ctx, e)) continue;
     if (isUnit(e.kind)) return e;
+    if (underConstructionBuilding(ctx, e)) return e;
     if (isBuilding(e.kind) && (factionTrainsOf(ctx, e.kind).length > 0 || factionResearchesOf(ctx, e.kind).length > 0)) return e;
   }
   return null;
+}
+
+export function buildConstructionCard(building) {
+  const slots = new Array(9).fill(null);
+  slots[8] = {
+    id: `cancel-construction:${building.id}`,
+    commandId: "construction.cancel",
+    kind: "button",
+    action: "cancelConstruction",
+    intent: { type: "cancelConstruction", buildingId: building.id },
+    icon: "CNCL",
+    label: "Cancel",
+    enabled: true,
+    cls: "cancel",
+    title: "Cancel construction for a full refund",
+    repeatable: false,
+  };
+  return card("construction", `construction|${building.id}`, slots);
 }
 
 export function buildWorkerBuildCard(ctx) {
@@ -630,6 +652,10 @@ function isOwn(ctx, e) {
 function selectedOwnUnits(ctx, selection) {
   return (selection || []).filter((e) =>
     isOwn(ctx, e) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
+}
+
+function underConstructionBuilding(ctx, entity) {
+  return isOwn(ctx, entity) && isBuilding(entity?.kind) && Number.isFinite(entity.buildProgress);
 }
 
 function workerOnlySelection(ctx, selection) {

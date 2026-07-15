@@ -194,6 +194,15 @@ pub(crate) fn construction_system(
                 continue;
             }
         };
+        let marked_paid = entities
+            .get_mut(site)
+            .is_some_and(|building| building.mark_construction_cost_paid());
+        if !marked_paid {
+            entities.remove(site);
+            players[player_index].refund_cost(cost);
+            mark_build_waiting_for_resources(entities, worker);
+            continue;
+        }
         players[player_index].record_entity_created(kind);
         if let Some(w) = entities.get_mut(worker) {
             w.clear_path();

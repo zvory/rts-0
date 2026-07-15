@@ -78,6 +78,10 @@ fn waiting_build_starts_when_resources_become_available() {
         .iter()
         .find(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
         .expect("waiting build should spawn a scaffold once resources are available");
+    assert!(
+        scaffold.construction_cost_paid(),
+        "a scaffold created by the economy-backed build flow should retain its refund receipt"
+    );
     assert_eq!(
         entities
             .get(worker)
