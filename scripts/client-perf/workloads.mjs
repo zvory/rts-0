@@ -90,7 +90,7 @@ export function buildClientPerfWorkloads(env = process.env) {
       setup: {
         snapshotStreamId: "supply-300-hellhole",
         snapshotStreamFrameCount: 900,
-        waitForMinEntities: 380,
+        waitForMinEntities: SUPPLY_300_LAB_HELLHOLE.projectedEntityCount,
         resetPerfAfterSetup: true,
       },
     },
