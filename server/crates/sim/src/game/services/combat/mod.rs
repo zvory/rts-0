@@ -35,6 +35,7 @@ mod events;
 mod panzerfaust;
 mod priority;
 mod projection;
+mod shot_blocker_index;
 mod target_policy;
 mod weapons;
 
@@ -49,6 +50,7 @@ use acquisition::{
 };
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
+use shot_blocker_index::ShotBlockerIndex;
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
@@ -77,6 +79,7 @@ fn resolve_target(
     mode: CombatMode,
 ) -> Option<u32> {
     let occ = Occupancy::build(map, entities);
+    let blockers = ShotBlockerIndex::build(map, entities);
     let tank_trap_relation = StaticPathingRelation::for_player(owner, teams);
     let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
         occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
@@ -88,6 +91,7 @@ fn resolve_target(
     resolve_target_with_obstruction(
         map,
         entities,
+        &blockers,
         teams,
         spatial,
         los,
@@ -143,9 +147,11 @@ pub(in crate::game) fn combat_system(
             weapons::tick_tank_stationary_range(e);
         }
     }
+    let blockers = ShotBlockerIndex::build(map, entities);
     panzerfaust::tick_states(
         map,
         entities,
+        &blockers,
         teams,
         methamphetamines_researched,
         fog,
@@ -158,6 +164,7 @@ pub(in crate::game) fn combat_system(
         if panzerfaust::handle_combat_if_panzerfaust(
             map,
             entities,
+            &blockers,
             teams,
             methamphetamines_researched,
             occ,
@@ -272,6 +279,7 @@ pub(in crate::game) fn combat_system(
         let target = resolve_target_with_obstruction(
             map,
             entities,
+            &blockers,
             teams,
             spatial,
             &los,
@@ -357,6 +365,7 @@ pub(in crate::game) fn combat_system(
             direct_fire_target_legal(
                 map,
                 entities,
+                &blockers,
                 teams,
                 &los,
                 fog,
@@ -371,6 +380,7 @@ pub(in crate::game) fn combat_system(
             direct_fire_target_legal(
                 map,
                 entities,
+                &blockers,
                 teams,
                 &los,
                 fog,
@@ -458,6 +468,7 @@ pub(in crate::game) fn combat_system(
                 let shot_victim_owner = apply_damage(
                     map,
                     entities,
+                    &blockers,
                     teams,
                     events,
                     fog,
@@ -536,6 +547,7 @@ pub(in crate::game) fn combat_system(
     coax::fire_tank_coax_system(
         map,
         entities,
+        &blockers,
         teams,
         spatial,
         &los,

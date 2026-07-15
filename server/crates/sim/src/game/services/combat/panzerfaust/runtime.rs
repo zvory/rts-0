@@ -10,13 +10,14 @@ use super::{
     convert_panzerfaust_to_rifleman, mirror_weapon_to_body, panzerfaust_state,
     panzerfaust_target_fireable, panzerfaust_target_in_range, panzerfaust_target_valid,
     recovery_ticks, set_panzerfaust_state, Fog, LineOfSight, Map, PanzerfaustFireContext,
-    SmokeCloudStore, TeamRelations,
+    ShotBlockerIndex, SmokeCloudStore, TeamRelations,
 };
 
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game::services::combat) fn tick_states(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     fog: &Fog,
@@ -42,6 +43,7 @@ pub(in crate::game::services::combat) fn tick_states(
             } => tick_windup(
                 map,
                 entities,
+                blockers,
                 teams,
                 fog,
                 smokes,
@@ -90,6 +92,7 @@ pub(in crate::game::services::combat) fn tick_states(
 fn tick_windup(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -117,7 +120,7 @@ fn tick_windup(
     if !panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target)
         || !panzerfaust_target_in_range(map, entities, id, target)
         || !panzerfaust_target_fireable(
-            &PanzerfaustFireContext::new(map, entities, teams, los, fog, smokes),
+            &PanzerfaustFireContext::new(map, entities, blockers, teams, los, fog, smokes),
             id,
             owner,
             target,

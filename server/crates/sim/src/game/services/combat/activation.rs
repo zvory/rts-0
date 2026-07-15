@@ -5,6 +5,7 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 
 use super::acquisition::{direct_fire_target_legal, DirectFireLegality};
+use super::shot_blocker_index::ShotBlockerIndex;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct SecondaryWeaponActivationConstraints {
@@ -18,6 +19,7 @@ pub(super) struct SecondaryWeaponActivationConstraints {
 pub(super) fn secondary_weapon_target_passes_activation(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
     fog: &Fog,
@@ -54,6 +56,7 @@ pub(super) fn secondary_weapon_target_passes_activation(
     direct_fire_target_legal(
         map,
         entities,
+        blockers,
         teams,
         los,
         fog,

@@ -18,6 +18,7 @@ use super::events::{
     push_under_attack_notices_for_visible_attack,
 };
 use super::projection::{resolve_shot_victim, shot_blocker_intersection};
+use super::shot_blocker_index::ShotBlockerIndex;
 use super::RANGE_SLACK;
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
@@ -27,6 +28,7 @@ use super::RANGE_SLACK;
 pub(super) fn apply_damage(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
@@ -55,6 +57,7 @@ pub(super) fn apply_damage(
     let shot_victim = resolve_shot_victim(
         map,
         entities,
+        blockers,
         teams,
         attacker,
         victim,

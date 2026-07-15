@@ -22,6 +22,7 @@ use super::activation::{
 };
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
+use super::shot_blocker_index::ShotBlockerIndex;
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
 
 const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;
@@ -39,6 +40,7 @@ struct TankCoaxSnapshot {
 pub(super) fn fire_tank_coax_system(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &crate::game::services::spatial::SpatialIndex,
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
@@ -60,6 +62,7 @@ pub(super) fn fire_tank_coax_system(
         let Some(tid) = resolve_tank_coax_target(
             map,
             entities,
+            blockers,
             teams,
             spatial,
             los,
@@ -95,6 +98,7 @@ pub(super) fn fire_tank_coax_system(
         let shot_victim_owner = apply_damage(
             map,
             entities,
+            blockers,
             teams,
             events,
             fog,
@@ -162,6 +166,7 @@ fn tank_coax_snapshot(
 fn resolve_tank_coax_target(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &crate::game::services::spatial::SpatialIndex,
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
@@ -181,7 +186,7 @@ fn resolve_tank_coax_target(
         can_retain_moving_target: false,
     };
     let candidates = tank_coax_target_candidates(
-        map, entities, teams, spatial, los, fog, smokes, attacker, snapshot,
+        map, entities, blockers, teams, spatial, los, fog, smokes, attacker, snapshot,
     );
     priority::choose_target(&context, &candidates)
 }
@@ -190,6 +195,7 @@ fn resolve_tank_coax_target(
 fn tank_coax_target_candidates(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &crate::game::services::spatial::SpatialIndex,
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
@@ -222,6 +228,7 @@ fn tank_coax_target_candidates(
         if !secondary_weapon_target_passes_activation(
             map,
             entities,
+            blockers,
             teams,
             los,
             fog,

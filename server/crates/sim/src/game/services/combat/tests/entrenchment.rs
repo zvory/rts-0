@@ -34,9 +34,11 @@ fn apply_test_damage_with_seed_and_teams(
         .get(attacker)
         .and_then(|entity| combat_rules::default_weapon_profile(entity.kind))
         .expect("test attacker should have a default weapon profile");
+    let blockers = ShotBlockerIndex::build(&map, entities);
     apply_damage(
         &map,
         entities,
+        &blockers,
         teams,
         events,
         &fog,
