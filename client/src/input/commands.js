@@ -811,7 +811,9 @@ export function _activateCommandHotkey(ev) {
     if (contextAction) {
       dispatchCommandButtonMouseEvent(btn, "contextmenu", ev);
     } else if (!btn.disabled) {
-      dispatchCommandButtonMouseEvent(btn, "click", ev);
+      // Alt-click is a pointer-only secondary affordance. A hotkey whose descriptor does not
+      // declare Alt must reach the primary click handler instead of imitating an Alt-click.
+      dispatchCommandButtonMouseEvent(btn, "click", ev, false);
     }
     return {
       handled: true,
@@ -834,12 +836,12 @@ function commandContextActionRequested(btn, ev) {
     (ev.shiftKey && modifiers.has("shift"));
 }
 
-function dispatchCommandButtonMouseEvent(btn, type, ev) {
+function dispatchCommandButtonMouseEvent(btn, type, ev, altKey = !!ev.altKey) {
   if (typeof MouseEvent === "function" && typeof btn.dispatchEvent === "function") {
     btn.dispatchEvent(new MouseEvent(type, {
       bubbles: true,
       cancelable: true,
-      altKey: !!ev.altKey,
+      altKey,
       ctrlKey: !!ev.ctrlKey,
       metaKey: !!ev.metaKey,
       shiftKey: !!ev.shiftKey,
@@ -851,7 +853,7 @@ function dispatchCommandButtonMouseEvent(btn, type, ev) {
       type,
       bubbles: true,
       cancelable: true,
-      altKey: !!ev.altKey,
+      altKey,
       ctrlKey: !!ev.ctrlKey,
       metaKey: !!ev.metaKey,
       shiftKey: !!ev.shiftKey,
