@@ -683,11 +683,7 @@ impl Game {
             .collect())
     }
 
-    /// Resolve a bounded unit-spawn batch without mutating the game.
-    ///
-    /// Requests and candidates are evaluated in caller order. Each accepted spawn is added to a
-    /// scratch entity store before the next request, so the returned batch is safe to submit as one
-    /// atomic `SpawnEntities` operation. Requests with no legal candidate are omitted.
+    /// Resolve caller-ordered unit spawns in scratch state, omitting requests with no legal spot.
     pub fn lab_plan_unit_spawns(
         &self,
         requests: &[(u32, EntityKind)],
@@ -700,20 +696,20 @@ impl Game {
                 maximum: LAB_PLACEMENT_PLAN_CANDIDATE_LIMIT,
             });
         }
-        let mut scratch = self.clone();
+        let mut scratch_entities = self.state.entities.clone();
         let mut resolved = Vec::with_capacity(requests.len());
         for &(owner, kind) in requests {
             self.validate_owner(owner)?;
             if !kind.is_unit() {
                 return Err(invalid_kind(kind, "planUnitSpawns"));
             }
-            let occupancy = Occupancy::build(&scratch.state.map, &scratch.state.entities);
+            let occupancy = Occupancy::build(&self.state.map, &scratch_entities);
             for &(x, y) in candidates {
-                if validate_world_position(&scratch.state.map, x, y).is_err()
+                if validate_world_position(&self.state.map, x, y).is_err()
                     || !standability::unit_spawn_standable(
-                        &scratch.state.map,
+                        &self.state.map,
                         &occupancy,
-                        &scratch.state.entities,
+                        &scratch_entities,
                         kind,
                         x,
                         y,
@@ -728,12 +724,7 @@ impl Game {
                     y,
                     completed: true,
                 };
-                if scratch
-                    .state
-                    .entities
-                    .spawn_unit(owner, kind, x, y)
-                    .is_none()
-                {
+                if scratch_entities.spawn_unit(owner, kind, x, y).is_none() {
                     return Err(invalid_kind(kind, "planUnitSpawns"));
                 }
                 resolved.push(spawn);

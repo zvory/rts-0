@@ -50,25 +50,53 @@ pub fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
     ];
     let catalog = catalog_for(DEFAULT_FACTION_ID)
         .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;
-    let supply_of = |kind: EntityKind| {
+    let supply_of = |kind: EntityKind| -> Result<u32, String> {
+        if !kind.is_unit() {
+            return Err(format!(
+                "Hellhole composition contains non-unit kind {kind}"
+            ));
+        }
         if catalog.allows_unit(kind) {
-            supply_cost(kind)
+            Ok(supply_cost(kind))
         } else {
-            0
+            Ok(0)
         }
     };
     let mut out = required.to_vec();
-    let mut supply: u32 = out.iter().copied().map(supply_of).sum();
+    let mut supply = out
+        .iter()
+        .copied()
+        .map(&supply_of)
+        .sum::<Result<u32, _>>()?;
+    if supply > TARGET_SUPPLY {
+        return Err(format!(
+            "Hellhole required composition uses {supply} supply, above target {TARGET_SUPPLY}"
+        ));
+    }
     let mut index = 0;
+    let mut attempts_without_progress = 0;
     while supply < TARGET_SUPPLY {
         let kind = filler[index % filler.len()];
         index += 1;
-        let cost = supply_of(kind);
-        if supply + cost > TARGET_SUPPLY {
+        let cost = supply_of(kind)?;
+        if cost == 0 || supply + cost > TARGET_SUPPLY {
+            attempts_without_progress += 1;
+            if attempts_without_progress == filler.len() {
+                return Err(format!(
+                    "Hellhole composition cannot reach {TARGET_SUPPLY} supply from {supply} with the configured filler units"
+                ));
+            }
             continue;
         }
         out.push(kind);
         supply += cost;
+        attempts_without_progress = 0;
+    }
+    if out.len() != SHUTTLE_UNIT_COUNT {
+        return Err(format!(
+            "Hellhole 300-supply composition has {} units, expected {SHUTTLE_UNIT_COUNT}",
+            out.len()
+        ));
     }
     Ok(out)
 }
@@ -135,4 +163,23 @@ pub fn respawn_candidates() -> Vec<(f32, f32)> {
             .then_with(|| a.0.total_cmp(&b.0))
     });
     candidates
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_composition_keeps_supply_and_unit_count_contracts() {
+        let composition = composition_300_supply().expect("canonical composition");
+        let catalog = catalog_for(DEFAULT_FACTION_ID).expect("default faction catalog");
+        let supply: u32 = composition
+            .iter()
+            .copied()
+            .filter(|kind| catalog.allows_unit(*kind))
+            .map(supply_cost)
+            .sum();
+        assert_eq!(supply, TARGET_SUPPLY);
+        assert_eq!(composition.len(), SHUTTLE_UNIT_COUNT);
+    }
 }

@@ -461,7 +461,11 @@ fn lab_unit_spawn_planner_is_bounded_non_mutating_and_reserves_earlier_spawns() 
         .expect("bounded planning should succeed");
     assert_eq!(planned.len(), 2);
     assert_ne!((planned[0].x, planned[0].y), (planned[1].x, planned[1].y));
-    assert_eq!(game.state.entities.ids(), before, "planning must not mutate");
+    assert_eq!(
+        game.state.entities.ids(),
+        before,
+        "planning must not mutate"
+    );
     game.apply_lab_op(LabOp::SpawnEntities(planned))
         .expect("the planned atomic batch should remain valid");
 
@@ -471,9 +475,7 @@ fn lab_unit_spawn_planner_is_bounded_non_mutating_and_reserves_earlier_spawns() 
         Err(LabError::BatchSize { .. })
     ));
     let owned = game.lab_owned_units(1).expect("authoritative roster");
-    assert!(owned
-        .iter()
-        .any(|(_, kind)| *kind == EntityKind::Rifleman));
+    assert!(owned.iter().any(|(_, kind)| *kind == EntityKind::Rifleman));
 }
 
 #[test]

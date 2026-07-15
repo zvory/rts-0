@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use super::lab_replay_operations::lab_op_to_replay_operation;
 use crate::protocol::{Command, LabReplayOperation, LabReplayOperationEntry};
@@ -15,9 +15,16 @@ const CORRIDOR_ALONG_RADIUS_TILES: i32 = 5;
 const CORRIDOR_LATERAL_RADIUS_TILES: i32 = 2;
 
 pub(crate) fn lab_scenario_driver_for(scenario_id: &str) -> Option<LabScenarioDriver> {
-    (scenario_id == SCENARIO_ID)
-        .then(LabScenarioDriver::supply_300_hellhole)
-        .and_then(Result::ok)
+    if scenario_id != SCENARIO_ID {
+        return None;
+    }
+    match LabScenarioDriver::supply_300_hellhole() {
+        Ok(driver) => Some(driver),
+        Err(err) => {
+            eprintln!("Cannot start Lab scenario driver for {scenario_id}: {err}");
+            None
+        }
+    }
 }
 
 pub(crate) struct LabScenarioDriver {
@@ -25,7 +32,7 @@ pub(crate) struct LabScenarioDriver {
     target_composition: Vec<EntityKind>,
     respawn_candidates: Vec<(f32, f32)>,
     central_unit_provenance: BTreeMap<u32, (u32, EntityKind)>,
-    active_central_unit_ids: BTreeSet<u32>,
+    pending_replacements: Vec<(u32, EntityKind)>,
     reset_roster_on_next_tick: bool,
     scheduled_actions: Vec<ScheduledAction>,
     last_processed_tick: Option<u32>,
@@ -42,7 +49,7 @@ impl LabScenarioDriver {
             target_composition: composition_300_supply()?,
             respawn_candidates: respawn_candidates(),
             central_unit_provenance: BTreeMap::new(),
-            active_central_unit_ids: BTreeSet::new(),
+            pending_replacements: Vec::new(),
             reset_roster_on_next_tick: true,
             scheduled_actions: Vec::new(),
             last_processed_tick: None,
@@ -101,125 +108,86 @@ impl LabScenarioDriver {
                     return None;
                 }
             };
-            current.extend(
-                units
-                    .into_iter()
-                    .map(|(id, kind)| (id, (player_id, kind))),
-            );
+            current.extend(units.into_iter().map(|(id, kind)| (id, (player_id, kind))));
         }
 
-        if self.reset_roster_on_next_tick {
-            self.active_central_unit_ids = current.keys().copied().collect();
-            self.reset_roster_on_next_tick = false;
-        }
-        if self.central_unit_provenance.is_empty() {
-            for (&entity_id, &(owner, current_kind)) in &current {
-                self.active_central_unit_ids.insert(entity_id);
-                self.central_unit_provenance
-                    .insert(entity_id, (owner, current_kind));
-            }
-            return None;
-        }
-
-        let missing_before_conversions: Vec<_> = self
-            .active_central_unit_ids
-            .iter()
-            .filter(|entity_id| !current.contains_key(entity_id))
-            .filter_map(|entity_id| {
-                self.central_unit_provenance
-                    .get(entity_id)
-                    .map(|&(owner, kind)| (*entity_id, owner, kind))
-            })
-            .collect();
-        let mut converted_old_ids = BTreeSet::new();
-        for (&new_id, &(owner, current_kind)) in &current {
-            if self.active_central_unit_ids.contains(&new_id) {
-                continue;
-            }
-            let converted_from = (current_kind == EntityKind::Rifleman).then(|| {
-                missing_before_conversions
-                    .iter()
-                    .find(|(old_id, old_owner, old_kind)| {
-                        !converted_old_ids.contains(old_id)
-                            && *old_owner == owner
-                            && *old_kind == EntityKind::Panzerfaust
-                    })
-            });
-            if let Some(Some(&(old_id, old_owner, original_kind))) = converted_from {
-                converted_old_ids.insert(old_id);
-                self.active_central_unit_ids.remove(&old_id);
-                self.active_central_unit_ids.insert(new_id);
-                self.central_unit_provenance
-                    .insert(new_id, (old_owner, original_kind));
-            } else {
-                self.active_central_unit_ids.insert(new_id);
-                self.central_unit_provenance
-                    .entry(new_id)
-                    .or_insert((owner, current_kind));
-            }
-        }
-        let missing: Vec<_> = missing_before_conversions
-            .into_iter()
-            .filter(|(entity_id, _, _)| !converted_old_ids.contains(entity_id))
-            .collect();
-        let mut selected_missing = Vec::new();
-        let mut requests = Vec::new();
-        for player_id in [1, 2] {
-            let live_kinds: Vec<_> = current
-                .values()
-                .filter(|(owner, _)| *owner == player_id)
-                .map(|(_, kind)| *kind)
-                .collect();
-            let shortage = self
-                .target_composition
-                .len()
-                .saturating_sub(live_kinds.len());
-            selected_missing.extend(
-                missing
-                    .iter()
-                    .filter(|(_, owner, _)| *owner == player_id)
-                    .take(shortage)
-                    .copied(),
-            );
-            let selected_for_player: Vec<_> = selected_missing
+        let missing_slots: Vec<_> = if self.reset_roster_on_next_tick {
+            Vec::new()
+        } else {
+            self.central_unit_provenance
                 .iter()
-                .filter(|(_, owner, _)| *owner == player_id)
+                .filter(|(entity_id, owner_kind)| {
+                    !current
+                        .get(entity_id)
+                        .is_some_and(|(owner, _)| *owner == owner_kind.0)
+                })
+                .map(|(entity_id, (owner, kind))| (*entity_id, *owner, *kind))
+                .collect()
+        };
+        if self.reset_roster_on_next_tick {
+            self.pending_replacements.clear();
+            self.rebuild_roster_provenance(&current);
+            self.reset_roster_on_next_tick = false;
+        } else {
+            self.central_unit_provenance
+                .retain(|entity_id, owner_kind| {
+                    current
+                        .get(entity_id)
+                        .is_some_and(|(owner, _)| *owner == owner_kind.0)
+                });
+            let mut unknown_ids: Vec<_> = current
+                .keys()
+                .filter(|entity_id| !self.central_unit_provenance.contains_key(entity_id))
                 .copied()
                 .collect();
-            requests.extend(
-                selected_for_player
-                    .iter()
-                    .map(|&(_, owner, kind)| (owner, kind)),
-            );
+            for (expected_owner, expected_kind) in self.pending_replacements.drain(..) {
+                let Some(index) = unknown_ids.iter().position(|entity_id| {
+                    current.get(entity_id).is_some_and(|(owner, current_kind)| {
+                        *owner == expected_owner
+                            && (*current_kind == expected_kind
+                                || (expected_kind == EntityKind::Panzerfaust
+                                    && *current_kind == EntityKind::Rifleman))
+                    })
+                }) else {
+                    continue;
+                };
+                let entity_id = unknown_ids.remove(index);
+                self.central_unit_provenance
+                    .insert(entity_id, (expected_owner, expected_kind));
+            }
+        }
 
-            let mut modeled_kinds = live_kinds;
-            modeled_kinds.extend(selected_for_player.iter().map(|(_, _, kind)| *kind));
-            let mut remaining = shortage.saturating_sub(selected_for_player.len());
+        let mut requests = Vec::new();
+        for player_id in [1, 2] {
+            let mut live_kinds: Vec<_> = current
+                .iter()
+                .filter(|(_, (owner, _))| *owner == player_id)
+                .map(|(entity_id, (_, current_kind))| {
+                    self.central_unit_provenance
+                        .get(entity_id)
+                        .map_or(*current_kind, |(_, original_kind)| *original_kind)
+                })
+                .collect();
+            let mut deficits = Vec::new();
             for &target_kind in &self.target_composition {
-                if let Some(index) = modeled_kinds.iter().position(|kind| *kind == target_kind) {
-                    modeled_kinds.swap_remove(index);
-                } else if remaining > 0 {
-                    requests.push((player_id, target_kind));
-                    remaining -= 1;
+                if let Some(index) = live_kinds.iter().position(|kind| *kind == target_kind) {
+                    live_kinds.swap_remove(index);
+                } else {
+                    deficits.push(target_kind);
                 }
             }
-            requests.extend((0..remaining).map(|_| (player_id, EntityKind::Rifleman)));
+            for &(_, missing_owner, missing_kind) in &missing_slots {
+                if missing_owner != player_id {
+                    continue;
+                }
+                if let Some(index) = deficits.iter().position(|kind| *kind == missing_kind) {
+                    deficits.remove(index);
+                    requests.push((player_id, missing_kind));
+                }
+            }
+            requests.extend(deficits.into_iter().map(|kind| (player_id, kind)));
         }
         if requests.is_empty() {
-            if tick == 0 {
-                for player_id in [1, 2] {
-                    let count = current
-                        .values()
-                        .filter(|(owner, _)| *owner == player_id)
-                        .count();
-                    if count != self.target_composition.len() {
-                        eprintln!(
-                            "Hellhole central roster for player {player_id} started at {count}, expected {}",
-                            self.target_composition.len()
-                        );
-                    }
-                }
-            }
             return None;
         }
         let spawns = match game.lab_plan_unit_spawns(&requests, &self.respawn_candidates) {
@@ -236,23 +204,58 @@ impl LabScenarioDriver {
                 requests.len()
             );
         }
-        let mut claimed_missing = BTreeSet::new();
-        for spawn in &spawns {
-            if let Some((entity_id, _, _)) =
-                selected_missing.iter().find(|(entity_id, owner, kind)| {
-                    !claimed_missing.contains(entity_id)
-                        && *owner == spawn.owner
-                        && *kind == spawn.kind
-                })
-            {
-                claimed_missing.insert(*entity_id);
-                self.active_central_unit_ids.remove(entity_id);
-            }
-        }
+        self.pending_replacements = spawns
+            .iter()
+            .map(|spawn| (spawn.owner, spawn.kind))
+            .collect();
         (!spawns.is_empty()).then(|| LabScenarioAction::LabOperation {
             request_id: deterministic_request_id(0x52, tick, 0),
             op: LabOp::SpawnEntities(spawns),
         })
+    }
+
+    fn rebuild_roster_provenance(&mut self, current: &BTreeMap<u32, (u32, EntityKind)>) {
+        self.central_unit_provenance.clear();
+        for player_id in [1, 2] {
+            let mut unknown_ids: Vec<_> = current
+                .iter()
+                .filter(|(_, (owner, _))| *owner == player_id)
+                .map(|(entity_id, _)| *entity_id)
+                .collect();
+            let mut unmatched_targets = Vec::new();
+            for &target_kind in &self.target_composition {
+                if let Some(index) = unknown_ids.iter().position(|entity_id| {
+                    current
+                        .get(entity_id)
+                        .is_some_and(|(_, current_kind)| *current_kind == target_kind)
+                }) {
+                    let entity_id = unknown_ids.remove(index);
+                    self.central_unit_provenance
+                        .insert(entity_id, (player_id, target_kind));
+                } else {
+                    unmatched_targets.push(target_kind);
+                }
+            }
+
+            // A fired Panzerfaust remains the same entity id but becomes a Rifleman. After a seek,
+            // exact-kind matching leaves those surplus Riflemen available to refill Panzerfaust
+            // provenance without creating an extra unit.
+            for target_kind in unmatched_targets {
+                if target_kind != EntityKind::Panzerfaust {
+                    continue;
+                }
+                let Some(index) = unknown_ids.iter().position(|entity_id| {
+                    current
+                        .get(entity_id)
+                        .is_some_and(|(_, current_kind)| *current_kind == EntityKind::Rifleman)
+                }) else {
+                    continue;
+                };
+                let entity_id = unknown_ids.remove(index);
+                self.central_unit_provenance
+                    .insert(entity_id, (player_id, target_kind));
+            }
+        }
     }
 
     pub(super) fn sync_to_tick(&mut self, tick: u32, entries: &[LabReplayOperationEntry]) {
@@ -277,7 +280,7 @@ impl LabScenarioDriver {
             target_composition: Vec::new(),
             respawn_candidates: Vec::new(),
             central_unit_provenance: BTreeMap::new(),
-            active_central_unit_ids: BTreeSet::new(),
+            pending_replacements: Vec::new(),
             reset_roster_on_next_tick: true,
             scheduled_actions: actions
                 .into_iter()
@@ -646,5 +649,57 @@ mod tests {
                 .count(),
             17
         );
+    }
+
+    #[test]
+    fn extra_unit_does_not_mask_a_different_kind_deficit_or_enlarge_canonical_roster() {
+        let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
+        let mut game = scenario.build_game().unwrap();
+        let mut driver = LabScenarioDriver::supply_300_hellhole().unwrap();
+        driver.actions_for_tick(&game);
+        let canonical_slot_count = driver.central_unit_provenance.len();
+
+        let extra_spawn = game
+            .lab_plan_unit_spawns(&[(1, EntityKind::Rifleman)], &driver.respawn_candidates)
+            .unwrap();
+        assert_eq!(extra_spawn.len(), 1);
+        game.apply_lab_op(LabOp::SpawnEntities(extra_spawn))
+            .unwrap();
+        let victim = game
+            .lab_owned_units(1)
+            .unwrap()
+            .into_iter()
+            .find(|(_, kind)| *kind == EntityKind::Tank)
+            .map(|(id, _)| id)
+            .unwrap();
+        game.apply_lab_op(LabOp::DeleteEntity { entity_id: victim })
+            .unwrap();
+        game.tick();
+
+        let actions = driver.actions_for_tick(&game);
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            LabScenarioAction::LabOperation {
+                op: LabOp::SpawnEntities(spawns),
+                ..
+            } if spawns.iter().any(|spawn| {
+                (spawn.owner, spawn.kind) == (1, EntityKind::Tank)
+            })
+        )));
+        for action in actions {
+            match action {
+                LabScenarioAction::Command(command) => game
+                    .issue_lab_command_as(command.player_id, command.command, command.options)
+                    .unwrap(),
+                LabScenarioAction::LabOperation { op, .. } => {
+                    game.apply_lab_op(op).unwrap();
+                }
+            }
+        }
+        game.tick();
+        driver.actions_for_tick(&game);
+
+        assert_eq!(driver.central_unit_provenance.len(), canonical_slot_count);
+        assert!(driver.pending_replacements.is_empty());
     }
 }
