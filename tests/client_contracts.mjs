@@ -7,6 +7,7 @@ import { runScoreboardContracts } from "./client_contracts/scoreboard_contracts.
 
 await import("./client_contracts/settings_contracts.mjs");
 await import("./client_contracts/hud_contracts.mjs");
+await import("./client_contracts/client_flamegraph_contracts.mjs");
 runFrameProfilerContracts();
 await import("./client_contracts/frame_entity_contracts.mjs");
 await import("./client_contracts/presentation_frame_contracts.mjs");

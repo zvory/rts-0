@@ -251,6 +251,43 @@ node scripts/client-perf-harness.mjs --active-supply-pair --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
 
+Canonical client CPU flame graph:
+
+```bash
+git fetch origin main
+node scripts/client-flamegraph.mjs --preview
+```
+
+The flame-graph command runs the deterministic `supply-300-hellhole-stream` workload for 15 seconds
+at the default viewport, DPR 1, CPU throttle 1, and a 500 microsecond V8 sampling interval. The
+harness completes workload assertions, resets its local performance window, and observes at least
+30 rendered frames before CPU sampling begins, so module loading and setup do not dominate the
+profile. It writes the raw `.cpuprofile`, the ordinary harness `summary.json`, a ranked function
+summary, and SVG/PNG flame graphs under ignored `target/client-perf/flamegraphs/`; `--preview`
+publishes the PNG through the normal 24-hour Tailnet Preview service.
+
+Flame width is inclusive sampled CPU time. The heading and ranked JSON use self time aggregated by
+function, source URL, and line so the same function reached through multiple call stacks is not
+understated. Read both views: a wide parent identifies an expensive subsystem, while high self time
+identifies the function doing the work. The colors distinguish game-client JavaScript, Pixi,
+browser/native work, and idle/garbage collection; they are navigation aids rather than performance
+budgets.
+
+Useful variants retain the same one-command workflow:
+
+```bash
+node scripts/client-flamegraph.mjs --workload supply-300-active --seconds 20 --preview
+node scripts/client-flamegraph.mjs --cpu-throttle 4 --viewport 1440x900 --dpr 1 --preview
+```
+
+Before writing client optimization phases, capture from a clean worktree on current `origin/main`,
+inspect the ranked self/inclusive functions and their source, and pair the result with
+`frame.work`/renderer/fog phase evidence from the same harness summary. Use the snapshot stream as
+the repeatable renderer-isolation lane; use `supply-300-active` when the conclusion depends on
+prediction or production-shaped active-player behavior. A page cannot grant itself V8 Profiler
+access, so remote playtester function profiles require a later DevTools, extension, or launcher
+workflow rather than a silent in-page upload.
+
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
 points at an already-healthy server. It drives headless Chrome with the repository-root
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload

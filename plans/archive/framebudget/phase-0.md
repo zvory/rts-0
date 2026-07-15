@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Dispensed. The existing server-heavy Lab scenario and client-only Hellhole snapshot stream
+- [x] Done. Dispensed: the existing server-heavy Lab scenario and client-only Hellhole snapshot stream
   provide separate server and client saturation lanes; this combined end-to-end phase is
   intentionally not being pursued.
 
