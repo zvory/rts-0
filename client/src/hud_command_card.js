@@ -407,6 +407,7 @@ export function buildUnitCard(ctx, selection) {
             enabled: affordance.autocastEnabledIds.length === 0,
           }
         : null,
+      contextHotkeyModifiers: definition.ability === ABILITY.MORTAR_FIRE ? ["alt"] : [],
     };
   }
 
@@ -470,7 +471,7 @@ export function buildTrainCard(ctx, building) {
       .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
     const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
-    const repeatHelp = "Alt-click or Alt+hotkey adds one auto-build; Shift+hotkey removes one";
+    const repeatHelp = "Alt-click or Ctrl+hotkey adds one auto-build; Shift+hotkey removes one";
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
@@ -493,7 +494,7 @@ export function buildTrainCard(ctx, building) {
         buildingIds: producerIds,
         unit,
       },
-      shiftContextAction: true,
+      contextHotkeyModifiers: ["ctrl", "shift"],
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }
