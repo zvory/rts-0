@@ -448,7 +448,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 1,
+    "simSchemaVersion": 2,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -600,6 +600,9 @@ metadata only when old readers can ignore it without changing authoritative stat
 removing, renaming, or changing the meaning of authoritative fields requires a new checkpoint
 version and either an explicit migrator or a stable rejection reason. Existing replay and lab assets
 remain on their current schemas until their phases introduce containers around this payload.
+Simulation schema 2 adds the authoritative construction-cost payment receipt; schema 1 payloads are
+rejected because their unfinished scaffolds cannot be refunded safely. Bundled lab checkpoint assets
+use schema 2 and contain no in-progress construction that needs a receipt backfill.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
