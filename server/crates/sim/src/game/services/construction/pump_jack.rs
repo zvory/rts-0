@@ -2,6 +2,28 @@ use std::collections::BTreeSet;
 
 use super::{config, standability, EntityKind, EntityStore, Map, Occupancy, TeamRelations};
 
+pub(super) fn all_site_unit_blockers_are_friendly(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    owner: u32,
+    builder: u32,
+    tile_x: u32,
+    tile_y: u32,
+) -> bool {
+    entities.iter().all(|entity| {
+        entity.id == builder
+            || entity.hp == 0
+            || !entity.is_unit()
+            || !standability::unit_intersects_building_footprint(
+                entity,
+                EntityKind::PumpJack,
+                tile_x,
+                tile_y,
+            )
+            || teams.same_team_or_same_owner(owner, entity.owner)
+    })
+}
+
 pub(super) fn eject_friendly_units_from_site(
     map: &Map,
     entities: &mut EntityStore,

@@ -104,6 +104,13 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
         .get_mut(worker)
         .expect("worker should exist")
         .set_order(Order::build(EntityKind::PumpJack, 4, 4));
+    let blocker = entities
+        .spawn_unit(1, EntityKind::Worker, sx, sy)
+        .expect("friendly blocker should spawn");
+    let blocker_before = entities
+        .get(blocker)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("friendly blocker should exist");
     let mut players = vec![player_state(1)];
     players[0].set_resources(49, 0);
     let mut events = HashMap::new();
@@ -122,6 +129,13 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
             .iter()
             .all(|entity| entity.kind != EntityKind::PumpJack),
         "resource wait must not spawn a Pump Jack scaffold"
+    );
+    assert_eq!(
+        entities
+            .get(blocker)
+            .map(|entity| (entity.pos_x, entity.pos_y)),
+        Some(blocker_before),
+        "a Pump Jack that cannot yet be afforded must not displace friendly units"
     );
     assert!(matches!(
         events.get(&1).and_then(|events| events.first()),
@@ -146,6 +160,13 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
     );
     assert_eq!(players[0].steel, 0);
     assert_eq!(players[0].oil, 0);
+    assert_ne!(
+        entities
+            .get(blocker)
+            .map(|entity| (entity.pos_x, entity.pos_y)),
+        Some(blocker_before),
+        "the friendly blocker should move once construction can actually start"
+    );
 }
 
 #[test]
@@ -201,7 +222,7 @@ fn arrived_pump_jack_ejects_owned_and_allied_units_before_starting() {
 }
 
 #[test]
-fn arrived_pump_jack_does_not_eject_enemy_unit() {
+fn arrived_pump_jack_does_not_eject_any_units_when_enemy_blocks_site() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (site_x, site_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -223,10 +244,18 @@ fn arrived_pump_jack_does_not_eject_enemy_unit() {
     let enemy = entities
         .spawn_unit(2, EntityKind::Tank, site_x, site_y)
         .expect("enemy blocker should spawn");
-    let before = entities
-        .get(enemy)
-        .map(|entity| (entity.pos_x, entity.pos_y))
-        .expect("enemy should exist");
+    let friendly = entities
+        .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+        .expect("friendly blocker should spawn");
+    let before: Vec<_> = [enemy, friendly]
+        .into_iter()
+        .map(|id| {
+            entities
+                .get(id)
+                .map(|entity| (entity.pos_x, entity.pos_y))
+                .expect("blocker should exist")
+        })
+        .collect();
     let mut players = vec![player_state(1), player_state(2)];
     let mut events = HashMap::new();
 
@@ -235,8 +264,14 @@ fn arrived_pump_jack_does_not_eject_enemy_unit() {
     assert!(entities
         .iter()
         .all(|entity| entity.kind != EntityKind::PumpJack));
-    let enemy = entities.get(enemy).expect("enemy should survive");
-    assert_eq!((enemy.pos_x, enemy.pos_y), before);
+    for (index, id) in [enemy, friendly].into_iter().enumerate() {
+        let entity = entities.get(id).expect("blocker should survive");
+        assert_eq!(
+            (entity.pos_x, entity.pos_y),
+            before[index],
+            "no unit should be displaced while an enemy still blocks construction"
+        );
+    }
     assert_eq!(
         entities
             .get(builder)

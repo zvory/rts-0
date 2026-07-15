@@ -215,7 +215,7 @@ pub(crate) fn unit_position_clear_of_building_footprint(
         return false;
     };
     !unit_body_intersects_rect(candidate_body, site_rect)
-        && unit_static_standable(map, occupancy, kind, x, y)
+        && unit_static_standable_with_facing(map, occupancy, kind, x, y, facing)
         && entities.iter().all(|entity| {
             entity.hp == 0
                 || !entity.is_unit()
@@ -874,6 +874,45 @@ mod tests {
             EntityKind::Worker,
             160.0,
             f32::INFINITY,
+        ));
+    }
+
+    #[test]
+    fn ejection_standability_preserves_oriented_vehicle_facing() {
+        let mut map = flat_map(12);
+        set_tile(&mut map, 5, 5, crate::protocol::terrain::ROCK);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let candidate = map.tile_center(5, 4);
+
+        assert!(unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            candidate.0,
+            candidate.1,
+            0.0,
+        ));
+        assert!(!unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            candidate.0,
+            candidate.1,
+            std::f32::consts::FRAC_PI_2,
+        ));
+        assert!(!unit_position_clear_of_building_footprint(
+            &map,
+            &occ,
+            &entities,
+            &BTreeSet::new(),
+            EntityKind::Tank,
+            std::f32::consts::FRAC_PI_2,
+            candidate.0,
+            candidate.1,
+            EntityKind::PumpJack,
+            9,
+            9,
         ));
     }
 

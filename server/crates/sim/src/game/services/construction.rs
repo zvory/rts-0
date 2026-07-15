@@ -91,17 +91,21 @@ pub(crate) fn construction_system(
         let mut site_status = standability::building_site_status_for_build_intent(
             map, entities, kind, tx, ty, worker,
         );
-        if kind == EntityKind::PumpJack
+        let can_eject_friendly_blockers = kind == EntityKind::PumpJack
             && site_status == standability::BuildSiteStatus::BlockedByUnit
-        {
-            pump_jack::eject_friendly_units_from_site(map, entities, &teams, owner, worker, tx, ty);
-            site_status = standability::building_site_status_for_build_intent(
-                map, entities, kind, tx, ty, worker,
+            && pump_jack::all_site_unit_blockers_are_friendly(
+                entities, &teams, owner, worker, tx, ty,
             );
+        if can_eject_friendly_blockers {
+            // Treat friendly bodies as provisionally clear. They are moved only after the
+            // owner can afford to start, immediately before the final placement check.
+            site_status = standability::BuildSiteStatus::Clear;
         }
         match site_status {
             standability::BuildSiteStatus::Clear => {
-                reset_build_unit_blocked_timer(entities, worker);
+                if !can_eject_friendly_blockers {
+                    reset_build_unit_blocked_timer(entities, worker);
+                }
             }
             standability::BuildSiteStatus::BlockedByUnit => {
                 let timed_out = mark_build_waiting_on_unit_blocker(entities, worker);
@@ -144,6 +148,36 @@ pub(crate) fn construction_system(
             }
             mark_build_waiting_for_resources(entities, worker);
             continue;
+        }
+
+        if can_eject_friendly_blockers {
+            pump_jack::eject_friendly_units_from_site(map, entities, &teams, owner, worker, tx, ty);
+            match standability::building_site_status_for_build_intent(
+                map, entities, kind, tx, ty, worker,
+            ) {
+                standability::BuildSiteStatus::Clear => {
+                    reset_build_unit_blocked_timer(entities, worker);
+                }
+                standability::BuildSiteStatus::BlockedByUnit => {
+                    let timed_out = mark_build_waiting_on_unit_blocker(entities, worker);
+                    if timed_out {
+                        notice_build_failure(events, owner, "Cannot build there");
+                        if let Some(w) = entities.get_mut(worker) {
+                            w.clear_active_order();
+                        }
+                    }
+                    continue;
+                }
+                standability::BuildSiteStatus::BlockedByBuilding
+                | standability::BuildSiteStatus::BlockedByResourceNode
+                | standability::BuildSiteStatus::InvalidFootprint => {
+                    notice_build_failure(events, owner, "Cannot build there");
+                    if let Some(w) = entities.get_mut(worker) {
+                        w.clear_active_order();
+                    }
+                    continue;
+                }
+            }
         }
 
         if !players[player_index].spend_cost(cost) {
