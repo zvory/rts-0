@@ -1207,7 +1207,11 @@ export class Fog {
 before calling `fog.update`; those views are rendered as intel, not as local fog sources. Normal
 match snapshots provide `visibleTiles`, so the overlay follows server-authoritative fog including
 smoke blockers and five-second lingering death sight; local stamping remains a fallback for
-older/dev object snapshots.
+older/dev object snapshots. That fallback still rebuilds the complete visibility union on every
+rendered frame. It may reuse one entity's previously computed tile stamp only while identity, kind,
+exact world position, tile size, sight, footprint, and terrain are unchanged; any changed input
+invalidates the stamp and performs the ordinary line-of-sight rays in the same frame. This is exact
+memoization, not a lower fog cadence or stale-state allowance.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
 `command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the
