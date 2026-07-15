@@ -1,6 +1,21 @@
 use std::collections::{HashMap, HashSet};
 
+use super::connection::ConnectionSink;
 use super::room_task::RoomPlayer;
+
+pub(super) fn replay_viewer(name: String, msg_tx: ConnectionSink) -> RoomPlayer {
+    RoomPlayer {
+        name,
+        color: "#6f8fa8".to_string(),
+        ready: true,
+        spectator: true,
+        msg_tx,
+        head_of_line_count: 0,
+        last_received_client_seq: 0,
+        last_sim_consumed_client_seq: 0,
+        last_sim_consumed_client_tick: None,
+    }
+}
 
 pub(super) struct Participants<'a> {
     order: &'a [u32],

@@ -14,13 +14,13 @@ use crate::protocol::{DiagnosticCapabilities, LabMapDraft, TeamId};
 
 /// A connected player as tracked inside a room.
 pub(in crate::lobby) struct RoomPlayer {
-    pub(super) name: String,
+    pub(in crate::lobby) name: String,
     pub(in crate::lobby) color: String,
-    pub(super) ready: bool,
+    pub(in crate::lobby) ready: bool,
     pub(in crate::lobby) spectator: bool,
     pub(in crate::lobby) msg_tx: ConnectionSink,
     pub(in crate::lobby) head_of_line_count: u32,
-    pub(super) last_received_client_seq: u32,
+    pub(in crate::lobby) last_received_client_seq: u32,
     pub(in crate::lobby) last_sim_consumed_client_seq: u32,
     pub(in crate::lobby) last_sim_consumed_client_tick: Option<u32>,
 }
