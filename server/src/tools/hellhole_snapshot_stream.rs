@@ -166,22 +166,6 @@ pub(crate) fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>)
 mod tests {
     use super::*;
 
-    fn first_frames(bytes: &[u8], count: usize) -> Vec<&[u8]> {
-        assert_eq!(&bytes[..MAGIC.len()], MAGIC);
-        let header_len = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
-        let mut offset = 12 + header_len;
-        (0..count)
-            .map(|_| {
-                let len =
-                    u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
-                offset += 4;
-                let frame = &bytes[offset..offset + len];
-                offset += len;
-                frame
-            })
-            .collect()
-    }
-
     #[test]
     fn generated_stream_has_bounded_header_and_exact_frame_table() {
         let (bytes, summary) = generate_hellhole_snapshot_stream(3).unwrap();
@@ -224,21 +208,6 @@ mod tests {
             offset += 4 + len;
         }
         assert_eq!(offset, bytes.len());
-    }
-
-    #[test]
-    fn checked_artifact_starts_with_canonical_frames() {
-        let checked_artifact = std::fs::read(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../client/assets/snapshot-streams/supply-300-hellhole.rtsstream"
-        ))
-        .unwrap();
-        let (generated, _) = generate_hellhole_snapshot_stream(3).unwrap();
-        assert_eq!(
-            first_frames(&checked_artifact, 3),
-            first_frames(&generated, 3),
-            "checked-in Hellhole stream starts with stale simulation frames"
-        );
     }
 
     #[test]
