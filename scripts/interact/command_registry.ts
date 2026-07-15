@@ -168,7 +168,7 @@ const COMMAND_RECORDS = Object.freeze({
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats"],
     defaults: ["workspaceRoot=current worktree", "map=Default", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab, game, and scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    bounds: ["one session across Lab, game, and dev-scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
     example: { spectate: ["ai_2_1", "ai_turtle"], viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
@@ -218,7 +218,7 @@ const COMMAND_RECORDS = Object.freeze({
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["id/unit/count/blocker/case use the same bounded launch fields as /dev/scenarios", "the scenario remains server-authored and observation-only"],
     defaults: ["blocker/case=omitted", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab, game, and scenario", "safe lowercase scenario tokens", "count 1-400", "viewport 320-4096 x 240-4096"],
+    bounds: ["one session across Lab, game, and dev-scenario", "safe lowercase scenario tokens", "count 1-400", "viewport 320-4096 x 240-4096"],
     example: { id: "direct_reverse_order", unit: "tank", count: 1, viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
   }),
   "scenario-inspect": descriptor("Inspect bounded visible scenario entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],cameraViewport?:boolean,limit?:int}", {
@@ -248,7 +248,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   "scenario-capture-timelapse": descriptor("Capture sampled dev-scenario frames as a compact H.264 time-lapse and contact sheet.", "{sessionId:string,name?:token,maxDurationMs?:int,sampleEveryMs?:int,fps?:int,speed?:number,viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,presentation?:\"clean\"|\"normal\"}", {
     timeoutClass: "lifecycle-media", recordable: false,
-    variants: ["stops when the scenario concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use scenario camera overview first for a whole-map time-lapse"],
+    variants: ["stops when the scenario concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use dev-scenario camera overview first for a whole-map time-lapse"],
     defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "region=viewport", "presentation=clean"],
     bounds: ["duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<scenario-session-id>", name: "pathing", maxDurationMs: 30000, sampleEveryMs: 500, speed: 4 },
@@ -291,7 +291,7 @@ const NAMESPACE_COMMAND_KEYS = Object.freeze({
     "give-up": "game-give-up",
     shutdown: "shutdown",
   }),
-  scenario: Object.freeze({
+  "dev-scenario": Object.freeze({
     open: "scenario-open",
     close: "close",
     status: "status",

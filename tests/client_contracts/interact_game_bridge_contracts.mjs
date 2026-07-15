@@ -22,17 +22,17 @@ assert.equal(
   "the game bridge accepts its isolated AI-vs-AI spectator launch",
 );
 assert.equal(
-  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=scenario")),
+  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=dev-scenario")),
   true,
   "the observation bridge accepts an explicit bounded dev-scenario launch",
 );
 assert.equal(
   interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=game")),
   false,
-  "dev scenarios require their separate scenario namespace gate",
+  "dev scenarios require their separate dev-scenario namespace gate",
 );
 assert.equal(
-  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=bad/scenario&unit=tank&count=1&interact=scenario")),
+  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=bad/scenario&unit=tank&count=1&interact=dev-scenario")),
   false,
   "the scenario bridge rejects unsafe launch tokens",
 );

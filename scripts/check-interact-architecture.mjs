@@ -76,7 +76,7 @@ function checkRegistry() {
 
 function checkCliNamespace() {
   const cli = sources.get("cli.ts") || "";
-  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs <lab|game|scenario> <command> [JSON-object]";')) {
+  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs <lab|game|dev-scenario> <command> [JSON-object]";')) {
     failures.push("the Interact CLI usage must require an explicit supported namespace");
   }
   if (!cli.includes("namespace in INTERACT_NAMESPACES") || !cli.includes('"unknownNamespace"')) {

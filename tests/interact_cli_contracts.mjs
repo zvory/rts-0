@@ -57,8 +57,8 @@ try {
     assert.equal(help.stderr, "", `${helpCommand} keeps machine-readable help on stdout`);
     const helpEnvelope = JSON.parse(help.stdout);
     assert.equal(helpEnvelope.ok, true, `${helpCommand} returns a successful envelope`);
-    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game", "scenario"], `${helpCommand} lists every supported namespace`);
-    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game|scenario> <command> [JSON-object]", `${helpCommand} requires a namespace`);
+    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game", "dev-scenario"], `${helpCommand} lists every supported namespace`);
+    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game|dev-scenario> <command> [JSON-object]", `${helpCommand} requires a namespace`);
   }
   for (const args of [["lab", "--help"], ["help", "lab"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {
@@ -83,19 +83,24 @@ try {
       "game help exposes bounded match observation, player controls, and region-aware media commands",
     );
   }
-  for (const args of [["scenario", "--help"], ["help", "scenario"]]) {
+  for (const args of [["dev-scenario", "--help"], ["help", "dev-scenario"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {
       cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
     });
     assert.equal(help.status, 0, `${args.join(" ")} succeeds without a Git workspace`);
     const result = JSON.parse(help.stdout).result;
-    assert.equal(result.namespace, "scenario", `${args.join(" ")} identifies the scenario namespace`);
+    assert.equal(result.namespace, "dev-scenario", `${args.join(" ")} identifies the dev-scenario namespace`);
     assert.deepEqual(
       result.commands,
       ["open", "close", "status", "inspect", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "shutdown"],
-      "scenario help exposes observation, framing, and media without gameplay mutations",
+      "dev-scenario help exposes observation, framing, and media without gameplay mutations",
     );
   }
+  const retiredScenarioNamespace = spawnSync(process.execPath, [cli, "scenario", "--help"], {
+    cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+  });
+  assert.notEqual(retiredScenarioNamespace.status, 0, "the retired scenario namespace is rejected");
+  assert.equal(JSON.parse(retiredScenarioNamespace.stderr).error.code, "unknownNamespace", "the namespace rename does not leave a hidden alias");
   assert.deepEqual(Object.keys(INTERACT_COMMAND_HELP).sort(), [...INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
   assert.deepEqual(
     INTERACT_COMMAND_HELP.screenshot.variants,
@@ -207,7 +212,7 @@ try {
   callNamespace("game", "shutdown");
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "game contract daemon shuts down cleanly");
 
-  const scenarioOpened = callNamespace("scenario", "open", {
+  const scenarioOpened = callNamespace("dev-scenario", "open", {
     id: "direct_reverse_order", unit: "tank", count: 1,
   }).result;
   assert.match(scenarioOpened.sessionId, /^scenario_[a-f0-9]{32}$/, "scenario open returns a distinct bounded session id");
@@ -216,17 +221,17 @@ try {
   assert.deepEqual(scenarioOpened.capabilities.orders, [], "scenario sessions expose no gameplay orders");
   assert.equal(scenarioOpened.capabilities.giveUp, false, "scenario sessions expose no surrender mutation");
   assert.deepEqual(scenarioOpened.capabilities.media, ["screenshot", "recording", "timelapse"], "scenario sessions advertise every observation capture mode");
-  const scenarioScreenshot = callNamespace("scenario", "screenshot", {
+  const scenarioScreenshot = callNamespace("dev-scenario", "screenshot", {
     sessionId: scenarioOpened.sessionId, name: "before",
   }).result;
   assert.equal(scenarioScreenshot.presentation, "clean", "scenario screenshots use clean presentation by default");
   assert.equal(scenarioScreenshot.preview.available, true, "scenario screenshots publish a Tailnet preview");
-  const scenarioRecording = callNamespace("scenario", "record-start", {
+  const scenarioRecording = callNamespace("dev-scenario", "record-start", {
     sessionId: scenarioOpened.sessionId, name: "full-run", maxDurationMs: 1000,
   }).result;
   assert.equal(scenarioRecording.recorder.presentation, "clean", "scenario recordings use clean presentation by default");
-  callNamespace("scenario", "record-stop", { sessionId: scenarioOpened.sessionId });
-  const scenarioTimelapse = callNamespace("scenario", "capture-timelapse", {
+  callNamespace("dev-scenario", "record-stop", { sessionId: scenarioOpened.sessionId });
+  const scenarioTimelapse = callNamespace("dev-scenario", "capture-timelapse", {
     sessionId: scenarioOpened.sessionId, name: "pathing", maxDurationMs: 1000, sampleEveryMs: 500,
   }).result;
   assert.equal(scenarioTimelapse.preview.available, true, "scenario time-lapses publish a Tailnet video preview");
@@ -235,8 +240,8 @@ try {
     "sessionKindMismatch",
     "scenario sessions cannot inherit game commands",
   );
-  callNamespace("scenario", "close", { sessionId: scenarioOpened.sessionId });
-  callNamespace("scenario", "shutdown");
+  callNamespace("dev-scenario", "close", { sessionId: scenarioOpened.sessionId });
+  callNamespace("dev-scenario", "shutdown");
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "scenario contract daemon shuts down cleanly");
 
   const mismatchEnv = { ...baseEnv, RTS_INTERACT_TEST_CHECKOUT_COMMIT: "b".repeat(40) };
@@ -689,7 +694,7 @@ function callNamespace(namespace, command, input = {}, env = baseEnv) {
   const response = JSON.parse(result.stdout);
   assert.equal(response.ok, true, `${namespace} ${command} returns a successful envelope`);
   if (namespace === "game" && command === "open") testArtifacts.ownGameSession(response.result.sessionId);
-  if (namespace === "scenario" && command === "open") testArtifacts.ownScenarioSession(response.result.sessionId);
+  if (namespace === "dev-scenario" && command === "open") testArtifacts.ownScenarioSession(response.result.sessionId);
   return response;
 }
 

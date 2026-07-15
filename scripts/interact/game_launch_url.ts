@@ -43,7 +43,7 @@ export function interactLaunchUrl({
     if (devScenario.blocker) url.searchParams.set("blocker", devScenario.blocker);
     if (devScenario.case) url.searchParams.set("case", devScenario.case);
     if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
-    url.searchParams.set("interact", "scenario");
+    url.searchParams.set("interact", "dev-scenario");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
     return url.href;
   }

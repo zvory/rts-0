@@ -180,7 +180,7 @@ dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances ex
 authoritative tick while paused. Normal seek/reset controls are replay-only.
 
 Scenario setup is server-side only under `server/crates/sim/src/game/setup/dev_scenarios.rs`; do
-not expose arbitrary spawning or map editing through client commands. The Interact `scenario`
+not expose arbitrary spawning or map editing through client commands. The Interact `dev-scenario`
 namespace may observe, frame, screenshot, record, and time-lapse these watcher rooms; its artifacts
 remain confined under `target/interact/scenario/<session-id>/`.
 
