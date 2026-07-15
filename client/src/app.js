@@ -440,7 +440,7 @@ export class App {
     const notice = formatReplaySeekNotice(m);
     if (!notice) return;
     this.replaySeekNotice = notice;
-    this.showToast(notice, 5000);
+    this.showToast(notice, null);
   }
 
   /**
@@ -941,12 +941,15 @@ export class App {
    * Pop a transient toast (server notices, connection problems, etc.).
    * Re-arming the timer keeps the latest message visible.
    * @param {string} text
+   * @param {number|null} [timeoutMs] Pass null to keep the toast visible until explicitly hidden.
    */
   showToast(text, timeoutMs = TOAST_MS) {
     if (!text) return;
     dom.toast.textContent = text;
     dom.toast.hidden = false;
-    if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (this.toastTimer !== undefined) clearTimeout(this.toastTimer);
+    this.toastTimer = undefined;
+    if (timeoutMs === null) return;
     this.toastTimer = window.setTimeout(() => {
       dom.toast.hidden = true;
       this.toastTimer = undefined;
