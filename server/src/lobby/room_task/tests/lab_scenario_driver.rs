@@ -35,7 +35,7 @@ fn hellhole_scripted_combat_orders_are_recorded_once_and_replayable() {
                     cmd: Command::AttackMove { units, .. },
                     ignore_command_limits,
                 } => {
-                    assert_eq!(units.len(), 100);
+                    assert_eq!(units.len(), 111);
                     assert!(*ignore_command_limits);
                     *player_id
                 }

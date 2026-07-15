@@ -209,6 +209,7 @@ fn grant_lab_state(game: &mut Game) -> Result<(), String> {
 fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
     let required = [
         EntityKind::Worker,
+        EntityKind::Golem,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::Panzerfaust,
@@ -255,12 +256,13 @@ fn supply_of(kind: EntityKind) -> Result<u32, String> {
     }
     let catalog = catalog_for(DEFAULT_FACTION_ID)
         .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;
-    if !catalog.allows_unit(kind) {
-        return Err(format!(
-            "{kind} is not available to faction {DEFAULT_FACTION_ID}"
-        ));
-    }
-    Ok(raw_supply)
+    // Lab can spawn units from every playable faction. Authoritative supply,
+    // however, counts only units in the owning player's faction catalog.
+    Ok(if catalog.allows_unit(kind) {
+        raw_supply
+    } else {
+        0
+    })
 }
 
 fn dense_interleaved_positions(count: usize) -> Vec<(f32, f32)> {

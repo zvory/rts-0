@@ -6,9 +6,10 @@ export const SUPPLY_300_LAB_HELLHOLE = Object.freeze({
   playerIds: Object.freeze([1, 2]),
   godModePlayers: Object.freeze([1, 2]),
   supplyUsed: 300,
-  projectedEntityCount: 202,
+  projectedEntityCount: 224,
   requiredUnitKinds: Object.freeze([
     "worker",
+    "golem",
     "rifleman",
     "machine_gunner",
     "panzerfaust",
@@ -22,6 +23,7 @@ export const SUPPLY_300_LAB_HELLHOLE = Object.freeze({
   countsByOwner: Object.freeze({
     1: Object.freeze({
       worker: 11,
+      golem: 11,
       rifleman: 11,
       machine_gunner: 10,
       panzerfaust: 10,
@@ -34,6 +36,7 @@ export const SUPPLY_300_LAB_HELLHOLE = Object.freeze({
     }),
     2: Object.freeze({
       worker: 11,
+      golem: 11,
       rifleman: 11,
       machine_gunner: 10,
       panzerfaust: 10,
