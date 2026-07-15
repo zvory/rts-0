@@ -266,6 +266,20 @@ fn checkpoint_payload_rejects_corrupt_oversized_and_unsupported_text() {
             field: "compatibility.protocolVersion",
         })
     ));
+
+    let legacy_sim_schema = mutate_payload(&text, |value| {
+        value["compatibility"]["simSchemaVersion"] = serde_json::json!(1);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &legacy_sim_schema,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "compatibility.simSchemaVersion",
+        })
+    ));
 }
 
 #[test]
