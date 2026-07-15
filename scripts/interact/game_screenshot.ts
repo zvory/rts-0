@@ -13,9 +13,12 @@ export async function captureGameScreenshot(
   session: GameSession,
   input: JsonObject,
   artifactPreview: InteractTailnetPreview | null,
+  captureKind: "game" | "scenario" = "game",
 ) {
-  const name = typeof input.name === "string" ? input.name : "game";
-  const presentation = input.presentation === "clean" ? "clean" : "normal";
+  const name = typeof input.name === "string" ? input.name : captureKind;
+  const presentation = input.presentation === "clean" || (input.presentation == null && captureKind === "scenario")
+    ? "clean"
+    : "normal";
   const viewport = isObject(input.viewport)
     ? input.viewport as { width: number; height: number; deviceScaleFactor?: number }
     : null;
@@ -26,7 +29,7 @@ export async function captureGameScreenshot(
   const entities = objectArray(inspected.entities);
   const entitiesById = new Map(entities.map((entity) => [Number(entity.id), entity]));
   const subjectSummaries = subjectIds.map((id) => entitiesById.get(id) || null);
-  if (subjectSummaries.some((entity) => !entity)) throw codedError("unknownEntity", "game screenshot subjects must exist in the current fog-filtered snapshot.");
+  if (subjectSummaries.some((entity) => !entity)) throw codedError("unknownEntity", `${captureKind} screenshot subjects must exist in the current watcher snapshot.`);
   const capture = await session.driver.screenshot({
     sessionId: session.sessionId,
     name,
@@ -35,7 +38,7 @@ export async function captureGameScreenshot(
     region: (input.region || "viewport") as CaptureRegion,
     subjectIds,
     subjectSummaries,
-    request: { command: "game screenshot", sessionId: session.sessionId, name, presentation, viewport, region: input.region || "viewport", subjects: subjectIds },
+    request: { command: `${captureKind} screenshot`, sessionId: session.sessionId, name, presentation, viewport, region: input.region || "viewport", subjects: subjectIds },
   });
   const image = asObject(capture.image);
   const visible = {

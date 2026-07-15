@@ -21,9 +21,7 @@ import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
 import { waitForInteractStartup } from "./bridge_startup.ts";
-
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
-
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
@@ -35,14 +33,12 @@ const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
 const ARTIFACT_CAPABILITY_HEADER = "x-interact-lab-capability";
-
 export const DRIVER_STATES = Object.freeze({
   OPENING: "opening",
   OPEN: "open",
   CLOSING: "closing",
   CLOSED: "closed",
 });
-
 type JsonObject = Record<string, unknown>;
 interface WorkspaceInfo { root: string; branch: string; head: string }
 interface BridgeResult extends JsonObject {
@@ -120,10 +116,11 @@ interface ActiveFixedCapture {
 }
 interface DriverOptions {
   workspaceRoot?: string;
-  mode?: "lab" | "game";
+  mode?: "lab" | "game" | "scenario";
   map?: string;
   seed?: string;
   scenario?: string;
+  devScenario?: { id: string; unit: string; count: number; blocker: string; case: string };
   opponent?: string;
   spectate?: string[] | null;
   renderer?: string;
@@ -201,6 +198,7 @@ export class InteractDriver {
     map,
     seed = "",
     scenario = "blank",
+    devScenario = { id: "", unit: "", count: 1, blocker: "", case: "" },
     opponent = "ai_2_1",
     spectate = null,
     renderer = "pixi",
@@ -220,6 +218,7 @@ export class InteractDriver {
       map: map || defaultMapForMode(mode),
       seed,
       scenario,
+      devScenario,
       opponent,
       spectate,
       renderer,
@@ -1075,6 +1074,7 @@ export class InteractDriver {
       renderer: this.options.renderer,
       seed: this.options.seed,
       scenario: this.options.scenario,
+      devScenario: this.options.devScenario,
     });
   }
 
@@ -1201,7 +1201,7 @@ export function safeArtifactName(value: string, fallback = "scene") {
 
 function safeCaptureSessionId(value: unknown) {
   const sessionId = String(value || "").trim();
-  if (!/^(?:lab|game)_[a-f0-9]{32}$/.test(sessionId)) {
+  if (!/^(?:lab|game|scenario)_[a-f0-9]{32}$/.test(sessionId)) {
     throw new InteractDriverError("invalidSession", "sessionId must be a valid Interact session id.");
   }
   return sessionId;

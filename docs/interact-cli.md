@@ -3,9 +3,11 @@
 Interact is a project-local, namespaced command-line tool. The `lab` namespace arranges and
 inspects small authoritative Lab scenes. The `game` namespace opens either one isolated normal
 human-vs-AI match or a spectator-only AI-vs-AI match for bounded inspection, screenshots, real-time
-video, and sampled time-lapse video. Both
+video, and sampled time-lapse video. The observation-only `scenario` namespace opens the existing
+server-authored dev scenarios for screenshots, before/after stills, real-time video, and sampled
+time lapses. All three
 start this worktree's normal Rust server and a headless client using Pixi by default; `open` accepts
-`renderer:"babylon"` in either namespace. Interact never edits source files.
+`renderer:"babylon"` in every namespace. Interact never edits source files.
 
 Interact requires Node 22.18 or newer and runs its TypeScript source directly through Node's
 built-in type stripping; there is no compile or generated-output step. Install the repository-owned
@@ -64,6 +66,22 @@ node scripts/interact/cli.mjs game close '{"sessionId":"<id>"}'
 node scripts/interact/cli.mjs game shutdown
 ```
 
+Dev scenarios use their existing server-owned launch fields and expose no gameplay mutations:
+
+```bash
+node scripts/interact/cli.mjs scenario open '{"id":"direct_reverse_order","unit":"tank","count":1,"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs scenario inspect '{"sessionId":"<id>","limit":100}'
+node scripts/interact/cli.mjs scenario camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
+node scripts/interact/cli.mjs scenario screenshot '{"sessionId":"<id>","name":"before"}'
+node scripts/interact/cli.mjs scenario record-start '{"sessionId":"<id>","name":"full-run","maxDurationMs":10000}'
+node scripts/interact/cli.mjs scenario record-wait '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs scenario screenshot '{"sessionId":"<id>","name":"after"}'
+node scripts/interact/cli.mjs scenario capture-timelapse '{"sessionId":"<id>","name":"pathing","maxDurationMs":30000,"sampleEveryMs":500,"speed":4}'
+node scripts/interact/cli.mjs scenario capture-cancel '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs scenario close '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs scenario shutdown
+```
+
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
 `time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
 `import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
@@ -83,6 +101,15 @@ ability, input-event, DOM-selector, or browser-evaluation surface. `give-up` use
 surrender flow and returns only after the score screen appears. Spectator sessions expose neither
 move nor surrender; their only mutation is the AI-only room's existing bounded speed control used
 internally by time-lapse capture.
+
+The complete `scenario` surface is `open`, `close`, `status`, `inspect`, `camera`, `screenshot`,
+`record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, and `shutdown`.
+`scenario open` accepts the same `id`, `unit`, `count`, optional `blocker`, and optional `case`
+fields listed by `/dev/scenarios`. Its launch gate requires `watchScenario=1` and
+`interact=scenario`; the server still selects and constructs the scenario. The namespace exposes no
+spawn, order, move, build, arbitrary protocol, input-event, DOM-selector, or browser-evaluation
+surface. Scenario media defaults to clean presentation; use `presentation:"normal"` when the HUD
+or minimap is part of the review.
 
 Global help returns the namespace catalog. `lab --help`, `lab help <command>`, and
 `lab <command> --help` return the Lab command catalog or a command's exact accepted shape and
@@ -158,7 +185,7 @@ concurrent calls return the one active session instead of starting another brows
 before `open` when a fresh session or different launch options are required. Optional aliases match
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
 cross-session aliases are rejected rather than guessed. A session may retain up to 400 aliases.
-Only one authoritative session may be open per worktree across both namespaces. Opening the other
+Only one authoritative session may be open per worktree across all three namespaces. Opening another
 kind while a session is active returns `sessionKindMismatch` and preserves the current session.
 Server-rejected Lab launches, such as an unknown map or scenario, return `launchFailed` with the
 server's bounded error text as soon as the browser receives it rather than consuming the full
@@ -257,7 +284,7 @@ Repeat production uses the normal authoritative `adjustProductionRepeat` game co
 producer. Producer ownership, compatibility, allocation policy, resources, supply, and retry
 behavior remain ordinary simulation rules.
 
-Artifacts are first confined to `target/interact/<lab|game>/<session-id>/` and ignored by Git.
+Artifacts are first confined to `target/interact/<lab|game|scenario>/<session-id>/` and ignored by Git.
 On publication, Interact copies the PNG or MP4 into the machine-level `tailnet-preview` service
 outside the worktree. That service binds the stable Tailnet port 8091, has no idle timeout, and
 retains each copied artifact for at least 24 hours. The URL therefore survives Lab `close`,
@@ -339,7 +366,7 @@ duration, capped at 45, 75, and 30 seconds respectively. `record-stop`, `record-
 120-second deadline. Close, shutdown, and idle cleanup initiate recorder settlement before draining
 queued session work, so an outstanding waiter cannot prevent the lifecycle action that resolves it.
 
-Recordings live under `target/interact/<lab|game>/<session-id>/recordings/`, are capped at 64 MiB, and are
+Recordings live under `target/interact/<lab|game|scenario>/<session-id>/recordings/`, are capped at 64 MiB, and are
 never printed through the CLI. The duration watchdog finalizes automatically. Session `close`,
 daemon `shutdown`, and idle teardown attempt bounded finalization and remove a partial directory if
 finalization fails; they do not leave FFmpeg owned by the session. Recording checks require
@@ -367,6 +394,12 @@ authoritative map bounds and disables the automatic spectator camera. Time-lapse
 Tailnet video/contact-sheet previews, sampled ticks and hashes in the withheld manifest, the actual
 stop reason, and the selected region. `status` reports progress and `capture-cancel` interrupts at
 the next wait/frame boundary.
+
+`scenario capture-timelapse` uses the same sampling, region, encoder, progress, cancellation, and
+preview contracts against an authored dev-scenario watcher room. It defaults to clean presentation,
+records the scenario launch fields in the withheld manifest, and temporarily restores the prior
+authoritative speed after capture. Run `scenario camera` with `action:"overview"` first when a fixed
+whole-map view is more useful than the normal watcher camera.
 
 ## Fixed-step capture
 

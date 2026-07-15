@@ -35,8 +35,12 @@ try {
     "Lab opens accept hyphenated bundled scenario ids",
   );
   const gameSessionId = `game_${"b".repeat(32)}`;
+  const scenarioSessionId = `scenario_${"c".repeat(32)}`;
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");
+  assert.doesNotThrow(() => validateCommandInput("scenario-open", { id: "direct_reverse_order", unit: "tank", count: 1 }));
+  assert.throws(() => validateCommandInput("scenario-open", { id: "bad/scenario", unit: "tank", count: 1 }), (error) => error?.code === "invalidInput");
+  assert.doesNotThrow(() => validateCommandInput("scenario-capture-timelapse", { sessionId: scenarioSessionId, maxDurationMs: 1000, sampleEveryMs: 500 }));
   assert.equal(timelapseFrameBound(60_000, 1_000), 60, "one-minute default time-lapse samples exactly 60 frames");
   assert.equal(timelapseMayCaptureFrame(0, 1_000, 500, 1_500), true, "time-lapse always retains its initial frame");
   assert.equal(timelapseMayCaptureFrame(1, 1_000, 500, 1_499), true, "time-lapse samples later frames before its deadline");
@@ -110,6 +114,19 @@ try {
     sessionId: spectator.sessionId, maxDurationMs: 1_000, sampleEveryMs: 500, region: "minimap",
   });
   assert.equal(timelapse.frameSummary.count, 2, "game time-lapse returns sampled media through the bounded service surface");
+  await service.execute("close", { sessionId: spectator.sessionId });
+
+  const scenario = await service.execute("scenario-open", {
+    id: "supply_stress_active", unit: "rifleman", count: 200,
+  });
+  testArtifacts.ownScenarioSession(scenario.sessionId);
+  assert.equal(scenario.capabilities.role, "observer", "scenario capabilities describe the observation namespace rather than its server seat");
+  assert.deepEqual(scenario.capabilities.orders, [], "scenario capabilities expose no gameplay orders");
+  assert.equal(scenario.capabilities.giveUp, false, "scenario capabilities expose no surrender mutation");
+  const scenarioTimelapse = await service.execute("scenario-capture-timelapse", {
+    sessionId: scenario.sessionId, maxDurationMs: 1_000, sampleEveryMs: 500,
+  });
+  assert.equal(scenarioTimelapse.frameSummary.count, 2, "active-player dev scenarios retain the bounded time-lapse surface");
 
   console.log("✅ interact_fixed_capture_contracts.mjs: bounds, tick mapping, service, and media passed");
 } finally {

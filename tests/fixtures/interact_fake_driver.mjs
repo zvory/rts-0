@@ -290,7 +290,7 @@ export async function openInteractDriver(options) {
       };
     },
     async captureTimelapse({ sessionId, name = "timelapse", fps = 30, speed = 8, region = "viewport" }) {
-      const directory = `${options.workspaceRoot}/target/interact/game/${sessionId}/timelapse/${name}`;
+      const directory = `${options.workspaceRoot}/target/interact/${options.mode || "game"}/${sessionId}/timelapse/${name}`;
       fs.mkdirSync(directory, { recursive: true });
       fs.writeFileSync(path.join(directory, `${name}.mp4`), "fixture-mp4\n");
       fs.writeFileSync(path.join(directory, `${name}-contact-sheet.png`), Buffer.from(ONE_PIXEL_PNG, "base64"));
