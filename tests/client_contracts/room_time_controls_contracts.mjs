@@ -5,6 +5,24 @@ import { assert } from "./assertions.mjs";
 import { LAB_ROLE } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
+import { formatReplaySeekNotice } from "../../client/src/replay_seek_notice.js";
+
+assert(
+  formatReplaySeekNotice({ fromTick: 900, targetTick: 300 }) === "Seeking backward 20 seconds…",
+  "replay seek notices describe authoritative backward distance in seconds",
+);
+assert(
+  formatReplaySeekNotice({ fromTick: 300, targetTick: 345 }) === "Seeking forward 1.5 seconds…",
+  "replay seek notices describe authoritative forward distance in seconds",
+);
+assert(
+  formatReplaySeekNotice({ fromTick: 30, targetTick: 30 }) === "Seeking to the current replay position…",
+  "replay seek notices handle an accepted no-distance seek",
+);
+assert(
+  formatReplaySeekNotice({ fromTick: "invalid", targetTick: 30 }) === "",
+  "replay seek notices ignore malformed protocol values",
+);
 
 const priorWindow = globalThis.window;
 const priorDocument = globalThis.document;

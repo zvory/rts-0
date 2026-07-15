@@ -278,7 +278,55 @@ fn replay_room_rejects_rapid_seek_without_resetting_viewers() {
     assert!(!messages
         .iter()
         .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    assert!(!messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::RoomTimeSeekStarted { .. })));
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+}
+
+#[test]
+fn replay_seek_started_reaches_every_viewer_before_rebuild_results() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 4);
+    let mut replay = ReplaySession::new(artifact).unwrap();
+    for _ in 0..3 {
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+    }
+    let mut task = RoomTask::new(
+        "replay-seek-started-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut controller = add_test_room_player(&mut task, 99, true);
+    let mut viewer = add_test_room_player(&mut task, 100, true);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_seek_room_time_to(99, 1);
+
+    for (label, writer) in [("controller", &mut controller), ("viewer", &mut viewer)] {
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(
+            matches!(
+                messages.first(),
+                Some(ServerMessage::RoomTimeSeekStarted {
+                    controller_id: 99,
+                    from_tick: 3,
+                    target_tick: 1,
+                })
+            ),
+            "{label} should receive seek progress before rebuilt replay messages: {messages:?}"
+        );
+        assert!(messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::Start(_))));
+        assert!(messages.iter().any(|msg| matches!(
+            msg,
+            ServerMessage::RoomTimeState(state) if state.current_tick == 1
+        )));
+    }
 }
 
 #[test]

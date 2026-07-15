@@ -29,6 +29,13 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Shared room-controlled time cursor/state. Sent reliably outside snapshot cadence.
     RoomTimeState(RoomTimeState),
+    /// An accepted replay seek is about to rebuild shared room time. Broadcast before the
+    /// synchronous rebuild so every viewer can present immediate progress feedback.
+    RoomTimeSeekStarted {
+        controller_id: u32,
+        from_tick: u32,
+        target_tick: u32,
+    },
     /// Authoritative live-match pause state. Sent reliably after start and on every transition.
     LivePauseState(LivePauseState),
     /// Authoritative observer analysis data for replay viewers and live spectators.

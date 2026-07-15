@@ -7,16 +7,17 @@ use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::crash_replay::{dump_crash_replay_artifact, panic_reason};
 use super::super::dev_replay::load_replay_artifact;
 use super::super::launch::{LaunchPrediction, StartPayloadBuilder, StartPayloadRecipient};
+use super::super::participants::replay_viewer;
 use super::super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
-use super::super::replay_session::{validate_vision_selection_request, ReplaySession};
+use super::super::replay_session::{
+    validate_vision_selection_request, ReplaySeekPlan, ReplaySession,
+};
 use super::super::session_policy::{RoomTimeOperation, RoomTimeSource, SessionPhase};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::tick_control::{RoomTimeSpeed, TickControl};
 use super::super::ReplayBranchSeed;
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
-use super::types::{
-    LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, RoomMode, RoomPlayer,
-};
+use super::types::{LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, RoomMode};
 use super::RoomTask;
 use crate::protocol::{Event, RoomTimeState, ServerMessage, StartPayload, VisionSelectionRequest};
 use rts_sim::game::Game;
@@ -51,8 +52,7 @@ impl RoomTask {
             return;
         }
         self.order.push(player_id);
-        self.players
-            .insert(player_id, replay_room_player(name, msg_tx));
+        self.players.insert(player_id, replay_viewer(name, msg_tx));
         let _ = ack.send(true);
         self.send_replay_start_to(player_id);
         self.send_room_time_state_to(player_id);
@@ -71,8 +71,7 @@ impl RoomTask {
             return;
         }
         self.order.push(player_id);
-        self.players
-            .insert(player_id, replay_room_player(name, msg_tx));
+        self.players.insert(player_id, replay_viewer(name, msg_tx));
         self.reassign_host_if_needed();
         let _ = ack.send(true);
         self.send_current_shutdown_warning_to(player_id);
@@ -91,8 +90,7 @@ impl RoomTask {
             return;
         }
         self.order.push(player_id);
-        self.players
-            .insert(player_id, replay_room_player(name, msg_tx));
+        self.players.insert(player_id, replay_viewer(name, msg_tx));
         let _ = ack.send(true);
 
         match &self.phase {
@@ -560,8 +558,8 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
-        self.on_seek_replay_room_time(player_id, send_analysis, |session, room, viewers, id| {
-            session.seek_back(room, viewers, id, ticks_back)
+        self.on_seek_replay_room_time(player_id, send_analysis, |session| {
+            session.plan_seek_back(ticks_back)
         });
     }
 
@@ -584,8 +582,8 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
-        self.on_seek_replay_room_time(player_id, send_analysis, |session, room, viewers, id| {
-            session.seek_to(room, viewers, id, tick)
+        self.on_seek_replay_room_time(player_id, send_analysis, |session| {
+            session.plan_seek_to(tick)
         });
     }
 
@@ -593,7 +591,7 @@ impl RoomTask {
         &mut self,
         player_id: u32,
         send_analysis: bool,
-        seek: impl FnOnce(&mut ReplaySession, &str, usize, u32) -> Result<u32, String>,
+        plan_seek: impl FnOnce(&ReplaySession) -> Result<ReplaySeekPlan, String>,
     ) {
         let context = ReplayTickContext {
             scheduler_lag: Duration::ZERO,
@@ -611,7 +609,14 @@ impl RoomTask {
         };
 
         let viewer_count = self.players.len();
-        let seek_result = seek(&mut session, &self.room, viewer_count, player_id);
+        let seek_result = plan_seek(&session).and_then(|plan| {
+            self.broadcast(&ServerMessage::RoomTimeSeekStarted {
+                controller_id: player_id,
+                from_tick: plan.from_tick,
+                target_tick: plan.target_tick,
+            });
+            session.apply_seek(&self.room, viewer_count, player_id, plan)
+        });
         match seek_result {
             Ok(_) => {
                 let starts = self
@@ -677,19 +682,5 @@ impl RoomTask {
         if self.players.contains_key(&player_id) && matches!(self.phase, Phase::ReplayViewer(_)) {
             self.on_leave(player_id);
         }
-    }
-}
-
-fn replay_room_player(name: String, msg_tx: ConnectionSink) -> RoomPlayer {
-    RoomPlayer {
-        name,
-        color: "#6f8fa8".to_string(),
-        ready: true,
-        spectator: true,
-        msg_tx,
-        head_of_line_count: 0,
-        last_received_client_seq: 0,
-        last_sim_consumed_client_seq: 0,
-        last_sim_consumed_client_tick: None,
     }
 }

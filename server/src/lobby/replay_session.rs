@@ -94,6 +94,12 @@ pub(super) struct ReplayKeyframe {
     pub(super) next_command: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ReplaySeekPlan {
+    pub(super) from_tick: u32,
+    pub(super) target_tick: u32,
+}
+
 impl ReplaySession {
     #[allow(dead_code)]
     pub(super) const DEFAULT_SPEED: f32 = 2.0;
@@ -412,6 +418,7 @@ impl ReplaySession {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn seek_back(
         &mut self,
         room: &str,
@@ -419,14 +426,11 @@ impl ReplaySession {
         controller_id: u32,
         ticks_back: u32,
     ) -> Result<u32, String> {
-        let target_tick = self
-            .current_tick()
-            .saturating_sub(ticks_back)
-            .max(self.start_tick)
-            .min(self.duration_ticks);
-        self.seek_to(room, viewer_count, controller_id, target_tick)
+        let plan = self.plan_seek_back(ticks_back)?;
+        self.apply_seek(room, viewer_count, controller_id, plan)
     }
 
+    #[cfg(test)]
     pub(super) fn seek_to(
         &mut self,
         room: &str,
@@ -434,24 +438,66 @@ impl ReplaySession {
         controller_id: u32,
         target_tick: u32,
     ) -> Result<u32, String> {
+        let plan = self.plan_seek_to(target_tick)?;
+        self.apply_seek(room, viewer_count, controller_id, plan)
+    }
+
+    pub(super) fn plan_seek_back(&self, ticks_back: u32) -> Result<ReplaySeekPlan, String> {
+        self.plan_seek_to(self.current_tick().saturating_sub(ticks_back))
+    }
+
+    pub(super) fn plan_seek_to(&self, target_tick: u32) -> Result<ReplaySeekPlan, String> {
         if self
             .last_seek_at
             .is_some_and(|last_seek| last_seek.elapsed() < Self::SEEK_COOLDOWN)
         {
             return Err("Replay seek ignored; wait before seeking again.".to_string());
         }
-        let from_tick = self.current_tick();
-        let target_tick = target_tick.clamp(self.start_tick, self.duration_ticks);
+        Ok(ReplaySeekPlan {
+            from_tick: self.current_tick(),
+            target_tick: target_tick.clamp(self.start_tick, self.duration_ticks),
+        })
+    }
+
+    pub(super) fn apply_seek(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        plan: ReplaySeekPlan,
+    ) -> Result<u32, String> {
+        // Replay reconstruction is synchronous CPU work. In the production multi-thread runtime,
+        // mark this section as blocking so Tokio can hand this worker's async tasks (especially
+        // connection writers carrying RoomTimeSeekStarted) to a replacement worker. The fallback
+        // keeps ordinary unit tests and any current-thread runtime usable.
+        if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
+            handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
+        }) {
+            return tokio::task::block_in_place(|| {
+                self.apply_seek_blocking(room, viewer_count, controller_id, plan)
+            });
+        }
+        self.apply_seek_blocking(room, viewer_count, controller_id, plan)
+    }
+
+    fn apply_seek_blocking(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        plan: ReplaySeekPlan,
+    ) -> Result<u32, String> {
+        debug_assert_eq!(self.current_tick(), plan.from_tick);
         let seek_start = StdInstant::now();
-        let keyframe_tick = self.rebuild_to(target_tick)?;
+        let keyframe_tick = self.rebuild_to(plan.target_tick)?;
         self.last_seek_at = Some(StdInstant::now());
         self.last_controller_id = Some(controller_id);
         crate::log_info!(
             room = %room,
             controller_id,
             viewer_count,
-            from_tick,
-            to_tick = target_tick,
+            from_tick = plan.from_tick,
+            to_tick = plan.target_tick,
             keyframe_tick,
             duration_ticks = self.duration_ticks,
             command_count = self.artifact.command_log.len(),
@@ -459,7 +505,7 @@ impl ReplaySession {
             rebuild_ms = seek_start.elapsed().as_millis(),
             "replay seek rebuilt"
         );
-        Ok(target_tick)
+        Ok(plan.target_tick)
     }
 
     pub(super) fn rebuild_to(&mut self, target_tick: u32) -> Result<u32, String> {

@@ -64,6 +64,7 @@ import { InteractBridge, interactLaunchEnabled } from "./interact_bridge.js";
 import { InteractGameBridge, interactGameLaunchEnabled } from "./interact_game_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
+import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -142,6 +143,8 @@ export class App {
         : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
+    /** @type {string} active replay-seek toast, cleared by the rebuilt replay start. */
+    this.replaySeekNotice = "";
     /** @type {number|undefined} heartbeat interval id while connected. */
     this.heartbeatTimer = undefined;
     /** Whether the WebSocket has ever reached open in this page session. */
@@ -153,6 +156,7 @@ export class App {
     this.onObservationReady = this.onObservationReady.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
     this.onShutdownWarning = this.onShutdownWarning.bind(this);
+    this.onRoomTimeSeekStarted = this.onRoomTimeSeekStarted.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
     this.onCloseScorePanel = this.onCloseScorePanel.bind(this);
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
@@ -185,6 +189,7 @@ export class App {
     this.net.on(S.GAME_OVER, this.onGameOver);
     this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
+    this.net.on(S.ROOM_TIME_SEEK_STARTED, this.onRoomTimeSeekStarted);
     this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
@@ -431,6 +436,13 @@ export class App {
     if (this.lobby) this.lobby.setStatus(text, true);
   }
 
+  onRoomTimeSeekStarted(m) {
+    const notice = formatReplaySeekNotice(m);
+    if (!notice) return;
+    this.replaySeekNotice = notice;
+    this.showToast(notice, null);
+  }
+
   /**
    * Socket opened: start an app-level heartbeat so a healthy connection is never
    * dropped by the server's idle timeout. We only ping once the socket is open,
@@ -478,6 +490,10 @@ export class App {
     });
     this.setCleanPresentation(false);
     const startsReplay = !!payload?.replay;
+    if (this.replaySeekNotice) {
+      this.hideToast(this.replaySeekNotice);
+      this.replaySeekNotice = "";
+    }
     if (!startsReplay) this.lastObservationRunId = "";
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
     const capabilities = createRoomCapabilities({ startPayload: payload });
@@ -925,15 +941,28 @@ export class App {
    * Pop a transient toast (server notices, connection problems, etc.).
    * Re-arming the timer keeps the latest message visible.
    * @param {string} text
+   * @param {number|null} [timeoutMs] Pass null to keep the toast visible until explicitly hidden.
    */
   showToast(text, timeoutMs = TOAST_MS) {
     if (!text) return;
     dom.toast.textContent = text;
     dom.toast.hidden = false;
-    if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (this.toastTimer !== undefined) clearTimeout(this.toastTimer);
+    this.toastTimer = undefined;
+    if (timeoutMs === null) return;
     this.toastTimer = window.setTimeout(() => {
       dom.toast.hidden = true;
+      this.toastTimer = undefined;
     }, timeoutMs);
+  }
+
+  /** Hide the current toast, optionally only when it still contains the expected notice. */
+  hideToast(expectedText = null) {
+    if (expectedText != null && dom.toast.textContent !== expectedText) return false;
+    if (this.toastTimer !== undefined) clearTimeout(this.toastTimer);
+    this.toastTimer = undefined;
+    dom.toast.hidden = true;
+    return true;
   }
 
   shutdownSecondsRemaining(m) {

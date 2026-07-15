@@ -109,6 +109,7 @@ src/
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   presentation/    # Frozen semantic layers, opaque GridSnapshot accessors, static map, and frame assembly
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
+  replay_seek_notice.js # Shared replay-seek direction/duration toast formatting
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
@@ -537,6 +538,10 @@ status, and keyframe marks only from `capabilities.roomTime`. The AI-only live r
 speed-only room-time profile, so the same component renders no seek, step, or timeline affordance
 for those rooms. Replay fog-perspective controls and the replay-branch button remain gated by
 replay-specific visibility/action capabilities, not by lab or URL identity.
+
+The app shell listens for reliable `roomTimeSeekStarted` broadcasts throughout replay playback and
+shows every viewer, including the controller, a `Seeking forward/backward X seconds…` toast before
+the synchronous replay rebuild can stall visible snapshots.
 
 The shared control surface is the `dom.roomTimeControls` root (`#room-time-controls`). Static
 pause/step controls use `.room-time-pause-btn` and `.room-time-step-btn`; generated room-time status
@@ -1890,7 +1895,7 @@ Current areas:
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
   `observer_analysis_preferences.js`, `observer_analysis_rows.js`, `observer_analysis_signatures.js`,
-  `floating_panel_positioner.js`, `replay_controls.js`,
+  `floating_panel_positioner.js`, `replay_controls.js`, `replay_seek_notice.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
