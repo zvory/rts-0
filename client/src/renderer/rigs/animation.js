@@ -150,7 +150,7 @@ function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
   };
 }
 
-export function sampleRigAnimation(definition, entity, renderContext = {}) {
+export function sampleRigAnimation(definition, entity, renderContext = {}, options = {}) {
   const inputContext = renderContext || {};
   const context = inputContext[RIG_CONTEXT_READY]
     ? inputContext
@@ -159,7 +159,9 @@ export function sampleRigAnimation(definition, entity, renderContext = {}) {
       ...inputContext,
     };
   const parts = {};
+  const includeParts = normalizedPartSet(options.includeParts);
   for (const part of definition.parts || []) {
+    if (includeParts && !includeParts.has(part.id)) continue;
     parts[part.id] = {
       id: part.id,
       transform: { ...part.transform },
@@ -180,6 +182,13 @@ export function sampleRigAnimation(definition, entity, renderContext = {}) {
   }
 
   return { context, parts };
+}
+
+function normalizedPartSet(includeParts) {
+  if (includeParts == null) return null;
+  if (includeParts instanceof Set) return includeParts;
+  if (typeof includeParts === "string") return new Set([includeParts]);
+  return new Set(includeParts);
 }
 
 function applyBinding(sampled, binding, input) {

@@ -3,7 +3,7 @@ import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
-import { createRigRenderContext } from "./rigs/animation.js";
+import { createRigRenderContext, sampleRigAnimation } from "./rigs/animation.js";
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
 import { pngAtlasRouteCoverage, renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
@@ -164,6 +164,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(e.kind) || null;
   if (frameStrip && frameStripTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    applyRigAlpha(renderContext, pools.alpha);
     const frameStripMovement = this._frameStripMovementVisual?.(e, state);
     if (frameStripMovement) {
       renderContext.frameStripMoving = frameStripMovement.moving;
@@ -173,11 +174,15 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     const activePoolNames = new Set();
     const shadowRoute = routes.find((route) => route.parts?.includes?.("part.shadow"));
     if (shadowRoute) {
+      const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
+        includeParts: shadowRoute.parts,
+      });
       activePoolNames.add(shadowRoute.poolName);
       rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
         routes: [shadowRoute],
         alpha: pools.alpha,
         renderContext,
+        sampledAnimation,
       }) || []));
     }
     const poolName = pools.liveRigUnit || "liveUnitRigs";
@@ -197,10 +202,22 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(e.kind) ?? null;
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    applyRigAlpha(renderContext, pools.alpha);
     const rendered = [];
     const activePoolNames = new Set();
-    for (const route of routes) {
-      const coverage = pngAtlasRouteCoverage(definition, pngAtlas, route);
+    const routedCoverage = routes.map((route) => ({
+      route,
+      coverage: pngAtlasRouteCoverage(definition, pngAtlas, route),
+    }));
+    const sampledParts = new Set();
+    for (const { coverage } of routedCoverage) {
+      for (const partId of coverage.animationParts) sampledParts.add(partId);
+      for (const partId of coverage.missingParts) sampledParts.add(partId);
+    }
+    const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
+      includeParts: sampledParts,
+    });
+    for (const { route, coverage } of routedCoverage) {
       if (coverage.coveredParts.length > 0) {
         const pngRoute = coverage.missingParts.length === 0
           ? route
@@ -212,6 +229,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
           routes: [pngRoute],
           alpha: pools.alpha,
           renderContext,
+          sampledAnimation,
+          routesCovered: true,
         }) || []));
       }
       if (coverage.missingParts.length > 0) {
@@ -223,6 +242,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
           routes: [svgRoute],
           alpha: pools.alpha,
           renderContext,
+          sampledAnimation,
         }) || []));
       }
     }
@@ -231,10 +251,29 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   }
 
   destroyInactiveLiveRigInstances(this, e.id, routePoolNames(routes));
+  const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+  applyRigAlpha(renderContext, pools.alpha);
+  const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
+    includeParts: routePartIds(routes),
+  });
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
     routes,
     alpha: pools.alpha,
+    renderContext,
+    sampledAnimation,
   });
+}
+
+function applyRigAlpha(renderContext, alpha) {
+  if (typeof alpha === "number") renderContext.shotRevealAlpha = alpha;
+}
+
+function routePartIds(routes) {
+  const parts = new Set();
+  for (const route of routes || []) {
+    for (const partId of route.parts || []) parts.add(partId);
+  }
+  return parts;
 }
 
 function pngFallbackSvgRoute(route, pools = {}) {

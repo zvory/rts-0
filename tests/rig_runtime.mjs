@@ -341,6 +341,18 @@ test("rig runtime can update one routed part group", () => {
   instance.destroy();
 });
 
+test("animation sampler can skip parts outside the active render routes", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 13, kind: KIND.WORKER, owner: 1, facing: Math.PI / 2 };
+  const sampled = sampleRigAnimation(definition, entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    colorByOwner: new Map([[1, 0x778899]]),
+  }), { includeParts: ["part.shadow", "part.facingTick"] });
+
+  assert.deepEqual(Object.keys(sampled.parts).sort(), ["part.facingTick", "part.shadow"]);
+  assert.equal(sampled.parts["part.facingTick"].transform.rotation, Math.PI / 2);
+});
+
 test("geometry-scale animation grows coordinates without scaling stroke width", () => {
   const svg = `<svg viewBox="-12 -12 24 24" data-rts-rig-kind="${KIND.WORKER}" data-rts-rig-version="1" data-rts-origin="center">
   <polygon id="part.flash" points="-1,0 2,-1 2,1" fill="#ffd84a" stroke="#d8d0b0" stroke-width="2.2" data-rts-animation="recoilProgress:geometry.scaleX:1:0;recoilProgress:geometry.scaleY:0.5:0" />
@@ -508,7 +520,8 @@ test("default Worker draw uses live SVG rig without enabling comparison", () => 
   assert.equal(renderer.layers.unitShadows.children.length, 1);
   assert.equal(renderer.layers.units.children.length, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.get(entity.id).parts.get("part.shadow").display.visible, true);
-  assert.equal(renderer._liveRigPools.liveUnitRigs.get(entity.id).parts.get("part.shadow").display.visible, false);
+  assert.equal(renderer._liveRigPools.liveUnitRigShadows.get(entity.id).parts.size, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigs.get(entity.id).parts.has("part.shadow"), false);
 });
 
 test("default Tank draw uses live SVG rig with separate turret and hull parts", () => {
@@ -539,7 +552,7 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   assert.equal(unit.parts.get("part.barrel").display.rotation, Math.PI / 2);
   assert.equal(effects.parts.get("part.tank.flashCore").display.visible, true);
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
-  assert.equal(unit.parts.get("part.shadow").display.visible, false);
+  assert.equal(unit.parts.has("part.shadow"), false);
   assert.equal(unit.parts.get("part.fuelCue.box").display.visible, false);
 });
 
@@ -635,10 +648,13 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(contextCallCount, 1);
   assert.equal(typeof shadow.matches, "function");
+  assert.deepEqual([...shadow.parts.keys()], ["part.shadow"]);
   assert.equal(shadow.parts.get("part.shadow").display.visible, true);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
   assert.equal(typeof overlay.matches, "function");
   assert.equal(typeof effects.matches, "function");
+  assert.deepEqual([...overlay.parts.keys()].sort(), ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
+  assert.deepEqual([...effects.parts.keys()].sort(), ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
   assert.equal(unit.parts.has("sprite.hull"), true);
   assert.equal(unit.parts.has("sprite.turret"), true);
   assert.equal(unit.parts.has("sprite.barrel"), true);
@@ -1176,6 +1192,8 @@ test("live rig instances are destroyed through renderer-style sweep", () => {
   });
   const shadowInstance = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   const unitInstance = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.deepEqual([...shadowInstance.parts.keys()], ["part.shadow"]);
+  assert.deepEqual([...unitInstance.parts.keys()].sort(), ["part.body", "part.busyIndicator", "part.facingTick"]);
   for (const seen of Object.values(renderer._seen)) seen.clear();
   renderer._unseen = new Map([[entity.id, 999]]);
   _sweep.call(renderer);

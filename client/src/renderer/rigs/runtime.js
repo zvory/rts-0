@@ -2,6 +2,7 @@ import { sampleRigAnimation } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
+const PART_SELECTION_KEYS = new WeakMap();
 
 export function createDefaultPixiFactory(pixi = globalThis.PIXI) {
   return {
@@ -10,8 +11,8 @@ export function createDefaultPixiFactory(pixi = globalThis.PIXI) {
   };
 }
 
-export function createUnitRigInstance(kind, definition, pixiFactory = createDefaultPixiFactory()) {
-  return new UnitRigInstance(kind, definition, pixiFactory);
+export function createUnitRigInstance(kind, definition, pixiFactory = createDefaultPixiFactory(), options = {}) {
+  return new UnitRigInstance(kind, definition, pixiFactory, options);
 }
 
 export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
@@ -23,14 +24,19 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
     const pool = renderer._liveRigPools?.[route.poolName];
     if (!pool) continue;
     let instance = pool.get(entity.id);
-    if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition))) {
+    if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition, route.parts))) {
       instance.destroy();
       pool.delete(entity.id);
       instance = null;
       renderer._recordRenderDiagnostic?.(`renderer.rig.instance.rebuilt.${route.poolName}`);
     }
     if (!instance) {
-      instance = createUnitRigInstance(entity.kind, definition, renderer._rigPixiFactory ?? createDefaultPixiFactory());
+      instance = createUnitRigInstance(
+        entity.kind,
+        definition,
+        renderer._rigPixiFactory ?? createDefaultPixiFactory(),
+        { includeParts: route.parts },
+      );
       renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
       renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigContainer");
       renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigPart", instance.parts?.size || 0);
@@ -42,7 +48,7 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
     const layer = renderer.layers[route.layerName];
     if (!instance.container.parent && layer) layer.addChild(instance.container);
     instance.update(entity, context, {
-      includeParts: route.parts,
+      sampledAnimation: options.sampledAnimation,
       diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
     });
     rendered.push(instance);
@@ -51,15 +57,18 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
 }
 
 export class UnitRigInstance {
-  constructor(kind, definition, pixiFactory) {
+  constructor(kind, definition, pixiFactory, options = {}) {
     this.kind = kind;
     this.definition = definition;
     this._pixiFactory = pixiFactory;
     this.container = pixiFactory.createContainer();
     this.parts = new Map();
+    this._routeParts = normalizedPartSet(options.includeParts);
+    this._routePartKey = partSelectionKey(this._routeParts);
     this._destroyed = false;
 
     for (const part of definition.parts || []) {
+      if (this._routeParts && !this._routeParts.has(part.id)) continue;
       const display = pixiFactory.createGraphics();
       display.rtsRigPartId = part.id;
       this.parts.set(part.id, { definition: part, display });
@@ -67,8 +76,12 @@ export class UnitRigInstance {
     }
   }
 
-  matches(kind, definition) {
-    return this.kind === kind && this.definition === definition;
+  matches(kind, definition, includeParts = null) {
+    return (
+      this.kind === kind &&
+      this.definition === definition &&
+      this._routePartKey === partSelectionKey(includeParts)
+    );
   }
 
   update(entity, renderContext = {}, options = {}) {
@@ -80,8 +93,13 @@ export class UnitRigInstance {
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 
-    const sampled = sampleRigAnimation(this.definition, entity, renderContext);
-    const includeParts = normalizedPartSet(options.includeParts);
+    const includeParts = this._routeParts ?? normalizedPartSet(options.includeParts);
+    const sampled = options.sampledAnimation ?? sampleRigAnimation(
+      this.definition,
+      entity,
+      renderContext,
+      { includeParts },
+    );
     for (const [partId, rec] of this.parts) {
       const partState = sampled.parts[partId];
       if (!partState || (includeParts && !includeParts.has(partId))) {
@@ -274,4 +292,15 @@ function normalizedPartSet(includeParts) {
   if (typeof includeParts === "string") return new Set([includeParts]);
   if (Array.isArray(includeParts)) return new Set(includeParts);
   return new Set([...includeParts]);
+}
+
+function partSelectionKey(includeParts) {
+  if (includeParts && typeof includeParts === "object") {
+    const cached = PART_SELECTION_KEYS.get(includeParts);
+    if (cached !== undefined) return cached;
+  }
+  const parts = normalizedPartSet(includeParts);
+  const key = parts ? [...parts].sort().join("\u0000") : null;
+  if (includeParts && typeof includeParts === "object") PART_SELECTION_KEYS.set(includeParts, key);
+  return key;
 }
