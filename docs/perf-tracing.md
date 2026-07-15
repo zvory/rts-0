@@ -240,6 +240,34 @@ exercises simulation, per-player snapshot fanout, snapshot compaction, and the a
 usual `RTS_PERF*` and `RUST_LOG` environment variables when you need a different trace shape, or pass
 `--perf full` for every tick.
 
+Hellhole isolation pair:
+
+```bash
+# Server only: Game API in/out, no listener, socket, browser, or real-time pacing.
+scripts/hellhole-perf-harness.sh --ticks 900
+
+# Client only: checked-in snapshots, no WebSocket or live simulation.
+node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 30
+```
+
+The server command restores the canonical four-player scenario and measures each direct API round
+trip as `Game::tick()` plus one full-world snapshot, production compaction, and MessagePack
+encoding. It runs as fast as the server can complete work, reports aggregate average/p95/p99/max
+timings and payload size, and accepts `--json` for machine-readable output. It deliberately omits
+the room scheduler, WebSocket send, and browser so client speed cannot throttle it.
+
+For an explicitly combined visual check, run:
+
+```bash
+scripts/hellhole-perf-harness.sh --integrated --seconds 60
+```
+
+Integrated mode builds a release server, runs the canonical live Lab workload at the ordinary 30
+Hz cadence, and opens the controlled Chrome window visibly. It is useful for seeing both halves in
+tandem, but its result is end-to-end evidence rather than an isolated server or client measurement.
+The integrated workload is opt-in and is excluded from the default workload set and
+`--render-lag-suite`.
+
 Browser client performance harness:
 
 ```bash
@@ -294,7 +322,8 @@ points at an already-healthy server. It drives headless Chrome with the reposito
 under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
 `vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios, the active-player
 `supply-200-active`/`supply-300-active` pair, and the client-only
-`supply-300-hellhole-stream`. The active pair uses the same fixed local seed (`0x5a000300`),
+`supply-300-hellhole-stream`. The opt-in `supply-300-hellhole-integrated` workload is not included
+in default or render-lag-suite runs. The active pair uses the same fixed local seed (`0x5a000300`),
 viewport, DPR, CPU throttle, duration, and repeat settings. Both measured browsers join as player 1
 with compatible WASM prediction enabled; sampling fails for spectator/disabled prediction,
 client-mutated setup, wrong supply/cap/composition, or wrong projected regular-entity count. The

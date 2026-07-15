@@ -98,6 +98,23 @@ export function buildClientPerfWorkloads(env = process.env) {
         resetPerfAfterSetup: true,
       },
     },
+    {
+      id: "supply-300-hellhole-integrated",
+      description: "Opt-in live Lab view with the authoritative Hellhole server and Pixi client in tandem.",
+      kind: "labScenario",
+      defaultEnabled: false,
+      url: "/lab?room=client-perf-hellhole&map=1v1&scenario=supply-300-hellhole",
+      setup: {
+        liveLabScenario: {
+          scenarioId: "supply-300-hellhole",
+          mapWidth: 126,
+          mapHeight: 126,
+          projectedEntityCount: 380,
+        },
+        waitForMinEntities: 380,
+        resetPerfAfterSetup: true,
+      },
+    },
     ...(incidentReplaySource ? [{
       id: "incident-120-commander-endgame",
       description: "Paused Commander-perspective replay at the 244-entity late-game render incident.",
@@ -117,4 +134,8 @@ export function buildClientPerfWorkloads(env = process.env) {
       },
     }] : []),
   ]);
+}
+
+export function defaultClientPerfWorkloads(workloads = buildClientPerfWorkloads()) {
+  return Object.freeze(workloads.filter((workload) => workload.defaultEnabled !== false));
 }

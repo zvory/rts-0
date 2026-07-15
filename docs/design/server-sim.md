@@ -604,6 +604,15 @@ Simulation schema 2 adds the authoritative construction-cost payment receipt; sc
 rejected because their unfinished scaffolds cannot be refunded safely. Bundled lab checkpoint assets
 use schema 2 and contain no in-progress construction that needs a receipt backfill.
 
+The canonical Hellhole server benchmark is a direct `Game`-API harness, not a live room. Running
+`scripts/hellhole-perf-harness.sh` restores `supply-300-hellhole`, issues its deterministic Lab
+movement commands through the public Lab command seam, calls `tick()`, and produces one full-world
+snapshot through the normal compaction and MessagePack encoding path for every tick. It starts no
+HTTP listener, WebSocket, or browser and does not pace itself from wall time, so a slow renderer
+cannot become its bottleneck. The separate checked-in snapshot stream is the client-only lane. A
+live Lab server and Pixi client may be run together only through the explicit `--integrated` mode
+for visual/end-to-end inspection; that mode is not server-isolation evidence.
+
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` for reliable server messages and a dedicated latest-only slot for observer-analysis payloads sent to its socket.

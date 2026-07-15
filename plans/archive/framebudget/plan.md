@@ -15,10 +15,11 @@ owned-PR workflow archives it when the retirement lands so a future agent can cr
 
 ### [Phase 0 - Build the 300-Supply Lab Hellhole](phase-0.md)
 
-Phase 0 was dispensed instead of combining server and client saturation into one workload. The
-existing Lab scenario remains the server-heavy simulation/projection lane, while the generated
-snapshot stream is the repeatable client-only renderer lane. Keeping the lanes separate prevents
-server variance from obscuring client optimization comparisons.
+Phase 0 was dispensed instead of combining server and client saturation into one workload. The Lab
+scenario now feeds a direct, client-free server harness covering simulation, full-world projection,
+compaction, and encoding, while the generated snapshot stream is the repeatable client-only renderer
+lane. The live server/client Lab workload remains an explicit visual option. Keeping the default
+lanes separate prevents either runtime from obscuring optimization comparisons in the other.
 
 ### [Phase 1 - Own and Measure the Complete Frame](phase-1.md)
 
@@ -62,7 +63,8 @@ Before creating replacement implementation phases:
 - Preserve server-authoritative fog, the detached `PresentationFrameV1` boundary, last-successful-
   present selection semantics, one Match-owned RAF, and exactly one explicit present per frame.
 - Whole-map zoom remains the representative worst case; viewport culling is not benchmark success.
-- Keep the generated Hellhole snapshot stream unchanged during before/after comparisons.
+- Keep the generated Hellhole snapshot stream unchanged during client before/after comparisons and
+  use the API-in/API-out Hellhole harness for isolated server measurements.
 - Treat Chrome CPU throttling and local profiles as comparative machine-local evidence, not device
   certification.
 - Keep raw profiles, flame graphs, screenshots, and benchmark output under ignored `target/` paths.
