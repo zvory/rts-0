@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   InteractGameBridge,
   interactGameLaunchEnabled,
+  interactScenarioLaunchEnabled,
 } from "../../client/src/interact_game_bridge.js";
 
 assert.equal(
@@ -19,6 +20,21 @@ assert.equal(
   interactGameLaunchEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=interact-game-test&rtsRole=spectator&interact=game")),
   true,
   "the game bridge accepts its isolated AI-vs-AI spectator launch",
+);
+assert.equal(
+  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=scenario")),
+  true,
+  "the observation bridge accepts an explicit bounded dev-scenario launch",
+);
+assert.equal(
+  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=game")),
+  false,
+  "dev scenarios require their separate scenario namespace gate",
+);
+assert.equal(
+  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=bad/scenario&unit=tank&count=1&interact=scenario")),
+  false,
+  "the scenario bridge rejects unsafe launch tokens",
 );
 
 const previousDocument = globalThis.document;

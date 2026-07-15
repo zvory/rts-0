@@ -15,6 +15,7 @@ export const INTERACT_GAME_LIMITS = Object.freeze({
 });
 
 const GAME_ROOM_PREFIX = "interact-game-";
+const DEV_SCENARIO_TOKEN_RE = /^[a-z0-9_]+$/;
 const DEFAULT_FOCUS_PADDING = 48;
 const SINGLE_UNIT_FOCUS_PADDING = 32;
 
@@ -32,11 +33,37 @@ export function interactGameLaunchEnabled(locationLike = globalThis.location) {
   }
 }
 
+export function interactScenarioLaunchEnabled(locationLike = globalThis.location) {
+  try {
+    const params = new URLSearchParams(locationLike?.search || "");
+    const pathname = locationLike?.pathname || "";
+    const blocker = params.get("blocker") || "";
+    const scenarioCase = params.get("case") || "";
+    return (pathname === "/" || pathname === "") &&
+      params.get("interact") === "scenario" &&
+      params.get("watchScenario") === "1" &&
+      DEV_SCENARIO_TOKEN_RE.test(params.get("id") || "") &&
+      DEV_SCENARIO_TOKEN_RE.test(params.get("unit") || "") &&
+      /^[1-9][0-9]*$/.test(params.get("count") || "") &&
+      (!blocker || DEV_SCENARIO_TOKEN_RE.test(blocker)) &&
+      (!scenarioCase || DEV_SCENARIO_TOKEN_RE.test(scenarioCase));
+  } catch {
+    return false;
+  }
+}
+
 export class InteractGameBridge {
-  constructor({ app, windowLike = globalThis.window, enabled = interactGameLaunchEnabled(), sleep = delay } = {}) {
+  constructor({
+    app,
+    windowLike = globalThis.window,
+    enabled = interactGameLaunchEnabled() || interactScenarioLaunchEnabled(),
+    mode = interactScenarioLaunchEnabled() ? "scenario" : "game",
+    sleep = delay,
+  } = {}) {
     this.app = app;
     this.windowLike = windowLike;
     this.enabled = !!enabled;
+    this.mode = mode === "scenario" ? "scenario" : "game";
     this.sleep = sleep;
     this.destroyed = false;
     this.surface = Object.freeze({
@@ -68,13 +95,13 @@ export class InteractGameBridge {
                   : "ready";
     return {
       version: INTERACT_GAME_BRIDGE_VERSION,
-      mode: "game",
+      mode: this.mode,
       enabled: this.enabled && !this.destroyed,
       ready: reason === "ready",
       reason,
       websocketConnected,
       startReceived: !!match,
-      room: this.app?.matchLaunch?.room || "",
+      room: this.app?.matchLaunch?.room || this.app?.devWatch?.room || "",
       snapshotTick: snapshotApplied ? match.state.tick : null,
       playerId: match?.state?.playerId ?? null,
       role: match?.state?.spectator ? "spectator" : "player",

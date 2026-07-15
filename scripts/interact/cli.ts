@@ -20,10 +20,11 @@ import type { RuntimePaths, RuntimeRecord } from "./runtime.ts";
 
 const STARTUP_TIMEOUT_MS = 15_000;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const USAGE = "node scripts/interact/cli.mjs <lab|game> <command> [JSON-object]";
+const USAGE = "node scripts/interact/cli.mjs <lab|game|scenario> <command> [JSON-object]";
 const NAMESPACE_SUMMARIES = Object.freeze({
   lab: "Arrange and inspect authoritative Lab scenes.",
   game: "Observe and minimally control one isolated human-vs-AI match.",
+  scenario: "Observe and capture one authored server-backed dev scenario.",
 });
 
 interface DaemonIdentity extends RuntimeRecord {
@@ -67,7 +68,7 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
   const namespace = namespaceHelp ? argv[1] : argv[0];
   if (!namespace || !(namespace in INTERACT_NAMESPACES)) {
     if (namespaceHelp && namespace) {
-      throw cliError("unknownNamespace", `Unknown Interact namespace ${JSON.stringify(namespace)}. Available namespaces: lab, game.`);
+      throw cliError("unknownNamespace", `Unknown Interact namespace ${JSON.stringify(namespace)}. Available namespaces: lab, game, scenario.`);
     }
     throw cliError("unknownNamespace", `Interact requires a namespace. Usage: ${USAGE}`);
   }

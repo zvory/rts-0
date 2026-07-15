@@ -27,7 +27,7 @@ export const ALL_CATALOG_CATEGORIES = Object.freeze([
 export const ALIAS_RE = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{1,64}$/;
-const SESSION_RE = /^(?:lab|game)_[a-f0-9]{32}$/;
+const SESSION_RE = /^(?:lab|game|scenario)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
@@ -60,6 +60,7 @@ export function validatorFor(command: string): (value: unknown) => CommandInput 
 export function validateCommandInput(command: string, value: unknown): CommandInput {
   record(value, "input");
   const session = () => sessionId(value.sessionId);
+  if (command.startsWith("scenario-")) return validateScenarioNamespaceInput(command, value, session);
   if (command.startsWith("game-")) return validateGameNamespaceInput(command, value, session);
   if (command === "shutdown") return exact(value, [], "shutdown");
   if (command === "status") {
@@ -162,6 +163,63 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
     if (value.viewport != null) viewport(value.viewport, 2048, "capture-fixed.viewport");
   } else if (command === "capture-cancel") {
     exact(value, ["sessionId"], command);
+  } else {
+    throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
+  }
+  return value;
+}
+
+function validateScenarioNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
+  if (command === "scenario-open") {
+    exact(value, ["workspaceRoot", "id", "unit", "count", "blocker", "case", "renderer", "viewport"], "scenario open");
+    if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("scenario open.workspaceRoot", "must be a non-empty string");
+    scenarioToken(value.id, "scenario open.id");
+    scenarioToken(value.unit, "scenario open.unit");
+    integer(value.count, "scenario open.count", 1, 400);
+    if (value.blocker != null) scenarioToken(value.blocker, "scenario open.blocker");
+    if (value.case != null) scenarioToken(value.case, "scenario open.case");
+    if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("scenario open.renderer", "must be pixi or babylon");
+    if (value.viewport != null) viewport(value.viewport, 4096, "scenario open.viewport");
+    return value;
+  }
+  session();
+  if (command === "scenario-inspect") {
+    exact(value, ["sessionId", "ids", "kinds", "cameraViewport", "limit"], "scenario inspect");
+    if (value.ids != null) idArray(value.ids, "scenario inspect.ids", 0, INTERACT_LIMITS.maxInspectRefs);
+    if (value.kinds != null) array(value.kinds, "scenario inspect.kinds", 0, 32, (entry: unknown) => token(entry, "scenario inspect.kind"));
+    optionalBoolean(value.cameraViewport, "scenario inspect.cameraViewport");
+    if (value.limit != null) integer(value.limit, "scenario inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
+  } else if (command === "scenario-camera") {
+    exact(value, ["sessionId", "camera"], "scenario camera");
+    validateGameCamera(value.camera);
+  } else if (command === "scenario-screenshot") {
+    exact(value, ["sessionId", "name", "presentation", "viewport", "region", "subjects"], "scenario screenshot");
+    artifactToken(value.name, "scenario screenshot.name");
+    presentation(value.presentation, "scenario screenshot.presentation");
+    if (value.viewport != null) viewport(value.viewport, 2048, "scenario screenshot.viewport");
+    if (value.region != null) captureRegion(value.region, "scenario screenshot.region");
+    if (value.subjects != null) idArray(value.subjects, "scenario screenshot.subjects", 0, INTERACT_LIMITS.maxScreenshotSubjects);
+  } else if (command === "scenario-record-start") {
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "region", "scale", "presentation"], "scenario record-start");
+    artifactToken(value.name, "scenario record-start.name");
+    if (value.maxDurationMs != null) integer(value.maxDurationMs, "scenario record-start.maxDurationMs", 1_000, INTERACT_LIMITS.maxRecordingDurationMs);
+    if (value.viewport != null) viewport(value.viewport, 2048, "scenario record-start.viewport");
+    if (value.crop != null) recordingCrop(value.crop);
+    if (value.region != null) captureRegion(value.region, "scenario record-start.region");
+    if (value.crop != null && value.region != null) invalid("scenario record-start", "cannot combine crop with region");
+    if (value.scale != null) boundedNumber(value.scale, "scenario record-start.scale", 0.25, 1);
+    presentation(value.presentation, "scenario record-start.presentation");
+  } else if (command === "scenario-capture-timelapse") {
+    exact(value, ["sessionId", "name", "maxDurationMs", "sampleEveryMs", "fps", "speed", "viewport", "region", "presentation"], "scenario capture-timelapse");
+    artifactToken(value.name, "scenario capture-timelapse.name");
+    const duration = value.maxDurationMs == null ? GAME_TIMELAPSE_LIMITS.defaultDurationMs : integer(value.maxDurationMs, "scenario capture-timelapse.maxDurationMs", 1_000, GAME_TIMELAPSE_LIMITS.maxDurationMs);
+    const sampleEvery = value.sampleEveryMs == null ? GAME_TIMELAPSE_LIMITS.defaultSampleEveryMs : integer(value.sampleEveryMs, "scenario capture-timelapse.sampleEveryMs", GAME_TIMELAPSE_LIMITS.minSampleEveryMs, GAME_TIMELAPSE_LIMITS.maxSampleEveryMs);
+    if (timelapseFrameBound(duration, sampleEvery) > GAME_TIMELAPSE_LIMITS.maxFrames) invalid("scenario capture-timelapse", `may capture at most ${GAME_TIMELAPSE_LIMITS.maxFrames} sampled frames`);
+    if (value.fps != null) integer(value.fps, "scenario capture-timelapse.fps", GAME_TIMELAPSE_LIMITS.minFps, GAME_TIMELAPSE_LIMITS.maxFps);
+    if (value.speed != null) boundedNumber(value.speed, "scenario capture-timelapse.speed", GAME_TIMELAPSE_LIMITS.minSpeed, GAME_TIMELAPSE_LIMITS.maxSpeed);
+    if (value.viewport != null) viewport(value.viewport, 2048, "scenario capture-timelapse.viewport");
+    if (value.region != null) captureRegion(value.region, "scenario capture-timelapse.region");
+    presentation(value.presentation, "scenario capture-timelapse.presentation");
   } else {
     throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
   }
@@ -333,6 +391,12 @@ function artifactToken(value: unknown, label: string) {
 
 function presentation(value: unknown, label: string) {
   if (value != null && !["clean", "normal"].includes(String(value))) invalid(label, "must be clean or normal");
+}
+
+function scenarioToken(value: unknown, label: string) {
+  if (typeof value !== "string" || !/^[a-z0-9_]+$/.test(value) || value.length > 64) {
+    invalid(label, "must be a lowercase scenario token");
+  }
 }
 
 function displayName(value: unknown, label: string, maximumBytes: number) {

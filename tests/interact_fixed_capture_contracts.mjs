@@ -35,8 +35,12 @@ try {
     "Lab opens accept hyphenated bundled scenario ids",
   );
   const gameSessionId = `game_${"b".repeat(32)}`;
+  const scenarioSessionId = `scenario_${"c".repeat(32)}`;
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");
+  assert.doesNotThrow(() => validateCommandInput("scenario-open", { id: "direct_reverse_order", unit: "tank", count: 1 }));
+  assert.throws(() => validateCommandInput("scenario-open", { id: "bad/scenario", unit: "tank", count: 1 }), (error) => error?.code === "invalidInput");
+  assert.doesNotThrow(() => validateCommandInput("scenario-capture-timelapse", { sessionId: scenarioSessionId, maxDurationMs: 1000, sampleEveryMs: 500 }));
   assert.equal(timelapseFrameBound(60_000, 1_000), 60, "one-minute default time-lapse samples exactly 60 frames");
   assert.equal(timelapseMayCaptureFrame(0, 1_000, 500, 1_500), true, "time-lapse always retains its initial frame");
   assert.equal(timelapseMayCaptureFrame(1, 1_000, 500, 1_499), true, "time-lapse samples later frames before its deadline");

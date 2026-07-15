@@ -168,7 +168,7 @@ const COMMAND_RECORDS = Object.freeze({
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats"],
     defaults: ["workspaceRoot=current worktree", "map=Default", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab and game", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    bounds: ["one session across Lab, game, and scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
     example: { spectate: ["ai_2_1", "ai_turtle"], viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
@@ -214,6 +214,45 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["AI-vs-AI spectator session only", "duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<game-session-id>", name: "whole-map", maxDurationMs: 120000, sampleEveryMs: 1000, speed: 8, region: "viewport" },
   }),
+  "scenario-open": descriptor("Open or recover one authored server-backed dev scenario for observation and media capture.", "{workspaceRoot?:string,id:token,unit:token,count:int,blocker?:token,case?:token,renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
+    scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
+    variants: ["id/unit/count/blocker/case use the same bounded launch fields as /dev/scenarios", "the scenario remains server-authored and observation-only"],
+    defaults: ["blocker/case=omitted", "renderer=pixi", "viewport=1440x900 at DPR 1"],
+    bounds: ["one session across Lab, game, and scenario", "safe lowercase scenario tokens", "count 1-400", "viewport 320-4096 x 240-4096"],
+    example: { id: "direct_reverse_order", unit: "tank", count: 1, viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
+  }),
+  "scenario-inspect": descriptor("Inspect bounded visible scenario entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],cameraViewport?:boolean,limit?:int}", {
+    lane: "observation",
+    defaults: ["ids/kinds=unfiltered", "cameraViewport=false", "limit=25"],
+    bounds: ["0-400 unique ids", "0-32 kinds", "limit 1-400", "only the no-fog watcher snapshot is inspectable"],
+    example: { sessionId: "<scenario-session-id>", limit: 100 },
+  }),
+  "scenario-camera": descriptor("Set the camera, focus bounded visible entity ids, or frame the whole scenario map.", "{sessionId:string,camera:game-camera-command}", {
+    variants: ["focus {action,entities,padding?}", "overview {action,padding?} fits the whole map", "set {action,snapshot:CameraSnapshotV1}"],
+    defaults: ["focus.padding=32 for one unit, otherwise 48"],
+    bounds: ["focus 1-400 unique ids", "padding 0-1024", "snapshot framingScale >0 and <=16"],
+    example: { sessionId: "<scenario-session-id>", camera: { action: "overview" } },
+  }),
+  "scenario-screenshot": descriptor("Capture a readiness-checked dev-scenario PNG with a clean battlefield by default.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,subjects?:u32[]}", {
+    variants: ["region=viewport|minimap|custom crop", "presentation=normal retains the HUD", "response.preview.url is the user-delivery URL"],
+    defaults: ["name=scenario", "presentation=clean", "viewport=current", "region=viewport", "subjects=[]"],
+    bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
+    example: { sessionId: "<scenario-session-id>", name: "before", presentation: "clean" },
+  }),
+  "scenario-record-start": descriptor("Start one real-time H.264 dev-scenario recording with a clean battlefield by default.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:crop,region?:\"viewport\"|\"minimap\"|crop,scale?:number,presentation?:\"clean\"|\"normal\"}", {
+    recordable: false,
+    variants: ["presentation=clean records only the battlefield", "presentation=normal retains the HUD and overlays"],
+    defaults: ["name=scenario", "maxDurationMs=10000", "viewport=current", "region=viewport", "scale=1", "presentation=clean"],
+    bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
+    example: { sessionId: "<scenario-session-id>", name: "full-run", maxDurationMs: 10000 },
+  }),
+  "scenario-capture-timelapse": descriptor("Capture sampled dev-scenario frames as a compact H.264 time-lapse and contact sheet.", "{sessionId:string,name?:token,maxDurationMs?:int,sampleEveryMs?:int,fps?:int,speed?:number,viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,presentation?:\"clean\"|\"normal\"}", {
+    timeoutClass: "lifecycle-media", recordable: false,
+    variants: ["stops when the scenario concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use scenario camera overview first for a whole-map time-lapse"],
+    defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "region=viewport", "presentation=clean"],
+    bounds: ["duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
+    example: { sessionId: "<scenario-session-id>", name: "pathing", maxDurationMs: 30000, sampleEveryMs: 500, speed: 4 },
+  }),
 });
 
 export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinition>> = Object.freeze(Object.fromEntries(
@@ -233,7 +272,9 @@ export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinitio
 export const INTERACT_COMMAND_KEYS = Object.freeze(Object.keys(INTERACT_COMMAND_REGISTRY));
 
 const NAMESPACE_COMMAND_KEYS = Object.freeze({
-  lab: Object.freeze(Object.fromEntries(INTERACT_COMMAND_KEYS.filter((name) => !name.startsWith("game-")).map((name) => [name, name]))),
+  lab: Object.freeze(Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
+    (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
+  ).map((name) => [name, name]))),
   game: Object.freeze({
     open: "game-open",
     close: "close",
@@ -248,6 +289,20 @@ const NAMESPACE_COMMAND_KEYS = Object.freeze({
     "capture-timelapse": "game-capture-timelapse",
     "capture-cancel": "capture-cancel",
     "give-up": "game-give-up",
+    shutdown: "shutdown",
+  }),
+  scenario: Object.freeze({
+    open: "scenario-open",
+    close: "close",
+    status: "status",
+    inspect: "scenario-inspect",
+    camera: "scenario-camera",
+    screenshot: "scenario-screenshot",
+    "record-start": "scenario-record-start",
+    "record-stop": "record-stop",
+    "record-wait": "record-wait",
+    "capture-timelapse": "scenario-capture-timelapse",
+    "capture-cancel": "capture-cancel",
     shutdown: "shutdown",
   }),
 });
