@@ -55,6 +55,15 @@ export function runFrameProfilerContracts() {
     assert(ids.includes("supply-200-active") && ids.includes("supply-300-active"), "paired active 200/300 workloads are checked in");
     const defaultIds = defaultClientPerfWorkloads(workloads).map((workload) => workload.id);
     assert(defaultIds.includes("supply-300-hellhole-stream"), "client-only Hellhole remains in the default renderer workload set");
+    const stream = workloads.find((workload) => workload.id === "supply-300-hellhole-stream");
+    assert(
+      stream?.setup?.snapshotStreamPlayerId === 1
+        && stream?.setup?.snapshotStreamSpectator === false
+        && JSON.stringify(stream?.setup?.snapshotStreamTeamIds) === JSON.stringify([1, 2, 1, 2])
+        && stream?.setup?.snapshotStreamVisibilityTileCount === 126 * 126
+        && stream?.setup?.waitForMinEntities === 288,
+      "client-only Hellhole measures the full-cadence Player 1 2v2 projection",
+    );
     assert(!defaultIds.includes("supply-300-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");
     const integrated = workloads.find((workload) => workload.id === "supply-300-hellhole-integrated");
     assert(integrated?.kind === "labScenario" && integrated?.setup?.waitForMinEntities === 380, "integrated Hellhole retains an explicit canonical Lab view");

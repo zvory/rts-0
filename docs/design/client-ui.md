@@ -1213,6 +1213,11 @@ exact world position, tile size, sight, footprint, and terrain are unchanged; an
 invalidates the stamp and performs the ordinary line-of-sight rays in the same frame. This is exact
 memoization, not a lower fog cadence or stale-state allowance.
 
+The checked-in Hellhole client-performance stream follows the normal path: it is active Player 1's
+fog-filtered projection from the canonical `1+3` versus `2+4` scenario and carries the full
+server-authored visibility grid. It must not be converted to a full-world spectator projection,
+which would benchmark local fallback ray casting instead of ordinary player presentation.
+
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
 `command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the
 Command Car's own command weight per admitted Command Car, with unit supply as weight and a fallback

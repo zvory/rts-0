@@ -69,19 +69,19 @@ pub fn generate_hellhole_snapshot_stream(
 
     let (mut game, mut driver) = build_hellhole_game()?;
 
-    let initial_entity_count = game.snapshot_full_for(1).entities.len();
+    let initial_entity_count = game.snapshot_for(1).entities.len();
     let mut start = serde_json::to_value(game.start_payload())
         .map_err(|err| format!("failed to serialize start payload: {err}"))?;
     let start_object = start
         .as_object_mut()
         .ok_or_else(|| "start payload was not a JSON object".to_string())?;
     start_object.insert("playerId".to_string(), json!(1));
-    start_object.insert("spectator".to_string(), json!(true));
+    start_object.insert("spectator".to_string(), json!(false));
     start_object.insert(
         "snapshotStream".to_string(),
         json!({
             "id": STREAM_ID,
-            "title": "Supply 300 Hellhole — offline snapshot stream",
+            "title": "Supply 300 Hellhole — Player 1 offline snapshot stream",
             "sourceScenario": STREAM_ID,
             "serverSimulation": false,
             "initialCamera": {
@@ -100,8 +100,11 @@ pub fn generate_hellhole_snapshot_stream(
     for index in 0..frame_count {
         action_counts.add(apply_hellhole_scenario_actions(&mut game, &mut driver)?);
         let event_sets = game.tick();
-        let mut snapshot = game.snapshot_full_for(1);
-        snapshot.events = union_events(event_sets.iter().map(|(_, events)| events));
+        let mut snapshot = game.snapshot_for(1);
+        snapshot.events = event_sets
+            .into_iter()
+            .find_map(|(player_id, events)| (player_id == 1).then_some(events))
+            .unwrap_or_default();
         death_events += snapshot
             .events
             .iter()
@@ -219,7 +222,7 @@ mod tests {
         let (bytes, summary) = generate_hellhole_snapshot_stream(3).unwrap();
         assert_eq!(summary.frame_count, 3);
         assert_eq!((summary.first_tick, summary.last_tick), (1, 3));
-        assert_eq!(summary.initial_entity_count, 380);
+        assert_eq!(summary.initial_entity_count, 295);
         assert_eq!(&bytes[..MAGIC.len()], MAGIC);
 
         let header_len = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
@@ -227,9 +230,10 @@ mod tests {
             serde_json::from_slice(&bytes[12..12 + header_len]).unwrap();
         assert_eq!(header["frameCount"], 3);
         assert_eq!(header["loop"], false);
-        assert_eq!(header["start"]["spectator"], true);
+        assert_eq!(header["start"]["playerId"], 1);
+        assert_eq!(header["start"]["spectator"], false);
         assert_eq!(header["start"]["players"].as_array().unwrap().len(), 4);
-        for (index, team_id) in [1, 2, 3, 4].into_iter().enumerate() {
+        for (index, team_id) in [1, 2, 1, 2].into_iter().enumerate() {
             assert_eq!(header["start"]["players"][index]["teamId"], team_id);
         }
         assert_eq!(header["start"]["map"]["width"], 126);
@@ -243,7 +247,10 @@ mod tests {
                 .count(),
             470
         );
-        assert_eq!(header["initialEntityCount"], 380);
+        assert_eq!(
+            header["initialEntityCount"].as_u64(),
+            Some(summary.initial_entity_count as u64)
+        );
         assert_eq!(
             header["start"]["snapshotStream"]["sourceScenario"],
             STREAM_ID

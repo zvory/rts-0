@@ -990,6 +990,14 @@ mod tests {
             .expect("supply-300-hellhole scenario should restore through lab APIs");
         assert_eq!(game.seed(), 0x5a00_0300);
         assert_eq!(game.start_payload().players.len(), 4);
+        assert_eq!(
+            game.start_payload()
+                .players
+                .iter()
+                .map(|player| player.team_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 1, 2],
+        );
         assert_eq!(game.lab_god_mode_players(), vec![3, 4]);
         assert_eq!(game.perf_entity_counts().entities, 380);
 

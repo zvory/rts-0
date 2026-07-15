@@ -406,8 +406,9 @@ impl Game {
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.state.entities.get(tid) {
-                        let visible = v.owner == pid
-                            || self.state.fog.is_visible_world(pid, t.pos_x, t.pos_y);
+                        // snapshot_for() projects through the living team's unioned fog, so the
+                        // invariant must judge target visibility through that same projection.
+                        let visible = live_fog.is_visible_world(pid, t.pos_x, t.pos_y);
                         assert!(
                             visible,
                             "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",

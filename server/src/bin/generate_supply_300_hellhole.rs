@@ -24,7 +24,7 @@ const OUT: &str = concat!(
     "/assets/lab-scenarios/supply-300-hellhole.json"
 );
 const MAP_NAME: &str = "No Terrain";
-const SCENARIO_NAME: &str = "Supply 300 Hellhole";
+const SCENARIO_NAME: &str = "Supply 300 2v2 Hellhole";
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
 const ROCK_CELL_TILES: u32 = 5;
 const TARGET_ROCK_TILES: usize = 470;
@@ -118,7 +118,7 @@ fn blank_hellhole_lab(composition: &[EntityKind]) -> Result<Game, String> {
     let players: Vec<_> = (1..=4)
         .map(|id| PlayerInit {
             id,
-            team_id: id,
+            team_id: if id == 1 || id == 3 { 1 } else { 2 },
             faction_id: DEFAULT_FACTION_ID.to_string(),
             name: format!("Hellhole {id}"),
             color: match id {
