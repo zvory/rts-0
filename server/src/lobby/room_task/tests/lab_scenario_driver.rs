@@ -134,6 +134,54 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
 }
 
 #[test]
+fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
+    let mut config = lab_config();
+    config.scenario = Some("supply-300-hellhole".to_string());
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        RoomMode::Lab(config),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, _writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+
+    let initial_entity_count = lab_snapshot(&task).entities.len();
+    task.lab_driver = Some(LabScenarioDriver::scripted_for_test(
+        1,
+        LabScenarioAction::LabOperation {
+            request_id: 7001,
+            op: LabOp::SpawnEntities(vec![LabSpawnEntity {
+                owner: 1,
+                kind: EntityKind::Rifleman,
+                x: 10.0 * 32.0,
+                y: 10.0 * 32.0,
+                completed: true,
+            }]),
+        },
+    ));
+
+    task.on_tick(tokio::time::Instant::now());
+    task.on_tick(tokio::time::Instant::now());
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 1);
+
+    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count);
+    task.on_tick(tokio::time::Instant::now());
+    task.on_tick(tokio::time::Instant::now());
+
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    let timeline = task.lab_timeline.as_ref().unwrap();
+    assert_eq!(timeline.replay_entry_count(), 1);
+    assert_eq!(timeline.replay_entries()[0].tick, 1);
+    assert_eq!(timeline.replay_entries()[0].request_id, 7001);
+}
+
+#[test]
 fn scripted_action_batch_rebases_before_crossing_timeline_cap() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());

@@ -17,6 +17,7 @@ pub(super) struct LabTimeline {
     replay_entries: Vec<LabReplayOperationEntry>,
     next_sequence: u64,
     pending_entry_reservation: usize,
+    reconstructed_through_tick: Option<u32>,
     last_seek_at: Option<StdInstant>,
 }
 
@@ -69,6 +70,7 @@ impl LabTimeline {
             replay_entries: Vec::new(),
             next_sequence: 0,
             pending_entry_reservation: 0,
+            reconstructed_through_tick: None,
             last_seek_at: None,
         };
         timeline.push_keyframe(game);
@@ -82,6 +84,7 @@ impl LabTimeline {
         self.replay_entries.clear();
         self.next_sequence = 0;
         self.pending_entry_reservation = 0;
+        self.reconstructed_through_tick = None;
         self.last_seek_at = None;
         self.push_keyframe(game);
     }
@@ -215,14 +218,23 @@ impl LabTimeline {
     }
 
     pub(super) fn truncate_future(&mut self, current_tick: u32) -> bool {
+        // A seek rebuilds recorded operations only through its target. If the room then runs
+        // forward before accepting new work, same-tick entries later in the retained history have
+        // not been applied to the live game and must be replaced along with the rest of the old
+        // future. At the seek target itself, all entries at that tick were reconstructed and stay.
+        let retain_through_tick = self
+            .reconstructed_through_tick
+            .take()
+            .unwrap_or(current_tick);
         let old_entry_count = self.entries.len();
         let old_replay_entry_count = self.replay_entries.len();
         let old_keyframe_count = self.keyframes.len();
-        self.entries.retain(|entry| entry.tick <= current_tick);
+        self.entries
+            .retain(|entry| entry.tick <= retain_through_tick);
         self.replay_entries
-            .retain(|entry| entry.tick <= current_tick);
+            .retain(|entry| entry.tick <= retain_through_tick);
         self.keyframes
-            .retain(|keyframe| keyframe.tick <= current_tick);
+            .retain(|keyframe| keyframe.tick <= retain_through_tick);
         if self.keyframes.is_empty() {
             return old_entry_count != self.entries.len()
                 || old_replay_entry_count != self.replay_entries.len()
@@ -297,6 +309,7 @@ impl LabTimeline {
             game.tick();
         }
 
+        self.reconstructed_through_tick = Some(target_tick);
         self.last_seek_at = Some(StdInstant::now());
         Ok(LabTimelineSeek {
             target_tick,
