@@ -905,9 +905,7 @@ mod tests {
         let loaded_rifleman_count = snapshot
             .entities
             .iter()
-            .filter(|entity| {
-                entity.kind == "rifleman" && entity.panzerfaust_loaded == Some(true)
-            })
+            .filter(|entity| entity.kind == "rifleman" && entity.panzerfaust_loaded == Some(true))
             .count();
         assert!(
             loaded_rifleman_count >= 12,

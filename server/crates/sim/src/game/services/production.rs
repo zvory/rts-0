@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{EntityStore, OrderIntent, ProdItem, RallyIntent, RallyKind};
+use crate::game::entity::{Entity, EntityStore, OrderIntent, ProdItem, RallyIntent, RallyKind};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -187,12 +187,7 @@ pub(crate) fn production_system(
         if let Some((owner, upgrade)) = completed_research {
             if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                 player.upgrades.insert(upgrade);
-            }
-            if upgrade == UpgradeKind::MortarAutocast {
-                set_owned_mortar_autocast(entities, owner, true);
-            }
-            if upgrade == UpgradeKind::Panzerfausts {
-                set_owned_riflemen_panzerfaust(entities, owner, true);
+                sync_owned_upgrade_effects(entities, owner, &player.upgrades);
             }
             if let Some(b) = entities.get_mut(id) {
                 if let Some(queue) = b.research_queue_mut() {
@@ -229,22 +224,7 @@ pub(crate) fn production_system(
             let spawn_facing = first_rally
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
-                let mortar_autocast_researched = players
-                    .iter()
-                    .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast));
-                if unit == EntityKind::MortarTeam && mortar_autocast_researched {
-                    if let Some(e) = entities.get_mut(spawned) {
-                        e.set_autocast_enabled(AbilityKind::MortarFire, true);
-                    }
-                }
-                let panzerfausts_researched = players
-                    .iter()
-                    .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::Panzerfausts));
-                if panzerfausts_researched {
-                    if let Some(e) = entities.get_mut(spawned) {
-                        e.set_panzerfaust_upgrade(true);
-                    }
-                }
+                sync_spawned_upgrade_effects(entities, players, owner, spawned);
                 if let Some(facing) = spawn_facing {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_facing(facing);
@@ -290,48 +270,53 @@ fn rally_order_intent(unit_can_gather: bool, rally: RallyIntent) -> OrderIntent 
     }
 }
 
-fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bool) {
-    for id in entities.ids() {
-        if let Some(e) = entities.get_mut(id) {
-            if e.owner == owner && e.kind == EntityKind::MortarTeam {
-                e.set_autocast_enabled(AbilityKind::MortarFire, enabled);
-            }
-        }
+fn sync_entity_upgrade_effects(
+    entity: &mut Entity,
+    upgrades: &std::collections::BTreeSet<UpgradeKind>,
+) {
+    if entity.kind == EntityKind::MortarTeam {
+        entity.set_autocast_enabled(
+            AbilityKind::MortarFire,
+            upgrades.contains(&UpgradeKind::MortarAutocast),
+        );
     }
+    entity.set_panzerfaust_upgrade(upgrades.contains(&UpgradeKind::Panzerfausts));
 }
 
-fn set_owned_riflemen_panzerfaust(entities: &mut EntityStore, owner: u32, enabled: bool) {
-    for id in entities.ids() {
-        if let Some(e) = entities.get_mut(id) {
-            if e.owner == owner && e.kind == EntityKind::Rifleman {
-                e.set_panzerfaust_upgrade(enabled);
-            }
-        }
-    }
-}
-
-pub(crate) fn sync_owned_autocast_from_upgrades(
+pub(crate) fn sync_owned_upgrade_effects(
     entities: &mut EntityStore,
     owner: u32,
     upgrades: &std::collections::BTreeSet<UpgradeKind>,
 ) {
-    set_owned_mortar_autocast(
-        entities,
-        owner,
-        upgrades.contains(&UpgradeKind::MortarAutocast),
-    );
+    for id in entities.ids() {
+        if let Some(entity) = entities.get_mut(id).filter(|entity| entity.owner == owner) {
+            sync_entity_upgrade_effects(entity, upgrades);
+        }
+    }
 }
 
-pub(crate) fn sync_owned_riflemen_from_upgrades(
+pub(crate) fn sync_all_owned_upgrade_effects(entities: &mut EntityStore, players: &[PlayerState]) {
+    for player in players {
+        sync_owned_upgrade_effects(entities, player.id, &player.upgrades);
+    }
+}
+
+pub(crate) fn sync_spawned_upgrade_effects(
     entities: &mut EntityStore,
+    players: &[PlayerState],
     owner: u32,
-    upgrades: &std::collections::BTreeSet<UpgradeKind>,
+    entity_id: u32,
 ) {
-    set_owned_riflemen_panzerfaust(
-        entities,
-        owner,
-        upgrades.contains(&UpgradeKind::Panzerfausts),
-    );
+    let Some(upgrades) = players
+        .iter()
+        .find(|player| player.id == owner)
+        .map(|player| &player.upgrades)
+    else {
+        return;
+    };
+    if let Some(entity) = entities.get_mut(entity_id) {
+        sync_entity_upgrade_effects(entity, upgrades);
+    }
 }
 
 #[cfg(test)]

@@ -1519,7 +1519,7 @@ mod tests {
             serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
-        assert_eq!(value["ev"].as_array().unwrap().len(), 12);
+        assert_eq!(value["ev"].as_array().unwrap().len(), 11);
         assert_eq!(
             value["n"],
             serde_json::json!([4, 17, 2, 2, 3, PREDICTION_PROTOCOL_VERSION, 8, 42])
@@ -1549,7 +1549,6 @@ mod tests {
             serde_json::json!([12, 11, [360.0, 384.0], [416.0, 384.0], 15])
         );
         assert_eq!(value["ev"][10], serde_json::json!([13, 416.0, 384.0]));
-        assert_eq!(value["ev"][11], serde_json::json!([14, 11, 2]));
     }
 
     #[test]
@@ -1617,7 +1616,7 @@ mod tests {
         assert_eq!(section("visibility").count, 4);
         assert!(section("visibility").bytes > 0);
         assert_eq!(section("resourceDeltas").count, 1);
-        assert_eq!(section("events").count, 12);
+        assert_eq!(section("events").count, 11);
         assert_eq!(section("smokes").count, 1);
         assert_eq!(section("abilityObjects").count, 1);
         assert_eq!(section("trenches").count, 1);

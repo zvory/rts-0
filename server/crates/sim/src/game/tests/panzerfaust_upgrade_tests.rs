@@ -81,7 +81,7 @@ fn unlock_panzerfausts(game: &mut Game, player_id: u32) {
         .expect("player should exist")
         .upgrades
         .insert(UpgradeKind::Panzerfausts);
-    crate::game::services::production::sync_owned_riflemen_from_upgrades(
+    crate::game::services::production::sync_owned_upgrade_effects(
         &mut game.state.entities,
         player_id,
         &game
@@ -213,7 +213,28 @@ fn automatic_panzerfaust_fire_only_targets_real_vehicles_in_range() {
 }
 
 #[test]
-fn automatic_fire_does_not_chase_but_explicit_attack_can() {
+fn out_of_range_vehicle_does_not_suppress_normal_rifle_fire() {
+    let mut game = empty_flat_game(&players());
+    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
+    let infantry = spawn_on_tile(&mut game, 2, EntityKind::Rifleman, 10, 8);
+    let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 14, 8);
+    unlock_panzerfausts(&mut game, 1);
+    refresh_world(&mut game);
+    let infantry_hp = game.state.entities.get(infantry).expect("infantry").hp;
+    let tank_hp = game.state.entities.get(tank).expect("tank").hp;
+
+    let mut launches = 0;
+    for _ in 0..45 {
+        launches += launch_count(&game.tick(), 1, rifleman);
+    }
+
+    assert_eq!(launches, 0);
+    assert!(game.state.entities.get(infantry).expect("infantry").hp < infantry_hp);
+    assert_eq!(game.state.entities.get(tank).expect("tank").hp, tank_hp);
+}
+
+#[test]
+fn out_of_range_launcher_does_not_block_rifle_chase_and_explicit_attack_can_close() {
     let mut game = empty_flat_game(&players());
     let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
     let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 18, 8);
@@ -237,7 +258,10 @@ fn automatic_fire_does_not_chase_but_explicit_attack_can() {
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("rifleman");
     assert_eq!(launches, 0);
-    assert_eq!(idle_pos, start);
+    assert_ne!(
+        idle_pos, start,
+        "ordinary Rifleman combat should remain active"
+    );
 
     game.enqueue(
         1,

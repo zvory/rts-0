@@ -1,5 +1,5 @@
 {
-  "reason": "tracked line budgets and import graph for the current simulation architecture",
+  "reason": "Centralize entity upgrade-effect synchronization for production, Lab mutation, and checkpoint-backed setup",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1629,6 +1629,16 @@
       "path": "services/production.rs",
       "line": 16,
       "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production.rs",
+      "line": 306,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/production.rs",
+      "line": 298,
+      "code": "pub(crate) fn sync_all_owned_upgrade_effects(entities: &mut EntityStore, players: &[PlayerState]) {"
     },
     {
       "path": "services/production.rs",

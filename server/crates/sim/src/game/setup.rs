@@ -312,7 +312,7 @@ impl Game {
                     }
                 }
             }
-            crate::game::services::production::sync_owned_riflemen_from_upgrades(
+            crate::game::services::production::sync_owned_upgrade_effects(
                 &mut entities,
                 ps.id,
                 &ps.upgrades,

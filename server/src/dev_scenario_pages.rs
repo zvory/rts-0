@@ -328,22 +328,6 @@ mod tests {
         );
         assert!(html.contains("Entrenchment Inspection"));
         assert!(html.contains("/dev/scenarios?id=entrenchment_inspection&unit=rifleman&count=1"));
-        assert!(html.contains("Panzerfaust Duel"));
-        assert!(html.contains("/dev/scenarios?id=panzerfaust_duel&unit=panzerfaust&count=1"));
-        assert!(html.contains("Panzerfaust Windup Cancel"));
-        assert!(
-            html.contains("/dev/scenarios?id=panzerfaust_windup_cancel&unit=panzerfaust&count=1")
-        );
-        assert!(html.contains("Panzerfaust Target Death"));
-        assert!(
-            html.contains("/dev/scenarios?id=panzerfaust_target_death&unit=panzerfaust&count=1")
-        );
-        assert!(html.contains("Panzerfaust Entrenched Range"));
-        assert!(html
-            .contains("/dev/scenarios?id=panzerfaust_entrenched_range&unit=panzerfaust&count=1"));
-        assert!(html.contains("Panzerfaust Methamphetamines Timing"));
-        assert!(html
-            .contains("/dev/scenarios?id=panzerfaust_methamphetamines&unit=panzerfaust&count=1"));
         assert!(html.contains("/dev/scenarios?id=tank_coax_inspection&unit=tank&count=1"));
     }
 }

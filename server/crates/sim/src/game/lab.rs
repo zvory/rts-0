@@ -1,7 +1,4 @@
-//! Authoritative lab mutation API.
-//!
-//! Lab callers get typed operations with validation at the `Game` seam. This module owns the repair
-//! pass so room/client code never reaches into stores, fog, spatial indexes, or economy state.
+//! Authoritative validated Lab mutation and repair API at the `Game` seam.
 
 use std::collections::HashSet;
 
@@ -768,16 +765,12 @@ impl Game {
         } else {
             return Err(invalid_kind(input.kind, "spawnEntity"));
         };
-        if self
-            .state
-            .players
-            .iter()
-            .any(|player| player.id == input.owner && player.has_upgrade(UpgradeKind::Panzerfausts))
-        {
-            if let Some(entity) = self.state.entities.get_mut(id) {
-                entity.set_panzerfaust_upgrade(true);
-            }
-        }
+        production::sync_spawned_upgrade_effects(
+            &mut self.state.entities,
+            &self.state.players,
+            input.owner,
+            id,
+        );
         Ok(LabOpOutcome::Spawned { entity_id: id })
     }
 
@@ -846,16 +839,13 @@ impl Game {
             entity.owner = input.owner;
             entity.clear_orders();
             clear_lab_production_state(entity);
-            if kind == EntityKind::Rifleman {
-                let enabled = self
-                    .state
-                    .players
-                    .iter()
-                    .find(|player| player.id == input.owner)
-                    .is_some_and(|player| player.upgrades.contains(&UpgradeKind::Panzerfausts));
-                entity.set_panzerfaust_upgrade(enabled);
-            }
         }
+        production::sync_spawned_upgrade_effects(
+            &mut self.state.entities,
+            &self.state.players,
+            input.owner,
+            input.entity_id,
+        );
         self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
         Ok(LabOpOutcome::OwnerSet {
@@ -918,12 +908,7 @@ impl Game {
         } else {
             player.upgrades.remove(&input.upgrade);
         }
-        production::sync_owned_autocast_from_upgrades(
-            &mut self.state.entities,
-            input.player_id,
-            &player.upgrades,
-        );
-        production::sync_owned_riflemen_from_upgrades(
+        production::sync_owned_upgrade_effects(
             &mut self.state.entities,
             input.player_id,
             &player.upgrades,
@@ -1012,7 +997,7 @@ impl Game {
     fn repair_lab_state(&mut self) {
         self.state.entities.clear_stale_miner_slots();
         self.sync_lab_god_mode_flags();
-        self.repair_mortar_autocast_state();
+        production::sync_all_owned_upgrade_effects(&mut self.state.entities, &self.state.players);
         systems::recompute_supply(&mut self.state.players, &self.state.entities);
         self.reset_derived_state();
         let ids = self.state.player_ids();
@@ -1026,21 +1011,6 @@ impl Game {
         self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]
         self.assert_invariants();
-    }
-
-    fn repair_mortar_autocast_state(&mut self) {
-        for player in &self.state.players {
-            production::sync_owned_autocast_from_upgrades(
-                &mut self.state.entities,
-                player.id,
-                &player.upgrades,
-            );
-            production::sync_owned_riflemen_from_upgrades(
-                &mut self.state.entities,
-                player.id,
-                &player.upgrades,
-            );
-        }
     }
 
     pub(crate) fn sync_lab_god_mode_flags(&mut self) {

@@ -196,10 +196,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn researchable_upgrades_include_current_gun_unlocks() {
+    fn researchable_upgrades_match_current_building_catalogs() {
         assert_eq!(
             researchable_upgrades(EntityKind::TrainingCentre),
-            vec![UpgradeKind::Methamphetamines, UpgradeKind::Entrenchment]
+            vec![
+                UpgradeKind::Methamphetamines,
+                UpgradeKind::Panzerfausts,
+                UpgradeKind::Entrenchment
+            ]
         );
         assert_eq!(
             researchable_upgrades(EntityKind::ResearchComplex),

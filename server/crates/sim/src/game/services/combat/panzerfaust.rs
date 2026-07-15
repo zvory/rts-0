@@ -168,7 +168,14 @@ fn panzerfaust_combat_context(
         (attacker.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
     };
     let mode = combat_mode_with_moving_fire(attacker, false);
-    let acquire_px = aggro_px;
+    // Only an explicit attack order may chase with the disposable launcher. Automatic modes
+    // should leave out-of-range vehicles to normal movement/rifle combat until they enter the
+    // current launcher range.
+    let acquire_px = if mode == CombatMode::Ordered {
+        aggro_px
+    } else {
+        range_px
+    };
     Some((
         attacker.owner,
         attacker.pos_x,
