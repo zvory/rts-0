@@ -9,7 +9,7 @@ import {
 } from "./command_inputs.ts";
 import { commandDefinition } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
-import { gameSessionCapabilities } from "./game_session.ts";
+import { gameSessionCapabilities, scenarioSessionCapabilities } from "./game_session.ts";
 import { executeObservationCommand } from "./observation_session.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
@@ -223,11 +223,11 @@ export class InteractService {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
           map, seed: kind === "lab" ? input.seed ?? null : null,
           opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
-          spectate: kind === "game" ? input.spectate || null : null, role: kind === "game" ? (input.spectate ? "spectator" : "player") : null,
+          spectate: kind === "game" ? input.spectate || null : null,
+          role: kind === "game" ? (input.spectate ? "spectator" : "player") : kind === "scenario" ? "observer" : null,
           devScenario: kind === "scenario"
             ? { id: input.id, unit: input.unit, count: input.count, blocker: input.blocker || null, case: input.case || null }
             : null,
-          ...(kind === "scenario" ? { role: "spectator" } : {}),
           renderer: input.renderer || "pixi",
         },
       };
@@ -268,7 +268,9 @@ export class InteractService {
       status,
       capabilities: session.kind === "lab"
         ? { aliases: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
-        : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
+        : session.kind === "scenario"
+          ? scenarioSessionCapabilities(this.maxSessions)
+          : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
     };
   }
   get(sessionId: string | null | undefined) {

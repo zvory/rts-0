@@ -32,7 +32,9 @@ export async function executeObservationCommand(
     return handled("direct", { sessionId, ...await session.driver.inspect({
       ids: input.ids,
       kinds: input.kinds,
-      ownership: gameInspectionOwnership(input.ownership, session.sceneIdentity.role),
+      ownership: session.kind === "scenario"
+        ? "visible"
+        : gameInspectionOwnership(input.ownership, session.sceneIdentity.role),
       cameraViewport: input.cameraViewport === true,
       limit: input.limit || 25,
     }) });

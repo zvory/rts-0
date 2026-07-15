@@ -153,6 +153,11 @@ try {
   const moved = await bridge.move({ units: [10], x: 500, y: 500 });
   assert.equal(moved.accepted, true, "move reports normal client admission");
   assert.deepEqual(issuedCommand, { c: "move", units: [10], x: 500, y: 500 }, "move builds exactly one normal move command");
+  await assert.rejects(
+    () => bridge.time({ action: "speed", speed: 8 }),
+    (error) => error?.code === "spectatorRequired",
+    "ordinary game players cannot control room time",
+  );
   await assert.rejects(() => bridge.move({ units: [20], x: 500, y: 500 }), (error) => error?.code === "notControllable");
   await assert.rejects(
     () => bridge.move({ units: [30], x: 500, y: 500 }),
@@ -172,6 +177,21 @@ try {
   await assert.rejects(() => bridge.move({ units: [10], x: 600, y: 600 }), (error) => error?.code === "playerSeatRequired");
   const time = await bridge.time({ action: "speed", speed: 8 });
   assert.equal(time.roomTime.speed, 8, "AI-only spectator time control confirms the authoritative speed");
+  match.state.spectator = false;
+  const scenarioBridge = new InteractGameBridge({
+    app: bridge.app,
+    windowLike: {},
+    enabled: true,
+    mode: "scenario",
+    sleep: async () => {},
+  });
+  const scenarioTime = await scenarioBridge.time({ action: "speed", speed: 4 });
+  assert.equal(scenarioTime.roomTime.speed, 4, "active-player dev scenarios retain room-time control for time-lapse capture");
+  const rejectedScenarioMove = await scenarioBridge.call("move", { units: [10], x: 600, y: 600 });
+  assert.equal(rejectedScenarioMove.ok, false, "active-player dev scenarios expose no gameplay mutation bridge");
+  assert.equal(rejectedScenarioMove.error.code, "methodUnavailable", "scenario gameplay mutations fail at the page-bridge boundary");
+  scenarioBridge.destroy();
+  match.state.spectator = true;
   bridge.camera({ action: "overview", padding: 20 });
   assert.equal(autoSpectatorEnabled, false, "whole-map framing disables automatic fight-following camera movement");
   assert.deepEqual(overview, {

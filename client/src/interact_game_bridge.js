@@ -1,5 +1,5 @@
-// Narrow, launch-gated automation for one isolated human-vs-AI match.
-// This surface intentionally supports observation, move orders, and surrender only.
+// Narrow, launch-gated automation for an isolated match or authored dev scenario.
+// Games support bounded observation, move, and surrender; scenarios stay observation/media-only.
 
 import { cmd, isUnit } from "./protocol.js";
 import { INTERACT_BRIDGE_KEY } from "./interact_bridge.js";
@@ -135,8 +135,8 @@ export class InteractGameBridge {
     switch (method) {
       case "status": return this.status();
       case "inspect": return this.inspect(input);
-      case "move": return this.move(input);
-      case "giveUp": return this.giveUp();
+      case "move": return this.gameMutation(method, () => this.move(input));
+      case "giveUp": return this.gameMutation(method, () => this.giveUp());
       case "time": return this.time(input);
       case "camera": return this.camera(input);
       case "presentation": return this.presentation(input);
@@ -145,14 +145,23 @@ export class InteractGameBridge {
     }
   }
 
-  session({ activeMatch = false, playerSeat = false, spectator = false } = {}) {
+  gameMutation(method, action) {
+    if (this.mode !== "game") {
+      throw bridgeError("methodUnavailable", `${method} is unavailable in an observation-only dev scenario.`);
+    }
+    return action();
+  }
+
+  session({ activeMatch = false, playerSeat = false, roomTimeControl = false } = {}) {
     const status = this.status();
-    if (!status.ready) throw bridgeError(status.reason, `Interact game is not ready: ${status.reason}.`);
+    if (!status.ready) throw bridgeError(status.reason, `Interact observation session is not ready: ${status.reason}.`);
     if (activeMatch && status.phase !== "active") {
-      throw bridgeError("matchConcluded", "The isolated match has already concluded.");
+      throw bridgeError("matchConcluded", "The authoritative session has already concluded.");
     }
     if (playerSeat && status.role !== "player") throw bridgeError("playerSeatRequired", "This command requires the controlled player seat.");
-    if (spectator && status.role !== "spectator") throw bridgeError("spectatorRequired", "This command requires an AI-vs-AI spectator session.");
+    if (roomTimeControl && status.role !== "spectator" && this.mode !== "scenario") {
+      throw bridgeError("spectatorRequired", "Game time control requires an AI-vs-AI spectator session.");
+    }
     return { match: this.app.match, status };
   }
 
@@ -264,12 +273,12 @@ export class InteractGameBridge {
   }
 
   async time(input = {}) {
-    const { match } = this.session({ activeMatch: true, spectator: true });
-    if (input.action !== "speed") throw bridgeError("invalidTime", "AI-vs-AI game time supports only action=speed.");
-    if (match.capabilities?.roomTime?.setSpeed !== true) throw bridgeError("roomTimeUnavailable", "This AI-only room does not expose speed control.");
+    const { match } = this.session({ activeMatch: true, roomTimeControl: true });
+    if (input.action !== "speed") throw bridgeError("invalidTime", "Interact time control supports only action=speed.");
+    if (match.capabilities?.roomTime?.setSpeed !== true) throw bridgeError("roomTimeUnavailable", "This room does not expose speed control.");
     const speed = boundedNumber(input.speed, "time.speed", 0.125, 8);
     if (match.net?.setRoomTimeSpeed?.(speed) !== true) throw bridgeError("roomTimeRejected", "The room-time speed command was not sent.");
-    await this.waitFor(() => Number(match.roomTimeControls?.roomTimeState?.speed) === speed || gamePhase(match) === "concluded", "AI-only room speed confirmation");
+    await this.waitFor(() => Number(match.roomTimeControls?.roomTimeState?.speed) === speed || gamePhase(match) === "concluded", "room speed confirmation");
     return { roomTime: projectRoomTime(match.roomTimeControls?.roomTimeState), snapshotTick: match.state.tick };
   }
 

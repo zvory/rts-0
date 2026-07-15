@@ -114,6 +114,19 @@ try {
     sessionId: spectator.sessionId, maxDurationMs: 1_000, sampleEveryMs: 500, region: "minimap",
   });
   assert.equal(timelapse.frameSummary.count, 2, "game time-lapse returns sampled media through the bounded service surface");
+  await service.execute("close", { sessionId: spectator.sessionId });
+
+  const scenario = await service.execute("scenario-open", {
+    id: "supply_stress_active", unit: "rifleman", count: 200,
+  });
+  testArtifacts.ownScenarioSession(scenario.sessionId);
+  assert.equal(scenario.capabilities.role, "observer", "scenario capabilities describe the observation namespace rather than its server seat");
+  assert.deepEqual(scenario.capabilities.orders, [], "scenario capabilities expose no gameplay orders");
+  assert.equal(scenario.capabilities.giveUp, false, "scenario capabilities expose no surrender mutation");
+  const scenarioTimelapse = await service.execute("scenario-capture-timelapse", {
+    sessionId: scenario.sessionId, maxDurationMs: 1_000, sampleEveryMs: 500,
+  });
+  assert.equal(scenarioTimelapse.frameSummary.count, 2, "active-player dev scenarios retain the bounded time-lapse surface");
 
   console.log("✅ interact_fixed_capture_contracts.mjs: bounds, tick mapping, service, and media passed");
 } finally {

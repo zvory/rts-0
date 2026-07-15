@@ -212,7 +212,9 @@ try {
   }).result;
   assert.match(scenarioOpened.sessionId, /^scenario_[a-f0-9]{32}$/, "scenario open returns a distinct bounded session id");
   assert.equal(scenarioOpened.kind, "scenario", "scenario open identifies the dev scenario kind");
+  assert.equal(scenarioOpened.capabilities.role, "observer", "scenario capabilities describe the observation namespace rather than the underlying server seat");
   assert.deepEqual(scenarioOpened.capabilities.orders, [], "scenario sessions expose no gameplay orders");
+  assert.equal(scenarioOpened.capabilities.giveUp, false, "scenario sessions expose no surrender mutation");
   assert.deepEqual(scenarioOpened.capabilities.media, ["screenshot", "recording", "timelapse"], "scenario sessions advertise every observation capture mode");
   const scenarioScreenshot = callNamespace("scenario", "screenshot", {
     sessionId: scenarioOpened.sessionId, name: "before",
