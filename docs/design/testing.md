@@ -301,7 +301,11 @@ canary runs own a private server; the browser shard passes its existing loopback
   This direct API-in/API-out lane includes simulation, full-world projection, compaction, and
   MessagePack encoding but no room task, network transport, browser, or wall-clock pacing. Use
   `scripts/hellhole-perf-harness.sh --integrated` only when the live Lab server and visible Pixi
-  client need to be inspected together; do not use its timings as isolated server evidence.
+  client need to be inspected together; do not use its timings as isolated server evidence. The
+  canonical reference-MacBook goal is `realtime_factor >= 8.0` on one serial execution lane with no
+  subsystem parallelization. For the default workload, that is at most 3.75 seconds elapsed and at
+  most 4.167 ms average API round-trip work. Passing the normal 33.3 ms live tick budget is not a
+  substitute for meeting this headroom target.
 - Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
   when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
   change. The harness compares Worker and Tank part and composition samples.

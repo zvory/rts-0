@@ -256,6 +256,17 @@ encoding. It runs as fast as the server can complete work, reports aggregate ave
 timings and payload size, and accepts `--json` for machine-readable output. It deliberately omits
 the room scheduler, WebSocket send, and browser so client speed cannot throttle it.
 
+Interpret the result against the project goal, not only the 30 Hz live deadline. On the designated
+reference MacBook (currently MacBook Pro `Mac17,8`, Apple M5 Pro), the default 900-tick release run
+must reach `realtime_factor >= 8.0` using one serial execution lane. That corresponds to no more
+than 3.75 seconds elapsed for 30 simulated seconds and no more than 4.167 ms average API round-trip
+work. Do not meet or report the target by parallelizing simulation, projection, compaction, or
+encoding across cores. macOS thread migration is acceptable, but simultaneous benchmark work on
+multiple cores is not. A result that fits inside the ordinary 33.3 ms tick interval but misses 8.0×
+still fails the local headroom goal, which intentionally compensates for materially weaker
+deployment hardware. Record the reference host, revision, release profile, and repeat count with
+before/after results.
+
 For an explicitly combined visual check, run:
 
 ```bash
