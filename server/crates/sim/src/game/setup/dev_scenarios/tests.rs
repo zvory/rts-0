@@ -373,6 +373,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             0x5150_030d,
         ),
         Game::new_factory_zero_gap_perpendicular_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_030d),
         Game::new_tank_trap_line_build_scenario(
             "tank_trap_line_horizontal",
             EntityKind::ScoutCar,
@@ -1091,6 +1092,39 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
             "{unit} move goal should be perpendicular to the hull on the same y axis"
         );
     }
+}
+
+#[test]
+fn command_car_building_corner_matches_reduced_reproduction_layout() {
+    let setup = Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
+        .expect("scenario setup should succeed");
+    assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
+    assert_eq!(setup.goal, (3216.0, 3472.0));
+    assert_eq!(setup.units.len(), 1);
+    for (kind, expected_pos) in [
+        (EntityKind::Factory, (3472.0, 3728.0)),
+        (EntityKind::TrainingCentre, (3440.0, 3648.0)),
+        (EntityKind::Barracks, (3536.0, 3584.0)),
+    ] {
+        let building = setup
+            .game
+            .state
+            .entities
+            .iter()
+            .find(|entity| entity.kind == kind)
+            .unwrap_or_else(|| panic!("scenario should include {kind}"));
+        assert_eq!((building.pos_x, building.pos_y), expected_pos);
+    }
+    let command_car = setup
+        .game
+        .state
+        .entities
+        .get(setup.units[0])
+        .expect("scenario Command Car should exist");
+    assert_eq!(command_car.kind, EntityKind::CommandCar);
+    assert_eq!((command_car.pos_x, command_car.pos_y), (3536.0, 3664.0));
+    assert!((command_car.facing() - 2.823_079_3).abs() <= 0.000_001);
+    assert_units_do_not_intersect_buildings(&setup.game);
 }
 
 #[test]
