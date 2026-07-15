@@ -166,10 +166,10 @@ session and include only the returned Tailnet Preview URL in the handoff.
 
 ## Final 200/300 Measurement Checkpoint
 
-First rerun the canonical Phase 0 workload at default settings:
+First rerun the canonical client-only workload at default settings:
 
 ```bash
-node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
+node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
 
 Then run the exact Phase 1 workloads with fixed composition and seed. Run the serious repeated

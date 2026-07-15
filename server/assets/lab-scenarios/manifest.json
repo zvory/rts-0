@@ -21,10 +21,10 @@
     {
       "id": "supply-300-hellhole",
       "title": "Supply 300 Hellhole",
-      "description": "Two exact 300-supply armies interleaved in sustained god-mode combat on the authored 1v1 map.",
-      "tags": ["two-player", "stress", "frame-budget"],
-      "map": "1v1",
-      "playerCount": 2,
+      "description": "Four-player No Terrain Lab stress setup with 300 supply per player, two center combat blobs, and two scripted diagonal shuttle armies.",
+      "tags": ["four-player", "stress", "frame-budget"],
+      "map": "No Terrain",
+      "playerCount": 4,
       "filename": "supply-300-hellhole.json"
     }
   ]

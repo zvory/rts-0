@@ -93,7 +93,7 @@ impl RoomTask {
             );
             if !result.ok {
                 crate::log_warn!(room = %self.room, player_id, error = ?result.error,
-                    "lab scenario scripted command rejected");
+                    "lab scenario shuttle command rejected");
             }
         }
     }

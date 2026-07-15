@@ -15,8 +15,8 @@ the same entity.
 Phase 1's explicit-present timing and exact 200/300 workloads must be merged first. Use its artifacts
 as the before measurement and do not change the workload while comparing this phase.
 
-Keep Phase 0's `supply-300-lab-hellhole` scenario and descriptor unchanged, and use one canonical
-rerun as the first coarse full-world stress comparison before the broader active-player matrix.
+Keep the client-only `supply-300-hellhole-stream` artifact unchanged, and use one canonical rerun
+as the first renderer-ceiling comparison before the broader active-player matrix.
 
 ## Scope
 
@@ -179,10 +179,10 @@ node scripts/client-perf-harness.mjs \
   --trace
 ```
 
-Also run the canonical Lab stress workload once at default settings:
+Also run the canonical client-only stress workload once at default settings:
 
 ```bash
-node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
+node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
 
 Report full frame/update/present p95, frame-view/presentation/selection/adapter p50/p95, exact rig
@@ -215,5 +215,5 @@ animation evaluations, temporary copies, and texture wrappers.
   `scripts/wait-pr.sh <pr>` and verify reachability before Phase 3.
 - The handoff must provide exact before/after structural counts, frame-path timing/allocation
   evidence, retained adapter reads and why, prediction/fog/selection contract confirmation, the
-  Interact Preview URL, active-player matrix artifacts, the Lab hellhole comparison, and the core
+  Interact Preview URL, active-player matrix artifacts, the client-only Hellhole comparison, and the core
   visual/input checks Phase 3 should repeat.

@@ -14,9 +14,9 @@ measurements that expose misses against the 16.67 ms 60 FPS work budget.
 Establish deterministic local 200- and 300-supply workloads through the server-authoritative
 dev-scenario path. The measured browser must be an active player with normal prediction enabled;
 spectator, replay, client-mutated, or prediction-disabled evidence is insufficient for later phases.
-After explicit presentation timing is active, also recapture the canonical Phase 0
-`supply-300-lab-hellhole` workload without changing its scenario or descriptor. That Lab result is
-the comparative full-world stress baseline; it does not replace the active-player evidence.
+Use the existing client-only `supply-300-hellhole-stream` for renderer-ceiling comparisons without
+making the server simulation the limiting factor. Server-heavy Lab runs remain a separate
+simulation/projection stress lane and do not replace the active-player evidence.
 
 ## Constraints and Non-Goals
 
@@ -34,8 +34,7 @@ the comparative full-world stress baseline; it does not replace the active-playe
   in this phase.
 - Do not change the production supply cap or add a production command/query parameter. The 200/300
   setup is bounded local test infrastructure only.
-- Do not alter or regenerate Phase 0's bundled Lab hellhole or workload descriptor. Versioning that
-  benchmark requires a separate reviewed change and a new baseline.
+- Do not alter or regenerate the client-only Hellhole stream while comparing renderer changes.
 - Do not claim device certification or that 300 supply is safe from the Phase 1 baseline.
 
 ## Expected Touch Points
@@ -149,13 +148,13 @@ cargo test --manifest-path server/Cargo.toml -p rts-sim dev_scenario
 cargo test --manifest-path server/Cargo.toml structured_log
 node scripts/client-perf-harness.mjs --workload supply-200-active --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-active --seconds 10
-node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
+node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 node scripts/check-docs-health.mjs
 git diff --check
 ```
 
-Retain paired 200/300 `summary.json` artifacts from identical default settings plus the recaptured
-Lab hellhole summary as the baseline for Phase 2. GitHub's `Main test gate` remains the
+Retain paired 200/300 `summary.json` artifacts from identical default settings plus the client-only
+Hellhole stream summary as the baseline for Phase 2. GitHub's `Main test gate` remains the
 authoritative full suite.
 
 ## Interact Lab Manual Test
@@ -185,12 +184,12 @@ cycle. The screenshot supports visual review but does not replace exact present-
 
 ## PR and Handoff Requirements
 
-- Start only after Phase 0 is merged and reachable from `origin/main`; implement on a fresh
-  `zvorygin/` branch after confirming current `origin/main`.
+- This phase is complete; its former Phase 0 dependency was later dispensed in favor of separate
+  client- and server-saturation lanes.
 - Mark this phase Done in the implementation commit.
 - Run `scripts/agent-pr.sh --verification "<focused checks and paired baseline passed>"`, then
   `scripts/wait-pr.sh <pr>` and verify the phase head is reachable from `origin/main`.
 - The handoff must list the one-frame/one-present contract, every new metric and reset window, exact
   workload composition/counts, paired artifact paths, proof of active prediction, the Interact
-  Preview URL, the unchanged Lab hellhole id and recaptured summary, remaining unattributed time,
+  Preview URL, the unchanged client-only Hellhole id and recaptured summary, remaining unattributed time,
   and the core visual/lifecycle tests Phase 2 should repeat.

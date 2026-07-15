@@ -1,56 +1,5 @@
 import path from "node:path";
 
-export const SUPPLY_300_LAB_HELLHOLE = Object.freeze({
-  scenarioId: "supply-300-hellhole",
-  map: "1v1",
-  playerIds: Object.freeze([1, 2]),
-  teamByPlayer: Object.freeze({ 1: 1, 2: 2 }),
-  godModePlayers: Object.freeze([1, 2]),
-  supplyUsed: 300,
-  projectedEntityCount: 224,
-  requiredUnitKinds: Object.freeze([
-    "worker",
-    "golem",
-    "rifleman",
-    "machine_gunner",
-    "panzerfaust",
-    "anti_tank_gun",
-    "mortar_team",
-    "artillery",
-    "scout_car",
-    "tank",
-    "command_car",
-  ]),
-  countsByOwner: Object.freeze({
-    1: Object.freeze({
-      worker: 11,
-      golem: 11,
-      rifleman: 11,
-      machine_gunner: 10,
-      panzerfaust: 10,
-      anti_tank_gun: 10,
-      mortar_team: 10,
-      artillery: 10,
-      scout_car: 10,
-      tank: 9,
-      command_car: 9,
-    }),
-    2: Object.freeze({
-      worker: 11,
-      golem: 11,
-      rifleman: 11,
-      machine_gunner: 10,
-      panzerfaust: 10,
-      anti_tank_gun: 10,
-      mortar_team: 10,
-      artillery: 10,
-      scout_car: 10,
-      tank: 9,
-      command_car: 9,
-    }),
-  }),
-});
-
 const ACTIVE_UNIT_ORDER = Object.freeze([
   "worker",
   "rifleman",
@@ -138,16 +87,6 @@ export function buildClientPerfWorkloads(env = process.env) {
       },
     },
     {
-      id: "supply-300-lab-hellhole",
-      description: "Server-authoritative 1v1 Lab fight with two exact 300-supply god-mode armies.",
-      kind: "labScenario",
-      url: "/lab?room=client-perf-hellhole&map=1v1&scenario=supply-300-hellhole",
-      setup: {
-        labHellhole: SUPPLY_300_LAB_HELLHOLE,
-        resetPerfAfterSetup: true,
-      },
-    },
-    {
       id: "supply-300-hellhole-stream",
       description: "Client-only playback of 900 Hellhole snapshots at the authored 30 Hz cadence.",
       kind: "snapshotStream",
@@ -155,7 +94,7 @@ export function buildClientPerfWorkloads(env = process.env) {
       setup: {
         snapshotStreamId: "supply-300-hellhole",
         snapshotStreamFrameCount: 900,
-        waitForMinEntities: SUPPLY_300_LAB_HELLHOLE.projectedEntityCount,
+        waitForMinEntities: 380,
         resetPerfAfterSetup: true,
       },
     },

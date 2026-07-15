@@ -1,10 +1,7 @@
-import { applyLabHellholeSetup, validateLabHellholeSample } from "./lab_hellhole_setup.mjs";
-
 export async function initializeWorkloadSetup(page, setup) {
   if (!setup) return null;
   const result = { actions: [] };
   await applySnapshotStreamSetup(page, setup, result);
-  await applyLabHellholeSetup(page, setup, result);
   await applyActiveSupplyStressSetup(page, setup, result);
   return result;
 }
@@ -33,15 +30,6 @@ export function validateActiveSupplyStressSample(sample, expected) {
     errors.push("per-owner/per-kind composition differs from the workload descriptor");
   }
   return errors;
-}
-
-export function labHellholeSampleErrors(setup, setupResult, summary) {
-  if (!setup?.labHellhole || !setupResult?.labHellhole) return [];
-  return validateLabHellholeSample({
-    setupResult: setupResult.labHellhole,
-    monitor: summary?.labHellholeMonitor,
-    finalFrameCount: summary?.perf?.summary?.frameCount,
-  }, setup.labHellhole);
 }
 
 async function applyActiveSupplyStressSetup(page, setup, result) {
