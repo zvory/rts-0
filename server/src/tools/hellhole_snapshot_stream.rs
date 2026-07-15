@@ -2,10 +2,11 @@
 
 use std::path::Path;
 
+use rts_sim::game::lab::LabCommandOptions;
 use serde_json::json;
 
 use crate::lab_scenarios::load_lab_scenario_by_id;
-use crate::protocol::{serialize_messagepack_compact_snapshot, Event};
+use crate::protocol::{serialize_messagepack_compact_snapshot, Command, Event};
 
 pub const STREAM_ID: &str = "supply-300-hellhole";
 pub const DEFAULT_FRAME_COUNT: u32 = 900;
@@ -13,8 +14,8 @@ pub const TICK_RATE_HZ: u32 = 30;
 pub const MAGIC: &[u8; 8] = b"RTSSTRM1";
 
 const TILE: f32 = 32.0;
-const CENTER_TILE_X: f32 = 96.0;
-const CENTER_TILE_Y: f32 = 63.0;
+const CENTER_TILE: f32 = 63.0;
+const SHUTTLE_OFFSET_TILES: f32 = 18.0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotStreamSummary {
@@ -49,6 +50,7 @@ pub fn generate_hellhole_snapshot_stream(
 
     let scenario = load_lab_scenario_by_id(STREAM_ID)?;
     let mut game = scenario.build_game()?;
+    enqueue_initial_shuttles(&mut game)?;
 
     let initial_entity_count = game.snapshot_full_for(1).entities.len();
     let mut start = serde_json::to_value(game.start_payload())
@@ -66,8 +68,8 @@ pub fn generate_hellhole_snapshot_stream(
             "sourceScenario": STREAM_ID,
             "serverSimulation": false,
             "initialCamera": {
-                "centerX": CENTER_TILE_X * TILE,
-                "centerY": CENTER_TILE_Y * TILE
+                "centerX": CENTER_TILE * TILE,
+                "centerY": CENTER_TILE * TILE
             }
         }),
     );
@@ -130,6 +132,28 @@ pub fn generate_hellhole_snapshot_stream(
     Ok((bytes, summary))
 }
 
+fn enqueue_initial_shuttles(game: &mut rts_sim::game::Game) -> Result<(), String> {
+    for (player_id, x_dir, y_dir) in [(3, -1.0, 1.0), (4, 1.0, 1.0)] {
+        let units = game.lab_owned_unit_ids(player_id).map_err(|err| {
+            format!("failed to collect player {player_id} shuttle units: {err:?}")
+        })?;
+        game.issue_lab_command_as(
+            player_id,
+            Command::Move {
+                units,
+                x: (CENTER_TILE + x_dir * SHUTTLE_OFFSET_TILES) * TILE,
+                y: (CENTER_TILE + y_dir * SHUTTLE_OFFSET_TILES) * TILE,
+                queued: false,
+            },
+            LabCommandOptions {
+                ignore_command_limits: true,
+            },
+        )
+        .map_err(|err| format!("failed to enqueue player {player_id} shuttle: {err:?}"))?;
+    }
+    Ok(())
+}
+
 fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>) -> Vec<Event> {
     let mut events = Vec::new();
     for set in event_sets {
@@ -150,8 +174,8 @@ mod tests {
     fn generated_stream_has_bounded_header_and_exact_frame_table() {
         let (bytes, summary) = generate_hellhole_snapshot_stream(3).unwrap();
         assert_eq!(summary.frame_count, 3);
-        assert_eq!((summary.first_tick, summary.last_tick), (2, 4));
-        assert_eq!(summary.initial_entity_count, 224);
+        assert_eq!((summary.first_tick, summary.last_tick), (1, 3));
+        assert_eq!(summary.initial_entity_count, 380);
         assert_eq!(&bytes[..MAGIC.len()], MAGIC);
 
         let header_len = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
@@ -160,12 +184,13 @@ mod tests {
         assert_eq!(header["frameCount"], 3);
         assert_eq!(header["loop"], false);
         assert_eq!(header["start"]["spectator"], true);
-        assert_eq!(header["start"]["players"].as_array().unwrap().len(), 2);
-        assert_eq!(header["start"]["players"][0]["teamId"], 1);
-        assert_eq!(header["start"]["players"][1]["teamId"], 2);
+        assert_eq!(header["start"]["players"].as_array().unwrap().len(), 4);
+        for (index, team_id) in [1, 2, 3, 4].into_iter().enumerate() {
+            assert_eq!(header["start"]["players"][index]["teamId"], team_id);
+        }
         assert_eq!(header["start"]["map"]["width"], 126);
         assert_eq!(header["start"]["map"]["height"], 126);
-        assert_eq!(header["initialEntityCount"], 224);
+        assert_eq!(header["initialEntityCount"], 380);
         assert_eq!(
             header["start"]["snapshotStream"]["sourceScenario"],
             STREAM_ID

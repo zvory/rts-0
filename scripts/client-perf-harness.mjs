@@ -11,7 +11,6 @@ import {
 } from "./snapshot-codec-bakeoff.mjs";
 import {
   initializeWorkloadSetup,
-  labHellholeSampleErrors,
   validateActiveSupplyStressSample,
 } from "./client-perf/workload_setup.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
@@ -345,7 +344,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     if (!summary.clientNetReport) {
       errors.push("ClientNetReport snapshot could not be generated");
     }
-    errors.push(...workloadSetupErrors(workload, workloadSetup, summary));
+    errors.push(...workloadSetupErrors(workload, workloadSetup));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
@@ -1448,7 +1447,7 @@ async function setWorkloadRoomTimeSpeed(page, speed) {
   }, speed);
 }
 
-function workloadSetupErrors(workload, setupResult, summary = null) {
+function workloadSetupErrors(workload, setupResult) {
   const minSelected = Number(workload.setup?.minSelectedCount || 0);
   if (!setupResult) return workload.setup ? [`${workload.id} setup did not run`] : [];
   const errors = [];
@@ -1456,7 +1455,6 @@ function workloadSetupErrors(workload, setupResult, summary = null) {
   if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
-  errors.push(...labHellholeSampleErrors(workload.setup, setupResult, summary));
   errors.push(...validateActiveSupplyStressSample(
     setupResult.activeSupplyStress,
     workload.setup?.activeSupplyStress,

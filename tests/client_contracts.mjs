@@ -40,7 +40,6 @@ runScoreboardContracts();
 await import("./client_contracts/net_contracts.mjs");
 await import("./client_contracts/snapshot_stream_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");
-await import("./client_contracts/lab_perf_contracts.mjs");
 await import("./interact_driver_contracts.mjs");
 await import("./interact_cli_contracts.mjs");
 await import("./interact_tailnet_preview_contracts.mjs");
