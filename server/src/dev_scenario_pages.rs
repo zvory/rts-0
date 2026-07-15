@@ -309,6 +309,10 @@ mod tests {
             "/dev/scenarios?id=vehicle_small_block_baseline&unit=tank&count=5&blocker=anti_tank_gun"
         ));
         assert!(html.contains("/dev/scenarios?id=factory_zero_gap_perpendicular&unit=tank&count=1"));
+        assert!(html.contains("Command Car Building Corner"));
+        assert!(
+            html.contains("/dev/scenarios?id=command_car_building_corner&unit=command_car&count=1")
+        );
         assert!(html.contains("Tank Trap Pathing Matrix"));
         assert!(html.contains("<select name=\"case\""));
         assert!(html.contains("<option value=\"friendly_vehicle_reroute\""));

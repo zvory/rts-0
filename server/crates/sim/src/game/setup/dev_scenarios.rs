@@ -278,6 +278,55 @@ impl Game {
         .checkpoint_backed("dev:factory_zero_gap_perpendicular")
     }
 
+    pub fn new_command_car_building_corner_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if unit != EntityKind::CommandCar {
+            return Err(format!("unsupported building-corner unit {unit}"));
+        }
+        if unit_count != 1 {
+            return Err(format!(
+                "unsupported building-corner unit count {unit_count}"
+            ));
+        }
+
+        let (map, start_tile, buildings, unit_start, unit_facing, goal) =
+            command_car_building_corner_map();
+        let mut entities = EntityStore::new();
+        for (kind, x, y) in buildings {
+            entities
+                .spawn_building(1, kind, x, y, true)
+                .ok_or_else(|| format!("failed to spawn {kind}"))?;
+        }
+        let unit_id = entities
+            .spawn_unit(1, unit, unit_start.0, unit_start.1)
+            .ok_or_else(|| "failed to spawn command car".to_string())?;
+        if let Some(entity) = entities.get_mut(unit_id) {
+            entity.set_facing(unit_facing);
+        }
+
+        let player_id = 1;
+        let game = build_dev_scenario_game(
+            map,
+            entities,
+            player_id,
+            start_tile,
+            seed,
+            "dev:command_car_building_corner",
+        );
+
+        DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![unit_id],
+            goal,
+            issue_after_ticks: config::TICK_HZ,
+        }
+        .checkpoint_backed("dev:command_car_building_corner")
+    }
+
     pub fn new_tank_trap_line_build_scenario(
         scenario_id: &str,
         vehicle: EntityKind,

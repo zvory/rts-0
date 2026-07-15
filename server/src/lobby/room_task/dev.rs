@@ -183,6 +183,13 @@ impl RoomTask {
                             seed,
                         )?)
                     }
+                    DevScenarioId::CommandCarBuildingCorner => {
+                        session_from_setup!(Game::new_command_car_building_corner_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
                     DevScenarioId::TankTrapLineHorizontal
                     | DevScenarioId::TankTrapLineVertical
                     | DevScenarioId::TankTrapLineDiagonal => {

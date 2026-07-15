@@ -539,6 +539,14 @@ const FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES: [DevScenarioLaunch; 3] = [
     },
 ];
 
+const COMMAND_CAR_BUILDING_CORNER_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "command_car_building_corner",
+    unit: EntityKind::CommandCar,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
 const TANK_TRAP_LINE_HORIZONTAL_LAUNCHES: [DevScenarioLaunch; 2] = [
     DevScenarioLaunch {
         id: "tank_trap_line_horizontal",
@@ -731,7 +739,7 @@ const PANZERFAUST_METHAMPHETAMINES_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenar
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -768,6 +776,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
         title: "Factory Zero-Gap Perpendicular",
         description: "One vehicle starts flush against the east side of a factory, waits half a second, then moves ten tiles directly east.",
         launches: &FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "command_car_building_corner",
+        title: "Command Car Building Corner",
+        description: "One Command Car starts inside the reduced Vehicle Works, Training Centre, and Barracks corner from the Soupman match, waits one second, then moves southwest.",
+        launches: &COMMAND_CAR_BUILDING_CORNER_LAUNCHES,
     },
     DevScenarioSpec {
         id: "tank_trap_line_horizontal",
@@ -961,6 +975,7 @@ pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
         EntityKind::Artillery => "artillery",
         EntityKind::ScoutCar => "scout car",
         EntityKind::Tank => "tank",
+        EntityKind::CommandCar => "command car",
         _ => "unit",
     }
 }
@@ -1087,6 +1102,16 @@ mod tests {
             Some(DevScenarioLaunch {
                 id: "factory_zero_gap_perpendicular",
                 unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("command_car_building_corner:unit=command_car:count=1"),
+            Some(DevScenarioLaunch {
+                id: "command_car_building_corner",
+                unit: EntityKind::CommandCar,
                 count: 1,
                 blocker: None,
                 case: None,
@@ -1309,6 +1334,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("factory_zero_gap_perpendicular", "tank", "3", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("command_car_building_corner", "tank", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("command_car_building_corner", "command_car", "2", None),
             None
         );
         assert_eq!(

@@ -239,6 +239,35 @@ pub(super) fn factory_zero_gap_perpendicular_map(
     (map, start_tile, factory_pos, unit_start, goal)
 }
 
+#[allow(clippy::type_complexity)]
+pub(super) fn command_car_building_corner_map() -> (
+    Map,
+    (u32, u32),
+    [(EntityKind, f32, f32); 3],
+    (f32, f32),
+    f32,
+    (f32, f32),
+) {
+    let mut map = flat_dev_map(1);
+    let buildings = [
+        (EntityKind::Factory, 3472.0, 3728.0),
+        (EntityKind::TrainingCentre, 3440.0, 3648.0),
+        (EntityKind::Barracks, 3536.0, 3584.0),
+    ];
+    let unit_start = (3536.0, 3664.0);
+    let unit_facing = 2.823_079_3;
+    let goal = (3216.0, 3472.0);
+    let start_tile = (
+        (unit_start.0 / config::TILE_SIZE as f32) as u32,
+        (unit_start.1 / config::TILE_SIZE as f32) as u32,
+    );
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = start_tile;
+    }
+
+    (map, start_tile, buildings, unit_start, unit_facing, goal)
+}
+
 pub(super) fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
     unit: EntityKind,
