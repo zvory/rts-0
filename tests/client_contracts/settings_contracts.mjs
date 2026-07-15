@@ -32,6 +32,7 @@ import {
   writeAutoSpectatorEnabled,
 } from "../../client/src/auto_spectator_settings.js";
 import {
+  HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
   HotkeyProfileService,
@@ -62,6 +63,7 @@ function hotkeyService() {
     "parseImportText",
     "resolveCard",
     "resolveSlot",
+    "hotkeyForCommand",
   ]) {
     assertHasMethod(hotkeys, method, "HotkeyProfileService");
   }
@@ -286,6 +288,37 @@ function hotkeyService() {
     assert(hotkeys.getActiveProfile().bindings["unit.move"] === "M",
       "hotkey editor: saved profile applies immediately as the active profile");
 
+    cleanup();
+  });
+
+  withFakeSettingsDocument((windowListeners) => {
+    const hotkeys = hotkeyService();
+    const hotkeyTab = buildSettingsTabs({ hotkeyProfiles: hotkeys }).find((tab) => tab.id === "hotkeys");
+    const root = document.createElement("div");
+    const cleanup = hotkeyTab.render(root, { kind: "match" });
+    const contextSelect = findFakeById(root, "hotkey-context-select");
+    assert(
+      contextSelect.children.some((option) => option.value === "hud-shortcuts"),
+      "hotkey editor: exposes HUD Shortcuts as a configurable context",
+    );
+    contextSelect.value = "hud-shortcuts";
+    contextSelect.listeners.change();
+    const idleWorkers = findFakes(root, (el) =>
+      el.dataset?.commandId === HOTKEY_COMMAND_SELECT_IDLE_WORKERS
+    )[0];
+    assert(idleWorkers?.dataset.hotkey === "T", "hotkey editor: Grid shows T for idle-worker selection");
+    idleWorkers.listeners.click({ preventDefault() {} });
+    windowListeners.keydown({
+      key: "K",
+      code: "KeyK",
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    findFakeById(root, "hotkey-save-profile").listeners.click();
+    assert(
+      hotkeys.hotkeyForCommand(HOTKEY_COMMAND_SELECT_IDLE_WORKERS) === "K",
+      "hotkey editor: saves and activates a customized idle-worker key",
+    );
     cleanup();
   });
 

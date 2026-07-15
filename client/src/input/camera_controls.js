@@ -1,6 +1,6 @@
 import { ABILITY } from "../protocol.js";
 import { ZOOM_STEP } from "./constants.js";
-import { isTextEntry } from "./placement.js";
+import { commandHotkeyFromEvent, isTextEntry } from "./placement.js";
 
 export function _handleKeyDown(ev) {
   // Never hijack typing in inputs (lobby name field, etc.).
@@ -32,6 +32,8 @@ export function _handleKeyDown(ev) {
       break;
   }
 
+  if (activateGlobalHotkey(this, ev)) return;
+
   const commandHotkey = this._activateCommandHotkey(ev);
   if (commandHotkey) {
     if (commandHotkey.armed?.quickCast) {
@@ -52,6 +54,20 @@ export function _handleKeyDown(ev) {
   }
   if (ev.repeat) return;
   if (this._handleControlGroupHotkey(ev)) return;
+}
+
+function activateGlobalHotkey(input, ev) {
+  if (ev.repeat || ev.altKey || ev.ctrlKey || ev.metaKey) return false;
+  const key = commandHotkeyFromEvent(ev);
+  if (!key) return false;
+  for (const action of input.globalHotkeyActions || []) {
+    const resolved = input.hotkeyProfiles?.hotkeyForCommand?.(action.commandId) || "";
+    if (resolved !== key) continue;
+    action.activate?.();
+    ev.preventDefault?.();
+    return true;
+  }
+  return false;
 }
 
 function repeatedWorldAbilityHotkeyTarget(target) {

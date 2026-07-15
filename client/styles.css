@@ -2957,7 +2957,7 @@ input[type="text"]:focus {
   line-height: 1.05;
   text-align: center;
   text-shadow: 1px 1px 0 #191710;
-  cursor: pointer;
+  cursor: default;
 }
 .idle-workers-button:hover:not(:disabled) {
   border-color: rgba(216, 193, 133, 0.72);
@@ -2972,8 +2972,11 @@ input[type="text"]:focus {
 }
 .idle-workers-button:disabled {
   color: var(--muted);
-  cursor: default;
   opacity: 0.72;
+}
+.idle-workers-button:disabled[data-selectable="true"] {
+  color: var(--ink);
+  opacity: 1;
 }
 .idle-workers-label {
   display: inline;
