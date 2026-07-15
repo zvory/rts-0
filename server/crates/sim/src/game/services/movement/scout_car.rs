@@ -115,7 +115,12 @@ pub(super) fn plan_scout_car_motion(
     let mut best_score = f32::INFINITY;
 
     if step_budget > 0.01 {
-        for primitive in scout_car_primitives(route.reverse_waypoint.is_some()) {
+        // A behind-the-car intermediate route point is often the pathfinder telling the car to
+        // back out of a pocket before continuing. Keep distant final clicks on the established
+        // forward-turn behavior, but let reverse compete with forward arcs for this local exit.
+        let waypoint_behind =
+            route.next_index > 0 && waypoint_is_behind(e.facing(), route.target, current);
+        for primitive in scout_car_primitives(route.reverse_waypoint.is_some(), waypoint_behind) {
             let travel_distance =
                 primitive_travel_distance(current, &route, primitive, step_budget, e.facing());
             if travel_distance <= 0.01 {
@@ -156,10 +161,15 @@ pub(super) fn plan_scout_car_motion(
     };
 
     let (pos, post_pop_count) = scout_car_post_motion_waypoint_pops(map, occ, e, &route, candidate);
+    let reverse_waypoint = if candidate.primitive.travel_sign < 0.0 {
+        Some(route.target)
+    } else {
+        route.reverse_waypoint
+    };
     Some(ScoutCarMotionPlan {
         pos,
         facing: Some(candidate.facing),
-        reverse_waypoint: route.reverse_waypoint.filter(|wp| {
+        reverse_waypoint: reverse_waypoint.filter(|wp| {
             route.pre_pop_count + post_pop_count == 0
                 || e.movement
                     .as_ref()
@@ -339,7 +349,7 @@ fn vehicle_route_lookahead_px(kind: EntityKind) -> f32 {
     }
 }
 
-fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
+fn scout_car_primitives(reverse_only: bool, allow_reverse: bool) -> Vec<Primitive> {
     if reverse_only {
         return vec![Primitive {
             curvature: 0.0,
@@ -349,7 +359,7 @@ fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
     }
 
     let max = 1.0 / SCOUT_CAR_MIN_TURN_RADIUS_PX;
-    [
+    let mut primitives: Vec<_> = [
         0.0,
         max * 0.35,
         -max * 0.35,
@@ -365,7 +375,15 @@ fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
         travel_sign: 1.0,
         ordinal: ordinal as u8,
     })
-    .collect()
+    .collect();
+    if allow_reverse {
+        primitives.push(Primitive {
+            curvature: 0.0,
+            travel_sign: -1.0,
+            ordinal: primitives.len() as u8,
+        });
+    }
+    primitives
 }
 
 fn primitive_travel_distance(
