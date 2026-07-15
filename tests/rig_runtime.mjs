@@ -58,6 +58,12 @@ import {
   SCOUT_CAR_RIG_SVG,
 } from "../client/src/renderer/rigs/vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
+import {
+  createInspectionPixiFactory,
+  createInspectionPngPixiFactory,
+  FakeContainer,
+  FakeGraphics,
+} from "./helpers/rig_inspection_pixi.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
@@ -665,6 +671,29 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(unit.parts.get("sprite.barrel").display.rotation, Math.PI / 2);
 });
 
+test("PNG route coverage keeps mutable and Set part selections independent", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const mutableParts = ["part.shadow"];
+  const shadowCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, {
+    parts: mutableParts,
+  });
+  assert.deepEqual(shadowCoverage.coveredParts, []);
+  assert.deepEqual(shadowCoverage.missingParts, ["part.shadow"]);
+
+  mutableParts[0] = "part.hull";
+  const hullCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, {
+    parts: mutableParts,
+  });
+  assert.deepEqual(hullCoverage.coveredParts, ["part.hull"]);
+  assert.deepEqual(hullCoverage.missingParts, []);
+
+  const turretCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, {
+    parts: new Set(["part.turret"]),
+  });
+  assert.deepEqual(turretCoverage.coveredParts, ["part.turret"]);
+  assert.deepEqual(turretCoverage.missingParts, []);
+});
+
 test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => {
   const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
   const entity = {
@@ -1167,6 +1196,29 @@ test("live rig renderer rebuilds same-id instances when entity kind changes", ()
   riflemanRig.destroy();
 });
 
+test("live rig renderer rebuilds instances after a mutable route changes", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 93, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: 0 };
+  const renderer = makeRigRenderer();
+  const parts = ["part.shadow"];
+  const options = {
+    routes: [{ poolName: "liveUnitRigs", layerName: "units", parts }],
+  };
+
+  renderLiveUnitRig(renderer, entity, new Map([[1, 0x336699]]), {}, definition, options);
+  parts[0] = "part.body";
+  renderLiveUnitRig(renderer, entity, new Map([[1, 0x336699]]), {}, definition, options);
+  const bodyRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.deepEqual([...bodyRig.parts.keys()], ["part.body"]);
+
+  parts[0] = "part.facingTick";
+  renderLiveUnitRig(renderer, entity, new Map([[1, 0x336699]]), {}, definition, options);
+  const facingRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(bodyRig._destroyed, true);
+  assert.deepEqual([...facingRig.parts.keys()], ["part.facingTick"]);
+  facingRig.destroy();
+});
+
 test("missing live rig definitions fail closed instead of drawing procedural fallback", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 5, kind: KIND.EKAT, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
@@ -1309,22 +1361,6 @@ function makeRigRenderer() {
   };
 }
 
-function createInspectionPixiFactory() {
-  return {
-    createContainer: () => new FakeContainer(),
-    createGraphics: () => new FakeGraphics(),
-  };
-}
-
-function createInspectionPngPixiFactory() {
-  return {
-    ...createInspectionPixiFactory(),
-    createRectangle: (x, y, width, height) => ({ x, y, width, height, w: width, h: height }),
-    createTexture: (baseTexture, rectangle) => ({ baseTexture, frame: rectangle }),
-    createSprite: (texture) => new FakeSprite(texture),
-  };
-}
-
 function fakeAtlasTexture() {
   return { baseTexture: { id: "fake-tank-atlas" } };
 }
@@ -1392,115 +1428,6 @@ function assertAlmostEqual(actual, expected, label, epsilon = 0.000001) {
     Math.abs(actual - expected) <= epsilon,
     `${label}: expected ${expected}, got ${actual}`,
   );
-}
-
-class FakeContainer {
-  constructor() {
-    this.children = [];
-    this.position = makePointSetter(this, "x", "y");
-    this.scale = makePointSetter(this, "scaleX", "scaleY");
-    this.pivot = makePointSetter(this, "pivotX", "pivotY");
-    this.x = 0;
-    this.y = 0;
-    this.scaleX = 1;
-    this.scaleY = 1;
-    this.visible = true;
-    this.alpha = 1;
-    this.rotation = 0;
-    this.destroyed = false;
-  }
-
-  addChild(child) {
-    child.parent = this;
-    this.children.push(child);
-  }
-
-  removeChild(child) {
-    child.parent = null;
-    this.children = this.children.filter((candidate) => candidate !== child);
-  }
-
-  destroy() {
-    this.destroyed = true;
-  }
-}
-
-class FakeSprite extends FakeContainer {
-  constructor(texture) {
-    super();
-    this.texture = texture;
-    this.tint = 0xffffff;
-    this.anchorX = 0;
-    this.anchorY = 0;
-    this.anchor = makePointSetter(this, "anchorX", "anchorY");
-    this.destroyOptions = null;
-  }
-
-  destroy(options = null) {
-    this.destroyed = true;
-    this.destroyOptions = options;
-  }
-}
-
-class FakeGraphics extends FakeContainer {
-  constructor() {
-    super();
-    this.commands = [];
-    this.lineWidth = 0;
-    this.clearCount = 0;
-  }
-
-  clear() {
-    this.clearCount += 1;
-    this.commands = [];
-    this.lineWidth = 0;
-  }
-
-  beginFill(color, alpha = 1) {
-    this.commands.push({ op: "beginFill", color, alpha });
-  }
-
-  endFill() {
-    this.commands.push({ op: "endFill" });
-  }
-
-  lineStyle(width = 0, color = 0, alpha = 1) {
-    this.lineWidth = width;
-    this.commands.push({ op: "lineStyle", width, color, alpha });
-  }
-
-  moveTo(x, y) {
-    this.commands.push({ op: "moveTo", x, y });
-  }
-
-  lineTo(x, y) {
-    this.commands.push({ op: "lineTo", x, y });
-  }
-
-  drawPolygon(points) {
-    this.commands.push({ op: "drawPolygon", points });
-  }
-
-  drawCircle(x, y, radius) {
-    this.commands.push({ op: "drawCircle", x, y, radius });
-  }
-
-  drawEllipse(x, y, rx, ry) {
-    this.commands.push({ op: "drawEllipse", x, y, rx, ry });
-  }
-
-  drawRect(x, y, width, height) {
-    this.commands.push({ op: "drawRect", x, y, width, height });
-  }
-}
-
-function makePointSetter(target, xKey, yKey) {
-  return {
-    set(x, y = x) {
-      target[xKey] = x;
-      target[yKey] = y;
-    },
-  };
 }
 
 function test(name, fn) {

@@ -1,6 +1,7 @@
 import { STATS } from "../../config.js";
 import { KIND, SETUP, STATE } from "../../protocol.js";
 import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
+import { normalizedPartSet } from "./part_selection.js";
 
 const TRANSFORM_PROPERTIES = new Set([
   "transform.x",
@@ -182,13 +183,6 @@ export function sampleRigAnimation(definition, entity, renderContext = {}, optio
   }
 
   return { context, parts };
-}
-
-function normalizedPartSet(includeParts) {
-  if (includeParts == null) return null;
-  if (includeParts instanceof Set) return includeParts;
-  if (typeof includeParts === "string") return new Set([includeParts]);
-  return new Set(includeParts);
 }
 
 function applyBinding(sampled, binding, input) {

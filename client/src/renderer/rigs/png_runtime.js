@@ -1,11 +1,11 @@
 import { hexToInt, lightenColor } from "../shared.js";
 import { sampleRigAnimation } from "./animation.js";
+import { isImmutablePartSelection, normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const ATLAS_SPRITES_CACHE = new WeakMap();
 const ROUTE_COVERAGE_CACHE = new WeakMap();
 const ALL_ROUTE_PARTS = Object.freeze({});
-const PART_SELECTION_KEYS = new WeakMap();
 
 export function renderPngUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   const atlas = options.atlas;
@@ -71,8 +71,10 @@ export function pngAtlasRouteCoverage(definition, atlas, route) {
       animationParts: [],
     };
   }
-  const cacheKey = Array.isArray(route?.parts) ? route.parts : ALL_ROUTE_PARTS;
-  const cached = cachedRouteCoverage(definition, atlas, cacheKey);
+  const cacheKey = includeParts
+    ? (isImmutablePartSelection(route?.parts) ? route.parts : null)
+    : ALL_ROUTE_PARTS;
+  const cached = cacheKey ? cachedRouteCoverage(definition, atlas, cacheKey) : null;
   if (cached) return cached;
   const sprites = atlasSprites(definition, atlas);
   const coveredParts = new Set();
@@ -92,7 +94,7 @@ export function pngAtlasRouteCoverage(definition, atlas, route) {
     missingParts: Object.freeze(includeParts ? [...includeParts].filter((partId) => !coveredParts.has(partId)) : []),
     animationParts: Object.freeze([...animationParts]),
   });
-  cacheRouteCoverage(definition, atlas, cacheKey, coverage);
+  if (cacheKey) cacheRouteCoverage(definition, atlas, cacheKey, coverage);
   return coverage;
 }
 
@@ -114,7 +116,8 @@ class PngAtlasRigInstance {
     this._pixiFactory = pixiFactory;
     this.container = pixiFactory.createContainer();
     this.parts = new Map();
-    this._routeParts = normalizedPartSet(options.includeParts);
+    const routeParts = normalizedPartSet(options.includeParts);
+    this._routeParts = routeParts ? new Set(routeParts) : null;
     this._routePartKey = partSelectionKey(this._routeParts);
     this._destroyed = false;
 
@@ -393,24 +396,6 @@ function rotateOffset(offset, rotation) {
     x: offset.x * cos - offset.y * sin,
     y: offset.x * sin + offset.y * cos,
   };
-}
-
-function normalizedPartSet(parts) {
-  if (parts == null) return null;
-  if (parts instanceof Set) return parts;
-  if (!Array.isArray(parts)) return null;
-  return new Set(parts);
-}
-
-function partSelectionKey(parts) {
-  if (parts && typeof parts === "object") {
-    const cached = PART_SELECTION_KEYS.get(parts);
-    if (cached !== undefined) return cached;
-  }
-  const selected = normalizedPartSet(parts);
-  const key = selected ? [...selected].sort().join("\u0000") : null;
-  if (parts && typeof parts === "object") PART_SELECTION_KEYS.set(parts, key);
-  return key;
 }
 
 function setPoint(point, x, y) {

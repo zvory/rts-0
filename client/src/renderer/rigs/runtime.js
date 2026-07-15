@@ -1,8 +1,8 @@
 import { sampleRigAnimation } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
+import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
-const PART_SELECTION_KEYS = new WeakMap();
 
 export function createDefaultPixiFactory(pixi = globalThis.PIXI) {
   return {
@@ -63,7 +63,8 @@ export class UnitRigInstance {
     this._pixiFactory = pixiFactory;
     this.container = pixiFactory.createContainer();
     this.parts = new Map();
-    this._routeParts = normalizedPartSet(options.includeParts);
+    const routeParts = normalizedPartSet(options.includeParts);
+    this._routeParts = routeParts ? new Set(routeParts) : null;
     this._routePartKey = partSelectionKey(this._routeParts);
     this._destroyed = false;
 
@@ -285,22 +286,4 @@ function setPoint(point, x, y) {
     point.x = x;
     point.y = y;
   }
-}
-
-function normalizedPartSet(includeParts) {
-  if (includeParts == null) return null;
-  if (typeof includeParts === "string") return new Set([includeParts]);
-  if (Array.isArray(includeParts)) return new Set(includeParts);
-  return new Set([...includeParts]);
-}
-
-function partSelectionKey(includeParts) {
-  if (includeParts && typeof includeParts === "object") {
-    const cached = PART_SELECTION_KEYS.get(includeParts);
-    if (cached !== undefined) return cached;
-  }
-  const parts = normalizedPartSet(includeParts);
-  const key = parts ? [...parts].sort().join("\u0000") : null;
-  if (includeParts && typeof includeParts === "object") PART_SELECTION_KEYS.set(includeParts, key);
-  return key;
 }
