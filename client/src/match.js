@@ -12,6 +12,7 @@ import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
+import * as matchLabTools from "./match_lab_tools.js";
 import { PredictionController } from "./prediction_controller.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
@@ -627,56 +628,23 @@ export class Match {
   }
 
   armLabTool(tool, callbacks = {}) {
-    if (!this.clientIntent || typeof this.clientIntent.beginLabTool !== "function") return null;
-    const onWorldClick = typeof callbacks === "function"
-      ? callbacks
-      : callbacks?.onWorldClick;
-    const onBoxSelection = typeof callbacks === "object" ? callbacks?.onBoxSelection : null;
-    this.labToolWorldClickHandler = typeof onWorldClick === "function" ? onWorldClick : null;
-    this.labToolBoxSelectionHandler = typeof onBoxSelection === "function" ? onBoxSelection : null;
-    const active = this.clientIntent.beginLabTool(tool);
-    this.publishLabToolChange({ type: "armed", tool: active });
-    return active;
+    return matchLabTools.arm(this, tool, callbacks);
+  }
+
+  updateLabToolPayload(payload) {
+    return matchLabTools.updatePayload(this, payload);
   }
 
   cancelLabTool(reason = "cancelled") {
-    this.labToolWorldClickHandler = null;
-    this.labToolBoxSelectionHandler = null;
-    const cancelled = this.clientIntent?.cancelLabTool?.(reason) || null;
-    if (cancelled) this.publishLabToolChange({ type: "cancelled", reason, tool: cancelled });
-    return cancelled;
+    return matchLabTools.cancel(this, reason);
   }
 
   consumeLabToolWorldClick(event) {
-    const tool = this.clientIntent?.activeLabTool || null;
-    if (!tool || event?.tool?.id !== tool.id) return;
-    const h = this.labToolWorldClickHandler;
-    try {
-      const r = h?.({ ...event, tool });
-      if (r && typeof r.catch === "function") {
-        r.catch((err) => this.handleLabToolActionError(err));
-      }
-    } catch (err) {
-      this.handleLabToolActionError(err);
-    } finally {
-      if (!tool.keepArmedOnWorldClick) this.cancelLabTool("worldClick");
-    }
+    matchLabTools.consumeWorldClick(this, event);
   }
 
   consumeLabToolBoxSelection(event) {
-    const tool = this.clientIntent?.activeLabTool || null;
-    if (!tool || event?.tool?.id !== tool.id) return;
-    const h = this.labToolBoxSelectionHandler;
-    try {
-      const r = h?.({ ...event, tool });
-      if (r && typeof r.catch === "function") {
-        r.catch((err) => this.handleLabToolActionError(err));
-      }
-    } catch (err) {
-      this.handleLabToolActionError(err);
-    } finally {
-      if (!tool.keepArmedOnBoxSelection) this.cancelLabTool("boxSelect");
-    }
+    matchLabTools.consumeBoxSelection(this, event);
   }
 
   handleLabToolActionError(err) {

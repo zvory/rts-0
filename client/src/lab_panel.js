@@ -575,8 +575,8 @@ export class LabPanel {
     this.captureVisibleSetupFields();
     this.targetPlayerId = this.validOwner(owner);
     const active = this.activeLabTool();
-    if (active?.kind === "spawnEntity") {
-      this.armSpawnTool({ ...active.payload, owner: this.targetPlayerId });
+    if (active?.kind === "spawnEntity" && typeof this.match?.updateLabToolPayload === "function") {
+      this.match.updateLabToolPayload({ ...active.payload, owner: this.targetPlayerId });
       return;
     }
     this.render();

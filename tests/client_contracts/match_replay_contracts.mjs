@@ -188,8 +188,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(labToolMatch.clientIntent.activeLabTool === null, "Match lab tool controller clears consumed tools");
     assert(labToolChanges.at(-1)?.reason === "worldClick", "Match lab tool controller publishes world-click cancellation");
     const persistent = labToolMatch.armLabTool(
-      { kind: "spawnEntity", keepArmedOnWorldClick: true },
+      { kind: "spawnEntity", payload: { owner: 1 }, keepArmedOnWorldClick: true },
       { onWorldClick: () => {} },
+    );
+    labToolMatch.clientIntent.updateLabToolPreview({ toolId: persistent.id, x: 8, y: 16 });
+    const updatedPersistent = labToolMatch.updateLabToolPayload({ owner: 2 });
+    assert(updatedPersistent === persistent, "Match updates persistent Lab tools without replacing their identity");
+    assert(
+      labToolChanges.at(-1)?.type === "updated" &&
+        labToolMatch.clientIntent.labToolPreview?.payload?.owner === 2,
+      "Match publishes Lab tool payload updates and preserves the live preview",
     );
     labToolMatch.consumeLabToolWorldClick({
       tool: persistent,
