@@ -65,7 +65,7 @@ export function parseClientFlameGraphArgs(argv) {
     else if (arg === "--help" || arg === "-h") options.help = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
-  if (!/^\d+x\d+$/.test(options.viewport)) throw new Error("--viewport must look like 1440x900");
+  if (!/^[1-9]\d*x[1-9]\d*$/.test(options.viewport)) throw new Error("--viewport must look like 1440x900");
   if (options.intervalUs < 100 || options.intervalUs > 100_000) {
     throw new Error("--interval-us must be between 100 and 100000");
   }
@@ -107,6 +107,7 @@ export async function runClientFlameGraph(options) {
     "--cpu-throttle", String(options.cpuThrottle),
     "--viewport", options.viewport,
     "--dpr", String(options.dpr),
+    "--cpu-profile-interval-us", String(options.intervalUs),
     "--output-root", runRoot,
   ];
   if (options.baseUrl) harnessArgs.push("--base-url", options.baseUrl);
@@ -115,10 +116,7 @@ export async function runClientFlameGraph(options) {
   runChecked(process.execPath, harnessArgs, {
     cwd: REPO_ROOT,
     stdio: "inherit",
-    env: {
-      ...process.env,
-      RTS_CLIENT_CPU_PROFILE_INTERVAL_US: String(options.intervalUs),
-    },
+    env: process.env,
   });
 
   const artifactDir = latestArtifactDirectory(path.join(runRoot, options.workload));

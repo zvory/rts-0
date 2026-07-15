@@ -7,32 +7,46 @@ export function analyzeCpuProfile(profile) {
   if (!profile || !Array.isArray(profile.nodes) || profile.nodes.length === 0) {
     throw new Error("CPU profile has no call-tree nodes");
   }
-  const nodes = new Map((profile.nodes || []).map((node) => [node.id, {
+  const nodes = new Map(profile.nodes.map((node) => [node.id, {
     ...node,
     parentId: null,
     selfUs: 0,
     totalUs: 0,
   }]));
+  if (nodes.size !== profile.nodes.length) throw new Error("CPU profile has duplicate node ids");
   for (const node of nodes.values()) {
     for (const childId of node.children || []) {
       const child = nodes.get(childId);
-      if (child) child.parentId = node.id;
+      if (!child) throw new Error(`CPU profile node ${node.id} references missing child ${childId}`);
+      if (child.parentId != null && child.parentId !== node.id) {
+        throw new Error(`CPU profile node ${childId} has multiple parents`);
+      }
+      child.parentId = node.id;
     }
   }
 
-  const samples = profile.samples || [];
-  const deltas = profile.timeDeltas || [];
+  const samples = profile.samples;
+  const deltas = profile.timeDeltas;
+  if (!Array.isArray(samples) || samples.length === 0) {
+    throw new Error("CPU profile has no samples");
+  }
+  if (!Array.isArray(deltas) || deltas.length !== samples.length) {
+    throw new Error("CPU profile samples and time deltas differ in length");
+  }
   let sampledUs = 0;
   for (let index = 0; index < samples.length; index += 1) {
-    const delta = Math.max(0, Number(deltas[index] || 0));
+    const delta = Number(deltas[index]);
+    if (!Number.isFinite(delta) || delta < 0) {
+      throw new Error(`CPU profile has invalid time delta at sample ${index}`);
+    }
     const node = nodes.get(samples[index]);
-    if (!node) continue;
+    if (!node) throw new Error(`CPU profile sample ${index} references missing node ${samples[index]}`);
     node.selfUs += delta;
     sampledUs += delta;
   }
 
   const roots = [...nodes.values()].filter((node) => node.parentId == null);
-  if (roots.length === 0) throw new Error("CPU profile call tree has no root");
+  if (roots.length !== 1) throw new Error(`CPU profile call tree has ${roots.length} roots; expected one`);
   const calculateTotal = (node, active = new Set()) => {
     if (active.has(node.id)) return node.selfUs;
     active.add(node.id);
@@ -265,6 +279,12 @@ export function parseCpuFlameGraphArgs(argv) {
       "usage: client-cpu-profile-to-flamegraph.mjs --input profile.cpuprofile "
       + "--output flamegraph.svg [--title text]",
     );
+  }
+  if (!Number.isFinite(parsed.width) || parsed.width <= 0) {
+    throw new Error("--width must be a positive number");
+  }
+  if (!Number.isFinite(parsed.minWidthPx) || parsed.minWidthPx < 0) {
+    throw new Error("--min-width must be a non-negative number");
   }
   return parsed;
 }

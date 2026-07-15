@@ -5,8 +5,8 @@
   "exceptions": [
     {
       "path": "scripts/client-perf-harness.mjs",
-      "lines": 1911,
-      "reason": "Frame-budget Phase 1 adds exact active-player and Lab authority checks plus standalone server startup policy to the existing oversized harness; keep ratcheting until workload execution and reporting are split."
+      "lines": 1917,
+      "reason": "The harness still combines workload execution, reporting, active-player setup, and server startup; CPU profile mechanics are split into browser_profile.mjs, and this exception must keep ratcheting as the remaining responsibilities move out."
     },
     {
       "path": "scripts/docdrift-sweep.mjs",

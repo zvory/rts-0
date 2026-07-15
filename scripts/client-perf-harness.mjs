@@ -14,8 +14,9 @@ import {
   validateActiveSupplyStressSample,
 } from "./client-perf/workload_setup.mjs";
 import {
-  cancelCpuProfile,
+  cleanupBrowserProfile,
   configurePageEmulation,
+  parseCpuProfileInterval,
   puppeteerViewport,
   startCpuProfile,
   stopCpuProfile,
@@ -190,14 +191,17 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   const errors = [];
   let tracePath = null;
   let cpuProfile = null;
+  let cpuProfilePath = null;
+  let page = null;
+  let cdpSession = null;
   let summary = null;
   let snapshotCodecBakeoff = null;
   let workloadSetup = null;
 
   try {
     await prepareWorkload(workload);
-    const page = await browser.newPage();
-    const cdpSession = await configurePageEmulation(page, args.cpuThrottleRate);
+    page = await browser.newPage();
+    cdpSession = await configurePageEmulation(page, args.cpuThrottleRate);
     if (args.snapshotCodecBakeoff) {
       await installSnapshotCodecCapture(page, args.snapshotCodecMaxSamples);
     }
@@ -242,9 +246,10 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
     );
-    cpuProfile = await startCpuProfile(page, process.env.RTS_CLIENT_CPU_PROFILE_INTERVAL_US, cdpSession);
+    cpuProfile = await startCpuProfile(page, args.cpuProfileIntervalUs, cdpSession);
     await sleep(args.durationMs);
-    await stopCpuProfile(cpuProfile, path.join(artifactDir, "cpu-profile.cpuprofile"));
+    cpuProfilePath = cpuProfile ? path.join(artifactDir, "cpu-profile.cpuprofile") : null;
+    await stopCpuProfile(cpuProfile, cpuProfilePath);
 
     summary = await collectPageSummary(page);
     if (args.snapshotCodecBakeoff) {
@@ -311,6 +316,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         baseUrl: server.baseUrl,
         reusedServer: server.reused,
         cpuThrottleRate: args.cpuThrottleRate,
+        cpuProfileIntervalUs: args.cpuProfileIntervalUs,
       },
       workloadSetup,
       stressMatrix: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
@@ -341,6 +347,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       artifacts: {
         summaryJson: path.join(artifactDir, "summary.json"),
         traceJson: tracePath,
+        cpuProfile: cpuProfilePath,
       },
       notes: [
         "This harness fails on runtime errors and missing summaries, not absolute FPS thresholds.",
@@ -360,8 +367,6 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
 
     if (args.trace) await page.tracing.stop();
-    await cdpSession?.detach?.().catch(() => {});
-    await page.close().catch(() => {});
 
     if (errors.length > 0) artifact.status = "failed";
     fs.writeFileSync(path.join(artifactDir, "summary.json"), `${JSON.stringify(artifact, null, 2)}\n`);
@@ -382,12 +387,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     };
   } catch (err) {
     errors.push(err.stack || err.message);
-    await cancelCpuProfile(cpuProfile);
-    try {
-      if (args.trace) await browser.pages().then((pages) => pages.at(-1)?.tracing?.stop?.()).catch(() => {});
-    } catch {
-      // Best effort cleanup only.
-    }
+    if (args.trace) await page?.tracing?.stop?.().catch(() => {});
     const artifact = {
       schemaVersion: 1,
       status: "failed",
@@ -408,6 +408,8 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       deviceScaleFactor: args.deviceScaleFactor,
       matrixCell: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
     };
+  } finally {
+    await cleanupBrowserProfile({ controller: cpuProfile, emulationSession: cdpSession, page });
   }
 }
 
@@ -1665,6 +1667,7 @@ function parseArgs(argv) {
     viewport: { ...DEFAULT_VIEWPORT },
     deviceScaleFactor: DEFAULT_DEVICE_SCALE_FACTOR,
     cpuThrottleRate: DEFAULT_CPU_THROTTLE_RATE,
+    cpuProfileIntervalUs: null,
     stressMatrix: false,
     matrixRepeatCount: DEFAULT_MATRIX_REPEAT_COUNT,
     matrixCpuThrottles: [...DEFAULT_MATRIX_CPU_THROTTLES],
@@ -1716,6 +1719,8 @@ function parseArgs(argv) {
     else if (arg.startsWith("--dpr=")) args.deviceScaleFactor = parsePositiveNumber(arg.slice("--dpr=".length), "--dpr");
     else if (arg === "--cpu-throttle") args.cpuThrottleRate = parsePositiveNumber(value(), arg);
     else if (arg.startsWith("--cpu-throttle=")) args.cpuThrottleRate = parsePositiveNumber(arg.slice("--cpu-throttle=".length), "--cpu-throttle");
+    else if (arg === "--cpu-profile-interval-us") args.cpuProfileIntervalUs = parseCpuProfileInterval(value(), arg);
+    else if (arg.startsWith("--cpu-profile-interval-us=")) args.cpuProfileIntervalUs = parseCpuProfileInterval(arg.slice("--cpu-profile-interval-us=".length), "--cpu-profile-interval-us");
     else if (arg === "--matrix-repeat") args.matrixRepeatCount = parsePositiveInt(value(), arg);
     else if (arg.startsWith("--matrix-repeat=")) args.matrixRepeatCount = parsePositiveInt(arg.slice("--matrix-repeat=".length), "--matrix-repeat");
     else if (arg === "--matrix-cpu") args.matrixCpuThrottles = parsePositiveNumberList(value(), arg);
@@ -1761,6 +1766,7 @@ Options:
   --viewport <width>x<height>    Browser viewport. Default: ${DEFAULT_VIEWPORT.width}x${DEFAULT_VIEWPORT.height}.
   --dpr <n>                      Device scale factor for a single workload run. Default: ${DEFAULT_DEVICE_SCALE_FACTOR}.
   --cpu-throttle <n>             Chrome CPU throttle factor for a single workload run. Default: ${DEFAULT_CPU_THROTTLE_RATE}.
+  --cpu-profile-interval-us <n>  Also write a V8 CPU profile using a 100-100000 microsecond interval.
   --matrix-repeat <n>            Repeat count per stress-matrix cell. Default: ${DEFAULT_MATRIX_REPEAT_COUNT}.
   --matrix-cpu <list>            Comma list such as 1,2,4. Default: ${DEFAULT_MATRIX_CPU_THROTTLES.join(",")}.
   --matrix-viewport <list>       Comma list of small,default,large or WxH. Default: default.

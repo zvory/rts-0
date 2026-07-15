@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   analyzeCpuProfile,
+  parseCpuFlameGraphArgs,
   renderCpuFlameGraph,
   writeCpuFlameGraphArtifacts,
 } from "../../scripts/client-cpu-profile-to-flamegraph.mjs";
@@ -68,7 +69,13 @@ const syntheticProfile = {
 
   assert.throws(() => parseClientFlameGraphArgs(["--interval-us", "99"]), /between 100 and 100000/);
   assert.throws(() => parseClientFlameGraphArgs(["--viewport", "wide"]), /must look like/);
+  assert.throws(() => parseClientFlameGraphArgs(["--viewport", "0x900"]), /must look like/);
   assert.throws(() => parseClientFlameGraphArgs(["--unknown"]), /unknown argument/);
+
+  assert.throws(
+    () => parseCpuFlameGraphArgs(["--input", "profile", "--output", "graph", "--width", "NaN"]),
+    /--width must be a positive number/,
+  );
 }
 
 {
@@ -102,14 +109,41 @@ const syntheticProfile = {
 }
 
 assert.throws(() => analyzeCpuProfile({ nodes: [] }), /no call-tree nodes/);
+assert.throws(() => analyzeCpuProfile({ nodes: syntheticProfile.nodes }), /no samples/);
+assert.throws(
+  () => analyzeCpuProfile({ ...syntheticProfile, timeDeltas: [500] }),
+  /samples and time deltas differ in length/,
+);
+assert.throws(
+  () => analyzeCpuProfile({ ...syntheticProfile, samples: [999], timeDeltas: [500] }),
+  /references missing node/,
+);
+
+{
+  const failingSession = {
+    detached: false,
+    async send() { throw new Error("CDP failure"); },
+    async detach() { this.detached = true; },
+  };
+  const page = { target: () => ({ createCDPSession: async () => failingSession }) };
+  await assert.rejects(() => configurePageEmulation(page, 2), /CDP failure/);
+  assert.equal(failingSession.detached, true, "failed emulation setup detaches its session");
+  failingSession.detached = false;
+  await assert.rejects(() => startCpuProfile(page, "500"), /CDP failure/);
+  assert.equal(failingSession.detached, true, "failed profiler setup detaches its session");
+}
 
 {
   const calls = [];
   const session = {
+    detached: 0,
     async send(method, params) {
       calls.push({ method, params });
       if (method === "Profiler.stop") return { profile: syntheticProfile };
       return {};
+    },
+    async detach() {
+      this.detached += 1;
     },
   };
   const page = { target: () => ({ createCDPSession: async () => session }) };
@@ -117,7 +151,7 @@ assert.throws(() => analyzeCpuProfile({ nodes: [] }), /no call-tree nodes/);
   assert.equal(await configurePageEmulation(page, 2), session);
   assert.equal(calls.at(-1)?.method, "Emulation.setCPUThrottlingRate");
 
-  await assert.rejects(() => startCpuProfile(page, "99", session), /integer from 100 through 100000/);
+  await assert.rejects(() => startCpuProfile(page, "99", session), /integer between 100 and 100000/);
   const controller = await startCpuProfile(page, "500", session);
   assert.deepEqual(
     calls.slice(-3).map((call) => call.method),
@@ -131,6 +165,11 @@ assert.throws(() => analyzeCpuProfile({ nodes: [] }), /no call-tree nodes/);
     assert.equal(JSON.parse(fs.readFileSync(outputPath, "utf8")).samples.length, 4);
     await cancelCpuProfile(controller);
     assert.equal(calls.filter((call) => call.method === "Profiler.stop").length, 1);
+    assert.equal(session.detached, 0, "a caller-owned throttling session stays attached");
+
+    const ownedController = await startCpuProfile(page, "500");
+    await cancelCpuProfile(ownedController);
+    assert.equal(session.detached, 1, "a profiler-owned session is detached on cancellation");
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
