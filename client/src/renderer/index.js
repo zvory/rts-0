@@ -244,6 +244,7 @@ export class Renderer {
     this._missingTextureEntityIds = new Set();
     this._renderFrameCount = 0;
     this._lastRenderErrorFrame = -1;
+    this._renderAttemptHadError = false;
     this._loadLivePngRigAtlases();
     this._liveFrameStripsByKind = createLiveFrameStrips();
     this._liveFrameStripTextures = new Map();
@@ -301,6 +302,8 @@ export class Renderer {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
     this.app.render();
     this._renderFrameCount += 1;
+    if (this._renderAttemptHadError) this._lastRenderErrorFrame = this._renderFrameCount;
+    this._renderAttemptHadError = false;
   }
 
   visualNow() {
@@ -625,6 +628,7 @@ export class Renderer {
     // Capture readiness is a property of the current rendered frame. A texture can
     // legitimately be unavailable while an atlas is loading, then render normally
     // once it resolves; do not keep that transient fallback pinned forever.
+    this._renderAttemptHadError = false;
     this._missingTextureEntityIds.clear();
   }
 
@@ -841,6 +845,7 @@ export class Renderer {
   }
 
   _recordRenderError(label, err) {
+    this._renderAttemptHadError = true;
     this._lastRenderErrorFrame = this._renderFrameCount;
     const now = typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()
