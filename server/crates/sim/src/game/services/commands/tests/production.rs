@@ -194,7 +194,7 @@ fn entrenchment_researches_at_training_centre_with_contract_cost_and_time() {
     assert_eq!(queue[0].upgrade, UpgradeKind::Entrenchment);
     assert_eq!(queue[0].progress, 0);
     assert_eq!(queue[0].total, crate::config::TICK_HZ * 30);
-    assert_eq!(players[0].steel, 900);
+    assert_eq!(players[0].steel, 800);
     assert_eq!(players[0].oil, 1_000);
 }
 
