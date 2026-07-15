@@ -364,9 +364,7 @@ impl RoomTask {
         let full_vision_events = rts_sim::perf::timed(perf.as_mut(), "event_union", || {
             union_events(per_player_events.values())
         });
-        let full_world_projection = self
-            .projection_policy()
-            .full_world_snapshot_for(view_player_id);
+        let projection_policy = self.projection_policy();
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,
@@ -376,19 +374,14 @@ impl RoomTask {
             perf.as_mut(),
         )
         .send_to_recipients(&mut self.players, recipients, |_id, player| {
-            let snapshot = if player.spectator {
-                full_world_projection.snapshot_with_events(
-                    &game,
-                    &mut per_player_events,
-                    &full_vision_events,
-                )
+            let role = if player.spectator {
+                RecipientRole::Spectator
             } else {
-                let mut snapshot = game.snapshot_for(view_player_id);
-                if let Some(mut events) = per_player_events.remove(&view_player_id) {
-                    snapshot.events.append(&mut events);
-                }
-                snapshot
+                RecipientRole::ActivePlayer
             };
+            let snapshot = projection_policy
+                .dev_watch_snapshot_for(role, view_player_id)
+                .snapshot_with_events(&game, &mut per_player_events, &full_vision_events);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 
