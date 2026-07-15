@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -69,6 +69,46 @@ phase done, push a PR, delete the candidate, or start Phase 2; preserve the loca
 artifacts, return a blocked handoff, then stop and give the user the plain-language inspection
 report required by `plan.md`. Failure to spawn a fresh reviewer or obtain a well-formed verdict is
 also blocked, never permission to self-accept.
+
+## Accepted Evidence
+
+- Parent: `a568ea6da8b5ba80382991188e18ef7e061a83f8`.
+- Measured runtime candidate: `327fb37ab3a614f4bd84a2b745667370bffd335c`.
+- Scope: one private `EntityStore` map alias and local total/panic-free hasher, plus three focused
+  tests. No dependency, persistent state, capacity-policy change, or extra memory; the independent
+  reviewer assigned the localized 3% tier.
+- Hasher selection: three preliminary alternating 300-tick pairs measured a 13.394% median API gain
+  for identity hashing and 11.936% for an odd-multiplier mix. Identity hashing was retained.
+- Exact output: both 900-frame streams were byte-identical at 23,997,915 bytes with SHA-256
+  `0a6e4b40c8af8ab01aae08755fb6e8811584a38aa746682943ff7131901142d1`.
+- Every normalized non-timing field matched in all nine official pairs.
+
+| Pair | API gain | Wall-factor gain |
+| ---: | ---: | ---: |
+| 1 | 13.946% | 16.191% |
+| 2 | 11.623% | 13.151% |
+| 3 | 8.733% | 9.541% |
+| 4 | 3.369% | 3.464% |
+| 5 | 14.783% | 17.372% |
+| 6 | 16.041% | 19.113% |
+| 7 | 7.903% | 8.569% |
+| 8 | 28.157% | 39.127% |
+| 9 | 42.322% | 73.374% |
+
+- Nine of nine pairs were positive on both measures. Median API gain was 13.946% and median wall
+  gain was 16.191%. Pairs 8 and 9 experienced a whole-machine slowdown; excluding those outliers,
+  the first-seven medians remained 11.623% API and 13.151% wall.
+- Median tails improved: tick p95 13.068%, tick p99 7.534%, API p95 13.469%, and API p99 7.688%.
+- Profiles retained identical semantic summaries. Inclusive `RandomState` samples fell from
+  483/3,583 (13.480%) to 113/2,958 (3.820%), and SipHash samples fell from 155/3,583 (4.326%) to
+  46/2,958 (1.555%). The remaining samples belong to unchanged maps.
+- Focused checks passed: four `entity_store` tests, twelve `checkpoint_payload_` tests, the sim
+  architecture check, `rts-sim --lib` clippy with warnings denied, and `git diff --check`.
+  `rts-sim --all-targets` clippy remains blocked by unrelated pre-existing test warnings.
+- Independent initial review verdict: `ACCEPT`. It confirmed the 3% tier, scope and panic safety,
+  exact parity, all semantic and sign gates, tail improvements, and profiler attribution.
+- Raw ignored evidence is retained under `target/server-perf/serialperf-phase-1/` in the task
+  worktree. No PR was opened before the requested user evidence review.
 
 ## Completion and Handoff
 
