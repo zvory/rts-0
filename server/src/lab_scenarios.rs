@@ -993,7 +993,121 @@ mod tests {
         assert_eq!(game.lab_god_mode_players(), vec![1, 2, 3, 4]);
         assert_eq!(game.perf_entity_counts().entities, 380);
 
+        let start = game.start_payload();
+        let map = &start.map;
+        let rock_count = map
+            .terrain
+            .iter()
+            .filter(|&&tile| tile == crate::protocol::terrain::ROCK)
+            .count();
+        assert_eq!(rock_count, 470, "Hellhole sparse stone layout drifted");
+        let mut rocks_by_quadrant = [0usize; 4];
+        for tile_y in 0..map.height {
+            for tile_x in 0..map.width {
+                let index = (tile_y * map.width + tile_x) as usize;
+                if map.terrain[index] != crate::protocol::terrain::ROCK {
+                    continue;
+                }
+                let quadrant = usize::from(tile_x >= map.width / 2)
+                    + 2 * usize::from(tile_y >= map.height / 2);
+                rocks_by_quadrant[quadrant] += 1;
+                for dy in -1i32..=1 {
+                    for dx in -1i32..=1 {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let neighbor_x = tile_x as i32 + dx;
+                        let neighbor_y = tile_y as i32 + dy;
+                        if neighbor_x < 0
+                            || neighbor_y < 0
+                            || neighbor_x >= map.width as i32
+                            || neighbor_y >= map.height as i32
+                        {
+                            continue;
+                        }
+                        let neighbor = (neighbor_y as u32 * map.width + neighbor_x as u32) as usize;
+                        assert_ne!(
+                            map.terrain[neighbor],
+                            crate::protocol::terrain::ROCK,
+                            "stone tiles must remain isolated for formation movement"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(
+            rocks_by_quadrant.iter().all(|&count| count >= 100),
+            "stone must remain distributed around the whole map: {rocks_by_quadrant:?}"
+        );
+        let central_rock_count = (43u32..=83)
+            .flat_map(|tile_y| (43u32..=83).map(move |tile_x| (tile_x, tile_y)))
+            .filter(|&(tile_x, tile_y)| {
+                map.terrain[(tile_y * map.width + tile_x) as usize]
+                    == crate::protocol::terrain::ROCK
+            })
+            .count();
+        assert!(
+            central_rock_count >= 40,
+            "central convergence field must retain pathfinding obstacles: {central_rock_count}"
+        );
         let snapshot = game.snapshot_full_for(1);
+        let central_units: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| {
+                (entity.owner == 1 || entity.owner == 2) && entity.kind != "scout_plane"
+            })
+            .filter(|entity| {
+                (1_200.0..=2_800.0).contains(&entity.x) && (1_700.0..=2_400.0).contains(&entity.y)
+            })
+            .collect();
+        let min_x = central_units
+            .iter()
+            .map(|entity| entity.x)
+            .fold(f32::INFINITY, f32::min);
+        let max_x = central_units
+            .iter()
+            .map(|entity| entity.x)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let min_y = central_units
+            .iter()
+            .map(|entity| entity.y)
+            .fold(f32::INFINITY, f32::min);
+        let max_y = central_units
+            .iter()
+            .map(|entity| entity.y)
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!(
+            max_x - min_x <= 650.0 && max_y - min_y <= 600.0,
+            "central scrum packing expanded to {:.1}x{:.1}px",
+            max_x - min_x,
+            max_y - min_y
+        );
+        for player_id in [1, 2] {
+            let central_unit_count = snapshot
+                .entities
+                .iter()
+                .filter(|entity| {
+                    entity.owner == player_id
+                        && (1_200.0..=2_800.0).contains(&entity.x)
+                        && (1_700.0..=2_400.0).contains(&entity.y)
+                })
+                .count();
+            assert_eq!(
+                central_unit_count, 85,
+                "non-shuttle player {player_id} must remain fully packed into the central scrum"
+            );
+        }
+        for entity in &snapshot.entities {
+            let tile_x = (entity.x / map.tile_size as f32).floor() as u32;
+            let tile_y = (entity.y / map.tile_size as f32).floor() as u32;
+            assert_ne!(
+                map.terrain[(tile_y * map.width + tile_x) as usize],
+                crate::protocol::terrain::ROCK,
+                "entity {} spawned on stone",
+                entity.id
+            );
+        }
         let supply: Vec<_> = snapshot
             .player_resources
             .iter()

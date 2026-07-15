@@ -1,17 +1,20 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use rts_protocol::{
     Command, InitialCamera, LabCheckpointScenarioV1 as ProtocolLabCheckpointScenarioV1,
     LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, DEFAULT_FACTION_ID,
 };
-use rts_rules::balance::building_stats;
+use rts_rules::balance::{
+    building_stats, TANK_BODY_CLEARANCE_PX, TANK_BODY_LENGTH_PX, TANK_BODY_WIDTH_PX,
+};
 use rts_rules::economy::supply_cost;
 use rts_rules::faction::catalog_for;
+use rts_rules::terrain::MAP_TERRAIN_ROCK;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
-    LabCommandOptions, LabOp, LabOpOutcome, LabSetCompletedResearch, LabSetPlayerResources,
-    LabSpawnEntity,
+    LabCommandOptions, LabError, LabOp, LabOpOutcome, LabSetCompletedResearch,
+    LabSetPlayerResources, LabSpawnEntity,
 };
 use rts_sim::game::map::Map;
 use rts_sim::game::upgrade;
@@ -29,6 +32,25 @@ const TARGET_SUPPLY: u32 = 300;
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
 const CENTER: (f32, f32) = (63.0 * TILE, 63.0 * TILE);
 const SHUTTLE_OFFSET_TILES: f32 = 18.0;
+const ROCK_CELL_TILES: u32 = 5;
+const TARGET_ROCK_TILES: usize = 470;
+const UNIT_FOOTPRINT_CLEARANCE_TILES: i32 = 1;
+const DENSE_SCRUM_COLUMNS: usize = 28;
+const DENSE_SCRUM_ROWS: usize = 18;
+const DENSE_SCRUM_GAP_PX: f32 = 2.0;
+const BUILDING_CLUSTERS: [(u32, u32, u32); 4] = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
+const BUILDING_LAYOUT: [(EntityKind, u32, u32); 10] = [
+    (EntityKind::CityCentre, 0, 0),
+    (EntityKind::Barracks, 4, 0),
+    (EntityKind::Factory, 8, 0),
+    (EntityKind::Steelworks, 12, 0),
+    (EntityKind::ResearchComplex, 16, 0),
+    (EntityKind::Depot, 0, 4),
+    (EntityKind::Depot, 3, 4),
+    (EntityKind::Depot, 6, 4),
+    (EntityKind::Depot, 9, 4),
+    (EntityKind::Depot, 12, 4),
+];
 
 fn main() {
     let out = std::env::args()
@@ -42,17 +64,23 @@ fn main() {
 }
 
 fn run(out: PathBuf) -> Result<(), String> {
-    let mut game = blank_no_terrain_lab()?;
+    let composition = composition_300_supply()?;
+    let mut game = blank_hellhole_lab(&composition)?;
     clear_default_entities(&mut game)?;
     grant_lab_state(&mut game)?;
 
-    let composition = composition_300_supply()?;
     let mut units_by_player = BTreeMap::<u32, Vec<(u32, EntityKind)>>::new();
     spawn_building_rings(&mut game)?;
-    for player_id in 1..=4 {
-        let positions = positions_for_player(player_id, composition.len());
-        for (kind, (x, y)) in composition.iter().copied().zip(positions) {
-            let id = spawn(&mut game, player_id, kind, x, y, true)?;
+    spawn_dense_central_scrum(&mut game, &composition, &mut units_by_player)?;
+    for player_id in [3, 4] {
+        for (kind, (x, y)) in composition
+            .iter()
+            .copied()
+            .zip(shuttle_positions_for_player(player_id, composition.len()))
+        {
+            let id = spawn(&mut game, player_id, kind, x, y, true).map_err(|err| {
+                format!("failed to spawn player {player_id} {kind} at ({x}, {y}): {err}")
+            })?;
             units_by_player
                 .entry(player_id)
                 .or_default()
@@ -95,7 +123,7 @@ fn run(out: PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn blank_no_terrain_lab() -> Result<Game, String> {
+fn blank_hellhole_lab(composition: &[EntityKind]) -> Result<Game, String> {
     let players: Vec<_> = (1..=4)
         .map(|id| PlayerInit {
             id,
@@ -115,9 +143,103 @@ fn blank_no_terrain_lab() -> Result<Game, String> {
     let start_players: Vec<_> = players.iter().map(|p| (p.id, p.team_id)).collect();
     let map_metadata = Map::metadata_for_name(MAP_NAME)
         .map_err(|err| format!("cannot load map metadata {MAP_NAME:?}: {err}"))?;
-    let map = Map::load_for_players(MAP_NAME, &start_players, SEED)
+    let mut map = Map::load_for_players(MAP_NAME, &start_players, SEED)
         .map_err(|err| format!("cannot load map {MAP_NAME:?}: {err}"))?;
+    let rock_count = populate_sparse_rock_occluders(&mut map, composition)?;
+    if rock_count < 128 {
+        return Err(format!(
+            "sparse Hellhole terrain produced only {rock_count} stone tiles"
+        ));
+    }
     Ok(Game::new_lab(&players, SEED, map, map_metadata))
+}
+
+fn populate_sparse_rock_occluders(
+    map: &mut Map,
+    composition: &[EntityKind],
+) -> Result<usize, String> {
+    let occupied = occupied_spawn_tiles(map.size, composition)?;
+    let mut candidates = Vec::new();
+    for cell_y in (0..map.size).step_by(ROCK_CELL_TILES as usize) {
+        for cell_x in (0..map.size).step_by(ROCK_CELL_TILES as usize) {
+            let hash = SEED ^ cell_x.wrapping_mul(0x9e37_79b9) ^ cell_y.wrapping_mul(0x85eb_ca6b);
+            let tile_x = cell_x + 1 + hash % (ROCK_CELL_TILES - 2);
+            let tile_y = cell_y + 1 + hash.rotate_left(13) % (ROCK_CELL_TILES - 2);
+            if tile_x >= map.size - 1
+                || tile_y >= map.size - 1
+                || occupied.contains(&(tile_x, tile_y))
+            {
+                continue;
+            }
+            candidates.push((hash, tile_x, tile_y));
+        }
+    }
+    candidates.sort_unstable();
+    if candidates.len() < TARGET_ROCK_TILES {
+        return Err(format!(
+            "Hellhole terrain has only {} valid stone candidates for target {TARGET_ROCK_TILES}",
+            candidates.len()
+        ));
+    }
+    for &(_, tile_x, tile_y) in candidates.iter().take(TARGET_ROCK_TILES) {
+        map.terrain[(tile_y * map.size + tile_x) as usize] = MAP_TERRAIN_ROCK;
+    }
+    Ok(TARGET_ROCK_TILES)
+}
+
+fn occupied_spawn_tiles(
+    map_size: u32,
+    composition: &[EntityKind],
+) -> Result<BTreeSet<(u32, u32)>, String> {
+    let mut occupied = BTreeSet::new();
+    for player_id in [3, 4] {
+        for position in shuttle_positions_for_player(player_id, composition.len()) {
+            reserve_world_point(&mut occupied, map_size, position);
+        }
+    }
+
+    for (_, origin_x, origin_y) in BUILDING_CLUSTERS {
+        for (kind, dx, dy) in BUILDING_LAYOUT {
+            let stats = building_stats(kind).ok_or_else(|| format!("{kind} is not a building"))?;
+            reserve_rect(
+                &mut occupied,
+                map_size,
+                origin_x as i32 + dx as i32,
+                origin_y as i32 + dy as i32,
+                origin_x as i32 + dx as i32 + stats.foot_w as i32 - 1,
+                origin_y as i32 + dy as i32 + stats.foot_h as i32 - 1,
+            );
+        }
+    }
+    Ok(occupied)
+}
+
+fn reserve_world_point(reserved: &mut BTreeSet<(u32, u32)>, map_size: u32, position: (f32, f32)) {
+    let tile_x = (position.0 / TILE).floor() as i32;
+    let tile_y = (position.1 / TILE).floor() as i32;
+    reserve_rect(
+        reserved,
+        map_size,
+        tile_x - UNIT_FOOTPRINT_CLEARANCE_TILES,
+        tile_y - UNIT_FOOTPRINT_CLEARANCE_TILES,
+        tile_x + UNIT_FOOTPRINT_CLEARANCE_TILES,
+        tile_y + UNIT_FOOTPRINT_CLEARANCE_TILES,
+    );
+}
+
+fn reserve_rect(
+    reserved: &mut BTreeSet<(u32, u32)>,
+    map_size: u32,
+    min_x: i32,
+    min_y: i32,
+    max_x: i32,
+    max_y: i32,
+) {
+    for tile_y in min_y.max(0)..=max_y.min(map_size as i32 - 1) {
+        for tile_x in min_x.max(0)..=max_x.min(map_size as i32 - 1) {
+            reserved.insert((tile_x as u32, tile_y as u32));
+        }
+    }
 }
 
 fn clear_default_entities(game: &mut Game) -> Result<(), String> {
@@ -224,13 +346,94 @@ fn supply_of(kind: EntityKind) -> Result<u32, String> {
     })
 }
 
-fn positions_for_player(player_id: u32, count: usize) -> Vec<(f32, f32)> {
-    match player_id {
-        1 | 2 => central_positions(player_id, count),
-        3 => grid_positions(shuttle_endpoint(1.0, -1.0), count, 10, 64.0),
-        4 => grid_positions(shuttle_endpoint(-1.0, -1.0), count, 10, 64.0),
-        _ => unreachable!("only four hellhole players are generated"),
+fn spawn_dense_central_scrum(
+    game: &mut Game,
+    composition: &[EntityKind],
+    units_by_player: &mut BTreeMap<u32, Vec<(u32, EntityKind)>>,
+) -> Result<(), String> {
+    let candidates = dense_scrum_candidates();
+    let mut next_candidate = 0usize;
+    for &kind in composition {
+        for player_id in [1, 2] {
+            let mut spawned = None;
+            while let Some(&(x, y)) = candidates.get(next_candidate) {
+                next_candidate += 1;
+                match try_spawn(game, player_id, kind, x, y, true)? {
+                    Some(id) => {
+                        spawned = Some(id);
+                        break;
+                    }
+                    None => continue,
+                }
+            }
+            let id = spawned.ok_or_else(|| {
+                format!(
+                    "dense Hellhole scrum exhausted {} candidates while placing player {player_id} {kind}",
+                    candidates.len()
+                )
+            })?;
+            units_by_player
+                .entry(player_id)
+                .or_default()
+                .push((id, kind));
+        }
     }
+    Ok(())
+}
+
+fn dense_scrum_candidates() -> Vec<(f32, f32)> {
+    let spacing_x = TANK_BODY_LENGTH_PX + TANK_BODY_CLEARANCE_PX * 2.0 + DENSE_SCRUM_GAP_PX;
+    let spacing_y = TANK_BODY_WIDTH_PX + TANK_BODY_CLEARANCE_PX * 2.0 + DENSE_SCRUM_GAP_PX;
+    let width = (DENSE_SCRUM_COLUMNS - 1) as f32 * spacing_x;
+    let height = (DENSE_SCRUM_ROWS - 1) as f32 * spacing_y;
+    let mut candidates = Vec::with_capacity(DENSE_SCRUM_COLUMNS * DENSE_SCRUM_ROWS);
+    for row in 0..DENSE_SCRUM_ROWS {
+        for column in 0..DENSE_SCRUM_COLUMNS {
+            let x = CENTER.0 - width * 0.5 + column as f32 * spacing_x;
+            let y = CENTER.1 - height * 0.5 + row as f32 * spacing_y;
+            candidates.push((x, y));
+        }
+    }
+    candidates.sort_by(|a, b| {
+        let a_distance = (a.0 - CENTER.0).powi(2) + (a.1 - CENTER.1).powi(2);
+        let b_distance = (b.0 - CENTER.0).powi(2) + (b.1 - CENTER.1).powi(2);
+        a_distance
+            .total_cmp(&b_distance)
+            .then_with(|| a.1.total_cmp(&b.1))
+            .then_with(|| a.0.total_cmp(&b.0))
+    });
+    candidates
+}
+
+fn try_spawn(
+    game: &mut Game,
+    owner: u32,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    completed: bool,
+) -> Result<Option<u32>, String> {
+    match game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+        owner,
+        kind,
+        x,
+        y,
+        completed,
+    })) {
+        Ok(LabOpOutcome::Spawned { entity_id }) => Ok(Some(entity_id)),
+        Err(LabError::Placement { .. }) => Ok(None),
+        Ok(other) => Err(format!("unexpected spawn outcome for {kind}: {other:?}")),
+        Err(err) => Err(format!("lab operation failed: {err:?}")),
+    }
+}
+
+fn shuttle_positions_for_player(player_id: u32, count: usize) -> Vec<(f32, f32)> {
+    let center = match player_id {
+        3 => shuttle_endpoint(1.0, -1.0),
+        4 => shuttle_endpoint(-1.0, -1.0),
+        _ => unreachable!("only shuttle players have endpoint formations"),
+    };
+    grid_positions(center, count, 10, 64.0)
 }
 
 fn shuttle_endpoint(x_dir: f32, y_dir: f32) -> (f32, f32) {
@@ -238,16 +441,6 @@ fn shuttle_endpoint(x_dir: f32, y_dir: f32) -> (f32, f32) {
         CENTER.0 + x_dir * SHUTTLE_OFFSET_TILES * TILE,
         CENTER.1 + y_dir * SHUTTLE_OFFSET_TILES * TILE,
     )
-}
-
-fn central_positions(player_id: u32, count: usize) -> Vec<(f32, f32)> {
-    let parity = if player_id == 1 { 0 } else { 1 };
-    grid_positions(CENTER, count * 2, 24, 64.0)
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, pos)| (index % 2 == parity).then_some(pos))
-        .take(count)
-        .collect()
 }
 
 fn grid_positions(
@@ -272,20 +465,8 @@ fn grid_positions(
 }
 
 fn spawn_building_rings(game: &mut Game) -> Result<(), String> {
-    let clusters = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
-    for (player_id, origin_x, origin_y) in clusters {
-        for (kind, dx, dy) in [
-            (EntityKind::CityCentre, 0, 0),
-            (EntityKind::Barracks, 4, 0),
-            (EntityKind::Factory, 8, 0),
-            (EntityKind::Steelworks, 12, 0),
-            (EntityKind::ResearchComplex, 16, 0),
-            (EntityKind::Depot, 0, 4),
-            (EntityKind::Depot, 3, 4),
-            (EntityKind::Depot, 6, 4),
-            (EntityKind::Depot, 9, 4),
-            (EntityKind::Depot, 12, 4),
-        ] {
+    for (player_id, origin_x, origin_y) in BUILDING_CLUSTERS {
+        for (kind, dx, dy) in BUILDING_LAYOUT {
             let (x, y) = building_center(kind, origin_x + dx, origin_y + dy)?;
             spawn(game, player_id, kind, x, y, true)?;
         }

@@ -339,6 +339,13 @@ The snapshot-stream workload is the client-only isolation lane. It fetches the g
 MessagePack snapshots into the normal decoder and renderer at 30 Hz. Its setup assertion fails unless
 the page reports no WebSocket and no live simulation. Regenerate the thirty-second, 900-frame artifact
 with `cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream`.
+The canonical checkpoint materializes 470 deterministic isolated stone occluders across the No
+Terrain base map, including the central scrum and two diagonal shuttle lanes. Two formations are
+dense and interleaved around the central stones by a deterministic body-aware compact packer; the
+other two repeatedly shuttle diagonally through the obstructed field. Only the minimum shuttle
+collision footprints and building footprints needed for a valid tick-zero setup are excluded before
+terrain selection. The rocks make fallback fog and line-of-sight work representative while also
+forcing the scripted formations through pathfinding obstacles.
 Preserved schema 2
 incident replays are analysis evidence only and are not replay-harness workloads. The
 `--render-lag-suite` path runs the current workload set, then writes a rollup at

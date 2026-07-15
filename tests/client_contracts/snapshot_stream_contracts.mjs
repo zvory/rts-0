@@ -84,8 +84,9 @@ function snapshotFrame(tick) {
       checkedArtifact.header.start.players.every((player, index) => player.teamId === index + 1) &&
       checkedArtifact.header.start?.map?.width === 126 &&
       checkedArtifact.header.start?.map?.height === 126 &&
+      checkedArtifact.header.start.map.terrain.filter((tile) => tile === 1).length === 470 &&
       checkedArtifact.header.start?.snapshotStream?.sourceScenario === "supply-300-hellhole",
-    "checked-in Hellhole snapshot stream matches the canonical four-player scenario",
+    "checked-in Hellhole snapshot stream matches the canonical four-player 470-stone scenario",
   );
 }
 
