@@ -53,6 +53,7 @@ export class PixiPresentationAdapter {
     this._lastView = null;
     this._staticMapRevision = null;
     this._decalFrameKey = null;
+    this._groundDecalsAwaitingPresent = false;
     this._destroyed = false;
   }
 
@@ -78,8 +79,9 @@ export class PixiPresentationAdapter {
           this._lastView = view;
         }
         const frameKey = `${frame.generation}:${frame.frameId}`;
-        const groundDecals = frameKey === this._decalFrameKey ? [] : view.groundDecals;
-        this._decalFrameKey = frameKey;
+        const groundDecals = frameKey === this._decalFrameKey || this._groundDecalsAwaitingPresent
+          ? []
+          : view.groundDecals;
         this._renderer.render(view.state, view.camera, view.fog, view.alpha, {
           frameViews: view.frameViews,
           profiler: view.profiler,
@@ -89,10 +91,15 @@ export class PixiPresentationAdapter {
           observerMapAnalysis: view.observerMapAnalysis,
           feedbackView: view.feedback,
           reconciledGroundDecals: groundDecals,
+          onGroundDecalsStaged: () => {
+            this._groundDecalsAwaitingPresent = true;
+          },
         });
         this._renderer.drawSelectionBox(view.marquee);
+        this._decalFrameKey = frameKey;
       });
       time("renderer.present", () => this._present());
+      this._groundDecalsAwaitingPresent = false;
       return Object.freeze({ presented: true });
     } catch (err) {
       this._renderer?._recordRenderError?.("pixiPresentationFrame", err);
@@ -137,6 +144,7 @@ export class PixiPresentationAdapter {
     this._destroyed = true;
     this._lastFrame = null;
     this._lastView = null;
+    this._groundDecalsAwaitingPresent = false;
     this._sources = null;
     this._renderer.destroy();
   }

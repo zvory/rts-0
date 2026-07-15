@@ -136,13 +136,25 @@ const recoveryFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 532, so
 assert(adapter.render(recoveryFrame).presented === true, "a later Pixi frame still presents after a bounded backend failure");
 assert(engine.errors.some(([label]) => label === "pixiPresentationFrame"), "bounded backend failure records an actionable diagnostic");
 
-const presentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 540, sourceTick: 12, groundDecals: [] });
+const updateRetryDecal = { id: 90, decalClass: "infantry", x: 44, y: 48, seed: 90 };
+const stagedUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 536, sourceTick: 12, groundDecals: [updateRetryDecal] });
+engine.failAfterStagingNext = true;
+assert(adapter.render(stagedUpdateFailureFrame).presented === false, "Pixi update failure after persistent staging is bounded to the current frame");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the failed update had already staged its persistent decal batch");
+const afterUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 538, sourceTick: 13, groundDecals: [updateRetryDecal] });
+assert(adapter.render(afterUpdateFailureFrame).presented === true, "Pixi presents a later frame after a post-staging update failure");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "update retry does not stamp the retained decal batch twice");
+
+const retryDecal = { id: 91, decalClass: "infantry", x: 48, y: 52, seed: 91 };
+const presentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 540, sourceTick: 14, groundDecals: [retryDecal] });
 engine.failPresentNext = true;
 const framesBeforePresentFailure = engine._renderFrameCount;
 assert(adapter.render(presentFailureFrame).presented === false, "Pixi present failure is bounded to the current frame");
 assert(engine._renderFrameCount === framesBeforePresentFailure, "a failed present does not advance renderer readiness");
-const afterPresentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 544, sourceTick: 13, groundDecals: [] });
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the failed present had already staged its persistent decal batch");
+const afterPresentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 544, sourceTick: 15, groundDecals: [retryDecal] });
 assert(adapter.render(afterPresentFailureFrame).presented === true, "Pixi presents a later frame after a bounded present failure");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "present retry does not stamp the retained decal batch twice");
 
 const captureClock = { now: () => 532 };
 adapter.enterFixedCapture(captureClock);
@@ -178,6 +190,7 @@ function fakeEngine() {
     marquees: [],
     errors: [],
     failNext: false,
+    failAfterStagingNext: false,
     failPresentNext: false,
     presents: 0,
     destroyed: 0,
@@ -192,6 +205,11 @@ function fakeEngine() {
         throw new Error("planned backend failure");
       }
       this.renders.push({ state, camera, fog, alpha, options });
+      if (options.reconciledGroundDecals.length > 0) options.onGroundDecalsStaged?.();
+      if (this.failAfterStagingNext) {
+        this.failAfterStagingNext = false;
+        throw new Error("planned backend failure after decal staging");
+      }
     },
     present() {
       if (this.failPresentNext) {

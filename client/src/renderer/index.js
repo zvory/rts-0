@@ -439,6 +439,7 @@ export class Renderer {
     observerMapAnalysis = null,
     feedbackView: preparedFeedbackView = null,
     reconciledGroundDecals = null,
+    onGroundDecalsStaged = null,
   } = {}) {
     this._beginRenderFrame();
     this._profiler = profiler || null;
@@ -494,6 +495,9 @@ export class Renderer {
         "groundDecals",
         () => this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state),
       );
+      if (Array.isArray(reconciledGroundDecals) && reconciledGroundDecals.length > 0) {
+        onGroundDecalsStaged?.();
+      }
     });
     time("renderer.trenches", () => {
       this._drawSafely("trenches", () => this._drawTrenches(state));
