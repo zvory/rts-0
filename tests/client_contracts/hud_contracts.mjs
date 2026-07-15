@@ -948,7 +948,7 @@ function fakeHudRootWithoutResourceSpans() {
     trainCard.slots[0].contextIntent.type === "adjustProductionRepeat" &&
       trainCard.slots[0].contextIntent.buildingIds.join(",") === "20,21" &&
       trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN &&
-      trainCard.slots[0].contextHotkeyModifiers.join(",") === "ctrl,shift",
+      trainCard.slots[0].contextHotkeyModifiers.join(",") === "alt,ctrl,shift",
     "train buttons should adjust repeat production across selected compatible producers",
   );
   assert(

@@ -1411,7 +1411,7 @@ only those repeatable command-card buttons. Legal manual build, train, and resea
 actionable while their red cost is unaffordable: build enters placement and relies on the worker's
 authoritative wait at the site, while train/research append an unpaid queue entry. Selected producers
 render `prodWaiting` as a striped zero-progress bar labeled `waiting for resources / supply`, and
-progress extrapolation stays disabled until the server reports the item paid. Alt-clicking a train button or pressing Ctrl with its
+progress extrapolation stays disabled until the server reports the item paid. Alt-clicking a train button or pressing Alt or Ctrl with its
 resolved hotkey adds that unit to one selected compatible producer's ordered standing repeat list;
 pressing Shift with the resolved hotkey removes it from one producer. The server applies each signed
 adjustment atomically so rapid inputs allocate distinct producers from current authoritative state.
