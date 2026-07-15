@@ -133,7 +133,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     }));
 
     const renderResult = time("match.renderer", () => match.renderer.render(presentationFrame));
-    if (renderResult?.presented !== false) {
+    if (renderResult?.presented === true) {
       match.state.acknowledgeReconciledGroundDecals?.();
       match.input?.publishSelectionScene?.(selectionScene);
     }

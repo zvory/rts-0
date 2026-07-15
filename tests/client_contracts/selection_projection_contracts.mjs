@@ -285,7 +285,12 @@ function scene(entities, projection = orthographic(), options = {}) {
       selectedEntities: () => [],
     },
     fog: { update() {} },
-    renderer: { render() { if (failRender) throw new Error("synthetic render failure"); } },
+    renderer: {
+      render() {
+        if (failRender) throw new Error("synthetic render failure");
+        return { presented: true };
+      },
+    },
     clientIntent: null,
     visualProfile: null,
     hud: { update() {} },
