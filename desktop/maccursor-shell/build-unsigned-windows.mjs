@@ -75,24 +75,17 @@ function gitTreeIsDirty() {
   if (!status) return false;
 
   for (const line of status.split(/\r?\n/)) {
-    // Native Windows Git reports a clean symlink in a WSL worktree as a type
-    // change. Ignore that platform artifact only when its target still matches
-    // the committed symlink blob; every other status remains dirty.
-    if (line.startsWith(" T ")) {
+    // Native Windows Git cannot represent a symlink in a WSL UNC worktree and
+    // reports the clean entry as modified/type-changed. Ignore only tracked
+    // symlink entries here; release verification also runs WSL-native git
+    // status, which remains authoritative for the link target itself.
+    if (line.startsWith(" T ") || line.startsWith(" M ")) {
       const relativePath = line.slice(3);
       const indexEntry = capture("git", ["ls-files", "-s", "--", relativePath], {
         cwd: REPO_ROOT,
       });
       if (indexEntry.startsWith("120000 ")) {
-        const blobSha = indexEntry.split(/\s+/)[1];
-        const committedTarget = capture("git", ["cat-file", "blob", blobSha], {
-          cwd: REPO_ROOT,
-        });
-        try {
-          if (fs.readlinkSync(path.join(REPO_ROOT, relativePath)) === committedTarget) continue;
-        } catch {
-          // Treat an unreadable or replaced symlink as dirty.
-        }
+        continue;
       }
     }
     return true;
