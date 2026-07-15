@@ -6,6 +6,10 @@ const tauriConfig = JSON.parse(
   await readFile(new URL("src-tauri/tauri.conf.json", shellRoot), "utf8"),
 );
 const windowsLauncher = await readFile(new URL("run.cmd", shellRoot), "utf8");
+const windowsArtifactBuilder = await readFile(
+  new URL("build-unsigned-windows.mjs", shellRoot),
+  "utf8",
+);
 
 assert.equal(tauriConfig.productName, "Bewegungskrieg");
 assert.equal(tauriConfig.identifier, "dev.bewegungskrieg.Bewegungskrieg");
@@ -16,6 +20,10 @@ assert.match(windowsLauncher, /cargo run --manifest-path/);
 assert.match(windowsLauncher, /CARGO_TARGET_DIR=%LOCALAPPDATA%\\rts-0\\tauri-target-windows/);
 assert.match(windowsLauncher, /CARGO_BUILD_JOBS=2/);
 assert.doesNotMatch(windowsLauncher, /rts-server|server\.exe/i);
+assert.match(windowsArtifactBuilder, /"--bundles",\s*"nsis"/);
+assert.match(windowsArtifactBuilder, /unsigned-windows-nsis-playtest/);
+assert.match(windowsArtifactBuilder, /rts-server\.exe/);
+assert.doesNotMatch(windowsArtifactBuilder, /targets:\s*"msi"/);
 
 import {
   LAST_PROFILE_KEY,
