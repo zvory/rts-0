@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::time::Instant as StdInstant;
+use std::{collections::HashMap, time::Instant as StdInstant};
 
 use tokio::time::Instant as TokioInstant;
 
@@ -14,8 +13,7 @@ use super::super::snapshots::union_events;
 use super::types::{DevScenarioId, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
-use rts_sim::game::command::SimCommand;
-use rts_sim::game::Game;
+use rts_sim::game::{command::SimCommand, Game};
 
 pub(super) enum DevDriver {
     Scenario(DevScenarioDriver),
@@ -125,8 +123,7 @@ impl RoomTask {
             | RoomMode::ReplayBranch { .. }
             | RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevScenario(config) => {
-                let _scenario_faction_id =
-                    default_faction_id_for(FactionRequestContext::DevScenario);
+                let _ = default_faction_id_for(FactionRequestContext::DevScenario);
                 let seed = match_seed();
                 macro_rules! session_from_setup {
                     ($setup:expr $(,)?) => {{

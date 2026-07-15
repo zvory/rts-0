@@ -763,7 +763,7 @@ const PANZERFAUST_METHAMPHETAMINES_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenar
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 19] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
