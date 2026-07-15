@@ -2,7 +2,7 @@ use rts_sim::game::entity::EntityKind;
 
 mod command_car_corner;
 use command_car_corner::{
-    COMMAND_CAR_BUILDING_CORNER_SOUTH_SPEC, COMMAND_CAR_BUILDING_CORNER_SPEC,
+    COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -816,7 +816,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 21] = [
         launches: &FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES,
     },
     COMMAND_CAR_BUILDING_CORNER_SPEC,
-    COMMAND_CAR_BUILDING_CORNER_SOUTH_SPEC,
+    COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
     DevScenarioSpec {
         id: "factory_wall_rally_spawn",
         title: "Factory Wall Rally Spawn",
@@ -1155,7 +1155,7 @@ mod tests {
         );
         for id in [
             "command_car_building_corner",
-            "command_car_building_corner_south",
+            "command_car_building_corner_west_southwest",
         ] {
             assert_eq!(
                 parse_dev_scenario_room(&format!("{id}:unit=command_car:count=1")),
@@ -1399,7 +1399,7 @@ mod tests {
         );
         for id in [
             "command_car_building_corner",
-            "command_car_building_corner_south",
+            "command_car_building_corner_west_southwest",
         ] {
             assert_eq!(parse_dev_scenario_launch(id, "tank", "1", None), None);
             assert_eq!(

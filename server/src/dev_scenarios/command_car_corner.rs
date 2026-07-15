@@ -8,8 +8,8 @@ const NORTHWEST_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     case: None,
 }];
 
-const SOUTH_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "command_car_building_corner_south",
+const WEST_SOUTHWEST_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "command_car_building_corner_west_southwest",
     unit: EntityKind::CommandCar,
     count: 1,
     blocker: None,
@@ -23,9 +23,10 @@ pub(super) const COMMAND_CAR_BUILDING_CORNER_SPEC: DevScenarioSpec = DevScenario
     launches: &NORTHWEST_LAUNCHES,
 };
 
-pub(super) const COMMAND_CAR_BUILDING_CORNER_SOUTH_SPEC: DevScenarioSpec = DevScenarioSpec {
-    id: "command_car_building_corner_south",
-    title: "Command Car Building Corner — South",
-    description: "The same trapped Command Car and three-building layout, but the order target is exactly ten tiles south of its starting position.",
-    launches: &SOUTH_LAUNCHES,
+pub(super) const COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC: DevScenarioSpec =
+    DevScenarioSpec {
+        id: "command_car_building_corner_west_southwest",
+        title: "Command Car Building Corner — West-Southwest",
+        description: "The same trapped Command Car and three-building layout, but the order target is ten tiles west and four tiles south of its starting position.",
+        launches: &WEST_SOUTHWEST_LAUNCHES,
 };

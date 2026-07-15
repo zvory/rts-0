@@ -288,7 +288,7 @@ impl Game {
         Self::new_command_car_corner_scenario_with_goal(unit, unit_count, seed, false)
     }
 
-    pub fn new_command_car_corner_south_scenario(
+    pub fn new_command_car_corner_west_southwest_scenario(
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
@@ -300,7 +300,7 @@ impl Game {
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
-        goal_is_south: bool,
+        goal_is_west_southwest: bool,
     ) -> Result<DevScenarioSetup, String> {
         if unit != EntityKind::CommandCar {
             return Err(format!("unsupported building-corner unit {unit}"));
@@ -313,10 +313,13 @@ impl Game {
 
         let (map, start_tile, buildings, unit_start, unit_facing, northwest_goal) =
             command_car_building_corner_map();
-        let (goal, checkpoint_name) = if goal_is_south {
+        let (goal, checkpoint_name) = if goal_is_west_southwest {
             (
-                (unit_start.0, unit_start.1 + config::TILE_SIZE as f32 * 10.0),
-                "dev:command_car_building_corner_south",
+                (
+                    unit_start.0 - config::TILE_SIZE as f32 * 10.0,
+                    unit_start.1 + config::TILE_SIZE as f32 * 4.0,
+                ),
+                "dev:command_car_building_corner_west_southwest",
             )
         } else {
             (northwest_goal, "dev:command_car_building_corner")

@@ -68,19 +68,26 @@ fn backs_out_and_completes_route() {
 }
 
 #[test]
-fn south_variant_targets_ten_tiles_down_and_completes_route() {
-    let setup = Game::new_command_car_corner_south_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
-        .expect("south scenario setup should succeed");
+fn west_southwest_variant_targets_ten_left_four_down_and_completes_route() {
+    let setup = Game::new_command_car_corner_west_southwest_scenario(
+        EntityKind::CommandCar,
+        1,
+        0x5150_0011,
+    )
+    .expect("west-southwest scenario setup should succeed");
     let command_car = setup
         .game
         .state
         .entities
         .get(setup.units[0])
         .expect("scenario Command Car should exist");
-    assert_eq!(setup.goal.0, command_car.pos_x);
+    assert_eq!(
+        setup.goal.0,
+        command_car.pos_x - config::TILE_SIZE as f32 * 10.0
+    );
     assert_eq!(
         setup.goal.1,
-        command_car.pos_y + config::TILE_SIZE as f32 * 10.0
+        command_car.pos_y + config::TILE_SIZE as f32 * 4.0
     );
     assert_completes_route(setup, false);
 }

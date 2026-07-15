@@ -195,8 +195,8 @@ impl RoomTask {
                     DevScenarioId::CommandCarBuildingCorner => session_from_setup!(
                         Game::new_command_car_corner_scenario(config.unit, config.count, seed)?,
                     ),
-                    DevScenarioId::CommandCarBuildingCornerSouth => {
-                        session_from_setup!(Game::new_command_car_corner_south_scenario(
+                    DevScenarioId::CommandCarBuildingCornerWestSouthwest => {
+                        session_from_setup!(Game::new_command_car_corner_west_southwest_scenario(
                             config.unit,
                             config.count,
                             seed,

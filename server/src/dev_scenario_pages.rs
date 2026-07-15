@@ -313,9 +313,9 @@ mod tests {
         assert!(
             html.contains("/dev/scenarios?id=command_car_building_corner&unit=command_car&count=1")
         );
-        assert!(html.contains("Command Car Building Corner — South"));
+        assert!(html.contains("Command Car Building Corner — West-Southwest"));
         assert!(html.contains(
-            "/dev/scenarios?id=command_car_building_corner_south&unit=command_car&count=1"
+            "/dev/scenarios?id=command_car_building_corner_west_southwest&unit=command_car&count=1"
         ));
         assert!(html.contains("Tank Trap Pathing Matrix"));
         assert!(html.contains("<select name=\"case\""));

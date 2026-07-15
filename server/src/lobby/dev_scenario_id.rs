@@ -7,7 +7,7 @@ pub(in crate::lobby) enum DevScenarioId {
     VehicleSmallBlockBaseline,
     FactoryZeroGapPerpendicular,
     CommandCarBuildingCorner,
-    CommandCarBuildingCornerSouth,
+    CommandCarBuildingCornerWestSouthwest,
     FactoryWallRallySpawn,
     TankTrapLineHorizontal,
     TankTrapLineVertical,
@@ -33,7 +33,9 @@ impl DevScenarioId {
             "vehicle_small_block_baseline" => Some(Self::VehicleSmallBlockBaseline),
             "factory_zero_gap_perpendicular" => Some(Self::FactoryZeroGapPerpendicular),
             "command_car_building_corner" => Some(Self::CommandCarBuildingCorner),
-            "command_car_building_corner_south" => Some(Self::CommandCarBuildingCornerSouth),
+            "command_car_building_corner_west_southwest" => {
+                Some(Self::CommandCarBuildingCornerWestSouthwest)
+            }
             "factory_wall_rally_spawn" => Some(Self::FactoryWallRallySpawn),
             "tank_trap_line_horizontal" => Some(Self::TankTrapLineHorizontal),
             "tank_trap_line_vertical" => Some(Self::TankTrapLineVertical),
@@ -60,7 +62,9 @@ impl DevScenarioId {
             Self::VehicleSmallBlockBaseline => "vehicle_small_block_baseline",
             Self::FactoryZeroGapPerpendicular => "factory_zero_gap_perpendicular",
             Self::CommandCarBuildingCorner => "command_car_building_corner",
-            Self::CommandCarBuildingCornerSouth => "command_car_building_corner_south",
+            Self::CommandCarBuildingCornerWestSouthwest => {
+                "command_car_building_corner_west_southwest"
+            }
             Self::FactoryWallRallySpawn => "factory_wall_rally_spawn",
             Self::TankTrapLineHorizontal => "tank_trap_line_horizontal",
             Self::TankTrapLineVertical => "tank_trap_line_vertical",
