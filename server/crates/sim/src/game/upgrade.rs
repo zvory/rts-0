@@ -214,7 +214,7 @@ mod tests {
         let definition = definition(UpgradeKind::Entrenchment);
         assert_eq!(definition.researched_at, EntityKind::TrainingCentre);
         assert_eq!(definition.requires_upgrade, None);
-        assert_eq!(definition.cost_steel, 100);
+        assert_eq!(definition.cost_steel, 200);
         assert_eq!(definition.cost_oil, 0);
         assert_eq!(definition.research_ticks, crate::config::TICK_HZ * 30);
     }

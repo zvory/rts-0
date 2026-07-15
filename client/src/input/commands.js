@@ -807,7 +807,9 @@ export function _activateCommandHotkey(ev) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
     if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
-    const contextAction = ev.altKey && btn.dataset.contextAction === "true";
+    const contextAction = btn.dataset.contextAction === "true" && (
+      ev.altKey || (ev.shiftKey && btn.dataset.shiftContextAction === "true")
+    );
     if (contextAction) {
       dispatchCommandButtonMouseEvent(btn, "contextmenu", ev);
     } else if (!btn.disabled) {

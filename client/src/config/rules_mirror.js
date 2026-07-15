@@ -378,7 +378,7 @@ export const UPGRADES = Object.freeze({
     upgrade: UPGRADE.ENTRENCHMENT,
     label: "Entrenchment",
     icon: "ENT",
-    cost: Object.freeze({ steel: 100, oil: 0 }),
+    cost: Object.freeze({ steel: 200, oil: 0 }),
     researchTicks: ENTRENCHMENT_RESEARCH_TICKS,
     description: "Let eligible infantry create and use persistent trenches",
     researchedAt: KIND.TRAINING_CENTRE,

@@ -913,7 +913,8 @@ function fakeHudRootWithoutResourceSpans() {
   assert(
     trainCard.slots[0].contextIntent.type === "adjustProductionRepeat" &&
       trainCard.slots[0].contextIntent.buildingIds.join(",") === "20,21" &&
-      trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN,
+      trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN &&
+      trainCard.slots[0].shiftContextAction === true,
     "train buttons should adjust repeat production across selected compatible producers",
   );
   assert(
@@ -928,7 +929,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(!trainCard.slots[1].enabled, "requirement-gated train button should be disabled");
   assert(
     trainCard.slots[1].title.startsWith("Requires Training Centre") &&
-      trainCard.slots[1].title.includes("hold Shift to remove one"),
+      trainCard.slots[1].title.includes("Shift+hotkey removes one"),
     "train locked tooltip should name its requirement and allocation controls",
   );
   assert(trainCard.slots[2].label === "Panzerfaust", "Barracks third train slot should be Panzerfaust");

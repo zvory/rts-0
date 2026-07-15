@@ -1402,7 +1402,7 @@ authoritative wait at the site, while train/research append an unpaid queue entr
 render `prodWaiting` as a striped zero-progress bar labeled `waiting for resources / supply`, and
 progress extrapolation stays disabled until the server reports the item paid. Alt-clicking a train button or pressing Alt with its
 resolved hotkey adds that unit to one selected compatible producer's ordered standing repeat list;
-holding Shift with the same gesture removes it from one producer. The server applies each signed
+pressing Shift with the resolved hotkey removes it from one producer. The server applies each signed
 adjustment atomically so rapid inputs allocate distinct producers from current authoritative state.
 Each train button shows the authoritative active/compatible producer count (for example `2/3`) and
 renders one gold rotating autocast swirl per active producer, evenly phase-offset around the ring.
