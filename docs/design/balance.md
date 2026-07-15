@@ -531,7 +531,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
+| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 594 (~19.8s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -551,7 +551,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains workers; +50 supply; players start with one free |
+| city_centre                | City Centre        | 600 | 1     | 350 | 3x3  | 550       | trains workers; +50 supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +50 supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; +8 supply if present |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |
