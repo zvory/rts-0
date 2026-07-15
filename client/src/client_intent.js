@@ -408,6 +408,20 @@ export class ClientIntent {
     return active;
   }
 
+  /** Replace the active Lab tool payload without interrupting its current interaction. */
+  updateLabToolPayload(payload) {
+    const active = this.activeLabTool;
+    if (!active || !payload || typeof payload !== "object") return null;
+    active.payload = { ...payload };
+    if (this.labToolPreview?.toolId === active.id) {
+      this.labToolPreview = {
+        ...this.labToolPreview,
+        payload: { ...active.payload },
+      };
+    }
+    return active;
+  }
+
   /** Update the renderer-facing cursor ghost for the active lab tool. */
   updateLabToolPreview(preview) {
     const tool = this.activeLabTool;
