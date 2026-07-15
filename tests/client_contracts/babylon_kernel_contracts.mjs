@@ -151,9 +151,17 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
   sequence.push(semanticCamera instanceof FixedPerspectiveCamera ? "camera" : "bad-camera");
   const priorDocument = globalThis.document;
   const dom = fakeDom();
+  const measuredPhases = [];
   globalThis.document = dom.document;
   try {
-    const renderer = bundle.createRenderer(dom.parent);
+    const renderer = bundle.createRenderer(dom.parent, {
+      profiler: () => ({
+        time(label, fn) {
+          measuredPhases.push(label);
+          return fn();
+        },
+      }),
+    });
     sequence.push(renderer instanceof BabylonPresentationAdapter ? "renderer" : "bad-renderer");
     semanticCamera.resize(900, 600);
     semanticCamera.setMapBounds(2000, 1400);
@@ -193,6 +201,7 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     assert.ok(Object.isFrozen(frame.projection.perspective), "presentation frame retains detached scene coefficients");
     assert.equal(renderer.render(frame).presented, true);
     assert.equal(renderer._scene.renderCount, 1, "Match-driven render calls scene.render exactly once");
+    assert.deepEqual(measuredPhases, ["renderer.update", "renderer.present"], "Babylon attributes scene update and actual present separately");
     assert.equal(renderer._engine.runRenderLoopCalls, 0, "Babylon never owns an engine render loop");
     const sceneDiagnostics = renderer.sceneDiagnostics();
     assert.deepEqual(

@@ -150,9 +150,11 @@ export function devWatchConfig() {
     const caseRoomPart = scenarioCase ? `:case=${scenarioCase}` : "";
     const caseBannerPart = scenarioCase ? ` case=${scenarioCase}` : "";
     return {
+      id,
       room: `__dev_scenario__:${id}:unit=${unit}:count=${count}${blockerRoomPart}${caseRoomPart}`,
       noFog: true,
       kind: "scenario",
+      activePlayer: id === "supply_stress_active" && (count === "200" || count === "300"),
       banner: `local dev scenario no fog ${id} unit=${unit} count=${count}${blockerBannerPart}${caseBannerPart}`,
     };
   }

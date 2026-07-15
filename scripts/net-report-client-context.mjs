@@ -8,8 +8,14 @@ export function summarizeClientContext(rows, warnThreshold) {
       "frame_raf_dispatch_p95_ms",
       "frame_unattributed_max_ms",
       "frame_unattributed_p95_ms",
+      "frame_work_budget_miss_count",
+      "present_budget_miss_count",
       "renderer_max_ms",
       "renderer_p95_ms",
+      "renderer_update_max_ms",
+      "renderer_update_p95_ms",
+      "renderer_present_max_ms",
+      "renderer_present_p95_ms",
       "top_renderer_phase_ms",
       "snapshot_late_frame_count",
       "predicted_snapshot_late_frame_count",
@@ -40,6 +46,18 @@ export function summarizeClientContext(rows, warnThreshold) {
     commandBurstWorstFramePhases: summarizeStringField(rows, "command_burst_worst_frame_phase"),
     topRendererPhaseLabels: summarizeStringField(rows, "top_renderer_phase"),
     topRenderDiagnosticGroupLabels: summarizeStringField(rows, "top_render_diagnostic_group"),
+    frameBudget: {
+      workMisses: metricMaxValue(metrics.frame_work_budget_miss_count),
+      presentMisses: metricMaxValue(metrics.present_budget_miss_count),
+      updateMaxMs: metricMaxValue(metrics.renderer_update_max_ms),
+      updateP95Ms: metricMaxValue(metrics.renderer_update_p95_ms),
+      presentMaxMs: metricMaxValue(metrics.renderer_present_max_ms),
+      presentP95Ms: metricMaxValue(metrics.renderer_present_p95_ms),
+      rafDispatchMaxMs: metricMaxValue(metrics.frame_raf_dispatch_max_ms),
+      rafDispatchP95Ms: metricMaxValue(metrics.frame_raf_dispatch_p95_ms),
+      unattributedMaxMs: metricMaxValue(metrics.frame_unattributed_max_ms),
+      unattributedP95Ms: metricMaxValue(metrics.frame_unattributed_p95_ms),
+    },
     lateSnapshotPredictionCoverage: {
       lateFrames,
       predictedLateFrames,
@@ -97,11 +115,13 @@ export function appendClientFrameContextMarkdown(lines, players, { formatPctX100
       ? `${context.topRenderDiagnosticGroups[0].label} total ${context.topRenderDiagnosticGroups[0].total} max/frame ${context.topRenderDiagnosticGroups[0].maxFrame}`
       : "n/a";
     const coverage = context.lateSnapshotPredictionCoverage;
+    const budget = context.frameBudget;
+    const budgetDetail = `${budget.workMisses} 60 FPS work-budget misses; ${budget.presentMisses} 60 FPS present-budget misses; renderer update max/p95 ${budget.updateMaxMs}/${budget.updateP95Ms}ms; renderer present max/p95 ${budget.presentMaxMs}/${budget.presentP95Ms}ms; RAF dispatch max/p95 ${budget.rafDispatchMaxMs}/${budget.rafDispatchP95Ms}ms; unattributed max/p95 ${budget.unattributedMaxMs}/${budget.unattributedP95Ms}ms`;
     const lateCoverage = coverage.lateFrames
       ? `${coverage.predictedLateFrames}/${coverage.lateFrames} predicted (${formatPctX100(coverage.predictedLatePctX100)})`
       : "no late snapshot frames";
     lines.push(
-      `- player ${player.playerId}: ${context.interpretation.text}; likely phase ${phase}; renderer ${renderer}; diagnostics ${counter}; late-snapshot prediction ${lateCoverage}; ${coverage.interpretation}.`
+      `- player ${player.playerId}: ${context.interpretation.text}; likely phase ${phase}; ${budgetDetail}; renderer ${renderer}; diagnostics ${counter}; late-snapshot prediction ${lateCoverage}; ${coverage.interpretation}.`
     );
   }
 }
@@ -156,6 +176,19 @@ function interpretLocalFrameWork(metrics, warnThreshold) {
 
 function likelyClientPhase(metrics, framePhases, rendererPhases, warnThreshold) {
   if (
+    metricMaxValue(metrics.present_budget_miss_count) > 0 ||
+    metricMaxValue(metrics.renderer_present_p95_ms) >= warnThreshold.renderer_present_p95_ms ||
+    metricMaxValue(metrics.renderer_present_max_ms) >= warnThreshold.renderer_present_max_ms
+  ) {
+    return { label: "renderer.present", reason: "actual present crossed the 60 FPS or renderer threshold" };
+  }
+  if (
+    metricMaxValue(metrics.renderer_update_p95_ms) >= warnThreshold.renderer_update_p95_ms ||
+    metricMaxValue(metrics.renderer_update_max_ms) >= warnThreshold.renderer_update_max_ms
+  ) {
+    return { label: "renderer.update", reason: "renderer scene update crossed threshold" };
+  }
+  if (
     metricMaxValue(metrics.frame_raf_dispatch_p95_ms) >= warnThreshold.frame_raf_dispatch_p95_ms ||
     metricMaxValue(metrics.frame_raf_dispatch_max_ms) >= warnThreshold.frame_raf_dispatch_max_ms
   ) {
@@ -181,6 +214,7 @@ function likelyClientPhase(metrics, framePhases, rendererPhases, warnThreshold) 
     return { label: "frame.unattributed", reason: "unattributed frame work crossed threshold" };
   }
   if (
+    metricMaxValue(metrics.frame_work_budget_miss_count) > 0 ||
     metricMaxValue(metrics.frame_work_p95_ms) >= warnThreshold.frame_work_p95_ms ||
     metricMaxValue(metrics.frame_work_max_ms) >= warnThreshold.frame_work_max_ms
   ) {
@@ -334,6 +368,10 @@ function metricMaxValue(metric) {
 function hasClientFrameContext(context) {
   if (!context) return false;
   return context.interpretation.status !== "unknown" ||
+    context.frameBudget.workMisses > 0 ||
+    context.frameBudget.presentMisses > 0 ||
+    context.frameBudget.updateMaxMs > 0 ||
+    context.frameBudget.presentMaxMs > 0 ||
     context.topFramePhases.length > 0 ||
     context.topRendererPhases.length > 0 ||
     context.topRenderDiagnosticGroups.length > 0 ||

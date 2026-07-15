@@ -114,6 +114,20 @@ export function installFakePixi() {
   class FakeApplication {
     constructor(options = {}) {
       this.options = options;
+      this.renderCalls = 0;
+      this.ticker = {
+        started: false,
+        startCalls: 0,
+        stopCalls: 0,
+        start: () => {
+          this.ticker.started = true;
+          this.ticker.startCalls += 1;
+        },
+        stop: () => {
+          this.ticker.started = false;
+          this.ticker.stopCalls += 1;
+        },
+      };
       this.stage = new FakeContainer();
       this.view = { style: {}, parentNode: null };
       this.renderer = {
@@ -123,6 +137,9 @@ export function installFakePixi() {
           this.height = h;
         },
       };
+    }
+    render() {
+      this.renderCalls += 1;
     }
     destroy() {
       this.destroyed = true;

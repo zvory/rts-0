@@ -316,6 +316,9 @@ const approvedCurrentFactionFiles = new Set([
   // Panzerfaust inspection scenarios deliberately seed current Tank/Rifleman interactions as
   // no-fog dev fixtures; public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/panzerfaust.rs",
+  // Frame-budget stress setup deliberately pins one mixed current-roster force while public
+  // faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/supply_stress.rs",
   // Tank coax inspection deliberately seeds current roster targets as a no-fog dev fixture;
   // public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/tank_coax.rs",

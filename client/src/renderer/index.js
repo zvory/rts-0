@@ -110,6 +110,7 @@ export class Renderer {
 
     /** The PIXI.Application. Exposed for the render loop / ticker. */
     this.app = new PIXI.Application({
+      autoStart: false,
       antialias: false,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
@@ -243,6 +244,7 @@ export class Renderer {
     this._missingTextureEntityIds = new Set();
     this._renderFrameCount = 0;
     this._lastRenderErrorFrame = -1;
+    this._renderAttemptHadError = false;
     this._loadLivePngRigAtlases();
     this._liveFrameStripsByKind = createLiveFrameStrips();
     this._liveFrameStripTextures = new Map();
@@ -290,19 +292,18 @@ export class Renderer {
 
   enterFixedCapture(renderClock) {
     this.setRenderClock(renderClock);
-    this._captureTickerWasRunning = this.app?.ticker?.started === true;
-    this.app?.ticker?.stop?.();
-  }
-
-  presentFixedCaptureFrame() {
-    this.app?.render?.();
   }
 
   exitFixedCapture(renderClock) {
     this.setRenderClock(renderClock);
-    const resumeTicker = this._captureTickerWasRunning === true;
-    this._captureTickerWasRunning = false;
-    if (resumeTicker) this.app?.ticker?.start?.();
+  }
+
+  present() {
+    if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
+    this.app.render();
+    this._renderFrameCount += 1;
+    if (this._renderAttemptHadError) this._lastRenderErrorFrame = this._renderFrameCount;
+    this._renderAttemptHadError = false;
   }
 
   visualNow() {
@@ -438,6 +439,7 @@ export class Renderer {
     observerMapAnalysis = null,
     feedbackView: preparedFeedbackView = null,
     reconciledGroundDecals = null,
+    onGroundDecalsStaged = null,
   } = {}) {
     this._beginRenderFrame();
     this._profiler = profiler || null;
@@ -493,6 +495,9 @@ export class Renderer {
         "groundDecals",
         () => this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state),
       );
+      if (Array.isArray(reconciledGroundDecals) && reconciledGroundDecals.length > 0) {
+        onGroundDecalsStaged?.();
+      }
     });
     time("renderer.trenches", () => {
       this._drawSafely("trenches", () => this._drawTrenches(state));
@@ -624,10 +629,10 @@ export class Renderer {
   }
 
   _beginRenderFrame() {
-    this._renderFrameCount += 1;
     // Capture readiness is a property of the current rendered frame. A texture can
     // legitimately be unavailable while an atlas is loading, then render normally
     // once it resolves; do not keep that transient fallback pinned forever.
+    this._renderAttemptHadError = false;
     this._missingTextureEntityIds.clear();
   }
 
@@ -844,6 +849,7 @@ export class Renderer {
   }
 
   _recordRenderError(label, err) {
+    this._renderAttemptHadError = true;
     this._lastRenderErrorFrame = this._renderFrameCount;
     const now = typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()
@@ -1020,6 +1026,7 @@ export class Renderer {
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
+    this.app?.ticker?.stop?.();
 
     // Per-id pooled Graphics across every layer.
     for (const key of Object.keys(this._pools)) {

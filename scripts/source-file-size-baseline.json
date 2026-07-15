@@ -5,8 +5,8 @@
   "exceptions": [
     {
       "path": "scripts/client-perf-harness.mjs",
-      "lines": 1888,
-      "reason": "Replay workload cleanup lowered the existing oversized harness; keep ratcheting until browser harness reporting is split."
+      "lines": 1918,
+      "reason": "Frame-budget Phase 1 adds exact active-player and Lab authority checks plus standalone server startup policy to the existing oversized harness; keep ratcheting until workload execution and reporting are split."
     },
     {
       "path": "scripts/docdrift-sweep.mjs",
@@ -59,9 +59,19 @@
       "reason": "Game-state Phase 2 routes pathing through the DerivedState shell and exposes internal config preservation for reset; keep ratcheting until pathing diagnostics are split."
     },
     {
+      "path": "server/src/dev_scenarios.rs",
+      "lines": 1512,
+      "reason": "Frame-budget Phase 1 adds the two bounded authoritative supply-stress launches to the centralized dev-scenario catalog; keep ratcheting until catalog data is separated from parsing and tests."
+    },
+    {
       "path": "server/src/main.rs",
       "lines": 1845,
       "reason": "Snapshot lifecycle diagnostics added writer serialization/send timing to the existing oversized server shell; keep ratcheting until connection writer handling is split."
+    },
+    {
+      "path": "server/src/structured_log.rs",
+      "lines": 1538,
+      "reason": "Frame-budget Phase 1 adds stable update, present, RAF-dispatch, unattributed-work, and 60 FPS budget diagnostics to the centralized structured-log classifier; keep ratcheting until net-report classification is extracted."
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",

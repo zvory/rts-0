@@ -22,7 +22,6 @@ export function renderFixedCaptureFrame(match, visualTimeMs) {
   if (!match.captureClock) throw new Error("Fixed capture is not active.");
   match.captureClock.advanceTo(visualTimeMs);
   runMatchCaptureFrame(match, visualTimeMs);
-  match.renderer.presentFixedCaptureFrame();
   return { visualTimeMs, tick: match.state.tick, rendererFrame: match.renderer._renderFrameCount };
 }
 

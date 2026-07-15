@@ -12,8 +12,44 @@ import {
   parsePositiveNumberList,
 } from "../../scripts/client-perf-harness.mjs";
 import { FrameProfiler, collectMatchFrameContext } from "../../client/src/frame_profiler.js";
+import { validateActiveSupplyStressSample } from "../../scripts/client-perf/workload_setup.mjs";
+import {
+  buildClientPerfWorkloads,
+  SUPPLY_ACTIVE_WORKLOADS,
+} from "../../scripts/client-perf/workloads.mjs";
 
 export function runFrameProfilerContracts() {
+  {
+    const expected = SUPPLY_ACTIVE_WORKLOADS[200];
+    const sample = {
+      source: "server-authoritative-dev-scenario",
+      clientMutated: false,
+      scenarioId: expected.scenarioId,
+      scenarioSeed: expected.scenarioSeed,
+      playerId: expected.playerId,
+      spectator: false,
+      predictionEnabled: true,
+      predictionReady: true,
+      predictionMode: "tracking",
+      supplyUsed: expected.targetSupply,
+      supplyCap: expected.supplyCap,
+      projectedEntityCount: expected.projectedEntityCount,
+      countsByOwner: expected.countsByOwner,
+    };
+    assert(validateActiveSupplyStressSample(sample, expected).length === 0, "active supply workload accepts exact authoritative player evidence");
+    for (const mutation of [
+      { spectator: true },
+      { predictionEnabled: false, predictionMode: "disabled" },
+      { supplyUsed: 199 },
+      { projectedEntityCount: 1 },
+      { clientMutated: true },
+    ]) {
+      assert(validateActiveSupplyStressSample({ ...sample, ...mutation }, expected).length > 0, "active supply workload rejects invalid authority, prediction, supply, or projection evidence");
+    }
+    const ids = buildClientPerfWorkloads({}).map((workload) => workload.id);
+    assert(ids.includes("supply-200-active") && ids.includes("supply-300-active"), "paired active 200/300 workloads are checked in");
+  }
+
   {
     let clock = 0;
     const profiler = new FrameProfiler({
@@ -26,6 +62,8 @@ export function runFrameProfilerContracts() {
     profiler.beginFrame({ at: 0, frameGapMs: 16, scheduledAt: -5 });
     profiler.recordPhase("match.camera", 3);
     profiler.recordPhase("renderer.units", 9);
+    profiler.recordPhase("renderer.update", 18);
+    profiler.recordPhase("renderer.present", 18);
     profiler.recordPhase("private.localLabel", 11);
     profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 2);
     profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 1);
@@ -65,7 +103,7 @@ export function runFrameProfilerContracts() {
     assert(summary.recentLongFrames[0].rafDispatchMs === 5, "FrameProfiler long-frame context includes RAF dispatch delay");
     assert(summary.recentLongFrames[0].unattributedFrameMs === 22, "FrameProfiler long-frame context includes unattributed work");
     assert(
-      summary.recentLongFrames[0].rendererNestedPhase?.label === "renderer.units",
+      summary.recentLongFrames[0].rendererNestedPhase?.label === "renderer.present",
       "FrameProfiler long-frame context names the slowest nested renderer phase",
     );
     const createdCounter = summary.renderDiagnostics.counters.find(
@@ -88,13 +126,17 @@ export function runFrameProfilerContracts() {
     assert(report.worstFramePhase === "frame.unattributed", "FrameProfiler report summary names worst phase");
     assert(report.worstFramePhaseMs === 22, "FrameProfiler report summary records worst phase max");
     assert(report.rendererMaxMs === 0, "FrameProfiler report summary tolerates missing renderer phase");
+    assert(report.rendererUpdateMaxMs === 18 && report.rendererUpdateP95Ms === 24, "renderer update max/p95 are stable report scalars");
+    assert(report.rendererPresentMaxMs === 18 && report.rendererPresentP95Ms === 24, "actual present max/p95 are stable report scalars");
+    assert(report.frameWorkBudgetMissCount === 1, "FrameProfiler counts complete frame work above the 60 FPS budget");
+    assert(report.presentBudgetMissCount === 1, "FrameProfiler counts presents above the 60 FPS budget");
     assert(
       report.clientFramePhases.some((phase) => phase.label === "frame.unattributed") &&
         !report.clientFramePhases.some((phase) => phase.label === "private.localLabel"),
       "FrameProfiler upload phase summary uses stable allowlisted labels",
     );
-    assert(report.rendererFramePhases[0].label === "renderer.units", "FrameProfiler upload names top renderer subphase");
-    assert(report.topRendererPhase === "renderer.units", "FrameProfiler upload exposes top renderer phase scalar");
+    assert(report.rendererFramePhases[0].label === "renderer.present", "FrameProfiler upload names top renderer subphase");
+    assert(report.topRendererPhase === "renderer.present", "FrameProfiler upload exposes top renderer phase scalar");
     assert(
       report.renderDiagnosticCounters.some((counter) => counter.label === "renderer.pixi.displayObject") &&
         report.renderDiagnosticCounters.every((counter) => counter.label !== "private.counter.label"),
@@ -114,6 +156,7 @@ export function runFrameProfilerContracts() {
     assert(typeof surface.reportSummary === "function", "FrameProfiler debug surface exposes reportSummary()");
     profiler.resetReportWindow();
     assert(profiler.reportSummary().frameCount === 0, "FrameProfiler can reset only report-window aggregates");
+    assert(profiler.reportSummary().frameWorkBudgetMissCount === 0 && profiler.reportSummary().presentBudgetMissCount === 0, "report reset clears 60 FPS budget-miss counts");
     assert(profiler.reportSummary().renderDiagnostics.counters.length === 0, "FrameProfiler report reset clears diagnostics");
     assert(profiler.summary().frameCount === 3, "FrameProfiler report-window reset preserves debug aggregates");
     surface.reset();

@@ -8,10 +8,11 @@ import { BabylonFogLayer } from "./fog_layer.js";
 import { BabylonGenericEntities } from "./generic_entities.js";
 
 export class BabylonPresentationAdapter {
-  constructor(canvasParent, { Babylon }) {
+  constructor(canvasParent, { Babylon, sources = null }) {
     this.id = "babylon";
     this._Babylon = Babylon;
     this._parent = canvasParent;
+    this._sources = sources || {};
     this._destroyed = false;
     this._renderFrameCount = 0;
     this._lastError = null;
@@ -39,14 +40,18 @@ export class BabylonPresentationAdapter {
 
   render(frame) {
     if (this._destroyed || !this._scene) return Object.freeze({ presented: false });
+    const profiler = this._sources?.profiler?.() || null;
+    const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     try {
       if (!frame || frame.version !== 1) throw new TypeError("Babylon requires PresentationFrameV1.");
-      this._syncCamera(frame.projection);
-      this._syncGround(frame.projection?.mapBounds);
-      this._genericEntities.sync(frame);
-      this._fogLayer.sync(frame);
-      this._feedbackLayer.sync(frame);
-      this._scene.render();
+      time("renderer.update", () => {
+        this._syncCamera(frame.projection);
+        this._syncGround(frame.projection?.mapBounds);
+        this._genericEntities.sync(frame);
+        this._fogLayer.sync(frame);
+        this._feedbackLayer.sync(frame);
+      });
+      time("renderer.present", () => this._present());
       this._renderFrameCount += 1;
       this._lastError = null;
       return Object.freeze({ presented: true });
@@ -88,7 +93,6 @@ export class BabylonPresentationAdapter {
   }
 
   enterFixedCapture() {}
-  presentFixedCaptureFrame() { this._scene?.render(); }
   exitFixedCapture() {}
 
   destroy() {
@@ -112,6 +116,11 @@ export class BabylonPresentationAdapter {
     this._canvas = null;
     this._errorNode?.remove();
     this._errorNode = null;
+    this._sources = null;
+  }
+
+  _present() {
+    this._scene.render();
   }
 
   _createScene() {

@@ -281,9 +281,13 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   assert(decalAcknowledgements === 0, "a failed backend frame retains its reconciled decal batch for retry");
   assert(match.presentationFrame.diagnosticsContext.assemblyOrdinal === 1, "one presentation assembly occurs for the frame");
   assert(published === null, "a failed backend frame does not publish a new selection scene");
+  presented = undefined;
+  runMatchCaptureFrame(match, 708);
+  assert(decalAcknowledgements === 0, "a malformed backend result cannot acknowledge the reconciled decal batch");
+  assert(published === null, "a malformed backend result cannot publish a new selection scene");
   presented = true;
   runMatchCaptureFrame(match, 716);
-  assert(decalReconciliations === 2, "the next frame reconciles the retained decal batch again");
+  assert(decalReconciliations === 3, "later frames keep reconciling the retained decal batch until presentation succeeds");
   assert(decalAcknowledgements === 1, "a successful backend frame acknowledges its reconciled decal batch");
   assert(published?.frameId === match.presentationFrame.frameId, "published selection scene matches the presented frame id");
 }

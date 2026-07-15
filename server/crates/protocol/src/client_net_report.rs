@@ -274,6 +274,10 @@ pub struct ClientNetReport {
     #[serde(default)]
     pub slow_frame_count: u32,
     #[serde(default)]
+    pub frame_work_budget_miss_count: u32,
+    #[serde(default)]
+    pub present_budget_miss_count: u32,
+    #[serde(default)]
     pub worst_frame_phase: String,
     #[serde(default)]
     pub worst_frame_phase_ms: u16,
@@ -281,6 +285,14 @@ pub struct ClientNetReport {
     pub renderer_max_ms: u16,
     #[serde(default)]
     pub renderer_p95_ms: u16,
+    #[serde(default)]
+    pub renderer_update_max_ms: u16,
+    #[serde(default)]
+    pub renderer_update_p95_ms: u16,
+    #[serde(default)]
+    pub renderer_present_max_ms: u16,
+    #[serde(default)]
+    pub renderer_present_p95_ms: u16,
     #[serde(default)]
     pub top_renderer_phase: String,
     #[serde(default)]

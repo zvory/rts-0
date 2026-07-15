@@ -29,6 +29,8 @@ mod match_history;
 mod replay;
 mod types;
 
+#[cfg(test)]
+pub(super) use super::dev_scenario_id::DevScenarioId;
 use super::lab_scenario_driver::LabScenarioDriver;
 #[cfg(test)]
 use super::replay_session::ReplaySession;
@@ -45,7 +47,7 @@ use helpers::{LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
 use lab::LabSession;
 use types::{AiSlot, Phase};
 pub(super) use types::{
-    DevScenarioConfig, DevScenarioId, LabRoomConfig, PendingClientCommandAck, RoomMode, RoomPlayer,
+    DevScenarioConfig, LabRoomConfig, PendingClientCommandAck, RoomMode, RoomPlayer,
 };
 
 pub(super) struct RoomTask {

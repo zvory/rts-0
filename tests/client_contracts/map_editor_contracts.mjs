@@ -2,6 +2,39 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import { installFakePixi } from "./pixi_fakes.mjs";
+
+{
+  const savedRaf = globalThis.requestAnimationFrame;
+  let scheduled = 0;
+  globalThis.requestAnimationFrame = () => ++scheduled;
+  try {
+    const viewport = {
+      destroyed: false,
+      lastFrameAt: 0,
+      keys: {},
+      camera: {
+        x: 10,
+        y: 20,
+        zoom: 2,
+        update() {},
+      },
+      renderer: {
+        world: {
+          position: { set() {} },
+          scale: { set() {} },
+        },
+        presents: 0,
+        present() { this.presents += 1; },
+      },
+      tick: MapEditorViewport.prototype.tick,
+    };
+    viewport.tick(16);
+    assert.equal(viewport.renderer.presents, 1, "each Map Editor RAF explicitly presents once");
+    assert.equal(scheduled, 1, "Map Editor schedules one successor RAF");
+  } finally {
+    globalThis.requestAnimationFrame = savedRaf;
+  }
+}
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
@@ -26,6 +59,35 @@ import {
   symmetricMapTiles,
   symmetricTerrainTiles,
 } from "../../client/src/map_editor_session.js";
+
+{
+  const savedCancel = globalThis.cancelAnimationFrame;
+  const savedWindow = globalThis.window;
+  const cancelled = [];
+  globalThis.cancelAnimationFrame = (frame) => cancelled.push(frame);
+  globalThis.window = { removeEventListener() {} };
+  try {
+    const viewport = {
+      destroyed: false,
+      frame: 73,
+      unsubscribe() {},
+      renderer: {
+        app: { view: { removeEventListener() {} } },
+        destroyed: 0,
+        destroy() { this.destroyed += 1; },
+      },
+      labels: [],
+      overlay: { destroy() {} },
+    };
+    MapEditorViewport.prototype.destroy.call(viewport);
+    MapEditorViewport.prototype.destroy.call(viewport);
+    assert.deepEqual(cancelled, [73], "Map Editor teardown cancels its one owned RAF exactly once");
+    assert.equal(viewport.renderer.destroyed, 1, "Map Editor teardown destroys Pixi idempotently");
+  } finally {
+    globalThis.cancelAnimationFrame = savedCancel;
+    globalThis.window = savedWindow;
+  }
+}
 
 const repoRoot = new URL("../../", import.meta.url);
 const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-terrain.json", repoRoot), "utf8"));

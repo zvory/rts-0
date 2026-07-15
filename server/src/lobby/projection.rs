@@ -200,11 +200,19 @@ impl ProjectionPolicy {
         )
     }
 
-    pub(super) fn full_world_snapshot_for(self, view_player_id: u32) -> SnapshotProjection {
-        SnapshotProjection::full_world(
-            view_player_id,
-            self.snapshot_options_for(RecipientRole::Spectator),
-        )
+    pub(super) fn dev_watch_snapshot_for(
+        self,
+        role: RecipientRole,
+        view_player_id: u32,
+    ) -> SnapshotProjection {
+        match role {
+            RecipientRole::ActivePlayer => {
+                SnapshotProjection::player_fog(view_player_id, self.snapshot_options_for(role))
+            }
+            RecipientRole::Spectator => {
+                SnapshotProjection::full_world(view_player_id, self.snapshot_options_for(role))
+            }
+        }
     }
 
     pub(super) fn observer_analysis_audience(self) -> ObserverAnalysisAudience {
@@ -311,7 +319,17 @@ mod tests {
             DiagnosticPolicy::PROJECTED_MOVEMENT_PATHS,
         );
         assert_eq!(
-            dev.full_world_snapshot_for(7),
+            dev.dev_watch_snapshot_for(RecipientRole::ActivePlayer, 7),
+            SnapshotProjection::player_fog(
+                7,
+                SnapshotOptions {
+                    include_movement_paths: true,
+                    movement_paths_for_all_projected: true,
+                },
+            )
+        );
+        assert_eq!(
+            dev.dev_watch_snapshot_for(RecipientRole::Spectator, 7),
             SnapshotProjection::full_world(
                 7,
                 SnapshotOptions {

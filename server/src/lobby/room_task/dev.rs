@@ -5,12 +5,13 @@ use tokio::time::Instant as TokioInstant;
 use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::crash_replay::{dump_crash_replay, panic_reason};
 use super::super::dev_replay::match_seed;
+use super::super::dev_scenario_id::DevScenarioId;
 use super::super::faction_validation::{default_faction_id_for, FactionRequestContext};
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::projection::RecipientRole;
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::snapshots::union_events;
-use super::types::{DevScenarioId, Phase, RoomMode, RoomPlayer};
+use super::types::{Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
 use rts_sim::game::{command::SimCommand, Game};
@@ -56,15 +57,26 @@ impl DevScenarioDriver {
     }
 }
 
+const SUPPLY_STRESS_ACTIVE_SEED: u32 = 0x5a00_0300;
+
 impl RoomTask {
     pub(super) fn on_join_dev_watch(
         &mut self,
         player_id: u32,
         name: String,
+        requested_spectator: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
         if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        let active_supply_player = matches!(
+            &self.mode,
+            RoomMode::DevScenario(config) if matches!(config.id, DevScenarioId::SupplyStressActive)
+        ) && !requested_spectator;
+        if active_supply_player && self.players.values().any(|player| !player.spectator) {
             let _ = ack.send(false);
             return;
         }
@@ -75,7 +87,7 @@ impl RoomTask {
                 name,
                 color: "#6f8fa8".to_string(),
                 ready: true,
-                spectator: true,
+                spectator: !active_supply_player,
                 msg_tx,
                 head_of_line_count: 0,
                 last_received_client_seq: 0,
@@ -124,7 +136,11 @@ impl RoomTask {
             | RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevScenario(config) => {
                 let _ = default_faction_id_for(FactionRequestContext::DevScenario);
-                let seed = match_seed();
+                let seed = if matches!(config.id, DevScenarioId::SupplyStressActive) {
+                    SUPPLY_STRESS_ACTIVE_SEED
+                } else {
+                    match_seed()
+                };
                 macro_rules! session_from_setup {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
@@ -233,6 +249,9 @@ impl RoomTask {
                             seed,
                         )?)
                     }
+                    DevScenarioId::SupplyStressActive => session_from_setup!(
+                        Game::new_supply_stress_scenario(config.count as u32, seed)?,
+                    ),
                 }
             }
         }
@@ -245,9 +264,12 @@ impl RoomTask {
             return;
         };
         let payload = game.start_payload();
-        let diagnostics = self
-            .projection_policy()
-            .diagnostic_capabilities_for(RecipientRole::Spectator);
+        let role = if player.spectator {
+            RecipientRole::Spectator
+        } else {
+            RecipientRole::ActivePlayer
+        };
+        let diagnostics = self.projection_policy().diagnostic_capabilities_for(role);
         let start_policy = self.session_policy();
         let builder = StartPayloadBuilder::simulation(start_policy, &payload);
         super::super::launch::send_start_payloads(
@@ -256,8 +278,12 @@ impl RoomTask {
             [LaunchRecipient {
                 connection_id: watcher_id,
                 payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
-                prediction: LaunchPrediction::Disabled,
-                role: RecipientRole::Spectator,
+                prediction: if player.spectator {
+                    LaunchPrediction::Disabled
+                } else {
+                    LaunchPrediction::Enabled
+                },
+                role,
                 diagnostics,
                 clear_pending_snapshot: false,
                 lab: None,
@@ -339,9 +365,7 @@ impl RoomTask {
         let full_vision_events = rts_sim::perf::timed(perf.as_mut(), "event_union", || {
             union_events(per_player_events.values())
         });
-        let projection = self
-            .projection_policy()
-            .full_world_snapshot_for(view_player_id);
+        let projection_policy = self.projection_policy();
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,
@@ -351,8 +375,14 @@ impl RoomTask {
             perf.as_mut(),
         )
         .send_to_recipients(&mut self.players, recipients, |_id, player| {
-            let snapshot =
-                projection.snapshot_with_events(&game, &mut per_player_events, &full_vision_events);
+            let role = if player.spectator {
+                RecipientRole::Spectator
+            } else {
+                RecipientRole::ActivePlayer
+            };
+            let snapshot = projection_policy
+                .dev_watch_snapshot_for(role, view_player_id)
+                .snapshot_with_events(&game, &mut per_player_events, &full_vision_events);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 

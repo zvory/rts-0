@@ -1,4 +1,5 @@
-use super::room_task::{DevScenarioConfig, DevScenarioId, LabRoomConfig, RoomMode};
+use super::dev_scenario_id::DevScenarioId;
+use super::room_task::{DevScenarioConfig, LabRoomConfig, RoomMode};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
 use crate::lab_scenarios::lab_scenario_exists;

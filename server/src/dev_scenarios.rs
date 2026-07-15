@@ -731,6 +731,23 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     case: None,
 }];
 
+const SUPPLY_STRESS_ACTIVE_LAUNCHES: [DevScenarioLaunch; 2] = [
+    DevScenarioLaunch {
+        id: "supply_stress_active",
+        unit: EntityKind::Worker,
+        count: 200,
+        blocker: None,
+        case: None,
+    },
+    DevScenarioLaunch {
+        id: "supply_stress_active",
+        unit: EntityKind::Worker,
+        count: 300,
+        blocker: None,
+        case: None,
+    },
+];
+
 const PANZERFAUST_WINDUP_CANCEL_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     id: "panzerfaust_windup_cancel",
     unit: EntityKind::Panzerfaust,
@@ -763,7 +780,7 @@ const PANZERFAUST_METHAMPHETAMINES_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenar
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 19] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 20] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -878,6 +895,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 19] = [
         title: "Tank Coax Inspection",
         description: "One held Tank faces infantry-priority targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke, and buildings around the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
         launches: &TANK_COAX_INSPECTION_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "supply_stress_active",
+        title: "Active Player Supply Stress",
+        description: "Deterministic two-player mixed late-game armies at exact 200 or 300 supply for local frame-budget measurement.",
+        launches: &SUPPLY_STRESS_ACTIVE_LAUNCHES,
     },
 ];
 

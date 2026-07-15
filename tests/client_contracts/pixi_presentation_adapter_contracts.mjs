@@ -91,10 +91,18 @@ const sourceState = {
   consumePendingGroundDecals() { destructiveReads += 1; return []; },
 };
 const engine = fakeEngine();
+const measuredPhases = [];
+const profiler = {
+  recordDiagnosticCounter() {},
+  time(label, fn) {
+    measuredPhases.push(label);
+    return fn();
+  },
+};
 const sources = {
   renderClock: { now: () => 500 },
   state: () => sourceState,
-  profiler: () => ({ recordDiagnosticCounter() {} }),
+  profiler: () => profiler,
   visualProfile: () => ({ unitOverrides: [{ id: "test" }], frameStripOverrides: [] }),
   staticMap: () => assembler.staticMap,
 };
@@ -107,6 +115,9 @@ assert(first.presented && second.presented, "Pixi adapter presents an immutable 
 assert(engine.staticMaps.length === 1, "unchanged static-map revision is materialized once into Pixi-owned staging");
 assert(engine.staticMaps[0].terrain instanceof Uint8Array, "Pixi owns its copied terrain staging buffer");
 assert(engine.renders.length === 2, "repeated render(frame) calls reach the backend without reassembly");
+assert(engine.presents === 2 && engine._renderFrameCount === 2, "each successful adapter call explicitly presents exactly once");
+assert(measuredPhases.filter((label) => label === "renderer.update").length === 2, "Pixi scene update is measured for every adapter call");
+assert(measuredPhases.filter((label) => label === "renderer.present").length === 2, "Pixi present is measured independently for every adapter call");
 assert(stateReadCount === readsAfterFirst, "repeated render of the same frame does not query legacy state again");
 assert(destructiveReads === 0, "Pixi render never consumes the shared GameState decal queue");
 assert(engine.renders[0].options.reconciledGroundDecals.length === 1, "first presentation reconciles its assembled decal batch");
@@ -125,11 +136,30 @@ const recoveryFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 532, so
 assert(adapter.render(recoveryFrame).presented === true, "a later Pixi frame still presents after a bounded backend failure");
 assert(engine.errors.some(([label]) => label === "pixiPresentationFrame"), "bounded backend failure records an actionable diagnostic");
 
+const updateRetryDecal = { id: 90, decalClass: "infantry", x: 44, y: 48, seed: 90 };
+const stagedUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 536, sourceTick: 12, groundDecals: [updateRetryDecal] });
+engine.failAfterStagingNext = true;
+assert(adapter.render(stagedUpdateFailureFrame).presented === false, "Pixi update failure after persistent staging is bounded to the current frame");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the failed update had already staged its persistent decal batch");
+const afterUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 538, sourceTick: 13, groundDecals: [updateRetryDecal] });
+assert(adapter.render(afterUpdateFailureFrame).presented === true, "Pixi presents a later frame after a post-staging update failure");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "update retry does not stamp the retained decal batch twice");
+
+const retryDecal = { id: 91, decalClass: "infantry", x: 48, y: 52, seed: 91 };
+const presentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 540, sourceTick: 14, groundDecals: [retryDecal] });
+engine.failPresentNext = true;
+const framesBeforePresentFailure = engine._renderFrameCount;
+assert(adapter.render(presentFailureFrame).presented === false, "Pixi present failure is bounded to the current frame");
+assert(engine._renderFrameCount === framesBeforePresentFailure, "a failed present does not advance renderer readiness");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the failed present had already staged its persistent decal batch");
+const afterPresentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 544, sourceTick: 15, groundDecals: [retryDecal] });
+assert(adapter.render(afterPresentFailureFrame).presented === true, "Pixi presents a later frame after a bounded present failure");
+assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "present retry does not stamp the retained decal batch twice");
+
 const captureClock = { now: () => 532 };
 adapter.enterFixedCapture(captureClock);
-adapter.presentFixedCaptureFrame();
 adapter.exitFixedCapture(captureClock);
-assert(engine.captureLifecycle.join(",") === "enter,present,exit", "fixed capture delegates through the same Pixi adapter lifecycle");
+assert(engine.captureLifecycle.join(",") === "enter,exit", "fixed capture swaps clocks without a ticker-owned present path");
 
 const replacementMap = { width: 1, height: 1, tileSize: 16, terrain: new Uint8Array([2]), resources: [] };
 assembler.reset({ map: replacementMap, generation: 2 });
@@ -160,6 +190,9 @@ function fakeEngine() {
     marquees: [],
     errors: [],
     failNext: false,
+    failAfterStagingNext: false,
+    failPresentNext: false,
+    presents: 0,
     destroyed: 0,
     captureLifecycle: [],
     buildStaticMap(staticMap) {
@@ -171,14 +204,25 @@ function fakeEngine() {
         this.failNext = false;
         throw new Error("planned backend failure");
       }
-      this._renderFrameCount += 1;
       this.renders.push({ state, camera, fog, alpha, options });
+      if (options.reconciledGroundDecals.length > 0) options.onGroundDecalsStaged?.();
+      if (this.failAfterStagingNext) {
+        this.failAfterStagingNext = false;
+        throw new Error("planned backend failure after decal staging");
+      }
+    },
+    present() {
+      if (this.failPresentNext) {
+        this.failPresentNext = false;
+        throw new Error("planned present failure");
+      }
+      this.presents += 1;
+      this._renderFrameCount += 1;
     },
     drawSelectionBox(rect) { this.marquees.push(rect); },
     _recordRenderError(label, error) { this.errors.push([label, error.message]); },
     resize() {},
     enterFixedCapture() { this.captureLifecycle.push("enter"); },
-    presentFixedCaptureFrame() { this.captureLifecycle.push("present"); },
     exitFixedCapture() { this.captureLifecycle.push("exit"); },
     captureReadiness() { return { ready: true }; },
     groundDecalDiagnostics() { return {}; },
