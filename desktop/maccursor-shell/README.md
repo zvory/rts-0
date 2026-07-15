@@ -139,7 +139,7 @@ parallelism on machines without a page file:
 
 ```powershell
 $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'rts-0\tauri-target-windows-release'
-$env:CARGO_BUILD_JOBS = '2'
+$env:CARGO_BUILD_JOBS = '1'
 cmd.exe /d /c "pushd \\wsl.localhost\Ubuntu\home\alex\dev\rts-0\desktop\maccursor-shell && node build-unsigned-windows.mjs"
 ```
 

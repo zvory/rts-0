@@ -66,6 +66,40 @@ function capture(command, args, options = {}) {
   return run(command, args, { ...options, capture: true }).stdout.trim();
 }
 
+function gitTreeIsDirty() {
+  const status = capture(
+    "git",
+    ["-c", "core.filemode=false", "status", "--short", "--untracked-files=normal"],
+    { cwd: REPO_ROOT },
+  );
+  if (!status) return false;
+
+  for (const line of status.split(/\r?\n/)) {
+    // Native Windows Git reports a clean symlink in a WSL worktree as a type
+    // change. Ignore that platform artifact only when its target still matches
+    // the committed symlink blob; every other status remains dirty.
+    if (line.startsWith(" T ")) {
+      const relativePath = line.slice(3);
+      const indexEntry = capture("git", ["ls-files", "-s", "--", relativePath], {
+        cwd: REPO_ROOT,
+      });
+      if (indexEntry.startsWith("120000 ")) {
+        const blobSha = indexEntry.split(/\s+/)[1];
+        const committedTarget = capture("git", ["cat-file", "blob", blobSha], {
+          cwd: REPO_ROOT,
+        });
+        try {
+          if (fs.readlinkSync(path.join(REPO_ROOT, relativePath)) === committedTarget) continue;
+        } catch {
+          // Treat an unreadable or replaced symlink as dirty.
+        }
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
@@ -171,9 +205,7 @@ function main() {
 
   const gitSha = capture("git", ["rev-parse", "HEAD"], { cwd: REPO_ROOT });
   const shortSha = gitSha.slice(0, 12);
-  const dirty = capture("git", ["status", "--short", "--untracked-files=normal"], {
-    cwd: REPO_ROOT,
-  }).length > 0;
+  const dirty = gitTreeIsDirty();
   const cargoTauriVersion = capture("cargo", ["tauri", "--version"]);
   const rustcVersion = capture("rustc", ["--version"]);
   const targetDirectory = path.resolve(metadata.target_directory);
