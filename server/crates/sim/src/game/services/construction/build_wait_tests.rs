@@ -149,6 +149,104 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
 }
 
 #[test]
+fn arrived_pump_jack_ejects_owned_and_allied_units_before_starting() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    entities
+        .spawn_node(EntityKind::Oil, site_x, site_y)
+        .expect("oil node should spawn");
+    let builder = entities
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            site_x + config::TILE_SIZE as f32,
+            site_y,
+        )
+        .expect("builder should spawn");
+    entities
+        .get_mut(builder)
+        .expect("builder should exist")
+        .set_order(Order::build(EntityKind::PumpJack, 4, 4));
+    let owned_worker = entities
+        .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+        .expect("owned blocker should spawn");
+    let allied_tank = entities
+        .spawn_unit(2, EntityKind::Tank, site_x, site_y)
+        .expect("allied blocker should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].team_id = 7;
+    players[1].team_id = 7;
+    let mut events = HashMap::new();
+
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+
+    assert!(entities
+        .iter()
+        .any(|entity| entity.kind == EntityKind::PumpJack && entity.under_construction()));
+    let site_rect =
+        crate::game::services::geometry::building_rect_for_footprint(EntityKind::PumpJack, 4, 4)
+            .expect("Pump Jack rect");
+    for unit in [owned_worker, allied_tank] {
+        let entity = entities.get(unit).expect("friendly unit should survive");
+        let body = crate::game::services::geometry::unit_body_for_entity(entity)
+            .expect("friendly unit should have a ground body");
+        assert!(
+            !crate::game::services::geometry::unit_body_intersects_rect(body, site_rect),
+            "friendly unit {} should be forced clear of the Pump Jack footprint",
+            entity.id,
+        );
+    }
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
+}
+
+#[test]
+fn arrived_pump_jack_does_not_eject_enemy_unit() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    entities
+        .spawn_node(EntityKind::Oil, site_x, site_y)
+        .expect("oil node should spawn");
+    let builder = entities
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            site_x + config::TILE_SIZE as f32,
+            site_y,
+        )
+        .expect("builder should spawn");
+    entities
+        .get_mut(builder)
+        .expect("builder should exist")
+        .set_order(Order::build(EntityKind::PumpJack, 4, 4));
+    let enemy = entities
+        .spawn_unit(2, EntityKind::Tank, site_x, site_y)
+        .expect("enemy blocker should spawn");
+    let before = entities
+        .get(enemy)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("enemy should exist");
+    let mut players = vec![player_state(1), player_state(2)];
+    let mut events = HashMap::new();
+
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+
+    assert!(entities
+        .iter()
+        .all(|entity| entity.kind != EntityKind::PumpJack));
+    let enemy = entities.get(enemy).expect("enemy should survive");
+    assert_eq!((enemy.pos_x, enemy.pos_y), before);
+    assert_eq!(
+        entities
+            .get(builder)
+            .expect("builder should survive")
+            .build_phase(),
+        Some(BuildPhase::WaitingAtSite),
+    );
+}
+
+#[test]
 fn waiting_build_cancels_when_building_claims_footprint() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();

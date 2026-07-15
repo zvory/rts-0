@@ -14,6 +14,8 @@ use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 use crate::rules::projection;
 
+mod pump_jack;
+
 /// Advance build orders. Workers in `ToSite` or `WaitingAtSite` that are in arrival range of
 /// their intended footprint re-validate placement and affordability, spawn the building, deduct
 /// cost, or keep waiting for resources / short-lived unit blockers. Workers in `Constructing`
@@ -86,9 +88,18 @@ pub(crate) fn construction_system(
         let was_unit_blocked_wait = build_wait_unit_blocked_ticks(entities, worker) > 0;
 
         // Re-validate placement against the live entity set.
-        match standability::building_site_status_for_build_intent(
+        let mut site_status = standability::building_site_status_for_build_intent(
             map, entities, kind, tx, ty, worker,
-        ) {
+        );
+        if kind == EntityKind::PumpJack
+            && site_status == standability::BuildSiteStatus::BlockedByUnit
+        {
+            pump_jack::eject_friendly_units_from_site(map, entities, &teams, owner, worker, tx, ty);
+            site_status = standability::building_site_status_for_build_intent(
+                map, entities, kind, tx, ty, worker,
+            );
+        }
+        match site_status {
             standability::BuildSiteStatus::Clear => {
                 reset_build_unit_blocked_timer(entities, worker);
             }

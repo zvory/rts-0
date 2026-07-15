@@ -1016,7 +1016,8 @@ minimap targeting feedback uses the mirrored cloud radius and duration effect fi
 replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. Advisory building placement ignores unit types whose client configuration marks them as
+command. If an owned or allied unit covers the patch, right-clicking that unit's body still resolves
+to the live oil beneath its Pump Jack footprint. Advisory building placement ignores unit types whose client configuration marks them as
 non-ground placement blockers. The Scout Plane stays out of the shared ground vehicle-body
 classifier, so its body does not block build previews. Normal gameplay selection and control-group
 commands exclude it, while Lab and spectator inspection paths allow selecting and grouping it. Its generated Fw 189-style top-down PNG frame-strip rig is scaled to the mirrored aircraft body so
