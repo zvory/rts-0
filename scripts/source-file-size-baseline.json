@@ -40,8 +40,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1860,
-      "reason": "Formation extraction lowered the existing oversized movement coordinator; keep ratcheting until coordinator policy is split."
+      "lines": 1755,
+      "reason": "Spawn-test extraction lowered the existing oversized movement coordinator; keep ratcheting until coordinator policy is split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
