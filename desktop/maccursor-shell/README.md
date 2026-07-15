@@ -1,6 +1,6 @@
-# macOS Tauri Desktop Shell
+# Tauri Desktop Shell
 
-This is the macOS Tauri shell for the live Bewegungskrieg web client. It opens a
+This is the Tauri shell for the live Bewegungskrieg web client. It opens a
 shell-owned startup selector first, then loads one of the built-in release
 channels in the same window:
 
@@ -42,7 +42,7 @@ spike:
 }
 ```
 
-Pointer Lock is deliberately disabled inside this shell. Cursor-lock requests
+Pointer Lock is deliberately disabled inside the macOS shell. Cursor-lock requests
 use `window.__RTS_NATIVE_CURSOR`, a Tauri-injected native bridge that hides and
 disconnects the macOS cursor, forwards native mouse movement/down/up/wheel
 events to the client, and exposes `diagnostics()` with the active backend,
@@ -50,6 +50,12 @@ native event count, JS processed count, dropped event count, delivery latency,
 and whether movement is batched. The current visible cursor is a DOM cursor
 painted directly in the native event handler (`visual: "dom-event-time"`), not
 a native overlay.
+
+That native bridge is macOS-only. Windows injects the same installed-app/runtime and release-channel
+metadata with `platform: "windows"`, but reports no native cursor backend or capture requirement and
+does not replace the Pointer Lock API. Windows uses WebView2 Pointer Lock with raw
+`unadjustedMovement`; if raw input is unavailable, cursor lock fails instead of falling back to
+lower-quality adjusted movement.
 
 Once a non-replay match starts in the Tauri shell, the web client aggressively
 requests native cursor capture, retries on focused unlocks, and grabs the cursor

@@ -4,7 +4,11 @@
 import { assert } from "./assertions.mjs";
 import { withFakeSettingsDocument } from "./fakes.mjs";
 import { MatchCombatAudio } from "../../client/src/match_combat_audio.js";
-import { MatchNetReporter, predictionReportFields } from "../../client/src/match_net_reporter.js";
+import {
+  MatchNetReporter,
+  cursorRuntimeReportFields,
+  predictionReportFields,
+} from "../../client/src/match_net_reporter.js";
 import { buildMatchSettingsContext } from "../../client/src/match_settings_context.js";
 import {
   EVENT,
@@ -12,6 +16,29 @@ import {
   MOVEMENT_PATH_DIAGNOSTICS,
   WEAPON_KIND,
 } from "../../client/src/protocol.js";
+
+// Windows desktop runtime diagnostics
+// ---------------------------------------------------------------------------
+{
+  const root = {
+    __RTS_DESKTOP_RUNTIME: {
+      shell: "tauri",
+      platform: "windows",
+      nativeCursorBackend: false,
+      nativeCursorCapture: false,
+      pointerLockDisabled: false,
+    },
+    __TAURI_INTERNALS__: { invoke() {} },
+    __TAURI__: { core: { invoke() {} } },
+  };
+  const fields = cursorRuntimeReportFields(root);
+  assert(fields.desktopRuntimePresent, "Windows net reports retain the desktop runtime flag");
+  assert(!fields.nativeCursorBridgePresent, "Windows net reports keep the macOS cursor bridge absent");
+  assert(!fields.nativeCursorSupported, "Windows net reports do not claim macOS native cursor support");
+  assert(!fields.nativeCursorActive, "Windows net reports do not claim native cursor capture is active");
+  assert(fields.tauriInternalsPresent, "Windows net reports retain Tauri internals diagnostics");
+  assert(fields.tauriGlobalPresent, "Windows net reports retain the Tauri global diagnostic");
+}
 
 // Match net-report/ping collaborator
 // ---------------------------------------------------------------------------
