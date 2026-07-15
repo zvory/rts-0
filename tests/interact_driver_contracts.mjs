@@ -15,6 +15,7 @@ import {
   validateWorkspaceRoot,
   withTimeout,
 } from "../scripts/interact/driver.ts";
+import { waitForInteractStartup } from "../scripts/interact/bridge_startup.ts";
 import {
   INTERACT_BRIDGE_KEY,
   INTERACT_BRIDGE_VERSION,
@@ -49,6 +50,28 @@ assert.ok(boundedLogLine.startsWith("2026-07-11 INFO"), "bounded diagnostic log 
 assert.ok(boundedLogLine.endsWith("final-marker"), "bounded diagnostic log lines retain the newest detail tail");
 assert.match(boundedLogLine, /<truncated>/, "bounded diagnostic log lines disclose truncation");
 assert.equal(boundLogLine(oversizedLogLine, 8).length, 8, "explicit diagnostic bounds are always honored");
+
+let startupWaitTimeout = null;
+const rejectedStartupStatus = await waitForInteractStartup({
+  waitForFunction: async (predicate, options) => {
+    startupWaitTimeout = options?.timeout;
+    const previousWindow = globalThis.window;
+    globalThis.window = { __rtsInteract: { status: () => ({ ready: false, launchError: "map not found" }) } };
+    try {
+      assert.equal(predicate(), true, "driver readiness polling treats a launch error as terminal");
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  },
+  evaluate: async () => ({ ready: false, launchError: "map not found" }),
+}, 1234);
+assert.equal(startupWaitTimeout, 1234, "driver readiness polling preserves the startup timeout");
+assert.deepEqual(
+  rejectedStartupStatus,
+  { ready: false, launchError: "map not found" },
+  "driver readiness inspection preserves the launch failure for coded error reporting",
+);
 
 const diagnosticDriver = new InteractDriver({ workspaceRoot: root });
 diagnosticDriver.page = new EventEmitter();
@@ -171,7 +194,7 @@ assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and 
 assert.equal(inspection.limit, 400, "inspection result limits support the large-scene operational bound");
 assert.equal(INTERACT_LIMITS.focusEntities, 400, "bridge camera focus shares the 400-reference bound");
 assert.equal(INTERACT_LIMITS.captureSubjects, 400, "bridge readiness checks share the 400-subject bound");
-assert.equal(INTERACT_BRIDGE_VERSION, 4, "the renamed Interact Lab launch contract increments the bridge version");
+assert.equal(INTERACT_BRIDGE_VERSION, 5, "launch-failure status projection increments the bridge version");
 assert.equal(inspection.cameraViewport, false, "inspection viewport filtering is opt-in");
 assert.equal(normalizeInspectionQuery({ cameraViewport: true }).cameraViewport, true, "inspection accepts the bounded camera viewport filter");
 
@@ -206,6 +229,48 @@ assert.deepEqual(
   "the launch-gated bridge exposes a bounded server startup failure",
 );
 failedLaunchBridge.destroy();
+let failedStartupPageClosed = false;
+let failedStartupBrowserClosed = false;
+let failedStartupServerClosed = false;
+const failedStartupPage = Object.assign(new EventEmitter(), {
+  goto: async () => {},
+  waitForFunction: async () => {},
+  evaluate: async () => ({
+    ready: false,
+    reason: "launchError",
+    launchError: 'Cannot load lab map "flat": map not found: "flat"',
+  }),
+  close: async () => { failedStartupPageClosed = true; },
+});
+const failedStartupBrowser = {
+  version: async () => "contract-browser",
+  newPage: async () => failedStartupPage,
+  close: async () => { failedStartupBrowserClosed = true; },
+};
+const failedStartupDriver = new InteractDriver({
+  workspaceRoot: root,
+  chromeFinder: () => "/contract/chrome",
+  puppeteerLoader: async () => ({ launch: async () => failedStartupBrowser }),
+  privateServerFactory: async () => ({
+    baseUrl: "http://127.0.0.1:8081/",
+    logPath: "",
+    reused: false,
+    close: async () => { failedStartupServerClosed = true; },
+  }),
+});
+try {
+  await assert.rejects(
+    failedStartupDriver.open(),
+    (error) => error?.code === "launchFailed" && error?.details?.status?.reason === "launchError",
+    "the driver maps a terminal bridge startup error without waiting for readiness",
+  );
+} finally {
+  await failedStartupDriver.close();
+  if (failedStartupDriver.sessionDir) fs.rmSync(failedStartupDriver.sessionDir, { recursive: true, force: true });
+}
+assert.equal(failedStartupPageClosed, true, "failed startup closes the browser page");
+assert.equal(failedStartupBrowserClosed, true, "failed startup closes the browser");
+assert.equal(failedStartupServerClosed, true, "failed startup closes the private server");
 const windowLike = {};
 const bridge = new InteractBridge({
   enabled: true,

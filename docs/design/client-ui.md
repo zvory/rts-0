@@ -619,7 +619,7 @@ padding, defaults to a close 32-world-pixel frame for readable single-unit captu
 48 world pixels for multi-subject and non-unit framing), and returns `CameraSnapshotV1` plus
 semantic CSS viewport and ground bounds. Camera set accepts only `CameraSnapshotV1`; status,
 readiness, screenshot manifest v2, recording manifest v2, and fixed-capture manifest v2 carry the
-same versioned shape. The Lab bridge surface version is 4. Setup mutations
+same versioned shape. The Lab bridge surface version is 5. Setup mutations
 wait for the server's immediate authoritative snapshot without advancing paused simulation. Order
 calls also wait for a new snapshot and request one bounded tick when paused so the queued command is
 consumed before success.

@@ -12,7 +12,7 @@ import {
 } from "./lab_spawn_catalog.js";
 
 export const INTERACT_BRIDGE_KEY = "__rtsInteract";
-export const INTERACT_BRIDGE_VERSION = 4;
+export const INTERACT_BRIDGE_VERSION = 5;
 export const INTERACT_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectPlayers: 16,

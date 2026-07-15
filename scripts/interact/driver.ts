@@ -20,6 +20,7 @@ import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
 import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
+import { waitForInteractStartup } from "./bridge_startup.ts";
 
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 
@@ -51,7 +52,6 @@ interface BridgeResult extends JsonObject {
   roomTime?: { paused?: boolean; speed?: number };
   frame?: number;
   ready?: boolean;
-  launchError?: string;
   visualStartMs?: number;
   rendererFrame?: number;
   frameErrors?: unknown[];
@@ -316,19 +316,9 @@ export class InteractDriver {
       this.page!.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
       "page navigation",
     );
-    await this.openStep(
-      this.page!.waitForFunction(
-        () => {
-          const status = window.__rtsInteract?.status?.();
-          return status?.ready === true || !!status?.launchError;
-        },
-        { timeout: this.options.startupTimeoutMs },
-      ),
-      "page readiness",
-    );
     const startupStatus = await this.openStep(
-      this.page!.evaluate(() => window.__rtsInteract?.status?.() || null),
-      "page readiness inspection",
+      waitForInteractStartup(this.page!, this.options.startupTimeoutMs),
+      "page readiness",
     );
     if (startupStatus?.launchError) {
       throw new InteractDriverError("launchFailed", startupStatus.launchError, { status: startupStatus });
