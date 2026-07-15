@@ -1438,11 +1438,7 @@ mod tests {
         let unit = entities.get(at).expect("at gun should exist");
         assert!(matches!(unit.order(), Order::AttackMove(_)));
         assert!(unit.queued_orders().is_empty());
-        assert_eq!(
-            unit.emplacement_facing(),
-            None,
-            "promoted movement should cancel the staged setup facing"
-        );
+        assert_eq!(unit.emplacement_facing(), None);
     }
 
     #[test]
