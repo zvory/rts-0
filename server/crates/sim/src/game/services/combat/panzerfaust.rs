@@ -11,6 +11,7 @@ use super::acquisition::{
     DirectFireLegality, DirectFireVisibility,
 };
 use super::chase::{chase_goal_for_target, chase_path_needs_refresh};
+use super::shot_blocker_index::ShotBlockerIndex;
 use super::weapons::mirror_weapon_to_body;
 use super::{
     dist2, Fog, LineOfSight, Map, MoveCoordinator, Occupancy, SmokeCloudStore, SpatialIndex,
@@ -26,6 +27,7 @@ pub(super) use runtime::tick_states;
 pub(super) fn handle_combat_if_panzerfaust(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
@@ -44,6 +46,7 @@ pub(super) fn handle_combat_if_panzerfaust(
         Some(PanzerfaustState::Loaded) => handle_loaded_combat(
             map,
             entities,
+            blockers,
             teams,
             methamphetamines_researched,
             occ,
@@ -61,6 +64,7 @@ pub(super) fn handle_combat_if_panzerfaust(
 fn handle_loaded_combat(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
@@ -84,8 +88,8 @@ fn handle_loaded_combat(
 
     let los = LineOfSight::with_smoke(map, smokes);
     let target = resolve_panzerfaust_target(
-        map, entities, teams, occ, spatial, &los, fog, smokes, id, owner, px, py, range_px,
-        acquire_px, mode,
+        map, entities, blockers, teams, occ, spatial, &los, fog, smokes, id, owner, px, py,
+        range_px, acquire_px, mode,
     );
     let Some(target) = target else {
         return false;
@@ -104,7 +108,8 @@ fn handle_loaded_combat(
 
     let distance = dist2(px, py, tx, ty).sqrt();
     let target_angle = (ty - py).atan2(tx - px);
-    let fire_context = PanzerfaustFireContext::new(map, entities, teams, &los, fog, smokes);
+    let fire_context =
+        PanzerfaustFireContext::new(map, entities, blockers, teams, &los, fog, smokes);
     let clear_shot = panzerfaust_target_fireable(&fire_context, id, owner, target);
     if distance <= range_px && clear_shot {
         if let Some(attacker) = entities.get_mut(id) {
@@ -185,6 +190,7 @@ fn panzerfaust_combat_context(
 fn resolve_panzerfaust_target(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     occ: &Occupancy,
     spatial: &SpatialIndex,
@@ -214,6 +220,7 @@ fn resolve_panzerfaust_target(
     resolve_target_for_weapon(
         map,
         entities,
+        blockers,
         teams,
         spatial,
         los,
@@ -300,6 +307,7 @@ fn panzerfaust_target_in_range(
 pub(super) struct PanzerfaustFireContext<'a, 'los> {
     map: &'a Map,
     entities: &'a EntityStore,
+    blockers: &'a ShotBlockerIndex,
     teams: &'a TeamRelations,
     los: &'a LineOfSight<'los>,
     fog: &'a Fog,
@@ -310,6 +318,7 @@ impl<'a, 'los> PanzerfaustFireContext<'a, 'los> {
     fn new(
         map: &'a Map,
         entities: &'a EntityStore,
+        blockers: &'a ShotBlockerIndex,
         teams: &'a TeamRelations,
         los: &'a LineOfSight<'los>,
         fog: &'a Fog,
@@ -318,6 +327,7 @@ impl<'a, 'los> PanzerfaustFireContext<'a, 'los> {
         Self {
             map,
             entities,
+            blockers,
             teams,
             los,
             fog,
@@ -338,6 +348,7 @@ fn panzerfaust_target_fireable(
     direct_fire_target_legal(
         context.map,
         context.entities,
+        context.blockers,
         context.teams,
         context.los,
         context.fog,

@@ -15,6 +15,7 @@ use crate::rules::terrain::{self, TerrainKind};
 
 use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
+use super::shot_blocker_index::ShotBlockerIndex;
 use super::weapons::{
     choose_target_preferring_anti_tank_field, effective_attack_profile,
     moving_fire_move_order_holds_path,
@@ -60,6 +61,7 @@ impl DirectFireLegality {
 pub(super) fn direct_fire_target_legal(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     los: &LineOfSight<'_>,
     fog: &Fog,
@@ -98,6 +100,7 @@ pub(super) fn direct_fire_target_legal(
         shot_hits_intended_target(
             map,
             entities,
+            blockers,
             teams,
             attacker,
             attacker_owner,
@@ -105,7 +108,15 @@ pub(super) fn direct_fire_target_legal(
             start,
         )
     } else {
-        !friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end)
+        !friendly_hard_blocker_between(
+            map,
+            entities,
+            blockers,
+            attacker,
+            attacker_owner,
+            start,
+            end,
+        )
     }
 }
 
@@ -138,6 +149,7 @@ fn is_passive_idle_unit(kind: EntityKind) -> bool {
 pub(super) fn resolve_target(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
@@ -161,6 +173,7 @@ pub(super) fn resolve_target(
     resolve_target_for_weapon(
         map,
         entities,
+        blockers,
         teams,
         spatial,
         los,
@@ -187,6 +200,7 @@ pub(super) fn resolve_target(
 pub(super) fn resolve_target_for_weapon(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
@@ -245,6 +259,7 @@ pub(super) fn resolve_target_for_weapon(
     let candidates = legal_target_candidates(
         map,
         entities,
+        blockers,
         teams,
         spatial,
         los,
@@ -302,6 +317,7 @@ fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -
 fn legal_target_candidates(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
@@ -353,7 +369,7 @@ fn legal_target_candidates(
         let in_weapon_range = effective_weapon_range_px.is_finite()
             && distance_sq <= effective_weapon_range_px * effective_weapon_range_px;
         if !target_has_legal_shot(
-            map, entities, teams, los, fog, smokes, self_id, owner, px, py, target,
+            map, entities, blockers, teams, los, fog, smokes, self_id, owner, px, py, target,
         ) {
             continue;
         }
@@ -384,6 +400,7 @@ fn legal_target_candidates(
 fn target_has_legal_shot(
     map: &Map,
     entities: &EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     los: &LineOfSight<'_>,
     fog: &Fog,
@@ -401,6 +418,7 @@ fn target_has_legal_shot(
             || direct_fire_target_legal(
                 map,
                 entities,
+                blockers,
                 teams,
                 los,
                 fog,
