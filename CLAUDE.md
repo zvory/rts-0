@@ -134,12 +134,6 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   checklist, and design documents.
 - Deployed behavior: use the `fly-logs` skill early for beta/mainline differences, WebSocket or lobby
   failures, match history, crashes, restarts, and performance spikes.
-- Graphics or rendering changes: use the project-local `interact` skill and its `interact lab`
-  command namespace to arrange one small
-  authoritative scene, capture a clean Pixi PNG, inspect that returned artifact once, and share only
-  its returned Tailnet Preview URL. Keep captures under `target/interact/lab/`; do not use
-  Browser/Computer Use, commit image bytes,
-  or accept a missing-texture fallback as review evidence.
 - Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
 - Pre-alpha/prototype plans: keep expensive-to-reverse architecture and authority/security on the
   critical path. Let actual scope determine the phase count, use playtests or measured checkpoints
