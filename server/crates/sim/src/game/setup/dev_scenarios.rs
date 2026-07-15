@@ -278,7 +278,7 @@ impl Game {
         .checkpoint_backed("dev:factory_zero_gap_perpendicular")
     }
 
-    pub fn new_command_car_building_corner_scenario(
+    pub fn new_command_car_corner_scenario(
         unit: EntityKind,
         unit_count: usize,
         seed: u32,

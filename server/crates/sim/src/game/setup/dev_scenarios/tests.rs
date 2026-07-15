@@ -373,7 +373,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             0x5150_030d,
         ),
         Game::new_factory_zero_gap_perpendicular_scenario(EntityKind::Tank, 1, 0x5150_030d),
-        Game::new_command_car_building_corner_scenario(EntityKind::CommandCar, 1, 0x5150_030d),
+        Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_030d),
         Game::new_tank_trap_line_build_scenario(
             "tank_trap_line_horizontal",
             EntityKind::ScoutCar,
@@ -1096,9 +1096,8 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
 
 #[test]
 fn command_car_building_corner_matches_reduced_reproduction_layout() {
-    let setup =
-        Game::new_command_car_building_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
-            .expect("scenario setup should succeed");
+    let setup = Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
+        .expect("scenario setup should succeed");
     assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
     assert_eq!(setup.goal, (3216.0, 3472.0));
     assert_eq!(setup.units.len(), 1);

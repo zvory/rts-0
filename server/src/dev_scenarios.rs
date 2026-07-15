@@ -780,7 +780,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
     DevScenarioSpec {
         id: "command_car_building_corner",
         title: "Command Car Building Corner",
-        description: "One Command Car starts inside the reduced Vehicle Works, Training Centre, and Barracks corner from the Soupman match, waits one second, then moves southwest.",
+        description: "One Command Car starts inside the reduced Vehicle Works, Training Centre, and Barracks corner from the Soupman match, waits one second, then moves northwest.",
         launches: &COMMAND_CAR_BUILDING_CORNER_LAUNCHES,
     },
     DevScenarioSpec {
