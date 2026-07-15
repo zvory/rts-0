@@ -48,9 +48,6 @@ mod formation;
 #[cfg(test)]
 mod pathing_budget_tests;
 mod rally;
-mod support_weapon;
-
-use support_weapon::begin_weapon_teardown_for_movement;
 
 #[cfg(test)]
 use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
@@ -311,7 +308,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
-            begin_weapon_teardown_for_movement(e);
+            e.begin_weapon_teardown_for_movement();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -367,7 +364,7 @@ impl<'a> MoveCoordinator<'a> {
         unit.set_path_goal(Some(goal));
         unit.mark_move_phase(MovePhase::AwaitingPath);
         unit.reset_gather_state();
-        begin_weapon_teardown_for_movement(unit);
+        unit.begin_weapon_teardown_for_movement();
         let (px, py) = (unit.pos_x, unit.pos_y);
         unit.reset_stuck(px, py);
     }

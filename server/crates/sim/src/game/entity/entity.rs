@@ -1021,6 +1021,39 @@ impl Entity {
         }
     }
 
+    /// Start or continue the weapon transition required before this entity can move.
+    /// Returns whether the entity is already packed and may move immediately.
+    pub(in crate::game) fn begin_weapon_teardown_for_movement(&mut self) -> bool {
+        let teardown_ticks = match self.kind {
+            EntityKind::MachineGunner => config::MACHINE_GUNNER_SETUP_TICKS,
+            EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
+            EntityKind::Artillery => {
+                self.reset_artillery_accuracy();
+                self.reset_artillery_blanket_sequence();
+                config::ARTILLERY_SETUP_TICKS
+            }
+            _ => return true,
+        };
+        if matches!(self.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
+            self.set_emplacement_facing(None);
+            self.set_pending_redeploy_facing(None);
+        }
+        match self.weapon_setup() {
+            WeaponSetup::Packed => true,
+            WeaponSetup::TearingDown { .. } => false,
+            WeaponSetup::TearingDownToRedeploy { ticks } => {
+                self.set_weapon_setup(WeaponSetup::TearingDown { ticks });
+                false
+            }
+            WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed => {
+                self.set_weapon_setup(WeaponSetup::TearingDown {
+                    ticks: teardown_ticks,
+                });
+                false
+            }
+        }
+    }
+
     pub fn under_construction(&self) -> bool {
         self.construction.is_some()
     }

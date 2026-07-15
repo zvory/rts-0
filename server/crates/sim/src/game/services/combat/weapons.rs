@@ -153,22 +153,9 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
 }
 
 pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
-    let Some(e) = entities.get_mut(id) else {
-        return false;
-    };
-    if !requires_weapon_setup(e.kind) {
-        return true;
-    }
-    match e.weapon_setup() {
-        WeaponSetup::Packed => true,
-        WeaponSetup::Deployed | WeaponSetup::SettingUp { .. } => {
-            e.set_weapon_setup(WeaponSetup::TearingDown {
-                ticks: setup_ticks_for(e.kind),
-            });
-            false
-        }
-        WeaponSetup::TearingDown { .. } | WeaponSetup::TearingDownToRedeploy { .. } => false,
-    }
+    entities
+        .get_mut(id)
+        .is_some_and(Entity::begin_weapon_teardown_for_movement)
 }
 
 pub(super) fn update_attack_move_no_target_teardown(entities: &mut EntityStore, id: u32) {
