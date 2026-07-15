@@ -13,6 +13,7 @@ import {
 } from "../scripts/interact/runtime.ts";
 import { INTERACT_COMMANDS } from "../scripts/interact/command_service.ts";
 import { INTERACT_COMMAND_HELP } from "../scripts/interact/command_help.ts";
+import { commandDefinition, namespaceCommandKey } from "../scripts/interact/command_registry.ts";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -101,6 +102,15 @@ try {
   });
   assert.notEqual(retiredScenarioNamespace.status, 0, "the retired scenario namespace is rejected");
   assert.equal(JSON.parse(retiredScenarioNamespace.stderr).error.code, "unknownNamespace", "the namespace rename does not leave a hidden alias");
+  for (const inheritedName of ["constructor", "toString", "__proto__"]) {
+    const inheritedNamespace = spawnSync(process.execPath, [cli, inheritedName, "--help"], {
+      cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+    });
+    assert.notEqual(inheritedNamespace.status, 0, `inherited object name ${inheritedName} is not a namespace`);
+    assert.equal(JSON.parse(inheritedNamespace.stderr).error.code, "unknownNamespace", `${inheritedName} fails at the namespace boundary`);
+    assert.equal(namespaceCommandKey(inheritedName, "open"), null, `${inheritedName} cannot resolve an internal command`);
+    assert.equal(commandDefinition(inheritedName), null, `${inheritedName} cannot resolve an inherited registry member`);
+  }
   assert.deepEqual(Object.keys(INTERACT_COMMAND_HELP).sort(), [...INTERACT_COMMANDS].sort(), "help descriptor coverage equals the public command catalog");
   assert.deepEqual(
     INTERACT_COMMAND_HELP.screenshot.variants,

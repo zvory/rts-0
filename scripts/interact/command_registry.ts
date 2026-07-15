@@ -21,6 +21,10 @@ interface DescriptorOptions {
   bounds?: string[];
   example?: HelpExample;
 }
+interface NamespaceRecord {
+  summary: string;
+  commands: Readonly<Record<string, string>>;
+}
 
 export interface CommandDefinition {
   name: string;
@@ -50,6 +54,10 @@ function descriptor(summary: string, acceptedShape: string, {
     scope, lane, timeoutClass, sceneMutation, recordable,
     help: Object.freeze({ summary, acceptedShape, variants, defaults, bounds, example }),
   });
+}
+
+function namespace(summary: string, commands: Record<string, string>): NamespaceRecord {
+  return Object.freeze({ summary, commands: Object.freeze(commands) });
 }
 
 const COMMAND_RECORDS = Object.freeze({
@@ -271,51 +279,66 @@ export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinitio
 
 export const INTERACT_COMMAND_KEYS = Object.freeze(Object.keys(INTERACT_COMMAND_REGISTRY));
 
-const NAMESPACE_COMMAND_KEYS = Object.freeze({
-  lab: Object.freeze(Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
-    (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
-  ).map((name) => [name, name]))),
-  game: Object.freeze({
-    open: "game-open",
-    close: "close",
-    status: "status",
-    inspect: "game-inspect",
-    move: "game-move",
-    camera: "game-camera",
-    screenshot: "game-screenshot",
-    "record-start": "game-record-start",
-    "record-stop": "record-stop",
-    "record-wait": "record-wait",
-    "capture-timelapse": "game-capture-timelapse",
-    "capture-cancel": "capture-cancel",
-    "give-up": "game-give-up",
-    shutdown: "shutdown",
-  }),
-  "dev-scenario": Object.freeze({
-    open: "scenario-open",
-    close: "close",
-    status: "status",
-    inspect: "scenario-inspect",
-    camera: "scenario-camera",
-    screenshot: "scenario-screenshot",
-    "record-start": "scenario-record-start",
-    "record-stop": "record-stop",
-    "record-wait": "record-wait",
-    "capture-timelapse": "scenario-capture-timelapse",
-    "capture-cancel": "capture-cancel",
-    shutdown: "shutdown",
-  }),
+const NAMESPACE_RECORDS = Object.freeze({
+  lab: namespace(
+    "Arrange and inspect authoritative Lab scenes.",
+    Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
+      (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
+    ).map((name) => [name, name])),
+  ),
+  game: namespace(
+    "Observe and minimally control one isolated human-vs-AI match.",
+    {
+      open: "game-open",
+      close: "close",
+      status: "status",
+      inspect: "game-inspect",
+      move: "game-move",
+      camera: "game-camera",
+      screenshot: "game-screenshot",
+      "record-start": "game-record-start",
+      "record-stop": "record-stop",
+      "record-wait": "record-wait",
+      "capture-timelapse": "game-capture-timelapse",
+      "capture-cancel": "capture-cancel",
+      "give-up": "game-give-up",
+      shutdown: "shutdown",
+    },
+  ),
+  "dev-scenario": namespace(
+    "Observe and capture one authored server-backed dev scenario.",
+    {
+      open: "scenario-open",
+      close: "close",
+      status: "status",
+      inspect: "scenario-inspect",
+      camera: "scenario-camera",
+      screenshot: "scenario-screenshot",
+      "record-start": "scenario-record-start",
+      "record-stop": "record-stop",
+      "record-wait": "record-wait",
+      "capture-timelapse": "scenario-capture-timelapse",
+      "capture-cancel": "capture-cancel",
+      shutdown: "shutdown",
+    },
+  ),
 });
 
+export const INTERACT_NAMESPACE_NAMES = Object.freeze(Object.keys(NAMESPACE_RECORDS));
 export const INTERACT_NAMESPACES = Object.freeze(Object.fromEntries(
-  Object.entries(NAMESPACE_COMMAND_KEYS).map(([namespace, commands]) => [namespace, Object.freeze(Object.keys(commands))]),
+  Object.entries(NAMESPACE_RECORDS).map(([namespace, record]) => [namespace, Object.freeze(Object.keys(record.commands))]),
+));
+export const INTERACT_NAMESPACE_SUMMARIES = Object.freeze(Object.fromEntries(
+  Object.entries(NAMESPACE_RECORDS).map(([namespace, record]) => [namespace, record.summary]),
 ));
 
 // Backward-compatible name for the original public Lab command catalog.
 export const INTERACT_COMMANDS = INTERACT_NAMESPACES.lab;
 
 export function namespaceCommandKey(namespace: string, command: string): string | null {
-  return (NAMESPACE_COMMAND_KEYS as Record<string, Readonly<Record<string, string>>>)[namespace]?.[command] || null;
+  if (!Object.hasOwn(NAMESPACE_RECORDS, namespace)) return null;
+  const commands = (NAMESPACE_RECORDS as Record<string, NamespaceRecord>)[namespace].commands;
+  return Object.hasOwn(commands, command) ? commands[command] : null;
 }
 
 export function namespaceCommandDefinition(namespace: string, command: string): CommandDefinition | null {
@@ -324,7 +347,7 @@ export function namespaceCommandDefinition(namespace: string, command: string): 
 }
 
 export function commandDefinition(command: string): CommandDefinition | null {
-  return INTERACT_COMMAND_REGISTRY[command] || null;
+  return Object.hasOwn(INTERACT_COMMAND_REGISTRY, command) ? INTERACT_COMMAND_REGISTRY[command] : null;
 }
 
 export function validateCommandInput(command: string, input: unknown) {

@@ -5,6 +5,19 @@ import {
   interactGameLaunchEnabled,
   interactScenarioLaunchEnabled,
 } from "../../client/src/interact_game_bridge.js";
+import { interactLaunchUrl } from "../../scripts/interact/game_launch_url.ts";
+
+const scenarioLaunchUrl = interactLaunchUrl({
+  mode: "scenario",
+  baseUrl: "http://localhost/",
+  room: "interact-scenario-test",
+  map: "Default",
+  opponent: "ai_2_1",
+  renderer: "pixi",
+  seed: "",
+  scenario: "",
+  devScenario: { id: "direct_reverse_order", unit: "tank", count: 1, blocker: "", case: "" },
+});
 
 assert.equal(
   interactGameLaunchEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=interact-game-test&rtsRole=player&interact=game")),
@@ -22,14 +35,24 @@ assert.equal(
   "the game bridge accepts its isolated AI-vs-AI spectator launch",
 );
 assert.equal(
-  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=dev-scenario")),
+  new URL(scenarioLaunchUrl).searchParams.get("interact"),
+  "dev-scenario",
+  "the Interact driver emits the public dev-scenario launch gate",
+);
+assert.equal(
+  interactScenarioLaunchEnabled(new URL(scenarioLaunchUrl)),
   true,
-  "the observation bridge accepts an explicit bounded dev-scenario launch",
+  "the observation bridge accepts the driver's bounded dev-scenario launch",
 );
 assert.equal(
   interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=game")),
   false,
   "dev scenarios require their separate dev-scenario namespace gate",
+);
+assert.equal(
+  interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=direct_reverse_order&unit=tank&count=1&interact=scenario")),
+  false,
+  "the observation bridge rejects the retired scenario launch gate",
 );
 assert.equal(
   interactScenarioLaunchEnabled(new URL("http://localhost/?watchScenario=1&id=bad/scenario&unit=tank&count=1&interact=dev-scenario")),
