@@ -1163,9 +1163,7 @@ export class LabPanel {
   resourcesForTargetPlayer() {
     const target = this.targetPlayer();
     const rows = this.match?.state?.playerResources || [];
-    const byId = rows.find((row) => Number(row?.id) === target);
-    const fallback = rows[target - 1] || rows[0] || null;
-    const resources = byId || fallback;
+    const resources = rows.find((row) => Number(row?.id) === target) || null;
     return { steel: resources?.steel ?? 0, oil: resources?.oil ?? 0 };
   }
 

@@ -793,6 +793,40 @@ function fakeHudRootWithoutResourceSpans() {
     "lab command card tech checks use selected-owner upgrades when per-owner upgrade data is present",
   );
 
+  const p1CommandCar = { id: 705, owner: 1, kind: KIND.COMMAND_CAR };
+  const p1LabHudState = {
+    playerId: 1,
+    spectator: true,
+    resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
+    playerResources: [
+      { id: 1, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50 },
+      { id: 2, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50 },
+    ],
+    players: p2LabHudState.players,
+    selectedEntities() {
+      return [p1CommandCar];
+    },
+    entitiesInterpolated() {
+      return [p1CommandCar];
+    },
+  };
+  const p1Hud = new HUD({ querySelector: () => null }, p1LabHudState, {}, null, null, null, labPolicy);
+  const p1CommandCarCard = buildCommandCardDescriptors(
+    p1Hud._commandDescriptorContext({ selectedEntities: [p1CommandCar], currentEntities: [p1CommandCar] }),
+  );
+  assert(
+    buttonByLabel(p1CommandCarCard, "Scout Plane").enabled,
+    "blue-player Scout Plane affordability uses its authoritative lab resource row",
+  );
+  p1LabHudState.playerResources = [p1LabHudState.playerResources[1]];
+  const missingP1ResourceCard = buildCommandCardDescriptors(
+    p1Hud._commandDescriptorContext({ selectedEntities: [p1CommandCar], currentEntities: [p1CommandCar] }),
+  );
+  assert(
+    !buttonByLabel(missingP1ResourceCard, "Scout Plane").enabled,
+    "blue-player affordability never borrows the orange player's resource row",
+  );
+
   const worker = { id: 10, owner: 1, kind: KIND.WORKER };
   const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
   const buildCard = buildCommandCardDescriptors(commandCardCtx({
