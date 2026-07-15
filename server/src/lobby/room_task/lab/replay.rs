@@ -1,11 +1,13 @@
-use std::time::Instant;
-
 use rts_sim::game::lab::{LabCommandOptions, LabOp, LabOpOutcome};
 use rts_sim::game::Game;
+use std::time::Instant;
 
 use super::super::super::connection::send_or_log;
 use super::super::super::current_unix_ms;
-use super::super::super::lab_replay_operations::lab_replay_operation_to_entry_kind;
+use super::super::super::lab_replay_operations::{
+    lab_op_to_replay_operation, lab_replay_operation_kind, lab_replay_operation_to_entry_kind,
+};
+use super::super::super::lab_scenario_driver::LabScenarioAction;
 use super::super::super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
 use super::super::super::session_policy::RoomTimeSource;
 use super::super::types::{LabSeekTarget, Phase};
@@ -74,26 +76,39 @@ fn truncate_lab_replay_name(name: &str) -> String {
 }
 
 impl RoomTask {
-    pub(in crate::lobby::room_task) fn enqueue_lab_scenario_commands(&mut self) {
-        let commands = match (&mut self.lab_driver, &self.phase) {
-            (Some(driver), Phase::InGame(game)) => driver.commands_for_tick(game),
+    pub(in crate::lobby::room_task) fn apply_lab_scenario_actions(&mut self) {
+        let actions = match (&mut self.lab_driver, &self.phase) {
+            (Some(driver), Phase::InGame(game)) => driver.actions_for_tick(game),
             _ => return,
         };
         let Some(operator_id) = self.lab_session.as_ref().map(|session| session.operator_id) else {
             return;
         };
-        for command in commands {
-            let player_id = command.player_id;
-            let result = self.apply_lab_issue_command(
-                command.request_id,
-                operator_id,
-                player_id,
-                command.command,
-                command.options,
-            );
+        for action in actions {
+            let result = match action {
+                LabScenarioAction::Command(command) => self.apply_lab_issue_command(
+                    command.request_id,
+                    operator_id,
+                    command.player_id,
+                    command.command,
+                    command.options,
+                ),
+                LabScenarioAction::LabOperation { request_id, op } => {
+                    let op_kind = lab_op_to_replay_operation(&op)
+                        .as_ref()
+                        .map(lab_replay_operation_kind)
+                        .unwrap_or("unserializable");
+                    self.apply_and_record_lab_operation(
+                        operator_id,
+                        request_id,
+                        op_kind.to_string(),
+                        op,
+                    )
+                }
+            };
             if !result.ok {
-                crate::log_warn!(room = %self.room, player_id, error = ?result.error,
-                    "lab scenario shuttle command rejected");
+                crate::log_warn!(room = %self.room, op = %result.op, error = ?result.error,
+                    "lab scenario action rejected");
             }
         }
     }

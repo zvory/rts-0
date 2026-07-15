@@ -1,5 +1,8 @@
 use super::support::*;
+use crate::lobby::lab_scenario_driver::{LabScenarioAction, LabScenarioDriver};
 use crate::lobby::room_task::types::LabSeekTarget;
+use rts_sim::game::entity::EntityKind;
+use rts_sim::game::lab::{LabOp, LabSpawnEntity};
 
 #[test]
 fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
@@ -19,8 +22,8 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
     assert_eq!(ack_rx.try_recv(), Ok(true));
     assert!(task.lab_driver.is_some());
     task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
-    task.enqueue_lab_scenario_commands();
-    task.enqueue_lab_scenario_commands();
+    task.apply_lab_scenario_actions();
+    task.apply_lab_scenario_actions();
 
     let timeline = task.lab_timeline.as_ref().expect("lab timeline");
     assert_eq!(timeline.replay_entry_count(), 2);
@@ -50,7 +53,7 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
         .as_mut()
         .expect("hellhole driver")
         .sync_to_tick(0, &recorded_entries);
-    task.enqueue_lab_scenario_commands();
+    task.apply_lab_scenario_actions();
     assert_eq!(
         task.lab_timeline.as_ref().unwrap().replay_entry_count(),
         2,
@@ -62,5 +65,70 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
         .expect("scripted commands should produce a valid replay artifact");
     task.load_lab_replay_artifact(99, artifact)
         .expect("scripted replay artifact should rebuild");
+    assert!(task.lab_driver.is_none());
+}
+
+#[test]
+fn scripted_spawn_is_recorded_once_seekable_and_portable() {
+    let mut config = lab_config();
+    config.scenario = Some("supply-300-hellhole".to_string());
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        RoomMode::Lab(config),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, _writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+
+    let initial_entity_count = lab_snapshot(&task).entities.len();
+    let spawn = LabSpawnEntity {
+        owner: 1,
+        kind: EntityKind::Rifleman,
+        x: 10.0 * 32.0,
+        y: 10.0 * 32.0,
+        completed: true,
+    };
+    task.lab_driver = Some(LabScenarioDriver::scripted_for_test(
+        0,
+        LabScenarioAction::LabOperation {
+            request_id: 7001,
+            op: LabOp::SpawnEntities(vec![spawn]),
+        },
+    ));
+
+    task.apply_lab_scenario_actions();
+    task.apply_lab_scenario_actions();
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    let timeline = task.lab_timeline.as_ref().expect("lab timeline");
+    assert_eq!(timeline.replay_entry_count(), 1);
+    assert!(matches!(
+        &timeline.replay_entries()[0],
+        crate::protocol::LabReplayOperationEntry {
+            tick: 0,
+            request_id: 7001,
+            op: crate::protocol::LabReplayOperation::SpawnEntities { spawns },
+            ..
+        } if spawns.len() == 1
+    ));
+
+    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    task.apply_lab_scenario_actions();
+    assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 1);
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+
+    let artifact = task
+        .export_lab_replay_artifact(99, Some("Scripted spawn replay"))
+        .expect("scripted spawn should export");
+    let json = serde_json::to_vec(&artifact).expect("artifact JSON");
+    let imported = crate::protocol::lab_replay_artifact_from_slice(&json)
+        .expect("artifact should parse after export");
+    task.load_lab_replay_artifact(99, imported)
+        .expect("scripted spawn replay should rebuild");
+    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
     assert!(task.lab_driver.is_none());
 }
