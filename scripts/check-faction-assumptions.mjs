@@ -335,6 +335,8 @@ const approvedCurrentFactionFiles = new Set([
   // The frame-budget hellhole generator deliberately materializes a fixed current-roster Kriegsia
   // Lab checkpoint for benchmarking; runtime faction admission remains outside this offline tool.
   "server/src/bin/generate_supply_300_hellhole.rs",
+  // The matching Lab driver deliberately churns that fixed current-roster stress fixture.
+  "server/src/lobby/lab_scenario_driver.rs",
   "server/src/lobby/room_task.rs",
   "server/src/protocol.rs",
   // Server-rendered wiki examples intentionally cite current catalog kinds.

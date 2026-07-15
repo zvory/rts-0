@@ -597,7 +597,7 @@ impl RoomTask {
         if self.live_paused && self.live_pause_controls_available() {
             return;
         }
-        self.enqueue_lab_scenario_commands();
+        self.apply_lab_scenario_actions();
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
         let projection_policy = self.projection_policy();

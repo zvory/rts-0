@@ -5,7 +5,9 @@ use std::path::Path;
 use serde_json::json;
 
 use crate::lab_scenarios::load_lab_scenario_by_id;
-use crate::lobby::lab_scenario_driver::{lab_scenario_driver_for, LabScenarioDriver};
+use crate::lobby::lab_scenario_driver::{
+    lab_scenario_driver_for, LabScenarioAction, LabScenarioDriver,
+};
 use crate::protocol::{serialize_messagepack_compact_snapshot, Event};
 
 pub const STREAM_ID: &str = "supply-300-hellhole";
@@ -75,7 +77,7 @@ pub fn generate_hellhole_snapshot_stream(
     let mut first_tick = 0;
     let mut last_tick = 0;
     for index in 0..frame_count {
-        enqueue_hellhole_shuttles(&mut game, &mut driver)?;
+        apply_hellhole_scenario_actions(&mut game, &mut driver)?;
         let event_sets = game.tick();
         let mut snapshot = game.snapshot_full_for(1);
         snapshot.events = union_events(event_sets.iter().map(|(_, events)| events));
@@ -138,14 +140,18 @@ pub(crate) fn build_hellhole_game() -> Result<(rts_sim::game::Game, LabScenarioD
     Ok((game, driver))
 }
 
-pub(crate) fn enqueue_hellhole_shuttles(
+pub(crate) fn apply_hellhole_scenario_actions(
     game: &mut rts_sim::game::Game,
     driver: &mut LabScenarioDriver,
 ) -> Result<(), String> {
-    for command in driver.commands_for_tick(game) {
-        let player_id = command.player_id;
-        game.issue_lab_command_as(player_id, command.command, command.options)
-            .map_err(|err| format!("failed to enqueue player {player_id} shuttle: {err:?}"))?;
+    for action in driver.actions_for_tick(game) {
+        let result = match action {
+            LabScenarioAction::Command(command) => {
+                game.issue_lab_command_as(command.player_id, command.command, command.options)
+            }
+            LabScenarioAction::LabOperation { op, .. } => game.apply_lab_op(op).map(|_| ()),
+        };
+        result.map_err(|err| format!("failed to apply Hellhole scenario action: {err:?}"))?;
     }
     Ok(())
 }

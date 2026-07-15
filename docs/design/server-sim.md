@@ -728,6 +728,12 @@ evidence, not substitutes for this isolation gate.
   manifest file set before opening a draft PR with a reviewer checklist. Paused lab room-time
   suppresses scheduled ticks; one-tick lab steps and running lab ticks use the same
   `LiveTickDriver` path as ordinary live simulation.
+  Bundled scenario drivers may emit a bounded ordered sequence of typed issue-as commands and
+  replay-serializable `LabOp` mutations immediately before that shared tick path. The room applies
+  each action independently through the same timeline-cap, future-truncation, durable-operation,
+  and operation-log rules as accepted operator work; direct benchmark and snapshot-stream tools
+  apply the same typed actions through the public `Game` Lab APIs without room or WebSocket state.
+  A rejected scripted action logs a warning and does not stop later actions or the room tick.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -800,9 +806,10 @@ branch seed.
   scheduled action. `RoomTask` still owns the Tokio interval and remains the only task that advances
   a room.
 - `lab_timeline.rs` owns room-local in-memory lab rewind recording outside the simulation crate. It
-  records a baseline keyframe after lab `Game` creation or setup import, records accepted lab
-  world mutations and issue-as commands in authoritative room order, stores periodic cloned `Game`
-  keyframes, rebuilds lab seeks from the nearest retained keyframe, and truncates future history
+  records a baseline keyframe after lab `Game` creation or setup import, records accepted lab world
+  mutations and issue-as commands—including bundled scenario actions—in authoritative room order,
+  stores periodic cloned `Game` keyframes, rebuilds lab seeks from the nearest retained keyframe,
+  and truncates future history
   after a past seek plus a new accepted lab operation or issue-as command. Portable
   `LabReplayArtifactV1` files rebuild this room-local timeline from their initial checkpoint setup
   and durable operation entries after load; the retained keyframes remain a seek cache, not a

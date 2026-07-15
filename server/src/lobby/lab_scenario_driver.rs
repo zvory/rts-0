@@ -1,5 +1,6 @@
+use super::lab_replay_operations::lab_op_to_replay_operation;
 use crate::protocol::{Command, LabReplayOperation, LabReplayOperationEntry};
-use rts_sim::game::lab::LabCommandOptions;
+use rts_sim::game::lab::{LabCommandOptions, LabOp};
 use rts_sim::game::Game;
 
 const SUPPLY_300_HELLHOLE_ID: &str = "supply-300-hellhole";
@@ -7,20 +8,23 @@ const LEG_TICKS: u32 = 900;
 const TILE: f32 = 32.0;
 const CENTER_TILE: f32 = 63.0;
 const SHUTTLE_OFFSET_TILES: f32 = 18.0;
+const MAX_ACTIONS_PER_TICK: usize = 16;
 
 pub(crate) fn lab_scenario_driver_for(scenario_id: &str) -> Option<LabScenarioDriver> {
     (scenario_id == SUPPLY_300_HELLHOLE_ID).then(LabScenarioDriver::supply_300_hellhole)
 }
 
 pub(crate) struct LabScenarioDriver {
-    shuttles: [DiagonalShuttle; 2],
-    last_issued_tick: Option<u32>,
+    shuttles: Vec<DiagonalShuttle>,
+    scheduled_actions: Vec<ScheduledAction>,
+    last_processed_tick: Option<u32>,
+    retained_entries_at_tick: Vec<LabReplayOperationEntry>,
 }
 
 impl LabScenarioDriver {
     fn supply_300_hellhole() -> Self {
         Self {
-            shuttles: [
+            shuttles: vec![
                 DiagonalShuttle {
                     player_id: 3,
                     endpoint_a: shuttle_endpoint(1.0, -1.0),
@@ -32,30 +36,76 @@ impl LabScenarioDriver {
                     endpoint_b: shuttle_endpoint(1.0, 1.0),
                 },
             ],
-            last_issued_tick: None,
+            scheduled_actions: Vec::new(),
+            last_processed_tick: None,
+            retained_entries_at_tick: Vec::new(),
         }
     }
 
-    pub(crate) fn commands_for_tick(&mut self, game: &Game) -> Vec<LabScenarioCommand> {
+    pub(crate) fn actions_for_tick(&mut self, game: &Game) -> Vec<LabScenarioAction> {
         let tick = game.tick_count();
-        if !tick.is_multiple_of(LEG_TICKS) || self.last_issued_tick == Some(tick) {
+        if self.last_processed_tick == Some(tick) {
             return Vec::new();
         }
-        self.last_issued_tick = Some(tick);
-        let phase = tick / LEG_TICKS;
-        self.shuttles
+        self.last_processed_tick = Some(tick);
+
+        let mut actions: Vec<_> = self
+            .scheduled_actions
             .iter()
-            .filter_map(|shuttle| shuttle.command_for_phase(game, tick, phase))
-            .collect()
+            .filter(|scheduled| scheduled.tick == tick)
+            .map(|scheduled| scheduled.action.clone())
+            .collect();
+        if tick.is_multiple_of(LEG_TICKS) {
+            let phase = tick / LEG_TICKS;
+            actions.extend(
+                self.shuttles
+                    .iter()
+                    .filter_map(|shuttle| shuttle.command_for_phase(game, tick, phase))
+                    .map(LabScenarioAction::Command),
+            );
+        }
+        actions.retain(|action| {
+            !self
+                .retained_entries_at_tick
+                .iter()
+                .any(|entry| action.matches_replay_entry(entry))
+        });
+        self.retained_entries_at_tick.clear();
+        actions.truncate(MAX_ACTIONS_PER_TICK);
+        actions
     }
 
     pub(super) fn sync_to_tick(&mut self, tick: u32, entries: &[LabReplayOperationEntry]) {
-        let recorded_at_tick = entries.iter().any(|entry| {
-            entry.tick == tick && self.shuttles.iter().any(|shuttle| shuttle.matches(entry))
-        });
-        self.last_issued_tick = (!tick.is_multiple_of(LEG_TICKS) || recorded_at_tick)
-            .then_some(tick - (tick % LEG_TICKS));
+        self.last_processed_tick = None;
+        self.retained_entries_at_tick = entries
+            .iter()
+            .filter(|entry| entry.tick == tick)
+            .cloned()
+            .collect();
     }
+
+    #[cfg(test)]
+    pub(crate) fn scripted_for_test(tick: u32, action: LabScenarioAction) -> Self {
+        Self::scripted_actions_for_test(tick, vec![action])
+    }
+
+    #[cfg(test)]
+    pub(crate) fn scripted_actions_for_test(tick: u32, actions: Vec<LabScenarioAction>) -> Self {
+        Self {
+            shuttles: Vec::new(),
+            scheduled_actions: actions
+                .into_iter()
+                .map(|action| ScheduledAction { tick, action })
+                .collect(),
+            last_processed_tick: None,
+            retained_entries_at_tick: Vec::new(),
+        }
+    }
+}
+
+struct ScheduledAction {
+    tick: u32,
+    action: LabScenarioAction,
 }
 
 struct DiagonalShuttle {
@@ -86,22 +136,6 @@ impl DiagonalShuttle {
         })
     }
 
-    fn matches(&self, entry: &LabReplayOperationEntry) -> bool {
-        let expected_destination = self.destination_for_phase(entry.tick / LEG_TICKS);
-        entry.request_id == entry.tick.saturating_add(1)
-            && matches!(
-                &entry.op,
-                LabReplayOperation::IssueCommandAs {
-                    player_id,
-                    cmd: Command::Move { x, y, queued, .. },
-                    ignore_command_limits,
-                } if *player_id == self.player_id
-                    && *ignore_command_limits
-                    && !*queued
-                    && (*x, *y) == expected_destination
-            )
-    }
-
     fn destination_for_phase(&self, phase: u32) -> (f32, f32) {
         if phase.is_multiple_of(2) {
             self.endpoint_b
@@ -111,6 +145,34 @@ impl DiagonalShuttle {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) enum LabScenarioAction {
+    Command(LabScenarioCommand),
+    LabOperation { request_id: u32, op: LabOp },
+}
+
+impl LabScenarioAction {
+    fn matches_replay_entry(&self, entry: &LabReplayOperationEntry) -> bool {
+        match self {
+            Self::Command(command) => {
+                entry.request_id == command.request_id
+                    && entry.op
+                        == (LabReplayOperation::IssueCommandAs {
+                            player_id: command.player_id,
+                            cmd: command.command.clone(),
+                            ignore_command_limits: command.options.ignore_command_limits,
+                        })
+            }
+            Self::LabOperation { request_id, op } => {
+                entry.request_id == *request_id
+                    && lab_op_to_replay_operation(op).is_some_and(|replay_op| entry.op == replay_op)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LabScenarioCommand {
     pub(crate) request_id: u32,
     pub(crate) player_id: u32,
@@ -128,6 +190,8 @@ fn shuttle_endpoint(x_dir: f32, y_dir: f32) -> (f32, f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_sim::game::entity::EntityKind;
+    use rts_sim::game::lab::LabSpawnEntity;
 
     fn move_entry(player_id: u32, tick: u32, destination: (f32, f32)) -> LabReplayOperationEntry {
         LabReplayOperationEntry {
@@ -149,20 +213,62 @@ mod tests {
     }
 
     #[test]
-    fn seek_sync_only_recognizes_the_scripted_shuttle_command() {
-        let mut driver = LabScenarioDriver::supply_300_hellhole();
+    fn replay_matching_only_recognizes_the_exact_scripted_shuttle_command() {
+        let driver = LabScenarioDriver::supply_300_hellhole();
         let scripted_destination = driver.shuttles[0].destination_for_phase(1);
         let mut user_entry = move_entry(3, LEG_TICKS, (0.0, 0.0));
+        let action = LabScenarioAction::Command(LabScenarioCommand {
+            request_id: LEG_TICKS + 1,
+            player_id: 3,
+            command: Command::Move {
+                units: vec![1],
+                x: scripted_destination.0,
+                y: scripted_destination.1,
+                queued: false,
+            },
+            options: LabCommandOptions {
+                ignore_command_limits: true,
+            },
+        });
 
-        driver.sync_to_tick(LEG_TICKS, std::slice::from_ref(&user_entry));
-        assert_eq!(driver.last_issued_tick, None);
+        assert!(!action.matches_replay_entry(&user_entry));
 
         user_entry = move_entry(3, LEG_TICKS, scripted_destination);
-        driver.sync_to_tick(LEG_TICKS, std::slice::from_ref(&user_entry));
-        assert_eq!(driver.last_issued_tick, Some(LEG_TICKS));
+        assert!(action.matches_replay_entry(&user_entry));
 
         user_entry.request_id += 1;
-        driver.sync_to_tick(LEG_TICKS, &[user_entry]);
-        assert_eq!(driver.last_issued_tick, None);
+        assert!(!action.matches_replay_entry(&user_entry));
+    }
+
+    #[test]
+    fn retained_spawn_action_is_filtered_independently() {
+        let action = LabScenarioAction::LabOperation {
+            request_id: 7,
+            op: LabOp::SpawnEntities(vec![LabSpawnEntity {
+                owner: 1,
+                kind: EntityKind::Rifleman,
+                x: 320.0,
+                y: 320.0,
+                completed: true,
+            }]),
+        };
+        let replay_op = lab_op_to_replay_operation(match &action {
+            LabScenarioAction::LabOperation { op, .. } => op,
+            _ => unreachable!(),
+        })
+        .unwrap();
+        let entry = LabReplayOperationEntry {
+            sequence: 0,
+            tick: 0,
+            request_id: 7,
+            operator_id: 99,
+            op: replay_op,
+        };
+        let mut driver = LabScenarioDriver::scripted_for_test(0, action);
+        driver.sync_to_tick(0, &[entry]);
+        let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SUPPLY_300_HELLHOLE_ID)
+            .expect("hellhole scenario");
+        let game = scenario.build_game().expect("hellhole game");
+        assert!(driver.actions_for_tick(&game).is_empty());
     }
 }

@@ -14,7 +14,7 @@ use crate::protocol::{default_snapshot_codec, encode_snapshot_frame, Event, Snap
 use rts_sim::perf;
 
 use super::hellhole_snapshot_stream::{
-    build_hellhole_game, enqueue_hellhole_shuttles, union_events, TICK_RATE_HZ,
+    apply_hellhole_scenario_actions, build_hellhole_game, union_events, TICK_RATE_HZ,
 };
 
 const DEFAULT_TICKS: u32 = 900;
@@ -162,7 +162,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
 
     while game.tick_count() < config.ticks {
         let round_trip_started = Instant::now();
-        enqueue_hellhole_shuttles(&mut game, &mut driver)?;
+        apply_hellhole_scenario_actions(&mut game, &mut driver)?;
 
         let tick_started = Instant::now();
         let event_sets = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()))
