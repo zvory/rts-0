@@ -42,8 +42,8 @@ export const MATRIX_VIEWPORT_PRESETS = Object.freeze({
   large: Object.freeze({ label: "large", width: 1920, height: 1080 }),
 });
 const DEFAULT_MATRIX_VIEWPORTS = Object.freeze([MATRIX_VIEWPORT_PRESETS.default]);
-export const RENDER_TARGET_FPS = 120;
-export const RENDER_FRAME_BUDGET_MS = 8.33;
+export const RENDER_TARGET_FPS = 240;
+export const RENDER_FRAME_BUDGET_MS = 4.17;
 export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
   Object.freeze({ fps: 60, frameBudgetMs: 16.67 }),
   Object.freeze({ fps: 120, frameBudgetMs: 8.33 }),
@@ -489,7 +489,7 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
   const warnings = [];
   if (nextMissedBudget) {
     const missedByMs = Math.abs(nextMissedBudget.p95MarginMs);
-    const clears120 = frameWorkP95Ms != null && frameWorkP95Ms <= RENDER_FRAME_BUDGET_MS;
+    const clearsTarget = frameWorkP95Ms != null && frameWorkP95Ms <= RENDER_FRAME_BUDGET_MS;
     warnings.push({
       kind: nextMissedBudget.fps <= RENDER_TARGET_FPS
         ? "frame_work_p95_over_budget"
@@ -498,8 +498,8 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
       fps: nextMissedBudget.fps,
       frameBudgetMs: nextMissedBudget.frameBudgetMs,
       p95MarginMs: nextMissedBudget.p95MarginMs,
-      message: clears120
-        ? `frame.work p95 ${formatMs(frameWorkP95Ms)} clears 120 FPS locally but misses the ${nextMissedBudget.fps} FPS headroom budget by ${formatMs(missedByMs)}`
+      message: clearsTarget
+        ? `frame.work p95 ${formatMs(frameWorkP95Ms)} clears ${RENDER_TARGET_FPS} FPS locally but misses the ${nextMissedBudget.fps} FPS headroom budget by ${formatMs(missedByMs)}`
         : `frame.work p95 ${formatMs(frameWorkP95Ms)} misses the ${nextMissedBudget.fps} FPS budget by ${formatMs(missedByMs)}`,
     });
   }
