@@ -33,10 +33,9 @@ fn cancel_command_distinguishes_construction_from_legacy_production_scope() {
         }
     ));
 
-    let construction: Command = serde_json::from_str(
-        r#"{"c":"cancel","building":7,"construction":true}"#,
-    )
-    .expect("construction cancel");
+    let construction: Command =
+        serde_json::from_str(r#"{"c":"cancel","building":7,"construction":true}"#)
+            .expect("construction cancel");
     assert!(matches!(
         construction,
         Command::Cancel {
