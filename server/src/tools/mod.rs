@@ -3,3 +3,4 @@
 pub mod ai_perf_harness;
 pub mod hellhole_perf_harness;
 pub mod hellhole_snapshot_stream;
+pub mod hellhole_spec;

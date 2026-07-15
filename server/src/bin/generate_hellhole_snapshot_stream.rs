@@ -26,12 +26,15 @@ fn main() {
 
     match write_hellhole_snapshot_stream(&output, frame_count) {
         Ok(summary) => println!(
-            "wrote {}: {} frames, ticks {}..={}, {} entities, {} bytes",
+            "wrote {}: {} frames, ticks {}..={}, {} initial entities, {} deaths, {} respawns, minimum {} entities, {} bytes",
             output.display(),
             summary.frame_count,
             summary.first_tick,
             summary.last_tick,
             summary.initial_entity_count,
+            summary.death_events,
+            summary.respawned_units,
+            summary.minimum_entity_count,
             summary.byte_len,
         ),
         Err(err) => {

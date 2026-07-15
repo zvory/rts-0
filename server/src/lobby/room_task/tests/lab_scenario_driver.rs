@@ -38,7 +38,7 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
                     cmd: Command::Move { units, .. },
                     ignore_command_limits,
                 } => {
-                    assert_eq!(units.len(), 85);
+                    assert_eq!(units.len(), 43);
                     assert!(*ignore_command_limits);
                     *player_id
                 }
@@ -65,6 +65,78 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
         .expect("scripted commands should produce a valid replay artifact");
     task.load_lab_replay_artifact(99, artifact)
         .expect("scripted replay artifact should rebuild");
+    assert!(task.lab_driver.is_none());
+}
+
+#[test]
+fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
+    let mut config = lab_config();
+    config.scenario = Some("supply-300-hellhole".to_string());
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        RoomMode::Lab(config),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, _writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+
+    task.apply_lab_scenario_actions();
+    assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 2);
+
+    let victim = lab_snapshot(&task)
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == "tank")
+        .map(|entity| entity.id)
+        .unwrap();
+    assert!(
+        task.apply_and_record_lab_operation(
+            99,
+            6001,
+            "deleteEntity".to_string(),
+            LabOp::DeleteEntity { entity_id: victim },
+        )
+        .ok
+    );
+    assert_eq!(lab_snapshot(&task).entities.len(), 379);
+
+    task.on_tick(tokio::time::Instant::now());
+    task.apply_lab_scenario_actions();
+    let entries = task.lab_timeline.as_ref().unwrap().replay_entries();
+    assert_eq!(entries.len(), 4);
+    assert_eq!(
+        entries
+            .iter()
+            .filter(|entry| matches!(
+                &entry.op,
+                crate::protocol::LabReplayOperation::IssueCommandAs {
+                    cmd: Command::Move { units, .. },
+                    ..
+                } if units.len() == 43
+            ))
+            .count(),
+        2
+    );
+    assert!(entries.iter().any(|entry| matches!(
+        &entry.op,
+        crate::protocol::LabReplayOperation::SpawnEntities { spawns } if !spawns.is_empty()
+    )));
+    assert_eq!(lab_snapshot(&task).entities.len(), 380);
+
+    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(1));
+    assert_eq!(lab_snapshot(&task).entities.len(), 380);
+    task.apply_lab_scenario_actions();
+    assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 4);
+
+    let artifact = task
+        .export_lab_replay_artifact(99, Some("Hellhole churn replay"))
+        .unwrap();
+    task.load_lab_replay_artifact(99, artifact).unwrap();
+    assert_eq!(lab_snapshot(&task).entities.len(), 380);
     assert!(task.lab_driver.is_none());
 }
 
@@ -102,7 +174,12 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
 
     task.apply_lab_scenario_actions();
     task.apply_lab_scenario_actions();
-    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    assert!(lab_snapshot(&task).entities.iter().any(|entity| {
+        entity.owner == 1
+            && entity.kind == "rifleman"
+            && (entity.x - 10.0 * 32.0).abs() < 0.1
+            && (entity.y - 10.0 * 32.0).abs() < 0.1
+    }));
     let timeline = task.lab_timeline.as_ref().expect("lab timeline");
     assert_eq!(timeline.replay_entry_count(), 1);
     assert!(matches!(
@@ -116,7 +193,12 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
     ));
 
     task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
-    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    assert!(lab_snapshot(&task).entities.iter().any(|entity| {
+        entity.owner == 1
+            && entity.kind == "rifleman"
+            && (entity.x - 10.0 * 32.0).abs() < 0.1
+            && (entity.y - 10.0 * 32.0).abs() < 0.1
+    }));
     task.apply_lab_scenario_actions();
     assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 1);
     assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
@@ -166,7 +248,12 @@ fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
 
     task.on_tick(tokio::time::Instant::now());
     task.on_tick(tokio::time::Instant::now());
-    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    assert!(lab_snapshot(&task).entities.iter().any(|entity| {
+        entity.owner == 1
+            && entity.kind == "rifleman"
+            && (entity.x - 10.0 * 32.0).abs() < 0.1
+            && (entity.y - 10.0 * 32.0).abs() < 0.1
+    }));
     assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 1);
 
     task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
@@ -174,7 +261,12 @@ fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
     task.on_tick(tokio::time::Instant::now());
     task.on_tick(tokio::time::Instant::now());
 
-    assert_eq!(lab_snapshot(&task).entities.len(), initial_entity_count + 1);
+    assert!(lab_snapshot(&task).entities.iter().any(|entity| {
+        entity.owner == 1
+            && entity.kind == "rifleman"
+            && (entity.x - 10.0 * 32.0).abs() < 0.1
+            && (entity.y - 10.0 * 32.0).abs() < 0.1
+    }));
     let timeline = task.lab_timeline.as_ref().unwrap();
     assert_eq!(timeline.replay_entry_count(), 1);
     assert_eq!(timeline.replay_entries()[0].tick, 1);

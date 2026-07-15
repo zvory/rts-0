@@ -606,25 +606,34 @@ use schema 2 and contain no in-progress construction that needs a receipt backfi
 
 The canonical Hellhole server benchmark is a direct `Game`-API harness, not a live room. Running
 `scripts/hellhole-perf-harness.sh` restores `supply-300-hellhole`, issues its deterministic Lab
-movement commands through the public Lab command seam, calls `tick()`, and produces one full-world
-snapshot through the normal compaction and MessagePack encoding path for every tick. It starts no
+movement commands through the public Lab command seam, replenishes missing central units through a
+single replayable `SpawnEntities` batch before the next tick, calls `tick()`, and produces one
+full-world snapshot through the normal compaction and MessagePack encoding path for every tick. It starts no
 HTTP listener, WebSocket, or browser and does not pace itself from wall time, so a slow renderer
 cannot become its bottleneck. The separate checked-in snapshot stream is the client-only lane. A
 live Lab server and Pixi client may be run together only through the explicit `--integrated` mode
 for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
-The server-performance goal for this benchmark is at least **8.0× real time** on the designated
-local reference MacBook (currently MacBook Pro `Mac17,8`, Apple M5 Pro) when running the default
-900-tick release workload on one serial execution lane. Simulation, full-world projection,
-compaction, and MessagePack encoding must remain on that single lane; parallel workers, Rayon, or
-subsystem fan-out across cores do not satisfy the goal. macOS may migrate the serial thread between
-cores, so "single core" means no simultaneous benchmark work on multiple cores rather than fixed
-CPU affinity. For 900 ticks, 8.0× means completing 30 simulated seconds in at most 3.75 wall-clock
-seconds, with average API round-trip work at or below 4.167 ms. Merely staying below the ordinary
-33.3 ms live tick interval is not success: the local headroom target exists because deployment
-hardware is materially weaker than the reference MacBook. Profile and optimize the serial path
-until the target is met; use live-room, multi-room, AI, and deployment measurements as additional
-evidence, not substitutes for this isolation gate.
+The churn driver runs before every tick. Players 1 and 2 are mortal; the driver tracks their
+authoritative unit ids and original kinds, reconciles same-id Panzerfaust conversion, and restores
+each owner's canonical 85-unit roster. A replacement that dies during its first tick is recovered by
+the owner-count backstop even though the driver never observed its id. Placement considers at most
+504 nearest-center candidates, builds body occupancy once per missing request, accounts for earlier
+planned spawns, and emits at most one spawn batch. Unresolved requests are reported and retried.
+`Game::lab_owned_units` and `Game::lab_plan_unit_spawns` are the typed Lab queries at this seam;
+callers do not inspect simulation stores.
+
+Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 85
+ids from scenario seed, player, epoch, and id, selects exactly 43, and sends one unqueued move to a
+deterministically selected passable integer tile in the active diagonal endpoint corridor. The
+endpoint leg still changes every 900 ticks. Request ids, selection, jitter, and replay operations are
+deterministic across fresh runs and Lab seek reconstruction.
+
+The former static Hellhole's 8.0x target is not comparable to this churn workload: that fixture sent
+two full-army commands in 900 ticks and could not exercise death or path-request admission. Treat the
+new counters and serial timings as a measured regression baseline until repeated reference-machine
+runs establish a replacement headroom gate. Keep simulation, projection, compaction, encoding, and
+driver work on the same serial lane, and do not hide driver cost outside the measured round trip.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.

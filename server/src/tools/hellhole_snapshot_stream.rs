@@ -9,14 +9,12 @@ use crate::lobby::lab_scenario_driver::{
     lab_scenario_driver_for, LabScenarioAction, LabScenarioDriver,
 };
 use crate::protocol::{serialize_messagepack_compact_snapshot, Event};
+use crate::tools::hellhole_spec::{CENTER, SCENARIO_ID};
 
-pub const STREAM_ID: &str = "supply-300-hellhole";
+pub const STREAM_ID: &str = SCENARIO_ID;
 pub const DEFAULT_FRAME_COUNT: u32 = 900;
 pub const TICK_RATE_HZ: u32 = 30;
 pub const MAGIC: &[u8; 8] = b"RTSSTRM1";
-
-const TILE: f32 = 32.0;
-const CENTER_TILE: f32 = 63.0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotStreamSummary {
@@ -25,6 +23,26 @@ pub struct SnapshotStreamSummary {
     pub last_tick: u32,
     pub initial_entity_count: usize,
     pub byte_len: usize,
+    pub death_events: usize,
+    pub respawned_units: usize,
+    pub minimum_entity_count: usize,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HellholeActionCounts {
+    pub(crate) shuttle_commands: usize,
+    pub(crate) selected_units: usize,
+    pub(crate) respawn_batches: usize,
+    pub(crate) respawned_units: usize,
+}
+
+impl HellholeActionCounts {
+    pub(crate) fn add(&mut self, other: Self) {
+        self.shuttle_commands += other.shuttle_commands;
+        self.selected_units += other.selected_units;
+        self.respawn_batches += other.respawn_batches;
+        self.respawned_units += other.respawned_units;
+    }
 }
 
 pub fn write_hellhole_snapshot_stream(
@@ -67,8 +85,8 @@ pub fn generate_hellhole_snapshot_stream(
             "sourceScenario": STREAM_ID,
             "serverSimulation": false,
             "initialCamera": {
-                "centerX": CENTER_TILE * TILE,
-                "centerY": CENTER_TILE * TILE
+                "centerX": CENTER.0,
+                "centerY": CENTER.1
             }
         }),
     );
@@ -76,11 +94,20 @@ pub fn generate_hellhole_snapshot_stream(
     let mut frames = Vec::with_capacity(frame_count as usize);
     let mut first_tick = 0;
     let mut last_tick = 0;
+    let mut death_events = 0;
+    let mut action_counts = HellholeActionCounts::default();
+    let mut minimum_entity_count = initial_entity_count;
     for index in 0..frame_count {
-        apply_hellhole_scenario_actions(&mut game, &mut driver)?;
+        action_counts.add(apply_hellhole_scenario_actions(&mut game, &mut driver)?);
         let event_sets = game.tick();
         let mut snapshot = game.snapshot_full_for(1);
         snapshot.events = union_events(event_sets.iter().map(|(_, events)| events));
+        death_events += snapshot
+            .events
+            .iter()
+            .filter(|event| matches!(event, Event::Death { .. }))
+            .count();
+        minimum_entity_count = minimum_entity_count.min(snapshot.entities.len());
         snapshot.net_status = Default::default();
         if index == 0 {
             first_tick = snapshot.tick;
@@ -128,6 +155,9 @@ pub fn generate_hellhole_snapshot_stream(
         last_tick,
         initial_entity_count,
         byte_len: bytes.len(),
+        death_events,
+        respawned_units: action_counts.respawned_units,
+        minimum_entity_count,
     };
     Ok((bytes, summary))
 }
@@ -143,17 +173,29 @@ pub(crate) fn build_hellhole_game() -> Result<(rts_sim::game::Game, LabScenarioD
 pub(crate) fn apply_hellhole_scenario_actions(
     game: &mut rts_sim::game::Game,
     driver: &mut LabScenarioDriver,
-) -> Result<(), String> {
+) -> Result<HellholeActionCounts, String> {
+    let mut counts = HellholeActionCounts::default();
     for action in driver.actions_for_tick(game) {
         let result = match action {
             LabScenarioAction::Command(command) => {
+                counts.shuttle_commands += 1;
+                counts.selected_units += match &command.command {
+                    crate::protocol::Command::Move { units, .. } => units.len(),
+                    _ => 0,
+                };
                 game.issue_lab_command_as(command.player_id, command.command, command.options)
             }
-            LabScenarioAction::LabOperation { op, .. } => game.apply_lab_op(op).map(|_| ()),
+            LabScenarioAction::LabOperation { op, .. } => {
+                if let rts_sim::game::lab::LabOp::SpawnEntities(spawns) = &op {
+                    counts.respawn_batches += 1;
+                    counts.respawned_units += spawns.len();
+                }
+                game.apply_lab_op(op).map(|_| ())
+            }
         };
         result.map_err(|err| format!("failed to apply Hellhole scenario action: {err:?}"))?;
     }
-    Ok(())
+    Ok(counts)
 }
 
 pub(crate) fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>) -> Vec<Event> {
@@ -219,5 +261,17 @@ mod tests {
     #[test]
     fn default_artifact_covers_thirty_seconds() {
         assert_eq!(DEFAULT_FRAME_COUNT / TICK_RATE_HZ, 30);
+    }
+
+    #[test]
+    fn generated_churn_is_deterministic_and_contains_death_respawn_frames() {
+        let (first_bytes, first) = generate_hellhole_snapshot_stream(120).unwrap();
+        let (second_bytes, second) = generate_hellhole_snapshot_stream(120).unwrap();
+        assert_eq!(first_bytes, second_bytes);
+        assert_eq!(first, second);
+        assert!(first.death_events > 0);
+        assert!(first.death_events >= first.respawned_units);
+        assert!(first.death_events - first.respawned_units <= 10);
+        assert!(first.minimum_entity_count < first.initial_entity_count);
     }
 }

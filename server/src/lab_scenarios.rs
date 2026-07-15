@@ -975,7 +975,7 @@ mod tests {
         lab_scenario_payload_to_lab_op(loaded.scenario.clone())
             .expect("checkpoint scenario should fit import cap");
         let metadata = lab_scenario_payload_lab_metadata(&loaded.scenario);
-        assert_eq!(metadata.god_mode_players, vec![1, 2, 3, 4]);
+        assert_eq!(metadata.god_mode_players, vec![3, 4]);
         assert!(matches!(metadata.vision, LabVisionMode::All));
         assert_eq!(
             metadata
@@ -990,7 +990,7 @@ mod tests {
             .expect("supply-300-hellhole scenario should restore through lab APIs");
         assert_eq!(game.seed(), 0x5a00_0300);
         assert_eq!(game.start_payload().players.len(), 4);
-        assert_eq!(game.lab_god_mode_players(), vec![1, 2, 3, 4]);
+        assert_eq!(game.lab_god_mode_players(), vec![3, 4]);
         assert_eq!(game.perf_entity_counts().entities, 380);
 
         let start = game.start_payload();
