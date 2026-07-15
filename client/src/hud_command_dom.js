@@ -45,6 +45,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
  * @param {number} [opts.autobuildIndicatorCount] evenly-spaced rotating auto-build indicators.
  * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
+ * @param {boolean} [opts.shiftContextAction] whether Shift+hotkey invokes the context action.
  * @param {() => void} [opts.onMouseEnter] hover handler.
  * @param {() => void} [opts.onMouseLeave] hover-exit handler.
  * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
@@ -86,6 +87,7 @@ export function createCommandButton(opts) {
   }
   if (typeof opts.onContextMenu === "function") {
     btn.dataset.contextAction = "true";
+    if (opts.shiftContextAction) btn.dataset.shiftContextAction = "true";
     btn.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       opts.onContextMenu(ev);
