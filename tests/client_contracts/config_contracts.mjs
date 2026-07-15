@@ -171,7 +171,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "client config public export names remain stable across internal splits",
   );
   assert(MINING_CC_RANGE_TILES === 9, "client mirrors the server mining City Centre range");
-  assert(STATS[KIND.CITY_CENTRE].cost.steel === 225, "City Centre cost mirrors server");
+  assert(STATS[KIND.CITY_CENTRE].cost.steel === 350, "City Centre cost mirrors server");
   assert(
     Array.isArray(STATS[KIND.FACTORY].requires),
     "Vehicle Works should expose all server-side build prerequisites",
