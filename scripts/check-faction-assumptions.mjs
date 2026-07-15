@@ -310,6 +310,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/world_query.rs",
   "server/crates/sim/src/game/setup.rs",
   "server/crates/sim/src/game/setup/dev_scenarios.rs",
+  // Replay-derived Factory fixture intentionally enumerates today's vehicle roster; public
+  // faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/factory_wall_rally_spawn.rs",
   // Panzerfaust inspection scenarios deliberately seed current Tank/Rifleman interactions as
   // no-fog dev fixtures; public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/panzerfaust.rs",
