@@ -230,7 +230,11 @@ It fails on runtime errors or missing perf summaries, not on absolute FPS thresh
 suite writes per-workload summaries and a `target/client-perf/render-lag-comparison/<timestamp>/`
 rollup with advisory 60, 120, 240, and 480 FPS frame-work budget margins plus the next missed p95
 budget. The actual target is 240 FPS/4.17 ms; 60 and 120 FPS are lower diagnostic bands, and 480 FPS
-is the headroom band. Open a generated `summary.json` to inspect workload metadata, build/version, viewport,
+is the headroom band. The 240 FPS target is a reference-machine proxy for approximately 60 FPS on
+hardware with one quarter of the performance. It must be met with the same full-fidelity frame and
+cadence, not reduced update rates, stale presentation, cross-frame staggering, or work moved outside
+the measured frame without accounting for its scheduling cost. Open a generated `summary.json` to
+inspect workload metadata, build/version, viewport,
 entity/context counts, `renderBudget`, frame attribution, `frame.unattributed`,
 `frame.rafDispatch`, frame timing aggregates, worst phases, page errors, and the generated client
 net report.

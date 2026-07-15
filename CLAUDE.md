@@ -149,7 +149,13 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   Inspect the returned PNG and ranked JSON together with the harness frame-budget summary, then
   read the hottest functions before writing phases. Use `supply-300-hellhole-stream` for the
   repeatable renderer-isolation baseline and an active-player workload when making production-cap
-  claims; neither substitutes for the other.
+  claims; neither substitutes for the other. The 240 FPS/4.17 ms reference-machine target is a
+  headroom proxy for roughly 60 FPS on hardware with one quarter of the performance, not a license
+  to reduce presentation fidelity or cadence. Do not claim progress by reconciling entities, fog,
+  animation, or overlays less often; intentionally presenting stale state; staggering one logical
+  frame across multiple frames; or moving main-thread work outside the measured frame without
+  accounting for its scheduling impact. Exact caching, batching, culling, or redundant-work
+  elimination is valid only when every frame keeps the same state, timing semantics, and pixels.
 - Rendering optimization parity: sample at least 12 randomly selected deterministic ticks and
   capture each tick before and after with identical state, viewport, DPR, render clock, and ready
   assets. Compare decoded pixels exactly; any changed pixel must fail the check unless the visual

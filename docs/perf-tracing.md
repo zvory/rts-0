@@ -363,8 +363,11 @@ incident replays are analysis evidence only and are not replay-harness workloads
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
 per-budget margins and the next missed p95 budget. The actual target is 240 FPS (4.17 ms of
-frame work); 60 and 120 FPS remain lower diagnostic bands, while 480 FPS is the headroom band. The
-same block includes `frameAttribution`,
+frame work) on the reference machine. This is a headroom proxy: if the same complete frame costs
+roughly four times as much on materially slower hardware, 4.17 ms becomes approximately the 16.67 ms
+budget for 60 FPS. It is not a claim that the reference browser must literally present at 240 Hz,
+nor a portable certification of a particular player machine. The 60 and 120 FPS bands remain lower
+diagnostics, while 480 FPS is the headroom band. The same block includes `frameAttribution`,
 which reports top-level named work, `frame.unattributed` average/p95/max, `frame.rafDispatch`, and
 the average percentage of `frame.work` covered by named top-level phases. It also includes a local-only
 `renderDiagnostics` block with the counter groups above, recent long-frame context, and the largest
@@ -406,6 +409,16 @@ under that budget; a negative margin shows how far it missed. The 240 FPS/4.17 m
 target. The 60 and 120 FPS results remain useful intermediate diagnostics, but clearing either does
 not satisfy the target. A workload with p95 near 4.17 ms is only barely clearing 240 locally and
 should still be treated as risky for weaker hardware if it misses the 480 FPS headroom band.
+
+The target applies to the full-fidelity frame, not a reduced-cadence approximation. An optimization
+does not count toward the 4.17 ms goal if it reconciles entities, fog, animation, or overlays less
+often; intentionally shows stale state; staggers one logical frame's work across multiple frames; or
+moves main-thread work outside measured `frame.work` without accounting for the resulting dispatch,
+frame-gap, and end-to-end presentation cost. Exact caching, batching, offscreen culling, and other
+redundant-work elimination are valid only when each frame reflects the same current state with no
+added latency and the deterministic pixel-parity gate remains exact. Use average, p95, max, frame
+gaps, and RAF-dispatch evidence together so an infrequent expensive path cannot masquerade as a
+four-times throughput improvement.
 
 Use `frame.work` average, p95, and max instead of literal local `requestAnimationFrame` FPS for
 branch comparisons. Local RAF FPS is constrained by display refresh rate, browser scheduling,
