@@ -285,6 +285,23 @@ impl Game {
         unit_count: usize,
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
+        Self::new_command_car_corner_scenario_with_goal(unit, unit_count, seed, false)
+    }
+
+    pub fn new_command_car_corner_south_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        Self::new_command_car_corner_scenario_with_goal(unit, unit_count, seed, true)
+    }
+
+    fn new_command_car_corner_scenario_with_goal(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+        goal_is_south: bool,
+    ) -> Result<DevScenarioSetup, String> {
         if unit != EntityKind::CommandCar {
             return Err(format!("unsupported building-corner unit {unit}"));
         }
@@ -294,8 +311,16 @@ impl Game {
             ));
         }
 
-        let (map, start_tile, buildings, unit_start, unit_facing, goal) =
+        let (map, start_tile, buildings, unit_start, unit_facing, northwest_goal) =
             command_car_building_corner_map();
+        let (goal, checkpoint_name) = if goal_is_south {
+            (
+                (unit_start.0, unit_start.1 + config::TILE_SIZE as f32 * 10.0),
+                "dev:command_car_building_corner_south",
+            )
+        } else {
+            (northwest_goal, "dev:command_car_building_corner")
+        };
         let mut entities = EntityStore::new();
         for (kind, x, y) in buildings {
             entities
@@ -310,14 +335,8 @@ impl Game {
         }
 
         let player_id = 1;
-        let game = build_dev_scenario_game(
-            map,
-            entities,
-            player_id,
-            start_tile,
-            seed,
-            "dev:command_car_building_corner",
-        );
+        let game =
+            build_dev_scenario_game(map, entities, player_id, start_tile, seed, checkpoint_name);
 
         DevScenarioSetup {
             game,
@@ -326,7 +345,7 @@ impl Game {
             goal,
             issue_after_ticks: config::TICK_HZ,
         }
-        .checkpoint_backed("dev:command_car_building_corner")
+        .checkpoint_backed(checkpoint_name)
     }
 
     pub fn new_tank_trap_line_build_scenario(

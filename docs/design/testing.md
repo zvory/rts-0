@@ -146,6 +146,8 @@ Current scenario ids:
 - `factory_zero_gap_perpendicular` — one vehicle starting flush against a factory and moving east.
 - `command_car_building_corner` — one Command Car entering the reduced three-building corner from
   the Soupman match reproduction.
+- `command_car_building_corner_south` — the identical Command Car corner reproduction with its
+  target exactly ten tiles south of its starting position.
 - `factory_wall_rally_spawn` — one completed Factory vehicle spawning below a two-tile terrain wall
   and rallying almost due west, matching replay 104 tick 7923 geometry.
 - `tank_trap_line_horizontal` — Training Centre, engineers, one rifleman, and one vehicle for

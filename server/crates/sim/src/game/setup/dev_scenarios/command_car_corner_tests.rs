@@ -62,8 +62,30 @@ fn matches_reduced_reproduction_layout() {
 
 #[test]
 fn backs_out_and_completes_route() {
-    let mut setup = Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
+    let setup = Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
         .expect("scenario setup should succeed");
+    assert_completes_route(setup, true);
+}
+
+#[test]
+fn south_variant_targets_ten_tiles_down_and_completes_route() {
+    let setup = Game::new_command_car_corner_south_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
+        .expect("south scenario setup should succeed");
+    let command_car = setup
+        .game
+        .state
+        .entities
+        .get(setup.units[0])
+        .expect("scenario Command Car should exist");
+    assert_eq!(setup.goal.0, command_car.pos_x);
+    assert_eq!(
+        setup.goal.1,
+        command_car.pos_y + config::TILE_SIZE as f32 * 10.0
+    );
+    assert_completes_route(setup, false);
+}
+
+fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: bool) {
     for _ in 0..setup.issue_after_ticks {
         setup.game.tick();
     }
@@ -97,10 +119,12 @@ fn backs_out_and_completes_route() {
         after_first_tick.pos_y - start.1,
     );
     let forward = (start.2.cos(), start.2.sin());
-    assert!(
-        first_delta.0 * forward.0 + first_delta.1 * forward.1 < 0.0,
-        "the first maneuver should reverse toward the route exit, got delta {first_delta:?}"
-    );
+    if expect_initial_reverse {
+        assert!(
+            first_delta.0 * forward.0 + first_delta.1 * forward.1 < 0.0,
+            "the first maneuver should reverse toward the route exit, got delta {first_delta:?}"
+        );
+    }
 
     let mut arrived_tick = None;
     for tick in 2..=600 {
