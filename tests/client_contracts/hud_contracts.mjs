@@ -273,7 +273,8 @@ function fakeHudRootWithoutResourceSpans() {
     { type: "cancelConstruction", buildingId: 91 },
   );
   assert(
-    issued.length === 1 && issued[0].c === "cancel" && issued[0].building === 91,
+    issued.length === 1 && issued[0].c === "cancel" && issued[0].building === 91 &&
+      issued[0].construction === true,
     "construction cancellation should issue the authoritative building cancel command",
   );
 }

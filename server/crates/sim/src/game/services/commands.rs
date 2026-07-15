@@ -547,8 +547,11 @@ pub(in crate::game) fn apply_commands(
                     notice(events, player, "Production queue full");
                 }
             }
-            SimCommand::Cancel { building } => {
-                order_cancel(entities, players, player, building);
+            SimCommand::Cancel {
+                building,
+                construction,
+            } => {
+                order_cancel(entities, players, player, building, construction);
             }
             SimCommand::Stop { units } => {
                 let Some(units) =
@@ -1834,11 +1837,12 @@ fn order_cancel(
     players: &mut [PlayerState],
     player: u32,
     building: u32,
+    construction: bool,
 ) {
     let Some(ps) = players.iter_mut().find(|candidate| candidate.id == player) else {
         return;
     };
-    let Some(cancelled) = cancel::apply(entities, player, building) else {
+    let Some(cancelled) = cancel::apply(entities, player, building, construction) else {
         return;
     };
     match cancelled {

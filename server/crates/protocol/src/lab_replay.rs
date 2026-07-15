@@ -576,7 +576,7 @@ fn validate_command(
         }
         Command::Train { building, .. }
         | Command::Research { building, .. }
-        | Command::Cancel { building } => {
+        | Command::Cancel { building, .. } => {
             validate_entity_id(*building, "command.building", state)?;
         }
         Command::SetRally { building, x, y, .. } => {

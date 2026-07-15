@@ -281,7 +281,13 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
         &map,
         &mut entities,
         &mut players,
-        vec![(1, SimCommand::Cancel { building: barracks })],
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: barracks,
+                construction: false,
+            },
+        )],
     );
 
     assert!(entities
@@ -735,7 +741,13 @@ fn cancel_train_removes_latest_queued_unit_without_resetting_active_progress() {
         &map,
         &mut entities,
         &mut players,
-        vec![(1, SimCommand::Cancel { building: barracks })],
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: barracks,
+                construction: false,
+            },
+        )],
     );
 
     let queue = entities.get(barracks).expect("barracks").prod_queue();
@@ -833,7 +845,13 @@ fn manual_training_appends_behind_repeated_unit_and_cancel_clears_repeat() {
         &map,
         &mut entities,
         &mut players,
-        vec![(1, SimCommand::Cancel { building: barracks })],
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: barracks,
+                construction: false,
+            },
+        )],
     );
     let producer = entities.get(barracks).expect("barracks");
     assert!(producer

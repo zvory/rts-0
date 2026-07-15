@@ -35,7 +35,13 @@ fn cancel_unfinished_building_refunds_full_cost_and_releases_builder() {
         &map,
         &mut entities,
         &mut players,
-        vec![(1, SimCommand::Cancel { building: site })],
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: site,
+                construction: true,
+            },
+        )],
     );
 
     assert!(
@@ -95,7 +101,13 @@ fn cancel_unworked_scaffold_refunds_owner_and_rejects_enemy() {
         &map,
         &mut entities,
         &mut players,
-        vec![(2, SimCommand::Cancel { building: site })],
+        vec![(
+            2,
+            SimCommand::Cancel {
+                building: site,
+                construction: true,
+            },
+        )],
     );
     assert!(
         entities.contains(site),
@@ -108,7 +120,13 @@ fn cancel_unworked_scaffold_refunds_owner_and_rejects_enemy() {
         &map,
         &mut entities,
         &mut players,
-        vec![(1, SimCommand::Cancel { building: site })],
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: site,
+                construction: true,
+            },
+        )],
     );
     assert!(
         !entities.contains(site),
@@ -135,7 +153,13 @@ fn cancel_unpaid_authored_scaffold_does_not_refund_or_change_score() {
         &map,
         &mut entities,
         &mut players,
-        vec![(1, SimCommand::Cancel { building: site })],
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: site,
+                construction: true,
+            },
+        )],
     );
 
     assert!(
@@ -145,4 +169,66 @@ fn cancel_unpaid_authored_scaffold_does_not_refund_or_change_score() {
     assert_eq!(players[0].steel, starting_steel);
     assert_eq!(players[0].oil, starting_oil);
     assert_eq!(players[0].score.structure_score, starting_score);
+}
+
+#[test]
+fn cancellation_scope_cannot_cross_from_construction_into_production() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Barracks, 8, 8);
+    let completed = entities
+        .spawn_building(1, EntityKind::Barracks, x, y, true)
+        .expect("completed barracks should spawn");
+    entities
+        .get_mut(completed)
+        .expect("barracks should exist")
+        .push_production(ProdItem {
+            unit: EntityKind::Rifleman,
+            progress: 0,
+            total: 30,
+            paid: true,
+        });
+    let scaffold = entities
+        .spawn_building(1, EntityKind::Depot, x + 160.0, y, false)
+        .expect("depot scaffold should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: completed,
+                construction: true,
+            },
+        )],
+    );
+    assert_eq!(
+        entities
+            .get(completed)
+            .expect("completed building should survive")
+            .prod_queue()
+            .len(),
+        1,
+        "a delayed construction cancellation must not cancel completed-building production"
+    );
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Cancel {
+                building: scaffold,
+                construction: false,
+            },
+        )],
+    );
+    assert!(
+        entities.contains(scaffold),
+        "a production cancellation must not remove an unfinished building"
+    );
 }

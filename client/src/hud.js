@@ -564,7 +564,7 @@ export class HUD {
         return;
       case "cancelConstruction":
         if (Number.isInteger(intent.buildingId)) {
-          this._issueCommand(cmd.cancel(intent.buildingId));
+          this._issueCommand(cmd.cancelConstruction(intent.buildingId));
         }
         return;
       case "research":

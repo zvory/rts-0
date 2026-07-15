@@ -257,6 +257,11 @@ pub enum Command {
     },
     Cancel {
         building: u32,
+        /// Distinguish a construction-cancel intent from the legacy production-cancel action.
+        /// This prevents a delayed construction click from cancelling production after the
+        /// building completes before the command reaches the simulation.
+        #[serde(default, skip_serializing_if = "is_false")]
+        construction: bool,
     },
     Stop {
         units: Vec<u32>,
