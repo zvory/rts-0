@@ -1,49 +1,5 @@
 import path from "node:path";
 
-const ACTIVE_UNIT_ORDER = Object.freeze([
-  "worker",
-  "rifleman",
-  "machine_gunner",
-  "panzerfaust",
-  "anti_tank_gun",
-  "mortar_team",
-  "artillery",
-  "scout_car",
-  "tank",
-  "command_car",
-]);
-
-export const SUPPLY_ACTIVE_WORKLOADS = Object.freeze({
-  200: Object.freeze({
-    scenarioId: "supply_stress_active",
-    scenarioSeed: 0x5a000300,
-    targetSupply: 200,
-    playerId: 1,
-    spectator: false,
-    predictionRequired: true,
-    supplyCap: 50,
-    projectedEntityCount: 135,
-    countsByOwner: Object.freeze({
-      1: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [7, 7, 7, 7, 7, 7, 6, 7, 6, 6][index]]))),
-      2: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [7, 7, 7, 7, 7, 7, 6, 7, 6, 6][index]]))),
-    }),
-  }),
-  300: Object.freeze({
-    scenarioId: "supply_stress_active",
-    scenarioSeed: 0x5a000300,
-    targetSupply: 300,
-    playerId: 1,
-    spectator: false,
-    predictionRequired: true,
-    supplyCap: 50,
-    projectedEntityCount: 201,
-    countsByOwner: Object.freeze({
-      1: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [12, 10, 10, 10, 10, 10, 10, 10, 9, 9][index]]))),
-      2: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [12, 10, 10, 10, 10, 10, 10, 10, 9, 9][index]]))),
-    }),
-  }),
-});
-
 export function buildClientPerfWorkloads(env = process.env) {
   const incidentReplaySource = env.RTS_CLIENT_PERF_INCIDENT_REPLAY
     ? path.resolve(env.RTS_CLIENT_PERF_INCIDENT_REPLAY)
@@ -64,26 +20,6 @@ export function buildClientPerfWorkloads(env = process.env) {
       setup: {
         selectFirstEntities: 4,
         minSelectedCount: 1,
-      },
-    },
-    {
-      id: "supply-200-active",
-      description: "Active predicted player on the exact server-authoritative 200-supply stress setup.",
-      kind: "activeDevScenario",
-      url: "/dev/scenarios?id=supply_stress_active&unit=worker&count=200",
-      setup: {
-        activeSupplyStress: SUPPLY_ACTIVE_WORKLOADS[200],
-        resetPerfAfterSetup: true,
-      },
-    },
-    {
-      id: "supply-300-active",
-      description: "Active predicted player on the exact server-authoritative 300-supply stress setup.",
-      kind: "activeDevScenario",
-      url: "/dev/scenarios?id=supply_stress_active&unit=worker&count=300",
-      setup: {
-        activeSupplyStress: SUPPLY_ACTIVE_WORKLOADS[300],
-        resetPerfAfterSetup: true,
       },
     },
     {
