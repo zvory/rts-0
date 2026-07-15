@@ -135,12 +135,9 @@ fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: b
     }
 
     let mut arrived_tick = None;
-    let mut saw_intermediate_reverse = after_first_tick
-        .movement
-        .as_ref()
-        .is_some_and(|movement| {
-            movement.path.len() > 1 && movement.scout_car_reverse_waypoint.is_some()
-        });
+    let mut saw_intermediate_reverse = after_first_tick.movement.as_ref().is_some_and(|movement| {
+        movement.path.len() > 1 && movement.scout_car_reverse_waypoint.is_some()
+    });
     for tick in 2..=600 {
         setup.game.tick();
         assert_units_do_not_intersect_buildings(&setup.game);
@@ -150,12 +147,9 @@ fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: b
             .entities
             .get(unit_id)
             .expect("scenario Command Car should survive");
-        saw_intermediate_reverse |= command_car
-            .movement
-            .as_ref()
-            .is_some_and(|movement| {
-                movement.path.len() > 1 && movement.scout_car_reverse_waypoint.is_some()
-            });
+        saw_intermediate_reverse |= command_car.movement.as_ref().is_some_and(|movement| {
+            movement.path.len() > 1 && movement.scout_car_reverse_waypoint.is_some()
+        });
         if command_car.path_is_empty() {
             arrived_tick = Some(tick);
             break;
