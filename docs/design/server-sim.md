@@ -529,7 +529,7 @@ Field map for Phase 2 DTO conversion:
 | Runtime field | `GameCheckpointV1` strategy |
 | --- | --- |
 | `map` | Excluded as a body; represented by `mapBinding`. Import writes the exact container-supplied `Map` into `GameState.map` only after binding validation succeeds. |
-| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state, combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
+| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state (including whether an unfinished scaffold's construction cost was paid), combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
 | `fog` | `FogStateV1` live visibility grids per player/team. It is serialized for version 1; a later rebuild-only policy needs a proof before changing this row. |
 | `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
 | `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. |
@@ -1375,7 +1375,10 @@ General rules:
   footprint is legal but the player lacks resources, the worker enters `WaitingAtSite`, clears its
   path, emits one shortage notice when entering the wait, and retries silently until resources are
   available. Waiting does not reserve resources, so another spend can still win the race before the
-  scaffold appears.
+  scaffold appears. Economy-created scaffolds persist a paid-cost receipt: canceling one removes the
+  site, releases every attached builder's active Build order while preserving queued handoffs, and
+  refunds the full building cost without counting a building loss. Lab/authored unpaid scaffolds can
+  still be removed through cancellation but never create resources or reverse structure score.
 - Build-arrival blockers are classified. A building, scaffold, resource node, terrain/out-of-bounds
   footprint, missing tech requirement, unknown building kind, or missing builder eligibility cancels
   the active build order. Relevant unit bodies put the worker in `WaitingAtSite` for up to
