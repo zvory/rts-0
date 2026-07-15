@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::config;
 use crate::game::entity::{
     movement_body_class, uses_oriented_vehicle_body, Entity, EntityKind, EntityStore,
@@ -178,6 +180,49 @@ pub(crate) fn resource_node_building_overlap_allowed(
 ) -> bool {
     build_placement_policy(building_kind) == BuildPlacementPolicy::PumpJackOilOnly
         && pump_jack::oil_node_center_in_rect(node, rect)
+}
+
+pub(crate) fn unit_intersects_building_footprint(
+    entity: &Entity,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> bool {
+    let Some(rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
+        return false;
+    };
+    unit_body_for_entity(entity).is_some_and(|body| unit_body_intersects_rect(body, rect))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn unit_position_clear_of_building_footprint(
+    map: &Map,
+    occupancy: &Occupancy<'_>,
+    entities: &EntityStore,
+    ignored_units: &BTreeSet<u32>,
+    kind: EntityKind,
+    facing: f32,
+    x: f32,
+    y: f32,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> bool {
+    let Some(site_rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
+        return false;
+    };
+    let Some(candidate_body) = unit_body_with_facing(kind, x, y, facing) else {
+        return false;
+    };
+    !unit_body_intersects_rect(candidate_body, site_rect)
+        && unit_static_standable_with_facing(map, occupancy, kind, x, y, facing)
+        && entities.iter().all(|entity| {
+            entity.hp == 0
+                || !entity.is_unit()
+                || ignored_units.contains(&entity.id)
+                || unit_body_for_entity(entity)
+                    .is_none_or(|occupied| !unit_bodies_intersect(candidate_body, occupied))
+        })
 }
 
 #[cfg(test)]
@@ -829,6 +874,45 @@ mod tests {
             EntityKind::Worker,
             160.0,
             f32::INFINITY,
+        ));
+    }
+
+    #[test]
+    fn ejection_standability_preserves_oriented_vehicle_facing() {
+        let mut map = flat_map(12);
+        set_tile(&mut map, 5, 5, crate::protocol::terrain::ROCK);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let candidate = map.tile_center(5, 4);
+
+        assert!(unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            candidate.0,
+            candidate.1,
+            0.0,
+        ));
+        assert!(!unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            candidate.0,
+            candidate.1,
+            std::f32::consts::FRAC_PI_2,
+        ));
+        assert!(!unit_position_clear_of_building_footprint(
+            &map,
+            &occ,
+            &entities,
+            &BTreeSet::new(),
+            EntityKind::Tank,
+            std::f32::consts::FRAC_PI_2,
+            candidate.0,
+            candidate.1,
+            EntityKind::PumpJack,
+            9,
+            9,
         ));
     }
 
