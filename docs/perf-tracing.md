@@ -252,20 +252,26 @@ node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --sec
 
 The server command restores the canonical four-player scenario and measures each direct API round
 trip as `Game::tick()` plus one full-world snapshot, production compaction, and MessagePack
-encoding. It runs as fast as the server can complete work, reports aggregate average/p95/p99/max
-timings and payload size, and accepts `--json` for machine-readable output. It deliberately omits
-the room scheduler, WebSocket send, and browser so client speed cannot throttle it.
+encoding. Before each tick it also measures deterministic Hellhole driver work: one 43-of-85 move
+command per shuttle player every 30 ticks and a bounded nearest-center respawn batch for missing
+central units. It runs as fast as the server can complete work, reports aggregate
+average/p95/p99/max timings, payload size, command/selection/death/respawn counters, and the minimum
+outgoing entity count, and accepts `--json` for machine-readable output. It deliberately omits the
+room scheduler, WebSocket send, and browser so client speed cannot throttle it.
 
-Interpret the result against the project goal, not only the 30 Hz live deadline. On the designated
-reference MacBook (currently MacBook Pro `Mac17,8`, Apple M5 Pro), the default 900-tick release run
-must reach `realtime_factor >= 8.0` using one serial execution lane. That corresponds to no more
-than 3.75 seconds elapsed for 30 simulated seconds and no more than 4.167 ms average API round-trip
-work. Do not meet or report the target by parallelizing simulation, projection, compaction, or
-encoding across cores. macOS thread migration is acceptable, but simultaneous benchmark work on
-multiple cores is not. A result that fits inside the ordinary 33.3 ms tick interval but misses 8.0×
-still fails the local headroom goal, which intentionally compensates for materially weaker
-deployment hardware. Record the reference host, revision, release profile, and repeat count with
-before/after results.
+The old `realtime_factor >= 8.0` target described a materially different static fixture and is not a
+pass/fail threshold for this churn version. Record the reference host, revision, release profile,
+repeat count, full counter shape, and timing distribution, then compare like-for-like runs. Keep all
+driver, simulation, projection, compaction, and encoding work on the measured serial lane. A later
+optimization pass should establish a new headroom target from repeated reference-machine churn runs
+rather than reusing the static fixture's number.
+
+Regenerate the paired assets after changing the scenario or driver:
+
+```bash
+cargo run --release --manifest-path server/Cargo.toml --bin generate_supply_300_hellhole
+cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream
+```
 
 For an explicitly combined visual check, run:
 

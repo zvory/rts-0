@@ -305,13 +305,16 @@ canary runs own a private server; the browser shard passes its existing loopback
   without added latency and deterministic pixel parity is preserved.
 - Hellhole server performance: run `scripts/hellhole-perf-harness.sh --ticks 900` in release mode.
   This direct API-in/API-out lane includes simulation, full-world projection, compaction, and
-  MessagePack encoding but no room task, network transport, browser, or wall-clock pacing. Use
+  MessagePack encoding plus pre-tick scripted commands and respawn placement, but no room task,
+  network transport, browser, or wall-clock pacing. Its JSON reports shuttle commands/selected
+  units, deaths, respawn batches/units, and the minimum outgoing snapshot entity count. The entity
+  invariant is checked after pre-tick actions; a death tick's outgoing snapshot may intentionally
+  be lower until the following pre-tick restores the roster. Use
   `scripts/hellhole-perf-harness.sh --integrated` only when the live Lab server and visible Pixi
   client need to be inspected together; do not use its timings as isolated server evidence. The
-  canonical reference-MacBook goal is `realtime_factor >= 8.0` on one serial execution lane with no
-  subsystem parallelization. For the default workload, that is at most 3.75 seconds elapsed and at
-  most 4.167 ms average API round-trip work. Passing the normal 33.3 ms live tick budget is not a
-  substitute for meeting this headroom target.
+  old static fixture's `realtime_factor >= 8.0` target is not a gate for the new command/death churn
+  workload. Compare the full counter shape and timings like-for-like on the reference machine until
+  a repeated churn baseline establishes a new headroom target.
 - Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
   when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
   change. The harness compares Worker and Tank part and composition samples.

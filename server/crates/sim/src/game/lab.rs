@@ -34,6 +34,7 @@ const LAB_MAX_MUTATION_BATCH: usize = 400;
 const LAB_PLACEMENT_SUGGESTION_LIMIT: usize = 8;
 const LAB_PLACEMENT_SEARCH_RADIUS_TILES: i32 = 8;
 const LAB_PLACEMENT_SEARCH_WORK_LIMIT: usize = 256;
+const LAB_PLACEMENT_PLAN_CANDIDATE_LIMIT: usize = 512;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
@@ -670,15 +671,76 @@ impl Game {
         self.state.lab_god_mode_players.iter().copied().collect()
     }
 
-    pub fn lab_owned_unit_ids(&self, player_id: u32) -> Result<Vec<u32>, LabError> {
+    /// Return the authoritative live unit roster for one Lab player.
+    pub fn lab_owned_units(&self, player_id: u32) -> Result<Vec<(u32, EntityKind)>, LabError> {
         self.validate_owner(player_id)?;
         Ok(self
             .state
             .entities
             .iter()
             .filter(|entity| entity.owner == player_id && entity.is_unit() && entity.hp > 0)
-            .map(|entity| entity.id)
+            .map(|entity| (entity.id, entity.kind))
             .collect())
+    }
+
+    /// Resolve a bounded unit-spawn batch without mutating the game.
+    ///
+    /// Requests and candidates are evaluated in caller order. Each accepted spawn is added to a
+    /// scratch entity store before the next request, so the returned batch is safe to submit as one
+    /// atomic `SpawnEntities` operation. Requests with no legal candidate are omitted.
+    pub fn lab_plan_unit_spawns(
+        &self,
+        requests: &[(u32, EntityKind)],
+        candidates: &[(f32, f32)],
+    ) -> Result<Vec<LabSpawnEntity>, LabError> {
+        validate_batch_size(requests.len())?;
+        if candidates.len() > LAB_PLACEMENT_PLAN_CANDIDATE_LIMIT {
+            return Err(LabError::BatchSize {
+                count: candidates.len(),
+                maximum: LAB_PLACEMENT_PLAN_CANDIDATE_LIMIT,
+            });
+        }
+        let mut scratch = self.clone();
+        let mut resolved = Vec::with_capacity(requests.len());
+        for &(owner, kind) in requests {
+            self.validate_owner(owner)?;
+            if !kind.is_unit() {
+                return Err(invalid_kind(kind, "planUnitSpawns"));
+            }
+            let occupancy = Occupancy::build(&scratch.state.map, &scratch.state.entities);
+            for &(x, y) in candidates {
+                if validate_world_position(&scratch.state.map, x, y).is_err()
+                    || !standability::unit_spawn_standable(
+                        &scratch.state.map,
+                        &occupancy,
+                        &scratch.state.entities,
+                        kind,
+                        x,
+                        y,
+                    )
+                {
+                    continue;
+                }
+                let spawn = LabSpawnEntity {
+                    owner,
+                    kind,
+                    x,
+                    y,
+                    completed: true,
+                };
+                if scratch
+                    .state
+                    .entities
+                    .spawn_unit(owner, kind, x, y)
+                    .is_none()
+                {
+                    return Err(invalid_kind(kind, "planUnitSpawns"));
+                }
+                resolved.push(spawn);
+                break;
+            }
+        }
+        Ok(resolved)
     }
 
     pub fn restore_lab_checkpoint_scenario_op(
