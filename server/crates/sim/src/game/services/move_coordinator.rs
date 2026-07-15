@@ -25,8 +25,8 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
-    unit_body_with_facing, RectBody, UnitBody,
+    building_rect_for_entity, circle_intersects_rect, tile_rect, unit_bodies_intersect, unit_body,
+    unit_body_for_entity, unit_body_with_facing, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
@@ -48,6 +48,8 @@ mod formation;
 #[cfg(test)]
 mod pathing_budget_tests;
 mod rally;
+#[cfg(test)]
+mod spawn_tests;
 
 #[cfg(test)]
 use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
@@ -683,8 +685,9 @@ impl<'a> MoveCoordinator<'a> {
     ///
     /// Prefer points with a small clearance gap from the producing building so spawned units have
     /// room to move away. If no such point exists, fall back to the first legal ring so tight maps
-    /// do not block production. When `rally` is `Some`, candidate ties within a ring favor the
-    /// point closest to the rally so units still exit the side of the building facing it.
+    /// do not block production. Vehicles first prefer a point where their complete swept body can
+    /// rotate 360 degrees. When `rally` is `Some`, candidate ties within a ring favor the point
+    /// closest to the rally so units still exit the side of the building facing it.
     pub fn find_spawn_point(
         &self,
         entities: &EntityStore,
@@ -704,10 +707,13 @@ impl<'a> MoveCoordinator<'a> {
         let max_y = footprint.iter().map(|(_, y)| *y).max()? as i32;
 
         // Search outward in rings from the actual building footprint edge.
+        let prefer_rotation_clearance = uses_oriented_vehicle_body(spawned_kind);
         let mut fallback: Option<(f32, (f32, f32))> = None;
+        let mut preferred_fallback: Option<(f32, (f32, f32))> = None;
         for r in 1i32..=6 {
             let mut ring_best: Option<(f32, (f32, f32))> = None;
             let mut preferred_ring_best: Option<(f32, (f32, f32))> = None;
+            let mut rotation_clear_ring_best: Option<(f32, (f32, f32))> = None;
             for ty in (min_y - r)..=(max_y + r) {
                 for tx in (min_x - r)..=(max_x + r) {
                     if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
@@ -737,17 +743,36 @@ impl<'a> MoveCoordinator<'a> {
                     {
                         preferred_ring_best = Some((score, (cx, cy)));
                     }
+                    if prefer_rotation_clearance
+                        && full_rotation_spawn_clear(
+                            self.map,
+                            self.occ,
+                            entities,
+                            spawned_kind,
+                            cx,
+                            cy,
+                        )
+                        && rotation_clear_ring_best.is_none_or(|(best_score, _)| score < best_score)
+                    {
+                        rotation_clear_ring_best = Some((score, (cx, cy)));
+                    }
                 }
             }
             if fallback.is_none() {
                 fallback = ring_best;
             }
-            if let Some((_, point)) = preferred_ring_best {
+            if preferred_fallback.is_none() {
+                preferred_fallback = preferred_ring_best;
+            }
+            if !prefer_rotation_clearance && preferred_fallback.is_some() {
+                break;
+            }
+            if let Some((_, point)) = rotation_clear_ring_best {
                 return Some(point);
             }
         }
 
-        fallback.map(|(_, point)| point)
+        preferred_fallback.or(fallback).map(|(_, point)| point)
     }
 
     /// Prefer spawning oriented vehicles already facing the rally, but only if that body
@@ -1090,6 +1115,54 @@ fn spawn_gap_from_building(
     Some(unit_body_rect_gap(body, building_rect))
 }
 
+/// Checks a full rotation's swept circle, including configured hull clearance.
+///
+/// This remains spawn-selection policy: normal standability validates current facing, while
+/// production prefers every facing and may fall back when a base is congested.
+fn full_rotation_spawn_clear(
+    map: &Map,
+    occupancy: &Occupancy,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+) -> bool {
+    let Some(radius) = unit_body(kind, x, y).map(UnitBody::bounding_radius) else {
+        return false;
+    };
+    let envelope = CircleBody { x, y, radius };
+    let world_max = map.world_size_px();
+    if x - radius < 0.0 || y - radius < 0.0 || x + radius > world_max || y + radius > world_max {
+        return false;
+    }
+
+    let tile_size = config::TILE_SIZE as f32;
+    let min_tx = ((x - radius) / tile_size).floor() as i32;
+    let min_ty = ((y - radius) / tile_size).floor() as i32;
+    let max_tx = ((x + radius) / tile_size).floor() as i32;
+    let max_ty = ((y + radius) / tile_size).floor() as i32;
+    for ty in min_ty..=max_ty {
+        for tx in min_tx..=max_tx {
+            if !map.in_bounds(tx, ty) {
+                return false;
+            }
+            if (!map.is_passable(tx, ty) || !occupancy.passable_for_kind(tx, ty, kind))
+                && circle_intersects_rect(envelope, tile_rect(tx, ty))
+            {
+                return false;
+            }
+        }
+    }
+
+    entities.iter().all(|entity| {
+        if entity.hp == 0 || !entity.is_unit() {
+            return true;
+        }
+        unit_body_for_entity(entity)
+            .is_none_or(|existing| !unit_bodies_intersect(UnitBody::Circle(envelope), existing))
+    })
+}
+
 fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
     match body {
         UnitBody::Circle(circle) => {
@@ -1139,171 +1212,6 @@ mod tests {
             starts: vec![],
             base_sites: vec![],
         }
-    }
-
-    fn impassable_map(size: u32) -> Map {
-        Map {
-            size,
-            terrain: vec![terrain::WATER; (size * size) as usize],
-            starts: vec![],
-            base_sites: vec![],
-        }
-    }
-
-    fn set_passable(map: &mut Map, tx: u32, ty: u32) {
-        map.terrain[(ty * map.size + tx) as usize] = terrain::GRASS;
-    }
-
-    #[test]
-    fn spawn_search_finds_point_outside_footprint() {
-        let map = Map::generate(1, 0x1234_5678);
-        let mut entities = EntityStore::new();
-        // Place a barracks at tile (15, 15); footprint is 3x2.
-        let (cx, cy) = map.tile_center(15, 15);
-        let b_id = entities
-            .spawn_building(1, EntityKind::Barracks, cx, cy, true)
-            .unwrap();
-        let occ = Occupancy::build(&map, &entities);
-
-        let mut pathing = PathingService::new(8_192, 256);
-        pathing.advance_tick(1);
-        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-
-        let (sx, sy) = coordinator
-            .find_spawn_point(&entities, b_id, EntityKind::Tank, None)
-            .expect("spawn point should exist");
-
-        let (stx, sty) = map.tile_of(sx, sy);
-        let footprint = building_footprint(&map, entities.get(b_id).unwrap());
-
-        assert!(
-            !footprint.contains(&(stx, sty)),
-            "spawn tile ({stx},{sty}) is inside the barracks footprint {footprint:?}"
-        );
-
-        assert!(map.is_passable(stx as i32, sty as i32));
-    }
-
-    #[test]
-    fn tank_spawn_point_keeps_clear_of_top_map_edge() {
-        let map = Map::generate(1, 0x1234_5678);
-        let mut entities = EntityStore::new();
-        let (bx, by) = map.tile_center(3, 0);
-        let b_id = entities
-            .spawn_building(1, EntityKind::Factory, bx, by, true)
-            .unwrap();
-        let occ = Occupancy::build(&map, &entities);
-
-        let mut pathing = PathingService::new(8_192, 256);
-        pathing.advance_tick(1);
-        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-
-        let (sx, sy) = coordinator
-            .find_spawn_point(&entities, b_id, EntityKind::Tank, None)
-            .expect("spawn point should exist");
-
-        assert!(
-            standability::unit_spawn_standable(&map, &occ, &entities, EntityKind::Tank, sx, sy,),
-            "tank spawn point clips the top map edge"
-        );
-    }
-
-    #[test]
-    fn tank_spawn_point_keeps_clear_of_adjacent_building() {
-        let map = Map::generate(1, 0x1234_5678);
-        let mut entities = EntityStore::new();
-        let (fx, fy) = map.tile_center(16, 16);
-        let factory_id = entities
-            .spawn_building(1, EntityKind::Factory, fx, fy, true)
-            .unwrap();
-        let (nx, ny) = map.tile_center(20, 16);
-        entities
-            .spawn_building(1, EntityKind::Depot, nx, ny, true)
-            .unwrap();
-        let occ = Occupancy::build(&map, &entities);
-
-        let mut pathing = PathingService::new(8_192, 256);
-        pathing.advance_tick(1);
-        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-
-        let (sx, sy) = coordinator
-            .find_spawn_point(&entities, factory_id, EntityKind::Tank, None)
-            .expect("spawn point should exist");
-
-        assert!(
-            standability::unit_spawn_standable(&map, &occ, &entities, EntityKind::Tank, sx, sy,),
-            "tank spawn point is too close to the adjacent building"
-        );
-    }
-
-    #[test]
-    fn tank_spawn_point_prefers_gap_from_producer_when_available() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        let (fx, fy) = footprint_center(&map, EntityKind::Factory, 10, 10);
-        let factory_id = entities
-            .spawn_building(1, EntityKind::Factory, fx, fy, true)
-            .expect("factory should spawn");
-        let occ = Occupancy::build(&map, &entities);
-
-        let mut pathing = PathingService::new(8_192, 256);
-        pathing.advance_tick(1);
-        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-
-        let (sx, sy) = coordinator
-            .find_spawn_point(&entities, factory_id, EntityKind::Tank, None)
-            .expect("spawn point should exist");
-        let factory = entities.get(factory_id).expect("factory");
-        let rect = building_rect_for_entity(&map, factory).expect("factory rect");
-        let gap = spawn_gap_from_building(EntityKind::Tank, sx, sy, rect).expect("tank body");
-        let preferred = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius
-            * SPAWN_PREFERRED_GAP_UNIT_FRACTION;
-
-        assert!(
-            gap >= preferred,
-            "tank spawn should prefer at least {preferred:.2}px of building clearance, got {gap:.2}px"
-        );
-    }
-
-    #[test]
-    fn tank_spawn_point_falls_back_to_tight_exit_when_no_gap_candidate_exists() {
-        let mut map = impassable_map(12);
-        let mut entities = EntityStore::new();
-        let (fx, fy) = footprint_center(&map, EntityKind::Factory, 4, 4);
-        let factory_id = entities
-            .spawn_building(1, EntityKind::Factory, fx, fy, true)
-            .expect("factory should spawn");
-        for tx in 4..=6 {
-            set_passable(&mut map, tx, 3);
-        }
-        let occ = Occupancy::build(&map, &entities);
-
-        let mut pathing = PathingService::new(8_192, 256);
-        pathing.advance_tick(1);
-        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-
-        let (sx, sy) = coordinator
-            .find_spawn_point(&entities, factory_id, EntityKind::Tank, None)
-            .expect("tight spawn point should still be allowed");
-        let factory = entities.get(factory_id).expect("factory");
-        let rect = building_rect_for_entity(&map, factory).expect("factory rect");
-        let gap = spawn_gap_from_building(EntityKind::Tank, sx, sy, rect).expect("tank body");
-        let preferred = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius
-            * SPAWN_PREFERRED_GAP_UNIT_FRACTION;
-
-        assert_eq!(
-            map.tile_of(sx, sy),
-            (5, 3),
-            "only the tight tile-center exit should be legal"
-        );
-        assert!(
-            gap < preferred,
-            "test setup should force fallback to a sub-preferred gap, got {gap:.2}px"
-        );
     }
 
     #[test]

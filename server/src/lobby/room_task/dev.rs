@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::time::Instant as StdInstant;
+use std::{collections::HashMap, time::Instant as StdInstant};
 
 use tokio::time::Instant as TokioInstant;
 
@@ -14,8 +13,7 @@ use super::super::snapshots::union_events;
 use super::types::{DevScenarioId, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
-use rts_sim::game::command::SimCommand;
-use rts_sim::game::Game;
+use rts_sim::game::{command::SimCommand, Game};
 
 pub(super) enum DevDriver {
     Scenario(DevScenarioDriver),
@@ -119,18 +117,13 @@ impl RoomTask {
 
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
         match &self.mode {
-            RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
-            RoomMode::Replay { .. } => Err("room is not configured for a dev session".to_string()),
-            RoomMode::ReplayArtifact { .. } => {
-                Err("room is not configured for a dev session".to_string())
-            }
-            RoomMode::ReplayBranch { .. } => {
-                Err("room is not configured for a dev session".to_string())
-            }
-            RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
+            RoomMode::Normal
+            | RoomMode::Replay { .. }
+            | RoomMode::ReplayArtifact { .. }
+            | RoomMode::ReplayBranch { .. }
+            | RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevScenario(config) => {
-                let _scenario_faction_id =
-                    default_faction_id_for(FactionRequestContext::DevScenario);
+                let _ = default_faction_id_for(FactionRequestContext::DevScenario);
                 let seed = match_seed();
                 macro_rules! session_from_setup {
                     ($setup:expr $(,)?) => {{
@@ -186,6 +179,13 @@ impl RoomTask {
                     DevScenarioId::CommandCarBuildingCorner => session_from_setup!(
                         Game::new_command_car_corner_scenario(config.unit, config.count, seed)?,
                     ),
+                    DevScenarioId::FactoryWallRallySpawn => {
+                        session_from_setup!(Game::new_factory_wall_rally_spawn_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
                     DevScenarioId::TankTrapLineHorizontal
                     | DevScenarioId::TankTrapLineVertical
                     | DevScenarioId::TankTrapLineDiagonal => {

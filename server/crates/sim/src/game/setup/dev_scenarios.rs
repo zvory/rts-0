@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::state::TrackedRng;
 
+mod factory_wall_rally_spawn;
 mod layouts;
 mod panzerfaust;
 mod tank_coax;
@@ -690,5 +691,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
 
 /// Spawn the steel and oil clusters for a base site. The clusters point inward toward the map
 /// center so the layout is the same regardless of whether a player occupies the site.
+#[cfg(test)]
+mod factory_wall_rally_spawn_tests;
 #[cfg(test)]
 mod tests;

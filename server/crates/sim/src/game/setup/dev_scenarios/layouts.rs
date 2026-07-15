@@ -268,6 +268,52 @@ pub(super) fn command_car_building_corner_map() -> (
     (map, start_tile, buildings, unit_start, unit_facing, goal)
 }
 
+/// Translated geometry from replay 104 at tick 7923: a 3x3 Factory sits one clear tile below a
+/// two-tile-deep terrain wall, and its rally point is almost due west. The old spawn search chose
+/// the tile immediately below the wall, where the default east-facing hull fit but could not turn
+/// toward the rally point.
+#[allow(clippy::type_complexity)]
+pub(super) fn factory_wall_rally_spawn_map() -> (
+    Map,
+    (u32, u32),
+    (f32, f32),
+    (f32, f32),
+    (f32, f32),
+    (f32, f32),
+) {
+    let mut map = flat_dev_map(1);
+    let factory_tile = (map.size / 2, map.size / 2);
+    block_rect_tiles(
+        &mut map,
+        factory_tile.0 - 2,
+        factory_tile.1 - 3,
+        factory_tile.0 + 17,
+        factory_tile.1 - 2,
+    );
+
+    let factory_pos = services::occupancy::footprint_center(
+        &map,
+        EntityKind::Factory,
+        factory_tile.0,
+        factory_tile.1,
+    );
+    let trapped_spawn = map.tile_center(factory_tile.0 - 2, factory_tile.1 - 1);
+    let rotation_clear_spawn = map.tile_center(factory_tile.0 - 2, factory_tile.1);
+    let rally = (factory_pos.0 - 701.482, factory_pos.1 - 59.5);
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = factory_tile;
+    }
+
+    (
+        map,
+        factory_tile,
+        factory_pos,
+        trapped_spawn,
+        rotation_clear_spawn,
+        rally,
+    )
+}
+
 pub(super) fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
     unit: EntityKind,

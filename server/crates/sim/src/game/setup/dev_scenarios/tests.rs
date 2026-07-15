@@ -374,6 +374,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
         ),
         Game::new_factory_zero_gap_perpendicular_scenario(EntityKind::Tank, 1, 0x5150_030d),
         Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_030d),
+        Game::new_factory_wall_rally_spawn_scenario(EntityKind::Tank, 1, 0x5150_030d),
         Game::new_tank_trap_line_build_scenario(
             "tank_trap_line_horizontal",
             EntityKind::ScoutCar,

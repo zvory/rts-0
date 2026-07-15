@@ -547,6 +547,30 @@ const COMMAND_CAR_BUILDING_CORNER_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenari
     case: None,
 }];
 
+const FACTORY_WALL_RALLY_SPAWN_LAUNCHES: [DevScenarioLaunch; 3] = [
+    DevScenarioLaunch {
+        id: "factory_wall_rally_spawn",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+        case: None,
+    },
+    DevScenarioLaunch {
+        id: "factory_wall_rally_spawn",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+        case: None,
+    },
+    DevScenarioLaunch {
+        id: "factory_wall_rally_spawn",
+        unit: EntityKind::CommandCar,
+        count: 1,
+        blocker: None,
+        case: None,
+    },
+];
+
 const TANK_TRAP_LINE_HORIZONTAL_LAUNCHES: [DevScenarioLaunch; 2] = [
     DevScenarioLaunch {
         id: "tank_trap_line_horizontal",
@@ -739,7 +763,7 @@ const PANZERFAUST_METHAMPHETAMINES_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenar
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 19] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -782,6 +806,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
         title: "Command Car Building Corner",
         description: "One Command Car starts inside the reduced Vehicle Works, Training Centre, and Barracks corner from the Soupman match, waits one second, then moves northwest.",
         launches: &COMMAND_CAR_BUILDING_CORNER_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "factory_wall_rally_spawn",
+        title: "Factory Wall Rally Spawn",
+        description: "A completed vehicle exits a factory below a two-tile terrain wall and rallies almost due west, reproducing replay 104 tick 7923 geometry.",
+        launches: &FACTORY_WALL_RALLY_SPAWN_LAUNCHES,
     },
     DevScenarioSpec {
         id: "tank_trap_line_horizontal",
@@ -1118,6 +1148,16 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("factory_wall_rally_spawn:unit=command_car:count=1"),
+            Some(DevScenarioLaunch {
+                id: "factory_wall_rally_spawn",
+                unit: EntityKind::CommandCar,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_room("tank_trap_line_horizontal:unit=scout_car:count=1"),
             Some(DevScenarioLaunch {
                 id: "tank_trap_line_horizontal",
@@ -1342,6 +1382,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("command_car_building_corner", "command_car", "2", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("factory_wall_rally_spawn", "worker", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("factory_wall_rally_spawn", "tank", "3", None),
             None
         );
         assert_eq!(
