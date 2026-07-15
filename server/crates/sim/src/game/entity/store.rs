@@ -1,7 +1,40 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    hash::{BuildHasherDefault, Hasher},
+};
 
 use super::{Entity, EntityKind, GatherPhase};
 use serde::{Deserialize, Serialize};
+
+/// Hashes the server-allocated `u32` ids used only by [`EntityStore`].
+///
+/// The identity fast path preserves distinct low bucket bits for monotonically allocated ids. The
+/// phase benchmark also checked it against an odd-multiplier mix because sequential ids share
+/// high-bit control fingerprints.
+///
+/// The fallback byte path is total because `Hasher` supplies the other integer writers in terms of
+/// it, even though this private map's `u32` keys use `write_u32` directly.
+#[derive(Default)]
+struct EntityIdHasher(u64);
+
+impl Hasher for EntityIdHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.0 ^= u64::from(byte);
+            self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+
+    fn write_u32(&mut self, value: u32) {
+        self.0 = u64::from(value);
+    }
+}
+
+type EntityMap = HashMap<u32, Entity, BuildHasherDefault<EntityIdHasher>>;
 
 /// The authoritative collection of all entities, keyed by stable id.
 ///
@@ -11,7 +44,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EntityStore {
     next_id: u32,
-    map: HashMap<u32, Entity>,
+    map: EntityMap,
 }
 
 impl EntityStore {
@@ -20,7 +53,7 @@ impl EntityStore {
             // Start ids at 1 so 0 can never collide with the neutral-owner sentinel in
             // any accidental id/owner confusion, and so `0` reads as "no entity".
             next_id: 1,
-            map: HashMap::new(),
+            map: EntityMap::default(),
         }
     }
 
