@@ -1,6 +1,6 @@
 ---
 name: interact
-description: Use the local Interact CLI to arrange authoritative Lab scenes or inspect isolated human-vs-AI and AI-vs-AI spectator games, then capture Pixi screenshots, H.264 video, or region-aware time lapses. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, or live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
+description: Use the local Interact CLI to arrange authoritative Lab scenes, inspect isolated human-vs-AI or AI-vs-AI games, or run server-authored dev scenarios, then capture Pixi screenshots, H.264 video, or region-aware time lapses. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, dev-scenario, or live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
 ---
 
 # Interact Capture
@@ -18,6 +18,13 @@ for an AI-vs-AI spectator match. Retain its `game_...` session id. Player sessio
 `screenshot`, recording, and capture commands. Game media defaults to `presentation:"normal"` so
 the HUD and score screen remain visible. This namespace cannot join arbitrary rooms or issue
 attack, build, production, economy, ability, or arbitrary protocol commands.
+
+For an existing server-authored dev scenario, use
+`node scripts/interact/cli.mjs scenario <command> '<JSON-object>'`. `scenario open` takes the same
+`id`, `unit`, `count`, optional `blocker`, and optional `case` fields listed at `/dev/scenarios` and
+returns a `scenario_...` session id. The namespace is observation/media-only: `inspect`, `camera`,
+`screenshot`, recording, time-lapse, capture cancellation, and lifecycle commands. It cannot spawn,
+move, order, build, or send arbitrary input. Scenario media defaults to `presentation:"clean"`.
 
 1. Run `open`, retain `result.sessionId`, then run `catalog` before choosing players or kinds.
    `open` is safe to repeat: it returns the active session. Run `close` first only when a fresh
@@ -44,13 +51,17 @@ attack, build, production, economy, ability, or arbitrary protocol commands.
    bounded `maxDurationMs`, `sampleEveryMs`, and optional `speed` up to 8. Use `region:"minimap"`
    for a minimap-only time lapse. The capture stops at match conclusion or the duration ceiling;
    use `status` for progress and `capture-cancel` to interrupt it.
-6. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
+6. For a dev scenario, run `scenario screenshot` for a still. For before/after evidence, take the
+   first still, run a bounded `record-start` plus `record-wait` (or `capture-timelapse`), then take
+   the second still. `scenario capture-timelapse` accepts the same bounded duration, sample, speed,
+   region, and cancellation controls as the AI spectator form.
+7. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
    visual artifact: share that Tailnet URL and a concise scene result with the user. Never share a
    raw `target/interact` path; the adjacent JSON manifest remains local reproduction evidence.
-7. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
+8. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
-Capture files are confined to `target/interact/<lab|game>/<session-id>/` and ignored by Git. Do
+Capture files are confined to `target/interact/<lab|game|scenario>/<session-id>/` and ignored by Git. Do
 not request arbitrary paths or add image bytes to Git. Lab remains for bounded authored scenes;
 full-match observation is limited to the game namespace's isolated AI-vs-AI spectator mode. A
 Tailnet Preview URL is copied into the machine-level preview service with at least 24 hours of

@@ -23,6 +23,12 @@ export class InteractTestArtifacts {
     return sessionId;
   }
 
+  ownScenarioSession(sessionId) {
+    assert.match(sessionId, /^scenario_[a-f0-9]{32}$/, "test-owned scenario session ids stay unguessable");
+    this.ownedSessionDirectories.add(path.join(this.root, "..", "scenario", sessionId));
+    return sessionId;
+  }
+
   createSessionId() {
     return this.ownSession(`lab_${crypto.randomUUID().replaceAll("-", "")}`);
   }

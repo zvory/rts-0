@@ -9,8 +9,8 @@ import {
 } from "./command_inputs.ts";
 import { commandDefinition } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
-import { captureGameScreenshot } from "./game_screenshot.ts";
-import { gameInspectionOwnership, gameSessionCapabilities, requireGameSpectator } from "./game_session.ts";
+import { gameSessionCapabilities, scenarioSessionCapabilities } from "./game_session.ts";
+import { executeObservationCommand } from "./observation_session.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
 export { INTERACT_LIMITS } from "./command_inputs.ts";
@@ -33,6 +33,11 @@ interface ServiceInput extends JsonObject {
   map?: string;
   seed?: string | number;
   scenario?: string;
+  id?: string;
+  unit?: string;
+  count?: number;
+  blocker?: string;
+  case?: string;
   renderer?: string;
   viewport?: ViewportInput;
   categories?: string[];
@@ -75,7 +80,7 @@ interface ServiceInput extends JsonObject {
 }
 interface InteractSession {
   sessionId: string;
-  kind: "lab" | "game";
+  kind: "lab" | "game" | "scenario";
   driver: InteractDriver;
   aliases: Map<string, number>;
   sceneRevision: number;
@@ -97,7 +102,7 @@ export class InteractService {
   closePromise: Promise<boolean> | null;
   openAbortController: AbortController | null;
   openPromise: Promise<unknown> | null;
-  openingKind: "lab" | "game" | null;
+  openingKind: "lab" | "game" | "scenario" | null;
   coordinator: SessionCoordinator;
   sessions: Map<string, InteractSession>;
   log: (...values: unknown[]) => void;
@@ -129,7 +134,6 @@ export class InteractService {
     this.closePromise = null;
     this.closed = false;
   }
-
   async execute(command: string, rawInput: unknown = {}) {
     const definition = commandDefinition(command);
     if (!definition) {
@@ -147,8 +151,11 @@ export class InteractService {
         result = { shuttingDown: true };
       } else if (definition.handlerKey === "status") {
         result = await this.status(input);
-      } else if (definition.handlerKey === "open" || definition.handlerKey === "game-open") {
-        result = await this.open(input, definition.handlerKey === "game-open" ? "game" : "lab");
+      } else if (["open", "game-open", "scenario-open"].includes(definition.handlerKey)) {
+        const kind = definition.handlerKey === "game-open"
+          ? "game"
+          : definition.handlerKey === "scenario-open" ? "scenario" : "lab";
+        result = await this.open(input, kind);
       } else if (definition.handlerKey === "close") {
         result = { sessionId: input.sessionId, closed: await this.close(input.sessionId!) };
       } else if (definition.handlerKey === "capture-cancel") {
@@ -173,8 +180,7 @@ export class InteractService {
       return result;
     });
   }
-
-  async open(input: ServiceInput, kind: "lab" | "game" = "lab") {
+  async open(input: ServiceInput, kind: "lab" | "game" | "scenario" = "lab") {
     if (this.closed) throw new InteractError("serviceClosed", "Interact is shutting down.");
     const workspaceRoot = resolveRequestedWorkspace(input.workspaceRoot, this.workspaceRoot);
     let existing = this.sessions.values().next().value;
@@ -197,6 +203,8 @@ export class InteractService {
         map,
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
+        devScenario: { id: input.id || "", unit: input.unit || "", count: input.count || 1,
+          blocker: input.blocker || "", case: input.case || "" },
         opponent: input.opponent || "ai_2_1",
         spectate: input.spectate || null,
         renderer: input.renderer || "pixi",
@@ -215,7 +223,11 @@ export class InteractService {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
           map, seed: kind === "lab" ? input.seed ?? null : null,
           opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
-          spectate: kind === "game" ? input.spectate || null : null, role: kind === "game" ? (input.spectate ? "spectator" : "player") : null,
+          spectate: kind === "game" ? input.spectate || null : null,
+          role: kind === "game" ? (input.spectate ? "spectator" : "player") : kind === "scenario" ? "observer" : null,
+          devScenario: kind === "scenario"
+            ? { id: input.id, unit: input.unit, count: input.count, blocker: input.blocker || null, case: input.case || null }
+            : null,
           renderer: input.renderer || "pixi",
         },
       };
@@ -234,8 +246,7 @@ export class InteractService {
       if (this.openAbortController === openAbortController) this.openAbortController = null;
     }
   }
-
-  async describeExistingSession(session: InteractSession, requestedKind: "lab" | "game") {
+  async describeExistingSession(session: InteractSession, requestedKind: "lab" | "game" | "scenario") {
     if (session.kind !== requestedKind) {
       throw new InteractError(
         "sessionKindMismatch",
@@ -245,7 +256,6 @@ export class InteractService {
     }
     return this.describeSession(session);
   }
-
   async describeSession(session: InteractSession) {
     const status = await session.driver.status();
     const catalog = session.kind === "lab" ? await session.driver.catalog() : null;
@@ -258,17 +268,17 @@ export class InteractService {
       status,
       capabilities: session.kind === "lab"
         ? { aliases: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
-        : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
+        : session.kind === "scenario"
+          ? scenarioSessionCapabilities(this.maxSessions)
+          : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
     };
   }
-
   get(sessionId: string | null | undefined) {
     if (!sessionId) throw new InteractError("unknownSession", "Unknown or closed sessionId. Run open first.");
     const session = this.sessions.get(sessionId);
     if (!session) throw new InteractError("unknownSession", "Unknown or closed sessionId. Run open first.");
     return session;
   }
-
   async close(sessionId: string, reason = "explicit") {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
@@ -341,38 +351,28 @@ export class InteractService {
       maxSessions: this.maxSessions,
     };
   }
-
   async executeSession(command: string, session: InteractSession, input: ServiceInput) {
     const sessionId = session.sessionId;
     if (command.startsWith("game-") && session.kind !== "game") {
       throw new InteractError("sessionKindMismatch", "This command requires a game session.");
     }
-    if (command === "game-inspect") return { sessionId, ...await session.driver.inspect({
-      ids: input.ids, kinds: input.kinds, ownership: gameInspectionOwnership(input.ownership, session.sceneIdentity.role),
-      cameraViewport: input.cameraViewport === true, limit: input.limit || 25,
-    }) };
+    if (command.startsWith("scenario-") && session.kind !== "scenario") {
+      throw new InteractError("sessionKindMismatch", "This command requires a dev scenario session.");
+    }
+    const observation = await executeObservationCommand(command, session, input, this.artifactPreview);
+    if (observation.handled) {
+      if (observation.kind === "recording") {
+        return { ...observation.result, recorder: presentRecorderStatus(observation.result.recorder, this.artifactPreview) };
+      }
+      if (observation.kind === "capture") {
+        return presentFixedCaptureResult({ sessionId, ...observation.result }, this.artifactPreview);
+      }
+      return observation.result;
+    }
     if (command === "game-move") return { sessionId, result: await session.driver.move({
       units: input.units || [], x: input.x, y: input.y, queued: input.queued === true,
     }) };
     if (command === "game-give-up") return { sessionId, result: await session.driver.giveUp() };
-    if (command === "game-camera") {
-      const value = input.camera || {};
-      const driverCommand = value.action === "focus"
-        ? { action: "focus", entityIds: value.entities, padding: value.padding }
-        : value;
-      const response = await session.driver.camera(driverCommand);
-      return { sessionId, camera: response.camera || response, cameraViewport: response.cameraViewport || null, cameraWorldBounds: response.cameraWorldBounds || null };
-    }
-    if (command === "game-screenshot") return captureGameScreenshot(session, input, this.artifactPreview);
-    if (command === "game-record-start") {
-      const result = await session.driver.recordStart({ ...input, sessionId, presentation: input.presentation || "normal" });
-      return { sessionId, recorder: presentRecorderStatus(result, this.artifactPreview) };
-    }
-    if (command === "game-capture-timelapse") {
-      requireGameSpectator(session.sceneIdentity.role);
-      const result = await session.driver.captureTimelapse({ ...input, sessionId });
-      return presentFixedCaptureResult({ sessionId, ...result }, this.artifactPreview);
-    }
     if (session.kind !== "lab" && !["record-stop"].includes(command)) {
       throw new InteractError("sessionKindMismatch", "This command requires a Lab session.");
     }

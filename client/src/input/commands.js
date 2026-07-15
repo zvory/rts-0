@@ -807,13 +807,13 @@ export function _activateCommandHotkey(ev) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
     if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
-    const contextAction = btn.dataset.contextAction === "true" && (
-      ev.altKey || (ev.shiftKey && btn.dataset.shiftContextAction === "true")
-    );
+    const contextAction = commandContextActionRequested(btn, ev);
     if (contextAction) {
       dispatchCommandButtonMouseEvent(btn, "contextmenu", ev);
     } else if (!btn.disabled) {
-      dispatchCommandButtonMouseEvent(btn, "click", ev);
+      // Alt-click is a pointer-only secondary affordance. A hotkey whose descriptor does not
+      // declare Alt must reach the primary click handler instead of imitating an Alt-click.
+      dispatchCommandButtonMouseEvent(btn, "click", ev, false);
     }
     return {
       handled: true,
@@ -827,12 +827,21 @@ export function _activateCommandHotkey(ev) {
   return false;
 }
 
-function dispatchCommandButtonMouseEvent(btn, type, ev) {
+function commandContextActionRequested(btn, ev) {
+  if (btn.dataset.contextAction !== "true") return false;
+  const modifiers = new Set((btn.dataset.contextHotkeyModifiers || "").split(/\s+/).filter(Boolean));
+  return (ev.altKey && modifiers.has("alt")) ||
+    (ev.ctrlKey && modifiers.has("ctrl")) ||
+    (ev.metaKey && modifiers.has("meta")) ||
+    (ev.shiftKey && modifiers.has("shift"));
+}
+
+function dispatchCommandButtonMouseEvent(btn, type, ev, altKey = !!ev.altKey) {
   if (typeof MouseEvent === "function" && typeof btn.dispatchEvent === "function") {
     btn.dispatchEvent(new MouseEvent(type, {
       bubbles: true,
       cancelable: true,
-      altKey: !!ev.altKey,
+      altKey,
       ctrlKey: !!ev.ctrlKey,
       metaKey: !!ev.metaKey,
       shiftKey: !!ev.shiftKey,
@@ -844,7 +853,7 @@ function dispatchCommandButtonMouseEvent(btn, type, ev) {
       type,
       bubbles: true,
       cancelable: true,
-      altKey: !!ev.altKey,
+      altKey,
       ctrlKey: !!ev.ctrlKey,
       metaKey: !!ev.metaKey,
       shiftKey: !!ev.shiftKey,

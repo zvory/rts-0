@@ -63,19 +63,20 @@ function checkRegistry() {
     if (!help?.example || typeof help.example !== "object" || Array.isArray(help.example)) failures.push(`${name} help is missing an example object`);
   }
 
-  expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown", "game-open"]);
-  expectMetadata("observation lane", "lane", "observation", ["status", "record-wait", "game-inspect"]);
+  expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown", "game-open", "scenario-open"]);
+  expectMetadata("observation lane", "lane", "observation", ["status", "record-wait", "game-inspect", "scenario-inspect"]);
   expectMetadata("cancellation lane", "lane", "cancellation", ["capture-cancel"]);
-  expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown", "game-open"]);
-  expectMetadata("startup timeout", "timeoutClass", "startup", ["open", "game-open"]);
+  expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown", "game-open", "scenario-open"]);
+  expectMetadata("startup timeout", "timeoutClass", "startup", ["open", "game-open", "scenario-open"]);
   expectMetadata("lifecycle/media timeout", "timeoutClass", "lifecycle-media", [
     "close", "shutdown", "record-stop", "record-wait", "capture-fixed", "game-capture-timelapse",
+    "scenario-capture-timelapse",
   ]);
 }
 
 function checkCliNamespace() {
   const cli = sources.get("cli.ts") || "";
-  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs <lab|game> <command> [JSON-object]";')) {
+  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs <lab|game|scenario> <command> [JSON-object]";')) {
     failures.push("the Interact CLI usage must require an explicit supported namespace");
   }
   if (!cli.includes("namespace in INTERACT_NAMESPACES") || !cli.includes('"unknownNamespace"')) {
@@ -93,12 +94,12 @@ function expectMetadata(label, field, value, expected) {
 
 function checkServiceRouting() {
   const service = sources.get("command_service.ts") || "";
+  const routes = `${service}\n${sources.get("observation_session.ts") || ""}`;
   if (!service.includes("executeSession(definition.handlerKey")) {
     failures.push("command_service.ts must route registry handler keys into session handlers");
   }
   for (const definition of Object.values(INTERACT_COMMAND_REGISTRY)) {
-    const key = definition.handlerKey.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (!new RegExp(`(?:handlerKey|command)\\s*===\\s*["']${key}["']`).test(service)) {
+    if (!routes.includes(`"${definition.handlerKey}"`) && !routes.includes(`'${definition.handlerKey}'`)) {
       failures.push(`${definition.name} handler key ${definition.handlerKey} has no service route`);
     }
   }

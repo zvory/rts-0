@@ -64,6 +64,11 @@ export async function captureGameTimelapse(driver: InteractDriver, {
       metadata: {
         workspace: driver.workspace, serverBuild: driver.server?.build || null,
         map: driver.options.map, matchup: driver.options.spectate,
+        scenario: driver.options.mode === "scenario" ? {
+          ...driver.options.devScenario,
+          blocker: driver.options.devScenario.blocker || null,
+          case: driver.options.devScenario.case || null,
+        } : null,
         runtime: { node: process.version, platform: process.platform, architecture: process.arch, browser: driver.browserVersion || null },
         camera: startStatus.camera || null,
       },
@@ -157,7 +162,7 @@ async function captureSampledTimelapse({
     encoder = null;
     const manifest = {
       schemaVersion: 1,
-      kind: "interactGameTimelapse",
+      kind: metadata.scenario ? "interactScenarioTimelapse" : "interactGameTimelapse",
       createdAt: new Date(startedMs).toISOString(),
       finalizedAt: new Date().toISOString(),
       nondeterministic: true,
@@ -219,7 +224,7 @@ function codedError(code: string, message: string) {
 
 function validSessionId(value: unknown) {
   const sessionId = String(value || "");
-  if (!/^(?:lab|game)_[a-f0-9]{32}$/.test(sessionId)) throw codedError("invalidSession", "sessionId must be a valid Interact session id.");
+  if (!/^(?:lab|game|scenario)_[a-f0-9]{32}$/.test(sessionId)) throw codedError("invalidSession", "sessionId must be a valid Interact session id.");
   return sessionId;
 }
 

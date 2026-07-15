@@ -8,6 +8,18 @@ export function gameSessionCapabilities(role: unknown, maxSessions: number) {
   };
 }
 
+export function scenarioSessionCapabilities(maxSessions: number) {
+  return {
+    aliases: false,
+    inspectUi: true,
+    orders: [],
+    giveUp: false,
+    media: ["screenshot", "recording", "timelapse"],
+    role: "observer",
+    maxSessions,
+  };
+}
+
 export function gameInspectionOwnership(requested: unknown, role: unknown) {
   return typeof requested === "string" ? requested : role === "spectator" ? "visible" : "owned";
 }
