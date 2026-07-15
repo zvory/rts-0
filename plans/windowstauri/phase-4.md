@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Complete on 2026-07-14 (Windows x64 NSIS build and install smoke).
 
 ## Objective
 
@@ -57,12 +57,12 @@ Produce a repeatable unsigned Windows playtest artifact for the thin Tauri shell
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 3 identified a playable source-run commit.
-- [ ] Build an unsigned Windows artifact with the Windows-native toolchain.
-- [ ] Generate manifest, checksum, and README.
-- [ ] Assert the artifact does not include server/runtime assets.
-- [ ] Install or open the artifact on the build machine.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Confirm Phase 3 identified a playable source-run commit.
+- [x] Build an unsigned Windows artifact with the Windows-native toolchain.
+- [x] Generate manifest, checksum, and README.
+- [x] Assert the artifact does not include server/runtime assets.
+- [x] Install or open the artifact on the build machine.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 
@@ -93,3 +93,20 @@ Beta opens, shell logs are available, and the installer/artifact can be removed 
 Provide the artifact path, checksum, manifest path, Tauri output directory, and exact build command.
 State explicitly that the artifact does not contain a Windows server binary or bundled game runtime
 assets.
+
+## Implementation Handoff
+
+- Builder: `desktop/maccursor-shell/build-unsigned-windows.mjs`
+- Windows-local Cargo target: `%LOCALAPPDATA%\rts-0\tauri-target-windows-release`
+- Build environment: `CARGO_BUILD_JOBS=1` (the build machine has no page file)
+- Validated artifact source commit: `f119496baa826eddb1d1a812db25d820f63300fa`
+- Validated installer SHA-256: `4270144e1d1d14870e7b387da6fd6affb584bf84a39cfeecb645a4db765f6b75`
+- Install smoke: current-user silent install succeeded, packaged startup screen rendered, Beta navigation
+  completed, the local shell log recorded the packaged build id and selected profile, and silent
+  uninstall removed the install directory.
+- Thin-shell assertion: the manifest reported no forbidden runtime asset matches and no bundled
+  external binaries or extra resources. The installer contains no Windows game server or bundled
+  game runtime assets.
+
+The release phase must rebuild from the final merged commit and publish that new checksum; the hash
+above records the Phase 4 build used for the install smoke only.

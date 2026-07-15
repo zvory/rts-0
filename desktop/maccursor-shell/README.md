@@ -126,6 +126,28 @@ content from the selected beta or mainline website.
 
 Use `./build-unsigned.mjs --output <dir>` to write the artifact somewhere else.
 
+## Unsigned Windows artifact
+
+Build the first-playtest NSIS installer from Windows PowerShell or Command Prompt:
+
+```powershell
+node .\build-unsigned-windows.mjs
+```
+
+When building through the WSL UNC checkout, use a Windows-local Cargo target directory and limited
+parallelism on machines without a page file:
+
+```powershell
+$env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'rts-0\tauri-target-windows-release'
+$env:CARGO_BUILD_JOBS = '1'
+cmd.exe /d /c "pushd \\wsl.localhost\Ubuntu\home\alex\dev\rts-0\desktop\maccursor-shell && node build-unsigned-windows.mjs"
+```
+
+Output defaults to `src-tauri/target/unsigned-playtest-windows/`. The artifact directory contains
+the unsigned x64 NSIS setup executable, its SHA-256 checksum, `manifest.json`, playtester `README.md`,
+and `contents.txt`. The builder fails if Tauri config adds external binaries/resources or the
+artifact exposes server, client, map, Lab-scenario, or match-history payloads.
+
 ## Local logs
 
 The shell writes local JSONL diagnostics to Tauri's app log directory:
