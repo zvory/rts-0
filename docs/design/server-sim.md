@@ -1248,7 +1248,10 @@ start or continue. The status distinguishes invalid terrain, existing buildings 
 resource nodes, and relevant unit bodies, while preserving Tank Trap placement rules. Pump Jack
 placement is the resource-node exception: it is only valid when the Pump Jack footprint center is
 associated with non-depleted oil without another extractor on that same patch, and completed Pump
-Jacks, not workers, extract oil. Pump Jacks are treated like field infrastructure rather than
+Jacks, not workers, extract oil. When a Pump Jack builder arrives at an otherwise-valid site,
+owned and allied unit bodies overlapping the footprint are deterministically moved to the nearest
+static-standable, non-overlapping positions before placement is revalidated; enemy bodies remain
+ordinary temporary blockers. Pump Jacks are treated like field infrastructure rather than
 survival buildings for defeat checks, so a player with only Pump Jacks remaining is eliminated.
 Build orders can enter a `WaitingAtSite` phase and track unit-blocked ticks with a grace period
 derived from `TICK_HZ`. Otherwise-valid build orders may be issued and promoted while the player

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PRESET_GRID,
+  HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PROFILE_SCHEMA_VERSION,
   HOTKEY_STORAGE_ACTIVE_KEY,
   HOTKEY_STORAGE_PROFILES_KEY,
@@ -124,6 +125,15 @@ function commandCarCard() {
     ),
     "hotkey command catalog includes Heavy Guns research after Medium Guns unlocks its replacement slot",
   );
+  assert(
+    catalog.commands.some((command) =>
+      command.commandId === HOTKEY_COMMAND_SELECT_IDLE_WORKERS &&
+        command.gridHotkey === "T" &&
+        command.classicHotkey === "I" &&
+        command.global
+    ),
+    "hotkey command catalog includes the global idle-worker action with per-preset defaults",
+  );
 }
 
 {
@@ -137,11 +147,77 @@ function commandCarCard() {
     "Classic preset has no conflicts in any cataloged command-card context",
   );
   assert.equal(hotkeys.getActiveProfile().id, HOTKEY_PRESET_GRID, "Grid is the default active profile");
+  assert.equal(
+    hotkeys.hotkeyForCommand(HOTKEY_COMMAND_SELECT_IDLE_WORKERS),
+    "T",
+    "Grid preset binds idle-worker selection to T",
+  );
   hotkeys.setActiveProfile(HOTKEY_PRESET_CLASSIC);
+  assert.equal(
+    hotkeys.hotkeyForCommand(HOTKEY_COMMAND_SELECT_IDLE_WORKERS),
+    "I",
+    "Classic RTS uses conflict-free I because T is already assigned",
+  );
   assert.equal(
     hotkeys.resolveCard(commandCarCard()).slots[8].hotkey,
     "C",
     "Classic RTS preset binds Scout Plane ability to C",
+  );
+}
+
+{
+  const hotkeys = service();
+  const grid = hotkeys.profileById(HOTKEY_PRESET_GRID);
+  const conflicting = {
+    ...grid,
+    id: "custom.grid-global-conflict",
+    type: "custom",
+    bindings: { ...grid.bindings, [HOTKEY_COMMAND_SELECT_IDLE_WORKERS]: "Q" },
+  };
+  assert.equal(
+    hotkeys.validateDraftProfile(conflicting).ok,
+    false,
+    "grid profiles reject an idle-worker key that shadows the command-card grid",
+  );
+}
+
+{
+  const hotkeys = service();
+  const saved = hotkeys.saveCustomProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.pre-idle-action",
+    type: "custom",
+    mode: "direct",
+    name: "Existing Custom",
+    bindings: { "unit.move": "I" },
+    factionBindings: {},
+  });
+  assert.equal(saved.ok, true, "existing custom profiles gain a conflict-free idle-worker binding");
+  assert.notEqual(
+    saved.profile.bindings[HOTKEY_COMMAND_SELECT_IDLE_WORKERS],
+    "I",
+    "idle-worker migration does not displace an existing I binding",
+  );
+}
+
+{
+  const hotkeys = service();
+  const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
+  const conflicting = {
+    ...classic,
+    id: "custom.global-conflict",
+    type: "custom",
+    bindings: { ...classic.bindings, [HOTKEY_COMMAND_SELECT_IDLE_WORKERS]: "T" },
+    factionBindings: Object.fromEntries(Object.entries(classic.factionBindings)
+      .map(([factionId, bindings]) => [factionId, { ...bindings }])),
+  };
+  const validation = hotkeys.validateDraftProfile(conflicting);
+  assert.equal(validation.ok, false, "a global idle-worker binding cannot shadow a command-card key");
+  assert(
+    validation.errors.some((error) =>
+      error.code === "duplicateKey" && error.commandIds.includes(HOTKEY_COMMAND_SELECT_IDLE_WORKERS)
+    ),
+    "global hotkey conflicts identify the idle-worker action",
   );
 }
 

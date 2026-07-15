@@ -36,6 +36,7 @@ import {
   restoreSinglePlayerResourceShell,
 } from "./hud_resources.js";
 import { HudSelectionPanel } from "./hud_selection_panel.js";
+import { HOTKEY_COMMAND_SELECT_IDLE_WORKERS } from "./hotkey_profiles.js";
 import { resourceIconHtml } from "./resource_icons.js";
 export {
   formatTankOilUsed,
@@ -181,9 +182,8 @@ export class HUD {
     this.elSupply = rootEl.querySelector("#res-supply");
     this.elGameTimer = rootEl.querySelector("#game-timer");
     this.elIdleWorkers = rootEl.querySelector("#idle-workers");
+    this.elIdleWorkersLabel = rootEl.querySelector(".idle-workers-label");
     this.elIdleWorkersCount = rootEl.querySelector("#idle-workers-count");
-    this._onIdleWorkersClick = () => this._selectIdleWorkers();
-    this.elIdleWorkers?.addEventListener?.("click", this._onIdleWorkersClick);
     // Rebuild the static shell once so the top bar, replay rows, and command-card
     // hovers all use the shared resource icon definitions.
     if (this.elHud) {
@@ -241,10 +241,11 @@ export class HUD {
       this.elGameTimer.textContent = "00:00";
       this.elGameTimer.title = "Game time 00:00";
     }
-    this.elIdleWorkers?.removeEventListener?.("click", this._onIdleWorkersClick);
     if (this.elIdleWorkersCount) this.elIdleWorkersCount.textContent = "0";
+    if (this.elIdleWorkersLabel) this.elIdleWorkersLabel.textContent = "Idle workers (T):";
     if (this.elIdleWorkers) {
       this.elIdleWorkers.disabled = true;
+      if (this.elIdleWorkers.dataset) this.elIdleWorkers.dataset.selectable = "false";
       this.elIdleWorkers.title = "No idle workers";
       this.elIdleWorkers.setAttribute?.("aria-label", "No idle workers");
     }
@@ -286,28 +287,39 @@ export class HUD {
       this.state,
     ).length;
     const canSelect = this._canUseCommandSurface();
-    const enabled = count > 0 && canSelect;
-    const sig = `${count}:${enabled ? 1 : 0}`;
+    const hotkey = this.hotkeyProfiles?.hotkeyForCommand?.(HOTKEY_COMMAND_SELECT_IDLE_WORKERS) || "T";
+    const selectable = count > 0 && canSelect;
+    const sig = `${count}:${selectable ? 1 : 0}:${hotkey}`;
     if (sig === this._idleWorkersSig) return;
+    if (this.elIdleWorkersLabel) this.elIdleWorkersLabel.textContent = `Idle workers (${hotkey}):`;
     this.elIdleWorkersCount.textContent = String(count);
-    this.elIdleWorkers.disabled = !enabled;
+    this.elIdleWorkers.disabled = true;
+    if (this.elIdleWorkers.dataset) this.elIdleWorkers.dataset.selectable = selectable ? "true" : "false";
     const workersLabel = `${count} idle worker${count === 1 ? "" : "s"}`;
     this.elIdleWorkers.title = count === 0
-      ? "No idle workers"
+      ? `No idle workers; ${hotkey} selects idle workers`
       : canSelect
-        ? `Select ${workersLabel}`
+        ? `Press ${hotkey} to select ${workersLabel}`
         : `${workersLabel}; selection unavailable`;
     this.elIdleWorkers.setAttribute?.("aria-label", this.elIdleWorkers.title);
     this._idleWorkersSig = sig;
   }
 
-  _selectIdleWorkers() {
-    if (!this._canUseCommandSurface() || typeof this.state?.setSelection !== "function") return;
+  selectIdleWorkers() {
+    if (!this._canUseCommandSurface() || typeof this.state?.setSelection !== "function") return false;
     const workers = activeIdleWorkers(frameAuthoritativeEntities(this.state), this.state);
-    if (workers.length === 0) return;
+    if (workers.length === 0) return false;
     this._intent()?.closeCommandCardMenu?.();
     this.state.setSelection(workers.map((worker) => worker.id));
     this._intent()?.clearPlannedOrdersOutsideSelection?.(this.state.selection || []);
+    return true;
+  }
+
+  hotkeyActions() {
+    return [{
+      commandId: HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
+      activate: () => this.selectIdleWorkers(),
+    }];
   }
 
   // --- Resource / supply bar -------------------------------------------------

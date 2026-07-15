@@ -20,7 +20,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, BuildPhase,
-    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order, WeaponSetup,
+    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -308,7 +308,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
-            begin_deployed_weapon_teardown(e);
+            e.begin_weapon_teardown_for_movement();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -364,7 +364,7 @@ impl<'a> MoveCoordinator<'a> {
         unit.set_path_goal(Some(goal));
         unit.mark_move_phase(MovePhase::AwaitingPath);
         unit.reset_gather_state();
-        begin_deployed_weapon_teardown(unit);
+        unit.begin_weapon_teardown_for_movement();
         let (px, py) = (unit.pos_x, unit.pos_y);
         unit.reset_stuck(px, py);
     }
@@ -1117,19 +1117,6 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
             };
             (dx * dx + dy * dy).sqrt()
         }
-    }
-}
-
-fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
-    if !requires_weapon_setup(e.kind) {
-        return;
-    }
-    if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
-        let ticks = match e.kind {
-            EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
-            _ => config::MACHINE_GUNNER_SETUP_TICKS,
-        };
-        e.set_weapon_setup(WeaponSetup::TearingDown { ticks });
     }
 }
 

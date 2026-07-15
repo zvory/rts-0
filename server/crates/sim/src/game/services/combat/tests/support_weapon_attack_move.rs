@@ -111,18 +111,12 @@ fn attack_move_deployed_anti_tank_gun_tears_down_after_no_target_grace() {
     );
 
     run_combat_tick_on_map(&mut entities, &[player_state(1, false)], &map);
-    assert!(matches!(
-        entities
-            .get(at_id)
-            .expect("anti-tank gun should exist")
-            .weapon_setup(),
-        WeaponSetup::TearingDown { .. }
-    ));
+    let at = entities.get(at_id).expect("anti-tank gun should exist");
+    assert!(matches!(at.weapon_setup(), WeaponSetup::TearingDown { .. }));
+    assert_eq!(at.emplacement_facing(), None);
+    assert_eq!(at.pending_redeploy_facing(), None);
     assert!(
-        !entities
-            .get(at_id)
-            .expect("anti-tank gun should exist")
-            .path_is_empty(),
+        !at.path_is_empty(),
         "attack-move destination should be re-requested while teardown is pending"
     );
 

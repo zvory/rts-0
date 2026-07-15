@@ -511,7 +511,9 @@ folded into default targeting.
   `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
   underlying oil node. When that final load empties the patch, its Pump Jack disappears with it.
   Pump Jack placement requires overlap with a live oil node, but has no tech or mining-anchor
-  requirement.
+  requirement. Friendly units standing over the patch do not intercept the contextual right-click;
+  when the builder arrives, owned and allied units overlapping the footprint are moved to the
+  nearest clear positions before the Pump Jack scaffold is placed. Enemy units remain blockers.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch
@@ -531,7 +533,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
+| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 594 (~19.8s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -539,7 +541,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
-| scout_car       | 100 | 6   | 5     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
+| scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from the selected Command Car without a City Centre requirement; one active per Command Car; non-combat recon with 4-tile orbit radius and a 20-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 13    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
@@ -551,7 +553,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains workers; +50 supply; players start with one free |
+| city_centre                | City Centre        | 600 | 1     | 350 | 3x3  | 550       | trains workers; +50 supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +50 supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; +8 supply if present |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Panzerfaust and Machine Gunner require completed Training Centre; requires a City Centre |
@@ -560,7 +562,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after Medium Guns, and Artillery after Heavy Guns; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
-| pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; ejects friendly footprint occupants when its builder arrives; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

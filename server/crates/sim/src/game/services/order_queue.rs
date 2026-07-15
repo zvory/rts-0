@@ -19,8 +19,8 @@ use crate::game::services::order_execution::targeting::{
     stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
 };
 use crate::game::services::order_execution::{
-    begin_artillery_teardown_for_movement, execute_anti_tank_gun_setup,
-    start_artillery_fire_promoted_order, ArtilleryFireMode, FutureOrderMode,
+    execute_anti_tank_gun_setup, start_artillery_fire_promoted_order, ArtilleryFireMode,
+    FutureOrderMode,
 };
 use crate::game::services::standability;
 use crate::game::services::world_query;
@@ -275,7 +275,6 @@ pub(crate) fn promote_ready_orders(
 
     for (key, ids) in groups {
         coordinator.order_group_move(entities, key.owner, &ids, key.point(), key.attack_move);
-        begin_artillery_teardown_for_movement(entities, &ids);
     }
 }
 fn ready_for_next_order(
@@ -1439,6 +1438,7 @@ mod tests {
         let unit = entities.get(at).expect("at gun should exist");
         assert!(matches!(unit.order(), Order::AttackMove(_)));
         assert!(unit.queued_orders().is_empty());
+        assert_eq!(unit.emplacement_facing(), None);
     }
 
     #[test]

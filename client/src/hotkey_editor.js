@@ -9,6 +9,7 @@ import {
 } from "./hotkey_profiles.js";
 
 const CONTEXT_LABELS = Object.freeze({
+  "hud-shortcuts": "HUD Shortcuts",
   empty: "Empty Selection",
   "worker-main": "Worker Commands",
   "worker-build": "Worker Build Menu",
@@ -512,6 +513,10 @@ export class HotkeyEditor {
   _gridBindingMaps() {
     const profile = { bindings: {}, factionBindings: {} };
     for (const command of this.hotkeyProfiles.catalog.commands || []) {
+      if (command.gridHotkey) {
+        setProfileBindingForCommand(profile, command.commandId, command.gridHotkey);
+        continue;
+      }
       if (Number.isInteger(command.slotIndex)) {
         const slotKey = ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"][command.slotIndex] || "";
         if (slotKey) setProfileBindingForCommand(profile, command.commandId, slotKey);

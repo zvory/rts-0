@@ -101,7 +101,7 @@ pub const UNITS: &[UnitDef] = &[
             cost_steel: 50,
             cost_oil: 0,
             supply: 1,
-            build_ticks: 396,
+            build_ticks: 594,
             radius: 9.0,
         },
         armor_class: ArmorClass::Small,
@@ -274,7 +274,7 @@ pub const UNITS: &[UnitDef] = &[
         stats: balance::UnitStats {
             hp: 100,
             dmg: 6,
-            range_tiles: 5,
+            range_tiles: 7,
             cooldown: 6,
             speed: 2.35,
             sight_tiles: 15,
@@ -357,7 +357,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 600,
             sight_tiles: 1,
-            cost_steel: 225,
+            cost_steel: 350,
             cost_oil: 0,
             foot_w: 3,
             foot_h: 3,

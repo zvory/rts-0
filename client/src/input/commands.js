@@ -21,7 +21,7 @@ import {
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./artillery_targeting.js";
-import { commandHotkeyFromEvent } from "./placement.js";
+import { commandHotkeyFromEvent, entityIntersectsRect } from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 
 export function _onRightClick(p, ev = {}) {
@@ -175,8 +175,15 @@ function normalRightClickAction(input, p) {
 
   const gatherers = input._selectedGathererIds();
   const workers = input._selectedWorkerIds();
-  if (resource && resource.remaining !== 0) {
-    const action = resourceRightClickAction(resource, world || resource, gatherers, workers, input.state.map);
+  const contextualResource = resource || pumpJackOilUnderFriendlyUnit(input, target, workers);
+  if (contextualResource && contextualResource.remaining !== 0) {
+    const action = resourceRightClickAction(
+      contextualResource,
+      world || contextualResource,
+      gatherers,
+      workers,
+      input.state.map,
+    );
     if (action) return action;
   }
 
@@ -245,6 +252,42 @@ function resourceRightClickAction(resource, world, gatherers, workers, map) {
     };
   }
   return null;
+}
+
+function pumpJackOilUnderFriendlyUnit(input, target, workers) {
+  if (
+    workers.length === 0 ||
+    !target ||
+    !isUnit(target.kind) ||
+    !friendlyOwner(input.state, target.owner)
+  ) {
+    return null;
+  }
+  const map = input.state?.map;
+  const tileSize = map?.tileSize || DEFAULT_TILE_SIZE;
+  const stat = STATS[KIND.PUMP_JACK];
+  if (!stat?.footW || !stat?.footH) return null;
+
+  const matches = [];
+  for (const candidate of input._selectionEntities?.() || []) {
+    if (candidate.kind !== KIND.OIL || candidate.remaining === 0) continue;
+    const intent = _pumpJackBuildIntentForResource(candidate, map);
+    if (!intent) continue;
+    const minX = intent.tileX * tileSize;
+    const minY = intent.tileY * tileSize;
+    const maxX = minX + stat.footW * tileSize;
+    const maxY = minY + stat.footH * tileSize;
+    if (!entityIntersectsRect(target, minX, minY, maxX, maxY, tileSize)) continue;
+    matches.push(candidate);
+  }
+  matches.sort((a, b) => {
+    const ax = a.x - target.x;
+    const ay = a.y - target.y;
+    const bx = b.x - target.x;
+    const by = b.y - target.y;
+    return ax * ax + ay * ay - (bx * bx + by * by) || a.id - b.id;
+  });
+  return matches[0] || null;
 }
 
 function issueNormalRightClickAction(input, action, queued) {
@@ -721,6 +764,12 @@ function enemyOwner(state, owner) {
   }
   if (typeof state?.isEnemyOwner === "function") return state.isEnemyOwner(owner);
   return fallbackEnemyOwner(state?.playerId, owner);
+}
+
+function friendlyOwner(state, owner) {
+  return ownOwner(state, owner) || (
+    typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner)
+  );
 }
 
 function fallbackEnemyOwner(commandOwner, owner) {

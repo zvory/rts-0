@@ -109,6 +109,7 @@ src/
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   presentation/    # Frozen semantic layers, opaque GridSnapshot accessors, static map, and frame assembly
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
+  replay_seek_notice.js # Shared replay-seek direction/duration toast formatting
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
@@ -538,6 +539,10 @@ speed-only room-time profile, so the same component renders no seek, step, or ti
 for those rooms. Replay fog-perspective controls and the replay-branch button remain gated by
 replay-specific visibility/action capabilities, not by lab or URL identity.
 
+The app shell listens for reliable `roomTimeSeekStarted` broadcasts throughout replay playback and
+shows every viewer, including the controller, a `Seeking forward/backward X seconds…` toast before
+the synchronous replay rebuild can stall visible snapshots.
+
 The shared control surface is the `dom.roomTimeControls` root (`#room-time-controls`). Static
 pause/step controls use `.room-time-pause-btn` and `.room-time-step-btn`; generated room-time status
 and timeline markup use `.room-time-tick-status` and `.room-time-timeline*` selectors. The exported
@@ -901,12 +906,17 @@ export class HotkeyEditor {
 Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
 `description`, `createdWithBuild`, `basePreset`, `bindings`, and `factionBindings`. Direct-mode
 `bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.holdPosition`,
-`unit.stop`, `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
+`unit.stop`, `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Grid
+profiles compute command-card bindings from slots but store standalone HUD actions such as
+`hud.selectIdleWorkers` in `bindings`. Faction catalog
 actions are stored under `factionBindings[factionId]` with namespaced command ids shaped as
 `kriegsia.build.<kind>`, `kriegsia.train.<kind>`, `kriegsia.research.<upgrade>`, and
 `kriegsia.ability.<ability>`. Ekat uses the same `ekat.*` namespace for its exposed ability
 commands, currently `ekat.ability.ekatTeleport`, `ekat.ability.ekatLineShot`, and
-`ekat.ability.ekatMagicAnchor`. Imports migrate old flat Kriegsia ids like `build.city_centre`
+`ekat.ability.ekatMagicAnchor`. The always-active `hud.selectIdleWorkers` action appears in the HUD
+Shortcuts editor context and participates in conflict checks against every command-card context.
+Grid binds it to `T`; Classic RTS binds it to `I` because `T` is already assigned to training-centre,
+tank, and tank-research actions. Imports migrate old flat Kriegsia ids like `build.city_centre`
 into the Kriegsia binding set, preserve structurally valid unavailable faction commands with
 warnings, ignore unknown non-faction commands with warnings, reject invalid keys and same-context
 duplicates, and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to
@@ -1016,7 +1026,8 @@ minimap targeting feedback uses the mirrored cloud radius and duration effect fi
 replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. Advisory building placement ignores unit types whose client configuration marks them as
+command. If an owned or allied unit covers the patch, right-clicking that unit's body still resolves
+to the live oil beneath its Pump Jack footprint. Advisory building placement ignores unit types whose client configuration marks them as
 non-ground placement blockers. The Scout Plane stays out of the shared ground vehicle-body
 classifier, so its body does not block build previews. Normal gameplay selection and control-group
 commands exclude it, while Lab and spectator inspection paths allow selecting and grouping it. Its generated Fw 189-style top-down PNG frame-strip rig is scaled to the mirrored aircraft body so
@@ -1375,10 +1386,11 @@ export class HUD {
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
 ```
-The minimap status row shares its width between the game timer and an idle-worker tab capped at
-half the minimap width. The tab counts live local Workers whose authoritative activity is `idle`,
-disables when none are available or the command surface is read-only, and selects the current idle
-set through normal command-supply admission when clicked.
+The minimap status row shares its width between the game timer and an idle-worker status capped at
+half the minimap width. The status counts live local Workers whose authoritative activity is `idle`,
+shows the active profile's selection hotkey in parentheses, and remains pointer-disabled. Pressing
+the configured hotkey selects the current idle set through normal command-supply admission when the
+command surface is writable.
 
 The train command card is driven by the first selected production building type, but train clicks
 are issued to the selected completed compatible production buildings in round-robin order so a
@@ -1887,7 +1899,7 @@ Current areas:
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
   `observer_analysis_preferences.js`, `observer_analysis_rows.js`, `observer_analysis_signatures.js`,
-  `floating_panel_positioner.js`, `replay_controls.js`,
+  `floating_panel_positioner.js`, `replay_controls.js`, `replay_seek_notice.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
