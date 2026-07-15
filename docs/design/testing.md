@@ -280,12 +280,14 @@ canary runs own a private server; the browser shard passes its existing loopback
 - Lab panel controls: run `node tests/client_contracts.mjs` and
   `node scripts/check-client-architecture.mjs` when changing `client/src/lab_panel.js` player setup,
   spawn, resources, research, or result re-render behavior.
-- Client performance harness: run `node --check scripts/client-perf-harness.mjs` and
-  `node scripts/client-perf-harness.mjs --list` when changing the fixed browser performance
-  workloads, stress-matrix dimensions, harness script, or documented performance workflow. Workload
-  execution uses local headless Chrome against a local server and writes bounded JSON summaries
-  under `target/client-perf`; it is measurement-only and does not add FPS gates. Stress-matrix runs
-  vary CPU throttle, viewport, DPR, and repeat count, then write JSON and Markdown rollups.
+- Client performance harness: run `node --check scripts/client-perf-harness.mjs`,
+  `node scripts/client-perf-harness.mjs --list`, and
+  `node tests/client_contracts/client_flamegraph_contracts.mjs` when changing the fixed browser
+  performance workloads, stress-matrix dimensions, CPU/flame-graph capture, harness script, or
+  documented performance workflow. Workload execution uses local headless Chrome against a local
+  server and writes bounded JSON summaries under `target/client-perf`; it is measurement-only and
+  does not add FPS gates. Stress-matrix runs vary CPU throttle, viewport, DPR, and repeat count,
+  then write JSON and Markdown rollups.
   Render-lag summaries report advisory 60/120/240/480 FPS frame-work budget targets, p95 margin,
   next missed headroom budget, grouped render diagnostics, and long-frame context from local
   evidence instead of portable RAF FPS claims. `ClientNetReport` uploads are unchanged by these local

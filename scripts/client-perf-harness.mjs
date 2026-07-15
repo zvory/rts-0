@@ -13,6 +13,13 @@ import {
   initializeWorkloadSetup,
   validateActiveSupplyStressSample,
 } from "./client-perf/workload_setup.mjs";
+import {
+  cancelCpuProfile,
+  configurePageEmulation,
+  puppeteerViewport,
+  startCpuProfile,
+  stopCpuProfile,
+} from "./client-perf/browser_profile.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -182,6 +189,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   const requestFailures = [];
   const errors = [];
   let tracePath = null;
+  let cpuProfile = null;
   let summary = null;
   let snapshotCodecBakeoff = null;
   let workloadSetup = null;
@@ -189,7 +197,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   try {
     await prepareWorkload(workload);
     const page = await browser.newPage();
-    const cdpSession = await configurePageEmulation(page, args);
+    const cdpSession = await configurePageEmulation(page, args.cpuThrottleRate);
     if (args.snapshotCodecBakeoff) {
       await installSnapshotCodecCapture(page, args.snapshotCodecMaxSamples);
     }
@@ -234,7 +242,9 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
     );
+    cpuProfile = await startCpuProfile(page, process.env.RTS_CLIENT_CPU_PROFILE_INTERVAL_US, cdpSession);
     await sleep(args.durationMs);
+    await stopCpuProfile(cpuProfile, path.join(artifactDir, "cpu-profile.cpuprofile"));
 
     summary = await collectPageSummary(page);
     if (args.snapshotCodecBakeoff) {
@@ -372,6 +382,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     };
   } catch (err) {
     errors.push(err.stack || err.message);
+    await cancelCpuProfile(cpuProfile);
     try {
       if (args.trace) await browser.pages().then((pages) => pages.at(-1)?.tracing?.stop?.()).catch(() => {});
     } catch {
@@ -1553,22 +1564,6 @@ async function launchBrowser(puppeteer, chrome, args) {
       `--user-data-dir=${profileDir}`,
     ],
   });
-}
-
-async function configurePageEmulation(page, args) {
-  const rate = Number(args.cpuThrottleRate || DEFAULT_CPU_THROTTLE_RATE);
-  if (!Number.isFinite(rate) || rate <= 1) return null;
-  const session = await page.target().createCDPSession();
-  await session.send("Emulation.setCPUThrottlingRate", { rate });
-  return session;
-}
-
-function puppeteerViewport(viewport, deviceScaleFactor = DEFAULT_DEVICE_SCALE_FACTOR) {
-  return {
-    width: viewport.width,
-    height: viewport.height,
-    deviceScaleFactor,
-  };
 }
 
 async function installSnapshotCodecCapture(page, maxSamples) {

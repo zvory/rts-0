@@ -144,6 +144,12 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 - Pre-alpha/prototype plans: keep expensive-to-reverse architecture and authority/security on the
   critical path. Let actual scope determine the phase count, use playtests or measured checkpoints
   where they reduce risk, and keep speculative hardening/content in a deferred backlog.
+- Client performance planning: before proposing browser optimization phases, run
+  `node scripts/client-flamegraph.mjs --preview` from a clean worktree on current `origin/main`.
+  Inspect the returned PNG and ranked JSON together with the harness frame-budget summary, then
+  read the hottest functions before writing phases. Use `supply-300-hellhole-stream` for the
+  repeatable renderer-isolation baseline and an active-player workload when making production-cap
+  claims; neither substitutes for the other.
 - Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.
   For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
   so debug-only simulation invariants do not interrupt play; use a replay only when requested or

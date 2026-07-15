@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "scripts/client-perf-harness.mjs",
-      "lines": 1918,
+      "lines": 1911,
       "reason": "Frame-budget Phase 1 adds exact active-player and Lab authority checks plus standalone server startup policy to the existing oversized harness; keep ratcheting until workload execution and reporting are split."
     },
     {
