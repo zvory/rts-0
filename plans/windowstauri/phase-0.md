@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Completed on 2026-07-14.
 
 ## Objective
 
@@ -88,3 +88,18 @@ the next phase has a permitted command path.
 State whether the user granted the narrow Windows-native shell-build exception. Include the installed
 tool versions, WebView2 version/location, the path that future phases should use for Windows-native
 Tauri commands, and any path/access blocker.
+
+## Phase Handoff
+
+- The user explicitly authorized getting the Windows Tauri client working, including Windows-native
+  shell build commands. Git operations remain in WSL and no Windows server build is in scope.
+- Verified Windows 11 Pro x64 with Visual Studio Build Tools 2022 and the MSVC x64 tools, WebView2
+  Runtime 150.0.4078.65, Rust/Cargo 1.97.0, Tauri CLI 2.11.3, Node 24.18.0, npm 11.16.0, and Git.
+- Use `C:\Users\Alex\rts-0-control\repo` for Windows-native shell source commands. The portal is
+  viable, but Windows and WSL must not share the shell crate's default `target` directory.
+- Set `CARGO_TARGET_DIR` to `%LOCALAPPDATA%\rts-0\tauri-target-windows` for Windows builds.
+- This host has no active page file. Default-parallel Cargo failed with Windows error 1455; use
+  `CARGO_BUILD_JOBS=1` or `2` until a page file is enabled.
+- A two-job native build compiled the Tauri dependency graph and reached the project build script.
+  The next product blocker is `src-tauri/icons/icon.ico` being absent; Phase 1/2 should add the
+  Windows icon before expecting a complete native build.
