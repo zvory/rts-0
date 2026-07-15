@@ -51,7 +51,7 @@ const syntheticProfile = {
   assert.equal(defaults.preview, false);
 
   const custom = parseClientFlameGraphArgs([
-    "--workload", "supply-300-active",
+    "--workload", "selected-unit-hud-stress",
     "--seconds", "20",
     "--interval-us", "1000",
     "--cpu-throttle", "2",
@@ -59,7 +59,7 @@ const syntheticProfile = {
     "--dpr", "2",
     "--preview",
   ]);
-  assert.equal(custom.workload, "supply-300-active");
+  assert.equal(custom.workload, "selected-unit-hud-stress");
   assert.equal(custom.seconds, 20);
   assert.equal(custom.intervalUs, 1000);
   assert.equal(custom.cpuThrottle, 2);

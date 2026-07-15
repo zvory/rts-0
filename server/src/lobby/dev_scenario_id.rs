@@ -20,7 +20,6 @@ pub(in crate::lobby) enum DevScenarioId {
     PanzerfaustEntrenchedRange,
     PanzerfaustMethamphetamines,
     TankCoaxInspection,
-    SupplyStressActive,
 }
 
 impl DevScenarioId {
@@ -48,7 +47,6 @@ impl DevScenarioId {
             "panzerfaust_entrenched_range" => Some(Self::PanzerfaustEntrenchedRange),
             "panzerfaust_methamphetamines" => Some(Self::PanzerfaustMethamphetamines),
             "tank_coax_inspection" => Some(Self::TankCoaxInspection),
-            "supply_stress_active" => Some(Self::SupplyStressActive),
             _ => None,
         }
     }
@@ -77,7 +75,6 @@ impl DevScenarioId {
             Self::PanzerfaustEntrenchedRange => "panzerfaust_entrenched_range",
             Self::PanzerfaustMethamphetamines => "panzerfaust_methamphetamines",
             Self::TankCoaxInspection => "tank_coax_inspection",
-            Self::SupplyStressActive => "supply_stress_active",
         }
     }
 }

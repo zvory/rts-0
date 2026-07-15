@@ -12,47 +12,20 @@ import {
   parsePositiveNumberList,
 } from "../../scripts/client-perf-harness.mjs";
 import { FrameProfiler, collectMatchFrameContext } from "../../client/src/frame_profiler.js";
-import {
-  validateActiveSupplyStressSample,
-  validateLiveLabScenarioSample,
-} from "../../scripts/client-perf/workload_setup.mjs";
+import { validateLiveLabScenarioSample } from "../../scripts/client-perf/workload_setup.mjs";
 import {
   buildClientPerfWorkloads,
   defaultClientPerfWorkloads,
-  SUPPLY_ACTIVE_WORKLOADS,
 } from "../../scripts/client-perf/workloads.mjs";
 
 export function runFrameProfilerContracts() {
   {
-    const expected = SUPPLY_ACTIVE_WORKLOADS[200];
-    const sample = {
-      source: "server-authoritative-dev-scenario",
-      clientMutated: false,
-      scenarioId: expected.scenarioId,
-      scenarioSeed: expected.scenarioSeed,
-      playerId: expected.playerId,
-      spectator: false,
-      predictionEnabled: true,
-      predictionReady: true,
-      predictionMode: "tracking",
-      supplyUsed: expected.targetSupply,
-      supplyCap: expected.supplyCap,
-      projectedEntityCount: expected.projectedEntityCount,
-      countsByOwner: expected.countsByOwner,
-    };
-    assert(validateActiveSupplyStressSample(sample, expected).length === 0, "active supply workload accepts exact authoritative player evidence");
-    for (const mutation of [
-      { spectator: true },
-      { predictionEnabled: false, predictionMode: "disabled" },
-      { supplyUsed: 199 },
-      { projectedEntityCount: 1 },
-      { clientMutated: true },
-    ]) {
-      assert(validateActiveSupplyStressSample({ ...sample, ...mutation }, expected).length > 0, "active supply workload rejects invalid authority, prediction, supply, or projection evidence");
-    }
     const workloads = buildClientPerfWorkloads({});
     const ids = workloads.map((workload) => workload.id);
-    assert(ids.includes("supply-200-active") && ids.includes("supply-300-active"), "paired active 200/300 workloads are checked in");
+    assert(
+      ids.filter((id) => id.startsWith("supply-") && !id.includes("hellhole")).length === 0,
+      "Hellhole is the sole supply-scale client renderer benchmark",
+    );
     const defaultIds = defaultClientPerfWorkloads(workloads).map((workload) => workload.id);
     assert(defaultIds.includes("supply-300-hellhole-stream"), "client-only Hellhole remains in the default renderer workload set");
     const stream = workloads.find((workload) => workload.id === "supply-300-hellhole-stream");

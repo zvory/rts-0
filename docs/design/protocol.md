@@ -549,9 +549,8 @@ not become valid `setFaction`, AI-seat, replay-branch, or post-match replay ids 
 `docs/design/faction-architecture-inventory.md`, the lifecycle validator, and protocol parity in
 the same change.
 
-Prediction start compatibility metadata is present for live active players and for the bounded
-local-only active `supply_stress_active` dev recipient used by the frame-budget harness. Spectator,
-replay-viewer, Lab, and ordinary dev-watch recipients omit it. Clients MUST keep
+Prediction start compatibility metadata is present for live active players. Spectator,
+replay-viewer, Lab, and dev-watch recipients omit it. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
 and, when both sides know a build id, `predictionBuildId` matches the client bundle id. Mismatches
 fall back to authoritative snapshots/tracking instead of running local visual reconciliation.

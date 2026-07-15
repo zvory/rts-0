@@ -293,7 +293,6 @@ node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
-node scripts/client-perf-harness.mjs --active-supply-pair --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
 
@@ -322,35 +321,25 @@ budgets.
 Useful variants retain the same one-command workflow:
 
 ```bash
-node scripts/client-flamegraph.mjs --workload supply-300-active --seconds 20 --preview
 node scripts/client-flamegraph.mjs --cpu-throttle 4 --viewport 1440x900 --dpr 1 --preview
 ```
 
 Before writing client optimization phases, capture from a clean worktree on current `origin/main`,
 inspect the ranked self/inclusive functions and their source, and pair the result with
 `frame.work`/renderer/fog phase evidence from the same harness summary. Use the snapshot stream as
-the repeatable renderer-isolation lane; use `supply-300-active` when the conclusion depends on
-prediction or production-shaped active-player behavior. A page cannot grant itself V8 Profiler
-access, so remote playtester function profiles require a later DevTools, extension, or launcher
-workflow rather than a silent in-page upload.
+the sole supply-scale client renderer benchmark. Prediction or production-shaped active-player
+claims require separate evidence rather than a competing checked-in supply fixture. A page cannot
+grant itself V8 Profiler access, so remote playtester function profiles require a later DevTools,
+extension, or launcher workflow rather than a silent in-page upload.
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
 points at an already-healthy server. It drives headless Chrome with the repository-root
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
 under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
-`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios, the active-player
-`supply-200-active`/`supply-300-active` pair, and the client-only
+`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios and the client-only
 `supply-300-hellhole-stream`. The opt-in `supply-300-hellhole-integrated` workload is not included
-in default or render-lag-suite runs. The active pair uses the same fixed local seed (`0x5a000300`),
-viewport, DPR, CPU throttle, duration, and repeat settings. Both measured browsers join as player 1
-with compatible WASM prediction enabled; sampling fails for spectator/disabled prediction,
-client-mutated setup, wrong supply/cap/composition, or wrong projected regular-entity count. The
-authoritative per-player 200-supply mix is worker/rifleman/machine gunner/panzerfaust/anti-tank
-gun/mortar/artillery/scout car/tank/command car = `7/7/7/7/7/7/6/7/6/6`, with 135 regular entities
-in player 1's projection. The 300-supply mix is `12/10/10/10/10/10/10/10/9/9`, with 201 projected
-regular entities. Both preserve the normal production supply cap of 50; the fixture bypasses no
-production rule because simulation setup creates the units directly. Assertions complete before
-the profiler/report windows reset, then two successful explicit presents must occur before sampling.
+in default or render-lag-suite runs. Hellhole is the sole checked-in supply-scale client renderer
+benchmark.
 
 The snapshot-stream workload is the client-only isolation lane. It fetches the generated
 `client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
@@ -446,8 +435,8 @@ workload is more useful evidence than projecting the same millisecond or FPS del
 laptops.
 
 CPU-throttle results are synthetic scheduling-pressure evidence on the machine running Chrome, not
-real-device certification. In particular, neither active 300 supply nor the Lab full-world baseline
-claims that 300 supply is safe on player hardware.
+real-device certification. In particular, neither the Hellhole stream nor the Lab full-world
+baseline claims that 300 supply is safe on player hardware.
 
 Recurring top-level `match.*` phases above 1-2 ms p95 are advisory follow-up candidates;
 `match.renderer` and `match.minimap` are top-level phases, while `renderer.*` rows are nested
