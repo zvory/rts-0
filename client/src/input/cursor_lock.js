@@ -2,7 +2,6 @@ const CURSOR_LOCK_BROWSER = "browser";
 const CURSOR_LOCK_NATIVE_MACOS = "native-macos";
 
 export function installedAppRuntime() {
-  installTauriNativeCursorBridge();
   const standaloneDisplay = globalThis.matchMedia?.("(display-mode: standalone)")?.matches;
   return !!standaloneDisplay ||
     globalThis.navigator?.standalone === true ||
@@ -25,17 +24,8 @@ export function installTauriNativeCursorBridge(root = globalThis) {
   if (!root) return null;
   const existingBridge = root.__RTS_NATIVE_CURSOR;
   if (nativeBridgeSupported(existingBridge)) return existingBridge;
+  if (!macosNativeCursorRuntime(root.__RTS_DESKTOP_RUNTIME)) return null;
   if (typeof tauriInvokeFn(root) !== "function") return null;
-
-  const runtime = Object.freeze({
-    shell: "tauri",
-    platform: "macos",
-    nativeCursorBackend: true,
-    nativeCursorCapture: true,
-    pointerLockDisabled: true,
-    aggressiveCursorLock: true,
-  });
-  defineRuntimeGlobal(root, "__RTS_DESKTOP_RUNTIME", runtime);
 
   const listeners = new Set();
   const diagnostics = {
@@ -137,6 +127,14 @@ export function installTauriNativeCursorBridge(root = globalThis) {
   defineRuntimeGlobal(root, "__RTS_NATIVE_CURSOR", bridge);
   disableBrowserPointerLockForNativeShell(root);
   return root.__RTS_NATIVE_CURSOR === bridge ? bridge : nativeBridgeSupported(root.__RTS_NATIVE_CURSOR) ? root.__RTS_NATIVE_CURSOR : bridge;
+}
+
+function macosNativeCursorRuntime(runtime) {
+  return runtime?.shell === "tauri" &&
+    runtime?.platform === "macos" &&
+    runtime?.nativeCursorBackend === true &&
+    runtime?.nativeCursorCapture === true &&
+    runtime?.pointerLockDisabled === true;
 }
 
 export function cursorLockSupported(browserPointerLockSupported, nativeBridge = nativeDesktopCursorBridge()) {

@@ -1,7 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Cross-platform shell permissions for the desktop window.",
+  "identifier": "native-cursor-macos",
+  "description": "macOS-only native cursor command permissions for the desktop shell window.",
+  "platforms": [
+    "macOS"
+  ],
   "remote": {
     "urls": [
       "https://rts-0-zvorygin-beta.fly.dev/*",
@@ -14,10 +17,9 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "allow-desktop-log-info",
-    "allow-desktop-reveal-logs",
-    "allow-desktop-log-client-event",
-    "allow-desktop-open-profile"
+    "allow-maccursor-start",
+    "allow-maccursor-configure",
+    "allow-maccursor-stop",
+    "allow-maccursor-diagnostics"
   ]
 }

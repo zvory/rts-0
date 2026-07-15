@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Completed on 2026-07-14.
 
 ## Objective
 
@@ -54,14 +54,14 @@ Windows should launch the shell and use browser/WebView Pointer Lock.
 
 ## Implementation Checklist
 
-- [ ] Add a runtime policy helper and use it for initialization script generation.
-- [ ] Make Windows runtime script omit the native cursor bridge and Pointer Lock override.
-- [ ] Keep macOS runtime script behavior equivalent to current behavior.
-- [ ] Make log reveal/open commands platform-aware.
-- [ ] Update client Tauri/native cursor inference so Windows uses browser Pointer Lock.
-- [ ] Add focused tests for macOS-vs-Windows runtime script behavior.
-- [ ] Add focused JS tests for Windows desktop runtime using browser Pointer Lock.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Add a runtime policy helper and use it for initialization script generation.
+- [x] Make Windows runtime script omit the native cursor bridge and Pointer Lock override.
+- [x] Keep macOS runtime script behavior equivalent to current behavior.
+- [x] Make log reveal/open commands platform-aware.
+- [x] Update client Tauri/native cursor inference so Windows uses browser Pointer Lock.
+- [x] Add focused tests for macOS-vs-Windows runtime script behavior.
+- [x] Add focused JS tests for Windows desktop runtime using browser Pointer Lock.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 
@@ -90,3 +90,20 @@ that the startup screen renders.
 State the exact runtime fields injected on macOS and Windows. Call out whether any platform-specific
 Tauri API had to be gated. Tell the next agent the exact Windows command to use for the first source
 run.
+
+## Phase Handoff
+
+- macOS still injects `platform: "macos"`, all four native-cursor flags as `true`, the existing
+  `__RTS_NATIVE_CURSOR` bridge, and the Pointer Lock replacement. Its command permissions are now
+  isolated in a macOS-only capability.
+- Windows injects `platform: "windows"`, all four native-cursor flags as `false`, and the common
+  startup/profile/navigation/logging helpers. Its script contains no `__RTS_NATIVE_CURSOR`,
+  `maccursor_*`, or Pointer Lock replacement code.
+- Tauri globals alone no longer infer macOS native-cursor mode. Windows still counts as an installed
+  app through `__RTS_DESKTOP_RUNTIME` and reports Tauri diagnostics with native cursor absent.
+- Browser Pointer Lock remains raw-input-only. Rejection of `{ unadjustedMovement: true }` still
+  fails closed; no adjusted-movement fallback was added.
+- `desktop_reveal_logs` uses `open` on macOS and `explorer.exe` on Windows.
+- Added the Windows `icon.ico` required by `tauri-build` and listed it in the bundle config.
+- Windows crate tests pass with a worktree-specific Windows-local Cargo target and
+  `CARGO_BUILD_JOBS=2`; use a temporary `pushd` mapping when the source lives in a WSL worktree.

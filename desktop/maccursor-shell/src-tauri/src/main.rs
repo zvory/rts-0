@@ -8,9 +8,11 @@ use std::{
 };
 
 mod diagnostics;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod native_cursor;
 
 use diagnostics::{bounded_log_text, ShellDiagnostics, ShellLogInfo};
+#[cfg(target_os = "macos")]
 use native_cursor::{
     maccursor_configure, maccursor_diagnostics, maccursor_start, maccursor_stop,
     NativeCursorBackend,
@@ -98,8 +100,62 @@ impl DeveloperServerPolicy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShellPlatform {
+    Macos,
+    Windows,
+    Other,
+}
+
+impl ShellPlatform {
+    fn current() -> Self {
+        if cfg!(target_os = "macos") {
+            Self::Macos
+        } else if cfg!(target_os = "windows") {
+            Self::Windows
+        } else {
+            Self::Other
+        }
+    }
+
+    fn runtime_name(self) -> &'static str {
+        match self {
+            Self::Macos => "macos",
+            Self::Windows => "windows",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RuntimePolicy {
+    platform: ShellPlatform,
+    native_cursor_backend: bool,
+    native_cursor_capture: bool,
+    pointer_lock_disabled: bool,
+    aggressive_cursor_lock: bool,
+}
+
+impl RuntimePolicy {
+    fn for_platform(platform: ShellPlatform) -> Self {
+        let native_cursor = platform == ShellPlatform::Macos;
+        Self {
+            platform,
+            native_cursor_backend: native_cursor,
+            native_cursor_capture: native_cursor,
+            pointer_lock_disabled: native_cursor,
+            aggressive_cursor_lock: native_cursor,
+        }
+    }
+
+    fn current() -> Self {
+        Self::for_platform(ShellPlatform::current())
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RuntimeScriptOptions {
+    policy: RuntimePolicy,
     developer_server_url: Option<String>,
     autostart: bool,
     autolock: bool,
@@ -158,103 +214,111 @@ fn main() {
 }
 
 fn run() -> ShellResult<()> {
-    #[cfg(not(target_os = "macos"))]
-    return Err(shell_error("maccursor-shell is a macOS-only spike"));
-
+    let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    {
-        tauri::Builder::default()
-            .invoke_handler(tauri::generate_handler![
-                maccursor_start,
-                maccursor_configure,
-                maccursor_stop,
-                maccursor_diagnostics,
-                desktop_log_info,
-                desktop_reveal_logs,
-                desktop_log_client_event,
-                desktop_open_profile
-            ])
-            .setup(|app| {
-                let diagnostics =
-                    ShellDiagnostics::open(app.path().app_log_dir().map_err(|err| {
-                        shell_error(format!("failed to resolve app log directory: {err}"))
-                    })?)
-                    .map_err(shell_error)?;
-                app.manage(diagnostics.clone());
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        maccursor_start,
+        maccursor_configure,
+        maccursor_stop,
+        maccursor_diagnostics,
+        desktop_log_info,
+        desktop_reveal_logs,
+        desktop_log_client_event,
+        desktop_open_profile
+    ]);
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        desktop_log_info,
+        desktop_reveal_logs,
+        desktop_log_client_event,
+        desktop_open_profile
+    ]);
 
-                let initial_navigation = initial_navigation()?;
-                log_shell_start(&diagnostics, &initial_navigation);
-                log_startup_configuration(&diagnostics);
-                let developer_navigation_url = initial_navigation
-                    .developer_url()
-                    .map(str::parse::<tauri::Url>)
-                    .transpose()
-                    .map_err(|err| {
-                        shell_error(format!(
-                            "invalid developer server URL from {SERVER_URL_ENV}: {err}"
-                        ))
-                    })?;
+    builder
+        .setup(|app| {
+            let diagnostics = ShellDiagnostics::open(app.path().app_log_dir().map_err(|err| {
+                shell_error(format!("failed to resolve app log directory: {err}"))
+            })?)
+            .map_err(shell_error)?;
+            app.manage(diagnostics.clone());
+
+            let initial_navigation = initial_navigation()?;
+            log_shell_start(&diagnostics, &initial_navigation);
+            log_startup_configuration(&diagnostics);
+            let developer_navigation_url = initial_navigation
+                .developer_url()
+                .map(str::parse::<tauri::Url>)
+                .transpose()
+                .map_err(|err| {
+                    shell_error(format!(
+                        "invalid developer server URL from {SERVER_URL_ENV}: {err}"
+                    ))
+                })?;
+            #[cfg(target_os = "macos")]
+            let native_cursor = {
                 let native_cursor = NativeCursorBackend::with_diagnostics(diagnostics.clone());
                 app.manage(native_cursor.clone());
-                let runtime_script = desktop_runtime_script(&RuntimeScriptOptions {
-                    developer_server_url: initial_navigation.developer_url().map(str::to_string),
-                    autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
-                    autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
-                });
-                let initial_webview_url = initial_navigation.webview_url()?;
-                let navigation_monitor = NavigationMonitor::default();
-                let navigation_policy_diagnostics = diagnostics.clone();
-                let page_load_diagnostics = diagnostics.clone();
-                let page_load_monitor = navigation_monitor.clone();
-                let window = WebviewWindowBuilder::new(app, WINDOW_LABEL, initial_webview_url)
-                    .title("Bewegungskrieg")
-                    .inner_size(1280.0, 820.0)
-                    .min_inner_size(960.0, 640.0)
-                    .initialization_script(runtime_script)
-                    .on_navigation(move |url| {
-                        let allowed = navigation_allowed(url, developer_navigation_url.as_ref());
-                        if !allowed {
-                            navigation_policy_diagnostics.log_event(
-                                "navigation_rejected",
-                                json!({ "url": redact_url_for_log(url.as_str()) }),
-                            );
-                        }
-                        allowed
-                    })
-                    .on_page_load(move |window, payload| {
-                        handle_page_load(
-                            &page_load_diagnostics,
-                            &page_load_monitor,
-                            &window,
-                            payload,
+                native_cursor
+            };
+            let runtime_script = desktop_runtime_script(&RuntimeScriptOptions {
+                policy: RuntimePolicy::current(),
+                developer_server_url: initial_navigation.developer_url().map(str::to_string),
+                autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
+                autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
+            });
+            let initial_webview_url = initial_navigation.webview_url()?;
+            let navigation_monitor = NavigationMonitor::default();
+            let navigation_policy_diagnostics = diagnostics.clone();
+            let page_load_diagnostics = diagnostics.clone();
+            let page_load_monitor = navigation_monitor.clone();
+            let window = WebviewWindowBuilder::new(app, WINDOW_LABEL, initial_webview_url)
+                .title("Bewegungskrieg")
+                .inner_size(1280.0, 820.0)
+                .min_inner_size(960.0, 640.0)
+                .initialization_script(runtime_script)
+                .on_navigation(move |url| {
+                    let allowed = navigation_allowed(url, developer_navigation_url.as_ref());
+                    if !allowed {
+                        navigation_policy_diagnostics.log_event(
+                            "navigation_rejected",
+                            json!({ "url": redact_url_for_log(url.as_str()) }),
                         );
-                    })
-                    .build()?;
+                    }
+                    allowed
+                })
+                .on_page_load(move |window, payload| {
+                    handle_page_load(&page_load_diagnostics, &page_load_monitor, &window, payload);
+                })
+                .build()?;
+            #[cfg(target_os = "macos")]
+            {
                 native_cursor.install(&window);
                 let _ = app
                     .handle()
                     .set_activation_policy(tauri::ActivationPolicy::Regular);
-                let _ = window.set_focus();
-                Ok(())
-            })
-            .on_window_event(|window, event| {
-                if window.label() != WINDOW_LABEL {
-                    return;
+            }
+            let _ = window.set_focus();
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != WINDOW_LABEL {
+                return;
+            }
+            match event {
+                WindowEvent::Focused(false) => {
+                    #[cfg(target_os = "macos")]
+                    let _ = window.state::<NativeCursorBackend>().stop("window blur");
                 }
-                match event {
-                    WindowEvent::Focused(false) => {
-                        let _ = window.state::<NativeCursorBackend>().stop("window blur");
-                    }
-                    WindowEvent::CloseRequested { .. } => {
-                        let _ = window.state::<NativeCursorBackend>().stop("window closed");
-                        window.app_handle().exit(0);
-                    }
-                    _ => {}
+                WindowEvent::CloseRequested { .. } => {
+                    #[cfg(target_os = "macos")]
+                    let _ = window.state::<NativeCursorBackend>().stop("window closed");
+                    window.app_handle().exit(0);
                 }
-            })
-            .run(tauri::generate_context!())?;
-        Ok(())
-    }
+                _ => {}
+            }
+        })
+        .run(tauri::generate_context!())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -274,12 +338,24 @@ fn desktop_reveal_logs(
     ensure_startup_context(&window)?;
     std::fs::create_dir_all(diagnostics.log_dir())
         .map_err(|err| format!("failed to create shell log directory: {err}"))?;
-    std::process::Command::new("open")
+    let reveal_program = log_reveal_program(ShellPlatform::current())?;
+    std::process::Command::new(reveal_program)
         .arg(diagnostics.log_dir())
         .spawn()
         .map_err(|err| format!("failed to reveal shell log directory: {err}"))?;
     diagnostics.log_event("log_directory_revealed", json!({}));
     Ok(())
+}
+
+fn log_reveal_program(platform: ShellPlatform) -> Result<&'static str, String> {
+    match platform {
+        ShellPlatform::Macos => Ok("open"),
+        ShellPlatform::Windows => Ok("explorer.exe"),
+        ShellPlatform::Other => Err(
+            "revealing the shell log directory is not supported on this desktop platform"
+                .to_string(),
+        ),
+    }
 }
 
 #[tauri::command]
@@ -650,6 +726,9 @@ fn shell_build_id() -> Option<String> {
         .map(|value| bounded_log_text(&value))
 }
 
+const NATIVE_CURSOR_SCRIPT_BEGIN: &str = "/* RTS_NATIVE_CURSOR_BEGIN */";
+const NATIVE_CURSOR_SCRIPT_END: &str = "/* RTS_NATIVE_CURSOR_END */";
+
 fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     let autostart_script = if options.autostart {
         gated_automation_script(desktop_autostart_script())
@@ -667,7 +746,7 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
         serde_json::to_string(DEFAULT_PROFILE_ID).expect("default profile id serializes");
     let developer_server_url =
         serde_json::to_string(&options.developer_server_url).expect("developer URL serializes");
-    format!(
+    let mut script = format!(
         r#"
 (() => {{
   const profiles = Object.freeze({profiles}.map((profile) => Object.freeze({{ ...profile }})));
@@ -700,11 +779,11 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
 
   const runtime = Object.freeze({{
     shell: "tauri",
-    platform: "macos",
-    nativeCursorBackend: true,
-    nativeCursorCapture: true,
-    pointerLockDisabled: true,
-    aggressiveCursorLock: true,
+    platform: {platform},
+    nativeCursorBackend: {native_cursor_backend},
+    nativeCursorCapture: {native_cursor_capture},
+    pointerLockDisabled: {pointer_lock_disabled},
+    aggressiveCursorLock: {aggressive_cursor_lock},
     autostart: {autostart},
     autolock: {autolock},
     serverMode: selectedProfile ? "release" : developerSelected ? "developer" : "startup",
@@ -717,27 +796,11 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     writable: false
   }});
 
-  const denied = () => Promise.reject(new DOMException(
-    "Pointer Lock is disabled in the macOS native-cursor shell.",
-    "NotAllowedError"
-  ));
-  const replace = (target, name) => {{
-    if (!target || typeof target[name] !== "function") return;
-    try {{
-      Object.defineProperty(target, name, {{
-        value: denied,
-        configurable: true,
-        writable: false
-      }});
-    }} catch {{}}
-  }};
-
-  const listeners = new Set();
   const diagnostics = {{
-    supported: true,
-    backend: "native-macos",
+    supported: runtime.nativeCursorBackend,
+    backend: runtime.nativeCursorBackend ? "native-macos" : "browser-raw",
     active: false,
-    visual: "dom-event-time",
+    visual: runtime.nativeCursorBackend ? "dom-event-time" : null,
     movementBatched: false,
     nativeEventsReceived: 0,
     jsEventsProcessed: 0,
@@ -748,6 +811,7 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     lastReason: "ready",
     lastError: null
   }};
+
   const invoke = (cmd, payload = {{}}) => {{
     const candidates = [
       window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke,
@@ -757,8 +821,9 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     ];
     const tauriInvoke = candidates.find((candidate) => typeof candidate === "function");
     if (typeof tauriInvoke !== "function") {{
-      diagnostics.lastError = "Tauri invoke bridge is unavailable.";
-      return Promise.reject(new Error(diagnostics.lastError));
+      const message = "Tauri invoke bridge is unavailable.";
+      diagnostics.lastError = message;
+      return Promise.reject(new Error(message));
     }}
     return tauriInvoke(cmd, payload);
   }};
@@ -796,6 +861,24 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
   if (typeof document !== "undefined") {{
     document.addEventListener("click", redirectSameOriginTargetBlank, true);
   }}
+
+  /* RTS_NATIVE_CURSOR_BEGIN */
+  const denied = () => Promise.reject(new DOMException(
+    "Pointer Lock is disabled in the macOS native-cursor shell.",
+    "NotAllowedError"
+  ));
+  const replace = (target, name) => {{
+    if (!target || typeof target[name] !== "function") return;
+    try {{
+      Object.defineProperty(target, name, {{
+        value: denied,
+        configurable: true,
+        writable: false
+      }});
+    }} catch {{}}
+  }};
+
+  const listeners = new Set();
   const showDesktopShellFailure = (message) => {{
     if (document.getElementById("rts-desktop-shell-failure")) return;
     const panel = document.createElement("aside");
@@ -899,6 +982,7 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
   replace(elementProto, "webkitRequestPointerLock");
   replace(htmlElementProto, "requestPointerLock");
   replace(htmlElementProto, "webkitRequestPointerLock");
+  /* RTS_NATIVE_CURSOR_END */
 
 {autostart_script}
 {autolock_script}
@@ -906,12 +990,29 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
 "#,
         autostart = options.autostart,
         autolock = options.autolock,
+        platform = serde_json::to_string(options.policy.platform.runtime_name())
+            .expect("platform name serializes"),
+        native_cursor_backend = options.policy.native_cursor_backend,
+        native_cursor_capture = options.policy.native_cursor_capture,
+        pointer_lock_disabled = options.policy.pointer_lock_disabled,
+        aggressive_cursor_lock = options.policy.aggressive_cursor_lock,
         autostart_script = autostart_script,
         autolock_script = autolock_script,
         default_profile_id = default_profile_id,
         developer_server_url = developer_server_url,
         profiles = profiles_json
-    )
+    );
+    if !options.policy.native_cursor_backend {
+        let start = script
+            .find(NATIVE_CURSOR_SCRIPT_BEGIN)
+            .expect("native cursor script start marker exists");
+        let end = script
+            .find(NATIVE_CURSOR_SCRIPT_END)
+            .expect("native cursor script end marker exists")
+            + NATIVE_CURSOR_SCRIPT_END.len();
+        script.replace_range(start..end, "");
+    }
+    script
 }
 
 fn gated_automation_script(script: &'static str) -> String {
@@ -1085,6 +1186,7 @@ mod tests {
     #[test]
     fn shipped_profiles_are_remote_urls_without_local_server_command() {
         let script = desktop_runtime_script(&RuntimeScriptOptions {
+            policy: RuntimePolicy::for_platform(ShellPlatform::Macos),
             developer_server_url: None,
             autostart: false,
             autolock: false,
@@ -1241,8 +1343,9 @@ mod tests {
     }
 
     #[test]
-    fn runtime_script_exposes_desktop_flag_and_disables_pointer_lock() {
+    fn macos_runtime_script_exposes_native_cursor_and_disables_pointer_lock() {
         let script = desktop_runtime_script(&RuntimeScriptOptions {
+            policy: RuntimePolicy::for_platform(ShellPlatform::Macos),
             developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
             autostart: false,
             autolock: false,
@@ -1253,6 +1356,7 @@ mod tests {
         assert!(script.contains("https://rts-0-zvorygin.fly.dev/"));
         assert!(script.contains("const defaultProfileId = \"beta\""));
         assert!(script.contains("nativeCursorBackend: true"));
+        assert!(script.contains("platform: \"macos\""));
         assert!(script.contains("aggressiveCursorLock: true"));
         assert!(script.contains("autostart: false"));
         assert!(script.contains("autolock: false"));
@@ -1273,8 +1377,43 @@ mod tests {
     }
 
     #[test]
+    fn windows_runtime_script_uses_raw_browser_pointer_lock_without_native_bridge() {
+        let script = desktop_runtime_script(&RuntimeScriptOptions {
+            policy: RuntimePolicy::for_platform(ShellPlatform::Windows),
+            developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
+            autostart: false,
+            autolock: false,
+        });
+
+        assert!(script.contains("platform: \"windows\""));
+        assert!(script.contains("nativeCursorBackend: false"));
+        assert!(script.contains("nativeCursorCapture: false"));
+        assert!(script.contains("pointerLockDisabled: false"));
+        assert!(script.contains("aggressiveCursorLock: false"));
+        assert!(script.contains("__RTS_DESKTOP_RUNTIME"));
+        assert!(script.contains("sameOriginTargetBlankUrl"));
+        assert!(script.contains("desktop_log_client_event"));
+        assert!(!script.contains("__RTS_NATIVE_CURSOR"));
+        assert!(!script.contains("maccursor_start"));
+        assert!(!script.contains("requestPointerLock"));
+        assert!(!script.contains(NATIVE_CURSOR_SCRIPT_BEGIN));
+        assert!(!script.contains(NATIVE_CURSOR_SCRIPT_END));
+    }
+
+    #[test]
+    fn log_reveal_program_matches_supported_platforms() {
+        assert_eq!(log_reveal_program(ShellPlatform::Macos).unwrap(), "open");
+        assert_eq!(
+            log_reveal_program(ShellPlatform::Windows).unwrap(),
+            "explorer.exe"
+        );
+        assert!(log_reveal_program(ShellPlatform::Other).is_err());
+    }
+
+    #[test]
     fn desktop_autolock_helper_preserves_existing_cursor_capture() {
         let script = desktop_runtime_script(&RuntimeScriptOptions {
+            policy: RuntimePolicy::for_platform(ShellPlatform::Macos),
             developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
             autostart: false,
             autolock: true,

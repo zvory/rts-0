@@ -596,6 +596,14 @@ import {
   assert(nativeDesktopCursorBridge({ __RTS_NATIVE_CURSOR: fakeBridge }) === fakeBridge, "native desktop bridge is discovered from the runtime global");
   const tauriCalls = [];
   const tauriRoot = {
+    __RTS_DESKTOP_RUNTIME: {
+      shell: "tauri",
+      platform: "macos",
+      nativeCursorBackend: true,
+      nativeCursorCapture: true,
+      pointerLockDisabled: true,
+      aggressiveCursorLock: true,
+    },
     __TAURI__: {
       core: {
         invoke(cmd, payload) {
@@ -606,14 +614,38 @@ import {
     },
   };
   const tauriBridge = installTauriNativeCursorBridge(tauriRoot);
-  assert(tauriBridge === nativeDesktopCursorBridge(tauriRoot), "Tauri global installs the native desktop bridge in the page world");
-  assert(tauriRoot.__RTS_DESKTOP_RUNTIME.nativeCursorCapture === true, "Tauri bridge marks native cursor capture as required");
+  assert(tauriBridge === nativeDesktopCursorBridge(tauriRoot), "macOS Tauri runtime installs the native desktop bridge in the page world");
+  assert(tauriRoot.__RTS_DESKTOP_RUNTIME.nativeCursorCapture === true, "macOS runtime keeps native cursor capture required");
   const tauriStart = await tauriBridge.start({ x: 12, y: 34, width: 800, height: 600 });
   assert(tauriStart.active === true, "Tauri native bridge start returns the command snapshot");
   assert(tauriCalls[0].cmd === "maccursor_start", "Tauri native bridge invokes the Rust start command");
   assert(
     tauriCalls[0].payload.x === 12 && tauriCalls[0].payload.width === 800,
     "Tauri native bridge forwards cursor and viewport bounds",
+  );
+  const windowsTauriRoot = {
+    __RTS_DESKTOP_RUNTIME: {
+      shell: "tauri",
+      platform: "windows",
+      nativeCursorBackend: false,
+      nativeCursorCapture: false,
+      pointerLockDisabled: false,
+      aggressiveCursorLock: false,
+    },
+    __TAURI__: tauriRoot.__TAURI__,
+  };
+  assert(
+    installTauriNativeCursorBridge(windowsTauriRoot) === null,
+    "Windows Tauri runtime does not infer or install the macOS native cursor bridge",
+  );
+  assert(
+    windowsTauriRoot.__RTS_NATIVE_CURSOR === undefined,
+    "Windows Tauri runtime leaves the native cursor global absent",
+  );
+  const tauriOnlyRoot = { __TAURI__: tauriRoot.__TAURI__ };
+  assert(
+    installTauriNativeCursorBridge(tauriOnlyRoot) === null,
+    "Tauri globals alone do not imply macOS native cursor mode",
   );
   let nativeBrowserFallbackCalled = 0;
   const nativeMode = await enterCursorLock(
