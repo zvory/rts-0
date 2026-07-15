@@ -140,7 +140,11 @@ export function startLab(doc = document, root = window) {
 
   function renderLockState() {
     const locked = isLocked();
+    const requestPending = state.pendingMode !== null;
     nodes.captureZone.dataset.locked = String(locked);
+    nodes.rawLockButton.disabled = locked || requestPending;
+    nodes.standardLockButton.disabled = locked || requestPending;
+    nodes.exitLockButton.disabled = !locked;
     if (locked) {
       const mode = state.activeMode ?? state.pendingMode ?? "unknown";
       nodes.lockHeadline.dataset.state = "locked";
@@ -184,7 +188,7 @@ export function startLab(doc = document, root = window) {
   }
 
   async function beginLock(mode) {
-    if (isLocked()) return;
+    if (isLocked() || state.pendingMode) return;
     state.pendingMode = mode;
     state.lastResult = "Requesting";
     renderLockState();
