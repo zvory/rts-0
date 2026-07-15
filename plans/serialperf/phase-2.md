@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Done — attempted and rejected; the implementation was not shipped.
+- [x] Done. Attempted and rejected; the implementation was not shipped.
 
 ## Rejected Result
 

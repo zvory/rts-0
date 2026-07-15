@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Done — skipped after scouting; the implementation was not attempted.
+- [x] Done. Skipped after scouting; the implementation was not attempted.
 
 ## Scout Result
 
