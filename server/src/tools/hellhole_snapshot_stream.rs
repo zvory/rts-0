@@ -9,14 +9,12 @@ use crate::lobby::lab_scenario_driver::{
     lab_scenario_driver_for, LabScenarioAction, LabScenarioDriver,
 };
 use crate::protocol::{serialize_messagepack_compact_snapshot, Event};
+use crate::tools::hellhole_spec::{CENTER, SCENARIO_ID};
 
-pub const STREAM_ID: &str = "supply-300-hellhole";
+pub const STREAM_ID: &str = SCENARIO_ID;
 pub const DEFAULT_FRAME_COUNT: u32 = 900;
 pub const TICK_RATE_HZ: u32 = 30;
 pub const MAGIC: &[u8; 8] = b"RTSSTRM1";
-
-const TILE: f32 = 32.0;
-const CENTER_TILE: f32 = 63.0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotStreamSummary {
@@ -87,8 +85,8 @@ pub fn generate_hellhole_snapshot_stream(
             "sourceScenario": STREAM_ID,
             "serverSimulation": false,
             "initialCamera": {
-                "centerX": CENTER_TILE * TILE,
-                "centerY": CENTER_TILE * TILE
+                "centerX": CENTER.0,
+                "centerY": CENTER.1
             }
         }),
     );
