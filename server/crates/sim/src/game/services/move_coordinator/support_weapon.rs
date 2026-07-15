@@ -12,14 +12,16 @@ pub(super) fn begin_weapon_teardown_for_movement(entity: &mut Entity) {
         }
         _ => return,
     };
+    if matches!(entity.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
+        entity.set_emplacement_facing(None);
+        entity.set_pending_redeploy_facing(None);
+    }
     match entity.weapon_setup() {
         WeaponSetup::Packed | WeaponSetup::TearingDown { .. } => {}
         WeaponSetup::TearingDownToRedeploy { ticks } => {
-            entity.set_pending_redeploy_facing(None);
             entity.set_weapon_setup(WeaponSetup::TearingDown { ticks });
         }
         WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed => {
-            entity.set_pending_redeploy_facing(None);
             entity.set_weapon_setup(WeaponSetup::TearingDown {
                 ticks: teardown_ticks,
             });

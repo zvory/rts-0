@@ -628,6 +628,62 @@ fn move_order_tears_down_deployed_anti_tank_guns_before_moving() {
 }
 
 #[test]
+fn move_cancels_staged_support_weapon_setup() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let support_weapons = [EntityKind::AntiTankGun, EntityKind::Artillery].map(|kind| {
+        entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("support weapon should spawn")
+    });
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetupAntiTankGuns {
+                units: support_weapons.to_vec(),
+                x: 100.0,
+                y: 220.0,
+                queued: false,
+            },
+        )],
+    );
+    for id in support_weapons {
+        assert!(
+            entities
+                .get(id)
+                .expect("support weapon should exist")
+                .emplacement_facing()
+                .is_some(),
+            "setup command should stage a facing"
+        );
+    }
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: support_weapons.to_vec(),
+                x: 220.0,
+                y: 100.0,
+                queued: false,
+            },
+        )],
+    );
+
+    for id in support_weapons {
+        let weapon = entities.get(id).expect("support weapon should exist");
+        assert_eq!(weapon.weapon_setup(), WeaponSetup::Packed);
+        assert_eq!(weapon.emplacement_facing(), None);
+        assert_eq!(weapon.pending_redeploy_facing(), None);
+    }
+}
+
+#[test]
 fn replacement_move_preserves_support_weapon_teardown_progress() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

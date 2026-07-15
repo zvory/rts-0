@@ -979,12 +979,10 @@ mod planned_actions {
 
         if let Some(goal) = move_goal.filter(|_| !move_units.is_empty()) {
             clear_queued_orders(entities, &move_units);
-            clear_staged_anti_tank_gun_setup(entities, &move_units);
             coordinator.order_group_move(entities, player, &move_units, goal, false);
         }
         if let Some(goal) = attack_move_goal.filter(|_| !attack_move_units.is_empty()) {
             clear_queued_orders(entities, &attack_move_units);
-            clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
             coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
         }
         for planner_notice in output.notices {
