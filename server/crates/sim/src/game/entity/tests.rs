@@ -303,6 +303,101 @@ fn entity_store_keeps_mutable_iteration_guardrails() {
 }
 
 #[test]
+fn entity_store_core_operations_keep_stale_ids_fallible() {
+    let mut store = EntityStore::new();
+    let worker = store
+        .spawn_unit(1, EntityKind::Worker, 10.0, 20.0)
+        .expect("worker should spawn");
+    let rifleman = store
+        .spawn_unit(2, EntityKind::Rifleman, 30.0, 40.0)
+        .expect("rifleman should spawn");
+
+    assert_eq!((worker, rifleman), (1, 2));
+    assert!(store.contains(worker));
+    assert_eq!(store.get(rifleman).map(|entity| entity.owner), Some(2));
+    let rifleman_hp = store
+        .get(rifleman)
+        .map(|entity| entity.hp)
+        .expect("rifleman should still exist");
+    if let Some(entity) = store.get_mut(rifleman) {
+        entity.hp = entity.hp.saturating_sub(1);
+    }
+    assert_eq!(
+        store.get(rifleman).map(|entity| entity.hp),
+        Some(rifleman_hp.saturating_sub(1))
+    );
+
+    assert_eq!(store.remove(worker).map(|entity| entity.id), Some(worker));
+    assert!(!store.contains(worker));
+    assert!(store.get(worker).is_none());
+    assert!(store.get_mut(worker).is_none());
+    assert!(store.remove(worker).is_none());
+    assert!(store.get(u32::MAX).is_none());
+}
+
+#[test]
+fn entity_store_iteration_and_checkpoint_restore_stay_ordered() {
+    let mut store = EntityStore::new();
+    let first = store
+        .spawn_unit(1, EntityKind::Worker, 10.0, 20.0)
+        .expect("worker should spawn");
+    let removed = store
+        .spawn_unit(1, EntityKind::Rifleman, 20.0, 20.0)
+        .expect("rifleman should spawn");
+    let last = store
+        .spawn_node(EntityKind::Steel, 30.0, 20.0)
+        .expect("steel should spawn");
+    assert!(store.remove(removed).is_some());
+
+    assert_eq!(store.ids(), vec![first, last]);
+    assert_eq!(
+        store.iter().map(|entity| entity.id).collect::<Vec<_>>(),
+        vec![first, last]
+    );
+
+    let restored = EntityStore::from_checkpoint_entities(
+        store.checkpoint_next_id(),
+        store.checkpoint_entities(),
+    );
+    assert_eq!(restored.next_id_for_test(), 4);
+    assert_eq!(restored.ids(), vec![first, last]);
+    assert!(restored.get(removed).is_none());
+}
+
+#[test]
+fn entity_store_serde_round_trip_and_default_semantics_stay_unchanged() {
+    let mut store = EntityStore::new();
+    store
+        .spawn_unit(3, EntityKind::Tank, 50.0, 60.0)
+        .expect("tank should spawn");
+    store
+        .spawn_building(3, EntityKind::Depot, 70.0, 80.0, true)
+        .expect("depot should spawn");
+
+    let encoded = serde_json::to_value(&store).expect("store should serialize");
+    assert_eq!(encoded["next_id"], 3);
+    assert!(encoded["map"].get("1").is_some());
+    assert!(encoded["map"].get("2").is_some());
+    let restored: EntityStore =
+        serde_json::from_value(encoded.clone()).expect("store should deserialize");
+    assert_eq!(
+        serde_json::to_value(restored).expect("restored store should serialize"),
+        encoded
+    );
+
+    let mut default_store = EntityStore::default();
+    let default_id = default_store
+        .spawn_node(EntityKind::Oil, 5.0, 6.0)
+        .expect("oil should spawn");
+    let mut new_store = EntityStore::new();
+    let new_id = new_store
+        .spawn_node(EntityKind::Oil, 5.0, 6.0)
+        .expect("oil should spawn");
+    assert_eq!(default_id, 0);
+    assert_eq!(new_id, 1);
+}
+
+#[test]
 fn order_state_machines_keep_intent_separate_from_execution() {
     let mut worker =
         Entity::new_unit(1, EntityKind::Worker, 10.0, 20.0).expect("worker should spawn");
