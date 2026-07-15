@@ -7,9 +7,10 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - [docs/design/client-ui.md](../design/client-ui.md) — module contracts in §4.1 and current Pixi
   behavior in §4.2
 - [client-rendering.md](../design/client-rendering.md) — renderer-neutral contracts and parity ledger
+- [client-stress-tests.md](../design/client-stress-tests.md) — benchmark contract
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `interact_bridge.js`, `interact_game_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
+- `app-shell`: `main.js`, `app.js`, stress-test modules, `interact_bridge.js`, `interact_game_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
   AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`, and
   `room_capabilities.js`.
 - `model`: `state.js`, `state_ground_decals.js` (client-only received death/impact decal queue), `client_intent.js`, `command_budget.js`,

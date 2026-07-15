@@ -1,5 +1,9 @@
 import { App } from "./app.js";
-import { diagnostics, snapshotStreamLaunchConfig } from "./bootstrap.js";
+import {
+  diagnostics,
+  snapshotStreamLaunchConfig,
+  stressTestLaunchConfig,
+} from "./bootstrap.js";
 import { MapEditorApp } from "./map_editor_app.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
 import { SnapshotStreamNet } from "./snapshot_stream_net.js";
@@ -11,7 +15,8 @@ import {
 async function start() {
   let app;
   try {
-    const snapshotStreamLaunch = snapshotStreamLaunchConfig();
+    const stressTestLaunch = stressTestLaunchConfig();
+    const snapshotStreamLaunch = stressTestLaunch || snapshotStreamLaunchConfig();
     app = mapEditorLaunchConfig()
       ? new MapEditorApp()
       : new App({
@@ -20,6 +25,7 @@ async function start() {
           ? new SnapshotStreamNet({ id: snapshotStreamLaunch.id, diagnostics })
           : null,
         snapshotStreamLaunch,
+        stressTestLaunch,
       });
   } catch (error) {
     showRendererBootstrapError(error);

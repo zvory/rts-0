@@ -67,6 +67,7 @@ import {
 import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
+import { StressTestRunner } from "./stress_test.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -97,10 +98,19 @@ export function shouldWarnBeforeUnload({
  * same Net connection.
  */
 export class App {
-  constructor({ rendererBackendBundle = null, net = null, snapshotStreamLaunch = null } = {}) {
+  constructor({
+    rendererBackendBundle = null,
+    net = null,
+    snapshotStreamLaunch = null,
+    stressTestLaunch = null,
+  } = {}) {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = net || new Net(wsUrl(), diagnostics);
     this.snapshotStreamLaunch = snapshotStreamLaunch;
+    this.stressTestLaunch = stressTestLaunch;
+    this.stressTestRunner = stressTestLaunch
+      ? new StressTestRunner({ launch: stressTestLaunch })
+      : null;
     this.devWatch = devWatchConfig();
     this.labCatalogLaunch = labCatalogRouteConfig();
     this.labHandoffLaunch = labHandoffLaunchConfig();
@@ -185,6 +195,7 @@ export class App {
 
   /** Connect, wire global server messages, and show the lobby. */
   async start() {
+    this.stressTestRunner?.mount();
     this.net.on(S.START, this.onStart);
     this.net.on(S.ERROR, this.onError);
     this.net.on(S.OBSERVATION_READY, this.onObservationReady);
@@ -218,6 +229,7 @@ export class App {
       else if (this.matchLaunch) this.maybeAutoJoinMatchLaunch();
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
+      this.stressTestRunner?.fail("The Hellhole workload could not be loaded.");
       this.showConnectionWarning(
         "Unable to connect after several attempts. Refresh to try again.",
       );
@@ -583,6 +595,9 @@ export class App {
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );
+    if (this.stressTestRunner) {
+      void this.stressTestRunner.run({ match: this.match, net: this.net });
+    }
     if (labMetadata) {
       this.labPanel = new LabPanel({
         root: dom.gameScreen,

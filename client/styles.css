@@ -253,6 +253,71 @@ body {
   pointer-events: none;
 }
 
+#stress-test-status {
+  position: fixed;
+  top: 46px;
+  right: 10px;
+  z-index: 80;
+  box-sizing: border-box;
+  width: min(380px, calc(100vw - 20px));
+  padding: 10px 12px;
+  border: 1px solid var(--panel-edge);
+  background: rgba(17, 17, 15, 0.94);
+  color: var(--ink);
+  font: 12px/1.45 var(--mono);
+  box-shadow: 0 5px 24px rgba(0, 0, 0, 0.38);
+}
+
+#stress-test-status > strong,
+#stress-test-status > span,
+#stress-test-status > code,
+#stress-test-status > p {
+  display: block;
+}
+
+#stress-test-status > strong {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+#stress-test-status > code {
+  margin-top: 4px;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+#stress-test-status dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  margin: 9px 0;
+}
+
+#stress-test-status dt { color: var(--ink-faint); }
+#stress-test-status dd { margin: 0; color: var(--ink); }
+#stress-test-status p { margin: 7px 0 0; }
+#stress-test-status .stress-test-storage { color: var(--ink-faint); }
+
+.stress-test-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.stress-test-links a,
+.stress-test-links button,
+#stress-test-status > button {
+  border: 1px solid var(--panel-edge);
+  padding: 4px 7px;
+  background: rgba(43, 40, 34, 0.95);
+  color: var(--ink);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 /* A full-screen screen container. Only one is visible at a time; the [hidden]
    attribute (toggled from main.js) wins over display. */
 .screen {

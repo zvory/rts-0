@@ -17,6 +17,8 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use tower_http::compression::predicate::SizeAbove;
+use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
@@ -28,6 +30,7 @@ mod interact_lab_artifacts;
 #[cfg(test)]
 mod main_replay_tests;
 mod map_handoffs;
+mod stress_tests;
 mod wiki;
 
 use rts_server::db::Db;
@@ -110,12 +113,13 @@ struct AppState {
     /// startup so cache-busting survives browser caches without a hard refresh.
     index_html: String,
     maps_dir: String,
-    /// Optional database for match history. `None` when `DATABASE_URL` is unset or the connect
-    /// failed; the front-page `/api/matches` endpoint returns an empty list in that case.
+    /// Optional database for match history and explicitly gated diagnostics. `None` when
+    /// `DATABASE_URL` is unset or the connection failed.
     db: Option<Arc<Db>>,
     lab_scenario_submission: LabScenarioSubmissionService,
     interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge,
     map_handoffs: map_handoffs::MapHandoffStore,
+    stress_tests: stress_tests::StressTestStore,
 }
 
 #[tokio::main]
@@ -141,6 +145,17 @@ async fn main() {
     let lobby_db = record_matches.then(|| db.clone()).flatten();
     if db.is_some() && !record_matches {
         rts_server::log_info!("RTS_RECORD_MATCHES unset; match history writes disabled");
+    }
+
+    // Client stress reports are independently gated so local `cargo run` can exercise the full
+    // HTTP workflow without writing to a shared database. Reports always reach structured logs
+    // and a bounded process-local cache; beta/mainline opt into durable Postgres storage.
+    let record_stress_tests = env_truthy("RTS_RECORD_STRESS_TESTS");
+    let stress_test_db = record_stress_tests.then(|| db.clone()).flatten();
+    if db.is_some() && !record_stress_tests {
+        rts_server::log_info!(
+            "RTS_RECORD_STRESS_TESTS unset; client stress-test database writes disabled"
+        );
     }
 
     let version = rts_server::build_info::build_id().to_string();
@@ -174,6 +189,7 @@ async fn main() {
         lab_scenario_submission,
         interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge::from_env(),
         map_handoffs: map_handoffs::MapHandoffStore::default(),
+        stress_tests: stress_tests::StressTestStore::new(stress_test_db),
     };
     let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
@@ -189,6 +205,8 @@ async fn main() {
         .route("/lab/", get(index_handler))
         .route("/map-editor", get(index_handler))
         .route("/map-editor/", get(index_handler))
+        .route("/stress-test", get(stress_test_index_handler))
+        .route("/stress-test/", get(stress_test_index_handler))
         .route("/version", get(version_handler))
         .route("/wiki", get(wiki::wiki_index_handler))
         .route("/wiki/", get(wiki::wiki_index_handler))
@@ -249,6 +267,19 @@ async fn main() {
             get(lobbies_handler).post(create_lobby_handler),
         )
         .route("/api/matches", get(matches_handler))
+        .route(
+            "/api/stress-tests",
+            post(stress_tests::create_handler)
+                .layer(DefaultBodyLimit::max(stress_tests::MAX_SUBMISSION_BYTES)),
+        )
+        .route(
+            "/api/stress-tests/{run_id}",
+            get(stress_tests::artifact_handler),
+        )
+        .route(
+            "/api/stress-tests/{run_id}/flamegraph.svg",
+            get(stress_tests::flamegraph_handler),
+        )
         .route("/api/observations/{match_run_id}", get(observation_handler))
         .route(
             "/api/matches/{id}/replay",
@@ -256,6 +287,7 @@ async fn main() {
         )
         .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
+        .layer(CompressionLayer::new().compress_when(SizeAbove::new(1024)))
         .with_state(state);
 
     let addr = std::env::var("RTS_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
@@ -330,6 +362,22 @@ async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
         [
             (header::CONTENT_TYPE, "text/html; charset=utf-8"),
             (header::CACHE_CONTROL, "no-cache"),
+        ],
+        state.index_html,
+    )
+}
+
+/// The JS Self-Profiling API is available only when the document opts into the policy. Other
+/// routes intentionally omit it; unsupported browsers still run the phase-timing fallback.
+async fn stress_test_index_handler(State(state): State<AppState>) -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+            (
+                header::HeaderName::from_static("document-policy"),
+                "js-profiling",
+            ),
         ],
         state.index_html,
     )
