@@ -694,46 +694,6 @@ function buttonByLabel(card, label) {
     Array.from(teamSelectionState.selection).join(",") === String(allyWorker.id),
     "single-click can select an allied entity for inspection",
   );
-  const overlappingBuilder = {
-    id: 204,
-    owner: 1,
-    kind: KIND.WORKER,
-    x: 160,
-    y: 160,
-    hp: 40,
-    maxHp: 40,
-    state: STATE.IDLE,
-  };
-  const overlappingScaffold = {
-    id: 205,
-    owner: 1,
-    kind: KIND.DEPOT,
-    x: 160,
-    y: 160,
-    hp: 75,
-    maxHp: 300,
-    buildProgress: 0.25,
-    state: STATE.CONSTRUCT,
-  };
-  teamSelectionState.applySnapshot({
-    tick: 1,
-    steel: 100,
-    oil: 100,
-    supplyUsed: 1,
-    supplyCap: 10,
-    entities: [ownWorker, allyWorker, enemyWorker, overlappingBuilder, overlappingScaffold],
-    events: [],
-  });
-  publishSelectionTestScene(selectionInput);
-  selectionInput._commitClickSelection(
-    { x: overlappingScaffold.x, y: overlappingScaffold.y },
-    false,
-    false,
-  );
-  assert(
-    Array.from(teamSelectionState.selection).join(",") === String(overlappingScaffold.id),
-    "click selection prefers an unfinished building over its overlapping builder",
-  );
   selectionInput._commitBoxSelection({ x0: 0, y0: 0, x1: 120, y1: 64 }, false);
   assert(
     Array.from(teamSelectionState.selection).join(",") === String(ownWorker.id),

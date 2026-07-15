@@ -47,6 +47,7 @@ const MAX_UNITS_PER_COMMAND: usize = 256;
 const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
 mod artillery_scatter;
+mod cancel;
 mod guards;
 mod planner_facts;
 mod production_repeat;
@@ -1828,76 +1829,35 @@ fn order_set_rally(
     }
 }
 
-/// Cancel an unfinished building for a full refund, or cancel the latest item in a completed
-/// building's production queue and refund any paid cost and reserved supply.
 fn order_cancel(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     player: u32,
     building: u32,
 ) {
-    let construction_kind = entities.get(building).and_then(|entity| {
-        (entity.owner == player && entity.is_building() && entity.under_construction())
-            .then_some(entity.kind)
-    });
-    if let Some(kind) = construction_kind {
-        let Some(player_index) = players.iter().position(|candidate| candidate.id == player) else {
-            return;
-        };
-        let builders = entities
-            .iter()
-            .filter(|entity| {
-                entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(building)
-            })
-            .map(|entity| entity.id)
-            .collect::<Vec<_>>();
-        if entities.remove(building).is_none() {
-            return;
-        }
-        for builder in builders {
-            if let Some(worker) = entities.get_mut(builder) {
-                worker.clear_active_order();
-            }
-        }
-        players[player_index].refund_cost(rules::economy::resource_cost(kind));
-        players[player_index].record_construction_cancelled(kind);
+    let Some(ps) = players.iter_mut().find(|candidate| candidate.id == player) else {
         return;
-    }
-
-    enum Cancelled {
-        Unit(ProdItem),
-        Upgrade(ResearchItem),
-    }
-
-    let cancelled = {
-        let b = match entities.get_mut(building) {
-            Some(b) if b.owner == player && b.is_building() => b,
-            _ => return,
-        };
-        b.set_repeat_production(None, false);
-        if let Some(item) = b.pop_last_research() {
-            Cancelled::Upgrade(item)
-        } else if let Some(item) = b.pop_last_production() {
-            Cancelled::Unit(item)
-        } else {
-            return;
-        }
     };
-    if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-        match cancelled {
-            Cancelled::Unit(item) if item.paid && config::unit_stats(item.unit).is_some() => {
-                ps.refund_cost(rules::economy::resource_cost(item.unit));
-                ps.release_supply(rules::economy::supply_cost(item.unit));
-            }
-            Cancelled::Upgrade(item) if item.paid => {
-                let definition = upgrade::definition(item.upgrade);
-                ps.refund_cost(rules::economy::ResourceCost::new(
-                    definition.cost_steel,
-                    definition.cost_oil,
-                ));
-            }
-            _ => {}
+    let Some(cancelled) = cancel::apply(entities, player, building) else {
+        return;
+    };
+    match cancelled {
+        cancel::Cancelled::Construction { kind, cost_paid } if cost_paid => {
+            ps.refund_cost(rules::economy::resource_cost(kind));
+            ps.record_construction_cancelled(kind);
         }
+        cancel::Cancelled::Unit(item) if item.paid && config::unit_stats(item.unit).is_some() => {
+            ps.refund_cost(rules::economy::resource_cost(item.unit));
+            ps.release_supply(rules::economy::supply_cost(item.unit));
+        }
+        cancel::Cancelled::Upgrade(item) if item.paid => {
+            let definition = upgrade::definition(item.upgrade);
+            ps.refund_cost(rules::economy::ResourceCost::new(
+                definition.cost_steel,
+                definition.cost_oil,
+            ));
+        }
+        _ => {}
     }
 }
 

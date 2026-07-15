@@ -13,6 +13,10 @@ fn cancel_unfinished_building_refunds_full_cost_and_releases_builder() {
         .expect("builder should spawn");
     let handoff = OrderIntent::move_to(site_x + 96.0, site_y);
     {
+        let site = entities.get_mut(site).expect("site should exist");
+        assert!(site.mark_construction_cost_paid());
+    }
+    {
         let builder = entities.get_mut(worker).expect("builder should exist");
         builder.set_order(Order::build(EntityKind::Factory, 8, 8));
         builder.mark_build_phase(BuildPhase::Constructing { site });
@@ -82,6 +86,10 @@ fn cancel_unworked_scaffold_refunds_owner_and_rejects_enemy() {
     let starting_oil = players[0].oil;
     assert!(players[0].spend_cost(cost));
     players[0].record_entity_created(EntityKind::ResearchComplex);
+    assert!(entities
+        .get_mut(site)
+        .expect("site should exist")
+        .mark_construction_cost_paid());
 
     apply_with_players(
         &map,
@@ -108,4 +116,33 @@ fn cancel_unworked_scaffold_refunds_owner_and_rejects_enemy() {
     );
     assert_eq!(players[0].steel, starting_steel);
     assert_eq!(players[0].oil, starting_oil);
+}
+
+#[test]
+fn cancel_unpaid_authored_scaffold_does_not_refund_or_change_score() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 8, 8);
+    let site = entities
+        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .expect("authored scaffold should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    let starting_steel = players[0].steel;
+    let starting_oil = players[0].oil;
+    let starting_score = players[0].score.structure_score;
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, SimCommand::Cancel { building: site })],
+    );
+
+    assert!(
+        !entities.contains(site),
+        "the authored scaffold is cancelled"
+    );
+    assert_eq!(players[0].steel, starting_steel);
+    assert_eq!(players[0].oil, starting_oil);
+    assert_eq!(players[0].score.structure_score, starting_score);
 }
