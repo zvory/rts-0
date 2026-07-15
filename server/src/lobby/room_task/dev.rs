@@ -62,7 +62,6 @@ impl RoomTask {
         &mut self,
         player_id: u32,
         name: String,
-        _requested_spectator: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
