@@ -351,7 +351,9 @@ incident replays are analysis evidence only and are not replay-harness workloads
 `--render-lag-suite` path runs the current workload set, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
-per-budget margins and the next missed p95 budget. The same block includes `frameAttribution`,
+per-budget margins and the next missed p95 budget. The actual target is 240 FPS (4.17 ms of
+frame work); 60 and 120 FPS remain lower diagnostic bands, while 480 FPS is the headroom band. The
+same block includes `frameAttribution`,
 which reports top-level named work, `frame.unattributed` average/p95/max, `frame.rafDispatch`, and
 the average percentage of `frame.work` covered by named top-level phases. It also includes a local-only
 `renderDiagnostics` block with the counter groups above, recent long-frame context, and the largest
@@ -389,9 +391,10 @@ optimization branches on the same machine, not as a portable guarantee for other
 For render-lag comparisons, read `renderBudget.frameWork` first: `frame.work` is total browser work
 inside the RAF and should be compared to the 16.67 ms, 8.33 ms, 4.17 ms, and 2.08 ms frame-work
 budgets for 60, 120, 240, and 480 FPS. A positive margin means the measured frame-work metric was
-under that budget; a negative margin shows how far it missed. The 120 FPS result remains useful,
-but a workload with p95 near 8 ms is only barely clearing 120 locally and should still be treated as
-risky for weaker hardware if it misses the 240 FPS headroom target.
+under that budget; a negative margin shows how far it missed. The 240 FPS/4.17 ms band is the actual
+target. The 60 and 120 FPS results remain useful intermediate diagnostics, but clearing either does
+not satisfy the target. A workload with p95 near 4.17 ms is only barely clearing 240 locally and
+should still be treated as risky for weaker hardware if it misses the 480 FPS headroom band.
 
 Use `frame.work` average, p95, and max instead of literal local `requestAnimationFrame` FPS for
 branch comparisons. Local RAF FPS is constrained by display refresh rate, browser scheduling,

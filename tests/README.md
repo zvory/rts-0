@@ -229,7 +229,8 @@ The harness starts its own local server unless `RTS_URL` or `--base-url` points 
 It fails on runtime errors or missing perf summaries, not on absolute FPS thresholds. The render-lag
 suite writes per-workload summaries and a `target/client-perf/render-lag-comparison/<timestamp>/`
 rollup with advisory 60, 120, 240, and 480 FPS frame-work budget margins plus the next missed p95
-budget. Open a generated `summary.json` to inspect workload metadata, build/version, viewport,
+budget. The actual target is 240 FPS/4.17 ms; 60 and 120 FPS are lower diagnostic bands, and 480 FPS
+is the headroom band. Open a generated `summary.json` to inspect workload metadata, build/version, viewport,
 entity/context counts, `renderBudget`, frame attribution, `frame.unattributed`,
 `frame.rafDispatch`, frame timing aggregates, worst phases, page errors, and the generated client
 net report.

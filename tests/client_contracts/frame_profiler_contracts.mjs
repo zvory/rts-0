@@ -202,7 +202,8 @@ export function runFrameProfilerContracts() {
       ],
     });
 
-    assert(report.target.frameBudgetMs === RENDER_FRAME_BUDGET_MS, "render budget report exposes the 120 FPS frame budget");
+    assert(report.target.fps === 240, "render budget report exposes the 240 FPS target");
+    assert(report.target.frameBudgetMs === RENDER_FRAME_BUDGET_MS, "render budget report exposes the 240 FPS frame budget");
     assert(report.target.frameBudgets.length === RENDER_FRAME_BUDGET_TARGETS.length, "render budget report exposes all FPS frame budgets");
     assert(report.status === "warn", "render budget report warns without failing on over-budget frame work");
     assert(report.frameWork.avgMs === 7.5, "render budget report includes frame.work average");
@@ -246,10 +247,30 @@ export function runFrameProfilerContracts() {
       ],
     });
 
-    assert(report.frameWork.nextMissedBudget.fps === 240, "120 FPS work can still miss the next headroom target");
+    assert(report.frameWork.nextMissedBudget.fps === 240, "120 FPS work can still miss the 240 FPS target");
     assert(
-      report.warnings.some((warning) => warning.kind === "frame_work_p95_misses_headroom_budget"),
-      "render budget report warns when local p95 clears 120 but misses higher headroom",
+      report.warnings.some((warning) => warning.kind === "frame_work_p95_over_budget" && warning.severity === "high"),
+      "render budget report treats a missed 240 FPS target as high severity",
+    );
+  }
+
+  {
+    const report = buildRenderBudgetReport({
+      schemaVersion: 1,
+      frameCount: 120,
+      slowFrameCount: 0,
+      phases: [
+        { label: "frame.work", count: 120, avgMs: 3, maxMs: 5, p50Ms: 2, p95Ms: 4, slowCount: 0 },
+      ],
+    });
+
+    assert(report.frameWork.nextMissedBudget.fps === 480, "240 FPS work can still miss the next headroom target");
+    assert(
+      report.warnings.some((warning) =>
+        warning.kind === "frame_work_p95_misses_headroom_budget"
+          && warning.message.includes("clears 240 FPS locally")
+      ),
+      "render budget report reserves headroom warnings for budgets above the 240 FPS target",
     );
   }
 
