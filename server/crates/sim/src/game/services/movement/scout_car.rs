@@ -619,11 +619,15 @@ fn score_candidate(
     } else {
         0.0
     };
-    let blocked_front_penalty = if front_blocked && candidate.primitive.curvature.abs() <= 1.0e-5 {
-        6.0
-    } else {
-        0.0
-    };
+    let blocked_front_penalty =
+        if front_blocked
+            && candidate.primitive.travel_sign > 0.0
+            && candidate.primitive.curvature.abs() <= 1.0e-5
+        {
+            6.0
+        } else {
+            0.0
+        };
 
     -route_progress * 10.0 - goal_progress * 2.5 - along * 0.75
         + lateral * 0.08
