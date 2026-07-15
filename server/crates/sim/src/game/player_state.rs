@@ -105,11 +105,11 @@ impl PlayerState {
 
     pub(crate) fn set_supply_counts(&mut self, used: u32, cap: u32) {
         self.supply_used = used;
-        self.supply_cap = cap.min(config::SUPPLY_CAP_MAX);
+        self.supply_cap = cap.min(config::PLAYER_SUPPLY_CAP);
     }
 
     pub(crate) fn reset_supply(&mut self) {
-        self.set_supply_counts(0, config::INTRINSIC_SUPPLY_CAP);
+        self.set_supply_counts(0, config::PLAYER_SUPPLY_CAP);
     }
 }
 

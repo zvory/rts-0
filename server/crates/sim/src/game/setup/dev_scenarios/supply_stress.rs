@@ -184,8 +184,8 @@ mod tests {
             assert_eq!(
                 resources,
                 vec![
-                    (1, target, config::INTRINSIC_SUPPLY_CAP),
-                    (2, target, config::INTRINSIC_SUPPLY_CAP),
+                    (1, target, config::PLAYER_SUPPLY_CAP),
+                    (2, target, config::PLAYER_SUPPLY_CAP),
                 ]
             );
 

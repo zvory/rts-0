@@ -177,13 +177,6 @@ pub fn supply_cost(kind: EntityKind) -> u32 {
     defs::unit_def(kind).map(|d| d.stats.supply).unwrap_or(0)
 }
 
-/// Supply provided by a building kind. Returns 0 for non-buildings.
-pub fn supply_provided(kind: EntityKind) -> u32 {
-    defs::building_def(kind)
-        .map(|d| d.stats.provides_supply)
-        .unwrap_or(0)
-}
-
 fn requirements_met(requirements: &[EntityKind], owned: &[EntityKind]) -> bool {
     requirements.iter().all(|req| owned.contains(req))
 }
@@ -364,16 +357,6 @@ mod tests {
         assert_eq!(cost(EntityKind::Steelworks), (150, 100));
         assert_eq!(supply_cost(EntityKind::Tank), 8);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
-        assert_eq!(
-            supply_provided(EntityKind::CityCentre),
-            crate::balance::CITY_CENTRE_SUPPLY
-        );
-        assert_eq!(
-            supply_provided(EntityKind::Depot),
-            crate::balance::DEPOT_SUPPLY
-        );
-        assert_eq!(supply_provided(EntityKind::Tank), 0);
-
         assert_eq!(
             trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::Factory),
             vec![

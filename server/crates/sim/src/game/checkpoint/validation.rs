@@ -62,7 +62,7 @@ pub(super) fn validate_players(
             player.upgrades.len(),
             MAX_COMPLETED_UPGRADES_PER_PLAYER,
         )?;
-        if player.supply_cap > config::SUPPLY_CAP_MAX {
+        if player.supply_cap > config::PLAYER_SUPPLY_CAP {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "players.supplyCap",
             });
@@ -116,16 +116,12 @@ pub(super) fn validate_player_supply(
     for player in players {
         let catalog = rules::faction::catalog_for(&player.faction_id);
         let mut expected_used = 0u32;
-        let mut expected_cap = config::INTRINSIC_SUPPLY_CAP;
+        let expected_cap = config::PLAYER_SUPPLY_CAP;
         for entity in &entities.entities {
             if entity.owner != player.id {
                 continue;
             }
             if entity.is_building() && !entity.under_construction() {
-                if catalog.is_some_and(|catalog| catalog.allows_building(entity.kind)) {
-                    expected_cap =
-                        expected_cap.saturating_add(rules::economy::supply_provided(entity.kind));
-                }
                 for item in entity.prod_queue().iter().filter(|item| item.paid) {
                     if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
                         expected_used =
@@ -139,7 +135,6 @@ pub(super) fn validate_player_supply(
                     expected_used.saturating_add(rules::economy::supply_cost(entity.kind));
             }
         }
-        expected_cap = expected_cap.min(config::SUPPLY_CAP_MAX);
         if player.supply_used != expected_used {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "players.supplyUsed",
