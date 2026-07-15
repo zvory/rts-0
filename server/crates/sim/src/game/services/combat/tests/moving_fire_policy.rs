@@ -1,6 +1,23 @@
 use super::*;
 
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = crate::config::TICK_HZ as u16 * 3;
+const MOVING_FIRE_ROUTE_GOAL: (f32, f32) = (500.0, 100.0);
+
+fn visible_target_x_outside_weapon_range(entities: &EntityStore, attacker_id: u32) -> f32 {
+    let attacker = entities
+        .get(attacker_id)
+        .expect("moving-fire attacker should exist for range setup");
+    let profile = effective_attack_profile(attacker);
+    let range_px = profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + RANGE_SLACK;
+    let target_x = attacker.pos_x + range_px + config::TILE_SIZE as f32;
+    let sight_px = attacker.sight_tiles() as f32 * config::TILE_SIZE as f32;
+    assert!(
+        target_x - attacker.pos_x < sight_px,
+        "{:?} fixture needs a visible target outside weapon range",
+        attacker.kind
+    );
+    target_x
+}
 
 #[test]
 fn moving_fire_move_orders_do_not_chase_targets_outside_weapon_range() {
@@ -9,24 +26,37 @@ fn moving_fire_move_orders_do_not_chase_targets_outside_weapon_range() {
         let unit_id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
             .expect("moving-fire unit should spawn");
+        let target_x = visible_target_x_outside_weapon_range(&entities, unit_id);
         entities
-            .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+            .spawn_unit(2, EntityKind::Rifleman, target_x, 100.0)
             .expect("enemy should spawn");
         if let Some(unit) = entities.get_mut(unit_id) {
-            unit.set_order(Order::move_to(300.0, 100.0));
-            unit.set_path(vec![(300.0, 100.0)]);
-            unit.set_path_goal(Some((300.0, 100.0)));
+            unit.set_order(Order::move_to(
+                MOVING_FIRE_ROUTE_GOAL.0,
+                MOVING_FIRE_ROUTE_GOAL.1,
+            ));
+            unit.set_path(vec![MOVING_FIRE_ROUTE_GOAL]);
+            unit.set_path_goal(Some(MOVING_FIRE_ROUTE_GOAL));
             unit.mark_move_phase(MovePhase::Moving);
         }
 
-        run_combat_tick(&mut entities);
+        let map = open_map(20);
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
 
         let unit = entities
             .get(unit_id)
             .expect("moving-fire unit should exist");
         assert_eq!(unit.target_id(), None, "{kind:?} should not acquire");
-        assert_eq!(unit.path_goal(), Some((300.0, 100.0)), "{kind:?}");
-        assert_eq!(unit.next_waypoint(), Some((300.0, 100.0)), "{kind:?}");
+        assert_eq!(unit.path_goal(), Some(MOVING_FIRE_ROUTE_GOAL), "{kind:?}");
+        assert_eq!(
+            unit.next_waypoint(),
+            Some(MOVING_FIRE_ROUTE_GOAL),
+            "{kind:?}"
+        );
     }
 }
 
@@ -37,13 +67,17 @@ fn moving_fire_attack_move_chases_enemy_outside_weapon_range() {
         let unit_id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
             .expect("moving-fire unit should spawn");
+        let target_x = visible_target_x_outside_weapon_range(&entities, unit_id);
         let enemy_id = entities
-            .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+            .spawn_unit(2, EntityKind::Rifleman, target_x, 100.0)
             .expect("enemy should spawn");
         if let Some(unit) = entities.get_mut(unit_id) {
-            unit.set_order(Order::attack_move_to(400.0, 100.0));
-            unit.set_path(vec![(400.0, 100.0)]);
-            unit.set_path_goal(Some((400.0, 100.0)));
+            unit.set_order(Order::attack_move_to(
+                MOVING_FIRE_ROUTE_GOAL.0,
+                MOVING_FIRE_ROUTE_GOAL.1,
+            ));
+            unit.set_path(vec![MOVING_FIRE_ROUTE_GOAL]);
+            unit.set_path_goal(Some(MOVING_FIRE_ROUTE_GOAL));
             unit.mark_move_phase(MovePhase::Moving);
         }
 
@@ -58,7 +92,7 @@ fn moving_fire_attack_move_chases_enemy_outside_weapon_range() {
             .get(unit_id)
             .expect("moving-fire unit should exist");
         assert_eq!(unit.target_id(), Some(enemy_id), "{kind:?} should acquire");
-        assert_ne!(unit.path_goal(), Some((400.0, 100.0)), "{kind:?}");
+        assert_ne!(unit.path_goal(), Some(MOVING_FIRE_ROUTE_GOAL), "{kind:?}");
         assert!(!unit.path_is_empty(), "{kind:?} should chase");
     }
 }
