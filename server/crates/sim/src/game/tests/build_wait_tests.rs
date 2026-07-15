@@ -70,6 +70,8 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         .entities
         .spawn_unit(1, EntityKind::Worker, worker_pos.0, worker_pos.1)
         .expect("worker should spawn");
+    let cost = crate::rules::economy::resource_cost(EntityKind::CityCentre);
+    let shortage_notice = crate::rules::economy::resource_shortage_notice_for_cost(0, 0, cost);
     game.state.players[0].set_resources(0, 0);
     refresh_derived_state(&mut game);
 
@@ -97,11 +99,11 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         under_construction_city_centres(&game).is_empty(),
         "broke arrival must not spawn a scaffold"
     );
-    assert_eq!(notice_count(&first_events, 1, "Not enough steel"), 1);
+    assert_eq!(notice_count(&first_events, 1, shortage_notice), 1);
 
     let repeat_events = game.tick();
     assert_eq!(
-        notice_count(&repeat_events, 1, "Not enough steel"),
+        notice_count(&repeat_events, 1, shortage_notice),
         0,
         "continuing the same resource wait should stay quiet"
     );
@@ -110,7 +112,6 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         "resource wait must keep retrying without reserving or spawning"
     );
 
-    let cost = crate::rules::economy::resource_cost(EntityKind::CityCentre);
     game.state.players[0].set_resources(cost.steel, cost.oil);
     game.tick();
 
@@ -313,9 +314,14 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
         Order::Idle
     ));
     assert_eq!(game.state.players[0].steel, 0);
+    assert_eq!(game.state.players[0].oil, 0);
     assert_eq!(
         game.state.players[1].steel, cost.steel,
         "losing worker must not pay for a footprint already claimed by a building"
+    );
+    assert_eq!(
+        game.state.players[1].oil, cost.oil,
+        "losing worker must not pay oil for a footprint already claimed by a building"
     );
     assert_eq!(notice_count(&events, 2, "Cannot build there"), 1);
 }
