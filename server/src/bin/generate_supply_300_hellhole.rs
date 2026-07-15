@@ -2,10 +2,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use rts_protocol::{
-    Command, InitialCamera, LabCheckpointScenarioV1 as ProtocolLabCheckpointScenarioV1,
+    Command, Event, InitialCamera, LabCheckpointScenarioV1 as ProtocolLabCheckpointScenarioV1,
     LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, DEFAULT_FACTION_ID,
 };
-use rts_rules::balance::{building_stats, unit_stats};
+use rts_rules::economy::supply_cost;
+use rts_rules::faction::catalog_for;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
     LabCommandOptions, LabOp, LabOpOutcome, LabSetCompletedResearch, LabSetPlayerResources,
@@ -19,14 +20,18 @@ const OUT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/lab-scenarios/supply-300-hellhole.json"
 );
-const MAP_NAME: &str = "No Terrain";
+const MAP_NAME: &str = "1v1";
 const SCENARIO_NAME: &str = "Supply 300 Hellhole";
 const SEED: u32 = 0x5a00_0300;
 const TILE: f32 = 32.0;
 const TARGET_SUPPLY: u32 = 300;
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
-const CENTER: (f32, f32) = (63.0 * TILE, 63.0 * TILE);
-const SHUTTLE_OFFSET_TILES: f32 = 18.0;
+const CENTER: (f32, f32) = (96.0 * TILE, 63.0 * TILE);
+const LATTICE_COLUMNS: usize = 16;
+const LATTICE_SPACING_X: f32 = 54.0;
+const LATTICE_SPACING_Y: f32 = 33.0;
+const PARTIAL_HP_MIN: usize = 1;
+const PARTIAL_HP_WARMUP_TICKS: u32 = 180;
 
 fn main() {
     let out = std::env::args()
@@ -40,16 +45,59 @@ fn main() {
 }
 
 fn run(out: PathBuf) -> Result<(), String> {
-    let mut game = blank_no_terrain_lab()?;
+    let mut game = blank_authored_lab()?;
     clear_default_entities(&mut game)?;
     grant_lab_state(&mut game)?;
 
     let composition = composition_300_supply()?;
     let mut units_by_player = BTreeMap::<u32, Vec<(u32, EntityKind)>>::new();
-    spawn_building_rings(&mut game)?;
-    for player_id in 1..=4 {
-        let positions = positions_for_player(player_id, composition.len());
-        for (kind, (x, y)) in composition.iter().copied().zip(positions) {
+    let positions = dense_interleaved_positions(composition.len() * 2);
+    let mut player_one = composition.clone();
+    let mut player_two = composition.clone();
+    remove_one(&mut player_one, EntityKind::Worker)?;
+    remove_one(&mut player_two, EntityKind::Rifleman)?;
+    let worker = spawn(
+        &mut game,
+        1,
+        EntityKind::Worker,
+        positions[0].0,
+        positions[0].1,
+        true,
+    )?;
+    let rifleman = spawn(
+        &mut game,
+        2,
+        EntityKind::Rifleman,
+        positions[1].0,
+        positions[1].1,
+        true,
+    )?;
+    units_by_player
+        .entry(1)
+        .or_default()
+        .push((worker, EntityKind::Worker));
+    units_by_player
+        .entry(2)
+        .or_default()
+        .push((rifleman, EntityKind::Rifleman));
+    issue(
+        &mut game,
+        2,
+        Command::Attack {
+            units: vec![rifleman],
+            target: worker,
+            queued: false,
+        },
+    )?;
+    let warmup_entity_count = game.perf_entity_counts().entities;
+    warm_until_partial_hp(&mut game, warmup_entity_count)?;
+    enable_god_mode(&mut game)?;
+
+    let mut position_index = 2;
+    for index in 0..player_one.len() {
+        for (player_id, kind) in [(1, player_one[index]), (2, player_two[index])] {
+            let (x, y) = positions[position_index];
+            position_index += 1;
             let id = spawn(&mut game, player_id, kind, x, y, true)?;
             units_by_player
                 .entry(player_id)
@@ -93,23 +141,25 @@ fn run(out: PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn blank_no_terrain_lab() -> Result<Game, String> {
-    let players: Vec<_> = (1..=4)
-        .map(|id| PlayerInit {
-            id,
-            team_id: id,
+fn blank_authored_lab() -> Result<Game, String> {
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            team_id: 1,
             faction_id: DEFAULT_FACTION_ID.to_string(),
-            name: format!("Hellhole {id}"),
-            color: match id {
-                1 => "#0072b2",
-                2 => "#d55e00",
-                3 => "#009e73",
-                _ => "#cc79a7",
-            }
-            .to_string(),
+            name: "Hellhole Kriegsia".to_string(),
+            color: "#0072b2".to_string(),
             is_ai: false,
-        })
-        .collect();
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Hellhole Bravo".to_string(),
+            color: "#d55e00".to_string(),
+            is_ai: false,
+        },
+    ];
     let start_players: Vec<_> = players.iter().map(|p| (p.id, p.team_id)).collect();
     let map_metadata = Map::metadata_for_name(MAP_NAME)
         .map_err(|err| format!("cannot load map metadata {MAP_NAME:?}: {err}"))?;
@@ -123,6 +173,7 @@ fn clear_default_entities(game: &mut Game) -> Result<(), String> {
         .snapshot_full_for(1)
         .entities
         .iter()
+        .filter(|entity| entity.kind != EntityKind::CityCentre.to_string())
         .map(|entity| entity.id)
         .collect();
     for chunk in ids.chunks(400) {
@@ -132,7 +183,7 @@ fn clear_default_entities(game: &mut Game) -> Result<(), String> {
 }
 
 fn grant_lab_state(game: &mut Game) -> Result<(), String> {
-    for player_id in 1..=4 {
+    for player_id in 1..=2 {
         apply(
             game,
             LabOp::SetPlayerResources(LabSetPlayerResources {
@@ -151,13 +202,6 @@ fn grant_lab_state(game: &mut Game) -> Result<(), String> {
                 }),
             )?;
         }
-        apply(
-            game,
-            LabOp::SetPlayerGodMode {
-                player_id,
-                enabled: true,
-            },
-        )?;
     }
     Ok(())
 }
@@ -176,29 +220,31 @@ fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
         EntityKind::Tank,
         EntityKind::CommandCar,
     ];
-    let filler = [
-        EntityKind::Tank,
-        EntityKind::Tank,
-        EntityKind::ScoutCar,
-        EntityKind::CommandCar,
-        EntityKind::MachineGunner,
-        EntityKind::MortarTeam,
-        EntityKind::AntiTankGun,
-        EntityKind::Rifleman,
-        EntityKind::Panzerfaust,
-    ];
     let mut out = required.to_vec();
     let mut supply = supply_for(&out)?;
     let mut index = 0;
+    let mut attempts_without_supply = 0;
     while supply < TARGET_SUPPLY {
-        let kind = filler[index % filler.len()];
+        let kind = required[index % required.len()];
         index += 1;
         let cost = supply_of(kind)?;
-        if supply + cost > TARGET_SUPPLY {
-            continue;
+        let next_supply = supply
+            .checked_add(cost)
+            .ok_or_else(|| format!("supply overflow while adding {kind}"))?;
+        if next_supply <= TARGET_SUPPLY {
+            out.push(kind);
+            supply = next_supply;
         }
-        out.push(kind);
-        supply += cost;
+        if cost > 0 && next_supply <= TARGET_SUPPLY {
+            attempts_without_supply = 0;
+        } else {
+            attempts_without_supply += 1;
+        }
+        if attempts_without_supply >= required.len() {
+            return Err(format!(
+                "cannot reach exactly {TARGET_SUPPLY} supply from {supply} with the Lab unit catalog"
+            ));
+        }
     }
     Ok(out)
 }
@@ -207,90 +253,45 @@ fn supply_for(units: &[EntityKind]) -> Result<u32, String> {
     units.iter().copied().map(supply_of).sum()
 }
 
-fn supply_of(kind: EntityKind) -> Result<u32, String> {
-    if kind == EntityKind::Golem {
-        return Ok(0);
-    }
-    unit_stats(kind)
-        .map(|stats| stats.supply)
-        .ok_or_else(|| format!("{kind} is not a unit"))
-}
-
-fn positions_for_player(player_id: u32, count: usize) -> Vec<(f32, f32)> {
-    match player_id {
-        1 | 2 => central_positions(player_id, count),
-        3 => grid_positions(shuttle_endpoint(1.0, -1.0), count, 10, 64.0),
-        4 => grid_positions(shuttle_endpoint(-1.0, -1.0), count, 10, 64.0),
-        _ => unreachable!("only four hellhole players are generated"),
-    }
-}
-
-fn shuttle_endpoint(x_dir: f32, y_dir: f32) -> (f32, f32) {
-    (
-        CENTER.0 + x_dir * SHUTTLE_OFFSET_TILES * TILE,
-        CENTER.1 + y_dir * SHUTTLE_OFFSET_TILES * TILE,
-    )
-}
-
-fn central_positions(player_id: u32, count: usize) -> Vec<(f32, f32)> {
-    let parity = if player_id == 1 { 0 } else { 1 };
-    grid_positions(CENTER, count * 2, 24, 64.0)
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, pos)| (index % 2 == parity).then_some(pos))
-        .take(count)
-        .collect()
-}
-
-fn grid_positions(
-    center: (f32, f32),
-    count: usize,
-    columns: usize,
-    spacing: f32,
-) -> Vec<(f32, f32)> {
-    let rows = count.div_ceil(columns);
-    let width = (columns.saturating_sub(1)) as f32 * spacing;
-    let height = (rows.saturating_sub(1)) as f32 * spacing;
-    (0..count)
-        .map(|index| {
-            let col = index % columns;
-            let row = index / columns;
-            (
-                center.0 - width * 0.5 + col as f32 * spacing,
-                center.1 - height * 0.5 + row as f32 * spacing,
-            )
-        })
-        .collect()
-}
-
-fn spawn_building_rings(game: &mut Game) -> Result<(), String> {
-    let clusters = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
-    for (player_id, origin_x, origin_y) in clusters {
-        for (kind, dx, dy) in [
-            (EntityKind::CityCentre, 0, 0),
-            (EntityKind::Barracks, 4, 0),
-            (EntityKind::Factory, 8, 0),
-            (EntityKind::Steelworks, 12, 0),
-            (EntityKind::ResearchComplex, 16, 0),
-            (EntityKind::Depot, 0, 4),
-            (EntityKind::Depot, 3, 4),
-            (EntityKind::Depot, 6, 4),
-            (EntityKind::Depot, 9, 4),
-            (EntityKind::Depot, 12, 4),
-        ] {
-            let (x, y) = building_center(kind, origin_x + dx, origin_y + dy)?;
-            spawn(game, player_id, kind, x, y, true)?;
-        }
-    }
+fn remove_one(units: &mut Vec<EntityKind>, kind: EntityKind) -> Result<(), String> {
+    let index = units
+        .iter()
+        .position(|candidate| *candidate == kind)
+        .ok_or_else(|| format!("composition is missing required {kind}"))?;
+    units.remove(index);
     Ok(())
 }
 
-fn building_center(kind: EntityKind, tile_x: u32, tile_y: u32) -> Result<(f32, f32), String> {
-    let stats = building_stats(kind).ok_or_else(|| format!("{kind} is not a building"))?;
-    Ok((
-        (tile_x as f32 + stats.foot_w as f32 * 0.5) * TILE,
-        (tile_y as f32 + stats.foot_h as f32 * 0.5) * TILE,
-    ))
+fn supply_of(kind: EntityKind) -> Result<u32, String> {
+    let raw_supply = supply_cost(kind);
+    if !kind.is_unit() || raw_supply == 0 {
+        return Err(format!("{kind} is not an ordinary supply-bearing unit"));
+    }
+    let catalog = catalog_for(DEFAULT_FACTION_ID)
+        .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;
+    // Lab can spawn units from every playable faction. Authoritative supply,
+    // however, counts only units in the owning player's faction catalog.
+    Ok(if catalog.allows_unit(kind) {
+        raw_supply
+    } else {
+        0
+    })
+}
+
+fn dense_interleaved_positions(count: usize) -> Vec<(f32, f32)> {
+    let rows = count.div_ceil(LATTICE_COLUMNS);
+    let width = (LATTICE_COLUMNS.saturating_sub(1)) as f32 * LATTICE_SPACING_X;
+    let height = (rows.saturating_sub(1)) as f32 * LATTICE_SPACING_Y;
+    (0..count)
+        .map(|index| {
+            let col = index % LATTICE_COLUMNS;
+            let row = index / LATTICE_COLUMNS;
+            (
+                CENTER.0 - width * 0.5 + col as f32 * LATTICE_SPACING_X,
+                CENTER.1 - height * 0.5 + row as f32 * LATTICE_SPACING_Y,
+            )
+        })
+        .collect()
 }
 
 fn spawn(
@@ -368,6 +369,49 @@ fn seed_initial_orders(
     Ok(())
 }
 
+fn warm_until_partial_hp(game: &mut Game, expected_entities: usize) -> Result<(), String> {
+    let mut attack_events = 0usize;
+    for _ in 0..PARTIAL_HP_WARMUP_TICKS {
+        let events = game.tick();
+        attack_events += events
+            .iter()
+            .flat_map(|(_, events)| events)
+            .filter(|event| matches!(event, Event::Attack { .. }))
+            .count();
+        let snapshot = game.snapshot_full_for(1);
+        if snapshot.entities.len() != expected_entities {
+            return Err(format!(
+                "warmup changed entity count: {} != {expected_entities}",
+                snapshot.entities.len()
+            ));
+        }
+        let partial_hp = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.hp > 0 && entity.hp < entity.max_hp)
+            .count();
+        if attack_events > 0 && partial_hp >= PARTIAL_HP_MIN {
+            return Ok(());
+        }
+    }
+    Err(format!(
+        "warmup did not produce partial HP and attack feedback within {PARTIAL_HP_WARMUP_TICKS} ticks"
+    ))
+}
+
+fn enable_god_mode(game: &mut Game) -> Result<(), String> {
+    for player_id in 1..=2 {
+        apply(
+            game,
+            LabOp::SetPlayerGodMode {
+                player_id,
+                enabled: true,
+            },
+        )?;
+    }
+    Ok(())
+}
+
 fn unit_ids(units_by_player: &BTreeMap<u32, Vec<(u32, EntityKind)>>, player_id: u32) -> Vec<u32> {
     units_by_player
         .get(&player_id)
@@ -406,7 +450,7 @@ fn add_protocol_lab_metadata(
         "lab".to_string(),
         serde_json::to_value(LabScenarioLabMetadata {
             vision: LabVisionMode::All,
-            god_mode_players: vec![1, 2, 3, 4],
+            god_mode_players: vec![1, 2],
             initial_camera: Some(InitialCamera {
                 center_x: CENTER.0 as u32,
                 center_y: CENTER.1 as u32,

@@ -237,6 +237,7 @@ node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
+node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
 
@@ -244,8 +245,14 @@ The browser harness starts a local server on an isolated port unless `RTS_URL` o
 points at an already-healthy server. It drives headless Chrome with the repository-root
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
 under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
-`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios plus
-`supply-300-hellhole-stream`, a client-only isolation lane. The latter fetches the generated
+`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios,
+`supply-300-lab-hellhole`, and `supply-300-hellhole-stream`. The live Hellhole workload starts the
+bundled setup through the ordinary Lab room path and rejects sampling unless scenario/map identity,
+both 300-supply compositions, god mode, full-world projection, MessagePack delivery, rendered
+frames, stable entity count, and continuing combat all match its checked-in descriptor. It is a
+spectator-shaped comparative stress lane, not an active-player supply-cap certification.
+
+The snapshot-stream workload remains a separate client-only isolation lane. It fetches the generated
 `client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
 MessagePack snapshots into the normal decoder and renderer at 30 Hz. Its setup assertion fails unless
 the page reports no WebSocket and no live simulation. Regenerate the thirty-second, 900-frame artifact

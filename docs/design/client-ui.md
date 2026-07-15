@@ -598,6 +598,11 @@ hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start t
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 
+The bundled `supply-300-hellhole` row is the canonical client stress setup. It launches the authored
+`1v1` map with two exact 300-used-supply, full-research Kriegsia armies, full-world Lab vision, and
+god mode for both players. Its generated checkpoint and exact composition are versioned benchmark
+inputs; regenerate or version the setup instead of hand-editing its embedded checkpoint payload.
+
 `interact_bridge.js`
 ```js
 export const INTERACT_BRIDGE_KEY = "__rtsInteract"

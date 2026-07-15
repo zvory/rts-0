@@ -9,7 +9,7 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
-import { initializeWorkloadSetup } from "./client-perf/snapshot_stream_setup.mjs";
+import { initializeWorkloadSetup, labHellholeSampleErrors } from "./client-perf/workload_setup.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -341,7 +341,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     if (!summary.clientNetReport) {
       errors.push("ClientNetReport snapshot could not be generated");
     }
-    errors.push(...workloadSetupErrors(workload, workloadSetup));
+    errors.push(...workloadSetupErrors(workload, workloadSetup, summary));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
@@ -1177,13 +1177,11 @@ function formatSignedMs(value) {
 }
 
 function formatCount(value) {
-  if (!Number.isFinite(value)) return "n/a";
-  return String(Math.round(value * 10) / 10);
+  return Number.isFinite(value) ? String(Math.round(value * 10) / 10) : "n/a";
 }
 
 function formatPercent(value) {
-  if (!Number.isFinite(value)) return "n/a";
-  return `${Math.round(value * 10) / 10}%`;
+  return Number.isFinite(value) ? `${Math.round(value * 10) / 10}%` : "n/a";
 }
 
 async function collectPageSummary(page) {
@@ -1236,6 +1234,7 @@ async function collectPageSummary(page) {
       health: healthSnapshot,
       perf: perfSnapshot,
       clientNetReport,
+      labHellholeMonitor: JSON.parse(JSON.stringify(window.__rtsLabHellholeMonitor || null)),
     };
   });
 }
@@ -1445,7 +1444,7 @@ async function setWorkloadRoomTimeSpeed(page, speed) {
   }, speed);
 }
 
-function workloadSetupErrors(workload, setupResult) {
+function workloadSetupErrors(workload, setupResult, summary = null) {
   const minSelected = Number(workload.setup?.minSelectedCount || 0);
   if (!setupResult) return workload.setup ? [`${workload.id} setup did not run`] : [];
   const errors = [];
@@ -1453,6 +1452,7 @@ function workloadSetupErrors(workload, setupResult) {
   if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
+  errors.push(...labHellholeSampleErrors(workload.setup, setupResult, summary));
   return errors;
 }
 
