@@ -1,8 +1,8 @@
 # Rust
 /server/target
 /server/crates/*/target
-/desktop/maccursor-shell/src-tauri/gen
-/desktop/maccursor-shell/src-tauri/target
+/desktop/*/src-tauri/gen
+/desktop/*/src-tauri/target
 /target/client-perf
 /target/server-perf
 # Current and legacy local interaction artifacts must never be staged.
