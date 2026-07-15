@@ -160,6 +160,9 @@ before `open` when a fresh session or different launch options are required. Opt
 cross-session aliases are rejected rather than guessed. A session may retain up to 400 aliases.
 Only one authoritative session may be open per worktree across both namespaces. Opening the other
 kind while a session is active returns `sessionKindMismatch` and preserves the current session.
+Server-rejected Lab launches, such as an unknown map or scenario, return `launchFailed` with the
+server's bounded error text as soon as the browser receives it rather than consuming the full
+startup timeout.
 
 `spawn`, `update`, and `remove` accept 1–400 items and each command reaches the authoritative game
 as one atomic plural operation. `update` accepts `updates:[...]`; the legacy singular `update:{...}`

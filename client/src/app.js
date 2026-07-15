@@ -417,6 +417,7 @@ export class App {
    */
   onError(m) {
     const msg = m && m.msg ? m.msg : "Server error";
+    this.interactBridge?.noteLaunchError?.(msg);
     this.showToast(msg);
     this.labCatalog?.setStatus(msg, { error: true });
   }

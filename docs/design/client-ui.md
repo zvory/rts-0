@@ -602,7 +602,7 @@ and auto-join for compatibility.
 ```js
 export const INTERACT_BRIDGE_KEY = "__rtsInteract"
 export class InteractBridge {
-  status()                            // readiness only; no internal references
+  status()                            // readiness or launch error; no internal references
   call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset/presentation/captureReadiness
   destroy()
 }
@@ -610,7 +610,9 @@ export function interactLaunchEnabled(locationLike?)
 ```
 `App` composes this bridge only when the `/lab` URL includes `interact=lab`. Its global surface is a
 frozen `{version, status, call}` object; it never returns `App`, `Match`, `Net`, `Renderer`, or
-`GameState`. Calls delegate through existing `LabClient`, normal `issueCommandAs`, room-time,
+`GameState`. Before readiness, server launch errors are projected as bounded status text so the
+local driver fails immediately instead of waiting for its startup deadline. Calls delegate through
+existing `LabClient`, normal `issueCommandAs`, room-time,
 semantic camera, and `GameState` projection seams. Catalog includes the mirrored command and ability ids;
 inspection can restrict results to the current camera viewport, while camera focus accepts bounded
 padding, defaults to a close 32-world-pixel frame for readable single-unit captures (and retains

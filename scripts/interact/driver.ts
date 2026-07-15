@@ -51,6 +51,7 @@ interface BridgeResult extends JsonObject {
   roomTime?: { paused?: boolean; speed?: number };
   frame?: number;
   ready?: boolean;
+  launchError?: string;
   visualStartMs?: number;
   rendererFrame?: number;
   frameErrors?: unknown[];
@@ -140,7 +141,7 @@ interface DriverOptions {
 declare global {
   interface Window {
     __rtsInteract?: {
-      status(): { ready?: boolean };
+      status(): { ready?: boolean; launchError?: string };
       call(method: string, input: unknown): Promise<{ ok: boolean; value?: unknown; error?: { code?: string; message?: string; details?: JsonObject } }>;
     };
   }
@@ -317,11 +318,21 @@ export class InteractDriver {
     );
     await this.openStep(
       this.page!.waitForFunction(
-        () => window.__rtsInteract?.status?.().ready === true,
+        () => {
+          const status = window.__rtsInteract?.status?.();
+          return status?.ready === true || !!status?.launchError;
+        },
         { timeout: this.options.startupTimeoutMs },
       ),
       "page readiness",
     );
+    const startupStatus = await this.openStep(
+      this.page!.evaluate(() => window.__rtsInteract?.status?.() || null),
+      "page readiness inspection",
+    );
+    if (startupStatus?.launchError) {
+      throw new InteractDriverError("launchFailed", startupStatus.launchError, { status: startupStatus });
+    }
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new InteractDriverError("sessionClosed", "Interact driver was closed during page startup.");
     }

@@ -179,6 +179,33 @@ assert.equal(interactLaunchEnabled({ pathname: "/lab", search: "?interact=lab" }
 assert.equal(interactLaunchEnabled({ pathname: "/lab", search: "?interact=0" }), false, "normal Lab URLs do not expose the bridge");
 assert.equal(interactLaunchEnabled({ pathname: "/", search: "?interact=lab" }), false, "non-Lab URLs never expose the bridge");
 assert.equal(interactLaunchEnabled({ pathname: "/lab", search: "?interact=1" }), false, "the pre-namespace launch flag no longer exposes the bridge");
+const failedLaunchBridge = new InteractBridge({
+  enabled: true,
+  windowLike: {},
+  app: { net: { ws: { readyState: 1 } }, labClient: null, match: null },
+});
+failedLaunchBridge.noteLaunchError('Cannot load lab map "flat": map not found: "flat"');
+assert.deepEqual(
+  failedLaunchBridge.status(),
+  {
+    version: INTERACT_BRIDGE_VERSION,
+    enabled: true,
+    ready: false,
+    reason: "launchError",
+    launchError: 'Cannot load lab map "flat": map not found: "flat"',
+    websocketConnected: true,
+    startReceived: false,
+    labRole: "",
+    room: "",
+    snapshotTick: null,
+    roomTime: null,
+    camera: null,
+    cameraViewport: null,
+    cameraWorldBounds: null,
+  },
+  "the launch-gated bridge exposes a bounded server startup failure",
+);
+failedLaunchBridge.destroy();
 const windowLike = {};
 const bridge = new InteractBridge({
   enabled: true,
@@ -198,6 +225,8 @@ const bridge = new InteractBridge({
     },
   },
 });
+bridge.noteLaunchError("late server error");
+assert.equal(bridge.status().ready, true, "server errors after readiness do not poison an active Interact session");
 assert.deepEqual(Object.keys(windowLike[INTERACT_BRIDGE_KEY]).sort(), ["call", "status", "version"], "bridge surface exposes no app internals");
 const catalog = await windowLike[INTERACT_BRIDGE_KEY].call("catalog", {});
 const faction = catalog.value.factions.find((entry) => entry.id === DEFAULT_FACTION_ID);
