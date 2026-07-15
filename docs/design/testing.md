@@ -283,13 +283,21 @@ canary runs own a private server; the browser shard passes its existing loopback
 - Client performance harness: run `node --check scripts/client-perf-harness.mjs` and
   `node scripts/client-perf-harness.mjs --list` when changing the fixed browser performance
   workloads, stress-matrix dimensions, harness script, or documented performance workflow. Workload
-  execution uses local headless Chrome against a local server and writes bounded JSON summaries
-  under `target/client-perf`; it is measurement-only and does not add FPS gates. Stress-matrix runs
+  execution uses local headless Chrome by default and writes bounded JSON summaries under
+  `target/client-perf`; it is measurement-only and does not add FPS gates. The offline Hellhole
+  stream remains in the default workload set, while the live server/client Hellhole is opt-in and
+  requires an explicit workload id. The integrated launcher exposes its controlled Chrome window
+  for visual inspection without changing workload identity. Stress-matrix runs
   vary CPU throttle, viewport, DPR, and repeat count, then write JSON and Markdown rollups.
   Render-lag summaries report advisory 60/120/240/480 FPS frame-work budget targets, p95 margin,
   next missed headroom budget, grouped render diagnostics, and long-frame context from local
   evidence instead of portable RAF FPS claims. `ClientNetReport` uploads are unchanged by these local
   artifacts.
+- Hellhole server performance: run `scripts/hellhole-perf-harness.sh --ticks 900` in release mode.
+  This direct API-in/API-out lane includes simulation, full-world projection, compaction, and
+  MessagePack encoding but no room task, network transport, browser, or wall-clock pacing. Use
+  `scripts/hellhole-perf-harness.sh --integrated` only when the live Lab server and visible Pixi
+  client need to be inspected together; do not use its timings as isolated server evidence.
 - Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
   when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
   change. The harness compares Worker and Tank part and composition samples.

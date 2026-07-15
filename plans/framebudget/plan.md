@@ -5,7 +5,8 @@
 Make a 300-supply cap technically evaluable by measuring the browser's complete Pixi frame and
 removing the client work already shown to scale badly near 200 supply. Server-authoritative active
 player workloads remain the production-shaped evidence; the client-only Hellhole stream isolates
-the renderer ceiling, while the existing Lab Hellhole remains a separate server stress lane. This
+the renderer ceiling, while the headless Hellhole harness isolates server simulation, projection,
+compaction, and encoding. The live Lab view remains an explicit integrated visual option. This
 plan covers the benchmark foundation
 and five agreed priorities without changing the production supply cap: single-frame ownership and
 honest presentation timing; route-specific rigs; revision-cached fog; one consolidated frame-entity
@@ -35,10 +36,10 @@ that either the Lab benchmark or phase completion automatically makes 300 supply
 
 ### [Phase 0 - Build the 300-Supply Lab Hellhole](phase-0.md)
 
-Dispensed. Keep the existing four-player Lab scenario as a server-heavy simulation/projection lane
-and its generated snapshot stream as a separate client-only renderer lane. Do not combine them into
-the former live Lab performance workload; the phase file retains that proposal only as historical
-context.
+Dispensed. Keep the existing four-player scenario behind a client-free server API harness and its
+generated snapshot stream as a separate client-only renderer lane. Do not include the opt-in live
+Lab workload in default measurements; the phase file retains the original combined proposal only
+as historical context.
 
 ### [Phase 1 - Own and Measure the Complete Frame](phase-1.md)
 
@@ -88,8 +89,9 @@ settings and report whether 300 supply actually clears the proposed 60 FPS gate.
   not a hardware-identical model of a player's PC.
 - Keep the generated client-only Hellhole stream unchanged during renderer comparisons. Regenerate
   it from its scenario only as an explicit fixture change, then re-establish the baseline.
-- The Lab scenario exercises server simulation and projection, while the snapshot stream is
-  spectator-shaped and prediction-free. Neither replaces Phase 1's active-player workload for a
+- The headless Hellhole harness exercises server simulation, projection, compaction, and encoding;
+  the snapshot stream is spectator-shaped and prediction-free. The integrated live Lab mode is
+  visual/end-to-end inspection only. None replaces Phase 1's active-player workload for a
   production cap decision.
 - Keep traces, screenshots, and benchmark outputs under ignored `target/` paths. Do not commit
   generated PNG captures or performance artifacts.
@@ -100,8 +102,8 @@ settings and report whether 300 supply actually clears the proposed 60 FPS gate.
 
 ## Measurement and Decision Rules
 
-- The client-only Hellhole stream provides repeatable renderer-ceiling comparisons; server-heavy
-  Lab runs remain separate simulation/projection evidence.
+- The client-only Hellhole stream provides repeatable renderer-ceiling comparisons; the headless
+  Hellhole harness remains separate server API-in/API-out evidence.
 - Phase 1 records the honest baseline; it is not expected to improve frame time.
 - Phase 2 and Phase 3 must retain comparable before/after artifacts for both the 200- and
   300-supply active-player workloads.

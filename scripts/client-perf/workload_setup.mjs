@@ -3,7 +3,25 @@ export async function initializeWorkloadSetup(page, setup) {
   const result = { actions: [] };
   await applySnapshotStreamSetup(page, setup, result);
   await applyActiveSupplyStressSetup(page, setup, result);
+  await applyLiveLabScenarioSetup(page, setup, result);
   return result;
+}
+
+export function validateLiveLabScenarioSample(sample, expected) {
+  if (!expected) return [];
+  const errors = [];
+  if (sample?.scenarioId !== expected.scenarioId) errors.push(`scenario ${sample?.scenarioId || "missing"} != ${expected.scenarioId}`);
+  if (sample?.mapWidth !== expected.mapWidth || sample?.mapHeight !== expected.mapHeight) {
+    errors.push(`map ${sample?.mapWidth}x${sample?.mapHeight} != ${expected.mapWidth}x${expected.mapHeight}`);
+  }
+  if (sample?.projectedEntityCount !== expected.projectedEntityCount) {
+    errors.push(`projected entities ${sample?.projectedEntityCount} != ${expected.projectedEntityCount}`);
+  }
+  if (sample?.labMode !== true) errors.push("match is not running in Lab mode");
+  if (sample?.offline !== false || sample?.websocket !== true) {
+    errors.push("live Lab workload is not connected through a WebSocket");
+  }
+  return errors;
 }
 
 export function validateActiveSupplyStressSample(sample, expected) {
@@ -104,6 +122,42 @@ async function applyActiveSupplyStressSetup(page, setup, result) {
   } catch (err) {
     const message = `active supply-stress setup failed: ${err.message}`;
     result.actions.push({ action: "verifyActiveSupplyStress", error: message });
+    result.error = message;
+  }
+}
+
+async function applyLiveLabScenarioSetup(page, setup, result) {
+  const expected = setup.liveLabScenario;
+  if (!expected) return;
+  try {
+    await page.waitForFunction(
+      ({ scenarioId, projectedEntityCount }) => window.__rts?.labLaunch?.scenario === scenarioId &&
+        window.__rts?.match?.state?._curById?.size === projectedEntityCount &&
+        window.__rts?.net?.offline !== true && window.__rts?.net?.ws != null,
+      { timeout: Number(setup.liveLabScenarioWaitTimeoutMs) || 20000 },
+      expected,
+    );
+    const action = await page.evaluate(() => {
+      const app = window.__rts;
+      return {
+        action: "verifyLiveLabScenario",
+        scenarioId: app?.labLaunch?.scenario || "",
+        mapWidth: app?.match?.predictionStartInfo?.map?.width || 0,
+        mapHeight: app?.match?.predictionStartInfo?.map?.height || 0,
+        projectedEntityCount: app?.match?.state?._curById?.size || 0,
+        labMode: !!app?.match?.labMetadata,
+        offline: app?.net?.offline === true,
+        websocket: app?.net?.ws != null,
+      };
+    });
+    const errors = validateLiveLabScenarioSample(action, expected);
+    if (errors.length > 0) action.error = errors.join("; ");
+    result.actions.push(action);
+    result.liveLabScenario = action;
+    if (action.error) result.error = action.error;
+  } catch (err) {
+    const message = `live Lab scenario setup failed: ${err.message}`;
+    result.actions.push({ action: "verifyLiveLabScenario", error: message });
     result.error = message;
   }
 }

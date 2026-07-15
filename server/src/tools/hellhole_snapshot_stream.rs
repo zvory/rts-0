@@ -12,6 +12,7 @@ pub const STREAM_ID: &str = "supply-300-hellhole";
 pub const DEFAULT_FRAME_COUNT: u32 = 900;
 pub const TICK_RATE_HZ: u32 = 30;
 pub const MAGIC: &[u8; 8] = b"RTSSTRM1";
+pub(crate) const SHUTTLE_LEG_TICKS: u32 = 900;
 
 const TILE: f32 = 32.0;
 const CENTER_TILE: f32 = 63.0;
@@ -48,9 +49,7 @@ pub fn generate_hellhole_snapshot_stream(
         return Err("frame count must be between 1 and 10,000".to_string());
     }
 
-    let scenario = load_lab_scenario_by_id(STREAM_ID)?;
-    let mut game = scenario.build_game()?;
-    enqueue_initial_shuttles(&mut game)?;
+    let mut game = build_hellhole_game()?;
 
     let initial_entity_count = game.snapshot_full_for(1).entities.len();
     let mut start = serde_json::to_value(game.start_payload())
@@ -132,8 +131,23 @@ pub fn generate_hellhole_snapshot_stream(
     Ok((bytes, summary))
 }
 
-fn enqueue_initial_shuttles(game: &mut rts_sim::game::Game) -> Result<(), String> {
-    for (player_id, x_dir, y_dir) in [(3, -1.0, 1.0), (4, 1.0, 1.0)] {
+pub(crate) fn build_hellhole_game() -> Result<rts_sim::game::Game, String> {
+    let scenario = load_lab_scenario_by_id(STREAM_ID)?;
+    let mut game = scenario.build_game()?;
+    enqueue_hellhole_shuttles(&mut game, 0)?;
+    Ok(game)
+}
+
+pub(crate) fn enqueue_hellhole_shuttles(
+    game: &mut rts_sim::game::Game,
+    phase: u32,
+) -> Result<(), String> {
+    let directions = if phase.is_multiple_of(2) {
+        [(3, -1.0, 1.0), (4, 1.0, 1.0)]
+    } else {
+        [(3, 1.0, -1.0), (4, -1.0, -1.0)]
+    };
+    for (player_id, x_dir, y_dir) in directions {
         let units = game.lab_owned_unit_ids(player_id).map_err(|err| {
             format!("failed to collect player {player_id} shuttle units: {err:?}")
         })?;
@@ -154,7 +168,7 @@ fn enqueue_initial_shuttles(game: &mut rts_sim::game::Game) -> Result<(), String
     Ok(())
 }
 
-fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>) -> Vec<Event> {
+pub(crate) fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>) -> Vec<Event> {
     let mut events = Vec::new();
     for set in event_sets {
         for event in set {

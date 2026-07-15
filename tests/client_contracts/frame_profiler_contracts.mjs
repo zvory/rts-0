@@ -12,9 +12,13 @@ import {
   parsePositiveNumberList,
 } from "../../scripts/client-perf-harness.mjs";
 import { FrameProfiler, collectMatchFrameContext } from "../../client/src/frame_profiler.js";
-import { validateActiveSupplyStressSample } from "../../scripts/client-perf/workload_setup.mjs";
+import {
+  validateActiveSupplyStressSample,
+  validateLiveLabScenarioSample,
+} from "../../scripts/client-perf/workload_setup.mjs";
 import {
   buildClientPerfWorkloads,
+  defaultClientPerfWorkloads,
   SUPPLY_ACTIVE_WORKLOADS,
 } from "../../scripts/client-perf/workloads.mjs";
 
@@ -46,8 +50,26 @@ export function runFrameProfilerContracts() {
     ]) {
       assert(validateActiveSupplyStressSample({ ...sample, ...mutation }, expected).length > 0, "active supply workload rejects invalid authority, prediction, supply, or projection evidence");
     }
-    const ids = buildClientPerfWorkloads({}).map((workload) => workload.id);
+    const workloads = buildClientPerfWorkloads({});
+    const ids = workloads.map((workload) => workload.id);
     assert(ids.includes("supply-200-active") && ids.includes("supply-300-active"), "paired active 200/300 workloads are checked in");
+    const defaultIds = defaultClientPerfWorkloads(workloads).map((workload) => workload.id);
+    assert(defaultIds.includes("supply-300-hellhole-stream"), "client-only Hellhole remains in the default renderer workload set");
+    assert(!defaultIds.includes("supply-300-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");
+    const integrated = workloads.find((workload) => workload.id === "supply-300-hellhole-integrated");
+    assert(integrated?.kind === "labScenario" && integrated?.setup?.waitForMinEntities === 380, "integrated Hellhole retains an explicit canonical Lab view");
+    const expectedLab = integrated.setup.liveLabScenario;
+    const liveLabSample = {
+      scenarioId: expectedLab.scenarioId,
+      mapWidth: expectedLab.mapWidth,
+      mapHeight: expectedLab.mapHeight,
+      projectedEntityCount: expectedLab.projectedEntityCount,
+      labMode: true,
+      offline: false,
+      websocket: true,
+    };
+    assert(validateLiveLabScenarioSample(liveLabSample, expectedLab).length === 0, "integrated Hellhole accepts exact live Lab identity");
+    assert(validateLiveLabScenarioSample({ ...liveLabSample, offline: true }, expectedLab).length > 0, "integrated Hellhole rejects an offline client lane");
   }
 
   {

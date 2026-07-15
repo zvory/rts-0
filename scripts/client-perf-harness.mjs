@@ -13,7 +13,7 @@ import {
   initializeWorkloadSetup,
   validateActiveSupplyStressSample,
 } from "./client-perf/workload_setup.mjs";
-import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
+import { buildClientPerfWorkloads, defaultClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
@@ -46,13 +46,14 @@ export const RECURRING_PHASE_WARN_MS = 1;
 export const RECURRING_PHASE_HIGH_WARN_MS = 2;
 const MAX_RECURRING_WARNINGS = 8;
 const WORKLOADS = buildClientPerfWorkloads();
-const RENDER_LAG_WORKLOAD_IDS = Object.freeze(WORKLOADS.map((workload) => workload.id));
+const DEFAULT_WORKLOADS = defaultClientPerfWorkloads(WORKLOADS);
+const RENDER_LAG_WORKLOAD_IDS = Object.freeze(DEFAULT_WORKLOADS.map((workload) => workload.id));
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.list) {
     for (const workload of WORKLOADS) {
-      console.log(`${workload.id}\t${workload.description}`);
+      console.log(`${workload.id}${workload.defaultEnabled === false ? " [opt-in]" : ""}\t${workload.description}`);
     }
     return;
   }
@@ -1545,7 +1546,7 @@ async function launchBrowser(puppeteer, chrome, args) {
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-client-perf-chrome-"));
   return puppeteer.launch({
     executablePath: chrome,
-    headless: "new",
+    headless: process.env.RTS_CLIENT_PERF_HEADED === "1" ? false : "new",
     defaultViewport: args.viewport,
     args: [
       "--no-sandbox",
@@ -1650,7 +1651,7 @@ function selectedWorkloads(args) {
   const ids = args.activeSupplyPair
     ? ["supply-200-active", "supply-300-active"]
     : args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
-  if (ids.length === 0) return WORKLOADS;
+  if (ids.length === 0) return DEFAULT_WORKLOADS;
   const byId = new Map(WORKLOADS.map((workload) => [workload.id, workload]));
   return ids.map((id) => {
     const workload = byId.get(id);
@@ -1753,7 +1754,7 @@ Options:
   --render-lag-suite             Run the full render-lag comparison workload set.
   --active-supply-pair           Run exact active-player 200/300 workloads with identical settings.
   --stress-matrix                Run workloads across CPU, viewport, DPR, and repeat matrix cells.
-  --workload <id>                Run one workload; repeatable. Defaults to all workloads.
+  --workload <id>                Run one workload; repeatable. Defaults to all non-opt-in workloads.
   --seconds <n>                  Browser collection time per workload. Default: ${DEFAULT_DURATION_MS / 1000}.
   --duration-ms <n>              Browser collection time per workload in milliseconds.
   --output-root <path>           Artifact root. Default: target/client-perf.
