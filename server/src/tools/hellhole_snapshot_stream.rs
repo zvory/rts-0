@@ -186,6 +186,15 @@ mod tests {
         }
         assert_eq!(header["start"]["map"]["width"], 126);
         assert_eq!(header["start"]["map"]["height"], 126);
+        assert_eq!(
+            header["start"]["map"]["terrain"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|tile| tile.as_u64() == Some(crate::protocol::terrain::ROCK as u64))
+                .count(),
+            470
+        );
         assert_eq!(header["initialEntityCount"], 380);
         assert_eq!(
             header["start"]["snapshotStream"]["sourceScenario"],
