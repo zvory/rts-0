@@ -1,7 +1,10 @@
+import { applyLabHellholeSetup } from "./lab_hellhole_setup.mjs";
+
 export async function initializeWorkloadSetup(page, setup) {
   if (!setup) return null;
   const result = { actions: [] };
   await applySnapshotStreamSetup(page, setup, result);
+  await applyLabHellholeSetup(page, setup, result);
   return result;
 }
 

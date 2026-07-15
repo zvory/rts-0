@@ -10,6 +10,7 @@ import {
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
 import { initializeWorkloadSetup } from "./client-perf/snapshot_stream_setup.mjs";
+import { validateLabHellholeSample } from "./client-perf/lab_hellhole_setup.mjs";
 import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -341,7 +342,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     if (!summary.clientNetReport) {
       errors.push("ClientNetReport snapshot could not be generated");
     }
-    errors.push(...workloadSetupErrors(workload, workloadSetup));
+    errors.push(...workloadSetupErrors(workload, workloadSetup, summary));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
@@ -1236,6 +1237,9 @@ async function collectPageSummary(page) {
       health: healthSnapshot,
       perf: perfSnapshot,
       clientNetReport,
+      labHellholeMonitor: window.__rtsLabHellholeMonitor
+        ? JSON.parse(JSON.stringify(window.__rtsLabHellholeMonitor))
+        : null,
     };
   });
 }
@@ -1445,13 +1449,20 @@ async function setWorkloadRoomTimeSpeed(page, speed) {
   }, speed);
 }
 
-function workloadSetupErrors(workload, setupResult) {
+function workloadSetupErrors(workload, setupResult, summary = null) {
   const minSelected = Number(workload.setup?.minSelectedCount || 0);
   if (!setupResult) return workload.setup ? [`${workload.id} setup did not run`] : [];
   const errors = [];
   if (setupResult.error) errors.push(`${workload.id} setup failed: ${setupResult.error}`);
   if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
+  }
+  if (workload.setup?.labHellhole && setupResult?.labHellhole) {
+    errors.push(...validateLabHellholeSample({
+      setupResult: setupResult.labHellhole,
+      monitor: summary?.labHellholeMonitor,
+      finalFrameCount: summary?.perf?.summary?.frameCount,
+    }, workload.setup.labHellhole));
   }
   return errors;
 }

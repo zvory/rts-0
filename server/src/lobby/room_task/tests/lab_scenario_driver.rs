@@ -2,7 +2,7 @@ use super::support::*;
 use crate::lobby::room_task::types::LabSeekTarget;
 
 #[test]
-fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
+fn hellhole_scripted_combat_orders_are_recorded_once_and_replayable() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());
     let mut task = RoomTask::new(
@@ -28,14 +28,14 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
         .replay_entries()
         .iter()
         .map(|entry| {
-            assert_eq!(entry.tick, 0);
+            assert_eq!(entry.tick, 1);
             match &entry.op {
                 crate::protocol::LabReplayOperation::IssueCommandAs {
                     player_id,
-                    cmd: Command::Move { units, .. },
+                    cmd: Command::AttackMove { units, .. },
                     ignore_command_limits,
                 } => {
-                    assert_eq!(units.len(), 85);
+                    assert_eq!(units.len(), 111);
                     assert!(*ignore_command_limits);
                     *player_id
                 }
@@ -43,7 +43,7 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
             }
         })
         .collect();
-    assert_eq!(scripted_players, vec![3, 4]);
+    assert_eq!(scripted_players, vec![1, 2]);
 
     let recorded_entries = timeline.replay_entries().to_vec();
     task.lab_driver
