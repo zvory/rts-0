@@ -764,6 +764,9 @@ impl<'a> MoveCoordinator<'a> {
             if preferred_fallback.is_none() {
                 preferred_fallback = preferred_ring_best;
             }
+            if !prefer_rotation_clearance && preferred_fallback.is_some() {
+                break;
+            }
             if let Some((_, point)) = rotation_clear_ring_best {
                 return Some(point);
             }
@@ -1112,12 +1115,10 @@ fn spawn_gap_from_building(
     Some(unit_body_rect_gap(body, building_rect))
 }
 
-/// Checks the exact swept envelope of a full rotation. A circle whose radius is the body's
-/// farthest point from its center covers every orientation, including configured hull clearance.
+/// Checks a full rotation's swept circle, including configured hull clearance.
 ///
-/// This deliberately remains spawn-selection policy rather than generic standability: normal
-/// standability validates the body's current facing, while production prefers enough room for
-/// every facing and may still fall back to an ordinarily standable point when a base is congested.
+/// This remains spawn-selection policy: normal standability validates current facing, while
+/// production prefers every facing and may fall back when a base is congested.
 fn full_rotation_spawn_clear(
     map: &Map,
     occupancy: &Occupancy,
@@ -1130,7 +1131,6 @@ fn full_rotation_spawn_clear(
         return false;
     };
     let envelope = CircleBody { x, y, radius };
-    let envelope_body = UnitBody::Circle(envelope);
     let world_max = map.world_size_px();
     if x - radius < 0.0 || y - radius < 0.0 || x + radius > world_max || y + radius > world_max {
         return false;
@@ -1159,7 +1159,7 @@ fn full_rotation_spawn_clear(
             return true;
         }
         unit_body_for_entity(entity)
-            .is_none_or(|existing| !unit_bodies_intersect(envelope_body, existing))
+            .is_none_or(|existing| !unit_bodies_intersect(UnitBody::Circle(envelope), existing))
     })
 }
 
