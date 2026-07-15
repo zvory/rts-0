@@ -63,7 +63,7 @@ async function main() {
   fs.mkdirSync(outputRoot, { recursive: true });
   const puppeteer = await loadPuppeteer();
   const chrome = findChrome(args.chrome);
-  const server = await startOrReuseServer(args);
+  const server = await startOrReuseServer(args, selected);
   const browser = await launchBrowser(puppeteer, chrome, args);
 
   try {
@@ -1471,7 +1471,7 @@ async function prepareWorkload(workload) {
   fs.copyFileSync(workload.source, path.join(targetDir, "replay.json"));
 }
 
-async function startOrReuseServer(args) {
+async function startOrReuseServer(args, selectedWorkloads = []) {
   const fromEnv = args.baseUrl || process.env.RTS_URL;
   if (fromEnv && await isHealthy(fromEnv)) {
     return {
@@ -1484,9 +1484,18 @@ async function startOrReuseServer(args) {
   const port = args.port || await allocatePort();
   const baseUrl = `http://127.0.0.1:${port}/`;
   const targetDir = cargoTargetDir();
-  const serverBin = process.env.RTS_SERVER_BIN || path.join(targetDir, "debug", "rts-server");
-  if (!fs.existsSync(serverBin)) {
-    runOrThrow("cargo", ["build", "--manifest-path", path.join(SERVER_DIR, "Cargo.toml")], {
+  const explicitServerBin = process.env.RTS_SERVER_BIN || "";
+  const serverBin = explicitServerBin || path.join(targetDir, "debug", "rts-server");
+  if (!explicitServerBin) {
+    // Worktree target directories can retain a runnable binary from an older
+    // branch revision. Rebuild incrementally so standalone workload commands
+    // always exercise the server code beside this harness.
+    runOrThrow("cargo", [
+      "build",
+      "--manifest-path", path.join(SERVER_DIR, "Cargo.toml"),
+      "-p", "rts-server",
+      "--bin", "rts-server",
+    ], {
       cwd: REPO_ROOT,
       env: { ...process.env, CARGO_TARGET_DIR: targetDir },
       stdio: "inherit",
@@ -1503,7 +1512,12 @@ async function startOrReuseServer(args) {
     env: {
       ...process.env,
       RTS_ADDR: `127.0.0.1:${port}`,
-      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS || "5",
+      // Active prediction must be measured against the production 30 Hz
+      // cadence. The accelerated 5 ms harness clock outruns the browser WASM
+      // predictor and turns the active-player workload into disabled-prediction
+      // evidence before sampling begins.
+      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS
+        || (selectedWorkloads.some((workload) => workload.kind === "activeDevScenario") ? "33" : "5"),
       RTS_MATCH_SEED: process.env.RTS_MATCH_SEED || "1",
     },
     stdio: ["ignore", log, log],

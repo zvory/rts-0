@@ -52,11 +52,10 @@ const validFacts = {
   }
   globalThis.window = {
     __rts: {
-      labLaunch: { scenario: descriptor.scenarioId },
+      labLaunch: { scenario: descriptor.scenarioId, map: descriptor.map },
       match: {
         labMetadata: { vision: { mode: "all" }, godModePlayers: [1, 2] },
         predictionStartInfo: {
-          map: { name: descriptor.map },
           players: [
             { id: 1, teamId: 1 },
             { id: 2, teamId: 2 },
@@ -91,9 +90,9 @@ const validFacts = {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   }
-  assert(!result.error, `Hellhole setup reads the authoritative start state: ${result.error || "ok"}`);
+  assert(!result.error, `Hellhole setup reads the selected launch and authoritative state: ${result.error || "ok"}`);
   assert(result.labHellhole?.facts?.map === descriptor.map,
-    "Hellhole setup reads the map from the server start payload");
+    "Hellhole setup reads the map from the normalized Lab launch config");
   assert(result.labHellhole?.facts?.teamByPlayer?.[2] === 2,
     "Hellhole setup reads opposing teams from the server start payload");
 }

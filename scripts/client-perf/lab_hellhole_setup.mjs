@@ -140,7 +140,10 @@ export async function applyLabHellholeSetup(page, setup, result) {
         initialRenderedFrames,
         facts: {
           scenarioId: window.__rts?.labLaunch?.scenario || "",
-          map: match?.predictionStartInfo?.map?.name || "",
+          // StartPayload.map intentionally carries authored geometry rather
+          // than the catalog id. The normalized Lab launch config is the
+          // source of the selected scenario/map pair.
+          map: window.__rts?.labLaunch?.map || "",
           labMode: !!match?.labMetadata,
           visionMode: match?.labMetadata?.vision?.mode || "",
           playerIds: (match?.predictionStartInfo?.players || []).map((player) => player.id),
