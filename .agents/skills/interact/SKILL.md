@@ -20,7 +20,7 @@ the HUD and score screen remain visible. This namespace cannot join arbitrary ro
 attack, build, production, economy, ability, or arbitrary protocol commands.
 
 For an existing server-authored dev scenario, use
-`node scripts/interact/cli.mjs scenario <command> '<JSON-object>'`. `scenario open` takes the same
+`node scripts/interact/cli.mjs dev-scenario <command> '<JSON-object>'`. `dev-scenario open` takes the same
 `id`, `unit`, `count`, optional `blocker`, and optional `case` fields listed at `/dev/scenarios` and
 returns a `scenario_...` session id. The namespace is observation/media-only: `inspect`, `camera`,
 `screenshot`, recording, time-lapse, capture cancellation, and lifecycle commands. It cannot spawn,
@@ -51,9 +51,9 @@ move, order, build, or send arbitrary input. Scenario media defaults to `present
    bounded `maxDurationMs`, `sampleEveryMs`, and optional `speed` up to 8. Use `region:"minimap"`
    for a minimap-only time lapse. The capture stops at match conclusion or the duration ceiling;
    use `status` for progress and `capture-cancel` to interrupt it.
-6. For a dev scenario, run `scenario screenshot` for a still. For before/after evidence, take the
+6. For a dev scenario, run `dev-scenario screenshot` for a still. For before/after evidence, take the
    first still, run a bounded `record-start` plus `record-wait` (or `capture-timelapse`), then take
-   the second still. `scenario capture-timelapse` accepts the same bounded duration, sample, speed,
+   the second still. `dev-scenario capture-timelapse` accepts the same bounded duration, sample, speed,
    region, and cancellation controls as the AI spectator form.
 7. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
    visual artifact: share that Tailnet URL and a concise scene result with the user. Never share a
