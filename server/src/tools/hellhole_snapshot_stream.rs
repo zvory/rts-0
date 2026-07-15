@@ -184,6 +184,17 @@ mod tests {
         assert_eq!(header["frameCount"], 3);
         assert_eq!(header["loop"], false);
         assert_eq!(header["start"]["spectator"], true);
+        assert_eq!(header["start"]["players"].as_array().unwrap().len(), 4);
+        for (index, team_id) in [1, 2, 3, 4].into_iter().enumerate() {
+            assert_eq!(header["start"]["players"][index]["teamId"], team_id);
+        }
+        assert_eq!(header["start"]["map"]["width"], 126);
+        assert_eq!(header["start"]["map"]["height"], 126);
+        assert_eq!(header["initialEntityCount"], 380);
+        assert_eq!(
+            header["start"]["snapshotStream"]["sourceScenario"],
+            STREAM_ID
+        );
         assert_eq!(header["start"]["snapshotStream"]["serverSimulation"], false);
 
         let mut offset = 12 + header_len;

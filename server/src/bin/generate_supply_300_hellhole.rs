@@ -5,7 +5,9 @@ use rts_protocol::{
     Command, InitialCamera, LabCheckpointScenarioV1 as ProtocolLabCheckpointScenarioV1,
     LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, DEFAULT_FACTION_ID,
 };
-use rts_rules::balance::{building_stats, unit_stats};
+use rts_rules::balance::building_stats;
+use rts_rules::economy::supply_cost;
+use rts_rules::faction::catalog_for;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
     LabCommandOptions, LabOp, LabOpOutcome, LabSetCompletedResearch, LabSetPlayerResources,
@@ -208,12 +210,18 @@ fn supply_for(units: &[EntityKind]) -> Result<u32, String> {
 }
 
 fn supply_of(kind: EntityKind) -> Result<u32, String> {
-    if kind == EntityKind::Golem {
-        return Ok(0);
+    if !kind.is_unit() {
+        return Err(format!("{kind} is not a unit"));
     }
-    unit_stats(kind)
-        .map(|stats| stats.supply)
-        .ok_or_else(|| format!("{kind} is not a unit"))
+    let catalog = catalog_for(DEFAULT_FACTION_ID)
+        .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;
+    // Lab can spawn units from every playable faction. Authoritative supply only
+    // counts units available to the owning player's faction.
+    Ok(if catalog.allows_unit(kind) {
+        supply_cost(kind)
+    } else {
+        0
+    })
 }
 
 fn positions_for_player(player_id: u32, count: usize) -> Vec<(f32, f32)> {

@@ -2,16 +2,19 @@
 
 ## Purpose
 
-Make a 300-supply cap technically evaluable by first creating one deliberately pathological,
-server-authoritative Lab battle, then measuring the browser's complete Pixi frame and removing the
-client work already shown to scale badly near 200 supply. This plan covers the benchmark foundation
+Make a 300-supply cap technically evaluable by measuring the browser's complete Pixi frame and
+removing the client work already shown to scale badly near 200 supply. Server-authoritative active
+player workloads remain the production-shaped evidence; the client-only Hellhole stream isolates
+the renderer ceiling, while the existing Lab Hellhole remains a separate server stress lane. This
+plan covers the benchmark foundation
 and five agreed priorities without changing the production supply cap: single-frame ownership and
 honest presentation timing; route-specific rigs; revision-cached fog; one consolidated frame-entity
 path; and cached minimap, HP, selection, and occupied-trench drawing. Viewport culling is explicitly
 excluded because whole-map zoom is normal play and therefore remains the representative worst case.
 
-Phase 0 is an initial measured checkpoint that establishes the reproducible Lab stress fixture.
-Three optimization phases follow before the final measured checkpoint, as required by
+Phase 0 was dispensed instead of combining the server and client saturation lanes. Phase 1 is the
+initial measured checkpoint, followed by two optimization phases and the final checkpoint, as
+required by
 `docs/context/planning.md`. The five priorities are grouped by contract boundary so each phase can
 land as one coherent PR instead of leaving partially migrated renderer paths. A later supply-cap
 decision is outside this plan and must use the final active-player evidence rather than assuming
@@ -21,7 +24,7 @@ that either the Lab benchmark or phase completion automatically makes 300 supply
 
 | Agreed priority | Owning phase |
 | --- | --- |
-| 0. Canonical 300-supply-per-side Lab hellhole and workload | [Phase 0](phase-0.md) |
+| 0. Combined Lab/client Hellhole workload (dispensed) | [Phase 0](phase-0.md) |
 | 1. One Match-owned RAF and honest Pixi-present timing | [Phase 1](phase-1.md) |
 | 2. Route-specific rig construction and one animation sample per entity | [Phase 2](phase-2.md) |
 | 3. Fog identity/revision caching | [Phase 3](phase-3.md) |
@@ -32,12 +35,10 @@ that either the Lab benchmark or phase completion automatically makes 300 supply
 
 ### [Phase 0 - Build the 300-Supply Lab Hellhole](phase-0.md)
 
-Add a bundled `1v1` Lab scenario with two exact 300-supply armies, every ordinary unit kind, both
-players in god mode, and a minimum-spacing interleaved formation kept in sustained combat. Register
-it as one canonical performance workload whose assertions cover composition, projection, codec,
-stable entity count, and continuing combat before sampling. Treat the checked-in fixture as the
-durable benchmark definition and its initial timing as provisional until Phase 1 owns and measures
-the complete presentation frame.
+Dispensed. Keep the existing four-player Lab scenario as a server-heavy simulation/projection lane
+and its generated snapshot stream as a separate client-only renderer lane. Do not combine them into
+the former live Lab performance workload; the phase file retains that proposal only as historical
+context.
 
 ### [Phase 1 - Own and Measure the Complete Frame](phase-1.md)
 
@@ -85,12 +86,11 @@ settings and report whether 300 supply actually clears the proposed 60 FPS gate.
 - Performance comparisons must use identical checked-in workloads, seeds, viewports, DPRs, CPU
   throttles, durations, and repeat counts. Chrome CPU throttling is a same-machine stress control,
   not a hardware-identical model of a player's PC.
-- Keep the Phase 0 scenario and workload descriptor unchanged after its baseline is accepted. If a
-  unit roster or scenario contract must change, version the fixture and re-establish its baseline
-  rather than silently rewriting the workload under later phases.
-- Phase 0's Lab route exercises normal authoritative snapshots and compression but is
-  spectator-shaped and prediction-free. Use it for comparative stress; use Phase 1's active-player
-  workload for a later production cap decision.
+- Keep the generated client-only Hellhole stream unchanged during renderer comparisons. Regenerate
+  it from its scenario only as an explicit fixture change, then re-establish the baseline.
+- The Lab scenario exercises server simulation and projection, while the snapshot stream is
+  spectator-shaped and prediction-free. Neither replaces Phase 1's active-player workload for a
+  production cap decision.
 - Keep traces, screenshots, and benchmark outputs under ignored `target/` paths. Do not commit
   generated PNG captures or performance artifacts.
 - Update `docs/design/client-rendering.md`, `docs/design/client-ui.md`, `docs/perf-tracing.md`, and
@@ -100,8 +100,8 @@ settings and report whether 300 supply actually clears the proposed 60 FPS gate.
 
 ## Measurement and Decision Rules
 
-- Phase 0 proves that the canonical Lab hellhole is exact, repeatable, sustained, and measurable;
-  its pre-Phase-1 timing is provisional.
+- The client-only Hellhole stream provides repeatable renderer-ceiling comparisons; server-heavy
+  Lab runs remain separate simulation/projection evidence.
 - Phase 1 records the honest baseline; it is not expected to improve frame time.
 - Phase 2 and Phase 3 must retain comparable before/after artifacts for both the 200- and
   300-supply active-player workloads.
