@@ -25,8 +25,8 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
-    unit_body_with_facing, RectBody, UnitBody,
+    building_rect_for_entity, circle_intersects_rect, tile_rect, unit_bodies_intersect, unit_body,
+    unit_body_for_entity, unit_body_with_facing, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
@@ -683,8 +683,9 @@ impl<'a> MoveCoordinator<'a> {
     ///
     /// Prefer points with a small clearance gap from the producing building so spawned units have
     /// room to move away. If no such point exists, fall back to the first legal ring so tight maps
-    /// do not block production. When `rally` is `Some`, candidate ties within a ring favor the
-    /// point closest to the rally so units still exit the side of the building facing it.
+    /// do not block production. Vehicles first prefer a point where their complete swept body can
+    /// rotate 360 degrees. When `rally` is `Some`, candidate ties within a ring favor the point
+    /// closest to the rally so units still exit the side of the building facing it.
     pub fn find_spawn_point(
         &self,
         entities: &EntityStore,
@@ -704,10 +705,13 @@ impl<'a> MoveCoordinator<'a> {
         let max_y = footprint.iter().map(|(_, y)| *y).max()? as i32;
 
         // Search outward in rings from the actual building footprint edge.
+        let prefer_rotation_clearance = uses_oriented_vehicle_body(spawned_kind);
         let mut fallback: Option<(f32, (f32, f32))> = None;
+        let mut preferred_fallback: Option<(f32, (f32, f32))> = None;
         for r in 1i32..=6 {
             let mut ring_best: Option<(f32, (f32, f32))> = None;
             let mut preferred_ring_best: Option<(f32, (f32, f32))> = None;
+            let mut rotation_clear_ring_best: Option<(f32, (f32, f32))> = None;
             for ty in (min_y - r)..=(max_y + r) {
                 for tx in (min_x - r)..=(max_x + r) {
                     if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
@@ -737,17 +741,33 @@ impl<'a> MoveCoordinator<'a> {
                     {
                         preferred_ring_best = Some((score, (cx, cy)));
                     }
+                    if prefer_rotation_clearance
+                        && full_rotation_spawn_clear(
+                            self.map,
+                            self.occ,
+                            entities,
+                            spawned_kind,
+                            cx,
+                            cy,
+                        )
+                        && rotation_clear_ring_best.is_none_or(|(best_score, _)| score < best_score)
+                    {
+                        rotation_clear_ring_best = Some((score, (cx, cy)));
+                    }
                 }
             }
             if fallback.is_none() {
                 fallback = ring_best;
             }
-            if let Some((_, point)) = preferred_ring_best {
+            if preferred_fallback.is_none() {
+                preferred_fallback = preferred_ring_best;
+            }
+            if let Some((_, point)) = rotation_clear_ring_best {
                 return Some(point);
             }
         }
 
-        fallback.map(|(_, point)| point)
+        preferred_fallback.or(fallback).map(|(_, point)| point)
     }
 
     /// Prefer spawning oriented vehicles already facing the rally, but only if that body
@@ -1090,6 +1110,57 @@ fn spawn_gap_from_building(
     Some(unit_body_rect_gap(body, building_rect))
 }
 
+/// Checks the exact swept envelope of a full rotation. A circle whose radius is the body's
+/// farthest point from its center covers every orientation, including configured hull clearance.
+///
+/// This deliberately remains spawn-selection policy rather than generic standability: normal
+/// standability validates the body's current facing, while production prefers enough room for
+/// every facing and may still fall back to an ordinarily standable point when a base is congested.
+fn full_rotation_spawn_clear(
+    map: &Map,
+    occupancy: &Occupancy,
+    entities: &EntityStore,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+) -> bool {
+    let Some(radius) = unit_body(kind, x, y).map(UnitBody::bounding_radius) else {
+        return false;
+    };
+    let envelope = CircleBody { x, y, radius };
+    let envelope_body = UnitBody::Circle(envelope);
+    let world_max = map.world_size_px();
+    if x - radius < 0.0 || y - radius < 0.0 || x + radius > world_max || y + radius > world_max {
+        return false;
+    }
+
+    let tile_size = config::TILE_SIZE as f32;
+    let min_tx = ((x - radius) / tile_size).floor() as i32;
+    let min_ty = ((y - radius) / tile_size).floor() as i32;
+    let max_tx = ((x + radius) / tile_size).floor() as i32;
+    let max_ty = ((y + radius) / tile_size).floor() as i32;
+    for ty in min_ty..=max_ty {
+        for tx in min_tx..=max_tx {
+            if !map.in_bounds(tx, ty) {
+                return false;
+            }
+            if (!map.is_passable(tx, ty) || !occupancy.passable_for_kind(tx, ty, kind))
+                && circle_intersects_rect(envelope, tile_rect(tx, ty))
+            {
+                return false;
+            }
+        }
+    }
+
+    entities.iter().all(|entity| {
+        if entity.hp == 0 || !entity.is_unit() {
+            return true;
+        }
+        unit_body_for_entity(entity)
+            .is_none_or(|existing| !unit_bodies_intersect(envelope_body, existing))
+    })
+}
+
 fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
     match body {
         UnitBody::Circle(circle) => {
@@ -1304,6 +1375,46 @@ mod tests {
             gap < preferred,
             "test setup should force fallback to a sub-preferred gap, got {gap:.2}px"
         );
+    }
+
+    #[test]
+    fn rotation_clear_spawn_uses_nearby_units_exact_oriented_bodies() {
+        let map = flat_map(12);
+        let spawn = (160.0, 160.0);
+        let nearby = (203.8, 203.8);
+        let mut entities = EntityStore::new();
+        let nearby_id = entities
+            .spawn_unit(1, EntityKind::Tank, nearby.0, nearby.1)
+            .expect("nearby tank should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        let spawn_radius = unit_body(EntityKind::Tank, spawn.0, spawn.1)
+            .expect("spawn body")
+            .bounding_radius();
+        let nearby_radius = unit_body_for_entity(entities.get(nearby_id).expect("nearby tank"))
+            .expect("nearby body")
+            .bounding_radius();
+        let center_distance = ((nearby.0 - spawn.0).powi(2) + (nearby.1 - spawn.1).powi(2)).sqrt();
+        assert!(
+            center_distance < spawn_radius + nearby_radius,
+            "test geometry must overlap the conservative bounding circles"
+        );
+        assert!(
+            full_rotation_spawn_clear(&map, &occ, &entities, EntityKind::Tank, spawn.0, spawn.1,),
+            "the swept spawn disk should clear the nearby tank's exact oriented body"
+        );
+
+        entities
+            .spawn_unit(1, EntityKind::Tank, 200.0, 160.0)
+            .expect("blocking tank should spawn");
+        assert!(!full_rotation_spawn_clear(
+            &map,
+            &occ,
+            &entities,
+            EntityKind::Tank,
+            spawn.0,
+            spawn.1,
+        ));
     }
 
     #[test]

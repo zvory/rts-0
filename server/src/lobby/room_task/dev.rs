@@ -186,6 +186,13 @@ impl RoomTask {
                     DevScenarioId::CommandCarBuildingCorner => session_from_setup!(
                         Game::new_command_car_corner_scenario(config.unit, config.count, seed)?,
                     ),
+                    DevScenarioId::FactoryWallRallySpawn => {
+                        session_from_setup!(Game::new_factory_wall_rally_spawn_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
                     DevScenarioId::TankTrapLineHorizontal
                     | DevScenarioId::TankTrapLineVertical
                     | DevScenarioId::TankTrapLineDiagonal => {
