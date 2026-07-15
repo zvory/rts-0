@@ -448,7 +448,7 @@ export function buildTrainCard(ctx, building) {
       .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
     const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
-    const repeatHelp = "Alt-click or Alt+hotkey adds one auto-build; hold Shift to remove one";
+    const repeatHelp = "Alt-click or Alt+hotkey adds one auto-build; Shift+hotkey removes one";
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),

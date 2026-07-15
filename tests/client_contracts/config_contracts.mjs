@@ -794,6 +794,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     );
     const coolingMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
     assert(coolingMortarButton?.dataset.contextAction === "true", "Mortar Fire button exposes its context hotkey action");
+    assert(!coolingMortarButton?.dataset.shiftContextAction, "Shift keeps Mortar Fire on its queued manual-fire action");
     assert(!coolingMortarButton?.disabled, "cooling-down Mortar Fire remains armable for queued manual fire");
     const coolingMortarCard = buildCommandCardDescriptors({
       playerId,
@@ -1037,15 +1038,36 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       commandCarButton?.dataset.contextAction === "true",
       "production buttons expose their allocation context action to the hotkey layer",
     );
+    assert(
+      commandCarButton?.dataset.shiftContextAction === "true",
+      "production buttons expose Shift as their decrement hotkey modifier",
+    );
     globalThis.document.getElementById = () => ({
       querySelectorAll() {
         return [commandCarButton];
       },
     });
     input.state = factoryHud.state;
-    const removeAutoBuildEv = {
+    const addAutoBuildEv = {
       code: "KeyE",
       altKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      repeat: false,
+      preventDefault() { this.prevented = true; },
+    };
+    const addAutoBuildResult = input._activateCommandHotkey(addAutoBuildEv);
+    const addAutoBuildCommand = sent[sent.length - 1];
+    assert(
+      addAutoBuildResult?.contextAction === true && addAutoBuildEv.prevented &&
+        addAutoBuildCommand?.c === "adjustProductionRepeat" &&
+        addAutoBuildCommand.delta === 1 && addAutoBuildCommand.buildings[0] === selectedFactory.id,
+      "Alt+production hotkeys dispatch one signed addition through the context-action path",
+    );
+    const removeAutoBuildEv = {
+      code: "KeyE",
+      altKey: false,
       ctrlKey: false,
       metaKey: false,
       shiftKey: true,
@@ -1058,7 +1080,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       removeAutoBuildResult?.contextAction === true && removeAutoBuildEv.prevented &&
         removeAutoBuildCommand?.c === "adjustProductionRepeat" &&
         removeAutoBuildCommand.delta === -1 && removeAutoBuildCommand.buildings[0] === selectedFactory.id,
-      "Alt+Shift production hotkeys dispatch one signed removal through the generic context-action path",
+      "Shift+production hotkeys dispatch one signed removal through the context-action path",
     );
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
