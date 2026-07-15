@@ -2,7 +2,25 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done — attempted and rejected; the implementation was not shipped.
+
+## Rejected Result
+
+The experiment added a private ascending live-id index to `EntityStore`, rebuilt it after direct
+serde and checkpoint restore, and covered insertion, removal, clone, duplicate restore, allocator
+wrap, and replacement collisions. Focused entity-store and checkpoint tests, the simulation
+architecture check, clippy, docs health, and diff hygiene passed. Parent
+`c7197acaa9880a1a35f1f20900f279efb548869c` and local candidate
+`eff4bf71943ba2f9796d00513f261e1dbedf8451` produced byte-identical 900-frame streams of 23,997,915
+bytes with SHA-256 `0a6e4b40c8af8ab01aae08755fb6e8811584a38aa746682943ff7131901142d1`.
+
+Across nine alternating paired runs, median API gain was -0.182% and median wall gain was -0.161%,
+with only three of nine pairs positive on both measures versus the required 5% median and eight of
+nine positive pairs. Tail gates passed, and profiling confirmed the intended ID collection/sorting
+cost fell from 107/2,886 samples (3.708%) to zero, but the end-to-end result did not improve. The
+independent reviewer returned `REJECT`; the implementation was neither pushed nor merged, Phase 3
+was not started, and `Done` records a closed rejected experiment for archival rather than an
+accepted optimization.
 
 ## Objective
 
