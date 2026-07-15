@@ -46,6 +46,7 @@ use rts_sim::game::{Game, PlayerInit};
 mod connection;
 mod crash_replay;
 mod dev_replay;
+mod dev_scenario_id;
 mod faction_validation;
 mod lab_replay_operations;
 mod lab_scenario_driver;
