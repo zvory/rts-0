@@ -613,6 +613,19 @@ cannot become its bottleneck. The separate checked-in snapshot stream is the cli
 live Lab server and Pixi client may be run together only through the explicit `--integrated` mode
 for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
+The server-performance goal for this benchmark is at least **8.0× real time** on the designated
+local reference MacBook (currently MacBook Pro `Mac17,8`, Apple M5 Pro) when running the default
+900-tick release workload on one serial execution lane. Simulation, full-world projection,
+compaction, and MessagePack encoding must remain on that single lane; parallel workers, Rayon, or
+subsystem fan-out across cores do not satisfy the goal. macOS may migrate the serial thread between
+cores, so "single core" means no simultaneous benchmark work on multiple cores rather than fixed
+CPU affinity. For 900 ticks, 8.0× means completing 30 simulated seconds in at most 3.75 wall-clock
+seconds, with average API round-trip work at or below 4.167 ms. Merely staying below the ordinary
+33.3 ms live tick interval is not success: the local headroom target exists because deployment
+hardware is materially weaker than the reference MacBook. Profile and optimize the serial path
+until the target is met; use live-room, multi-room, AI, and deployment measurements as additional
+evidence, not substitutes for this isolation gate.
+
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` for reliable server messages and a dedicated latest-only slot for observer-analysis payloads sent to its socket.
