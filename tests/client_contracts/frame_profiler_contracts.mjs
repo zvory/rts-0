@@ -66,10 +66,11 @@ export function runFrameProfilerContracts() {
       projectedEntityCount: expectedLab.projectedEntityCount,
       labMode: true,
       offline: false,
-      websocket: true,
+      websocketOpen: true,
     };
     assert(validateLiveLabScenarioSample(liveLabSample, expectedLab).length === 0, "integrated Hellhole accepts exact live Lab identity");
     assert(validateLiveLabScenarioSample({ ...liveLabSample, offline: true }, expectedLab).length > 0, "integrated Hellhole rejects an offline client lane");
+    assert(validateLiveLabScenarioSample({ ...liveLabSample, websocketOpen: false }, expectedLab).length > 0, "integrated Hellhole rejects a non-open WebSocket");
   }
 
   {

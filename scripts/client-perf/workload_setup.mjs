@@ -18,8 +18,8 @@ export function validateLiveLabScenarioSample(sample, expected) {
     errors.push(`projected entities ${sample?.projectedEntityCount} != ${expected.projectedEntityCount}`);
   }
   if (sample?.labMode !== true) errors.push("match is not running in Lab mode");
-  if (sample?.offline !== false || sample?.websocket !== true) {
-    errors.push("live Lab workload is not connected through a WebSocket");
+  if (sample?.offline !== false || sample?.websocketOpen !== true) {
+    errors.push("live Lab workload does not have an open WebSocket");
   }
   return errors;
 }
@@ -133,7 +133,8 @@ async function applyLiveLabScenarioSetup(page, setup, result) {
     await page.waitForFunction(
       ({ scenarioId, projectedEntityCount }) => window.__rts?.labLaunch?.scenario === scenarioId &&
         window.__rts?.match?.state?._curById?.size === projectedEntityCount &&
-        window.__rts?.net?.offline !== true && window.__rts?.net?.ws != null,
+        window.__rts?.net?.offline !== true &&
+        window.__rts?.net?.ws?.readyState === WebSocket.OPEN,
       { timeout: Number(setup.liveLabScenarioWaitTimeoutMs) || 20000 },
       expected,
     );
@@ -147,7 +148,7 @@ async function applyLiveLabScenarioSetup(page, setup, result) {
         projectedEntityCount: app?.match?.state?._curById?.size || 0,
         labMode: !!app?.match?.labMetadata,
         offline: app?.net?.offline === true,
-        websocket: app?.net?.ws != null,
+        websocketOpen: app?.net?.ws?.readyState === WebSocket.OPEN,
       };
     });
     const errors = validateLiveLabScenarioSample(action, expected);
