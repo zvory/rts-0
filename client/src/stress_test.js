@@ -7,6 +7,15 @@ import {
 const DEVICE_ID_KEY = "rts.stressTest.deviceId";
 const PROFILE_INTERVAL_MS = 10;
 const PROFILE_BUFFER_SAMPLES = 4_000;
+const MIN_MEASURED_FRAMES = 1;
+
+export function stressTestForegroundReady(documentLike = document) {
+  return documentLike.hidden !== true && documentLike.hasFocus() === true;
+}
+
+export function stressTestHasEnoughFrames(frameCount) {
+  return Number(frameCount) >= MIN_MEASURED_FRAMES;
+}
 
 export function stressTestHeadroom(frameWorkP95Ms) {
   const p95 = Number(frameWorkP95Ms);
@@ -45,82 +54,75 @@ export class StressTestRunner {
   async run({ match, net }) {
     if (this.started) return;
     this.started = true;
-    const visibility = { changes: 0, hiddenDuringRun: document.hidden, focusedAtStart: document.hasFocus() };
-    const onVisibilityChange = () => {
-      visibility.changes += 1;
-      visibility.hiddenDuringRun ||= document.hidden;
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
 
     try {
-      this.setState("warmup");
-      this.renderStatus(`Warming up for ${this.launch.warmupSeconds} seconds…`);
-      const refreshPromise = estimateRefreshRate();
-      const environmentPromise = collectEnvironment(match);
-      await delay(this.launch.warmupSeconds * 1000);
-      const refreshRateHz = await refreshPromise;
-      const environment = await environmentPromise;
-
-      match?.frameProfiler?.reset();
-      const observer = new BrowserTimingObserver();
-      observer.start();
-      let profiler = null;
-      let profilerError = "";
-      if (typeof globalThis.Profiler === "function") {
-        try {
-          profiler = new globalThis.Profiler({
-            sampleInterval: PROFILE_INTERVAL_MS,
-            maxBufferSize: PROFILE_BUFFER_SAMPLES,
-          });
-        } catch (error) {
-          profilerError = String(error?.message || error).slice(0, 240);
+      const environment = await collectEnvironment(match);
+      let completedAttempt = null;
+      while (!completedAttempt) {
+        if (!stressTestForegroundReady()) {
+          this.setState("waiting");
+          this.renderStatus("Paused. Return to this tab to start a fresh run.");
+          await waitForForeground();
         }
+
+        this.setState("warmup");
+        this.renderStatus(`Warming up for ${this.launch.warmupSeconds} seconds…`);
+        const refreshPromise = estimateRefreshRate();
+        const warmupComplete = await uninterruptedForegroundDelay(this.launch.warmupSeconds * 1000);
+        const refreshRateHz = await refreshPromise;
+        if (!warmupComplete) {
+          this.setState("waiting");
+          this.renderStatus("Tab left the foreground. Return here and the test will restart.");
+          continue;
+        }
+
+        match?.frameProfiler?.reset();
+        const observer = new BrowserTimingObserver();
+        observer.start();
+        const profilerState = startBrowserProfiler();
+        this.setState("measuring");
+        this.renderStatus(`Measuring ${this.launch.durationSeconds} seconds… Keep this tab visible.`);
+        const measuredAt = new Date().toISOString();
+        const measuredStarted = performance.now();
+        const measurementComplete = await uninterruptedForegroundDelay(
+          this.launch.durationSeconds * 1000,
+        );
+        const measuredDurationMs = Math.round(performance.now() - measuredStarted);
+        const browserTiming = observer.stop();
+
+        if (!measurementComplete) {
+          await discardBrowserProfiler(profilerState.profiler);
+          this.setState("waiting");
+          this.renderStatus("Tab left the foreground. This attempt was discarded; return to restart.");
+          continue;
+        }
+
+        const profile = await finishBrowserProfiler(profilerState, this.launch.label);
+        const frameSummary = match?.frameProfiler?.reportSummary?.() || {};
+        if (!stressTestHasEnoughFrames(frameSummary.frameCount)) {
+          this.setState("warmup");
+          this.renderStatus("Too few rendered frames. Restarting with a fresh warmup…");
+          await delay(250);
+          continue;
+        }
+        completedAttempt = {
+          browserTiming,
+          frameSummary,
+          measuredAt,
+          measuredDurationMs,
+          profile,
+          refreshRateHz,
+        };
       }
 
-      this.setState("measuring");
-      this.renderStatus(`Measuring ${this.launch.durationSeconds} seconds… Keep this tab visible.`);
-      const measuredAt = new Date().toISOString();
-      const measuredStarted = performance.now();
-      await delay(this.launch.durationSeconds * 1000);
-      const measuredDurationMs = Math.round(performance.now() - measuredStarted);
-      const browserTiming = observer.stop();
-
-      let profile = {
-        kind: "phase-timings",
-        supported: false,
-        error: profilerError || (typeof globalThis.Profiler === "function"
-          ? "The JS profiler could not start."
-          : "The JS Self-Profiling API is unavailable in this browser."),
-        trace: null,
-        summary: null,
-        flamegraphSvg: "",
-      };
-      if (profiler) {
-        try {
-          const rawTrace = await profiler.stop();
-          const trace = JSON.parse(JSON.stringify(rawTrace));
-          const analysis = analyzeSelfProfile(trace);
-          profile = {
-            kind: "js-self-profile",
-            supported: true,
-            error: "",
-            trace,
-            summary: selfProfileSummary(analysis),
-            flamegraphSvg: renderSelfProfileFlamegraph(analysis, {
-              title: `Hellhole stress test${this.launch.label ? ` — ${this.launch.label}` : ""}`,
-            }),
-          };
-        } catch (error) {
-          profile.error = String(error?.message || error).slice(0, 240);
-        }
-      }
-
-      visibility.hiddenDuringRun ||= document.hidden;
-      const frameSummary = match?.frameProfiler?.reportSummary?.() || {};
-      const invalidReasons = [];
-      if (visibility.hiddenDuringRun || visibility.changes > 0) invalidReasons.push("tab visibility changed");
-      if (!visibility.focusedAtStart || !document.hasFocus()) invalidReasons.push("tab was not focused");
-      if ((frameSummary.frameCount || 0) < 30) invalidReasons.push("too few rendered frames");
+      const {
+        browserTiming,
+        frameSummary,
+        measuredAt,
+        measuredDurationMs,
+        profile,
+        refreshRateHz,
+      } = completedAttempt;
       const payload = {
         schemaVersion: 1,
         workloadId: this.launch.id,
@@ -129,8 +131,8 @@ export class StressTestRunner {
         fingerprint: await environmentFingerprint(environment),
         measuredAt,
         measuredDurationMs,
-        status: invalidReasons.length ? "invalid" : "completed",
-        invalidReasons,
+        status: "completed",
+        invalidReasons: [],
         environment: { ...environment, refreshRateHz },
         stream: sanitizeStreamState(net?.publicState),
         frameSummary,
@@ -159,8 +161,6 @@ export class StressTestRunner {
       this.setState("failed");
       this.renderFailure(this.publicState.error);
       console.error("[stress-test] failed", error);
-    } finally {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
     }
   }
 
@@ -310,6 +310,100 @@ class BrowserTimingObserver {
       longestAnimationFrames: animationFrames.slice(0, 20),
     };
   }
+}
+
+function startBrowserProfiler() {
+  const state = {
+    profiler: null,
+    error: typeof globalThis.Profiler === "function"
+      ? "The JS profiler could not start."
+      : "The JS Self-Profiling API is unavailable in this browser.",
+  };
+  if (typeof globalThis.Profiler !== "function") return state;
+  try {
+    state.profiler = new globalThis.Profiler({
+      sampleInterval: PROFILE_INTERVAL_MS,
+      maxBufferSize: PROFILE_BUFFER_SAMPLES,
+    });
+    state.error = "";
+  } catch (error) {
+    state.error = String(error?.message || error).slice(0, 240);
+  }
+  return state;
+}
+
+async function finishBrowserProfiler(state, label) {
+  const fallback = {
+    kind: "phase-timings",
+    supported: false,
+    error: state.error,
+    trace: null,
+    summary: null,
+    flamegraphSvg: "",
+  };
+  if (!state.profiler) return fallback;
+  try {
+    const rawTrace = await state.profiler.stop();
+    const trace = JSON.parse(JSON.stringify(rawTrace));
+    const analysis = analyzeSelfProfile(trace);
+    return {
+      kind: "js-self-profile",
+      supported: true,
+      error: "",
+      trace,
+      summary: selfProfileSummary(analysis),
+      flamegraphSvg: renderSelfProfileFlamegraph(analysis, {
+        title: `Hellhole stress test${label ? ` — ${label}` : ""}`,
+      }),
+    };
+  } catch (error) {
+    fallback.error = String(error?.message || error).slice(0, 240);
+    return fallback;
+  }
+}
+
+async function discardBrowserProfiler(profiler) {
+  if (!profiler) return;
+  try {
+    await profiler.stop();
+  } catch {
+    // This attempt is intentionally discarded; a new profiler starts after foreground warmup.
+  }
+}
+
+function waitForForeground(documentLike = document, windowLike = window) {
+  if (stressTestForegroundReady(documentLike)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const check = () => {
+      if (!stressTestForegroundReady(documentLike)) return;
+      documentLike.removeEventListener("visibilitychange", check);
+      windowLike.removeEventListener("focus", check);
+      resolve();
+    };
+    documentLike.addEventListener("visibilitychange", check);
+    windowLike.addEventListener("focus", check);
+  });
+}
+
+function uninterruptedForegroundDelay(ms, documentLike = document, windowLike = window) {
+  if (!stressTestForegroundReady(documentLike)) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let timer = null;
+    const finish = (completed) => {
+      if (timer === null) return;
+      clearTimeout(timer);
+      timer = null;
+      documentLike.removeEventListener("visibilitychange", onStateChange);
+      windowLike.removeEventListener("blur", onStateChange);
+      resolve(completed);
+    };
+    const onStateChange = () => {
+      if (!stressTestForegroundReady(documentLike)) finish(false);
+    };
+    documentLike.addEventListener("visibilitychange", onStateChange);
+    windowLike.addEventListener("blur", onStateChange);
+    timer = setTimeout(() => finish(true), ms);
+  });
 }
 
 async function collectEnvironment(match) {

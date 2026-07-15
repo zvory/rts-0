@@ -9,7 +9,7 @@ This document owns the cross-file contract for the shareable client-only Hellhol
 `SnapshotStreamNet`. It uses the normal snapshot decode, `GameState`, `Match`, Pixi, fog, HUD,
 minimap, and animation-frame paths, but never opens a WebSocket or runs a server simulation.
 `?label=<text>` adds a bounded human label to every artifact. `?seconds=<2..25>` exists for local
-iteration; the shareable default is 15 seconds after a three-second warmup. The cap keeps the
+iteration; the shareable default is five seconds after a three-second warmup. The cap keeps the
 measurement inside the stream's first 30-second loop.
 
 The route response alone sends `Document-Policy: js-profiling`. Pixi's pinned CDN script uses
@@ -31,9 +31,11 @@ when supported; and a JS trace/flame graph when supported. The result UI reports
 tier and the approximate work reduction or headroom against 16.67 ms. This is a relative
 frame-work indicator, not a claim that the display actually presented at 120 or 240 Hz.
 
-A run is marked `invalid` instead of silently compared when the tab loses focus, changes
-visibility, or records fewer than 30 rendered frames. Invalid artifacts are still retained for
-diagnosis.
+Warmup and measurement require an uninterrupted visible, focused tab. If either condition changes,
+the current attempt and its browser profile are discarded without uploading; the runner waits for
+the tab to return, repeats the full warmup, and starts a fresh five-second measurement. A completed
+foreground window with at least one rendered frame is accepted, so a truly slow machine remains
+measurable; fewer frames trigger another local restart instead of a misleading zero-FPS artifact.
 
 ## Identification and privacy
 

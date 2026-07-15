@@ -1,5 +1,9 @@
 import { assert } from "./assertions.mjs";
-import { stressTestHeadroom } from "../../client/src/stress_test.js";
+import {
+  stressTestForegroundReady,
+  stressTestHasEnoughFrames,
+  stressTestHeadroom,
+} from "../../client/src/stress_test.js";
 import {
   analyzeSelfProfile,
   renderSelfProfileFlamegraph,
@@ -39,6 +43,13 @@ import {
     "8ms p95 reports the 120 FPS frame-work tier");
   assert(stressTestHeadroom(34).text.includes("less frame work"),
     "slow results explain the approximate speedup required for 60 FPS");
+  assert(stressTestForegroundReady({ hidden: false, hasFocus: () => true }),
+    "foreground readiness requires a visible focused document");
+  assert(!stressTestForegroundReady({ hidden: true, hasFocus: () => true }) &&
+    !stressTestForegroundReady({ hidden: false, hasFocus: () => false }),
+  "foreground readiness rejects hidden and unfocused attempts");
+  assert(stressTestHasEnoughFrames(1) && !stressTestHasEnoughFrames(0),
+    "one frame keeps sub-1 FPS hardware reportable without accepting a stalled renderer");
 }
 
 {
@@ -50,6 +61,6 @@ import {
   assert(config?.id === "supply-300-hellhole", "stress route selects the canonical snapshot stream");
   assert(config?.label === "Matt _bad_ laptop", "stress route bounds and sanitizes artifact labels");
   assert(config?.durationSeconds === 25, "stress route bounds the measurement window below stream rollover");
-  assert(stressTestLaunchConfig({ pathname: "/stress-test", search: "" })?.durationSeconds === 15,
-    "stress route uses the full default measurement window when seconds is absent");
+  assert(stressTestLaunchConfig({ pathname: "/stress-test", search: "" })?.durationSeconds === 5,
+    "stress route uses a five-second default measurement window when seconds is absent");
 }

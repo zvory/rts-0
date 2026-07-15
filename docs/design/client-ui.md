@@ -1555,7 +1555,8 @@ not an extension of the server wire protocol.
 `/stress-test` is the shareable automatic wrapper around the canonical Hellhole snapshot stream.
 It warms and resets the existing frame profiler, measures one bounded window, saves environment and
 phase diagnostics, and uses Chromium's JS Self-Profiling API for a sampled trace plus SVG flame
-graph when available. Other browsers save the phase-timing fallback. The complete cross-file route,
+graph when available. Hidden or unfocused attempts are discarded and restart after the tab returns;
+other browsers save the phase-timing fallback. The complete cross-file route,
 artifact, privacy, API, persistence, and input-limit contract lives in
 [`client-stress-tests.md`](client-stress-tests.md).
 

@@ -10,7 +10,7 @@ export function stressTestLaunchConfig(location = window.location) {
   const requestedSeconds = rawSeconds === null ? Number.NaN : Number(rawSeconds);
   const durationSeconds = Number.isFinite(requestedSeconds)
     ? Math.min(25, Math.max(2, Math.round(requestedSeconds)))
-    : 15;
+    : 5;
   return {
     id: "supply-300-hellhole",
     label,
