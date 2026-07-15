@@ -429,24 +429,6 @@ await withFakeDocument(() => {
   assert(!policy.isFeedbackOwner(1, state), "lab control policy does not treat the raw local player id as feedback owner");
   assert(policy.commandOwner(state) === 2, "lab control policy exposes the selected command owner");
   assert(policy.commandResources(state).steel === 125, "lab command resources resolve from the selected owner row");
-  const blueState = {
-    ...state,
-    selectedEntities() {
-      return [{ id: 10, owner: 1, kind: KIND.COMMAND_CAR }];
-    },
-  };
-  assert(
-    policy.commandResources(blueState).oil === 999 && policy.commandResources(blueState).supplyCap === 99,
-    "lab command resources prefer the authoritative blue-player row over spectator-shaped top-level resources",
-  );
-  blueState.playerResources = [
-    { id: 2, steel: 125, oil: 50, supplyUsed: 7, supplyCap: 12 },
-  ];
-  assertDeepEqual(
-    policy.commandResources(blueState),
-    { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
-    "lab command resources do not borrow a projected row belonging to another owner",
-  );
   assert(policy.commandFactionId(state) === "ekat", "lab command faction resolves from the selected owner");
   assertDeepEqual(
     policy.commandUpgrades(state),

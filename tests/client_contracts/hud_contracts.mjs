@@ -752,6 +752,14 @@ function fakeHudRootWithoutResourceSpans() {
     buttonByLabel(p1CommandCarCard, "Scout Plane").enabled,
     "blue-player Scout Plane affordability uses its authoritative lab resource row",
   );
+  p1LabHudState.playerResources = [p1LabHudState.playerResources[1]];
+  const missingP1ResourceCard = buildCommandCardDescriptors(
+    p1Hud._commandDescriptorContext({ selectedEntities: [p1CommandCar], currentEntities: [p1CommandCar] }),
+  );
+  assert(
+    !buttonByLabel(missingP1ResourceCard, "Scout Plane").enabled,
+    "blue-player affordability never borrows the orange player's resource row",
+  );
 
   const worker = { id: 10, owner: 1, kind: KIND.WORKER };
   const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
