@@ -11,7 +11,8 @@
 // A tile is rendered clear when visible, dimmed when explored-but-not-visible, and
 // solid dark when never explored (the renderer reads the grids directly). `revision`
 // increments only when those visibility semantics change so canvas overlays can cache
-// their fog view between identical frames.
+// their fog view between identical frames. The full union is rebuilt every update;
+// exact per-entity stamps may be reused only while every sight input is unchanged.
 
 import { STATS } from "./config.js";
 import { TERRAIN } from "./protocol.js";
@@ -41,6 +42,8 @@ export class Fog {
     this.visibleRevision = 0;
     this.exploredRevision = 0;
     this._nextVisibleGrid = new Uint8Array(mapWidth * mapHeight);
+    this._sourceStampCache = new Map();
+    this._sourceStampGeneration = 0;
   }
 
   resetMap(mapWidth, mapHeight, terrain = null) {
@@ -50,6 +53,8 @@ export class Fog {
     this.visibleGrid = new Uint8Array(mapWidth * mapHeight);
     this.exploredGrid = new Uint8Array(mapWidth * mapHeight);
     this._nextVisibleGrid = new Uint8Array(mapWidth * mapHeight);
+    this._sourceStampCache.clear();
+    this._sourceStampGeneration = 0;
     this.visibleRevision += 1;
     this.exploredRevision += 1;
     this.revision += 1;
@@ -57,6 +62,7 @@ export class Fog {
 
   updateTerrain(terrain = null) {
     this.terrain = terrain;
+    this._sourceStampCache.clear();
     this.revision += 1;
   }
 
@@ -68,7 +74,7 @@ export class Fog {
    * Buildings reveal their footprint plus sight around the footprint edge; units reveal
    * a filled circle. Explored is cumulative and is never cleared.
    *
-   * @param {Array<{kind:string,x:number,y:number}>} ownEntities entities owned by this player (world px centers)
+   * @param {Array<{id?:number,kind:string,x:number,y:number}>} ownEntities entities owned by this player (world px centers)
    * @param {number} tileSize world px per tile
    * @param {ArrayLike<number>|null} serverVisibleTiles server-authoritative current visibility
    */
@@ -102,19 +108,67 @@ export class Fog {
     let exploredChanged = false;
 
     if (ownEntities && tileSize) {
+      const sourceStampGeneration = ++this._sourceStampGeneration;
       for (const e of ownEntities) {
         const stat = STATS[e.kind];
         const sight = (stat && stat.sight) || DEFAULT_SIGHT_TILES;
         const cx = e.x / tileSize;
         const cy = e.y / tileSize;
+        const sourceId = e.id;
+        const cached = sourceId == null ? null : this._sourceStampCache.get(sourceId);
+        const sameSource = !!cached
+          && cached.kind === e.kind
+          && cached.x === e.x
+          && cached.y === e.y
+          && cached.tileSize === tileSize
+          && cached.sight === sight
+          && cached.footW === stat?.footW
+          && cached.footH === stat?.footH;
+
+        if (sameSource && cached.indices) {
+          cached.seenGeneration = sourceStampGeneration;
+          exploredChanged = this._applyCachedStamp(cached.indices, nextVisible) || exploredChanged;
+          continue;
+        }
+
+        // Capture only after observing an unchanged source twice. Interpolated
+        // movers therefore do not allocate a throwaway index list every frame.
+        const capturedIndices = sameSource ? [] : null;
         if (stat?.footW && stat?.footH) {
           exploredChanged =
-            this._stampFootprint(cx, cy, stat.footW, stat.footH, sight, nextVisible) ||
+            this._stampFootprint(
+              cx,
+              cy,
+              stat.footW,
+              stat.footH,
+              sight,
+              nextVisible,
+              capturedIndices,
+            ) ||
             exploredChanged;
         } else {
-          exploredChanged = this._stampCircle(cx, cy, sight, nextVisible) || exploredChanged;
+          exploredChanged =
+            this._stampCircle(cx, cy, sight, nextVisible, capturedIndices) || exploredChanged;
+        }
+        if (sourceId != null) {
+          this._sourceStampCache.set(sourceId, {
+            kind: e.kind,
+            x: e.x,
+            y: e.y,
+            tileSize,
+            sight,
+            footW: stat?.footW,
+            footH: stat?.footH,
+            indices: capturedIndices ? Uint32Array.from(capturedIndices) : null,
+            seenGeneration: sourceStampGeneration,
+          });
         }
       }
+      for (const [sourceId, entry] of this._sourceStampCache) {
+        if (entry.seenGeneration !== sourceStampGeneration) this._sourceStampCache.delete(sourceId);
+      }
+    } else {
+      this._sourceStampCache.clear();
     }
 
     let visibleChanged = false;
@@ -133,7 +187,13 @@ export class Fog {
    * visible and explored. Uses a squared-distance test so the reveal is round.
    * @private
    */
-  _stampCircle(cx, cy, radius, visibleGrid = this.visibleGrid) {
+  _stampCircle(
+    cx,
+    cy,
+    radius,
+    visibleGrid = this.visibleGrid,
+    capturedIndices = null,
+  ) {
     const r2 = radius * radius;
     const minTx = Math.max(0, Math.floor(cx - radius));
     const maxTx = Math.min(this.width - 1, Math.ceil(cx + radius));
@@ -150,6 +210,7 @@ export class Fog {
         if (dx * dx + dy * dy <= r2 && this._tileVisibleFrom(cx, cy, tx, ty)) {
           const i = rowBase + tx;
           visibleGrid[i] = 1;
+          capturedIndices?.push(i);
           if (this.exploredGrid[i] !== 1) {
             this.exploredGrid[i] = 1;
             exploredChanged = true;
@@ -166,7 +227,15 @@ export class Fog {
    * plus one tile out from each footprint edge.
    * @private
    */
-  _stampFootprint(cx, cy, footW, footH, radius, visibleGrid = this.visibleGrid) {
+  _stampFootprint(
+    cx,
+    cy,
+    footW,
+    footH,
+    radius,
+    visibleGrid = this.visibleGrid,
+    capturedIndices = null,
+  ) {
     if (![cx, cy, footW, footH, radius].every(Number.isFinite)) return false;
     const r = Math.floor(radius);
     const w = Math.floor(footW);
@@ -199,6 +268,7 @@ export class Fog {
             if (!this._tileVisibleFrom(originX, originY, tx, ty)) continue;
             const i = rowBase + tx;
             visibleGrid[i] = 1;
+            capturedIndices?.push(i);
             if (this.exploredGrid[i] !== 1) {
               this.exploredGrid[i] = 1;
               exploredChanged = true;
@@ -261,6 +331,19 @@ export class Fog {
     if (visibleChanged) this.visibleRevision += 1;
     if (exploredChanged) this.exploredRevision += 1;
     if (visibleChanged || exploredChanged || semanticChanged) this.revision += 1;
+  }
+
+  _applyCachedStamp(indices, visibleGrid) {
+    let exploredChanged = false;
+    for (let i = 0; i < indices.length; i++) {
+      const tileIndex = indices[i];
+      visibleGrid[tileIndex] = 1;
+      if (this.exploredGrid[tileIndex] !== 1) {
+        this.exploredGrid[tileIndex] = 1;
+        exploredChanged = true;
+      }
+    }
+    return exploredChanged;
   }
 
   _tileVisibleFrom(fromX, fromY, tileX, tileY) {
