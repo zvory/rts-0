@@ -33,7 +33,7 @@ Use for tests, CI/hooks, or focused verification.
 - `node scripts/check-docs-health.mjs` — docs map, capsule cap, and Markdown links.
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
-- `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`.
+- Canonical client CPU flame graph: `node scripts/client-flamegraph.mjs --preview`.
 - `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line source cap.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
