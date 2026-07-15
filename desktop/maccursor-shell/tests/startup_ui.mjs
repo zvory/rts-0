@@ -1,4 +1,21 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const shellRoot = new URL("../", import.meta.url);
+const tauriConfig = JSON.parse(
+  await readFile(new URL("src-tauri/tauri.conf.json", shellRoot), "utf8"),
+);
+const windowsLauncher = await readFile(new URL("run.cmd", shellRoot), "utf8");
+
+assert.equal(tauriConfig.productName, "Bewegungskrieg");
+assert.equal(tauriConfig.identifier, "dev.bewegungskrieg.Bewegungskrieg");
+assert.equal(tauriConfig.build.frontendDist, "../ui");
+assert.equal("externalBin" in tauriConfig.bundle, false);
+assert.equal("resources" in tauriConfig.bundle, false);
+assert.match(windowsLauncher, /cargo run --manifest-path/);
+assert.match(windowsLauncher, /CARGO_TARGET_DIR=%LOCALAPPDATA%\\rts-0\\tauri-target-windows/);
+assert.match(windowsLauncher, /CARGO_BUILD_JOBS=2/);
+assert.doesNotMatch(windowsLauncher, /rts-server|server\.exe/i);
 
 import {
   LAST_PROFILE_KEY,

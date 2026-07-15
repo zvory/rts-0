@@ -24,6 +24,21 @@ Or run it from this directory:
 ./run.sh
 ```
 
+On Windows, run the shell from Command Prompt or PowerShell:
+
+```powershell
+.\run.cmd
+```
+
+The Windows launcher builds only this Tauri shell crate. It defaults to two Cargo build jobs and a
+Windows-local target directory under `%LOCALAPPDATA%\rts-0\tauri-target-windows`; both defaults can
+be overridden with `CARGO_BUILD_JOBS` and `CARGO_TARGET_DIR`. When the checkout is accessed through
+WSL, map its UNC path for the command with `pushd` first:
+
+```powershell
+cmd.exe /d /c "pushd \\wsl.localhost\Ubuntu\home\alex\dev\rts-0\desktop\maccursor-shell && run.cmd"
+```
+
 The WebView injects `window.__RTS_DESKTOP_RUNTIME` before client scripts run.
 Remote beta/mainline pages receive the same native cursor bridge as the earlier
 spike:
@@ -117,6 +132,12 @@ The shell writes local JSONL diagnostics to Tauri's app log directory:
 
 ```text
 ~/Library/Logs/dev.bewegungskrieg.Bewegungskrieg/shell.log
+```
+
+On Windows the corresponding path is:
+
+```text
+%LOCALAPPDATA%\dev.bewegungskrieg.Bewegungskrieg\logs\shell.log
 ```
 
 The startup screen has **Copy log path** and **Reveal logs** actions. Log-path

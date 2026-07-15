@@ -2,7 +2,7 @@
 name = "maccursor-shell"
 version = "0.1.0"
 edition = "2021"
-description = "macOS Tauri shell for Bewegungskrieg release-channel playtests"
+description = "Tauri shell for Bewegungskrieg release-channel playtests"
 publish = false
 
 [build-dependencies]
