@@ -2,7 +2,22 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done — skipped after scouting; the implementation was not attempted.
+
+## Scout Result
+
+A fresh 900-tick Time Profiler run on `main` at
+`93d8a23303f4b262d6be4d5dc2d317823b776bf2` attributed 95/4,932 samples (1.926%) to all
+`SpatialIndex::build` work and 43/4,932 samples (0.872%) to allocation beneath those builds.
+Immediately preceding Hellhole profiles agreed: total spatial-build cost was 2.107–2.391% and its
+allocation cost was 0.832–1.126%. These scouting profiles are not acceptance benchmarks, but they
+establish a ceiling far below this phase's required 8% median gain.
+
+The proposed change would reuse allocation while preserving every clear, refill, per-cell sort,
+query, and rebuild boundary, so its realizable gain is smaller than the already insufficient total
+build cost. That ceiling does not justify high-complexity ownership plumbing through `DerivedState`,
+tick phases, and collision passes; Phase 2's rejection also fails this phase's formal precondition.
+No Phase 3 candidate was created, and the serial performance plan is closed for archival.
 
 ## Objective
 
