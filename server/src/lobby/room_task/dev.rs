@@ -119,15 +119,11 @@ impl RoomTask {
 
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
         match &self.mode {
-            RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
-            RoomMode::Replay { .. } => Err("room is not configured for a dev session".to_string()),
-            RoomMode::ReplayArtifact { .. } => {
-                Err("room is not configured for a dev session".to_string())
-            }
-            RoomMode::ReplayBranch { .. } => {
-                Err("room is not configured for a dev session".to_string())
-            }
-            RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
+            RoomMode::Normal
+            | RoomMode::Replay { .. }
+            | RoomMode::ReplayArtifact { .. }
+            | RoomMode::ReplayBranch { .. }
+            | RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevScenario(config) => {
                 let _scenario_faction_id =
                     default_faction_id_for(FactionRequestContext::DevScenario);
