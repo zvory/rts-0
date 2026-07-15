@@ -384,7 +384,7 @@ folded into default targeting.
   their setup and teardown timers from 30 ticks to 15. It also boosts Panzerfaust movement by the
   same 1.25x multiplier as Riflemen, from 1.6 px/tick to 2.0 px/tick; Panzerfaust rifle attacks also
   use the Rifleman's 16-to-12 tick cooldown improvement.
-- **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
+- **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 200 steel / 0 oil
   and takes 900 ticks (~30s). The rules surface defines Riflemen, Machine Gunners, and Panzerfausts
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
   Ekat-faction units, vehicles, buildings, support weapons other than Machine Gunners, and
