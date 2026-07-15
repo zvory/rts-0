@@ -768,6 +768,16 @@ impl Game {
         } else {
             return Err(invalid_kind(input.kind, "spawnEntity"));
         };
+        if self
+            .state
+            .players
+            .iter()
+            .any(|player| player.id == input.owner && player.has_upgrade(UpgradeKind::Panzerfausts))
+        {
+            if let Some(entity) = self.state.entities.get_mut(id) {
+                entity.set_panzerfaust_upgrade(true);
+            }
+        }
         Ok(LabOpOutcome::Spawned { entity_id: id })
     }
 
@@ -836,6 +846,15 @@ impl Game {
             entity.owner = input.owner;
             entity.clear_orders();
             clear_lab_production_state(entity);
+            if kind == EntityKind::Rifleman {
+                let enabled = self
+                    .state
+                    .players
+                    .iter()
+                    .find(|player| player.id == input.owner)
+                    .is_some_and(|player| player.upgrades.contains(&UpgradeKind::Panzerfausts));
+                entity.set_panzerfaust_upgrade(enabled);
+            }
         }
         self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
@@ -900,6 +919,11 @@ impl Game {
             player.upgrades.remove(&input.upgrade);
         }
         production::sync_owned_autocast_from_upgrades(
+            &mut self.state.entities,
+            input.player_id,
+            &player.upgrades,
+        );
+        production::sync_owned_riflemen_from_upgrades(
             &mut self.state.entities,
             input.player_id,
             &player.upgrades,
@@ -1007,6 +1031,11 @@ impl Game {
     fn repair_mortar_autocast_state(&mut self) {
         for player in &self.state.players {
             production::sync_owned_autocast_from_upgrades(
+                &mut self.state.entities,
+                player.id,
+                &player.upgrades,
+            );
+            production::sync_owned_riflemen_from_upgrades(
                 &mut self.state.entities,
                 player.id,
                 &player.upgrades,

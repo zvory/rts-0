@@ -166,13 +166,6 @@ export function decodeCompactEvent(record, index) {
         x: readNumber(fields[1], "event.panzerfaustImpact.x"),
         y: readNumber(fields[2], "event.panzerfaustImpact.y"),
       };
-    case EVENT.PANZERFAUST_CONVERSION:
-      requireLength(fields, 3, `panzerfaust conversion event ${index}`);
-      return {
-        e: EVENT.PANZERFAUST_CONVERSION,
-        id: readU32(fields[1], "event.panzerfaustConversion.id"),
-        toKind: readCode(fields[2], KIND_BY_CODE, "event.panzerfaustConversion.toKind"),
-      };
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }

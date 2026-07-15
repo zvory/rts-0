@@ -1429,10 +1429,6 @@ mod tests {
                     delay_ticks: 15,
                 },
                 Event::PanzerfaustImpact { x: 416.0, y: 384.0 },
-                Event::PanzerfaustConversion {
-                    id: 11,
-                    to_kind: kinds::RIFLEMAN.to_string(),
-                },
             ],
             upgrades: vec![upgrades::ARTILLERY_UNLOCK.to_string()],
             player_resources: Vec::new(),

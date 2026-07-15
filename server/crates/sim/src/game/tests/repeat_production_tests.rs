@@ -182,13 +182,9 @@ fn repeat_production_alternates_enabled_units() {
 #[test]
 fn disabling_repeat_units_preserves_the_next_unit() {
     let (mut game, barracks) = repeat_fixture();
-    let producer = game
-        .state
-        .entities
-        .get_mut(barracks)
-        .expect("barracks");
+    let producer = game.state.entities.get_mut(barracks).expect("barracks");
     producer.set_repeat_production(Some(EntityKind::MachineGunner), true);
-    producer.set_repeat_production(Some(EntityKind::Panzerfaust), true);
+    producer.set_repeat_production(Some(EntityKind::Rifleman), true);
 
     producer.set_repeat_production(None, true);
     assert_eq!(
@@ -196,15 +192,15 @@ fn disabling_repeat_units_preserves_the_next_unit() {
         Some(EntityKind::MachineGunner)
     );
 
-    producer.set_repeat_production(Some(EntityKind::Panzerfaust), false);
+    producer.set_repeat_production(Some(EntityKind::Rifleman), false);
     assert_eq!(
         producer.repeat_production(),
         Some(EntityKind::MachineGunner),
         "removing a later unit must not move the cursor"
     );
 
-    producer.set_repeat_production(Some(EntityKind::Panzerfaust), true);
-    producer.set_repeat_production(Some(EntityKind::Rifleman), false);
+    producer.set_repeat_production(Some(EntityKind::Rifleman), true);
+    producer.set_repeat_production(Some(EntityKind::Worker), false);
     assert_eq!(
         producer.repeat_production(),
         Some(EntityKind::MachineGunner),
@@ -212,18 +208,15 @@ fn disabling_repeat_units_preserves_the_next_unit() {
     );
 
     producer.set_repeat_production(Some(EntityKind::MachineGunner), false);
-    producer.set_repeat_production(Some(EntityKind::Panzerfaust), true);
+    producer.set_repeat_production(Some(EntityKind::Rifleman), true);
     assert_eq!(
         &producer
             .production
             .as_ref()
             .expect("production")
             .repeat_units,
-        &[EntityKind::Panzerfaust],
+        &[EntityKind::Rifleman],
         "removing the current unit must select its successor without adding duplicates"
     );
-    assert_eq!(
-        producer.repeat_production(),
-        Some(EntityKind::Panzerfaust)
-    );
+    assert_eq!(producer.repeat_production(), Some(EntityKind::Rifleman));
 }

@@ -222,18 +222,6 @@ impl RoomTask {
                             seed,
                         )?)
                     }
-                    DevScenarioId::PanzerfaustDuel
-                    | DevScenarioId::PanzerfaustWindupCancel
-                    | DevScenarioId::PanzerfaustTargetDeath
-                    | DevScenarioId::PanzerfaustEntrenchedRange
-                    | DevScenarioId::PanzerfaustMethamphetamines => {
-                        session_from_setup!(Game::new_panzerfaust_inspection_scenario(
-                            config.id.room_id(),
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
                     DevScenarioId::TankCoaxInspection => {
                         session_from_setup!(Game::new_tank_coax_inspection_scenario(
                             config.unit,

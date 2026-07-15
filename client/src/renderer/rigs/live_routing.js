@@ -1,6 +1,10 @@
 import { KIND } from "../../protocol.js";
 import { SCOUT_PLANE_PARTS, SCOUT_PLANE_RIG_SVG } from "./aircraft_svg.js";
-import { MACHINE_GUNNER_RIG_SVG, PANZERFAUST_RIG_SVG, RIFLEMAN_RIG_SVG } from "./infantry_svg.js";
+import {
+  LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG,
+  MACHINE_GUNNER_RIG_SVG,
+  RIFLEMAN_RIG_SVG,
+} from "./infantry_svg.js";
 import { compileSvgRig } from "./svg_importer.js";
 import {
   ANTI_TANK_GUN_PARTS,
@@ -21,6 +25,8 @@ import {
 } from "./vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "./worker_svg.js";
 
+const LOADED_RIFLEMAN_RIG_KEY = "rifleman.panzerfaustLoaded";
+
 const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_RIG_SVG],
   [KIND.ARTILLERY, ARTILLERY_RIG_SVG],
@@ -29,7 +35,7 @@ const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.GOLEM, GOLEM_RIG_SVG],
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_RIG_SVG],
   [KIND.MORTAR_TEAM, MORTAR_TEAM_RIG_SVG],
-  [KIND.PANZERFAUST, PANZERFAUST_RIG_SVG],
+  [LOADED_RIFLEMAN_RIG_KEY, LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG],
   [KIND.RIFLEMAN, RIFLEMAN_RIG_SVG],
   [KIND.SCOUT_CAR, SCOUT_CAR_RIG_SVG],
   [KIND.SCOUT_PLANE, SCOUT_PLANE_RIG_SVG],
@@ -145,7 +151,7 @@ const LIVE_RIG_PARTS = Object.freeze({
     shadow: MORTAR_TEAM_PARTS.shadow,
     unit: MORTAR_TEAM_PARTS.weapon,
   }),
-  [KIND.PANZERFAUST]: Object.freeze({
+  [LOADED_RIFLEMAN_RIG_KEY]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: PANZERFAUST_UNIT_PARTS,
   }),
@@ -169,7 +175,8 @@ const LIVE_RIG_PARTS = Object.freeze({
 export function createLiveRigDefinitions() {
   const definitions = new Map();
   for (const [kind, svgText] of LIVE_RIG_SOURCES) {
-    const compiled = compileSvgRig(svgText, { expectedKind: kind });
+    const expectedKind = kind === LOADED_RIFLEMAN_RIG_KEY ? KIND.RIFLEMAN : kind;
+    const compiled = compileSvgRig(svgText, { expectedKind });
     if (compiled.ok) definitions.set(kind, compiled.definition);
     else console.warn(`RTS live rig disabled for ${kind}: ${JSON.stringify(compiled.errors)}`);
   }
@@ -177,7 +184,15 @@ export function createLiveRigDefinitions() {
 }
 
 export function liveRigKinds() {
-  return LIVE_RIG_SOURCES.map(([kind]) => kind);
+  return LIVE_RIG_SOURCES
+    .map(([kind]) => kind)
+    .filter((kind) => kind !== LOADED_RIFLEMAN_RIG_KEY);
+}
+
+export function liveRigKeyForEntity(entity) {
+  return entity?.kind === KIND.RIFLEMAN && entity?.panzerfaustLoaded === true
+    ? LOADED_RIFLEMAN_RIG_KEY
+    : entity?.kind;
 }
 
 export function liveRigDefinitionFor(definitions, kind) {

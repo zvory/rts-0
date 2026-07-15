@@ -12,6 +12,7 @@ pub const EKAT_FACTION_ID: &str = "ekat";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
 pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";
+pub const PANZERFAUSTS_UPGRADE: &str = "panzerfausts";
 pub const ENTRENCHMENT_UPGRADE: &str = "entrenchment";
 pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = "anti_tank_gun_unlock";
 pub const ARTILLERY_UNLOCK_UPGRADE: &str = "artillery_unlock";
@@ -112,7 +113,6 @@ const DEFAULT_UNITS: &[EntityKind] = &[
     EntityKind::Worker,
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
-    EntityKind::Panzerfaust,
     EntityKind::AntiTankGun,
     EntityKind::MortarTeam,
     EntityKind::Artillery,
@@ -150,6 +150,10 @@ const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
     UpgradeCatalogEntry {
         id: METHAMPHETAMINES_UPGRADE,
+        researched_at: EntityKind::TrainingCentre,
+    },
+    UpgradeCatalogEntry {
+        id: PANZERFAUSTS_UPGRADE,
         researched_at: EntityKind::TrainingCentre,
     },
     UpgradeCatalogEntry {
@@ -715,13 +719,8 @@ mod tests {
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::Barracks),
-            vec![
-                EntityKind::Rifleman,
-                EntityKind::MachineGunner,
-                EntityKind::Panzerfaust
-            ]
+            vec![EntityKind::Rifleman, EntityKind::MachineGunner]
         );
-        assert!(catalog.allows_unit(EntityKind::Panzerfaust));
         assert_eq!(
             catalog.trainable_units(EntityKind::Factory),
             vec![

@@ -203,11 +203,7 @@ mod tests {
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
             trainable_units(EntityKind::Barracks),
-            &[
-                EntityKind::Rifleman,
-                EntityKind::MachineGunner,
-                EntityKind::Panzerfaust
-            ]
+            &[EntityKind::Rifleman, EntityKind::MachineGunner]
         );
         assert_eq!(
             trainable_units(EntityKind::Factory),
@@ -229,7 +225,6 @@ mod tests {
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
-        assert!(!train_requirement_met(EntityKind::Panzerfaust, &[]));
         assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
         assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
@@ -337,12 +332,6 @@ mod tests {
             defs::unit_def(EntityKind::ScoutPlane).map(|d| d.stats.sight_tiles),
             Some(crate::balance::SCOUT_PLANE_SIGHT_TILES)
         );
-        assert_eq!(
-            cost(EntityKind::Panzerfaust),
-            (60, 15),
-            "Panzerfaust cost should match the production exposure contract"
-        );
-        assert_eq!(supply_cost(EntityKind::Panzerfaust), 1);
         assert_eq!(
             defs::unit_def(EntityKind::Artillery).map(|d| d.stats.radius),
             defs::unit_def(EntityKind::Tank).map(|d| d.stats.radius),

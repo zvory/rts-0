@@ -60,10 +60,7 @@ pub fn is_economy_unit(kind: EntityKind) -> bool {
 pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker
-            | EntityKind::Rifleman
-            | EntityKind::MachineGunner
-            | EntityKind::Panzerfaust
+        EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
     )
 }
 
@@ -138,20 +135,6 @@ mod tests {
                     armor_class: Some(ArmorClass::Small),
                     weapon_class: WeaponClass::SmallArms,
                     threat_role: TargetThreatRole::Ordinary,
-                    is_vehicle_body: false,
-                    is_economy_unit: false,
-                    is_coax_infantry_priority: true,
-                },
-            ),
-            (
-                EntityKind::Panzerfaust,
-                ExpectedTargetFacts {
-                    is_unit: true,
-                    is_building: false,
-                    is_resource_node: false,
-                    armor_class: Some(ArmorClass::Small),
-                    weapon_class: WeaponClass::SmallArms,
-                    threat_role: TargetThreatRole::AntiArmorThreat,
                     is_vehicle_body: false,
                     is_economy_unit: false,
                     is_coax_infantry_priority: true,

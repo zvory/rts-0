@@ -312,6 +312,11 @@ impl Game {
                     }
                 }
             }
+            crate::game::services::production::sync_owned_riflemen_from_upgrades(
+                &mut entities,
+                ps.id,
+                &ps.upgrades,
+            );
             let loadout_id = override_record
                 .filter(|_| catalog.is_some())
                 .map(|record| record.loadout_id.clone())

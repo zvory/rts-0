@@ -191,6 +191,9 @@ pub(crate) fn production_system(
             if upgrade == UpgradeKind::MortarAutocast {
                 set_owned_mortar_autocast(entities, owner, true);
             }
+            if upgrade == UpgradeKind::Panzerfausts {
+                set_owned_riflemen_panzerfaust(entities, owner, true);
+            }
             if let Some(b) = entities.get_mut(id) {
                 if let Some(queue) = b.research_queue_mut() {
                     if !queue.is_empty() {
@@ -232,6 +235,14 @@ pub(crate) fn production_system(
                 if unit == EntityKind::MortarTeam && mortar_autocast_researched {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_autocast_enabled(AbilityKind::MortarFire, true);
+                    }
+                }
+                let panzerfausts_researched = players
+                    .iter()
+                    .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::Panzerfausts));
+                if panzerfausts_researched {
+                    if let Some(e) = entities.get_mut(spawned) {
+                        e.set_panzerfaust_upgrade(true);
                     }
                 }
                 if let Some(facing) = spawn_facing {
@@ -289,6 +300,16 @@ fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bo
     }
 }
 
+fn set_owned_riflemen_panzerfaust(entities: &mut EntityStore, owner: u32, enabled: bool) {
+    for id in entities.ids() {
+        if let Some(e) = entities.get_mut(id) {
+            if e.owner == owner && e.kind == EntityKind::Rifleman {
+                e.set_panzerfaust_upgrade(enabled);
+            }
+        }
+    }
+}
+
 pub(crate) fn sync_owned_autocast_from_upgrades(
     entities: &mut EntityStore,
     owner: u32,
@@ -298,6 +319,18 @@ pub(crate) fn sync_owned_autocast_from_upgrades(
         entities,
         owner,
         upgrades.contains(&UpgradeKind::MortarAutocast),
+    );
+}
+
+pub(crate) fn sync_owned_riflemen_from_upgrades(
+    entities: &mut EntityStore,
+    owner: u32,
+    upgrades: &std::collections::BTreeSet<UpgradeKind>,
+) {
+    set_owned_riflemen_panzerfaust(
+        entities,
+        owner,
+        upgrades.contains(&UpgradeKind::Panzerfausts),
     );
 }
 
@@ -312,6 +345,7 @@ mod tests {
     use crate::protocol::terrain;
 
     mod rally;
+    mod upgrades;
     mod waiting;
     use std::collections::HashMap;
 
@@ -377,37 +411,6 @@ mod tests {
                 .expect("mortar should exist")
                 .autocast_enabled(AbilityKind::MortarFire),
             Some(true)
-        );
-    }
-
-    #[test]
-    fn panzerfaust_production_completes_from_barracks_queue() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        let barracks = spawn_building_training(
-            &map,
-            &mut entities,
-            10,
-            10,
-            EntityKind::Barracks,
-            EntityKind::Panzerfaust,
-        );
-        let mut players = vec![player(1)];
-
-        tick_production(&map, &mut entities, &mut players);
-
-        assert!(entities
-            .get(barracks)
-            .expect("barracks")
-            .prod_queue()
-            .is_empty());
-        let panzerfaust = entities
-            .iter()
-            .find(|e| e.owner == 1 && e.kind == EntityKind::Panzerfaust && e.hp > 0)
-            .expect("Panzerfaust should spawn from completed Barracks queue");
-        assert!(
-            matches!(panzerfaust.order(), Order::Idle),
-            "without a rally point the produced Panzerfaust should stay idle"
         );
     }
 

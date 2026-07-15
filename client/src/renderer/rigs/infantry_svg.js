@@ -13,7 +13,7 @@ export const RIFLEMAN_RIG_SVG = `<svg viewBox="-24 -24 48 48" data-rts-rig-kind=
   <rect id="bounds.hp" x="-11" y="-18" width="22" height="6" fill="none" />
 </svg>`;
 
-export const PANZERFAUST_RIG_SVG = `<svg viewBox="-30 -24 60 48" data-rts-rig-kind="panzerfaust" data-rts-rig-version="1" data-rts-origin="center" id="panzerfaust.authored">
+export const LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG = `<svg viewBox="-30 -24 60 48" data-rts-rig-kind="rifleman" data-rts-rig-version="1" data-rts-origin="center" id="rifleman.panzerfaust-loaded.authored">
   <ellipse id="part.shadow" cx="0" cy="3.15" rx="9" ry="5.4" fill="#000000" opacity="0.28" />
   <polygon id="part.body" points="6.2,0 1.9,-5.58 -5.3,-4.32 -7.1,0 -5.3,4.32 1.9,5.58" fill="#6d89b8" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="part.head" cx="6.2" cy="0" r="3.06" fill="#7b96c4" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team-light-strong" data-rts-animation="facing:transform.rotation:1:0" />

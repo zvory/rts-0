@@ -248,7 +248,6 @@ impl SelfPlayRunner {
                     | Event::MortarImpact { .. }
                     | Event::PanzerfaustLaunch { .. }
                     | Event::PanzerfaustImpact { .. }
-                    | Event::PanzerfaustConversion { .. }
                     | Event::SmokeLaunch { .. } => None,
                 };
                 progressed |= self

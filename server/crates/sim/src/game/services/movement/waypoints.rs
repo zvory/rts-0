@@ -105,16 +105,15 @@ pub(super) fn advance_moving_units(
             breakthrough_ticks,
             recent_smoke_ticks,
         );
-        let speed_multiplier =
-            if matches!(kind, EntityKind::Rifleman | EntityKind::Panzerfaust) && has_meth {
-                config::METHAMPHETAMINES_SPEED_MULTIPLIER
-            } else if breakthrough_multiplier > 1.0 {
-                breakthrough_multiplier
-            } else if kind == EntityKind::MachineGunner && has_meth {
-                config::METHAMPHETAMINES_SPEED_MULTIPLIER
-            } else {
-                1.0
-            };
+        let speed_multiplier = if kind == EntityKind::Rifleman && has_meth {
+            config::METHAMPHETAMINES_SPEED_MULTIPLIER
+        } else if breakthrough_multiplier > 1.0 {
+            breakthrough_multiplier
+        } else if kind == EntityKind::MachineGunner && has_meth {
+            config::METHAMPHETAMINES_SPEED_MULTIPLIER
+        } else {
+            1.0
+        };
         let terrain_speed_multiplier = {
             let (tx, ty) = map.tile_of(x, y);
             TerrainKind::from_map_code(map.terrain_at(tx, ty))

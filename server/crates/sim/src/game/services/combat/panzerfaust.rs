@@ -1,8 +1,5 @@
 use crate::config;
-use crate::game::entity::{
-    convert_panzerfaust_to_rifleman as convert_panzerfaust_entity, AttackPhase, Entity, EntityKind,
-    EntityStore, Order, PanzerfaustState,
-};
+use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, PanzerfaustState};
 use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
@@ -38,7 +35,7 @@ pub(super) fn handle_combat_if_panzerfaust(
     id: u32,
 ) -> bool {
     match entities.get(id).and_then(|entity| {
-        (entity.kind == EntityKind::Panzerfaust)
+        (entity.kind == EntityKind::Rifleman)
             .then(|| entity.combat.as_ref().and_then(|combat| combat.panzerfaust))
             .flatten()
     }) {
@@ -56,7 +53,7 @@ pub(super) fn handle_combat_if_panzerfaust(
             smokes,
             id,
         ),
-        Some(PanzerfaustState::InFlight { .. } | PanzerfaustState::Recovery { .. }) | None => false,
+        Some(PanzerfaustState::Spent) | None => false,
     }
 }
 
@@ -131,7 +128,7 @@ fn handle_loaded_combat(
         return true;
     }
 
-    if mode != CombatMode::Opportunistic {
+    if mode == CombatMode::Ordered {
         let chase_goal =
             chase_goal_for_target(map, entities, id, (px, py), (tx, ty), range_px, distance);
         let chase_goal = coordinator.attack_chase_goal(entities, id, target, chase_goal, range_px);
@@ -159,7 +156,7 @@ fn panzerfaust_combat_context(
     id: u32,
 ) -> Option<(u32, f32, f32, f32, f32, CombatMode)> {
     let attacker = entities.get(id)?;
-    if attacker.hp == 0 || attacker.kind != EntityKind::Panzerfaust || !attacker.can_attack() {
+    if attacker.hp == 0 || attacker.kind != EntityKind::Rifleman || !attacker.can_attack() {
         return None;
     }
     let range_px = panzerfaust_range_tiles(attacker) * config::TILE_SIZE as f32
@@ -171,11 +168,7 @@ fn panzerfaust_combat_context(
         (attacker.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
     };
     let mode = combat_mode_with_moving_fire(attacker, false);
-    let acquire_px = if mode == CombatMode::Opportunistic {
-        range_px
-    } else {
-        aggro_px
-    };
+    let acquire_px = aggro_px;
     Some((
         attacker.owner,
         attacker.pos_x,
@@ -272,10 +265,6 @@ fn set_panzerfaust_state(entity: &mut Entity, state: PanzerfaustState) {
     }
 }
 
-fn convert_panzerfaust_to_rifleman(entity: &mut Entity, completed_target: u32) -> bool {
-    convert_panzerfaust_entity(entity, completed_target)
-}
-
 fn panzerfaust_range_tiles(attacker: &Entity) -> f32 {
     entrenchment_combat::attack_range_tiles(attacker, config::PANZERFAUST_RANGE_TILES as f32)
 }
@@ -366,13 +355,5 @@ fn windup_ticks(has_methamphetamines: bool) -> u16 {
         config::METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS
     } else {
         config::PANZERFAUST_WINDUP_TICKS
-    }
-}
-
-fn recovery_ticks(has_methamphetamines: bool) -> u16 {
-    if has_methamphetamines {
-        config::METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS
-    } else {
-        config::PANZERFAUST_RECOVERY_TICKS
     }
 }

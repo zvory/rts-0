@@ -11,10 +11,7 @@ pub const ENTRENCHMENT_AREA_DAMAGE_REDUCTION: f32 = 0.25;
 pub const ENTRENCHMENT_TRENCH_RADIUS_TILES: f32 = 0.375;
 
 pub fn is_entrenchment_eligible_infantry(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Panzerfaust
-    )
+    matches!(kind, EntityKind::Rifleman | EntityKind::MachineGunner)
 }
 
 #[cfg(test)]
@@ -23,11 +20,7 @@ mod tests {
 
     #[test]
     fn entrenchment_eligibility_names_only_combat_infantry() {
-        let eligible = [
-            EntityKind::Rifleman,
-            EntityKind::MachineGunner,
-            EntityKind::Panzerfaust,
-        ];
+        let eligible = [EntityKind::Rifleman, EntityKind::MachineGunner];
         for kind in EntityKind::ALL {
             assert_eq!(
                 is_entrenchment_eligible_infantry(kind),

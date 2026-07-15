@@ -28,7 +28,6 @@ pub mod kinds {
     pub const GOLEM: &str = "golem";
     pub const RIFLEMAN: &str = "rifleman";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
-    pub const PANZERFAUST: &str = "panzerfaust";
     pub const ANTI_TANK_GUN: &str = "anti_tank_gun";
     pub const MORTAR_TEAM: &str = "mortar_team";
     pub const ARTILLERY: &str = "artillery";
@@ -95,6 +94,7 @@ pub mod lobby_kinds {
 /// Permanent upgrade ids used by production/research and snapshot projection.
 pub mod upgrades {
     pub const METHAMPHETAMINES: &str = "methamphetamines";
+    pub const PANZERFAUSTS: &str = "panzerfausts";
     pub const ENTRENCHMENT: &str = "entrenchment";
     pub const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
     pub const TANK_UNLOCK: &str = "tank_unlock";
@@ -125,7 +125,7 @@ pub mod weapons {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 40;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 41;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -292,7 +292,6 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::GOLEM, 22),
     (kinds::RIFLEMAN, 2),
     (kinds::MACHINE_GUNNER, 3),
-    (kinds::PANZERFAUST, 24),
     (kinds::ANTI_TANK_GUN, 4),
     (kinds::MORTAR_TEAM, 15),
     (kinds::ARTILLERY, 16),
@@ -347,7 +346,6 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("artilleryFiring", 11),
     ("panzerfaustLaunch", 12),
     ("panzerfaustImpact", 13),
-    ("panzerfaustConversion", 14),
     ("miss", 15),
 ];
 
@@ -397,6 +395,7 @@ const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
 
 const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::METHAMPHETAMINES, 1),
+    (upgrades::PANZERFAUSTS, 10),
     (upgrades::ANTI_TANK_GUN_UNLOCK, 2),
     (upgrades::TANK_UNLOCK, 3),
     (upgrades::ARTILLERY_UNLOCK, 4),
@@ -583,7 +582,6 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("GOLEM", kinds::GOLEM),
         ("RIFLEMAN", kinds::RIFLEMAN),
         ("MACHINE_GUNNER", kinds::MACHINE_GUNNER),
-        ("PANZERFAUST", kinds::PANZERFAUST),
         ("ANTI_TANK_GUN", kinds::ANTI_TANK_GUN),
         ("MORTAR_TEAM", kinds::MORTAR_TEAM),
         ("ARTILLERY", kinds::ARTILLERY),
@@ -631,7 +629,6 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("ARTILLERY_FIRING", "artilleryFiring"),
         ("PANZERFAUST_LAUNCH", "panzerfaustLaunch"),
         ("PANZERFAUST_IMPACT", "panzerfaustImpact"),
-        ("PANZERFAUST_CONVERSION", "panzerfaustConversion"),
         ("MISS", "miss"),
     ])
 }
@@ -671,6 +668,7 @@ fn lobby_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
 fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("METHAMPHETAMINES", upgrades::METHAMPHETAMINES),
+        ("PANZERFAUSTS", upgrades::PANZERFAUSTS),
         ("ENTRENCHMENT", upgrades::ENTRENCHMENT),
         ("ANTI_TANK_GUN_UNLOCK", upgrades::ANTI_TANK_GUN_UNLOCK),
         ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
@@ -992,14 +990,6 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
         (
             "panzerfaustImpact",
             vec![code_field(0, "kind", "event"), field(1, "x"), field(2, "y")],
-        ),
-        (
-            "panzerfaustConversion",
-            vec![
-                code_field(0, "kind", "event"),
-                field(1, "id"),
-                code_field(2, "toKind", "kind"),
-            ],
         ),
     ]
     .into_iter()

@@ -886,7 +886,6 @@ mod tests {
             "machine_gunner",
             "mortar_team",
             "oil",
-            "panzerfaust",
             "pump_jack",
             "research_complex",
             "rifleman",
@@ -903,14 +902,16 @@ mod tests {
                 "render-preview scenario should include {kind} render coverage"
             );
         }
-        let panzerfaust_count = snapshot
+        let loaded_rifleman_count = snapshot
             .entities
             .iter()
-            .filter(|entity| entity.kind == "panzerfaust")
+            .filter(|entity| {
+                entity.kind == "rifleman" && entity.panzerfaust_loaded == Some(true)
+            })
             .count();
         assert!(
-            panzerfaust_count >= 12,
-            "render-preview scenario should include Panzerfaust formation coverage"
+            loaded_rifleman_count >= 12,
+            "render-preview scenario should include loaded Rifleman Panzerfaust formation coverage"
         );
     }
 
@@ -1134,9 +1135,8 @@ mod tests {
             ("golem".to_string(), 1),
             ("machine_gunner".to_string(), 10),
             ("mortar_team".to_string(), 9),
-            ("panzerfaust".to_string(), 9),
             ("research_complex".to_string(), 1),
-            ("rifleman".to_string(), 9),
+            ("rifleman".to_string(), 18),
             ("scout_car".to_string(), 10),
             ("steelworks".to_string(), 1),
             ("tank".to_string(), 17),

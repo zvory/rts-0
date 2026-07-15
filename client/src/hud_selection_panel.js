@@ -384,7 +384,7 @@ function selectionDetailSignature(entity, state = null) {
 }
 
 function isEntrenchmentEligibleKind(kind) {
-  return kind === KIND.RIFLEMAN || kind === KIND.MACHINE_GUNNER || kind === KIND.PANZERFAUST;
+  return kind === KIND.RIFLEMAN || kind === KIND.MACHINE_GUNNER;
 }
 
 function canReportOwnResearch(entity, state) {

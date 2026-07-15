@@ -7,7 +7,7 @@ import { DEFAULT_FACTION_ID, KIND } from "./protocol.js";
 import { factionCatalog, STATS } from "./config.js";
 
 const LAB_ONLY_UNIT_SPAWNS_BY_FACTION = Object.freeze({
-  [DEFAULT_FACTION_ID]: Object.freeze([KIND.PANZERFAUST, KIND.SCOUT_PLANE]),
+  [DEFAULT_FACTION_ID]: Object.freeze([KIND.SCOUT_PLANE]),
 });
 
 export function labSpawnFactionOptions() {
