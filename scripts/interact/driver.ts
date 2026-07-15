@@ -20,6 +20,7 @@ import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
 import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
+import { waitForInteractStartup } from "./bridge_startup.ts";
 
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 
@@ -140,7 +141,7 @@ interface DriverOptions {
 declare global {
   interface Window {
     __rtsInteract?: {
-      status(): { ready?: boolean };
+      status(): { ready?: boolean; launchError?: string };
       call(method: string, input: unknown): Promise<{ ok: boolean; value?: unknown; error?: { code?: string; message?: string; details?: JsonObject } }>;
     };
   }
@@ -315,13 +316,13 @@ export class InteractDriver {
       this.page!.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
       "page navigation",
     );
-    await this.openStep(
-      this.page!.waitForFunction(
-        () => window.__rtsInteract?.status?.().ready === true,
-        { timeout: this.options.startupTimeoutMs },
-      ),
+    const startupStatus = await this.openStep(
+      waitForInteractStartup(this.page!, this.options.startupTimeoutMs),
       "page readiness",
     );
+    if (startupStatus?.launchError) {
+      throw new InteractDriverError("launchFailed", startupStatus.launchError, { status: startupStatus });
+    }
     if (this.state !== DRIVER_STATES.OPENING) {
       throw new InteractDriverError("sessionClosed", "Interact driver was closed during page startup.");
     }

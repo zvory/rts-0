@@ -12,7 +12,7 @@ import {
 } from "./lab_spawn_catalog.js";
 
 export const INTERACT_BRIDGE_KEY = "__rtsInteract";
-export const INTERACT_BRIDGE_VERSION = 4;
+export const INTERACT_BRIDGE_VERSION = 5;
 export const INTERACT_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectPlayers: 16,
@@ -46,6 +46,7 @@ export class InteractBridge {
     this.enabled = !!enabled;
     this.sleep = sleep;
     this.destroyed = false;
+    this.launchError = "";
     this.surface = Object.freeze({
       version: INTERACT_BRIDGE_VERSION,
       status: () => this.status(),
@@ -67,22 +68,25 @@ export class InteractBridge {
       ? "bridgeClosed"
       : !this.enabled
         ? "launchGateDisabled"
-        : !websocketConnected
-          ? "websocketDisconnected"
-          : !startReceived
-            ? "waitingForStart"
-            : !operator
-              ? "labOperatorRequired"
-              : !snapshotApplied
-                ? "waitingForSnapshot"
-                : !roomTimeKnown
-                  ? "waitingForRoomTime"
-                  : "ready";
+        : this.launchError
+          ? "launchError"
+          : !websocketConnected
+            ? "websocketDisconnected"
+            : !startReceived
+              ? "waitingForStart"
+              : !operator
+                ? "labOperatorRequired"
+                : !snapshotApplied
+                  ? "waitingForSnapshot"
+                  : !roomTimeKnown
+                    ? "waitingForRoomTime"
+                    : "ready";
     return {
       version: INTERACT_BRIDGE_VERSION,
       enabled: this.enabled && !this.destroyed,
       ready: reason === "ready",
       reason,
+      launchError: this.launchError,
       websocketConnected,
       startReceived,
       labRole: labClient?.state?.role || "",
@@ -93,6 +97,11 @@ export class InteractBridge {
       cameraViewport: projectCameraViewport(match?.camera),
       cameraWorldBounds: projectCameraWorldBounds(match?.camera),
     };
+  }
+
+  noteLaunchError(message) {
+    if (this.destroyed || this.status().ready) return;
+    this.launchError = String(message || "Interact Lab launch failed.");
   }
 
   async call(method, input = {}) {
