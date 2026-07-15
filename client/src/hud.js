@@ -526,7 +526,7 @@ export class HUD {
       cooldownClocks: descriptor.cooldownClocks,
       autobuildIndicatorCount: descriptor.autobuildIndicatorCount,
       repeatable: descriptor.repeatable,
-      shiftContextAction: descriptor.contextIntent?.type === "adjustProductionRepeat",
+      shiftContextAction: descriptor.shiftContextAction,
       onMouseEnter: descriptor.intent?.type === "ability"
         ? () => this._showAbilityHoverPreview(descriptor.intent.ability, descriptor.intent.readyIds || [])
         : null,

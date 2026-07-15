@@ -471,6 +471,7 @@ export function buildTrainCard(ctx, building) {
         buildingIds: producerIds,
         unit,
       },
+      shiftContextAction: true,
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }
