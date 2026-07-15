@@ -116,7 +116,7 @@ pub(super) fn validate_player_supply(
     for player in players {
         let catalog = rules::faction::catalog_for(&player.faction_id);
         let mut expected_used = 0u32;
-        let mut expected_cap = 0u32;
+        let mut expected_cap = config::INTRINSIC_SUPPLY_CAP;
         for entity in &entities.entities {
             if entity.owner != player.id {
                 continue;

@@ -109,7 +109,7 @@ impl PlayerState {
     }
 
     pub(crate) fn reset_supply(&mut self) {
-        self.set_supply_counts(0, 0);
+        self.set_supply_counts(0, config::INTRINSIC_SUPPLY_CAP);
     }
 }
 

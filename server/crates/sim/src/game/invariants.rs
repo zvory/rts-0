@@ -90,7 +90,7 @@ impl Game {
         // ------------------------------------------------------------------
         for ps in &self.state.players {
             let catalog = rules::faction::catalog_for(&ps.faction_id);
-            let mut expected_cap = 0u32;
+            let mut expected_cap = config::INTRINSIC_SUPPLY_CAP;
             let mut expected_used = 0u32;
             for e in self.state.entities.iter() {
                 if e.owner != ps.id {
@@ -98,7 +98,8 @@ impl Game {
                 }
                 if e.is_building() && !e.under_construction() {
                     if catalog.is_some_and(|catalog| catalog.allows_building(e.kind)) {
-                        expected_cap += rules::economy::supply_provided(e.kind);
+                        expected_cap =
+                            expected_cap.saturating_add(rules::economy::supply_provided(e.kind));
                     }
                     for item in e.prod_queue().iter().filter(|item| item.paid) {
                         if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {

@@ -781,12 +781,12 @@ mod tests {
     }
 
     #[test]
-    fn city_centre_provides_start_supply() {
+    fn city_centre_does_not_gate_supply() {
         let city_centre = building_def(EntityKind::CityCentre)
             .expect("city centre def")
             .stats;
 
-        assert_eq!(city_centre.provides_supply, balance::CITY_CENTRE_SUPPLY);
+        assert_eq!(city_centre.provides_supply, 0);
     }
 
     #[test]

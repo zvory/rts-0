@@ -181,7 +181,13 @@ mod tests {
                 .iter()
                 .map(|player| (player.id, player.supply_used, player.supply_cap))
                 .collect();
-            assert_eq!(resources, vec![(1, target, 50), (2, target, 50)]);
+            assert_eq!(
+                resources,
+                vec![
+                    (1, target, config::INTRINSIC_SUPPLY_CAP),
+                    (2, target, config::INTRINSIC_SUPPLY_CAP),
+                ]
+            );
 
             let mut by_owner = BTreeMap::<u32, BTreeMap<String, usize>>::new();
             for entity in snapshot.entities.iter().filter(|entity| entity.owner > 0) {

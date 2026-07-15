@@ -143,7 +143,7 @@ pub(crate) struct PlayerState {
     pub(crate) oil: u32,
     /// Supply currently consumed by living + in-production units.
     pub(crate) supply_used: u32,
-    /// Supply provided by completed City Centres and Depots, capped at `SUPPLY_CAP_MAX`.
+    /// Intrinsic player supply allowance, capped at `SUPPLY_CAP_MAX`.
     pub(crate) supply_cap: u32,
     pub(crate) is_ai: bool,
     pub(crate) score: ScoreState,

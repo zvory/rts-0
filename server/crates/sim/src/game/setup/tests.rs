@@ -38,7 +38,7 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     assert_eq!(fixture.faction_id, EMPTY_FIXTURE_FACTION_ID);
     assert_eq!(fixture.steel, 125);
     assert_eq!(fixture.oil, 25);
-    assert_eq!(fixture.supply_cap, config::DEPOT_SUPPLY);
+    assert_eq!(fixture.supply_cap, config::INTRINSIC_SUPPLY_CAP);
     assert_eq!(
         fixture.supply_used,
         crate::rules::economy::supply_cost(EntityKind::ScoutCar)
@@ -101,7 +101,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
             game.state.players[0].supply_used,
             game.state.players[0].supply_cap
         ),
-        (0, 0, 0, 0)
+        (0, 0, 0, config::INTRINSIC_SUPPLY_CAP)
     );
     assert_eq!(owned_kind_count(&game, 1, EntityKind::CityCentre), 0);
     let loadout = &game.starting_loadouts()[0];
@@ -141,7 +141,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
         game.state.players[0].supply_used,
         game.state.players[0].supply_cap,
     );
-    assert_eq!(resources_before, (0, 0, 0, 0));
+    assert_eq!(resources_before, (0, 0, 0, config::INTRINSIC_SUPPLY_CAP));
 
     for cmd in [
         SimCommand::Build {
@@ -240,7 +240,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         assert_eq!(player.faction_id, DEFAULT_FACTION_ID);
         assert_eq!(player.steel, config::STARTING_STEEL);
         assert_eq!(player.oil, config::STARTING_OIL);
-        assert_eq!(player.supply_cap, config::CITY_CENTRE_SUPPLY);
+        assert_eq!(player.supply_cap, config::INTRINSIC_SUPPLY_CAP);
         assert_eq!(player.supply_used, config::STARTING_WORKERS);
         assert_eq!(
             owned_kind_count(&game, player.id, EntityKind::CityCentre),

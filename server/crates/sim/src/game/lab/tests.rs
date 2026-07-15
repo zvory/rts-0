@@ -274,7 +274,7 @@ fn lab_spawn_unit_repairs_supply_and_snapshot_fog() {
 }
 
 #[test]
-fn lab_spawn_building_repairs_supply_cap() {
+fn lab_spawn_building_keeps_intrinsic_supply_cap() {
     let mut game = new_game();
     let before_cap = game.snapshot_for(1).supply_cap;
     let (x, y) = footprint_center(&game.state.map, EntityKind::Depot, 28, 28);
@@ -288,10 +288,7 @@ fn lab_spawn_building_repairs_supply_cap() {
     }))
     .expect("depot should spawn");
 
-    assert_eq!(
-        game.snapshot_for(1).supply_cap,
-        before_cap + rules::economy::supply_provided(EntityKind::Depot)
-    );
+    assert_eq!(game.snapshot_for(1).supply_cap, before_cap);
 }
 
 #[test]
