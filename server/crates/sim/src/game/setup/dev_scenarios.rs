@@ -3,6 +3,7 @@ use crate::game::state::TrackedRng;
 
 mod factory_wall_rally_spawn;
 mod layouts;
+mod replay_142_vehicle_lock;
 mod tank_coax;
 
 use layouts::*;
