@@ -168,7 +168,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     EXPECTED_CONFIG_EXPORT_NAMES,
     "client config public export names remain stable across internal splits",
   );
-  assert(MINING_CC_RANGE_TILES === 9, "client mirrors the server mining City Centre range");
+  assert(MINING_CC_RANGE_TILES === 10, "client mirrors the server mining City Centre range");
   assert(
     STATS[KIND.CITY_CENTRE].cost.steel === 450 &&
       STATS[KIND.CITY_CENTRE].cost.oil === 150 &&
