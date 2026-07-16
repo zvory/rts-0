@@ -12,6 +12,7 @@ export class MatchInputRouter {
     this.zones = [];
     this.captureZone = null;
     this.captureSource = null;
+    this.hoverZone = null;
   }
 
   registerZone(zone) {
@@ -26,6 +27,7 @@ export class MatchInputRouter {
   unregisterZone(zone) {
     this.zones = this.zones.filter((z) => z !== zone);
     if (this.captureZone === zone) this._clearCapture();
+    if (this.hoverZone === zone) this._setHoverZone(null);
   }
 
   pointerDown(event) {
@@ -48,11 +50,14 @@ export class MatchInputRouter {
     if (zone && typeof zone.pointerMove === "function") {
       return !!zone.pointerMove(e);
     }
+    let hoverZone = null;
     for (const candidate of this.zones) {
       if (!candidate.contains(e)) continue;
-      if (typeof candidate.pointerMove === "function") return !!candidate.pointerMove(e);
-      return false;
+      hoverZone = candidate;
+      break;
     }
+    this._setHoverZone(hoverZone, e);
+    if (typeof hoverZone?.pointerMove === "function") return !!hoverZone.pointerMove(e);
     return false;
   }
 
@@ -77,6 +82,13 @@ export class MatchInputRouter {
   _clearCapture() {
     this.captureZone = null;
     this.captureSource = null;
+  }
+
+  _setHoverZone(zone, event) {
+    if (zone === this.hoverZone) return;
+    const previous = this.hoverZone;
+    this.hoverZone = zone;
+    previous?.pointerLeave?.(event);
   }
 
   _normalize(event) {
