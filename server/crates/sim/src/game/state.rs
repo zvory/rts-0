@@ -2,14 +2,10 @@ use std::collections::BTreeSet;
 
 use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
 
-use super::firing_reveal::FiringRevealSource;
-// The architecture baseline keys direct PlayerState imports by their source line.
-// Keep this long-standing import group stable across rustfmt versions.
-#[rustfmt::skip]
 use super::{
     ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore, building_memory::BuildingMemory,
-    commands, fog::Fog, fog::LingeringSightSource, map::Map, mortar::MortarShellStore,
-    replay::CommandLogEntry, setup::StartingLoadout, smoke::SmokeCloudStore,
+    commands, firing_reveal::FiringRevealSource, fog::Fog, fog::LingeringSightSource, map::Map,
+    mortar::MortarShellStore, replay::CommandLogEntry, setup::StartingLoadout, smoke::SmokeCloudStore,
     trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout, PlayerState,
 };
 

@@ -143,12 +143,6 @@ pub(in crate::game) fn combat_system(
             e.tick_weapon_cooldowns();
             tick_deployed_weapon_setup(e);
             weapons::tick_tank_stationary_range(e);
-            e.retain_firing_reveal_reaction_gates(
-                |target_id, reveal_viewer, episode_started_at_tick| {
-                    fog.active_firing_reveal_episode(reveal_viewer, target_id)
-                        == Some(episode_started_at_tick)
-                },
-            );
         }
     }
     let blockers = ShotBlockerIndex::build(map, entities);

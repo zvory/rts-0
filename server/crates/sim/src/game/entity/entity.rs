@@ -768,10 +768,10 @@ impl Entity {
 
     pub(in crate::game) fn retain_firing_reveal_reaction_gates(
         &mut self,
-        episode_is_active: impl FnMut(u32, u32, u32) -> bool,
+        gate_is_active: impl FnMut(u32, u32, u32, u32) -> bool,
     ) {
         if let Some(combat) = self.combat.as_mut() {
-            combat.retain_firing_reveal_reaction_gates(episode_is_active);
+            combat.retain_firing_reveal_reaction_gates(gate_is_active);
         }
     }
 

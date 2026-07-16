@@ -77,11 +77,12 @@ impl CombatState {
 
     pub(in crate::game) fn retain_firing_reveal_reaction_gates(
         &mut self,
-        mut episode_is_active: impl FnMut(u32, u32, u32) -> bool,
+        mut gate_is_active: impl FnMut(u32, u32, u32, u32) -> bool,
     ) {
         self.firing_reveal_reaction_gates.retain(|_, gates| {
-            gates.retain(|_, gate| {
-                episode_is_active(
+            gates.retain(|&target_id, gate| {
+                gate_is_active(
+                    target_id,
                     gate.reveal_source_entity,
                     gate.reveal_viewer,
                     gate.episode_started_at_tick,
