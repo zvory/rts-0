@@ -1526,7 +1526,12 @@ in-flight list request; visibility or new activity resumes with a fresh request.
 **Refresh** button and join-action freshness preflight each remain available. Explicit launch URLs
 skip this lobby-list loop. The app also leaves the WebSocket closed on an ordinary lobby page until
 Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unjoined connection is
-closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail.
+closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail. If an
+established ordinary-lobby socket closes, the app silently resets the joined room UI to the main
+lobby browser; dedicated launch URLs and active matches retain their existing disconnect handling.
+While connected, pointer, keyboard, wheel, and foregrounding input emits a transport-only activity
+notice at most once every 30 seconds so local-only camera interaction also prevents a false AFK
+disconnect.
 
 The browser keeps in-progress rows labeled `In match` and exposes a spectator
 action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending

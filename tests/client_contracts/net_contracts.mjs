@@ -99,6 +99,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assertHasMethod(net, "command", "Net");
   assertHasMethod(net, "ping", "Net");
   assertHasMethod(net, "netReport", "Net");
+  assertHasMethod(net, "activity", "Net");
   assertHasGetter(net, "playerId", "Net");
   assert(net.playerId === null, "Net.playerId should be null before welcome");
   assertHasMethod(net, "addAi", "Net");
@@ -267,6 +268,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   }
   assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
   assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
+  assert(msg.activity().t === "activity", "human-activity builder tag");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
   assert(msg.setRoomTimeSpeed(2).t === "setRoomTimeSpeed", "room-time speed builder tag");
   assert(msg.stepRoomTime().t === "stepRoomTime", "room-time step builder tag");
