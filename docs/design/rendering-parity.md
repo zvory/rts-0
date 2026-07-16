@@ -27,13 +27,14 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 | Terrain and resource-site readability | complete | missing | Babylon draws one flat map-bounds plane and does not present terrain classes or static resource sites. |
 | Current/explored fog, memory, intel, and reveals | complete | complete | Revisioned grids, separated presentation layers, and two-recipient secrecy check. |
 | Generic entity presence, team, selection, HP, and progress | complete | placeholder | Shared boxes and bars truthfully cover every received entity but are not kind-readable. |
+| Existing PNG/WebP/sprite-sheet/SVG reuse as flat art | complete | missing | Playable catch-up prefers directly reusable checked-in art on Babylon billboards/planes, with primitive fallback. |
 | Unit/building kind, facing, weapon, and setup readability | complete | missing | Babylon does not visibly distinguish most kinds and ignores weapon-facing/setup presentation. |
 | Entity-backed ability, weapon, and fuel-status cues | complete | missing | Active auras, loaded/active states, and low-oil feedback have no Babylon representation. |
 | Basic move/attack/build interaction feedback | complete | partial | Marquee, selected order lines, command/attack markers, and placement footprints work; rallies, ranges/arcs, and specialized target/setup previews are absent. |
 | Trenches, smoke, and ability objects | complete | missing | These gameplay-significant frame records are currently ignored by Babylon. |
 | Existing command, ability, and combat feedback catalog | complete | missing | Smoke, mortar, artillery, panzerfaust, muzzle, miss, resource, support-weapon, ability, and Lab feedback still render only in Pixi. |
 | HUD, minimap, lobby, panels, audio, control groups | shared external | shared external | Existing shared surfaces. |
-| Cosmetic decals, observer/debug overlays, and faction art | complete | deferred | Not required for the primitive live-player cutover unless playtest evidence shows a blocker. |
+| New/re-authored art, full rig/animation parity, cosmetic decals, and observer/debug overlays | complete | deferred | Direct reuse of existing flat art is in scope; broader fidelity work waits unless playtest evidence shows a blocker. |
 | Replay/spectator Babylon routes | complete | deferred | Future product need; these routes stay Pixi and must not load or depend on Babylon. |
 | Benchmarks, pools, vegetation, shadows, quality tiers | n/a | deferred | Add only from measured need. |
 | Babylon live/Lab default with explicit Pixi rollback | complete | missing | Final step after a real playtest and a no-selector live canary; selector/fallback checks must prove Pixi routes do not load Babylon. |
@@ -88,6 +89,6 @@ Each remaining phase records only the commands and inspected Lab capture that co
 risk. Manual review is appropriate for visual readability; automated checks remain required for
 authority/secrecy, projection agreement, and loop/teardown ownership.
 
-The active plan in `plans/render3d/` owns the primitive playable catch-up and live-player cutover.
-Missing or deferred rows outside that plan create no automatic phase, and visual fidelity is not a
-cutover requirement.
+The active plan in `plans/render3d/` owns the flat-art-or-primitive playable catch-up and live-player
+cutover. Missing or deferred rows outside that plan create no automatic phase, and visual fidelity
+is not a cutover requirement.
