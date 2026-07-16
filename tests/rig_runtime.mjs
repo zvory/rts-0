@@ -632,26 +632,20 @@ test("production rig route plans intern stable routes and part unions", () => {
   ]);
 });
 
-test("stable production route masks do not probe inactive rig pools every draw", () => {
-  class CountedMap extends Map {
-    get(key) {
-      this.getCount = (this.getCount || 0) + 1;
-      return super.get(key);
-    }
-  }
-
+test("production route plans preserve inactive-pool cleanup each draw", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 91, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
   const renderer = makeRigRenderer();
   renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
-  renderer._liveRigPools.liveUnitRigOverlays = new CountedMap();
-  renderer._liveRigPools.liveUnitRigEffects = new CountedMap();
+  let destroyed = 0;
+  renderer._liveRigPools.liveUnitRigEffects.set(entity.id, {
+    destroy() { destroyed += 1; },
+  });
 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
-  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
 
-  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.getCount || 0, 0);
-  assert.equal(renderer._liveRigPools.liveUnitRigEffects.getCount || 0, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.has(entity.id), false);
+  assert.equal(destroyed, 1);
 });
 
 test("default Worker draw uses live SVG rig without enabling comparison", () => {

@@ -358,25 +358,7 @@ function freezeRoute(poolName, layerName, parts) {
 }
 
 function reconcileActiveLiveRigPools(renderer, entityId, routePlan, activePoolNames) {
-  if (!routePlan.familyKey) {
-    destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames);
-    return;
-  }
-  let trackers = renderer._activeUnitRigPoolMasks;
-  if (!trackers) {
-    trackers = new Map();
-    renderer._activeUnitRigPoolMasks = trackers;
-  }
-  let tracker = trackers.get(routePlan.familyKey);
-  if (!tracker) {
-    tracker = new Map();
-    trackers.set(routePlan.familyKey, tracker);
-  }
-  const activeMask = poolMask(activePoolNames);
-  const previousMask = tracker.get(entityId);
-  tracker.set(entityId, activeMask);
-  if (previousMask == null || previousMask === activeMask) return;
-  destroyRigPoolsInMask(renderer, entityId, previousMask & ~activeMask);
+  destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames);
 }
 
 function destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames) {
