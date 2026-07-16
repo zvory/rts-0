@@ -26,9 +26,11 @@ Babylon without recreating Pixi styling or adding new effects.
   shared presentation data only for an existing cue that cannot be expressed from current records;
   never read mutable economy state from Babylon.
 - Consume the existing smoke-canister, mortar, artillery, panzerfaust, muzzle-flash, miss, command,
-  and impact feedback records. Map them to a tiny reusable vocabulary such as launch line,
-  projectile marker, target marker, impact flash, and short text; use the shared visual clock and
-  the record's existing lifetime rather than adding a backend loop or new event schema.
+  and impact feedback records. Reuse an existing checked-in effect/decal image or SVG on a flat
+  plane/billboard when it is directly suitable; otherwise map the record to a tiny reusable
+  vocabulary such as launch line, projectile marker, target marker, impact flash, and short text.
+  Use the shared visual clock and the record's existing lifetime rather than adding a backend loop
+  or new event schema.
 - Verify production/rally, mining, construction, movement, attack, targeted abilities, support
   weapons, and combat outcomes are visually explainable at ordinary play distance.
 - Update the rendering parity ledger and focused contracts, then capture and inspect one
@@ -49,8 +51,8 @@ Babylon without recreating Pixi styling or adding new effects.
   Pixi has a truthful, correctly gated generic Babylon representation.
 - Current commands and abilities do not require blind clicks, and consequential world changes do
   not happen without a visible explanation.
-- No GLB, bespoke weapon effect, new gameplay feature, generalized pool, or backend-owned clock is
-  introduced.
+- No GLB, bespoke weapon effect, new gameplay feature, asset-conversion pipeline, generalized pool,
+  or backend-owned clock is introduced.
 
 ## Verification and Manual Test
 

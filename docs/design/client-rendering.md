@@ -216,12 +216,19 @@ preserve team, facing, construction, selection, and HP data received in the fram
 minimap, audio, and control-group surfaces are reused. Babylon is opt-in for ordinary live players
 and Lab; replay and ordinary spectator matches explicitly fall back to Pixi.
 
-### 5.4 Trusted assets and events
+### 5.4 Flat-art reuse, trusted 3D assets, and events
 
-The first repository-owned asset needs only a small descriptor: id/path, source/license note,
-scene scale, axes, ground pivot, visible bounds, team-material slot, and required visual anchors.
-Missing required metadata falls back to a generic placeholder. Assets never affect selection or
-authority.
+Existing checked-in PNG, WebP, sprite-sheet, and SVG art may be reused as Babylon textures on
+billboards or planes without introducing a new asset descriptor. Prefer the existing public URL,
+frame rectangle, or plain source description when it is already suitable; Babylon never imports a
+Pixi display object or runtime class. One static frame is sufficient for the playable catch-up, a
+shadow is optional, and any load/adaptation failure falls back immediately to a truthful generic
+primitive.
+
+The first new repository-owned 3D asset needs only a small descriptor: id/path, source/license
+note, scene scale, axes, ground pivot, visible bounds, team-material slot, and required visual
+anchors. Missing required metadata falls back to a generic placeholder. Flat or 3D assets never
+affect selection or authority.
 
 The backend root owns loaded source assets, shared materials, and textures; entity/effect instances
 own instantiated nodes/state only. Introduce a registry, reference counting, or pooling only when
@@ -236,9 +243,9 @@ deterministic effect-capture tooling are separate future features.
 
 The current foundations do not require replay/spectator Babylon routes, default rollout, hostile
 asset validation, checksums/decoder policy, retained event history, generalized registries/pools,
-benchmark schemas/budgets, vegetation, shadows, quality tiers, full visual parity, faction art, or
-release certification. Add one through a new evidence-backed plan when a playtest, content need, or
-measurement justifies it.
+benchmark schemas/budgets, vegetation, required shadows, quality tiers, full rig/animation parity,
+new or re-authored faction art, or release certification. Add one through a new evidence-backed
+plan when a playtest, content need, or measurement justifies it.
 
 The deleted proof-of-concept remains historical only. Its observations may motivate a focused test
 after the corresponding real resource/effect exists, but they are not requirements or baselines.
