@@ -1478,7 +1478,7 @@ their start payload remains spectator-shaped.
 `lobby.js`
 ```js
 export class Lobby {
-  constructor(rootEl, net, audio?, { ensureConnected?, disconnectWhenIdle? }?)
+  constructor(rootEl, net, audio?, { ensureConnected?, disconnectWhenIdle?, autoRefreshLobbies? }?)
   show(), hide()
   // owns lobby state, manual pre-join browser refresh, latest-row join preflight,
   // ready/start/spectator role, and delegates browser DOM to lobby_browser_view.js and
@@ -1519,11 +1519,14 @@ export class LobbyCreateModal {
   destroy()
 }
 ```
-The pre-join lobby browser does not poll. It starts in a not-refreshed state and issues one
-`GET /api/lobbies` only when the player presses **Refresh** or when a join action performs its
-freshness preflight. The app also leaves the WebSocket closed on an ordinary lobby page until
-Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unjoined connection
-is closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail.
+The ordinary pre-join lobby browser loads once when shown. It then refreshes at most every five
+seconds only while the document is visible and the player has generated pointer, keyboard, touch,
+or scroll activity within the last 30 seconds. Hidden or inactive tabs stop the timer and abort an
+in-flight list request; visibility or new activity resumes with a fresh request. The manual
+**Refresh** button and join-action freshness preflight each remain available. Explicit launch URLs
+skip this lobby-list loop. The app also leaves the WebSocket closed on an ordinary lobby page until
+Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unjoined connection is
+closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail.
 
 The browser keeps in-progress rows labeled `In match` and exposes a spectator
 action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending

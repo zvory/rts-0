@@ -26,6 +26,15 @@ import {
 } from "./lobby_view.js";
 
 const NAME_STORAGE_KEY = "rts.playerName";
+export const LOBBY_BROWSER_REFRESH_INTERVAL_MS = 5000;
+export const LOBBY_BROWSER_ACTIVITY_WINDOW_MS = 30000;
+const LOBBY_BROWSER_ACTIVITY_EVENTS = Object.freeze([
+  "pointerdown",
+  "pointermove",
+  "keydown",
+  "scroll",
+  "touchstart",
+]);
 
 const DEFAULT_MAX_PLAYERS = 4;
 const COUNTDOWN_SOUND_BY_WORD = Object.freeze({
@@ -82,6 +91,26 @@ export function betaFactionSelectEnabledForLocation(locationLike) {
   );
 }
 
+export function lobbyBrowserAutoRefreshEligible({
+  enabled = true,
+  joined = false,
+  actionPending = false,
+  screenHidden = false,
+  documentHidden = false,
+  lastActivityAt = 0,
+  now = Date.now(),
+  activityWindowMs = LOBBY_BROWSER_ACTIVITY_WINDOW_MS,
+} = {}) {
+  return !!enabled &&
+    !joined &&
+    !actionPending &&
+    !screenHidden &&
+    !documentHidden &&
+    Number.isFinite(lastActivityAt) &&
+    Number.isFinite(now) &&
+    now - lastActivityAt <= activityWindowMs;
+}
+
 /**
  * The lobby screen controller.
  */
@@ -90,7 +119,7 @@ export class Lobby {
    * @param {HTMLElement} rootEl the `#lobby-screen` section.
    * @param {import("./net.js").Net} net network seam (join/ready/start + event bus).
    * @param {import("./audio.js").Audio|null} [audio] shared app audio engine.
-   * @param {{ensureConnected?: Function, disconnectWhenIdle?: Function}} [options]
+   * @param {{ensureConnected?: Function, disconnectWhenIdle?: Function, autoRefreshLobbies?: boolean}} [options]
    */
   constructor(rootEl, net, audio = null, options = {}) {
     this.root = rootEl;
@@ -153,6 +182,11 @@ export class Lobby {
     this._browserConnected = false;
     this._browserActionPending = false;
     this._pendingBrowserJoinRoom = "";
+    this._browserAutoRefreshEnabled = options.autoRefreshLobbies !== false;
+    this._browserActivityTracking = false;
+    this._browserAutoRefreshTimer = undefined;
+    this._lastBrowserActivityAt = 0;
+    this._lastBrowserRefreshAt = 0;
     this._ensureConnection = typeof options.ensureConnected === "function"
       ? options.ensureConnected
       : async () => this._browserConnected;
@@ -188,12 +222,21 @@ export class Lobby {
       this._reflectCreateButton();
     };
     this._onReplayPromptKeydown = (ev) => this._handleReplayPromptKeydown(ev);
+    this._onBrowserActivity = () => this._noteLobbyBrowserActivity();
+    this._onBrowserVisibilityChange = () => {
+      if (document.hidden) {
+        this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
+        return;
+      }
+      this._noteLobbyBrowserActivity({ refreshIfStale: true });
+    };
 
     this._restoreName();
     this._reflectJoinedState();
     this._buildReplayPrompt();
     this._wireDom();
     this._wireNet();
+    this._wireLobbyBrowserActivity();
     this._renderLobbyBrowser();
   }
 
@@ -201,14 +244,24 @@ export class Lobby {
 
   /** Show the lobby screen. */
   show() {
+    const enteringBrowser = !this._browserActivityTracking || !!this.root.hidden;
     this.root.hidden = false;
+    this._browserActivityTracking = true;
     this._renderLobbyBrowser();
+    if (
+      enteringBrowser &&
+      this._browserAutoRefreshEnabled &&
+      (typeof document === "undefined" || !document.hidden)
+    ) {
+      void this._refreshLobbyBrowser({ loading: !this._browserLoaded });
+    }
   }
 
   /** Hide the lobby screen (main.js reveals the game screen). */
   hide() {
     this.root.hidden = true;
-    this._cancelLobbyBrowserRefresh();
+    this._browserActivityTracking = false;
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
   }
 
   /**
@@ -216,6 +269,7 @@ export class Lobby {
    * This is client-local UI state; the App/server own the actual room detach.
    */
   resetToBrowser({ status = "" } = {}) {
+    this._browserActivityTracking = false;
     this._joined = false;
     this._ready = false;
     this._spectator = false;
@@ -231,7 +285,7 @@ export class Lobby {
     this._pendingReplayRoom = "";
     this._promptReturnFocus = null;
 
-    this._cancelLobbyBrowserRefresh();
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     this._clearCountdown();
     this._hideReplayPrompt(false);
     if (this.elPlayers) this.elPlayers.innerHTML = "";
@@ -319,7 +373,7 @@ export class Lobby {
     if (!await this._connectForAction()) return;
     this._sendJoin({ name, room, spectator: false });
     this._joined = true;
-    this._cancelLobbyBrowserRefresh();
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     this._spectator = false;
     this._reflectJoinedState(false);
     this.setStatus(`Joining "${room}"…`);
@@ -473,6 +527,14 @@ export class Lobby {
     this.net.on("close", this._onClose);
   }
 
+  _wireLobbyBrowserActivity() {
+    if (!this._browserAutoRefreshEnabled || typeof document === "undefined") return;
+    for (const eventName of LOBBY_BROWSER_ACTIVITY_EVENTS) {
+      document.addEventListener(eventName, this._onBrowserActivity, { passive: true });
+    }
+    document.addEventListener("visibilitychange", this._onBrowserVisibilityChange);
+  }
+
   /** Tear down listeners (not normally needed for a single-screen lifetime). */
   destroy() {
     this.net.off(S.LOBBY, this._onLobby);
@@ -482,7 +544,13 @@ export class Lobby {
     this.net.off(S.ERROR, this._onError);
     this.net.off("open", this._onOpen);
     this.net.off("close", this._onClose);
-    this._cancelLobbyBrowserRefresh();
+    if (this._browserAutoRefreshEnabled && typeof document !== "undefined") {
+      for (const eventName of LOBBY_BROWSER_ACTIVITY_EVENTS) {
+        document.removeEventListener(eventName, this._onBrowserActivity);
+      }
+      document.removeEventListener("visibilitychange", this._onBrowserVisibilityChange);
+    }
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     this.browserView?.destroy();
     this.createModal?.destroy();
     this._clearCountdown();
@@ -510,7 +578,7 @@ export class Lobby {
     this._joined = true;
     this._browserActionPending = false;
     this._pendingBrowserJoinRoom = "";
-    this._cancelLobbyBrowserRefresh();
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     this._reflectJoinedState(true);
 
     const players = m.players || [];
@@ -669,6 +737,60 @@ export class Lobby {
     this.btnRefreshLobbies.textContent = this._browserLoading ? "Refreshing..." : "Refresh";
   }
 
+  _browserAutoRefreshIsEligible(now = Date.now()) {
+    return lobbyBrowserAutoRefreshEligible({
+      enabled: this._browserAutoRefreshEnabled,
+      joined: this._joined,
+      actionPending: this._browserActionPending,
+      screenHidden: !this._browserActivityTracking || !!this.root?.hidden,
+      documentHidden: typeof document !== "undefined" && !!document.hidden,
+      lastActivityAt: this._lastBrowserActivityAt,
+      now,
+    });
+  }
+
+  _noteLobbyBrowserActivity({ refreshIfStale = false } = {}) {
+    if (
+      !this._browserAutoRefreshEnabled ||
+      !this._browserActivityTracking ||
+      this._joined ||
+      this.root?.hidden
+    ) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const now = Date.now();
+    this._lastBrowserActivityAt = now;
+    this._startLobbyBrowserAutoRefresh();
+    if (
+      !this._browserLoaded ||
+      (refreshIfStale && now - this._lastBrowserRefreshAt >= LOBBY_BROWSER_REFRESH_INTERVAL_MS)
+    ) {
+      void this._refreshLobbyBrowser({ loading: !this._browserLoaded });
+    }
+  }
+
+  _startLobbyBrowserAutoRefresh() {
+    if (!this._browserAutoRefreshIsEligible()) return;
+    if (this._browserAutoRefreshTimer !== undefined || typeof window === "undefined") return;
+    this._browserAutoRefreshTimer = window.setInterval(() => {
+      const now = Date.now();
+      if (!this._browserAutoRefreshIsEligible(now)) {
+        if (!this._browserActionPending) this._stopLobbyBrowserAutoRefresh();
+        return;
+      }
+      if (now - this._lastBrowserRefreshAt >= LOBBY_BROWSER_REFRESH_INTERVAL_MS) {
+        void this._refreshLobbyBrowser();
+      }
+    }, LOBBY_BROWSER_REFRESH_INTERVAL_MS);
+  }
+
+  _stopLobbyBrowserAutoRefresh({ cancelRequest = false } = {}) {
+    if (this._browserAutoRefreshTimer !== undefined && typeof window !== "undefined") {
+      window.clearInterval(this._browserAutoRefreshTimer);
+    }
+    this._browserAutoRefreshTimer = undefined;
+    if (cancelRequest) this._cancelLobbyBrowserRefresh();
+  }
+
   async _connectForAction({ reportError = true } = {}) {
     if (this._browserConnected) return true;
     this.setStatus("Connecting to server...");
@@ -700,6 +822,7 @@ export class Lobby {
       this._browserAbort?.abort();
     }
     this._browserLoading = true;
+    this._lastBrowserRefreshAt = Date.now();
     this._renderLobbyBrowser({ loading, error: "" });
     this._reflectRefreshButton();
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -876,7 +999,7 @@ export class Lobby {
     if (this.elRoom) this.elRoom.value = room;
     this.net.join(name, room, true, true);
     this._joined = true;
-    this._cancelLobbyBrowserRefresh();
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     this._spectator = true;
     this._reflectJoinedState(false);
     this.setStatus(`Joining replay in "${room}"...`);

@@ -12,11 +12,14 @@ import {
   withFakeDocument,
 } from "./fakes.mjs";
 import {
+  LOBBY_BROWSER_ACTIVITY_WINDOW_MS,
+  LOBBY_BROWSER_REFRESH_INTERVAL_MS,
   MAX_LOBBY_TEAMS,
   Lobby,
   PLAYABLE_FACTIONS,
   betaFactionSelectEnabledForLocation,
   countdownSoundId,
+  lobbyBrowserAutoRefreshEligible,
   shouldAcceptSpectatorDrop,
   shouldAcceptTeamDrop,
   teamSlotsForLobby,
@@ -495,7 +498,26 @@ import { textWithin } from "./dom_text.mjs";
 {
   const now = 200_000_000;
   const lobbySource = fs.readFileSync(new URL("../../client/src/lobby.js", import.meta.url), "utf8");
-  assert(!lobbySource.includes("setInterval"), "lobby browser has no background polling timer");
+  assert(LOBBY_BROWSER_REFRESH_INTERVAL_MS === 5000,
+    "active lobby refreshes are capped at one request per five seconds");
+  assert(LOBBY_BROWSER_ACTIVITY_WINDOW_MS === 30000,
+    "lobby auto-refresh activity expires after 30 seconds");
+  const eligibleRefresh = {
+    lastActivityAt: now - 1000,
+    now,
+  };
+  assert(lobbyBrowserAutoRefreshEligible(eligibleRefresh),
+    "a visible recently-active lobby is eligible for auto-refresh");
+  assert(!lobbyBrowserAutoRefreshEligible({ ...eligibleRefresh, documentHidden: true }),
+    "a hidden tab is not eligible for lobby auto-refresh");
+  assert(!lobbyBrowserAutoRefreshEligible({ ...eligibleRefresh, screenHidden: true }),
+    "a hidden lobby screen is not eligible for lobby auto-refresh");
+  assert(!lobbyBrowserAutoRefreshEligible({ ...eligibleRefresh, actionPending: true }),
+    "a join or create action pauses lobby auto-refresh");
+  assert(!lobbyBrowserAutoRefreshEligible({
+    ...eligibleRefresh,
+    lastActivityAt: now - LOBBY_BROWSER_ACTIVITY_WINDOW_MS - 1,
+  }), "an inactive lobby is not eligible for auto-refresh");
   assert(formatLobbyAge(now - 5_000, now) === "just now", "lobby browser formats fresh ages");
   assert(formatLobbyAge(now - 3 * 60_000, now) === "3m ago", "lobby browser formats minute ages");
   assert(formatLobbyAge(now - 2 * 60 * 60_000, now) === "2h ago", "lobby browser formats hour ages");
@@ -529,6 +551,91 @@ import { textWithin } from "./dom_text.mjs";
     "lobby create suggestion stays within the public lobby name limit");
   assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
     "lobby create suggestion avoids reserved internal prefixes");
+
+  {
+    const priorDocument = globalThis.document;
+    globalThis.document = { hidden: false };
+    try {
+      let initialLoads = 0;
+      const lobby = Object.assign(Object.create(Lobby.prototype), {
+        root: { hidden: true },
+        _browserActivityTracking: false,
+        _browserAutoRefreshEnabled: true,
+        _browserLoaded: false,
+        _renderLobbyBrowser() {},
+        _refreshLobbyBrowser({ loading } = {}) {
+          assert(loading, "the first lobby load renders a loading state");
+          initialLoads += 1;
+          return Promise.resolve([]);
+        },
+      });
+      lobby.show();
+      lobby.show();
+      assert(initialLoads === 1, "showing the ordinary lobby performs one initial list load");
+    } finally {
+      if (priorDocument === undefined) delete globalThis.document;
+      else globalThis.document = priorDocument;
+    }
+  }
+
+  {
+    const priorWindow = globalThis.window;
+    const priorDocument = globalThis.document;
+    const priorDateNow = Date.now;
+    let clock = 100_000;
+    let intervalCallback = null;
+    let clearedIntervals = 0;
+    const refreshes = [];
+    globalThis.window = {
+      setInterval(callback, delay) {
+        assert(delay === LOBBY_BROWSER_REFRESH_INTERVAL_MS,
+          "lobby activity timer uses the bounded refresh interval");
+        intervalCallback = callback;
+        return 17;
+      },
+      clearInterval(id) {
+        assert(id === 17, "lobby clears its active refresh timer");
+        clearedIntervals += 1;
+      },
+    };
+    globalThis.document = { hidden: false };
+    Date.now = () => clock;
+    try {
+      const lobby = Object.assign(Object.create(Lobby.prototype), {
+        _browserAutoRefreshEnabled: true,
+        _browserActivityTracking: true,
+        _browserAutoRefreshTimer: undefined,
+        _lastBrowserActivityAt: clock - 1000,
+        _lastBrowserRefreshAt: clock,
+        _browserLoaded: true,
+        _browserActionPending: false,
+        _joined: false,
+        root: { hidden: false },
+        _refreshLobbyBrowser(options = {}) {
+          this._lastBrowserRefreshAt = Date.now();
+          refreshes.push(options);
+          return Promise.resolve([]);
+        },
+      });
+
+      lobby._noteLobbyBrowserActivity();
+      assert(typeof intervalCallback === "function" && refreshes.length === 0,
+        "recent activity starts polling without duplicating a fresh initial load");
+      clock += LOBBY_BROWSER_REFRESH_INTERVAL_MS;
+      intervalCallback();
+      assert(refreshes.length === 1, "active lobby polling performs one bounded refresh");
+      clock += LOBBY_BROWSER_ACTIVITY_WINDOW_MS + 1;
+      intervalCallback();
+      assert(refreshes.length === 1 && clearedIntervals === 1,
+        "lobby polling stops once player activity expires");
+    } finally {
+      Date.now = priorDateNow;
+      if (priorWindow === undefined) delete globalThis.window;
+      else globalThis.window = priorWindow;
+      if (priorDocument === undefined) delete globalThis.document;
+      else globalThis.document = priorDocument;
+    }
+  }
 
   {
     const requests = [];
@@ -592,6 +699,11 @@ import { textWithin } from "./dom_text.mjs";
   }
 
   const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
+  const appSource = fs.readFileSync(new URL("../../client/src/app.js", import.meta.url), "utf8");
+  assert(appSource.includes("autoRefreshLobbies: !this.requiresConnectionOnStart()"),
+    "explicit launch URLs skip ordinary lobby-list auto-refresh");
+  assert(indexHtml.includes('id="lobby-browser-refresh"'),
+    "lobby browser retains its manual refresh button");
   assert(indexHtml.includes('class="lobby-manual-room" hidden'),
     "manual room-name join controls stay outside the normal pre-join product path");
   assert(indexHtml.includes("#lobby-room and #lobby-join remain hidden compatibility controls"),
