@@ -1,6 +1,40 @@
 use super::*;
 
 #[test]
+fn idle_machine_gunner_holds_position_once_setup_begins() {
+    let mut entities = EntityStore::new();
+    let mg_id = entities
+        .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+        .expect("machine gunner should spawn");
+
+    for setup in [WeaponSetup::SettingUp { ticks: 1 }, WeaponSetup::Deployed] {
+        let mg = entities.get_mut(mg_id).expect("mg should exist");
+        mg.set_order(Order::Idle);
+        mg.set_weapon_setup(setup);
+        assert!(matches!(combat_mode(mg), CombatMode::Opportunistic));
+    }
+}
+
+#[test]
+fn explicit_orders_release_setup_machine_gunner_from_hold_position() {
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
+        .expect("target should spawn");
+    let mg_id = entities
+        .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+        .expect("machine gunner should spawn");
+    let mg = entities.get_mut(mg_id).expect("mg should exist");
+    mg.set_weapon_setup(WeaponSetup::Deployed);
+
+    mg.set_order(Order::attack(target_id));
+    assert!(matches!(combat_mode(mg), CombatMode::Ordered));
+
+    mg.set_order(Order::attack_move_to(300.0, 100.0));
+    assert!(matches!(combat_mode(mg), CombatMode::Aggressive));
+}
+
+#[test]
 fn unfinished_attack_move_machine_gunner_resumes_without_idle_setup() {
     let mut entities = EntityStore::new();
     let mg_id = entities
