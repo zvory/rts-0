@@ -798,6 +798,9 @@ no eligible carriers, cooldown, or runtime status.
 The server projects ability affordances only when the owning player's faction catalog exposes that
 ability for the entity's global kind and the registry marks it for command-card exposure. Artillery
 projects separate `pointFire` and `blanketFire` affordances for selected owning clients.
+Scout Car `smoke` remains visible but disabled until the owner has a completed R&D Complex. The
+server checks that building requirement when a Smoke command is issued and again when a queued
+Smoke order promotes, so losing the R&D Complex relocks the ability.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
 means the ability is depleted and cannot be used by that caster.
 `autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and

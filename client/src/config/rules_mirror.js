@@ -203,6 +203,7 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
     charges: SCOUT_CAR_SMOKE_USES,
     cost: SMOKE_ABILITY_COST,
+    techRequirement: KIND.RESEARCH_COMPLEX,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
     upgradedRadiusTiles: SMOKE_PLUS_CLOUD_RADIUS_TILES,

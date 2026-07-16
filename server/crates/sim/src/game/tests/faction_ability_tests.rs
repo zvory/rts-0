@@ -2,18 +2,70 @@ use super::fixtures::*;
 use super::*;
 
 #[test]
-fn scout_car_smoke_requires_no_steelworks() {
+fn scout_car_smoke_requires_completed_research_complex() {
     let (mut game, scout, _target, _) = smoke_command_fixture();
     let target = game.state.map.tile_center(12, 8);
-    assert!(
-        !game
-            .state
+    let research_complexes: Vec<u32> = game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::ResearchComplex)
+        .map(|entity| entity.id)
+        .collect();
+    for id in research_complexes {
+        game.state.entities.remove(id);
+    }
+    let research_pos = game.state.map.tile_center(4, 4);
+    let incomplete_research = game
+        .state
+        .entities
+        .spawn_building(
+            1,
+            EntityKind::ResearchComplex,
+            research_pos.0,
+            research_pos.1,
+            false,
+        )
+        .expect("incomplete R&D Complex should spawn");
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.state
             .entities
-            .iter()
-            .any(|e| e.owner == 1 && e.kind == EntityKind::Steelworks),
-        "fixture should not contain Steelworks"
+            .get(scout)
+            .expect("scout should exist")
+            .ability_uses_remaining(ability::AbilityKind::Smoke),
+        Some(config::SCOUT_CAR_SMOKE_USES),
+        "Scout Car smoke should remain locked without a completed R&D Complex"
+    );
+    assert_eq!(
+        game.state.smokes.iter().count(),
+        0,
+        "locked Smoke should not create a cloud"
     );
 
+    game.state.entities.remove(incomplete_research);
+    game.state
+        .entities
+        .spawn_building(
+            1,
+            EntityKind::ResearchComplex,
+            research_pos.0,
+            research_pos.1,
+            true,
+        )
+        .expect("completed R&D Complex should spawn");
     game.enqueue(
         1,
         Command::UseAbility {
@@ -35,7 +87,7 @@ fn scout_car_smoke_requires_no_steelworks() {
                 .ability_uses_remaining(ability::AbilityKind::Smoke),
             Some(1)
         ),
-        "Scout Car smoke should be available before Steelworks and spend one use"
+        "Scout Car smoke should unlock after a completed R&D Complex and spend one use"
     );
     assert_eq!(
         game.state

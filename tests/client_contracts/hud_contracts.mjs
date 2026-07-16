@@ -1086,8 +1086,21 @@ function fakeHudRootWithoutResourceSpans() {
     kind: KIND.SCOUT_CAR,
     abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
   };
+  const smokeResearchComplex = {
+    id: 29,
+    owner: 1,
+    kind: KIND.RESEARCH_COMPLEX,
+  };
+  const lockedAbilityCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutCar],
+    entities: [{ ...smokeResearchComplex, buildProgress: 0.5 }, scoutCar],
+  }));
+  const lockedSmoke = buttonByAction(lockedAbilityCard, "ability");
+  assert(!lockedSmoke.enabled, "Smoke should be disabled until the player completes an R&D Complex");
+  assert(lockedSmoke.title === "Requires R&D Complex", "locked Smoke should explain its R&D requirement");
   const abilityCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutCar],
+    entities: [smokeResearchComplex, scoutCar],
     commandTarget: { kind: "ability", ability: ABILITY.SMOKE },
   }));
   const smoke = buttonByAction(abilityCard, "ability");

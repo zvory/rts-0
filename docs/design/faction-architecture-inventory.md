@@ -139,6 +139,8 @@ metadata. `client/src/config.js` is the checked client projection, while
 and `server/crates/sim/src/rules/projection.rs` own execution and projection hooks. Protocol
 ability vocabulary and compact codes remain mirrored through `server/crates/protocol/src/lib.rs`
 and `client/src/protocol.js`.
+Scout Car Smoke requires the owning player to retain a completed R&D Complex; the command card
+keeps the ability visible but disabled with the missing-tech reason until that building is present.
 
 ## Current Client Command Cards
 
