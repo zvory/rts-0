@@ -3,7 +3,11 @@ import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigKeyForEntity, liveRigRoutePlanFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
-import { createRigRenderContext, sampleRigAnimation } from "./rigs/animation.js";
+import {
+  createRigAnimationStage,
+  createRigRenderContext,
+  sampleRigAnimationInto,
+} from "./rigs/animation.js";
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
 import { pngAtlasRouteCoverage, renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
@@ -173,9 +177,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     }
     const drawPlan = frameStripDrawPlanFor(routePlan);
     if (drawPlan.shadowRoute) {
-      const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
-        includeParts: drawPlan.sampledParts,
-      });
+      const sampledAnimation = sampleRigAnimationInto(
+        animationStageFor(definition, drawPlan.sampledParts),
+        e,
+        renderContext,
+      );
       renderLiveUnitRig(this, e, colorByOwner, state, definition, {
         route: drawPlan.shadowRoute,
         alpha: pools.alpha,
@@ -200,9 +206,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     applyRigAlpha(renderContext, pools.alpha);
     const drawPlan = pngDrawPlanFor(definition, pngAtlas, routePlan);
-    const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
-      includeParts: drawPlan.sampledParts,
-    });
+    const sampledAnimation = sampleRigAnimationInto(
+      animationStageFor(definition, drawPlan.sampledParts),
+      e,
+      renderContext,
+    );
     for (const step of drawPlan.steps) {
       if (step.runtime === "png") {
         renderPngUnitRig(this, e, colorByOwner, state, definition, {
@@ -232,9 +240,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   reconcileActiveLiveRigPools(this, e.id, routePlan, routePlan.poolNames);
   const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
   applyRigAlpha(renderContext, pools.alpha);
-  const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
-    includeParts: routePlan.allParts,
-  });
+  const sampledAnimation = sampleRigAnimationInto(
+    animationStageFor(definition, routePlan.allParts),
+    e,
+    renderContext,
+  );
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
     routes: routePlan.routes,
     alpha: pools.alpha,
@@ -264,6 +274,21 @@ const UNIT_RIG_POOL_BITS = Object.freeze(Object.fromEntries(
 ));
 const FRAME_STRIP_DRAW_PLAN_CACHE = new WeakMap();
 const PNG_DRAW_PLAN_CACHE = new WeakMap();
+const ANIMATION_STAGE_CACHE = new WeakMap();
+
+function animationStageFor(definition, sampledParts) {
+  let byParts = ANIMATION_STAGE_CACHE.get(definition);
+  if (!byParts) {
+    byParts = new WeakMap();
+    ANIMATION_STAGE_CACHE.set(definition, byParts);
+  }
+  let stage = byParts.get(sampledParts);
+  if (!stage) {
+    stage = createRigAnimationStage(definition, { includeParts: sampledParts });
+    byParts.set(sampledParts, stage);
+  }
+  return stage;
+}
 
 function frameStripDrawPlanFor(routePlan) {
   const cached = FRAME_STRIP_DRAW_PLAN_CACHE.get(routePlan);

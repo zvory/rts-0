@@ -73,10 +73,7 @@ function renderLiveUnitRigRoute(renderer, entity, definition, context, route, op
   if (!instance.container.parent && layer) layer.addChild(instance.container);
   instance.update(entity, context, {
     sampledAnimation: options.sampledAnimation,
-    diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
-    diagnosticBatch: typeof renderer._recordKnownRenderDiagnostics === "function"
-      ? (labels, counts) => renderer._recordKnownRenderDiagnostics(labels, counts)
-      : null,
+    diagnosticRecorder: renderer,
   });
   return instance;
 }
@@ -193,14 +190,21 @@ function applyPartState(rec, state, context, diagnosticCounts) {
 }
 
 function flushDiagnosticCounts(options, labels, counts) {
+  if (typeof options.diagnosticRecorder?._recordKnownRenderDiagnostics === "function") {
+    options.diagnosticRecorder._recordKnownRenderDiagnostics(labels, counts);
+    return;
+  }
   if (typeof options.diagnosticBatch === "function") {
     options.diagnosticBatch(labels, counts);
     return;
   }
-  if (typeof options.diagnostics !== "function") return;
+  const diagnostic = typeof options.diagnostics === "function"
+    ? options.diagnostics
+    : options.diagnosticRecorder?._recordRenderDiagnostic?.bind?.(options.diagnosticRecorder);
+  if (!diagnostic) return;
   for (let i = 0; i < labels.length; i += 1) {
     for (let remaining = counts[i]; remaining > 0; remaining -= 1) {
-      options.diagnostics(labels[i], 1);
+      diagnostic(labels[i], 1);
     }
   }
 }
