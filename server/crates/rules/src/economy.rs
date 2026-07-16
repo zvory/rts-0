@@ -195,6 +195,8 @@ mod tests {
 
     #[test]
     fn ww2_production_chain_matches_design() {
+        let barracks = EntityKind::Barracks;
+
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
@@ -202,7 +204,7 @@ mod tests {
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
-            trainable_units(EntityKind::Barracks),
+            trainable_units(barracks),
             &[EntityKind::Rifleman, EntityKind::MachineGunner]
         );
         assert_eq!(
@@ -268,7 +270,7 @@ mod tests {
         );
 
         assert!(
-            build_requirement_met(EntityKind::Barracks, &[]),
+            build_requirement_met(barracks, &[]),
             "Barracks should remain buildable without a completed City Centre"
         );
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
@@ -278,11 +280,11 @@ mod tests {
         ));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::Barracks]
+            &[barracks]
         ));
         assert!(build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::CityCentre, EntityKind::Barracks]
+            &[EntityKind::CityCentre, barracks]
         ));
 
         assert!(!build_requirement_met(EntityKind::Factory, &[]));
@@ -393,7 +395,7 @@ mod tests {
         );
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
-            EntityKind::Barracks,
+            barracks,
             &[]
         ));
         assert!(build_requirement_met_for_faction(
