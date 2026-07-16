@@ -6,6 +6,12 @@ const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const ATLAS_SPRITES_CACHE = new WeakMap();
 const ROUTE_COVERAGE_CACHE = new WeakMap();
 const ALL_ROUTE_PARTS = Object.freeze({});
+const PNG_RIG_DIAGNOSTIC_LABELS = Object.freeze([
+  "renderer.pngRig.redraw.skipped.hidden",
+  "renderer.pngRig.redraw.completed",
+]);
+const PNG_RIG_HIDDEN = 0;
+const PNG_RIG_COMPLETED = 1;
 
 export function renderPngUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   const atlas = options.atlas;
@@ -59,6 +65,9 @@ function renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture
   instance.update(entity, context, {
     sampledAnimation: options.sampledAnimation,
     diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
+    diagnosticBatch: typeof renderer._recordKnownRenderDiagnostics === "function"
+      ? (labels, counts) => renderer._recordKnownRenderDiagnostics(labels, counts)
+      : null,
   });
   return instance;
 }
@@ -152,6 +161,7 @@ class PngAtlasRigInstance {
     }
     this._animationPartIds = new Set([...this.parts.values()].map((rec) => rec.sprite.animationPart));
     this._animationStage = createRigAnimationStage(definition, { includeParts: this._animationPartIds });
+    this._diagnosticCounts = new Uint32Array(PNG_RIG_DIAGNOSTIC_LABELS.length);
   }
 
   matchesPngAtlasRig(kind, definition, atlas, atlasTexture, includeParts = null) {
@@ -174,17 +184,20 @@ class PngAtlasRigInstance {
     this.container.rotation = 0;
 
     const sampled = options.sampledAnimation ?? sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    const diagnosticCounts = this._diagnosticCounts;
+    diagnosticCounts.fill(0);
     for (const [spriteId, rec] of this.parts) {
       const partState = sampled.parts[rec.sprite.animationPart];
       if (!partState) {
         rec.display.visible = false;
-        options.diagnostics?.("renderer.pngRig.redraw.skipped.hidden");
+        diagnosticCounts[PNG_RIG_HIDDEN] += 1;
         continue;
       }
       const frameRecord = frameRecordForContext(rec, sampled.context);
       if (rec.display.texture !== frameRecord.texture) rec.display.texture = frameRecord.texture;
-      applySpriteState(rec, frameRecord.frame, partState, sampled.context, options.diagnostics);
+      applySpriteState(rec, frameRecord.frame, partState, sampled.context, diagnosticCounts);
     }
+    flushDiagnosticCounts(options, PNG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }
 
   destroy() {
@@ -225,18 +238,31 @@ function frameRecordForContext(rec, context) {
   return colorKey !== null && rec.paletteFrames?.has(colorKey) ? rec.paletteFrames.get(colorKey) : rec.baseFrame;
 }
 
-function applySpriteState(rec, frame, state, context, diagnostics = null) {
+function applySpriteState(rec, frame, state, context, diagnosticCounts) {
   const { display, sprite: part } = rec;
   display.visible = state.visible;
   if (!state.visible) {
-    diagnostics?.("renderer.pngRig.redraw.skipped.hidden");
+    diagnosticCounts[PNG_RIG_HIDDEN] += 1;
     return;
   }
 
   applyDisplayTransform(display, state, frame, part, rec.transform);
   display.alpha = state.alpha;
   display.tint = tintForSlot(part.tintSlot ?? state.tintSlot, context, part);
-  diagnostics?.("renderer.pngRig.redraw.completed");
+  diagnosticCounts[PNG_RIG_COMPLETED] += 1;
+}
+
+function flushDiagnosticCounts(options, labels, counts) {
+  if (typeof options.diagnosticBatch === "function") {
+    options.diagnosticBatch(labels, counts);
+    return;
+  }
+  if (typeof options.diagnostics !== "function") return;
+  for (let i = 0; i < labels.length; i += 1) {
+    for (let remaining = counts[i]; remaining > 0; remaining -= 1) {
+      options.diagnostics(labels[i], 1);
+    }
+  }
 }
 
 function atlasSprites(definition, atlas) {

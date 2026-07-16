@@ -673,6 +673,21 @@ export class Renderer {
     this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
+  _recordKnownRenderDiagnostics(labels, counts) {
+    const profiler = this._profiler;
+    if (!profiler) return;
+    if (typeof profiler.recordKnownDiagnosticCounters === "function") {
+      profiler.recordKnownDiagnosticCounters(labels, counts);
+      return;
+    }
+    const length = Math.min(labels?.length || 0, counts?.length || 0);
+    for (let i = 0; i < length; i += 1) {
+      for (let remaining = Math.trunc(counts[i] || 0); remaining > 0; remaining -= 1) {
+        profiler.recordDiagnosticCounter?.(labels[i], 1);
+      }
+    }
+  }
+
   groundDecalDiagnostics() {
     return this._groundDecals?.diagnostics?.() || {
       totalStamped: 0,

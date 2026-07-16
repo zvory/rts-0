@@ -3,6 +3,18 @@ import { hexToInt, lightenColor } from "../shared.js";
 import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
+const SVG_RIG_DIAGNOSTIC_LABELS = Object.freeze([
+  "renderer.rig.redraw.skipped.hidden",
+  "renderer.rig.redraw.attempted",
+  "renderer.rig.redraw.skipped.unchanged",
+  "renderer.graphics.clear.liveRigPart",
+  "renderer.rig.redraw.completed",
+]);
+const SVG_RIG_HIDDEN = 0;
+const SVG_RIG_ATTEMPTED = 1;
+const SVG_RIG_UNCHANGED = 2;
+const SVG_RIG_CLEAR = 3;
+const SVG_RIG_COMPLETED = 4;
 
 export function createDefaultPixiFactory(pixi = globalThis.PIXI) {
   return {
@@ -62,6 +74,9 @@ function renderLiveUnitRigRoute(renderer, entity, definition, context, route, op
   instance.update(entity, context, {
     sampledAnimation: options.sampledAnimation,
     diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
+    diagnosticBatch: typeof renderer._recordKnownRenderDiagnostics === "function"
+      ? (labels, counts) => renderer._recordKnownRenderDiagnostics(labels, counts)
+      : null,
   });
   return instance;
 }
@@ -77,6 +92,7 @@ export class UnitRigInstance {
     this._routeParts = routeParts ? new Set(routeParts) : null;
     this._routePartKey = partSelectionKey(this._routeParts);
     this._animationStage = createRigAnimationStage(definition, { includeParts: this._routeParts });
+    this._diagnosticCounts = new Uint32Array(SVG_RIG_DIAGNOSTIC_LABELS.length);
     this._destroyed = false;
 
     for (const part of definition.parts || []) {
@@ -112,15 +128,18 @@ export class UnitRigInstance {
 
     const includeParts = this._routeParts ?? normalizedPartSet(options.includeParts);
     const sampled = options.sampledAnimation ?? sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    const diagnosticCounts = this._diagnosticCounts;
+    diagnosticCounts.fill(0);
     for (const [partId, rec] of this.parts) {
       const partState = sampled.parts[partId];
       if (!partState || (includeParts && !includeParts.has(partId))) {
         rec.display.visible = false;
-        options.diagnostics?.("renderer.rig.redraw.skipped.hidden");
+        diagnosticCounts[SVG_RIG_HIDDEN] += 1;
         continue;
       }
-      applyPartState(rec, partState, sampled.context, options.diagnostics);
+      applyPartState(rec, partState, sampled.context, diagnosticCounts);
     }
+    flushDiagnosticCounts(options, SVG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }
 
   destroy() {
@@ -135,11 +154,11 @@ export class UnitRigInstance {
   }
 }
 
-function applyPartState(rec, state, context, diagnostics = null) {
+function applyPartState(rec, state, context, diagnosticCounts) {
   const { display, definition: part } = rec;
   display.visible = state.visible;
   if (!state.visible) {
-    diagnostics?.("renderer.rig.redraw.skipped.hidden");
+    diagnosticCounts[SVG_RIG_HIDDEN] += 1;
     return;
   }
 
@@ -149,7 +168,7 @@ function applyPartState(rec, state, context, diagnostics = null) {
   const tintStroke = tintStrokeForSlot(state.tintSlot, teamColor);
   const geometryScaleX = state.geometryScale?.x ?? 1;
   const geometryScaleY = state.geometryScale?.y ?? 1;
-  diagnostics?.("renderer.rig.redraw.attempted");
+  diagnosticCounts[SVG_RIG_ATTEMPTED] += 1;
   const appearance = rec.appearance;
   if (
     appearance.initialized &&
@@ -158,19 +177,32 @@ function applyPartState(rec, state, context, diagnostics = null) {
     appearance.geometryScaleX === geometryScaleX &&
     appearance.geometryScaleY === geometryScaleY
   ) {
-    diagnostics?.("renderer.rig.redraw.skipped.unchanged");
+    diagnosticCounts[SVG_RIG_UNCHANGED] += 1;
     return;
   }
 
   display.clear?.();
-  diagnostics?.("renderer.graphics.clear.liveRigPart");
+  diagnosticCounts[SVG_RIG_CLEAR] += 1;
   drawPart(display, part.geometry, part.paint, tintFill, tintStroke, geometryScaleX, geometryScaleY);
   appearance.initialized = true;
   appearance.tintFill = tintFill;
   appearance.tintStroke = tintStroke;
   appearance.geometryScaleX = geometryScaleX;
   appearance.geometryScaleY = geometryScaleY;
-  diagnostics?.("renderer.rig.redraw.completed");
+  diagnosticCounts[SVG_RIG_COMPLETED] += 1;
+}
+
+function flushDiagnosticCounts(options, labels, counts) {
+  if (typeof options.diagnosticBatch === "function") {
+    options.diagnosticBatch(labels, counts);
+    return;
+  }
+  if (typeof options.diagnostics !== "function") return;
+  for (let i = 0; i < labels.length; i += 1) {
+    for (let remaining = counts[i]; remaining > 0; remaining -= 1) {
+      options.diagnostics(labels[i], 1);
+    }
+  }
 }
 
 function applyDisplayTransform(rec, state) {

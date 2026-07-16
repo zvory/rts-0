@@ -371,6 +371,48 @@ test("rig runtime reuses part graphics when only transforms change", () => {
   instance.destroy();
 });
 
+test("rig runtime batches the same diagnostic samples as the per-part callback path", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const perSampleInstance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
+  const batchedInstance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
+  const entity = {
+    id: 14,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 24,
+    y: 32,
+    facing: 0,
+    hp: 20,
+    maxHp: 30,
+  };
+  const context = createRigRenderContext(entity, {
+    now: fixedNow,
+    colorByOwner: new Map([[1, 0x225588]]),
+  });
+  const perSample = [];
+  const batched = [];
+  const batchOptions = {
+    diagnosticBatch(labels, counts) {
+      for (let i = 0; i < labels.length; i += 1) {
+        for (let sample = 0; sample < counts[i]; sample += 1) batched.push(labels[i]);
+      }
+    },
+  };
+
+  perSampleInstance.update(entity, context, { diagnostics: (label) => perSample.push(label) });
+  batchedInstance.update(entity, context, batchOptions);
+  perSampleInstance.update(entity, context, { diagnostics: (label) => perSample.push(label) });
+  batchedInstance.update(entity, context, batchOptions);
+
+  assert.deepEqual(
+    batched.toSorted(),
+    perSample.toSorted(),
+    "local SVG counts must flush every attempted, unchanged, hidden, clear, and completed sample",
+  );
+  perSampleInstance.destroy();
+  batchedInstance.destroy();
+});
+
 test("rig runtime can update one routed part group", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
@@ -736,6 +778,10 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
     state: STATE.IDLE,
   };
   const renderer = makeRigRenderer();
+  const diagnosticBatches = [];
+  renderer._recordKnownRenderDiagnostics = (labels, counts) => {
+    diagnosticBatches.push({ labels: [...labels], counts: [...counts] });
+  };
   let contextCallCount = 0;
   renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
   renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
@@ -768,6 +814,19 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("sprite.barrel").display.rotation, Math.PI / 2);
+  const pngDiagnosticCounts = new Map();
+  for (const batch of diagnosticBatches) {
+    for (let i = 0; i < batch.labels.length; i += 1) {
+      if (!batch.labels[i].startsWith("renderer.pngRig.redraw.")) continue;
+      pngDiagnosticCounts.set(batch.labels[i], (pngDiagnosticCounts.get(batch.labels[i]) || 0) + batch.counts[i]);
+    }
+  }
+  assert.equal(
+    (pngDiagnosticCounts.get("renderer.pngRig.redraw.completed") || 0)
+      + (pngDiagnosticCounts.get("renderer.pngRig.redraw.skipped.hidden") || 0),
+    unit.parts.size,
+    "PNG rig batches account for exactly one redraw diagnostic per sprite",
+  );
 });
 
 test("PNG route coverage keeps mutable and Set part selections independent", () => {
