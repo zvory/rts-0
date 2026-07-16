@@ -249,7 +249,7 @@ pub const UNITS: &[UnitDef] = &[
         stats: balance::UnitStats {
             hp: 100,
             dmg: 6,
-            range_tiles: 7,
+            range_tiles: 6,
             cooldown: 6,
             speed: 2.35,
             sight_tiles: 15,
