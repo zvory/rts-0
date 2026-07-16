@@ -32,12 +32,12 @@ import {
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
+import { UNDER_ATTACK_ID } from "./alerts.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
-const PING_MS = 900;
+const DEFAULT_PING_MS = 900;
 const UNDER_ATTACK_PING_MS = 1100;
-const UNDER_ATTACK_ALERT_ID = "under_attack";
 const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
 const ALERT_PING_INNER_RIM_INSET_PX = 2;
 const BORDER_PULSE_MS = 700;
@@ -863,7 +863,7 @@ export class Minimap {
       (ping) => now - ping.startedAt < this._pingDurationMs(ping),
     );
     for (const ping of this._pings) {
-      const isUnderAttack = ping.alertId === UNDER_ATTACK_ALERT_ID;
+      const isUnderAttack = ping.alertId === UNDER_ATTACK_ID;
       const t = (now - ping.startedAt) / this._pingDurationMs(ping);
       const p = this._worldToCanvas(ping.x, ping.y);
       const radius = 4 + 15 * t;
@@ -895,7 +895,7 @@ export class Minimap {
   }
 
   _pingDurationMs(ping) {
-    return ping.alertId === UNDER_ATTACK_ALERT_ID ? UNDER_ATTACK_PING_MS : PING_MS;
+    return ping.alertId === UNDER_ATTACK_ID ? UNDER_ATTACK_PING_MS : DEFAULT_PING_MS;
   }
 
   _drawArtilleryFiringMarkers(now) {
