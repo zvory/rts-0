@@ -12,6 +12,7 @@ import { _sweep } from "../client/src/renderer/layers.js";
 import {
   createLiveRigDefinitions,
   liveRigKeyForEntity,
+  liveRigRoutePlanFor,
   liveRigRoutesFor,
 } from "../client/src/renderer/rigs/live_routing.js";
 import { compileVisualUnitRigCandidates } from "../client/src/renderer/rigs/visual_override_rigs.js";
@@ -517,6 +518,57 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
   assert.equal(tankRoutes.length, 3);
   assert.deepEqual(tankRoutes[2].parts, ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
+});
+
+test("production rig route plans intern stable routes and part unions", () => {
+  const first = liveRigRoutePlanFor(KIND.TANK);
+  const second = liveRigRoutePlanFor(KIND.TANK, { visualOverride: { definition: {} } });
+  assert.strictEqual(second, first);
+  assert.strictEqual(liveRigRoutesFor(KIND.TANK), first.routes);
+  assert.equal(first.allParts.has("part.shadow"), true);
+  assert.equal(first.allParts.has("part.turret"), true);
+  assert.equal(first.allParts.has("part.tank.flashGlow"), true);
+  assert.deepEqual(first.poolNames, ["liveUnitRigShadows", "liveUnitRigs", "liveUnitRigEffects"]);
+
+  const shotPools = {
+    shadow: "shotRevealShadows",
+    unit: "shotReveals",
+    effects: "shotReveals",
+    liveRigShadow: "liveShotRevealRigShadows",
+    liveRigUnit: "liveShotRevealRigs",
+    liveRigOverlay: "liveShotRevealRigOverlays",
+    liveRigEffects: "liveShotRevealRigEffects",
+  };
+  const shot = liveRigRoutePlanFor(KIND.TANK, shotPools);
+  assert.strictEqual(liveRigRoutePlanFor(KIND.TANK, shotPools), shot);
+  assert.notStrictEqual(shot, first);
+  assert.deepEqual(shot.poolNames, [
+    "liveShotRevealRigShadows",
+    "liveShotRevealRigs",
+    "liveShotRevealRigEffects",
+  ]);
+});
+
+test("stable production route masks do not probe inactive rig pools every draw", () => {
+  class CountedMap extends Map {
+    get(key) {
+      this.getCount = (this.getCount || 0) + 1;
+      return super.get(key);
+    }
+  }
+
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 91, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
+  renderer._liveRigPools.liveUnitRigOverlays = new CountedMap();
+  renderer._liveRigPools.liveUnitRigEffects = new CountedMap();
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
+
+  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.getCount || 0, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.getCount || 0, 0);
 });
 
 test("default Worker draw uses live SVG rig without enabling comparison", () => {

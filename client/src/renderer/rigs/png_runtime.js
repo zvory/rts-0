@@ -13,44 +13,54 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
   if (!definition || !atlas || !atlasTexture) return null;
   const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
-  const rendered = [];
-  for (const route of options.routes || []) {
-    if (!options.routesCovered && !pngAtlasCanRenderRoute(definition, atlas, route)) continue;
-    const pool = renderer._liveRigPools?.[route.poolName];
-    if (!pool) continue;
-    let instance = pool.get(entity.id);
-    if (instance && !instance.matchesPngAtlasRig?.(entity.kind, definition, atlas, atlasTexture, route.parts)) {
-      instance.destroy?.();
-      pool.delete(entity.id);
-      instance = null;
-      renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.rebuilt.${route.poolName}`);
+  const rendered = options.collectResults === false ? null : [];
+  if (options.route) {
+    const instance = renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture, context, options.route, options);
+    if (instance && rendered) rendered.push(instance);
+  } else {
+    for (const route of options.routes || []) {
+      const instance = renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture, context, route, options);
+      if (instance && rendered) rendered.push(instance);
     }
-    if (!instance) {
-      instance = new PngAtlasRigInstance(
-        entity.kind,
-        definition,
-        atlas,
-        atlasTexture,
-        renderer._rigPixiFactory ?? createDefaultPngPixiFactory(),
-        { includeParts: route.parts },
-      );
-      renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.created.${route.poolName}`);
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigContainer");
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigPart", instance.parts?.size || 0);
-    } else {
-      renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.reused.${route.poolName}`);
-    }
-    pool.set(entity.id, instance);
-    renderer._seen[route.poolName]?.add(entity.id);
-    const layer = renderer.layers[route.layerName];
-    if (!instance.container.parent && layer) layer.addChild(instance.container);
-    instance.update(entity, context, {
-      sampledAnimation: options.sampledAnimation,
-      diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
-    });
-    rendered.push(instance);
   }
   return rendered;
+}
+
+function renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture, context, route, options) {
+  if (!options.routesCovered && !pngAtlasCanRenderRoute(definition, atlas, route)) return null;
+  const pool = renderer._liveRigPools?.[route.poolName];
+  if (!pool) return null;
+  let instance = pool.get(entity.id);
+  if (instance && !instance.matchesPngAtlasRig?.(entity.kind, definition, atlas, atlasTexture, route.parts)) {
+    instance.destroy?.();
+    pool.delete(entity.id);
+    instance = null;
+    renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.rebuilt.${route.poolName}`);
+  }
+  if (!instance) {
+    instance = new PngAtlasRigInstance(
+      entity.kind,
+      definition,
+      atlas,
+      atlasTexture,
+      renderer._rigPixiFactory ?? createDefaultPngPixiFactory(),
+      { includeParts: route.parts },
+    );
+    renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.created.${route.poolName}`);
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigContainer");
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigPart", instance.parts?.size || 0);
+  } else {
+    renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.reused.${route.poolName}`);
+  }
+  pool.set(entity.id, instance);
+  renderer._seen[route.poolName]?.add(entity.id);
+  const layer = renderer.layers[route.layerName];
+  if (!instance.container.parent && layer) layer.addChild(instance.container);
+  instance.update(entity, context, {
+    sampledAnimation: options.sampledAnimation,
+    diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
+  });
+  return instance;
 }
 
 export function pngAtlasCanRenderRoute(definition, atlas, route) {

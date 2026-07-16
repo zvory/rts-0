@@ -19,41 +19,51 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
   if (!definition) return null;
   const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
-  const rendered = [];
-  for (const route of options.routes || []) {
-    const pool = renderer._liveRigPools?.[route.poolName];
-    if (!pool) continue;
-    let instance = pool.get(entity.id);
-    if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition, route.parts))) {
-      instance.destroy();
-      pool.delete(entity.id);
-      instance = null;
-      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.rebuilt.${route.poolName}`);
+  const rendered = options.collectResults === false ? null : [];
+  if (options.route) {
+    const instance = renderLiveUnitRigRoute(renderer, entity, definition, context, options.route, options);
+    if (instance && rendered) rendered.push(instance);
+  } else {
+    for (const route of options.routes || []) {
+      const instance = renderLiveUnitRigRoute(renderer, entity, definition, context, route, options);
+      if (instance && rendered) rendered.push(instance);
     }
-    if (!instance) {
-      instance = createUnitRigInstance(
-        entity.kind,
-        definition,
-        renderer._rigPixiFactory ?? createDefaultPixiFactory(),
-        { includeParts: route.parts },
-      );
-      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigContainer");
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigPart", instance.parts?.size || 0);
-    } else {
-      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.reused.${route.poolName}`);
-    }
-    pool.set(entity.id, instance);
-    renderer._seen[route.poolName]?.add(entity.id);
-    const layer = renderer.layers[route.layerName];
-    if (!instance.container.parent && layer) layer.addChild(instance.container);
-    instance.update(entity, context, {
-      sampledAnimation: options.sampledAnimation,
-      diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
-    });
-    rendered.push(instance);
   }
   return rendered;
+}
+
+function renderLiveUnitRigRoute(renderer, entity, definition, context, route, options) {
+  const pool = renderer._liveRigPools?.[route.poolName];
+  if (!pool) return null;
+  let instance = pool.get(entity.id);
+  if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition, route.parts))) {
+    instance.destroy();
+    pool.delete(entity.id);
+    instance = null;
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.rebuilt.${route.poolName}`);
+  }
+  if (!instance) {
+    instance = createUnitRigInstance(
+      entity.kind,
+      definition,
+      renderer._rigPixiFactory ?? createDefaultPixiFactory(),
+      { includeParts: route.parts },
+    );
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigContainer");
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigPart", instance.parts?.size || 0);
+  } else {
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.reused.${route.poolName}`);
+  }
+  pool.set(entity.id, instance);
+  renderer._seen[route.poolName]?.add(entity.id);
+  const layer = renderer.layers[route.layerName];
+  if (!instance.container.parent && layer) layer.addChild(instance.container);
+  instance.update(entity, context, {
+    sampledAnimation: options.sampledAnimation,
+    diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
+  });
+  return instance;
 }
 
 export class UnitRigInstance {

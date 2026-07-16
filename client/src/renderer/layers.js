@@ -120,5 +120,8 @@ export function _sweep() {
       }
     }
   }
-  for (const id of evict) this._unseen.delete(id);
+  for (const id of evict) {
+    this._unseen.delete(id);
+    for (const tracker of this._activeUnitRigPoolMasks?.values?.() || []) tracker.delete(id);
+  }
 }
