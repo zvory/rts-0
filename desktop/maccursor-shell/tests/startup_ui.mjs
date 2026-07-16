@@ -21,7 +21,7 @@ assert.match(windowsLauncher, /CARGO_TARGET_DIR=%LOCALAPPDATA%\\rts-0\\tauri-tar
 assert.match(windowsLauncher, /CARGO_BUILD_JOBS=2/);
 assert.doesNotMatch(windowsLauncher, /rts-server|server\.exe/i);
 assert.match(windowsArtifactBuilder, /"--bundles",\s*"nsis"/);
-assert.match(windowsArtifactBuilder, /unsigned-windows-nsis-playtest/);
+assert.match(windowsArtifactBuilder, /unsigned-windows-nsis/);
 assert.match(windowsArtifactBuilder, /rts-server\.exe/);
 assert.doesNotMatch(windowsArtifactBuilder, /targets:\s*"msi"/);
 

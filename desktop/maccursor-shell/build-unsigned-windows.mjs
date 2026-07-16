@@ -11,7 +11,7 @@ const REPO_ROOT = path.resolve(SHELL_DIR, "../..");
 const TAURI_DIR = path.join(SHELL_DIR, "src-tauri");
 const CONFIG_PATH = path.join(TAURI_DIR, "tauri.conf.json");
 const CARGO_TOML_PATH = path.join(TAURI_DIR, "Cargo.toml");
-const DEFAULT_OUTPUT_ROOT = path.join(TAURI_DIR, "target", "unsigned-playtest-windows");
+const DEFAULT_OUTPUT_ROOT = path.join(TAURI_DIR, "target", "unsigned-windows");
 const BUILD_CONFIG_OVERRIDE = { bundle: { active: true, targets: "nsis" } };
 const RELEASE_PROFILES = [
   { id: "beta", label: "Beta", url: "https://rts-0-zvorygin-beta.fly.dev/" },
@@ -134,7 +134,7 @@ function forbiddenMatches(root) {
 function writeReadme(filePath, manifest) {
   fs.writeFileSync(
     filePath,
-    `# Bewegungskrieg unsigned Windows playtest installer
+    `# Bewegungskrieg unsigned Windows installer
 
 Artifact: \`${manifest.artifact.installerName}\`
 Built: ${manifest.createdAt}
@@ -143,7 +143,7 @@ Architecture: \`${manifest.target.arch}\`
 Shell version: \`${manifest.shell.version}\`
 SHA-256: \`${manifest.artifact.sha256}\`
 
-This first-playtest installer is **unsigned**. Windows SmartScreen may show
+This installer is **unsigned**. Windows SmartScreen may show
 **Windows protected your PC**. Verify the SHA-256 value first, then choose
 **More info > Run anyway** only if the checksum matches the GitHub Release.
 
@@ -246,7 +246,7 @@ function main() {
     schemaVersion: 1,
     createdAt: buildStartedAt,
     artifact: {
-      kind: "unsigned-windows-nsis-playtest",
+      kind: "unsigned-windows-nsis",
       name: artifactName,
       installerName,
       sha256: installerSha256,

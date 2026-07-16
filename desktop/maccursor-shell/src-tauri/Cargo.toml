@@ -1,8 +1,8 @@
 [package]
 name = "maccursor-shell"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
-description = "Tauri shell for Bewegungskrieg release-channel playtests"
+description = "Tauri shell for the Bewegungskrieg Windows client"
 publish = false
 
 [build-dependencies]

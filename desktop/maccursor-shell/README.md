@@ -128,7 +128,7 @@ Use `./build-unsigned.mjs --output <dir>` to write the artifact somewhere else.
 
 ## Unsigned Windows artifact
 
-Build the first-playtest NSIS installer from Windows PowerShell or Command Prompt:
+Build the unsigned NSIS installer from Windows PowerShell or Command Prompt:
 
 ```powershell
 node .\build-unsigned-windows.mjs
@@ -143,7 +143,7 @@ $env:CARGO_BUILD_JOBS = '1'
 cmd.exe /d /c "pushd \\wsl.localhost\Ubuntu\home\alex\dev\rts-0\desktop\maccursor-shell && node build-unsigned-windows.mjs"
 ```
 
-Output defaults to `src-tauri/target/unsigned-playtest-windows/`. The artifact directory contains
+Output defaults to `src-tauri/target/unsigned-windows/`. The artifact directory contains
 the unsigned x64 NSIS setup executable, its SHA-256 checksum, `manifest.json`, playtester `README.md`,
 and `contents.txt`. The builder fails if Tauri config adds external binaries/resources or the
 artifact exposes server, client, map, Lab-scenario, or match-history payloads.
@@ -172,6 +172,13 @@ navigation start/finish/rejection/timeout, native cursor capture start/failure,
 and desktop autostart/autolock failures. URLs are logged without query strings
 or fragments. The shell does not upload logs, record gameplay commands, collect
 telemetry, or include secrets intentionally.
+
+Installed-app Pointer Lock attempts also emit bounded `pointer_lock_*` lifecycle
+records for support detection, focus preparation, raw request invocation,
+promise/event completion, lock-element changes, failures, state transitions, and
+exit. The client retains the latest 80 records in `window.__rtsPointerLockTrace`;
+failed attempts copy that trace, the last request, and shell-write status into the
+on-screen diagnostic panel and `window.__rtsPointerLockDebug`.
 
 Manual check:
 
