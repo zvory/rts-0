@@ -35,7 +35,9 @@ import {
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
-const PING_MS = 1100;
+const PING_MS = 900;
+const UNDER_ATTACK_PING_MS = 1100;
+const UNDER_ATTACK_ALERT_ID = "under_attack";
 const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
 const ALERT_PING_INNER_RIM_INSET_PX = 2;
 const BORDER_PULSE_MS = 700;
@@ -361,13 +363,14 @@ export class Minimap {
    * @param {number} x world px
    * @param {number} y world px
    * @param {"info"|"warn"|"alert"} [severity]
+   * @param {string} [alertId] semantic alert identity, when present
    */
-  ping(x, y, severity = "alert") {
+  ping(x, y, severity = "alert", alertId = "") {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       this.pulseBorder();
       return;
     }
-    this._pings.push({ x, y, severity, startedAt: performance.now() });
+    this._pings.push({ x, y, severity, alertId, startedAt: performance.now() });
   }
 
   /** Add a globally visible short-lived artillery firing marker. */
@@ -856,9 +859,12 @@ export class Minimap {
   _drawPings(now) {
     const ctx = this.ctx;
     if (!ctx) return;
-    this._pings = this._pings.filter((p) => now - p.startedAt < PING_MS);
+    this._pings = this._pings.filter(
+      (ping) => now - ping.startedAt < this._pingDurationMs(ping),
+    );
     for (const ping of this._pings) {
-      const t = (now - ping.startedAt) / PING_MS;
+      const isUnderAttack = ping.alertId === UNDER_ATTACK_ALERT_ID;
+      const t = (now - ping.startedAt) / this._pingDurationMs(ping);
       const p = this._worldToCanvas(ping.x, ping.y);
       const radius = 4 + 15 * t;
       ctx.save();
@@ -868,7 +874,7 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.stroke();
-      if (ping.severity !== "warn") {
+      if (isUnderAttack) {
         ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -886,6 +892,10 @@ export class Minimap {
       ctx.strokeRect(1.5, 1.5, this.size - 3, this.size - 3);
       ctx.restore();
     }
+  }
+
+  _pingDurationMs(ping) {
+    return ping.alertId === UNDER_ATTACK_ALERT_ID ? UNDER_ATTACK_PING_MS : PING_MS;
   }
 
   _drawArtilleryFiringMarkers(now) {

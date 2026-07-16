@@ -16,7 +16,7 @@ function createSurfaces() {
     plays,
     toast: (text) => toasts.push(text),
     minimap: {
-      ping: (x, y, severity) => pings.push({ x, y, severity }),
+      ping: (x, y, severity, alertId) => pings.push({ x, y, severity, alertId }),
       pulseBorder: () => { borderPulses += 1; },
     },
     audio: {
@@ -56,6 +56,10 @@ function underAttack(x, y) {
   assert(presenter.present(underAttack(1100, 100)), "distinct under-attack bucket is admitted promptly");
   assert(surfaces.toasts.length === 2, "shared incident admission deduplicates toasts");
   assert(surfaces.pings.length === 2, "shared incident admission deduplicates minimap pings");
+  assert(
+    surfaces.pings.every(({ alertId }) => alertId === "under_attack"),
+    "under-attack minimap pings retain their semantic alert identity",
+  );
   assert(surfaces.plays.length === 2, "two admitted location buckets both schedule voices within 1.5 seconds");
   assert(
     surfaces.plays.every(({ id, opts }) =>

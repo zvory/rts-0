@@ -1336,7 +1336,7 @@ function pointerEvent(canvas, clientX, clientY, {
     {},
     { issueCommand() {} },
   );
-  minimap.ping(40, 60, "alert");
+  minimap.ping(40, 60, "alert", "under_attack");
   minimap._pings[0].startedAt = 100;
   minimap._drawPings(650);
 
@@ -1353,6 +1353,18 @@ function pointerEvent(canvas, clientX, clientY, {
     strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 1,
     "attack alert draws a crisp white inner stroke",
   );
+
+  canvas.context.calls.length = 0;
+  minimap._pings.length = 0;
+  minimap.ping(40, 60, "alert", "out_of_oil");
+  minimap._pings[0].startedAt = 100;
+  minimap._drawPings(550);
+  assert(
+    canvas.context.calls.filter((call) => call.op === "arc").length === 1,
+    "other positional alerts retain the generic single-ring treatment",
+  );
+  minimap._drawPings(1000);
+  assert(minimap._pings.length === 0, "generic positional alerts retain their 900 ms lifetime");
   minimap.destroy();
 }
 
