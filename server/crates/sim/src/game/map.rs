@@ -504,9 +504,20 @@ mod tests {
         for player_count in 1..=4 {
             let map = Map::load("4 Player Map", player_count, 0x1234_5678)
                 .expect("four-player map should load for every supported player count");
+            assert_eq!(map.size, 166);
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.base_sites.len(), 16);
         }
+
+        let mut four_player_starts = Map::load("4 Player Map", 4, 0x1234_5678)
+            .expect("four-player map should load all four starts")
+            .starts;
+        four_player_starts.sort_unstable();
+        assert_eq!(
+            four_player_starts,
+            vec![(29, 29), (29, 136), (136, 29), (136, 136)],
+            "four-player layout must remain centered after adding a 20-tile border"
+        );
     }
 
     #[test]
