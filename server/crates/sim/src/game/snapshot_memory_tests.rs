@@ -78,6 +78,15 @@ fn empty_flat_game_with_players(players: &[PlayerInit]) -> Game {
     game
 }
 
+fn advance_to_next_fog_refresh(game: &mut Game) {
+    loop {
+        game.tick();
+        if game.tick_count().is_multiple_of(FOG_UPDATE_INTERVAL_TICKS) {
+            break;
+        }
+    }
+}
+
 #[test]
 fn exposes_hidden_remembered_building_without_live_entity() {
     let mut game = empty_flat_game();
@@ -93,7 +102,7 @@ fn exposes_hidden_remembered_building_without_live_entity() {
         .entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("depot should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     let visible = game.snapshot_for(1);
     assert!(visible.entities.iter().any(|entity| entity.id == depot));
@@ -108,7 +117,7 @@ fn exposes_hidden_remembered_building_without_live_entity() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, far.0, far.1)
         .expect("far scout should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     let hidden = game.snapshot_for(1);
     assert!(hidden.entities.iter().all(|entity| entity.id != depot));
@@ -243,7 +252,7 @@ fn spectator_remembered_buildings_follow_selected_player_union() {
         .entities
         .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("enemy depot should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     game.state.entities.remove(p1_scout);
     let p2_scout = game
@@ -251,10 +260,10 @@ fn spectator_remembered_buildings_follow_selected_player_union() {
         .entities
         .spawn_unit(2, EntityKind::Rifleman, p2_scout_pos.0, p2_scout_pos.1)
         .expect("p2 scout should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     game.state.entities.remove(p2_scout);
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     let p1_view = game.snapshot_for_spectator(&[1]);
     let p2_view = game.snapshot_for_spectator(&[2]);
@@ -303,7 +312,7 @@ fn does_not_expose_never_scouted_building_memory() {
         .entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("depot should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     let snapshot = game.snapshot_for(1);
     assert!(snapshot.entities.iter().all(|entity| entity.id != depot));
@@ -328,7 +337,7 @@ fn keeps_destroyed_hidden_building_as_stale_intel_until_scouted() {
         .entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("depot should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     game.state.entities.remove(scout);
     let far = game.state.map.tile_center(40, 40);
@@ -336,8 +345,10 @@ fn keeps_destroyed_hidden_building_as_stale_intel_until_scouted() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, far.0, far.1)
         .expect("far scout should spawn");
+    let player_ids = game.state.player_ids();
+    game.recompute_live_fog(&player_ids);
     game.state.entities.remove(depot);
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     let stale = game.snapshot_for(1);
     assert!(stale
@@ -349,7 +360,7 @@ fn keeps_destroyed_hidden_building_as_stale_intel_until_scouted() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, depot_pos.0, depot_pos.1)
         .expect("new scout should spawn");
-    game.tick();
+    advance_to_next_fog_refresh(&mut game);
 
     let cleared = game.snapshot_for(1);
     assert!(cleared

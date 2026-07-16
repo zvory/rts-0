@@ -1,12 +1,13 @@
 //! Per-player fog of war. See `docs/design/server-sim.md` (`fog.rs`).
 //!
-//! The server is authoritative about visibility: each tick we recompute, for every player, a
-//! boolean grid of which tiles that player can currently see. A tile is visible if it falls
+//! The server is authoritative about visibility: at 15 Hz we recompute, for every player, a
+//! base boolean grid of which tiles that player can currently see. A tile is visible if it falls
 //! within the sight area of any of that player's entities (`sight_tiles`) and the line from
 //! the entity to that tile is not blocked by stone, smoke, or sight-blocking building footprints.
 //! Units stamp a circle from their body center; buildings stamp their full footprint plus
-//! `sight_tiles` around the footprint edge. Scout Planes add a separate team aerial sight pass
-//! that ignores stone and building blockers but still respects active smoke clouds. The snapshot
+//! `sight_tiles` around the footprint edge. Every simulation tick, event-driven sources are
+//! applied over that base grid: Scout Planes, lingering death vision, and firing reveals. Smoke
+//! and sight-blocking building changes wake the base refresh immediately. The snapshot
 //! layer uses this to withhold neutral/enemy entities standing on non-visible tiles, making the fog
 //! cheat-proof. During the same rebuild, firing-reveal stamps retain bounded entity-level
 //! provenance so combat can distinguish ordinary visibility from reveal-only visibility without
@@ -74,6 +75,9 @@ impl LingeringSightSource {
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Fog {
     size: u32,
+    /// Last scheduled ordinary-sight result, before event-driven visibility is applied.
+    #[serde(default)]
+    base_grids: HashMap<u32, Vec<bool>>,
     /// player id -> row-major visibility grid (`true` = visible this tick).
     grids: HashMap<u32, Vec<bool>>,
     /// Active firing-reveal provenance, rebuilt atomically with `grids`.
@@ -88,6 +92,7 @@ impl Fog {
     pub fn new(size: u32) -> Self {
         Fog {
             size,
+            base_grids: HashMap::new(),
             grids: HashMap::new(),
             firing_reveal_visibility: BTreeMap::new(),
         }
@@ -95,12 +100,20 @@ impl Fog {
 
     pub(in crate::game) fn from_checkpoint_grids(
         size: u32,
+        base_grids: BTreeMap<u32, Vec<bool>>,
         grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
+        let grids = grids.into_iter().collect::<HashMap<_, _>>();
+        let base_grids = if base_grids.is_empty() {
+            grids.clone()
+        } else {
+            base_grids.into_iter().collect()
+        };
         Fog {
             size,
-            grids: grids.into_iter().collect(),
+            base_grids,
+            grids,
             firing_reveal_visibility,
         }
     }
@@ -111,6 +124,13 @@ impl Fog {
 
     pub(in crate::game) fn checkpoint_grids(&self) -> BTreeMap<u32, Vec<bool>> {
         self.grids
+            .iter()
+            .map(|(&player, grid)| (player, grid.clone()))
+            .collect()
+    }
+
+    pub(in crate::game) fn checkpoint_base_grids(&self) -> BTreeMap<u32, Vec<bool>> {
+        self.base_grids
             .iter()
             .map(|(&player, grid)| (player, grid.clone()))
             .collect()
@@ -186,6 +206,14 @@ impl Fog {
             stamp_sight(grid, size, e, map, &los);
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
+        self.base_grids.clone_from(&self.grids);
+    }
+
+    /// Reset actionable visibility to the last ordinary-sight result before restamping
+    /// event-driven visibility sources for the current simulation tick.
+    pub(in crate::game) fn restore_base_visibility(&mut self) {
+        self.grids.clone_from(&self.base_grids);
+        self.firing_reveal_visibility.clear();
     }
 
     /// Add temporary death-vision sight sources to already-recomputed grids.
@@ -336,6 +364,7 @@ impl Fog {
         }
 
         let mut fog = Fog::new(self.size);
+        fog.base_grids.insert(viewer, union.clone());
         fog.grids.insert(viewer, union);
         fog
     }

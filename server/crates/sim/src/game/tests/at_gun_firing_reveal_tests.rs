@@ -451,6 +451,14 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
         "AT gun should remain visible through the full firing-cycle-plus-half-second window"
     );
 
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![tank],
+            target: enemy_at,
+            queued: false,
+        },
+    );
     game.tick();
     assert_eq!(
         game.tick_count(),
@@ -464,5 +472,15 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
             .iter()
             .any(|entity| entity.id == enemy_at),
         "AT gun should disappear from snapshots once the firing reveal expires"
+    );
+    assert_ne!(
+        game.state
+            .entities
+            .get(tank)
+            .expect("tank should exist")
+            .order()
+            .attack_target(),
+        Some(enemy_at),
+        "commands on the first expired reveal tick must consume refreshed event visibility"
     );
 }

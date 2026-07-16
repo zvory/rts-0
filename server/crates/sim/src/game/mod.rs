@@ -61,7 +61,7 @@ use serde::{Deserialize, Serialize};
 
 use building_memory::BuildingMemoryEntry;
 use derived_state::DerivedState;
-use entity::{BuildPhase, EntityKind, EntityStore};
+use entity::{blocks_line_of_sight, BuildPhase, EntityKind, EntityStore};
 use fog::Fog;
 use map::Map;
 pub use map::MapMetadata;
@@ -224,9 +224,20 @@ impl Game {
     ) -> Vec<(u32, Vec<Event>)> {
         self.state.tick = self.state.tick.wrapping_add(1);
         self.derived.advance_pathing_tick(self.state.tick);
+        let smoke_ids_before = self
+            .state
+            .smokes
+            .iter()
+            .map(|cloud| cloud.id)
+            .collect::<Vec<_>>();
+        let los_blockers_before = self.live_los_blocker_ids();
         self.state.smokes.retain_active(self.state.tick);
         let player_ids = self.state.player_ids();
-        self.retain_active_visibility_sources();
+        if self.retain_active_visibility_sources() {
+            crate::perf::timed(perf.as_deref_mut(), "fog_event_refresh", || {
+                self.refresh_event_live_fog();
+            });
+        }
 
         // Per-player event buckets, accumulated by the systems below.
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
@@ -280,11 +291,26 @@ impl Game {
             &mut self.state.world_combat_position,
         );
 
-        // Live fog refreshes at 15 Hz from the post-systems world state. Between refreshes,
-        // snapshots, commands, and combat all consume the same last authoritative visibility.
-        if self.state.tick % FOG_UPDATE_INTERVAL_TICKS == 0 {
+        let smoke_changed = smoke_ids_before
+            != self
+                .state
+                .smokes
+                .iter()
+                .map(|cloud| cloud.id)
+                .collect::<Vec<_>>();
+        let los_blockers_changed = los_blockers_before != self.live_los_blocker_ids();
+        // Ordinary moving sight refreshes at 15 Hz. Discrete occluder changes wake the base fog
+        // immediately, while the cheap event-visibility layer refreshes on every simulation tick.
+        if self.state.tick.is_multiple_of(FOG_UPDATE_INTERVAL_TICKS)
+            || smoke_changed
+            || los_blockers_changed
+        {
             crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
                 self.recompute_live_fog(&player_ids);
+            });
+        } else {
+            crate::perf::timed(perf.as_deref_mut(), "fog_event_refresh", || {
+                self.refresh_event_live_fog();
             });
         }
         self.refresh_building_memory(&player_ids);
@@ -577,6 +603,11 @@ impl Game {
             &self.state.map,
             &self.state.smokes,
         );
+        self.refresh_event_live_fog();
+    }
+
+    fn refresh_event_live_fog(&mut self) {
+        self.state.fog.restore_base_visibility();
         let teams = self.team_relations();
         self.state
             .fog
@@ -599,6 +630,15 @@ impl Game {
             &self.state.smokes,
         );
         self.retain_active_firing_reveal_reaction_gates();
+    }
+
+    fn live_los_blocker_ids(&self) -> Vec<u32> {
+        self.state
+            .entities
+            .iter()
+            .filter(|entity| entity.hp > 0 && blocks_line_of_sight(entity.kind))
+            .map(|entity| entity.id)
+            .collect()
     }
 
     fn retain_active_firing_reveal_reaction_gates(&mut self) {
