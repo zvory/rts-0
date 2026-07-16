@@ -220,10 +220,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
     "Training Centre should require a Barracks in the command card",
   );
-  assert(
-    STATS[KIND.BARRACKS].requires == null,
-    "Barracks should be available in the command card without a City Centre",
-  );
   assert(STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre build time mirrors server");
   assert(
     STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),

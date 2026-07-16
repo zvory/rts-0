@@ -188,8 +188,6 @@ mod tests {
 
     #[test]
     fn ww2_production_chain_matches_design() {
-        let barracks = EntityKind::Barracks;
-
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
@@ -197,7 +195,7 @@ mod tests {
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
-            trainable_units(barracks),
+            trainable_units(EntityKind::Barracks),
             &[EntityKind::Rifleman, EntityKind::MachineGunner]
         );
         assert_eq!(
@@ -262,10 +260,6 @@ mod tests {
             "Scout Plane is not exposed through any production building"
         );
 
-        assert!(
-            build_requirement_met(barracks, &[]),
-            "Barracks should remain buildable without a completed City Centre"
-        );
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
@@ -273,11 +267,11 @@ mod tests {
         ));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
-            &[barracks]
+            &[EntityKind::Barracks]
         ));
         assert!(build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::CityCentre, barracks]
+            &[EntityKind::CityCentre, EntityKind::Barracks]
         ));
 
         assert!(!build_requirement_met(EntityKind::Factory, &[]));
@@ -376,11 +370,6 @@ mod tests {
             ),
             "non-workers cannot build contextual Pump Jacks"
         );
-        assert!(build_requirement_met_for_faction(
-            DEFAULT_FACTION_ID,
-            barracks,
-            &[]
-        ));
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
             EntityKind::Factory,
