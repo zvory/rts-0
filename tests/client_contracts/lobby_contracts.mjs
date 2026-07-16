@@ -767,7 +767,8 @@ import { textWithin } from "./dom_text.mjs";
     });
     assert(textWithin(rowsRoot).includes("Refresh to load lobbies"),
       "lobby browser waits for an explicit first refresh");
-    assert(statusEl.textContent === "Not refreshed", "unrefreshed lobby browser labels its state");
+    assert(statusEl.textContent === "Not refreshed" && statusEl.hidden === false,
+      "unrefreshed lobby browser shows its state");
     view.render({
       rows: [],
       nowMs: now,
@@ -776,6 +777,15 @@ import { textWithin } from "./dom_text.mjs";
     });
     assert(statusEl.textContent === "" && statusEl.hidden,
       "a settled lobby browser hides the redundant refresh status");
+    view.render({ loading: true });
+    assert(statusEl.textContent === "Refreshing" && statusEl.hidden === false,
+      "refreshing shows the status again after the settled state hid it");
+    view.render({ error: "Lobby list unavailable." });
+    assert(statusEl.textContent === "Refresh failed" && statusEl.hidden === false,
+      "refresh failures keep the refresh status visible");
+    view.render();
+    assert(statusEl.textContent === "" && statusEl.hidden,
+      "a successful recovery hides the refresh status again");
     assert(textWithin(rowsRoot).includes("No lobbies"), "lobby browser renders compact empty state");
     findFakes(rowsRoot, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0]?.click();
     assert(createClicks === 1, "empty lobby browser create action opens the create flow");
