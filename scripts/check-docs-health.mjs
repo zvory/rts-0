@@ -5,6 +5,22 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contextLimitBytes = 5 * 1024;
+const planningPolicyFiles = ["CLAUDE.md", "docs/context/planning.md", "plans/README.md"];
+const phaseNumber = "(?:one|two|three|four|five|six|seven|eight|nine|ten|\\d+)";
+const fixedPhaseLimitPatterns = [
+  new RegExp(
+    `\\b(?:no more than|at most|maximum of|exactly)\\s+${phaseNumber}\\s+(?:executable\\s+|implementation\\s+)?phases?\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b(?:limit|restrict|cap)\\s+(?:[\\w-]+\\s+){0,4}?(?:to|at)\\s+${phaseNumber}\\s+(?:executable\\s+|implementation\\s+)?phases?\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b(?:name|plan|include|create|have)\\s+only\\s+(?:the\\s+next\\s+)?${phaseNumber}(?:\\s+or\\s+${phaseNumber})?\\s+(?:evidence-backed\\s+|executable\\s+|implementation\\s+)?phases?\\b`,
+    "i"
+  ),
+];
 const errors = [];
 
 function repoPath(...parts) {
@@ -121,6 +137,21 @@ function validateContextCapsuleSizes() {
   }
 }
 
+function validatePlanningPolicyHasNoFixedPhaseLimit() {
+  for (const relPath of planningPolicyFiles) {
+    const text = readFileSync(repoPath(relPath), "utf8");
+    for (const pattern of fixedPhaseLimitPatterns) {
+      const match = pattern.exec(text);
+      if (match) {
+        const line = text.slice(0, match.index).split("\n").length;
+        addError(
+          `${relPath}:${line} imposes a fixed phase-count limit; let actual scope determine the phase count`
+        );
+      }
+    }
+  }
+}
+
 function stripMarkdownLinkTarget(rawTarget) {
   const trimmed = rawTarget.trim();
   if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
@@ -176,6 +207,7 @@ function validateMarkdownLinks() {
 
 validateDocMap();
 validateContextCapsuleSizes();
+validatePlanningPolicyHasNoFixedPhaseLimit();
 validateMarkdownLinks();
 
 if (errors.length > 0) {

@@ -30,14 +30,14 @@ Each phase document should describe its scope, expected code or documentation to
 verification, manual testing focus, and handoff expectations. When a phase is complete, mark that
 phase document as done in the implementation commit for that phase.
 
-## Pre-alpha plans
+## Scope-driven pre-alpha plans
 
 Pre-alpha and experimental plans should put a playable or inspectable result before broad
 hardening. Keep only expensive-to-reverse architecture and authority/security invariants on the
-critical path, and name no more than three executable phases before a user playtest or measured
-checkpoint. Record speculative performance, parity, content, device, and certification ideas in a
-short deferred backlog; do not create runnable phase files for them until current evidence justifies
-the work.
+critical path, but let the actual evidence-backed scope determine how many executable phases the
+plan needs. Use a playtest or measured checkpoint where it materially reduces risk, and record
+genuinely speculative performance, parity, content, device, and certification ideas in a short
+deferred backlog instead of treating that backlog as overflow from a numeric phase cap.
 
 The phase runner executes approved phase files exactly as written. It must not turn a deferred
 backlog into an implementation chain or infer additional hardening phases.
