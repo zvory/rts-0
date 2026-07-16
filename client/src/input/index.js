@@ -351,6 +351,8 @@ export class Input {
     return this.clientIntent;
   }
 
+  isShiftHeld() { return this._shiftKeyDown; }
+
   _commandTarget() {
     return this._intent()?.commandTarget;
   }
@@ -391,6 +393,7 @@ export class Input {
   update(dt) {
     void dt;
     this._flushPointerLockCursor();
+    if (this.inputRouter?.activePreviewSurface?.()) return;
     if (this._labTool()) {
       this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);

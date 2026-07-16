@@ -266,6 +266,7 @@ import {
   const router = new MatchInputRouter(viewport);
   const leaves = [];
   router.registerZone({
+    previewSurface: "minimap",
     contains: (ev) => ev.clientX < 200,
     pointerDown: () => true,
     pointerMove: () => false,
@@ -274,6 +275,7 @@ import {
   });
 
   router.pointerMove({ clientX: 100, clientY: 100, source: "locked" });
+  assert(router.activePreviewSurface() === "minimap", "router exposes the hovered preview surface");
   router.pointerDown({ clientX: 100, clientY: 100, source: "locked" });
   assert(!router.releaseSource("dom"), "a different event source cannot release routed ownership");
   assert(router.releaseSource("locked"), "the ending event source releases routed ownership");
@@ -283,6 +285,25 @@ import {
   );
   assert(!router.pointerMove({ clientX: 500, clientY: 500, source: "locked" }),
     "released source no longer retains pointer capture");
+  assert(router.activePreviewSurface() === null, "source release relinquishes preview-surface ownership");
+
+  router.pointerDown({ clientX: 100, clientY: 100, source: "locked" });
+  assert(router.activePreviewSurface() === "minimap", "pointerDown alone establishes preview-surface ownership");
+  router.pointerUp({ clientX: 100, clientY: 100, source: "locked" });
+}
+
+{
+  const calls = [];
+  const coveredInput = Object.create(Input.prototype);
+  coveredInput.inputRouter = { activePreviewSurface: () => "minimap" };
+  coveredInput._flushPointerLockCursor = () => calls.push("cursor");
+  coveredInput._refreshAttackTargetPreview = () => calls.push("attack");
+  coveredInput._refreshResourceMiningPreview = () => calls.push("resource");
+  coveredInput._refreshAbilityTargetPreview = () => calls.push("ability");
+  coveredInput._refreshPlacement = () => calls.push("placement");
+  coveredInput._refreshLabToolPreview = () => calls.push("lab");
+  coveredInput.update(0);
+  assert(calls.join(",") === "cursor", "minimap ownership prevents viewport-underlay preview refreshes");
 }
 
 // ---------------------------------------------------------------------------

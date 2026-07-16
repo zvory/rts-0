@@ -52,7 +52,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       }
     });
     if (!capture) time("match.input", () => match.input.update(dt));
-    time("match.minimapIntent", () => match.minimap.updateCommandTargetPreview?.());
+    time("match.minimapIntent", () => match.minimap.updateCommandTargetPreview?.(match.input?.isShiftHeld?.() === true));
     time("match.predictionVisual", () => match.advancePredictionVisual());
     const frameViews = time(
       "match.frameEntityViews",
@@ -83,6 +83,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       "match.rendererFeedbackView",
       () => buildRendererFeedbackView(match.state, {
         clientIntent: match.clientIntent,
+        previewSurface: match.inputRouter?.activePreviewSurface?.(),
         entities: frameViews.interpolatedEntities,
         selectedEntities: frameViews.selectedEntities,
         now: visualTimeMs,

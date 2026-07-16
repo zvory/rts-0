@@ -251,7 +251,7 @@ export class Minimap {
     };
     this._onCanvasPointerDown = this._handleCanvasPointerDown.bind(this);
     this._onCanvasPointerMove = this._handleCanvasPointerMove.bind(this);
-    this._onCanvasPointerLeave = this._clearSetupPreviewHover.bind(this);
+    this._onCanvasPointerLeave = () => this.inputRouter?.releaseSource?.("dom") || this._clearSetupPreviewHover();
     this._onCanvasPointerUp = this._handleCanvasPointerUp.bind(this);
     this._onCanvasPointerCancel = this._handleCanvasPointerCancel.bind(this);
     this._onWindowBlur = this._handleWindowBlur.bind(this);
@@ -1039,18 +1039,18 @@ export class Minimap {
     );
   }
 
-  updateCommandTargetPreview() {
+  updateCommandTargetPreview(shiftKey = this._hoverShiftKey) {
     if (this._intent()?.commandTarget !== "setupAntiTankGuns") {
       this._clearMinimapSetupPreview();
       return false;
     }
     if (!this._hoverWorld) return false;
-    return this._refreshSetupPreviewAt(this._hoverWorld.x, this._hoverWorld.y, this._hoverShiftKey);
+    return this._refreshSetupPreviewAt(this._hoverWorld.x, this._hoverWorld.y, shiftKey);
   }
 
   inputZone() {
     return {
-      priority: 100,
+      priority: 100, previewSurface: "minimap",
       contains: (ev) => this._containsClientPoint(ev.clientX, ev.clientY),
       pointerDown: (ev) => this._handlePointerDown(ev),
       pointerMove: (ev) => this._handlePointerMove(ev),
@@ -1088,6 +1088,7 @@ export class Minimap {
   }
 
   _handleCanvasPointerDown(ev) {
+    this.inputRouter?.pointerMove(this._routerEvent(ev, "dom"));
     if (this._activePointerGesture) {
       // A second contact is a pinch or multi-touch inspection, never a target tap.
       if (this._activePointerGesture.pointerId !== ev.pointerId) this._cancelActivePointerGesture();
@@ -1158,7 +1159,7 @@ export class Minimap {
 
   _handleCanvasPointerMove(ev) {
     const gesture = this._activePointerGesture;
-    if (!gesture) return this._handlePointerMove(this._routerEvent(ev, "dom"));
+    if (!gesture) return this.inputRouter ? this.inputRouter.pointerMove(this._routerEvent(ev, "dom")) : this._handlePointerMove(this._routerEvent(ev, "dom"));
     if (gesture.pointerId !== ev.pointerId) return;
     if (!gesture.moved && this._gestureMovedBeyondTapSlop(gesture, ev)) {
       gesture.moved = true;
@@ -1242,8 +1243,8 @@ export class Minimap {
   _cancelActivePointerGesture() {
     const gesture = this._activePointerGesture;
     if (gesture) this._releasePointer(gesture.pointerId);
-    this._activePointerGesture = null;
-    this._dragging = false;
+    this._activePointerGesture = null; this._dragging = false;
+    this.inputRouter?.releaseSource?.("dom");
     this._clearSetupPreviewHover();
   }
 
