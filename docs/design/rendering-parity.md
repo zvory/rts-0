@@ -7,6 +7,7 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 
 - `shared external` — intentionally outside the world renderer.
 - `complete` — the backend supports the full capability named by the row.
+- `partial` — a useful subset exists, but named gameplay cases are still absent.
 - `representative` — one bounded real example validates the architecture.
 - `placeholder` — truthful generic coverage, not visual parity.
 - `missing` — not implemented.
@@ -19,18 +20,24 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 | One Match-owned rAF and visual clock | complete | complete | Babylon calls `scene.render()` only from the Match frame seam. |
 | Semantic camera/projection | complete | complete | Fixed perspective and scene-camera coefficients share one snapshot. |
 | Perspective-safe selection/marquee/ground hits | complete | complete | Shared `SelectionSceneV1` receives the selected camera projection. |
-| Detached fog-filtered presentation frame | complete | complete | Babylon reads only `PresentationFrameV1`. |
+| Detached fog-filtered dynamic presentation | complete | complete | Babylon's render path reads only `PresentationFrameV1`. |
+| Babylon backend construction isolation | n/a | missing | Match currently passes Babylon the broad mutable Pixi-oriented source bag even though the adapter uses only its profiler hook. |
 | Default Pixi and explicit lazy Babylon selector | complete | complete | `rtsRenderer=babylon` is live-player/Lab-only and lazy; replay/spectator matches stay Pixi. |
-| Static ground and generic scene | complete | representative | Phase 4 authoritative Lab kernel capture. |
+| Narrow detached static-map delivery | complete | missing | Babylon is passed a broad source bag containing a static-map callback but has no safe narrow contract and does not consume the data. |
+| Terrain and resource-site readability | complete | missing | Babylon draws one flat map-bounds plane and does not present terrain classes or static resource sites. |
 | Current/explored fog, memory, intel, and reveals | complete | complete | Revisioned grids, separated presentation layers, and two-recipient secrecy check. |
-| Generic entities, selection/HP, basic command feedback | complete | placeholder | Shared generic geometry/materials plus selection, bars, marquee, move/target, and placement cues. |
+| Generic entity presence, team, selection, HP, and progress | complete | placeholder | Shared boxes and bars truthfully cover every received entity but are not kind-readable. |
+| Unit/building kind, facing, weapon, and setup readability | complete | missing | Babylon does not visibly distinguish most kinds and ignores weapon-facing/setup presentation. |
+| Entity-backed ability, weapon, and fuel-status cues | complete | missing | Active auras, loaded/active states, and low-oil feedback have no Babylon representation. |
+| Basic move/attack/build interaction feedback | complete | partial | Marquee, selected order lines, command/attack markers, and placement footprints work; rallies, ranges/arcs, and specialized target/setup previews are absent. |
+| Trenches, smoke, and ability objects | complete | missing | These gameplay-significant frame records are currently ignored by Babylon. |
+| Existing command, ability, and combat feedback catalog | complete | missing | Smoke, mortar, artillery, panzerfaust, muzzle, miss, resource, support-weapon, ability, and Lab feedback still render only in Pixi. |
 | HUD, minimap, lobby, panels, audio, control groups | shared external | shared external | Existing shared surfaces. |
-| One representative trusted asset | complete | missing | Phase 6 representative, not catalog parity. |
-| One normalized finite attack effect | placeholder | missing | Phase 6 representative event spine. |
-| Long-tail effects/overlays and faction art | complete | deferred | Future playtest-driven content plans. |
-| Replay/spectator Babylon routes | complete | deferred | Future product need. |
+| Cosmetic decals, observer/debug overlays, and faction art | complete | deferred | Not required for the primitive live-player cutover unless playtest evidence shows a blocker. |
+| Replay/spectator Babylon routes | complete | deferred | Future product need; these routes stay Pixi and must not load or depend on Babylon. |
 | Benchmarks, pools, vegetation, shadows, quality tiers | n/a | deferred | Add only from measured need. |
-| Babylon default / Pixi removal | complete | deferred | Separate reviewed rollout decision. |
+| Babylon live/Lab default with explicit Pixi rollback | complete | missing | Final step after a real playtest and a no-selector live canary; selector/fallback checks must prove Pixi routes do not load Babylon. |
+| Pixi removal | complete | deferred | Keep Pixi for rollback and replay/spectator until a later product decision. |
 
 ## Completed shared-boundary evidence
 
@@ -65,13 +72,15 @@ conversion, Match-owned presentation, resize, bounded failure, and idempotent cl
 at that checkpoint drew only the authoritative map bounds and bounded visible generic primitives;
 fog and playable feedback were intentionally left to Phase 5.
 
-### `P5-playable-fog-interaction`
+### `P5-fog-interaction-slice`
 
 Babylon kernel and real two-recipient contracts prove revisioned current/explored fog, explicit
 memory/intel/reveal categories, aggregate-only diagnostics, generic entity state, minimal command
 feedback, and absence of a never-authorized sentinel from the presentation frame, scene, selection
 candidates, and diagnostics. Shared perspective selection remains mesh-independent; live-player
-and Lab routes are explicit while Pixi stays the default and owns replay/spectator rendering.
+and Lab routes are explicit while Pixi stays the default and owns replay/spectator rendering. This
+proved the control and secrecy slice; it did not make terrain, entity identity, gameplay zones, or
+the existing feedback catalog readable enough for a normal live-renderer cutover.
 
 ## Evidence policy
 
@@ -79,6 +88,6 @@ Each remaining phase records only the commands and inspected Lab capture that co
 risk. Manual review is appropriate for visual readability; automated checks remain required for
 authority/secrecy, projection agreement, and loop/teardown ownership.
 
-After Phase 5, a real playtest decides whether Phase 6 remains the next priority. After Phase 6,
-archive the plan. Missing/deferred rows create no automatic phase and do not authorize a default
-switch.
+The active plan in `plans/render3d/` owns the primitive playable catch-up and live-player cutover.
+Missing or deferred rows outside that plan create no automatic phase, and visual fidelity is not a
+cutover requirement.
