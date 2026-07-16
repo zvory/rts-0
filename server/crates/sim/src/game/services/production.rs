@@ -75,10 +75,7 @@ pub(crate) fn production_system(
                     .is_none_or(|required| player.upgrades.contains(&required));
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
-                let supply_available = player
-                    .supply_used
-                    .checked_add(supply)
-                    .is_some_and(|used| used <= player.supply_cap);
+                let supply_available = player.can_reserve_supply(supply);
                 if upgrade_met && supply_available && player.spend_cost(cost) {
                     if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
@@ -143,10 +140,7 @@ pub(crate) fn production_system(
             let cost = rules::economy::resource_cost(unit);
             let supply = rules::economy::supply_cost(unit);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                let supply_available = player
-                    .supply_used
-                    .checked_add(supply)
-                    .is_some_and(|used| used <= player.supply_cap);
+                let supply_available = player.can_reserve_supply(supply);
                 if supply_available && player.spend_cost(cost) {
                     if player.reserve_supply(supply) {
                         if !entities
@@ -784,7 +778,6 @@ mod tests {
             steel: 0,
             oil: 0,
             supply_used: 0,
-            supply_cap: 0,
             is_ai: false,
             score: ScoreState::default(),
             upgrades: Default::default(),

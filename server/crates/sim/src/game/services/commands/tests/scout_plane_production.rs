@@ -23,7 +23,6 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
         players[0].steel,
         players[0].oil,
         players[0].supply_used,
-        players[0].supply_cap,
     );
 
     let events = apply_with_players(
@@ -52,7 +51,6 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
             players[0].steel,
             players[0].oil,
             players[0].supply_used,
-            players[0].supply_cap,
         ),
         resources_before,
         "rejected Scout Plane training must not spend resources or reserve supply"

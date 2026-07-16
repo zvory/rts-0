@@ -88,7 +88,7 @@ const ENTITY_FIELDS: &[&str] = &[
     "scout_plane",
 ];
 const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
-const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
+const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
     (

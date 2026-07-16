@@ -1,10 +1,8 @@
-use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::PlayerState;
 use crate::rules;
 
-/// Recompute each player's supply used from living units plus units still in production queues and
-/// restore the intrinsic player cap.
+/// Recompute each player's supply used from living units plus units still in production queues.
 pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {
     for ps in players.iter_mut() {
         let catalog = rules::faction::catalog_for(&ps.faction_id);
@@ -24,6 +22,6 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 used += rules::economy::supply_cost(e.kind);
             }
         }
-        ps.set_supply_counts(used, config::PLAYER_SUPPLY_CAP);
+        ps.set_supply_used(used);
     }
 }

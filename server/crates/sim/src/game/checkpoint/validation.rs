@@ -62,11 +62,6 @@ pub(super) fn validate_players(
             player.upgrades.len(),
             MAX_COMPLETED_UPGRADES_PER_PLAYER,
         )?;
-        if player.supply_cap > config::PLAYER_SUPPLY_CAP {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "players.supplyCap",
-            });
-        }
         validate_count(
             "players.score.resourceIncomeHistory",
             player.resource_income_history_len(),

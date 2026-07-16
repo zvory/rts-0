@@ -42,6 +42,14 @@ where
     .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlayerCheckpointRef<'a, T> {
+    #[serde(flatten)]
+    state: &'a T,
+    supply_cap: u32,
+}
+
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
 const CHECKPOINT_VERSION: u32 = 1;
 // Construction funding provenance is authoritative state: restoring a scaffold without it can
@@ -177,7 +185,16 @@ impl GameCheckpointV1 {
             world_combat_active_through_tick: state.world_combat_active_through_tick,
             world_combat_position: state.world_combat_position,
             rng: RngDescriptorV1::from_rng(&state.rng),
-            players: serde_convert(&state.players)?,
+            players: state
+                .players
+                .iter()
+                .map(|player| {
+                    serde_convert(PlayerCheckpointRef {
+                        state: player,
+                        supply_cap: crate::config::PLAYER_SUPPLY_CAP,
+                    })
+                })
+                .collect::<Result<_, _>>()?,
             starting_loadouts: state.starting_loadouts.clone(),
             starting_loadout: state.starting_loadout,
             entities: EntityStoreV1::from_store(&state.entities),

@@ -14,7 +14,6 @@ impl PlayerState {
         self.steel = 0;
         self.oil = 10_000;
         self.supply_used = 0;
-        self.supply_cap = 0;
         self.score = Default::default();
         self.upgrades.clear();
         self.ability_cooldowns.clear();
@@ -88,14 +87,17 @@ impl PlayerState {
         self.upgrades.contains(&upgrade)
     }
 
+    pub(crate) fn can_reserve_supply(&self, supply: u32) -> bool {
+        self.supply_used
+            .checked_add(supply)
+            .is_some_and(|next| next <= config::PLAYER_SUPPLY_CAP)
+    }
+
     pub(crate) fn reserve_supply(&mut self, supply: u32) -> bool {
-        let Some(next) = self.supply_used.checked_add(supply) else {
-            return false;
-        };
-        if next > self.supply_cap {
+        if !self.can_reserve_supply(supply) {
             return false;
         }
-        self.supply_used = next;
+        self.supply_used += supply;
         true
     }
 
@@ -103,13 +105,12 @@ impl PlayerState {
         self.supply_used = self.supply_used.saturating_sub(supply);
     }
 
-    pub(crate) fn set_supply_counts(&mut self, used: u32, cap: u32) {
+    pub(crate) fn set_supply_used(&mut self, used: u32) {
         self.supply_used = used;
-        self.supply_cap = cap.min(config::PLAYER_SUPPLY_CAP);
     }
 
     pub(crate) fn reset_supply(&mut self) {
-        self.set_supply_counts(0, config::PLAYER_SUPPLY_CAP);
+        self.set_supply_used(0);
     }
 }
 

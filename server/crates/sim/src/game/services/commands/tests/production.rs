@@ -215,7 +215,6 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
         players[0].steel,
         players[0].oil,
         players[0].supply_used,
-        players[0].supply_cap,
     );
     let train_panzerfaust = SimCommand::Train {
         building: barracks,
@@ -242,7 +241,6 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
             players[0].steel,
             players[0].oil,
             players[0].supply_used,
-            players[0].supply_cap,
         ),
         resources_before,
         "failed Panzerfaust training must not spend resources or reserve supply"
@@ -300,7 +298,6 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
             players[0].steel,
             players[0].oil,
             players[0].supply_used,
-            players[0].supply_cap,
         ),
         resources_before,
         "canceling queued Panzerfaust should use normal Barracks refund and supply release"
@@ -343,8 +340,7 @@ fn panzerfaust_training_waits_for_resource_and_supply_blocks() {
         .pop_last_production();
 
     let mut supply_blocked = vec![player_state(1), player_state(2)];
-    let supply_cap = supply_blocked[0].supply_cap;
-    assert!(supply_blocked[0].reserve_supply(supply_cap));
+    assert!(supply_blocked[0].reserve_supply(config::PLAYER_SUPPLY_CAP));
     let events = apply_with_players(
         &map,
         &mut entities,
@@ -378,7 +374,6 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
         players[0].steel,
         players[0].oil,
         players[0].supply_used,
-        players[0].supply_cap,
     );
 
     let events = apply_with_players(
@@ -418,7 +413,6 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
             players[0].steel,
             players[0].oil,
             players[0].supply_used,
-            players[0].supply_cap,
         ),
         resources_before,
         "fixture-faction illegal build/train/research commands must not spend Steel/Oil or reserve Supply"
