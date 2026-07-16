@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const CATALOG = Object.freeze({
-  maps: [{ name: "Default", width: 64, height: 64, tileSize: 32 }],
+  maps: [{ name: "Chokes", width: 64, height: 64, tileSize: 32 }],
   players: [
     { id: 1, teamId: 1, factionId: "kriegsia", name: "North", color: "#fff" },
     { id: 2, teamId: 2, factionId: "kriegsia", name: "South", color: "#000" },
@@ -370,7 +370,7 @@ function deferred() {
 function checkpointScenario(name, tick, entities) {
   return {
     schemaVersion: 1, kind: "labCheckpointScenario", name: name || "Fixture setup", seed: 1,
-    map: { name: "Default", schemaVersion: 1, contentHash: "content", materializedHash: "materialized", data: { size: 64, terrain: [], starts: [], baseSites: [] } },
+    map: { name: "Chokes", schemaVersion: 1, contentHash: "content", materializedHash: "materialized", data: { size: 64, terrain: [], starts: [], baseSites: [] } },
     metadata: { exportedTick: tick, lab: { vision: { mode: "all" } }, sourceEntityIdMap: entities.map((entity) => ({ oldId: entity.id, newId: entity.id })) },
     checkpointPayload: JSON.stringify({ entities }),
   };

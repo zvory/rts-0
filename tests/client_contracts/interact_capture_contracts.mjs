@@ -88,7 +88,7 @@ const captureBridge = new InteractBridge({
         currRecvTime: 1,
         tick: 9,
         players: [],
-        map: { name: "Default", width: 64, height: 64, tileSize: 32 },
+        map: { name: "Chokes", width: 64, height: 64, tileSize: 32 },
         entityById: (id) => id === subject.id ? subject : null,
       },
       renderer: {

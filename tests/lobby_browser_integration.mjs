@@ -173,7 +173,7 @@ async function main() {
   ok(recreatedAbandoned.status === 201,
     `abandoned pending create lease releases the name (${recreatedAbandoned.status})`);
 
-  const labRoom = `__lab__:${uniqueRoom("browser-lab")}:map=Default:seed=321`;
+  const labRoom = `__lab__:${uniqueRoom("browser-lab")}:map=Chokes:seed=321`;
   const LabViewer = await connectClient("browser-lab");
   LabViewer.send({ t: "join", name: "Lab", room: labRoom, spectator: true });
   await LabViewer.waitFor((msg) => msg.t === "start" && msg.lab, 3000, "internal lab start");
@@ -328,8 +328,8 @@ async function main() {
   ok(lobbyA.players.find((player) => player.id === A.playerId)?.isSpectator === false,
     "browser open-row join enters as an active player");
 
-  A.send({ t: "selectMap", map: "Default" });
-  await A.waitFor((msg) => msg.t === "lobby" && msg.map === "Default", 3000, "browser four-seat map selection");
+  A.send({ t: "selectMap", map: "Chokes" });
+  await A.waitFor((msg) => msg.t === "lobby" && msg.map === "Chokes", 3000, "browser four-seat map selection");
 
   await waitForLobbyRow(
     room,
@@ -387,11 +387,11 @@ async function main() {
   );
   ok(hostRow.spectatorCount === 0, "host-only row starts with no spectators");
 
-  Host.send({ t: "selectMap", map: "No Terrain" });
-  await Host.waitFor((msg) => msg.t === "lobby" && msg.map === "No Terrain", 3000, "browser map selection");
+  Host.send({ t: "selectMap", map: "Chokes" });
+  await Host.waitFor((msg) => msg.t === "lobby" && msg.map === "Chokes", 3000, "browser map selection");
   await waitForLobbyRow(
     lifecycleRoom,
-    (row) => row.map === "No Terrain",
+    (row) => row.map === "Chokes",
     "map refresh after host selection",
   );
 
@@ -415,7 +415,7 @@ async function main() {
   ok(!Host.msgs.some((msg) => msg.t === "matchCountdown"), "browser AI-assisted start skips countdown");
   const inGameRow = await waitForLobbyRow(
     lifecycleRoom,
-    (row) => row.joinState === "inGame" && row.map === "No Terrain",
+    (row) => row.joinState === "inGame" && row.map === "Chokes",
     "in-game row is spectatable",
   );
   ok(inGameRow.occupiedSlots === 2, "in-game browser row keeps active human plus AI slots");

@@ -1018,7 +1018,7 @@ impl Lobby {
         }
         loop {
             let token = rand::random::<u128>();
-            let room = format!("__lab__:map-editor-{token:032x}:map=Default");
+            let room = format!("__lab__:map-editor-{token:032x}:map=Chokes");
             if rooms.contains_key(&room) {
                 continue;
             }
@@ -1027,7 +1027,7 @@ impl Lobby {
                 &mut rooms,
                 RoomMode::Lab(room_task::LabRoomConfig {
                     public_id: format!("map-editor-{token:032x}"),
-                    map_name: "Default".to_string(),
+                    map_name: "Chokes".to_string(),
                     seed: None,
                     scenario: None,
                     map_draft: Some(draft),

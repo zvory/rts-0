@@ -179,10 +179,10 @@ mod tests {
 
     #[test]
     fn room_mode_for_accepts_bounded_lab_room_config() {
-        match room_mode_for("__lab__:sandbox:map=low-econ:seed=12345") {
+        match room_mode_for("__lab__:sandbox:map=Chokes:seed=12345") {
             RoomMode::Lab(config) => {
                 assert_eq!(config.public_id, "sandbox");
-                assert_eq!(config.map_name, "low-econ");
+                assert_eq!(config.map_name, "Chokes");
                 assert_eq!(config.seed, Some(12345));
                 assert_eq!(config.scenario, None);
             }
@@ -200,7 +200,7 @@ mod tests {
             _ => panic!("blank lab scenario should use the current default map"),
         }
 
-        match room_mode_for("__lab__:sandbox:map=Default:scenario=lategame") {
+        match room_mode_for("__lab__:sandbox:map=Chokes:scenario=lategame") {
             RoomMode::Lab(config) => {
                 assert_eq!(config.public_id, "sandbox");
                 assert_eq!(config.scenario.as_deref(), Some("lategame"));
@@ -208,7 +208,7 @@ mod tests {
             _ => panic!("safe lab scenario room should parse as lab mode"),
         }
 
-        match room_mode_for("__lab__:sandbox:map=Default:scenario=blank") {
+        match room_mode_for("__lab__:sandbox:map=Chokes:scenario=blank") {
             RoomMode::Lab(config) => assert_eq!(config.scenario, None),
             _ => panic!("safe blank lab scenario room should parse as lab mode"),
         }
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn room_mode_for_rejects_unsafe_lab_room_config() {
         assert!(matches!(
-            room_mode_for("__lab__:../../bad:map=Default"),
+            room_mode_for("__lab__:../../bad:map=Chokes"),
             RoomMode::Normal
         ));
         assert!(matches!(

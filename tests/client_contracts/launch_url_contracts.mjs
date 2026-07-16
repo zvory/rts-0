@@ -123,7 +123,7 @@ async function testLabLaunchConfig() {
     getElementById: () => null,
   };
   globalThis.window = {
-    location: new URL("http://localhost/lab?room=sandbox&map=low-econ&seed=1234"),
+    location: new URL("http://localhost/lab?room=sandbox&map=Chokes&seed=1234"),
     localStorage: { getItem: () => null },
   };
   try {
@@ -131,9 +131,9 @@ async function testLabLaunchConfig() {
     let config = labLaunchConfig();
     assert(config, "lab route launch config should be recognized");
     assert(config.publicRoom === "sandbox", "lab launch keeps public room label");
-    assert(config.map === "low-econ", "lab launch keeps map label");
+    assert(config.map === "Chokes", "lab launch keeps map label");
     assert(
-      config.room === "__lab__:sandbox:map=low-econ:seed=1234",
+      config.room === "__lab__:sandbox:map=Chokes:seed=1234",
       "lab launch should build the server lab room id",
     );
 
@@ -225,7 +225,7 @@ async function testMatchLaunchConfig() {
   } = await import("../../client/src/launch_url.js");
 
   let config = matchLaunchConfig(new URL(
-    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1&rtsMap=No%20Terrain",
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1&rtsMap=Chokes",
   ));
   assert(config, "match launch URL should be recognized");
   assert(config.errors.length === 0, `match launch URL should be valid (${config.errors.join(" ")})`);
@@ -233,7 +233,7 @@ async function testMatchLaunchConfig() {
   assert(config.name === "Spectator", "spectator match launch uses the spectator display name");
   assert(config.spectator === true, "match launch can join as spectator");
   assert(config.start === true, "match launch defaults to starting when requested");
-  assert(config.map === "No Terrain", "match launch keeps a safe map display name");
+  assert(config.map === "Chokes", "match launch keeps a safe map display name");
   assert(
     JSON.stringify(config.ai) === JSON.stringify([
       { teamId: 1, aiProfileId: "ai_2_1" },
@@ -296,8 +296,8 @@ async function testMatchLaunchActions() {
   let action = nextMatchLaunchAction(config, {
     room: "agent-ai-selfplay",
     hostId: 7,
-    map: "Default",
-    maps: [{ name: "Default" }],
+    map: "Chokes",
+    maps: [{ name: "Chokes" }],
     players: [spectator],
     canStart: false,
   }, 7);
@@ -309,8 +309,8 @@ async function testMatchLaunchActions() {
   action = nextMatchLaunchAction(config, {
     room: "agent-ai-selfplay",
     hostId: 7,
-    map: "Default",
-    maps: [{ name: "Default" }],
+    map: "Chokes",
+    maps: [{ name: "Chokes" }],
     players: [
       spectator,
       { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_2_1" },
@@ -325,8 +325,8 @@ async function testMatchLaunchActions() {
   action = nextMatchLaunchAction(config, {
     room: "agent-ai-selfplay",
     hostId: 7,
-    map: "Default",
-    maps: [{ name: "Default" }],
+    map: "Chokes",
+    maps: [{ name: "Chokes" }],
     players: [
       spectator,
       { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_2_1" },
@@ -342,8 +342,8 @@ async function testMatchLaunchActions() {
   action = nextMatchLaunchAction(config, {
     room: "agent-ai-selfplay",
     hostId: 7,
-    map: "Default",
-    maps: [{ name: "Default" }],
+    map: "Chokes",
+    maps: [{ name: "Chokes" }],
     players: [
       spectator,
       { id: 20, isAi: true, isSpectator: false, teamId: 1, aiProfileId: "ai_2_1" },
@@ -354,26 +354,26 @@ async function testMatchLaunchActions() {
   assert(action.type === "start", "launch action starts once the requested AI lobby is startable");
 
   const mapConfig = matchLaunchConfig(new URL(
-    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsMap=No%20Terrain",
+    "http://localhost/?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsMap=4%20Player%20Map",
   ));
   action = nextMatchLaunchAction(mapConfig, {
     room: "agent-ai-selfplay",
     hostId: 7,
-    map: "Default",
-    maps: [{ name: "Default" }, { name: "No Terrain" }],
+    map: "Chokes",
+    maps: [{ name: "Chokes" }, { name: "4 Player Map" }],
     players: [spectator],
     canStart: false,
   }, 7);
   assert(
-    JSON.stringify(action) === JSON.stringify({ type: "selectMap", map: "No Terrain" }),
+    JSON.stringify(action) === JSON.stringify({ type: "selectMap", map: "4 Player Map" }),
     "launch action selects the requested available map before seating AIs",
   );
 
   action = nextMatchLaunchAction(config, {
     room: "agent-ai-selfplay",
     hostId: 7,
-    map: "Default",
-    maps: [{ name: "Default" }],
+    map: "Chokes",
+    maps: [{ name: "Chokes" }],
     players: [
       spectator,
       { id: 8, isAi: false, isSpectator: false, ready: false },

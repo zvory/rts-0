@@ -201,7 +201,7 @@ fn aborted_match_history_record_is_winnerless_and_replay_backed() {
     task.match_player_count = 2;
     task.match_human_count = 2;
     task.match_started_at = Some(chrono::Utc::now() - chrono::Duration::milliseconds(1_500));
-    task.match_map_name = "Default".to_string();
+    task.match_map_name = "Chokes".to_string();
     task.match_participants = players.iter().map(|player| player.name.clone()).collect();
 
     let ended_at = chrono::Utc::now();
@@ -218,7 +218,7 @@ fn aborted_match_history_record_is_winnerless_and_replay_backed() {
     assert_eq!(record.winner_name, None);
     assert_eq!(record.outcome, crate::db::MatchOutcome::Aborted);
     assert_eq!(record.duration_ms, 1_500);
-    assert_eq!(record.map_name, "Default");
+    assert_eq!(record.map_name, "Chokes");
     assert_eq!(
         record.participants,
         vec!["Player 1".to_string(), "Player 2".to_string()]

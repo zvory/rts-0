@@ -93,7 +93,7 @@ import {
 }
 
 const repoRoot = new URL("../../", import.meta.url);
-const noTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/no-terrain.json", repoRoot), "utf8"));
+const oneVOneNoTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1-no-terrain.json", repoRoot), "utf8"));
 const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
 
 {
@@ -105,16 +105,16 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 
 {
   const session = new MapEditorSession({ storage: null });
-  session.loadAuthoredMap(noTerrainMap);
+  session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
   assert.equal(session.exportMap().version, 3);
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
-  assert.equal(materialized.starts.length, 4);
-  assert.equal(materialized.baseSites.length, 8, "every authored base is materialized without choosing a player layout");
+  assert.equal(materialized.starts.length, 2);
+  assert.equal(materialized.baseSites.length, 4, "every authored base is materialized without choosing a player layout");
   assert(materialized.baseSites.some((site) => site.x === 25 && site.y === 25), "start locations are permanent base sites");
   assert.deepEqual(
     session.mapOverlay().bases.map((site) => site.index),
-    [4, 5, 6, 7],
+    [2, 3],
     "neutral base controls retain their backing authored base indices",
   );
 }

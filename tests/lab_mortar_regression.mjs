@@ -178,7 +178,7 @@ async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageInd
 }
 
 async function runLabMortarRegressionAttempt(attempt) {
-  const room = `__lab__:${uniqueRoom(`lab-mortar-${attempt}`)}:map=Default:seed=4242`;
+  const room = `__lab__:${uniqueRoom(`lab-mortar-${attempt}`)}:map=Chokes:seed=4242`;
   const operator = await connectClient("lab-mortar");
   try {
     operator.send({ t: "join", name: "Lab", room, spectator: true });

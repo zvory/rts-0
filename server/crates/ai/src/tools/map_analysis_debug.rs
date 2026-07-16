@@ -16,7 +16,7 @@ use rts_sim::protocol::{MapInfo, StartPayload};
 
 use crate::ai_core::map_analysis::{AiMapAnalysis, AiMapAnalysisDebugSnapshot};
 
-const DEFAULT_MAP: &str = "Default";
+const DEFAULT_MAP: &str = "Chokes";
 const DEFAULT_PLAYERS: u32 = 2;
 const DEFAULT_SEED: u32 = 0x1234_5678;
 const DEFAULT_TILE_PX: u32 = 7;
@@ -141,7 +141,7 @@ fn print_usage() {
         "usage: cargo run --manifest-path server/Cargo.toml -p rts-ai --bin ai-map-analysis-debug -- [flags]\n\
          \n\
          flags:\n\
-           --map <name>        map name understood by Map::load_for_players (default: Default)\n\
+           --map <name>        map name understood by Map::load_for_players (default: Chokes)\n\
            --players <n>       active player count used for slot selection (default: 2)\n\
            --seed <n|0xhex>    deterministic map seed (default: 0x12345678)\n\
            --out <path>        SVG output path (default: /tmp/rts-map-analysis/...svg)\n\
@@ -597,7 +597,7 @@ mod tests {
     fn parses_layer_filter_and_hex_seed() {
         let config = parse_args([
             "--map".to_string(),
-            "Low Econ".to_string(),
+            "Chokes".to_string(),
             "--seed".to_string(),
             "0x10".to_string(),
             "--layers".to_string(),
@@ -606,7 +606,7 @@ mod tests {
         .expect("args should parse")
         .expect("help should not be requested");
 
-        assert_eq!(config.map_name, "Low Econ");
+        assert_eq!(config.map_name, "Chokes");
         assert_eq!(config.seed, 16);
         assert!(config.layers.includes("chokes"));
         assert!(config.layers.includes("bases"));
@@ -616,7 +616,7 @@ mod tests {
     #[test]
     fn renders_default_map_svg_smoke() {
         let config = CliConfig {
-            map_name: "Default".to_string(),
+            map_name: "Chokes".to_string(),
             players: 2,
             seed: DEFAULT_SEED,
             out: PathBuf::from("/tmp/not-written.svg"),
@@ -631,7 +631,7 @@ mod tests {
         let overlay = analysis.debug_overlay();
         let svg = render_svg(&config, &start, &debug, &overlay.layers).expect("svg renders");
 
-        assert!(svg.contains("Default"));
+        assert!(svg.contains("Chokes"));
         assert!(svg.contains("layer-chokes"));
         assert!(svg.contains("K0"));
     }

@@ -556,7 +556,7 @@ mod tests {
     }
 
     fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
-        let metadata = Map::metadata_for_name("Default").unwrap();
+        let metadata = Map::metadata_for_name("Chokes").unwrap();
         let start_players: Vec<_> = players
             .iter()
             .map(|player| {
@@ -566,7 +566,7 @@ mod tests {
                 )
             })
             .collect();
-        let map = Map::load_for_players("Default", &start_players, seed).unwrap();
+        let map = Map::load_for_players("Chokes", &start_players, seed).unwrap();
         Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
     }
 

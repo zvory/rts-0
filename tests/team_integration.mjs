@@ -49,9 +49,9 @@ async function joinNamed(tag, room, name = tag, opts = {}) {
 }
 
 async function selectFourPlayerMap(client, label) {
-  client.send({ t: "selectMap", map: "Default" });
+  client.send({ t: "selectMap", map: "Chokes" });
   await client.waitFor(
-    (msg) => msg.t === "lobby" && msg.map === "Default",
+    (msg) => msg.t === "lobby" && msg.map === "Chokes",
     3000,
     `${label} four-player map selection`,
   );

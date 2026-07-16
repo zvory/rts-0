@@ -640,7 +640,7 @@ export class Lobby {
   _reflectMap() {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
-    const label = entry ? entry.name : (this._selectedMap || "Default");
+    const label = entry ? entry.name : (this._selectedMap || "Chokes");
     if (this._isReplayLobby()) {
       if (this.selMap) {
         this.selMap.disabled = true;
@@ -890,7 +890,7 @@ export class Lobby {
   _reflectSummary(room, players) {
     const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
     const mapEntry = this._availableMaps.find((entry) => entry.name === this._selectedMap);
-    const mapLabel = mapEntry ? mapEntry.name : (this._selectedMap || "Default");
+    const mapLabel = mapEntry ? mapEntry.name : (this._selectedMap || "Chokes");
     if (this.elRoomDisplay) this.elRoomDisplay.textContent = room || "main";
     if (this.elMapSummary) this.elMapSummary.textContent = mapLabel;
     if (this.elSeatsSummary) this.elSeatsSummary.textContent = this._isReplayLobby()

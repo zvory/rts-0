@@ -7,7 +7,7 @@ use crate::game::replay::ReplayStartComposition;
 use crate::protocol::terrain;
 
 fn default_map_metadata() -> MapMetadata {
-    Map::metadata_for_name("Default").expect("Default map metadata should load")
+    Map::metadata_for_name("Chokes").expect("Chokes map metadata should load")
 }
 
 fn team_faction_ai_players() -> [PlayerInit; 3] {
@@ -65,8 +65,8 @@ fn load_default_map_for(players: &[PlayerInit], seed: u32) -> (Map, MapMetadata)
         .iter()
         .map(|player| (player.id, player.team_id))
         .collect();
-    let map = Map::load_for_players("Default", &start_players, seed)
-        .expect("Default map should load for test players");
+    let map = Map::load_for_players("Chokes", &start_players, seed)
+        .expect("Chokes map should load for test players");
     (map, default_map_metadata())
 }
 

@@ -62,7 +62,7 @@ Open the game in one or more browser windows.
 - The host can add AI opponents from the lobby.
 - All human players must ready up before the host starts the match.
 - A one-player match with no AI is a never-ending sandbox.
-- Use the lobby's Open Lab link, or a shared `/lab?room=default&map=Default` URL, to stage
+- Use the lobby's Open Lab link, or a shared `/lab?room=default&map=Chokes` URL, to stage
   experiments outside the normal match lobby.
 - The old debug quickstart preset is not exposed in the normal lobby; it remains internal/test
   compatibility until debug-style setups return as first-class lab presets or scenarios.
