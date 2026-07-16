@@ -166,6 +166,7 @@ export const msg = Object.freeze({
   returnToLobby: () => ({ t: C.RETURN_TO_LOBBY }),
   ping: (ts) => ({ t: C.PING, ts }),
   netReport: (report) => ({ t: C.NET_REPORT, report }),
+  activity: () => ({ t: C.ACTIVITY }),
   setRoomTimeSpeed: (speed) => ({ t: C.SET_ROOM_TIME_SPEED, speed }),
   stepRoomTime: () => ({ t: C.STEP_ROOM_TIME }),
   seekRoomTime: (ticksBack) => ({ t: C.SEEK_ROOM_TIME, ticksBack }),

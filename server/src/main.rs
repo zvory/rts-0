@@ -96,9 +96,9 @@ fn configured_maps_dir() -> String {
 /// (or a stuck never-ready client) is dropped instead of wedging a shared room forever.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 
-/// Disconnect a browser that has sent no player action for five minutes. Automatic heartbeat and
-/// diagnostics traffic deliberately do not extend this deadline, so an abandoned lobby or match
-/// cannot keep the Fly Machine running indefinitely.
+/// Disconnect a browser that has sent no player action or human-input notice for five minutes.
+/// Automatic heartbeat and diagnostics traffic deliberately do not extend this deadline, so an
+/// abandoned lobby or match cannot keep the Fly Machine running indefinitely.
 const PLAYER_INACTIVITY_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 fn is_player_activity(message: &ClientMessage) -> bool {
@@ -119,6 +119,7 @@ fn is_player_activity(message: &ClientMessage) -> bool {
         | ClientMessage::PauseGame
         | ClientMessage::UnpauseGame
         | ClientMessage::ReturnToLobby
+        | ClientMessage::Activity
         | ClientMessage::SetRoomTimeSpeed { .. }
         | ClientMessage::StepRoomTime
         | ClientMessage::SeekRoomTime { .. }
@@ -836,12 +837,13 @@ mod tests {
     const TEST_PLAYER_ID: u32 = 42;
 
     #[test]
-    fn only_player_actions_extend_the_inactivity_deadline() {
+    fn only_player_actions_and_input_notices_extend_the_inactivity_deadline() {
         assert_eq!(PLAYER_INACTIVITY_TIMEOUT, Duration::from_secs(300));
         assert!(!is_player_activity(&ClientMessage::Ping { ts: 1.0 }));
         assert!(!is_player_activity(&ClientMessage::NetReport {
             report: Box::default(),
         }));
+        assert!(is_player_activity(&ClientMessage::Activity));
         assert!(is_player_activity(&ClientMessage::Ready { ready: true }));
     }
 
@@ -1540,6 +1542,10 @@ async fn handle_client_message(
                 *report,
                 outbound,
             );
+        }
+        ClientMessage::Activity => {
+            // The connection loop already extended the inactivity deadline. This transport-level
+            // notice deliberately has no room state to mutate.
         }
         ClientMessage::SetRoomTimeSpeed { speed } => {
             send_room_event(

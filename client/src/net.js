@@ -345,6 +345,11 @@ export class Net {
     this._send(msg.netReport(report));
   }
 
+  /** Report recent human input separately from automatic connection traffic. */
+  activity() {
+    return this._send(msg.activity());
+  }
+
   createSnapshotReportStats() {
     return {
       bytesTotal: 0,

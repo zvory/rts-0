@@ -125,6 +125,9 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
     NetReport { report: Box<ClientNetReport> },
+    /// Throttled notice that the connected browser received human input. This is distinct from
+    /// automatic heartbeat and diagnostics traffic so the server can expire abandoned sessions.
+    Activity,
     /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
     SetRoomTimeSpeed { speed: f32 },
     /// Advance room-controlled time by one simulation tick where the clock allows stepping.

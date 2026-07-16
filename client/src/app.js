@@ -71,6 +71,8 @@ import { StressTestRunner } from "./stress_test.js";
  * so we ping well inside that window to keep a healthy connection alive.
  */
 const HEARTBEAT_MS = 15000;
+const PLAYER_ACTIVITY_REPORT_INTERVAL_MS = 30000;
+const PLAYER_ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel"];
 
 export function isLivePlayerMatch(match) {
   return !!match &&
@@ -93,6 +95,16 @@ export function shouldReturnToLobbyBrowserAfterDisconnect({
   requiresConnectionOnStart = false,
 } = {}) {
   return !match && !requiresConnectionOnStart;
+}
+
+export function shouldReportPlayerActivity({
+  socketOpen = false,
+  nowMs = 0,
+  lastReportMs = Number.NEGATIVE_INFINITY,
+} = {}) {
+  return socketOpen &&
+    Number.isFinite(nowMs) &&
+    nowMs - lastReportMs >= PLAYER_ACTIVITY_REPORT_INTERVAL_MS;
 }
 
 /**
@@ -172,6 +184,7 @@ export class App {
     this.socketOpen = false;
     this.connectionPromise = null;
     this.intentionalIdleDisconnect = false;
+    this.lastPlayerActivityReportMs = Number.NEGATIVE_INFINITY;
 
     // Bind handlers once so we can off() them symmetrically.
     this.onStart = this.onStart.bind(this);
@@ -189,6 +202,7 @@ export class App {
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
+    this.onPlayerActivity = () => this.reportPlayerActivity();
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
@@ -223,6 +237,9 @@ export class App {
     dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
     window.addEventListener("beforeunload", this.onBeforeUnload);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    for (const eventName of PLAYER_ACTIVITY_EVENTS) {
+      document.addEventListener(eventName, this.onPlayerActivity, { passive: true });
+    }
 
     void this.loadVersion();
     if (this.labCatalogLaunch) {
@@ -280,8 +297,23 @@ export class App {
   }
 
   onVisibilityChange() {
-    if (!document.hidden || this.requiresConnectionOnStart()) return;
+    if (!document.hidden) {
+      this.reportPlayerActivity();
+      return;
+    }
+    if (this.requiresConnectionOnStart()) return;
     this.disconnectIdleConnection();
+  }
+
+  reportPlayerActivity(nowMs = performance.now()) {
+    if (!shouldReportPlayerActivity({
+      socketOpen: this.socketOpen,
+      nowMs,
+      lastReportMs: this.lastPlayerActivityReportMs,
+    })) return false;
+    if (!this.net.activity()) return false;
+    this.lastPlayerActivityReportMs = nowMs;
+    return true;
   }
 
   async prepareLabHandoff() {

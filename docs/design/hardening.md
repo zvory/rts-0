@@ -55,8 +55,9 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
 - **Connection liveness + player inactivity**: the server drops connections with no inbound frame
   for `IDLE_TIMEOUT = 40s` (`main.rs`), while the client pings every 15s (`app.js`) to keep healthy
   sockets alive. Independently, `PLAYER_INACTIVITY_TIMEOUT = 5m` closes any connection that sends
-  no player action; automatic `ping` and `netReport` traffic does not extend that deadline. This
-  bounds abandoned lobby and match connections while still evicting half-open/stuck clients.
+  no player action or throttled browser `activity` notice; automatic `ping` and `netReport` traffic
+  does not extend that deadline. This bounds abandoned lobby and match connections without
+  disconnecting a spectator or camera-only player who is still interacting with the game.
 - **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Replay artifact and seek limits**: production `ReplaySession` construction rejects malformed or

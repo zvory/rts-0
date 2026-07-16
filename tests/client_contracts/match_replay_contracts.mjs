@@ -77,6 +77,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   const { applyMatchUnitRanges } = await import("../../client/src/match_settings_toggles.js");
   const {
     App,
+    shouldReportPlayerActivity,
     shouldReturnToLobbyBrowserAfterDisconnect,
     shouldWarnBeforeUnload,
   } = await import("../../client/src/app.js");
@@ -404,6 +405,28 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     !shouldReturnToLobbyBrowserAfterDisconnect({ requiresConnectionOnStart: true }),
     "an explicit connected launch keeps its dedicated disconnect handling",
   );
+  assert(
+    shouldReportPlayerActivity({ socketOpen: true, nowMs: 30000, lastReportMs: 0 }),
+    "human input is reportable after the throttle interval",
+  );
+  assert(
+    !shouldReportPlayerActivity({ socketOpen: false, nowMs: 30000, lastReportMs: 0 }),
+    "human input is not reported without a socket",
+  );
+  assert(
+    !shouldReportPlayerActivity({ socketOpen: true, nowMs: 29999, lastReportMs: 0 }),
+    "human input reports are throttled",
+  );
+  {
+    const app = Object.create(App.prototype);
+    let activityCount = 0;
+    app.socketOpen = true;
+    app.lastPlayerActivityReportMs = 0;
+    app.net = { activity() { activityCount += 1; return true; } };
+    assert(app.reportPlayerActivity(30000), "eligible human input sends an activity notice");
+    assert(!app.reportPlayerActivity(30001), "a sent activity notice re-arms the throttle");
+    assert(activityCount === 1, "throttled activity emits one wire message");
+  }
   {
     const app = Object.create(App.prototype);
     let resetCount = 0;
