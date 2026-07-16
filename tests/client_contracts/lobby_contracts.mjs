@@ -518,6 +518,8 @@ import { textWithin } from "./dom_text.mjs";
     ...eligibleRefresh,
     lastActivityAt: now - LOBBY_BROWSER_ACTIVITY_WINDOW_MS - 1,
   }), "an inactive lobby is not eligible for auto-refresh");
+  assert(!lobbyBrowserAutoRefreshEligible({ ...eligibleRefresh, lastActivityAt: now + 1 }),
+    "a backward wall-clock adjustment does not extend lobby activity indefinitely");
   assert(formatLobbyAge(now - 5_000, now) === "just now", "lobby browser formats fresh ages");
   assert(formatLobbyAge(now - 3 * 60_000, now) === "3m ago", "lobby browser formats minute ages");
   assert(formatLobbyAge(now - 2 * 60 * 60_000, now) === "2h ago", "lobby browser formats hour ages");
@@ -585,6 +587,7 @@ import { textWithin } from "./dom_text.mjs";
     let clock = 100_000;
     let intervalCallback = null;
     let clearedIntervals = 0;
+    let cancelledRequests = 0;
     const refreshes = [];
     globalThis.window = {
       setInterval(callback, delay) {
@@ -611,6 +614,9 @@ import { textWithin } from "./dom_text.mjs";
         _browserActionPending: false,
         _joined: false,
         root: { hidden: false },
+        _cancelLobbyBrowserRefresh() {
+          cancelledRequests += 1;
+        },
         _refreshLobbyBrowser(options = {}) {
           this._lastBrowserRefreshAt = Date.now();
           refreshes.push(options);
@@ -626,8 +632,8 @@ import { textWithin } from "./dom_text.mjs";
       assert(refreshes.length === 1, "active lobby polling performs one bounded refresh");
       clock += LOBBY_BROWSER_ACTIVITY_WINDOW_MS + 1;
       intervalCallback();
-      assert(refreshes.length === 1 && clearedIntervals === 1,
-        "lobby polling stops once player activity expires");
+      assert(refreshes.length === 1 && clearedIntervals === 1 && cancelledRequests === 1,
+        "inactive lobby polling stops and cancels its in-flight request");
     } finally {
       Date.now = priorDateNow;
       if (priorWindow === undefined) delete globalThis.window;

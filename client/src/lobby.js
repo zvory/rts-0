@@ -31,6 +31,7 @@ export const LOBBY_BROWSER_ACTIVITY_WINDOW_MS = 30000;
 const LOBBY_BROWSER_ACTIVITY_EVENTS = Object.freeze([
   "pointerdown",
   "pointermove",
+  "click",
   "keydown",
   "scroll",
   "touchstart",
@@ -101,6 +102,7 @@ export function lobbyBrowserAutoRefreshEligible({
   now = Date.now(),
   activityWindowMs = LOBBY_BROWSER_ACTIVITY_WINDOW_MS,
 } = {}) {
+  const inactiveForMs = now - lastActivityAt;
   return !!enabled &&
     !joined &&
     !actionPending &&
@@ -108,7 +110,8 @@ export function lobbyBrowserAutoRefreshEligible({
     !documentHidden &&
     Number.isFinite(lastActivityAt) &&
     Number.isFinite(now) &&
-    now - lastActivityAt <= activityWindowMs;
+    inactiveForMs >= 0 &&
+    inactiveForMs <= activityWindowMs;
 }
 
 /**
@@ -774,7 +777,9 @@ export class Lobby {
     this._browserAutoRefreshTimer = window.setInterval(() => {
       const now = Date.now();
       if (!this._browserAutoRefreshIsEligible(now)) {
-        if (!this._browserActionPending) this._stopLobbyBrowserAutoRefresh();
+        if (!this._browserActionPending) {
+          this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
+        }
         return;
       }
       if (now - this._lastBrowserRefreshAt >= LOBBY_BROWSER_REFRESH_INTERVAL_MS) {
