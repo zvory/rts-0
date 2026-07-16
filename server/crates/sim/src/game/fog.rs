@@ -76,7 +76,7 @@ pub struct Fog {
     size: u32,
     /// player id -> row-major visibility grid (`true` = visible in the latest sample).
     grids: HashMap<u32, Vec<bool>>,
-    /// Active firing-reveal provenance, rebuilt atomically with `grids`.
+    /// Sampled firing-reveal provenance, rebuilt atomically with `grids`.
     ///
     /// The nested keys are viewer id -> revealed entity id. `reveal_only` means the entity's
     /// tile was dark immediately before its firing reveal was stamped. Combat uses this instead

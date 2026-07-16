@@ -623,9 +623,7 @@ impl Game {
         }
     }
 
-    fn retain_active_visibility_sources(&mut self) -> bool {
-        let lingering_before = self.state.lingering_sight.len();
-        let firing_before = self.state.firing_reveals.len();
+    fn retain_active_visibility_sources(&mut self) {
         self.state
             .lingering_sight
             .retain(|source| source.is_active_at(self.state.tick));
@@ -637,8 +635,6 @@ impl Game {
                     .get(source.entity_id())
                     .is_some_and(|entity| entity.hp > 0)
         });
-        lingering_before != self.state.lingering_sight.len()
-            || firing_before != self.state.firing_reveals.len()
     }
 
     pub(crate) fn team_relations(&self) -> teams::TeamRelations {
