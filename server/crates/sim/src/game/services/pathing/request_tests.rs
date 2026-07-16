@@ -36,7 +36,6 @@ fn request_tile_path_reports_cache_and_complexity_diagnostics() {
     let mut service = PathingService::new(8_192, 256);
     service.advance_tick(1);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Worker,
         start: (1, 1),
         goal: (8, 8),
@@ -68,7 +67,6 @@ fn cloning_pathing_service_does_not_copy_ephemeral_search_capacity() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Worker,
         start: (2, 2),
         goal: (55, 55),
@@ -96,7 +94,6 @@ fn budget_exhausted_partial_path_is_cached_only_for_the_same_budget() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Worker,
         start: (2, 2),
         goal: (55, 55),
@@ -133,7 +130,6 @@ fn exact_direct_segment_bypasses_astar() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Rifleman,
         start: (3, 4),
         goal: (25, 19),
@@ -160,7 +156,6 @@ fn blocked_direct_segment_falls_back_to_full_astar() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Rifleman,
         start: (5, 10),
         goal: (24, 10),
@@ -189,7 +184,6 @@ fn direct_segment_result_is_not_reused_for_unsafe_offsets_in_the_same_tiles() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Rifleman,
         start: (5, 10),
         goal: (24, 10),
@@ -225,7 +219,6 @@ fn pathing_permission_defers_cache_hits_and_misses() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Worker,
         start: (3, 4),
         goal: (25, 19),
@@ -267,7 +260,6 @@ fn completed_no_route_result_is_reused_without_another_search() {
     let occ = Occupancy::build(&map, &entities);
     let mut service = PathingService::new(8_192, 256);
     let req = PathRequest {
-        relation: StaticPathingRelation::single_owner(1),
         kind: EntityKind::Worker,
         start: (3, 4),
         goal: (25, 19),

@@ -620,7 +620,7 @@ const TANK_TRAP_LINE_DIAGONAL_LAUNCHES: [DevScenarioLaunch; 2] = [
 ];
 
 pub const TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE: &str = "friendly_vehicle_reroute";
-pub const TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH: &str = "enemy_vehicle_breach";
+pub const TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE: &str = "enemy_vehicle_reroute";
 pub const TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH: &str = "infantry_pass_through";
 pub const TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK: &str = "explicit_infantry_attack";
 
@@ -644,35 +644,35 @@ const TANK_TRAP_PATHING_MATRIX_LAUNCHES: [DevScenarioLaunch; 11] = [
         unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
-        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE),
     },
     DevScenarioLaunch {
         id: "tank_trap_pathing_matrix",
         unit: EntityKind::MortarTeam,
         count: 1,
         blocker: None,
-        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE),
     },
     DevScenarioLaunch {
         id: "tank_trap_pathing_matrix",
         unit: EntityKind::Artillery,
         count: 1,
         blocker: None,
-        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE),
     },
     DevScenarioLaunch {
         id: "tank_trap_pathing_matrix",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
-        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE),
     },
     DevScenarioLaunch {
         id: "tank_trap_pathing_matrix",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
-        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE),
     },
     DevScenarioLaunch {
         id: "tank_trap_pathing_matrix",
@@ -892,8 +892,8 @@ pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'
         ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE)) => {
             Some(Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE))
         }
-        ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH)) => {
-            Some(Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH))
+        ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE)) => {
+            Some(Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE))
         }
         ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH)) => {
             Some(Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH))
@@ -910,7 +910,7 @@ pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'
 pub fn dev_scenario_case_label(case: &str) -> &'static str {
     match case {
         TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE => "friendly vehicle reroute",
-        TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH => "enemy vehicle breach",
+        TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE => "enemy vehicle reroute",
         TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH => "infantry pass-through",
         TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK => "explicit infantry attack",
         _ => "case",
@@ -1128,14 +1128,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_room(
-                "tank_trap_pathing_matrix:unit=mortar_team:count=1:case=enemy_vehicle_breach"
+                "tank_trap_pathing_matrix:unit=mortar_team:count=1:case=enemy_vehicle_reroute"
             ),
             Some(DevScenarioLaunch {
                 id: "tank_trap_pathing_matrix",
                 unit: EntityKind::MortarTeam,
                 count: 1,
                 blocker: None,
-                case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+                case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE),
             })
         );
         assert_eq!(
@@ -1295,7 +1295,7 @@ mod tests {
                 "worker",
                 "1",
                 None,
-                Some("enemy_vehicle_breach")
+                Some("enemy_vehicle_reroute")
             ),
             None
         );

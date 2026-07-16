@@ -433,7 +433,7 @@ impl Game {
             TankTrapPathingLayout::FriendlyVehicleReroute => {
                 matches!(unit, EntityKind::ScoutCar | EntityKind::Tank)
             }
-            TankTrapPathingLayout::EnemyVehicleBreach => matches!(
+            TankTrapPathingLayout::EnemyVehicleReroute => matches!(
                 unit,
                 EntityKind::AntiTankGun
                     | EntityKind::MortarTeam

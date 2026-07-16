@@ -14,7 +14,6 @@ struct OccupancyTopology(Vec<OccupancyTopologyEntry>);
 #[derive(Debug, PartialEq, Eq)]
 struct OccupancyTopologyEntry {
     id: u32,
-    owner: u32,
     kind: EntityKind,
     pos_x_bits: u32,
     pos_y_bits: u32,
@@ -28,7 +27,6 @@ impl OccupancyTopology {
                 .filter(|entity| entity.is_building())
                 .map(|entity| OccupancyTopologyEntry {
                     id: entity.id,
-                    owner: entity.owner,
                     kind: entity.kind,
                     pos_x_bits: entity.pos_x.to_bits(),
                     pos_y_bits: entity.pos_y.to_bits(),
@@ -156,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn exact_key_detects_building_position_and_owner_changes() {
+    fn exact_key_detects_position_changes_but_ignores_owner_changes() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let (old_x, old_y) = footprint_center(&map, EntityKind::TankTrap, 5, 5);
@@ -180,6 +178,10 @@ mod tests {
             .expect("tank trap should remain")
             .owner = 2;
         cache.snapshot(&entities);
-        assert_eq!(cache.rebuild_count(), 3);
+        assert_eq!(
+            cache.rebuild_count(),
+            2,
+            "owner changes do not alter owner-independent static occupancy"
+        );
     }
 }

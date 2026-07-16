@@ -157,7 +157,7 @@ Current scenario ids:
 - `tank_trap_line_diagonal` — Training Centre, engineers, one rifleman, and one vehicle for
   manually building a diagonal Tank Trap line before the test units try to cross.
 - `tank_trap_pathing_matrix` — one dropdown-backed matrix scenario with selectable cases:
-  `friendly_vehicle_reroute`, `enemy_vehicle_breach`, `infantry_pass_through`, and
+  `friendly_vehicle_reroute`, `enemy_vehicle_reroute`, `infantry_pass_through`, and
   `explicit_infantry_attack`.
 - `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
@@ -179,10 +179,10 @@ not expose arbitrary spawning or map editing through client commands. The Intera
 namespace may observe, frame, screenshot, record, and time-lapse these watcher rooms; its artifacts
 remain confined under `target/interact/scenario/<session-id>/`.
 
-The Tank Trap pathing matrix scenarios are harnesses for owner-aware pathing, infantry
-pass-through, explicit infantry attacks, and attack-move acquisition filtering. Enemy Tank Traps are
-breachable for vehicle path planning only; physical movement and standability still treat live Tank
-Trap footprints and closed one-tile gaps as vehicle-body blockers until combat removes enough traps.
+The Tank Trap pathing matrix scenarios are harnesses for owner-independent vehicle pathing, infantry
+pass-through, explicit infantry attacks, and attack-move acquisition filtering. Vehicle path
+planning, physical movement, and standability treat every live Tank Trap footprint and closed
+one-tile gap as a vehicle-body blocker regardless of ownership or visibility.
 Combat acquisition should prioritize a Tank Trap only when that trap lies on the vehicle's bounded
 route window or closes a gap across it; irrelevant nearby traps should lose to combat targets.
 

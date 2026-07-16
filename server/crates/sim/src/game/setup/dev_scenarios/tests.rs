@@ -559,7 +559,7 @@ fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
             7usize,
             7usize,
         ),
-        ("enemy_vehicle_breach", EntityKind::Tank, 7usize, 8usize),
+        ("enemy_vehicle_reroute", EntityKind::Tank, 7usize, 8usize),
         (
             "infantry_pass_through",
             EntityKind::MachineGunner,
@@ -641,9 +641,9 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
 }
 
 #[test]
-fn tank_trap_enemy_breach_scenario_closes_sparse_vehicle_gaps() {
+fn tank_trap_enemy_reroute_scenario_closes_sparse_vehicle_gaps() {
     let setup = Game::new_tank_trap_pathing_scenario(
-        "enemy_vehicle_breach",
+        "enemy_vehicle_reroute",
         EntityKind::ScoutCar,
         1,
         0x5150_0103,

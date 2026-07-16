@@ -1,7 +1,6 @@
 use super::*;
 
 pub(super) type CacheKey = (
-    StaticPathingRelation,
     EntityKind,
     (i32, i32),
     (i32, i32),
@@ -27,7 +26,6 @@ impl PathingService {
         search_budget: usize,
     ) -> Option<(Vec<(i32, i32)>, usize)> {
         let key: CacheKey = (
-            req.relation.clone(),
             req.kind,
             req.start,
             req.goal,
@@ -59,14 +57,13 @@ impl PathingService {
                 .cache
                 .iter()
                 .min_by_key(|(key, entry)| (entry.last_used, *key))
-                .map(|(key, _)| key.clone())
+                .map(|(key, _)| *key)
             {
                 self.cache.remove(&oldest_key);
             }
         }
         self.cache.insert(
             (
-                req.relation.clone(),
                 req.kind,
                 req.start,
                 req.goal,

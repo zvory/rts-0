@@ -320,7 +320,7 @@ mod tests {
         assert!(html.contains("Tank Trap Pathing Matrix"));
         assert!(html.contains("<select name=\"case\""));
         assert!(html.contains("<option value=\"friendly_vehicle_reroute\""));
-        assert!(html.contains("<option value=\"enemy_vehicle_breach\""));
+        assert!(html.contains("<option value=\"enemy_vehicle_reroute\""));
         assert!(html.contains("<option value=\"infantry_pass_through\""));
         assert!(html.contains("<option value=\"explicit_infantry_attack\""));
         assert!(

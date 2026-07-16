@@ -1,6 +1,6 @@
 use super::{
     formation, standability, unit_bodies_intersect, unit_body_for_entity, unit_body_with_facing,
-    Occupancy, StaticPathingRelation, UnitBody,
+    Occupancy, UnitBody,
 };
 use crate::config;
 use crate::game::entity::{Entity, EntityStore, MovePhase};
@@ -39,8 +39,7 @@ pub(super) fn nearest_free_goal(
     };
     let occupied_unit_bodies =
         occupied_and_reserved_bodies(entities, teams, player, unit_id, fog, smokes);
-    let relation = StaticPathingRelation::for_player(player, teams);
-    let mut reachability = formation::FormationReachability::new(map, occ, relation);
+    let mut reachability = formation::FormationReachability::new(map, occ);
     let max_tile = map.size.checked_sub(1)?;
     let anchor = map.tile_of(rally.0, rally.1);
     let max_radius = anchor

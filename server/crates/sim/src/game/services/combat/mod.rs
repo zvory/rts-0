@@ -19,7 +19,7 @@ use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
+use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
@@ -80,9 +80,8 @@ fn resolve_target(
 ) -> Option<u32> {
     let occ = Occupancy::build(map, entities);
     let blockers = ShotBlockerIndex::build(map, entities);
-    let tank_trap_relation = StaticPathingRelation::for_player(owner, teams);
     let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-        occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
+        occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
     };
     let attacker_can_fire_while_moving = entities
         .get(self_id)
@@ -262,9 +261,8 @@ pub(in crate::game) fn combat_system(
         }
 
         // Resolve / acquire a target id based on the current order semantics.
-        let tank_trap_relation = StaticPathingRelation::for_player(owner, teams);
         let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-            occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
+            occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
         };
         let require_safe_mortar_autocast_target = is_mortar_team
             && matches!(

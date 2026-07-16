@@ -30,7 +30,7 @@ use crate::game::services::geometry::{
 };
 use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
-    building_footprint, footprint_center, footprint_tiles, Occupancy, StaticPathingRelation,
+    building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
 use crate::game::services::pathing::{
     simplify_reverse_waypoints_with_limit, PathCacheStatus, PathRequest, PathingRequestDiagnostics,
@@ -284,8 +284,7 @@ impl<'a> MoveCoordinator<'a> {
             occupied_trenches.remove(&trench_id);
         }
         let known_trenches = self.known_trenches_for_player(player).to_vec();
-        let relation = StaticPathingRelation::for_player(player, &self.teams);
-        let mut reachability = formation::FormationReachability::new(self.map, self.occ, relation);
+        let mut reachability = formation::FormationReachability::new(self.map, self.occ);
         let goals = formation::formation_goals_with_known_trenches_and_reachability(
             self.map,
             self.occ,
@@ -898,10 +897,9 @@ impl<'a> MoveCoordinator<'a> {
         source: PathingRequestSource,
     ) -> bool {
         let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
-        let ((sx, sy), owner, kind, start_pos) = match entities.get(id) {
+        let ((sx, sy), kind, start_pos) = match entities.get(id) {
             Some(e) => (
                 self.map.tile_of(e.pos_x, e.pos_y),
-                e.owner,
                 e.kind,
                 (e.pos_x, e.pos_y),
             ),
@@ -952,7 +950,6 @@ impl<'a> MoveCoordinator<'a> {
             ))
         .then_some((start_pos, goal));
         let req = PathRequest {
-            relation: StaticPathingRelation::for_player(owner, &self.teams),
             kind,
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
