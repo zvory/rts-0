@@ -64,6 +64,7 @@ pub(crate) fn construction_system(
                 w.set_target_id(Some(site));
                 w.mark_build_phase(BuildPhase::Constructing { site });
             }
+            eject_worker_from_static_overlap(map, entities, worker);
             continue;
         }
 
@@ -209,6 +210,7 @@ pub(crate) fn construction_system(
             w.set_target_id(Some(site));
             w.mark_build_phase(BuildPhase::Constructing { site });
         }
+        eject_worker_from_static_overlap(map, entities, worker);
     }
 
     // ----- Progress pass: workers actively constructing -----
@@ -258,7 +260,7 @@ pub(crate) fn construction_system(
             }
             let builders = builders_for_site(entities, site);
             for builder in &builders {
-                defensively_eject_worker_from_static_overlap(map, entities, *builder);
+                eject_worker_from_static_overlap(map, entities, *builder);
             }
             clear_build_orders(entities, &builders);
         }
@@ -444,21 +446,15 @@ pub(crate) fn resumable_site_for_build_intent(
     })
 }
 
-/// Ensure a worker that just finished construction is in a body-standable position before
-/// dropping its ghost phase. While the worker was ghost-anchored, its circular body was free
-/// to overlap building footprints (this is how a builder can stand inside its own scaffold).
-/// Once the worker leaves the ghost phase its body is checked by the static invariants, so it
-/// must not still be clipping any building rect. This is most easily violated when neighbours
-/// are packed tightly around the builder's arrival position; the builder's arrival check only
-/// enforces footprint clearance for the new building, not body clearance for adjacent ones.
+/// Ensure a worker is in a body-standable position whenever it attaches to a scaffold and before
+/// it drops its ghost phase. A worker may arrive inside its intended footprint because placement
+/// deliberately ignores the chosen builder's body. Once the scaffold exists, leaving the worker
+/// there would shelter it inside the building for the entire construction period. Tight placement
+/// against neighbouring buildings can also leave the worker clipping an adjacent footprint.
 ///
 /// We spiral outward from the worker's current tile and snap it to the first tile center where
 /// its body is fully static-standable (terrain passable, outside every building footprint).
-fn defensively_eject_worker_from_static_overlap(
-    map: &Map,
-    entities: &mut EntityStore,
-    worker: u32,
-) {
+fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worker: u32) {
     let (wx, wy, wkind) = match entities.get(worker) {
         Some(w) => (w.pos_x, w.pos_y, w.kind),
         None => return,
@@ -486,8 +482,7 @@ fn defensively_eject_worker_from_static_overlap(
                 let cy = ty as f32 * ts + ts * 0.5;
                 if standability::unit_static_standable(map, &occ, wkind, cx, cy) {
                     if let Some(w) = entities.get_mut(worker) {
-                        w.pos_x = cx;
-                        w.pos_y = cy;
+                        w.set_position(cx, cy);
                     }
                     return;
                 }
@@ -505,7 +500,7 @@ mod tests {
     use crate::protocol::terrain;
 
     #[test]
-    fn construction_allows_builder_body_inside_footprint() {
+    fn construction_ejects_builder_from_new_scaffold_and_keeps_building() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
         let (wx, wy) = footprint_center(&map, EntityKind::Depot, 4, 4);
@@ -545,6 +540,26 @@ mod tests {
                 Some(BuildPhase::Constructing { .. })
             ),
             "chosen builder should transition into active construction"
+        );
+        let built_site = entities
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Depot && entity.under_construction())
+            .expect("depot scaffold should exist");
+        let worker_entity = entities.get(worker).expect("worker should survive");
+        let occupancy = Occupancy::build(&map, &entities);
+        assert!(
+            standability::unit_static_standable(
+                &map,
+                &occupancy,
+                worker_entity.kind,
+                worker_entity.pos_x,
+                worker_entity.pos_y,
+            ),
+            "builder should be ejected to an attackable position outside the scaffold"
+        );
+        assert!(
+            active_sites.contains(&built_site.id),
+            "ejected builder should progress construction in the same tick"
         );
         assert!(
             events.get(&1).is_none_or(Vec::is_empty),
@@ -658,7 +673,7 @@ mod tests {
             "test setup must reproduce a body-overlap before the eject helper runs"
         );
 
-        defensively_eject_worker_from_static_overlap(&map, &mut entities, worker);
+        eject_worker_from_static_overlap(&map, &mut entities, worker);
 
         let occ_after = Occupancy::build(&map, &entities);
         let w = entities.get(worker).expect("worker should survive");
