@@ -497,22 +497,24 @@ folded into default targeting.
   `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
-  player's economy only if the resource node is within `MINING_CC_RANGE_TILES = 9.0` tiles of a
+  player's economy only if the resource node is within `MINING_CC_RANGE_TILES = 10.0` tiles of a
   completed home-base mining anchor owned by that player: City Centre for Kriegsia, or Zamok for
   Ekat. Workers deposit the base load; Golems deposit four times the base load.
   Starting resources are placed within `CC_RESOURCE_MAX_DIST_TILES = 7.0`, giving City Centres a
-  two-tile mining buffer around the authored/base resource cluster. If no completed mining anchor is
-  close enough, gatherers ignore new gather orders for that steel patch and active miners scatter
-  roughly one tile away from the patch. When a patch empties the gatherer goes idle (no automatic
-  retarget).
+  three-tile mining buffer around the authored/base resource cluster. If no completed mining
+  anchor is close enough, gatherers ignore new gather orders for that steel patch and active miners
+  scatter roughly one tile away from the patch. When a patch empties the gatherer goes idle (no
+  automatic retarget).
 - Oil extraction: workers do not directly mine oil. A worker right-click or contextual build on a
   live oil patch issues a Pump Jack build at that patch. Completed Pump Jacks mine
   `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
   underlying oil node. When that final load empties the patch, its Pump Jack disappears with it.
   Pump Jack placement requires overlap with a live oil node, but has no tech or mining-anchor
-  requirement. Friendly units standing over the patch do not intercept the contextual right-click;
-  when the builder arrives, owned and allied units overlapping the footprint are moved to the
-  nearest clear positions before the Pump Jack scaffold is placed. Enemy units remain blockers.
+  requirement. AI resource planning treats oil patches within the 10-tile mining-anchor range as
+  immediately available Pump Jack sites. Friendly units standing over the patch do not intercept
+  the contextual right-click; when the builder arrives, owned and allied units overlapping the
+  footprint are moved to the nearest clear positions before the Pump Jack scaffold is placed.
+  Enemy units remain blockers.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch
