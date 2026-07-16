@@ -418,6 +418,13 @@ mod tests {
         assert!(names.contains(&"No Terrain"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         assert!(names.contains(&"4 Player Map"), "got: {names:?}");
+        assert!(names.contains(&"3 Player Map"), "got: {names:?}");
+        let three_player_map = available
+            .iter()
+            .find(|entry| entry.name == "3 Player Map")
+            .expect("3-player map must be listed");
+        assert_eq!(three_player_map.min_players, 1);
+        assert_eq!(three_player_map.max_players, 3);
         // Every entry must have a non-empty description.
         for entry in &available {
             assert!(
