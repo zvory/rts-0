@@ -97,6 +97,7 @@ export function togglePointerLock() {
 
 export function _setCursorLockState(locked, mode) {
   const prior = { locked: this.pointerLocked, mode: this._cursorLockMode };
+  if (!locked && this.pointerLocked) this.inputRouter?.releaseSource?.("locked");
   this.pointerLocked = locked;
   this._cursorLockMode = locked ? mode : null;
   this.dom.classList.toggle("pointer-locked", locked);

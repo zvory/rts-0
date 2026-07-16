@@ -251,6 +251,7 @@ export class Minimap {
     };
     this._onCanvasPointerDown = this._handleCanvasPointerDown.bind(this);
     this._onCanvasPointerMove = this._handleCanvasPointerMove.bind(this);
+    this._onCanvasPointerLeave = this._clearSetupPreviewHover.bind(this);
     this._onCanvasPointerUp = this._handleCanvasPointerUp.bind(this);
     this._onCanvasPointerCancel = this._handleCanvasPointerCancel.bind(this);
     this._onWindowBlur = this._handleWindowBlur.bind(this);
@@ -977,6 +978,7 @@ export class Minimap {
     c.addEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     c.addEventListener("pointerdown", this._onCanvasPointerDown);
     c.addEventListener("pointermove", this._onCanvasPointerMove);
+    c.addEventListener("pointerleave", this._onCanvasPointerLeave);
     c.addEventListener("pointerup", this._onCanvasPointerUp);
     c.addEventListener("pointercancel", this._onCanvasPointerCancel);
     window.addEventListener("blur", this._onWindowBlur);
@@ -996,6 +998,7 @@ export class Minimap {
     c.removeEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     c.removeEventListener("pointerdown", this._onCanvasPointerDown);
     c.removeEventListener("pointermove", this._onCanvasPointerMove);
+    c.removeEventListener("pointerleave", this._onCanvasPointerLeave);
     c.removeEventListener("pointerup", this._onCanvasPointerUp);
     c.removeEventListener("pointercancel", this._onCanvasPointerCancel);
     window.removeEventListener("blur", this._onWindowBlur);
@@ -1051,7 +1054,9 @@ export class Minimap {
       contains: (ev) => this._containsClientPoint(ev.clientX, ev.clientY),
       pointerDown: (ev) => this._handlePointerDown(ev),
       pointerMove: (ev) => this._handlePointerMove(ev),
+      pointerLeave: () => this._clearSetupPreviewHover(),
       pointerUp: () => this._handlePointerUp(),
+      pointerCancel: () => this._handlePointerUp(),
     };
   }
 
@@ -1153,7 +1158,8 @@ export class Minimap {
 
   _handleCanvasPointerMove(ev) {
     const gesture = this._activePointerGesture;
-    if (!gesture || gesture.pointerId !== ev.pointerId) return;
+    if (!gesture) return this._handlePointerMove(this._routerEvent(ev, "dom"));
+    if (gesture.pointerId !== ev.pointerId) return;
     if (!gesture.moved && this._gestureMovedBeyondTapSlop(gesture, ev)) {
       gesture.moved = true;
       this._dragging = true;
@@ -1238,9 +1244,10 @@ export class Minimap {
     if (gesture) this._releasePointer(gesture.pointerId);
     this._activePointerGesture = null;
     this._dragging = false;
-    this._hoverWorld = null;
-    this._clearMinimapSetupPreview();
+    this._clearSetupPreviewHover();
   }
+
+  _clearSetupPreviewHover() { this._hoverWorld = null; this._clearMinimapSetupPreview(); }
 
   _updateHoverFromEvent(ev) {
     if (!this._ensureTransform()) return false;

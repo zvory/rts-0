@@ -53,11 +53,14 @@ The beta deploy workflow uses the `beta-deploy` concurrency group with `cancel-i
 GitHub allows an in-flight deploy to finish its Fly drain, then deploys only the newest successful
 pending commit.
 
-## Match-history secrets (Supabase)
+## Match-history and stress-test secrets (Supabase)
 
 Match history persistence requires `DATABASE_URL`. `RTS_RECORD_MATCHES=1` enables beta/mainline
 writes; when the gate is off, the server can read history but does not upload match rows or replay
 artifacts. Local `cargo run` should keep the gate off.
+
+`RTS_RECORD_STRESS_TESTS=1` independently persists accepted `/stress-test` reports. With that gate
+off they are still structured-log events and remain downloadable until the server process restarts.
 
 Set these once per Fly app (replace the URL with the rotated password):
 
@@ -65,11 +68,13 @@ Set these once per Fly app (replace the URL with the rotated password):
 flyctl secrets set \
   DATABASE_URL='postgres://postgres:NEW_PASSWORD@db.umerhlzpdtbxndptnhui.supabase.co:5432/postgres?sslmode=require' \
   RTS_RECORD_MATCHES=1 \
+  RTS_RECORD_STRESS_TESTS=1 \
   -a rts-0-zvorygin-beta
 
 flyctl secrets set \
   DATABASE_URL='postgres://postgres:NEW_PASSWORD@db.umerhlzpdtbxndptnhui.supabase.co:5432/postgres?sslmode=require' \
   RTS_RECORD_MATCHES=1 \
+  RTS_RECORD_STRESS_TESTS=1 \
   -a rts-0-zvorygin
 ```
 

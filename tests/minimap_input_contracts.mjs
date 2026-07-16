@@ -706,7 +706,80 @@ function pointerEvent(canvas, clientX, clientY, {
     preview.guns.some((e) => e.id === 31) && preview.guns.some((e) => e.id === 32),
     "setup minimap preview includes anti-tank guns and artillery",
   );
+  assert(h.router.releaseSource("locked"), "pointer-lock exit releases minimap preview ownership");
+  h.clientIntent.updateAntiTankGunSetupPreview({
+    source: "viewport",
+    mouseX: 650,
+    mouseY: 450,
+    guns: selected.slice(1),
+  });
+  h.minimap.updateCommandTargetPreview();
+  assert(
+    h.clientIntent.antiTankGunSetupPreview?.source === "viewport" &&
+      h.clientIntent.antiTankGunSetupPreview?.mouseX === 650,
+    "pointer-lock exit cannot leave a stale minimap point that overwrites native battlefield hover",
+  );
+  assert(h.router.pointerMove(lockedEvent(190, 290, 0)), "re-entering the minimap restores routed hover ownership");
+  assert(!h.router.pointerMove(lockedEvent(500, 500, 0)), "leaving the minimap releases locked-cursor preview ownership");
+  h.clientIntent.updateAntiTankGunSetupPreview({
+    source: "viewport",
+    mouseX: 700,
+    mouseY: 500,
+    guns: selected.slice(1),
+  });
+  h.minimap.updateCommandTargetPreview();
+  assert(
+    h.clientIntent.antiTankGunSetupPreview?.source === "viewport" &&
+      h.clientIntent.antiTankGunSetupPreview?.mouseX === 700,
+    "a stale locked-cursor minimap point does not overwrite the battlefield setup preview",
+  );
   h.minimap.destroy();
+}
+
+// Native minimap drags release setup-preview ownership when the pointer returns to the battlefield.
+{
+  const selected = [
+    { id: 41, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 30, y: 40 },
+    { id: 42, owner: 1, kind: KIND.ARTILLERY, x: 50, y: 60 },
+  ];
+  const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
+  const down = listenerFor(h.canvas, "pointerdown");
+  const move = listenerFor(h.canvas, "pointermove");
+  const leave = listenerFor(h.canvas, "pointerleave");
+  const up = listenerFor(h.canvas, "pointerup");
+  assert(down && move && leave && up, "minimap installs native hover ownership lifecycle listeners");
+
+  move(pointerEvent(h.canvas, 180, 280, { pointerId: 60, pointerType: "mouse" }));
+  assert(
+    h.clientIntent.antiTankGunSetupPreview?.source === "minimap",
+    "native mouse hover previews support-weapon setup with pointer-lock parity",
+  );
+  leave(pointerEvent(h.canvas, 350, 280, { pointerId: 60, pointerType: "mouse" }));
+
+  down(pointerEvent(h.canvas, 180, 280, { pointerId: 61, pointerType: "mouse" }));
+  move(pointerEvent(h.canvas, 200, 300, { pointerId: 61, pointerType: "mouse" }));
+  up(pointerEvent(h.canvas, 200, 300, { pointerId: 61, pointerType: "mouse" }));
+  assert(
+    h.clientIntent.commandTarget === "setupAntiTankGuns" &&
+      h.clientIntent.antiTankGunSetupPreview?.source === "minimap",
+    "a native minimap drag keeps setup targeting armed at its live minimap point",
+  );
+
+  leave(pointerEvent(h.canvas, 350, 300, { pointerId: 61, pointerType: "mouse" }));
+  h.clientIntent.updateAntiTankGunSetupPreview({
+    source: "viewport",
+    mouseX: 700,
+    mouseY: 500,
+    guns: selected,
+  });
+  h.minimap.updateCommandTargetPreview();
+  assert(
+    h.clientIntent.antiTankGunSetupPreview?.source === "viewport" &&
+      h.clientIntent.antiTankGunSetupPreview?.mouseX === 700,
+    "a completed native minimap drag cannot pin anti-tank or artillery cones to its last point",
+  );
+  h.minimap.destroy();
+  assert(listenerFor(h.canvas, "pointerleave", "remove"), "minimap teardown removes its native hover listener");
 }
 
 // Queued minimap setup previews aim from the accepted movement endpoint, matching world-view setup.

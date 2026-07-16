@@ -13,6 +13,7 @@ export function snapshotStreamLaunchConfig() {
     banner: `offline snapshot stream · ${id} · no WebSocket or live simulation`,
   };
 }
+export { stressTestLaunchConfig } from "./stress_test_launch.js";
 
 function diagnosticsEnabled() {
   try {

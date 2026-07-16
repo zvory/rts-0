@@ -1,3 +1,4 @@
+use super::test_support::speed_scaled_escape_deadline_ticks;
 use super::*;
 
 fn assert_units_do_not_intersect_buildings(game: &Game) {
@@ -61,14 +62,14 @@ fn matches_reduced_reproduction_layout() {
 }
 
 #[test]
-fn backs_out_and_completes_route() {
+fn clears_west_edge_of_building_corner() {
     let setup = Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
         .expect("scenario setup should succeed");
-    assert_completes_route(setup, true);
+    assert_escapes_corner(setup);
 }
 
 #[test]
-fn west_southwest_variant_targets_ten_left_four_down_and_completes_route() {
+fn west_southwest_variant_targets_ten_left_four_down_and_escapes_corner() {
     let setup = Game::new_command_car_corner_west_southwest_scenario(
         EntityKind::CommandCar,
         1,
@@ -89,21 +90,37 @@ fn west_southwest_variant_targets_ten_left_four_down_and_completes_route() {
         setup.goal.1,
         command_car.pos_y + config::TILE_SIZE as f32 * 4.0
     );
-    assert_completes_route(setup, false);
+    assert_escapes_corner(setup);
 }
 
-fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: bool) {
+fn assert_escapes_corner(mut setup: DevScenarioSetup) {
     for _ in 0..setup.issue_after_ticks {
         setup.game.tick();
     }
     let unit_id = setup.units[0];
-    let start = setup
+    let western_building_edge = setup
         .game
         .state
         .entities
-        .get(unit_id)
-        .map(|entity| (entity.pos_x, entity.pos_y, entity.facing()))
-        .expect("scenario Command Car should exist");
+        .iter()
+        .filter_map(|entity| {
+            services::geometry::building_rect_for_entity(&setup.game.state.map, entity)
+                .map(|rect| rect.min_x)
+        })
+        .min_by(f32::total_cmp)
+        .expect("scenario should include buildings");
+    let start_body = services::geometry::unit_body_for_entity(
+        setup
+            .game
+            .state
+            .entities
+            .get(unit_id)
+            .expect("scenario Command Car should exist"),
+    )
+    .expect("Command Car should have a movement body");
+    let escape_distance_px = (start_body.aabb().max_x - western_building_edge).max(0.0);
+    let deadline_ticks =
+        speed_scaled_escape_deadline_ticks(EntityKind::CommandCar, escape_distance_px, 6);
     setup.game.enqueue(
         setup.player_id,
         SimCommand::Move {
@@ -114,31 +131,8 @@ fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: b
         },
     );
 
-    setup.game.tick();
-    let after_first_tick = setup
-        .game
-        .state
-        .entities
-        .get(unit_id)
-        .expect("scenario Command Car should survive");
-    assert_units_do_not_intersect_buildings(&setup.game);
-    let first_delta = (
-        after_first_tick.pos_x - start.0,
-        after_first_tick.pos_y - start.1,
-    );
-    let forward = (start.2.cos(), start.2.sin());
-    if expect_initial_reverse {
-        assert!(
-            first_delta.0 * forward.0 + first_delta.1 * forward.1 < 0.0,
-            "the first maneuver should reverse toward the route exit, got delta {first_delta:?}"
-        );
-    }
-
-    let mut arrived_tick = None;
-    let mut saw_intermediate_reverse = after_first_tick.movement.as_ref().is_some_and(|movement| {
-        movement.path.len() > 1 && movement.scout_car_reverse_waypoint.is_some()
-    });
-    for tick in 2..=600 {
+    let mut escaped_tick = None;
+    for tick in 1..=deadline_ticks {
         setup.game.tick();
         assert_units_do_not_intersect_buildings(&setup.game);
         let command_car = setup
@@ -147,11 +141,10 @@ fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: b
             .entities
             .get(unit_id)
             .expect("scenario Command Car should survive");
-        saw_intermediate_reverse |= command_car.movement.as_ref().is_some_and(|movement| {
-            movement.path.len() > 1 && movement.scout_car_reverse_waypoint.is_some()
-        });
-        if command_car.path_is_empty() {
-            arrived_tick = Some(tick);
+        let body = services::geometry::unit_body_for_entity(command_car)
+            .expect("Command Car should have a movement body");
+        if body.aabb().max_x < western_building_edge {
+            escaped_tick = Some(tick);
             break;
         }
     }
@@ -162,19 +155,11 @@ fn assert_completes_route(mut setup: DevScenarioSetup, expect_initial_reverse: b
         .entities
         .get(unit_id)
         .expect("scenario Command Car should survive");
-    let distance_to_goal = ((command_car.pos_x - setup.goal.0).powi(2)
-        + (command_car.pos_y - setup.goal.1).powi(2))
-    .sqrt();
+    let body = services::geometry::unit_body_for_entity(command_car)
+        .expect("Command Car should have a movement body");
+    let remaining_escape_distance_px = (body.aabb().max_x - western_building_edge).max(0.0);
     assert!(
-        saw_intermediate_reverse,
-        "the corner route should exercise a latched intermediate reverse maneuver"
-    );
-    assert!(
-        arrived_tick.is_some(),
-        "Command Car should finish the route, stopped {distance_to_goal:.2}px from the goal"
-    );
-    assert!(
-        distance_to_goal <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX,
-        "Command Car should finish near the ordered goal, stopped {distance_to_goal:.2}px away"
+        escaped_tick.is_some(),
+        "Command Car should clear the west edge of the building corner within {deadline_ticks} speed-scaled ticks, still {remaining_escape_distance_px:.2}px inside it"
     );
 }

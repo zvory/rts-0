@@ -17,6 +17,9 @@ src/
   config/         # timing.js, presentation.js, rules_mirror.js, factions.js
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   snapshot_stream_net.js # Offline static snapshot-frame clock using Net's normal decoder/events
+  stress_test.js # App-owned shareable Hellhole benchmark lifecycle and result UI
+  stress_test_profile.js # Pure JS Self-Profiling trace analysis and SVG flame graph rendering
+  stress_test_launch.js # Bounded /stress-test route/query parser
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   prediction_compatibility.js # server/client prediction-build compatibility guard
@@ -1561,6 +1564,14 @@ snapshot frames through `Net._onMessage` without constructing a WebSocket. This 
 therefore keeps the normal decode, `GameState`, `Match`, Pixi, HUD, minimap, audio, and rAF paths while
 explicitly excluding live server simulation and delivery. Its header is a local artifact contract,
 not an extension of the server wire protocol.
+
+`/stress-test` is the shareable automatic wrapper around the canonical Hellhole snapshot stream.
+It warms and resets the existing frame profiler, measures one bounded window, saves environment and
+phase diagnostics, and uses Chromium's JS Self-Profiling API for a sampled trace plus SVG flame
+graph when available. Hidden or unfocused attempts are discarded and restart after the tab returns;
+other browsers save the phase-timing fallback. The complete cross-file route,
+artifact, privacy, API, persistence, and input-limit contract lives in
+[`client-stress-tests.md`](client-stress-tests.md).
 
 `match.js` builds
 `GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,

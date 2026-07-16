@@ -184,6 +184,38 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
 }
 
 {
+  const fixture = streamBytes({
+    id: "restartable",
+    frames: [snapshotFrame(21), snapshotFrame(22)],
+    loop: false,
+  });
+  const scheduled = [];
+  const events = [];
+  const net = new SnapshotStreamNet({
+    id: "restartable",
+    autoStart: false,
+    fetchFn: async () => ({ ok: true, arrayBuffer: async () => fixture.buffer }),
+    setTimeoutFn: (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    },
+    clearTimeoutFn: () => {},
+  });
+  net.on(S.START, () => events.push("start"));
+  net.on(S.SNAPSHOT, (snapshot) => events.push(`snapshot:${snapshot.tick}`));
+
+  await net.connect();
+  assert(scheduled.length === 0, "manual snapshot streams wait for the benchmark to start them");
+  net.restartFromBeginning();
+  assert(events.join(",") === "start,start" && scheduled.length === 1,
+    "restarting a manual stream rebuilds the match before scheduling its first frame");
+  scheduled.shift().callback();
+  assert(events.at(-1) === "snapshot:21",
+    "a restarted stream begins from the canonical first snapshot");
+  net.close();
+}
+
+{
   const priorWindow = globalThis.window;
   globalThis.window = {
     __rtsSnapshotStream: {
