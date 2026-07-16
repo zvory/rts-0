@@ -425,6 +425,22 @@ mod tests {
             .expect("3-player map must be listed");
         assert_eq!(three_player_map.min_players, 1);
         assert_eq!(three_player_map.max_players, 3);
+        let expected_three_player_starts = vec![(22, 43), (73, 136), (128, 45)];
+        for player_count in 1..=3 {
+            let mut map = Map::load("3 Player Map", player_count, 0x1234_5678)
+                .expect("three-player map should load for every supported player count");
+            assert_eq!(map.size, 150);
+            assert_eq!(map.starts.len(), player_count);
+            assert_eq!(map.base_sites.len(), 12);
+            if player_count == 3 {
+                map.starts.sort_unstable();
+                assert_eq!(map.starts, expected_three_player_starts);
+            }
+        }
+        assert!(
+            Map::load("3 Player Map", 4, 0x1234_5678).is_err(),
+            "three-player map should not expose a fourth start location"
+        );
         // Every entry must have a non-empty description.
         for entry in &available {
             assert!(
