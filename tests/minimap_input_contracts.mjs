@@ -109,7 +109,7 @@ function recordingContext(label) {
       this.calls.push({ op: "arc", args });
     },
     stroke() {
-      this.calls.push({ op: "stroke" });
+      this.calls.push({ op: "stroke", strokeStyle: this.strokeStyle, lineWidth: this.lineWidth });
     },
     fill() {
       this.calls.push({ op: "fill", fillStyle: this.fillStyle, globalAlpha: this.globalAlpha });
@@ -1323,6 +1323,49 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(h.router.pointerDown(lockedEvent(150, 250, 0)), "minimap zone is registered before destroy");
   h.minimap.destroy();
   assert(!h.router.pointerDown(lockedEvent(150, 250, 0)), "minimap zone is unregistered after destroy");
+}
+
+// Positional attack alerts use a slower red pulse with a crisp white inner rim.
+{
+  installWindowStub();
+  const canvas = fakeRenderableCanvas({ width: 220, height: 220 });
+  const minimap = new Minimap(
+    canvas,
+    { map: null },
+    {},
+    {},
+    { issueCommand() {} },
+  );
+  minimap.ping(40, 60, "alert", true);
+  minimap._pings[0].startedAt = 100;
+  minimap._drawPings(650);
+
+  const arcs = canvas.context.calls.filter((call) => call.op === "arc");
+  const strokes = canvas.context.calls.filter((call) => call.op === "stroke");
+  assert(arcs.length === 2, "attack alert draws both the red ring and its inner rim");
+  assertApprox(arcs[0].args[2], 11.5, 0.001, "attack alert advances halfway through its 1.1 second pulse");
+  assertApprox(arcs[1].args[2], 9.5, 0.001, "attack alert inner rim stays two pixels inside the red ring");
+  assert(
+    strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 2,
+    "attack alert keeps its strong red outer stroke",
+  );
+  assert(
+    strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 1,
+    "attack alert draws a crisp white inner stroke",
+  );
+
+  canvas.context.calls.length = 0;
+  minimap._pings.length = 0;
+  minimap.ping(40, 60, "alert");
+  minimap._pings[0].startedAt = 100;
+  minimap._drawPings(550);
+  assert(
+    canvas.context.calls.filter((call) => call.op === "arc").length === 1,
+    "other positional alerts retain the generic single-ring treatment",
+  );
+  minimap._drawPings(1000);
+  assert(minimap._pings.length === 0, "generic positional alerts retain their 900 ms lifetime");
+  minimap.destroy();
 }
 
 console.log("minimap_input_contracts: ok");
