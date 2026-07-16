@@ -4,10 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND, SETUP, STATE } from "../client/src/protocol.js";
-import {
-  _drawUnit,
-  _rigRenderContextFor,
-} from "../client/src/renderer/units.js";
+import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import {
   createLiveRigDefinitions,
@@ -65,12 +62,13 @@ import {
   SCOUT_CAR_RIG_SVG,
 } from "../client/src/renderer/rigs/vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
+import { createInspectionPixiFactory } from "./helpers/rig_inspection_pixi.mjs";
+import { assertAtlasSpriteUsesWorldScale } from "./helpers/rig_asset_assertions.mjs";
 import {
-  createInspectionPixiFactory,
-  createInspectionPngPixiFactory,
-  FakeContainer,
-  FakeGraphics,
-} from "./helpers/rig_inspection_pixi.mjs";
+  fakeAtlasTexture,
+  fakeFrameStripTexture,
+  makeRigRenderer,
+} from "./helpers/rig_renderer_harness.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
@@ -1430,159 +1428,6 @@ function readPngDimensions(repoRelativePath) {
     width: buffer.readUInt32BE(16),
     height: buffer.readUInt32BE(20),
   };
-}
-
-function makeRigRenderer() {
-  return {
-    _liveRigDefinitionsByKind: new Map(),
-    _liveFrameStripsByKind: new Map(),
-    _liveFrameStripTextures: new Map(),
-    _liveRigPools: {
-      liveUnitRigShadows: new Map(),
-      liveUnitRigs: new Map(),
-      liveUnitRigOverlays: new Map(),
-      liveUnitRigEffects: new Map(),
-      liveShotRevealRigShadows: new Map(),
-      liveShotRevealRigs: new Map(),
-      liveShotRevealRigOverlays: new Map(),
-      liveShotRevealRigEffects: new Map(),
-    },
-    _liveRigRoutes: {
-      liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
-      liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
-      liveUnitRigOverlays: { poolName: "liveUnitRigOverlays", layerName: "units" },
-      liveUnitRigEffects: { poolName: "liveUnitRigEffects", layerName: "units" },
-      liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
-      liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
-      liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
-      liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
-    },
-    _rigPixiFactory: createInspectionPngPixiFactory(),
-    _pools: { unitShadows: new Map(), units: new Map(), shotRevealShadows: new Map(), shotReveals: new Map() },
-    _seen: {
-      unitShadows: new Set(),
-      units: new Set(),
-      shotRevealShadows: new Set(),
-      shotReveals: new Set(),
-      liveUnitRigShadows: new Set(),
-      liveUnitRigs: new Set(),
-      liveUnitRigOverlays: new Set(),
-      liveUnitRigEffects: new Set(),
-      liveShotRevealRigShadows: new Set(),
-      liveShotRevealRigs: new Set(),
-      liveShotRevealRigOverlays: new Set(),
-      liveShotRevealRigEffects: new Set(),
-    },
-    layers: {
-      unitShadows: new FakeContainer(),
-      units: new FakeContainer(),
-      shotRevealShadows: new FakeContainer(),
-      shotReveals: new FakeContainer(),
-    },
-    _drawUnit(_entity, _colorByOwner, _state, pools = {}) {
-      return _drawUnit.call(this, _entity, _colorByOwner, _state, pools);
-    },
-    _slot(poolName, id) {
-      const pool = this._pools[poolName];
-      let graphic = pool.get(id);
-      if (!graphic) {
-        graphic = new FakeGraphics();
-        pool.set(id, graphic);
-        this.layers[poolName].addChild(graphic);
-      }
-      this._seen[poolName].add(id);
-      graphic.visible = true;
-      graphic.alpha = 1;
-      graphic.clear();
-      return graphic;
-    },
-    _shadow(g, cx, cy, radius) {
-      g.beginFill(0x000000, 0.28);
-      g.drawEllipse(cx, cy + radius * 0.35, radius, radius * 0.6);
-      g.endFill();
-    },
-    _vehicleShadow() {
-      throw new Error("worker comparison test should not draw vehicle shadow");
-    },
-    _tintFor(owner, colorByOwner) {
-      return colorByOwner.get(owner) ?? 0x9aa0a8;
-    },
-    _rigRenderContextFor(entity, colorByOwner, state) {
-      return _rigRenderContextFor.call(this, entity, colorByOwner, state);
-    },
-    _deployedWeaponSetupVisual: () => ({ prongFactor: 0, barrel: false }),
-    _tankMotionVisual: () => ({ activity: 0 }),
-    _map: { tileSize: 32 },
-  };
-}
-
-function fakeAtlasTexture() {
-  return { baseTexture: { id: "fake-tank-atlas" } };
-}
-
-function fakeFrameStripTexture() {
-  return { baseTexture: { id: "fake-rifleman-strip" } };
-}
-
-function assertAtlasSpriteUsesWorldScale(definition, atlas, spriteId) {
-  const worldScale = atlas.grid?.normalization?.worldScale;
-  assert.equal(typeof worldScale, "number");
-  const sprite = atlas.sprites.find((candidate) => candidate.id === spriteId);
-  assert.ok(sprite, `${spriteId} should exist`);
-  const visibleBounds = sprite.frame?.visibleBounds;
-  assert.ok(visibleBounds, `${spriteId} should have normalized visible bounds`);
-  const sourceBounds = unionPartBounds(definition, sprite.sourceParts);
-  const expectedPixelsPerUnitX = (visibleBounds.w / Math.max(1, sourceBounds.maxX - sourceBounds.minX)) / worldScale;
-  const expectedPixelsPerUnitY = (visibleBounds.h / Math.max(1, sourceBounds.maxY - sourceBounds.minY)) / worldScale;
-  assertAlmostEqual(sprite.frame.pixelsPerUnitX, expectedPixelsPerUnitX, `${spriteId} pixelsPerUnitX`);
-  assertAlmostEqual(sprite.frame.pixelsPerUnitY, expectedPixelsPerUnitY, `${spriteId} pixelsPerUnitY`);
-}
-
-function unionPartBounds(definition, partIds) {
-  const bounds = partIds
-    .map((partId) => definition.parts.find((part) => part.id === partId))
-    .filter(Boolean)
-    .map(partBounds);
-  assert.ok(bounds.length > 0, "sprite should reference at least one source part");
-  return {
-    minX: Math.min(...bounds.map((bound) => bound.minX)),
-    minY: Math.min(...bounds.map((bound) => bound.minY)),
-    maxX: Math.max(...bounds.map((bound) => bound.maxX)),
-    maxY: Math.max(...bounds.map((bound) => bound.maxY)),
-  };
-}
-
-function partBounds(part) {
-  const geometry = part?.geometry || {};
-  const points = [];
-  if (geometry.type === "rect") {
-    points.push([geometry.x, geometry.y], [geometry.x + geometry.width, geometry.y + geometry.height]);
-  } else if (geometry.type === "line") {
-    points.push([geometry.from.x, geometry.from.y], [geometry.to.x, geometry.to.y]);
-  } else if (geometry.type === "polygon" || geometry.type === "polyline") {
-    for (const point of geometry.points || []) points.push([point.x, point.y]);
-  } else if (geometry.type === "circle") {
-    points.push([geometry.cx - geometry.r, geometry.cy - geometry.r], [geometry.cx + geometry.r, geometry.cy + geometry.r]);
-  } else if (geometry.type === "ellipse") {
-    points.push([geometry.cx - geometry.rx, geometry.cy - geometry.ry], [geometry.cx + geometry.rx, geometry.cy + geometry.ry]);
-  }
-  assert.ok(points.length > 0, `${part?.id || "part"} should have measurable geometry`);
-  const strokePad = Math.max(part?.paint?.strokeWidth || 0, geometry.strokeWidth || 0, 1) * 0.5 + 0.5;
-  const xs = points.map(([x]) => x);
-  const ys = points.map(([, y]) => y);
-  return {
-    minX: Math.min(...xs) - strokePad,
-    minY: Math.min(...ys) - strokePad,
-    maxX: Math.max(...xs) + strokePad,
-    maxY: Math.max(...ys) + strokePad,
-  };
-}
-
-function assertAlmostEqual(actual, expected, label, epsilon = 0.000001) {
-  assert.ok(
-    Math.abs(actual - expected) <= epsilon,
-    `${label}: expected ${expected}, got ${actual}`,
-  );
 }
 
 function test(name, fn) {
