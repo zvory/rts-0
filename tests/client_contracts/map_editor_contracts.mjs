@@ -531,12 +531,22 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     terrain: Array(126 * 126).fill(TERRAIN.GRASS), starts: [], baseSites: [],
   });
   const result = addSymmetricDraftLocations(draft, {
-    kind: "start", tile: { x: 63, y: 30 }, symmetry: MAP_EDITOR_SYMMETRY.THREE_WAY,
+    kind: "start", tile: { x: 47, y: 7 }, symmetry: MAP_EDITOR_SYMMETRY.THREE_WAY,
   });
   assert.deepEqual(result, { ok: true, count: 3 });
-  assert.deepEqual(draft.startLocations, [{ x: 63, y: 30 }, { x: 90, y: 79 }, { x: 34, y: 78 }]);
+  assert.deepEqual(draft.startLocations, [{ x: 47, y: 7 }, { x: 118, y: 77 }, { x: 22, y: 104 }]);
   assert.deepEqual(draft.baseSites, draft.startLocations,
     "three-way placement creates a matching base for each 1v1v1 start");
+
+  const movedFromRotatedCopy = moveSymmetricDraftLocation(draft, {
+    kind: "start", locationIndex: 1, tile: { x: 117, y: 77 },
+    symmetry: MAP_EDITOR_SYMMETRY.THREE_WAY,
+  });
+  assert.deepEqual(movedFromRotatedCopy, { ok: true, count: 3 });
+  assert.deepEqual(draft.startLocations, [{ x: 48, y: 8 }, { x: 117, y: 77 }, { x: 23, y: 102 }],
+    "a rotated copy with square-grid rounding drift still moves the complete location group");
+  assert.deepEqual(draft.baseSites, draft.startLocations,
+    "moving a rounded three-way copy keeps its matching start bases coupled");
 
   const edgeDraft = authoredMapFromMaterialized({
     name: "Edge placement", description: "", size: 126,

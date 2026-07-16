@@ -407,13 +407,15 @@ export function moveSymmetricDraftLocation(draft, {
   const source = collection?.[Math.trunc(Number(locationIndex))];
   const target = normalizedDraftTile(draft, tile, radius);
   if (!source || !target) return draftEditError("Choose a valid location and map tile.");
+  if (sameLocation(source, target)) return { ok: true, count: 0 };
   const transforms = SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)];
   const plannedSources = new Set();
   const plans = [];
   for (const transform of transforms) {
-    const from = transformMapTile(source, draft.terrain.length, transform);
-    const index = collection.findIndex((candidate) => sameLocation(candidate, from));
+    const transformedFrom = transformMapTile(source, draft.terrain.length, transform);
+    const index = transformedLocationIndex(collection, transformedFrom, plannedSources, symmetry);
     if (index < 0 || plannedSources.has(index)) continue;
+    const from = collection[index];
     const to = transformMapTile(target, draft.terrain.length, transform);
     if (!draftLocationTileWithinClearance(draft, to, radius)) {
       return draftEditError("That location's symmetric copies do not fit within the map edge clearance.");
@@ -685,6 +687,31 @@ function draftLocationTileWithinClearance(draft, tile, radius) {
     && valid.y >= radius
     && valid.x < size - radius
     && valid.y < size - radius;
+}
+function transformedLocationIndex(collection, target, excluded, symmetry) {
+  if (!target) return -1;
+  const exact = collection.findIndex((candidate, index) => (
+    !excluded.has(index) && sameLocation(candidate, target)
+  ));
+  if (exact >= 0 || symmetry !== MAP_EDITOR_SYMMETRY.THREE_WAY) return exact;
+
+  // Snapping a 120-degree rotation to square-grid tiles can move a rotated copy by one
+  // tile when that copy is used as the next rotation's source. Match that bounded drift so
+  // every member of a generated three-location group remains a valid drag handle.
+  let nearest = -1;
+  let nearestDistance = Infinity;
+  for (let index = 0; index < collection.length; index++) {
+    if (excluded.has(index)) continue;
+    const candidate = collection[index];
+    const dx = candidate.x - target.x;
+    const dy = candidate.y - target.y;
+    const distance = dx * dx + dy * dy;
+    if (distance <= 2 && distance < nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
 }
 function validMapTile(tile, size) {
   const x = Math.trunc(Number(tile?.x)); const y = Math.trunc(Number(tile?.y));
