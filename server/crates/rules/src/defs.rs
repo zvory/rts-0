@@ -74,7 +74,6 @@ const FACTORY_UNITS: &[EntityKind] = &[
     EntityKind::Tank,
     EntityKind::CommandCar,
 ];
-const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
@@ -402,7 +401,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: BARRACKS_UNITS,
-        build_requires: CITY_CENTRE_REQUIRED,
+        build_requires: &[],
     },
     BuildingDef {
         kind: EntityKind::TrainingCentre,
