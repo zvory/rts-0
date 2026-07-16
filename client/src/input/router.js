@@ -12,6 +12,8 @@ export class MatchInputRouter {
     this.zones = [];
     this.captureZone = null;
     this.captureSource = null;
+    this.hoverZone = null;
+    this.hoverSource = null;
   }
 
   registerZone(zone) {
@@ -26,6 +28,7 @@ export class MatchInputRouter {
   unregisterZone(zone) {
     this.zones = this.zones.filter((z) => z !== zone);
     if (this.captureZone === zone) this._clearCapture();
+    if (this.hoverZone === zone) this._setHoverZone(null);
   }
 
   pointerDown(event) {
@@ -48,11 +51,14 @@ export class MatchInputRouter {
     if (zone && typeof zone.pointerMove === "function") {
       return !!zone.pointerMove(e);
     }
+    let hoverZone = null;
     for (const candidate of this.zones) {
       if (!candidate.contains(e)) continue;
-      if (typeof candidate.pointerMove === "function") return !!candidate.pointerMove(e);
-      return false;
+      hoverZone = candidate;
+      break;
     }
+    this._setHoverZone(hoverZone, e);
+    if (typeof hoverZone?.pointerMove === "function") return !!hoverZone.pointerMove(e);
     return false;
   }
 
@@ -74,9 +80,36 @@ export class MatchInputRouter {
     return false;
   }
 
+  /** Cancel interaction state owned by an event source that has stopped producing events. */
+  releaseSource(source) {
+    let released = false;
+    if (this.captureZone && this.captureSource === source) {
+      const zone = this.captureZone;
+      this._clearCapture();
+      zone.pointerCancel?.({ source });
+      released = true;
+    }
+    if (this.hoverZone && (!this.hoverSource || this.hoverSource === source)) {
+      this._setHoverZone(null, { source });
+      released = true;
+    }
+    return released;
+  }
+
   _clearCapture() {
     this.captureZone = null;
     this.captureSource = null;
+  }
+
+  _setHoverZone(zone, event) {
+    if (zone === this.hoverZone) {
+      if (zone) this.hoverSource = event?.source || null;
+      return;
+    }
+    const previous = this.hoverZone;
+    this.hoverZone = zone;
+    this.hoverSource = zone ? event?.source || null : null;
+    previous?.pointerLeave?.(event);
   }
 
   _normalize(event) {
@@ -215,6 +248,15 @@ export class DomClickInputZone {
       this._showPicker(clickTarget);
     }
     return true;
+  }
+
+  pointerCancel() {
+    const active = !!this.activeRoot;
+    this.activeRoot = null;
+    this.activeTarget = null;
+    this.activeClickTarget = null;
+    this.activeRange = null;
+    return active;
   }
 
   wheel(ev) {

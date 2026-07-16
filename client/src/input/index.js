@@ -595,6 +595,7 @@ export class Input {
   }
 
   _setCursorLockState(locked, mode) {
+    if (!locked && this.pointerLocked) this.inputRouter?.releaseSource?.("locked");
     this.pointerLocked = locked;
     this._cursorLockMode = locked ? mode : null;
     this.dom.classList.toggle("pointer-locked", locked);

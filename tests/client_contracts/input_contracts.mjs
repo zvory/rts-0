@@ -257,6 +257,34 @@ import {
   assert(calls.at(-1) === "lowDown", "unregistered zone no longer receives events");
 }
 
+{
+  const viewport = {
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+  };
+  const router = new MatchInputRouter(viewport);
+  const leaves = [];
+  router.registerZone({
+    contains: (ev) => ev.clientX < 200,
+    pointerDown: () => true,
+    pointerMove: () => false,
+    pointerLeave: (ev) => leaves.push(ev.source),
+    pointerCancel: (ev) => leaves.push(`cancel:${ev.source}`),
+  });
+
+  router.pointerMove({ clientX: 100, clientY: 100, source: "locked" });
+  router.pointerDown({ clientX: 100, clientY: 100, source: "locked" });
+  assert(!router.releaseSource("dom"), "a different event source cannot release routed ownership");
+  assert(router.releaseSource("locked"), "the ending event source releases routed ownership");
+  assert(
+    leaves.join(",") === "cancel:locked,locked",
+    "source release cancels capture and leaves hover exactly once",
+  );
+  assert(!router.pointerMove({ clientX: 500, clientY: 500, source: "locked" }),
+    "released source no longer retains pointer capture");
+}
+
 // ---------------------------------------------------------------------------
 // Context-sensitive hover previews
 // ---------------------------------------------------------------------------
@@ -348,6 +376,10 @@ import {
   assert(router.pointerDown({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone consumes locked pointerDown over HUD button");
   assert(router.pointerUp({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone consumes locked pointerUp over HUD button");
   assert(button.clickCount === 1, "DOM zone forwards locked pointer click to the HUD button");
+  assert(router.pointerDown({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone captures a second locked button press");
+  assert(router.releaseSource("locked"), "ending pointer lock cancels the captured DOM press");
+  assert(!router.pointerUp({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "cancelled DOM capture ignores a later pointerUp");
+  assert(button.clickCount === 1, "cancelling locked input cannot synthesize a stale HUD click");
   assert(router.pointerDown({ clientX: 760, clientY: 560, button: 0, source: "locked" }), "DOM zone consumes empty HUD panel space");
   assert(router.pointerUp({ clientX: 760, clientY: 560, button: 0, source: "locked" }), "empty HUD panel click releases capture");
   assert(button.clickCount === 1, "empty HUD panel space does not click the prior button");
@@ -920,6 +952,25 @@ import {
   assert(nativeMoveInput.mouse.x === 14 && nativeMoveInput.mouse.y === 15, "native move updates virtual cursor coordinates from native event coordinates");
   assert(painted.style.transform === "translate(14px, 15px)", "native move paints the DOM cursor during the native event handler");
   assert(nativeMoveInput._pendingPointerLockCursor === null, "native move does not wait for Input.update to flush the cursor visual");
+}
+
+{
+  const releasedSources = [];
+  const unlockedInput = Object.create(Input.prototype);
+  unlockedInput.pointerLocked = true;
+  unlockedInput._cursorLockMode = "browser";
+  unlockedInput.mouse = { x: 25, y: 30 };
+  unlockedInput.dom = { classList: { toggle() {} } };
+  unlockedInput.inputRouter = { releaseSource: (source) => releasedSources.push(source) };
+  unlockedInput._pointerLockCursor = { hidden: false };
+  unlockedInput._nativeButtonsMask = 1;
+  unlockedInput._panDrag = null;
+  unlockedInput._drag = null;
+  unlockedInput._placementDrag = null;
+
+  unlockedInput._setCursorLockState(false, null);
+  assert(releasedSources.length === 1 && releasedSources[0] === "locked",
+    "leaving pointer lock releases hover owned by the locked input source");
 }
 
 {
