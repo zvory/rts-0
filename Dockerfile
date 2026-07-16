@@ -29,7 +29,8 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates linux-perf \
+    && perf --version \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /app/server
 
