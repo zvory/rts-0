@@ -290,7 +290,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
       STATS[KIND.COMMAND_CAR].supply === 4 &&
-      STATS[KIND.COMMAND_CAR].sight === 13 &&
+      STATS[KIND.COMMAND_CAR].sight === 8 &&
       STATS[KIND.COMMAND_CAR].size < STATS[KIND.SCOUT_CAR].size &&
       STATS[KIND.COMMAND_CAR].body.length < STATS[KIND.SCOUT_CAR].body.length &&
       STATS[KIND.COMMAND_CAR].body.width < STATS[KIND.SCOUT_CAR].body.width,
