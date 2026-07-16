@@ -361,6 +361,7 @@ export function buildUnitCard(ctx, selection) {
     abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
   for (const affordance of slotOrderedAbilityAffordances) {
     const definition = affordance.definition;
+    const disabledReason = abilityDisabledReason(ctx, affordance);
     const recastActive = affordance.recastTargetObjectId != null;
     const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
     const commandableCount = recastActive
@@ -388,7 +389,11 @@ export function buildUnitCard(ctx, selection) {
       },
       icon: definition.icon,
       label: definition.label,
-      title: abilityDisabledReason(ctx, affordance),
+      title: disabledReason,
+      tooltipHtml: !affordance.unlocked
+        ? `<span class="cmd-tooltip-title">${definition.label}</span>` +
+          `<span class="cmd-tooltip-desc">${disabledReason}</span>`
+        : "",
       ability: definition.ability,
       enabled: affordance.unlocked && commandableCount > 0 && affordance.affordable,
       unaffordable: affordance.unlocked && commandableCount > 0 && !affordance.affordable,

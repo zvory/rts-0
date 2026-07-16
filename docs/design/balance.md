@@ -451,12 +451,13 @@ folded into default targeting.
   self-targeted, has no resource cost or cooldown, consumes the nearest owned living Golem within 2
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.
-- **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
-  no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
-  depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 14 tiles
-  from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
-  radius: 2 tiles. Cloud duration: 5 seconds. No cooldown; one Scout Car can spend both smoke uses
-  back-to-back immediately. After Smoke Plus research, future casts by that player use a 3-tile
+- **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability once their
+  player completes an R&D Complex; no completed Gun Works is required. Each scout car spawns with
+  2 smoke uses; once those uses are depleted, that car cannot use Smoke again. Smoke has no steel
+  or oil cost. Target range: 14 tiles from the caster. Launch delay: up to 100 ms at max range,
+  scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration: 5 seconds. No cooldown;
+  one Scout Car can spend both smoke uses back-to-back immediately. After Smoke Plus research,
+  future casts by that player use a 3-tile
   radius and 10-second duration.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
@@ -538,7 +539,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
-| scout_car       | 100 | 6   | 6     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
+| scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from the selected Command Car without a City Centre requirement; one active per Command Car; non-combat recon with 4-tile orbit radius and a 20-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
