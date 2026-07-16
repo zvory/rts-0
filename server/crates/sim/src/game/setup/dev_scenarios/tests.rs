@@ -392,7 +392,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
 }
 
 #[test]
-fn replay_142_vehicle_lock_scenario_recreates_slow_overlap() {
+fn replay_142_vehicle_lock_scenario_clears_without_slow_overlap() {
     let setup = Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_0142)
         .expect("replay-142 scenario setup should succeed");
     assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
@@ -422,25 +422,10 @@ fn replay_142_vehicle_lock_scenario_recreates_slow_overlap() {
         },
     );
 
-    let mut previous = {
-        let scout = game
-            .state
-            .entities
-            .get(colliding_scout_id)
-            .expect("colliding Scout Car should exist");
-        let command_car = game
-            .state
-            .entities
-            .get(command_car_id)
-            .expect("Command Car should exist");
-        (
-            (scout.pos_x, scout.pos_y),
-            (command_car.pos_x, command_car.pos_y),
-        )
-    };
-    let mut slow_run = 0u32;
-    let mut longest_slow_run = 0u32;
-    for _ in 0..180 {
+    let mut saw_contact = false;
+    let mut clear_tick = None;
+    let mut final_separation = 0.0;
+    for elapsed in 1..=180 {
         game.tick();
         let scout = game
             .state
@@ -453,24 +438,26 @@ fn replay_142_vehicle_lock_scenario_recreates_slow_overlap() {
             .get(command_car_id)
             .expect("Command Car should survive");
         let separation = (scout.pos_x - command_car.pos_x).hypot(scout.pos_y - command_car.pos_y);
-        let scout_step = (scout.pos_x - previous.0 .0).hypot(scout.pos_y - previous.0 .1);
-        let command_step =
-            (command_car.pos_x - previous.1 .0).hypot(command_car.pos_y - previous.1 .1);
-        if separation < 30.0 && scout_step < 1.0 && command_step < 1.0 {
-            slow_run += 1;
-            longest_slow_run = longest_slow_run.max(slow_run);
-        } else {
-            slow_run = 0;
+        if separation < 30.0 {
+            saw_contact = true;
+        } else if saw_contact && separation >= 40.0 && clear_tick.is_none() {
+            clear_tick = Some(elapsed);
         }
-        previous = (
-            (scout.pos_x, scout.pos_y),
-            (command_car.pos_x, command_car.pos_y),
-        );
+        final_separation = separation;
     }
 
     assert!(
-        longest_slow_run >= 100,
-        "replay-142 pair should overlap and translate below 1 px/tick for at least 100 ticks; longest run was {longest_slow_run}"
+        saw_contact,
+        "replay-142 fixture should recreate vehicle contact"
+    );
+    let clear_tick = clear_tick.expect("replay-142 pair should separate after making contact");
+    assert!(
+        clear_tick <= 90,
+        "replay-142 pair should clear within three seconds, cleared after {clear_tick} ticks"
+    );
+    assert!(
+        final_separation >= 40.0,
+        "replay-142 pair should remain separated, final separation was {final_separation:.2}px"
     );
 }
 

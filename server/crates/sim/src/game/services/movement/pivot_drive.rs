@@ -22,6 +22,8 @@ const PIVOT_VEHICLE_CRAWL_ANGLE_RAD: f32 = 0.55;
 const PIVOT_VEHICLE_PIVOT_ANGLE_RAD: f32 = 1.25;
 const VEHICLE_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const VEHICLE_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
+const VEHICLE_FOLLOW_ALIGNMENT_COS_MIN: f32 = 0.5;
+const VEHICLE_FOLLOW_LONGITUDINAL_DEADBAND_PX: f32 = 1.0;
 
 pub(super) fn vehicle_oil_starves_movement(
     entities: &mut EntityStore,
@@ -99,6 +101,9 @@ pub(super) fn vehicle_traffic_adjustment(
 
     let forward = (facing.cos(), facing.sin());
     let side = (-forward.1, forward.0);
+    let follow_forward = entities
+        .get(id)
+        .and_then(|entity| forward_traffic_heading(entity, facing));
     let vehicle_half_width = vehicle_body_half_width_with_clearance(kind);
     let query_radius = VEHICLE_TRAFFIC_LOOKAHEAD_PX + MAX_UNIT_BOUNDING_RADIUS_PX;
     let mut throttle_scale = 1.0_f32;
@@ -125,6 +130,27 @@ pub(super) fn vehicle_traffic_adjustment(
 
         let dx = neighbor.pos_x - x;
         let dy = neighbor.pos_y - y;
+        // Similar-heading moving vehicles form a local traffic stream. Only the trailing vehicle
+        // yields; making the leader react to its follower can trap both in reciprocal throttling.
+        if let (Some(ego_forward), Some(neighbor_forward)) = (
+            follow_forward,
+            forward_traffic_heading(neighbor, neighbor.facing()),
+        ) {
+            let alignment = ego_forward.0 * neighbor_forward.0 + ego_forward.1 * neighbor_forward.1;
+            if alignment >= VEHICLE_FOLLOW_ALIGNMENT_COS_MIN {
+                let shared = (
+                    ego_forward.0 + neighbor_forward.0,
+                    ego_forward.1 + neighbor_forward.1,
+                );
+                let shared_len = (shared.0 * shared.0 + shared.1 * shared.1).sqrt();
+                if shared_len > 1.0e-4 {
+                    let neighbor_ahead = (dx * shared.0 + dy * shared.1) / shared_len;
+                    if neighbor_ahead <= VEHICLE_FOLLOW_LONGITUDINAL_DEADBAND_PX {
+                        continue;
+                    }
+                }
+            }
+        }
         let ahead = dx * forward.0 + dy * forward.1;
         if ahead <= 0.0 || ahead > VEHICLE_TRAFFIC_LOOKAHEAD_PX {
             continue;
@@ -167,6 +193,24 @@ pub(super) fn vehicle_traffic_adjustment(
         throttle_scale,
         turn_bias,
     }
+}
+
+fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
+    if !uses_oriented_vehicle_body(entity.kind) || entity.path_is_empty() || !facing.is_finite() {
+        return None;
+    }
+    let forward = (facing.cos(), facing.sin());
+    if matches!(entity.kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
+        let reversing = entity
+            .movement
+            .as_ref()
+            .is_some_and(|movement| movement.scout_car_reverse_waypoint.is_some());
+        return (!reversing).then_some(forward);
+    }
+    let next = entity.next_waypoint()?;
+    let to_next = (next.0 - entity.pos_x, next.1 - entity.pos_y);
+    let forward_progress = to_next.0 * forward.0 + to_next.1 * forward.1;
+    (forward_progress > 0.0).then_some(forward)
 }
 
 fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
