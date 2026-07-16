@@ -63,6 +63,20 @@ import { ClientIntent } from "../../client/src/client_intent.js";
   assert(intent.attackTargetPreview?.targetId === 301, "ClientIntent owns attack hover previews");
   const armedLabTool = intent.beginLabTool({ kind: "fieldPoint", payload: { xField: "spawn-x", yField: "spawn-y" } });
   assert(armedLabTool.id && armedLabTool.kind === "fieldPoint", "ClientIntent arms lab tools with stable ids");
+  intent.updateLabToolPreview({ toolId: armedLabTool.id, x: 12, y: 24 });
+  const updatedLabTool = intent.updateLabToolPayload({ xField: "target-x", owner: 2 });
+  assert(updatedLabTool === armedLabTool, "ClientIntent updates an active Lab tool without replacing its identity");
+  assertDeepEqual(
+    intent.labToolPreview,
+    {
+      toolId: armedLabTool.id,
+      kind: "fieldPoint",
+      x: 12,
+      y: 24,
+      payload: { xField: "target-x", owner: 2 },
+    },
+    "ClientIntent immediately updates the payload of an existing Lab tool preview",
+  );
   assert(intent.commandTarget === null && intent.placement === null, "ClientIntent lab tools clear placement and command targeting");
   assert(intent.resourceMiningPreview === null, "ClientIntent lab tools clear hover previews");
   assert(intent.attackTargetPreview === null, "ClientIntent lab tools clear attack hover previews");

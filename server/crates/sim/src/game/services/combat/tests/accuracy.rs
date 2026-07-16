@@ -23,9 +23,11 @@ fn apply_test_damage_with_seed(
     let fog = Fog::new(map.size);
     let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(rng_seed);
+    let blockers = ShotBlockerIndex::build(&map, entities);
     apply_damage(
         &map,
         entities,
+        &blockers,
         &default_team_relations(),
         events,
         &fog,

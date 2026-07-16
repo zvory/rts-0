@@ -5,18 +5,18 @@ use crate::game::entity::{AttackPhase, EntityStore, PanzerfaustState};
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::protocol::Event;
 
-use super::events::{emit_conversion, emit_launch, LaunchEvent};
+use super::events::{emit_launch, LaunchEvent};
 use super::{
-    convert_panzerfaust_to_rifleman, mirror_weapon_to_body, panzerfaust_state,
-    panzerfaust_target_fireable, panzerfaust_target_in_range, panzerfaust_target_valid,
-    recovery_ticks, set_panzerfaust_state, Fog, LineOfSight, Map, PanzerfaustFireContext,
-    SmokeCloudStore, TeamRelations,
+    mirror_weapon_to_body, panzerfaust_state, panzerfaust_target_fireable,
+    panzerfaust_target_in_range, panzerfaust_target_valid, set_panzerfaust_state, Fog, LineOfSight,
+    Map, PanzerfaustFireContext, ShotBlockerIndex, SmokeCloudStore, TeamRelations,
 };
 
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game::services::combat) fn tick_states(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     fog: &Fog,
@@ -42,6 +42,7 @@ pub(in crate::game::services::combat) fn tick_states(
             } => tick_windup(
                 map,
                 entities,
+                blockers,
                 teams,
                 fog,
                 smokes,
@@ -54,34 +55,7 @@ pub(in crate::game::services::combat) fn tick_states(
                 ticks_remaining,
                 methamphetamines_researched,
             ),
-            PanzerfaustState::InFlight {
-                target,
-                impact_x,
-                impact_y,
-                ticks_remaining,
-            } => tick_in_flight(
-                entities,
-                methamphetamines_researched,
-                id,
-                target,
-                (impact_x, impact_y),
-                ticks_remaining,
-            ),
-            PanzerfaustState::Recovery {
-                target,
-                ticks_remaining,
-            } => {
-                tick_recovery(
-                    entities,
-                    teams,
-                    fog,
-                    smokes,
-                    events,
-                    id,
-                    target,
-                    ticks_remaining,
-                );
-            }
+            PanzerfaustState::Spent => {}
         }
     }
 }
@@ -90,6 +64,7 @@ pub(in crate::game::services::combat) fn tick_states(
 fn tick_windup(
     map: &Map,
     entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -117,7 +92,7 @@ fn tick_windup(
     if !panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target)
         || !panzerfaust_target_in_range(map, entities, id, target)
         || !panzerfaust_target_fireable(
-            &PanzerfaustFireContext::new(map, entities, teams, los, fog, smokes),
+            &PanzerfaustFireContext::new(map, entities, blockers, teams, los, fog, smokes),
             id,
             owner,
             target,
@@ -165,15 +140,7 @@ fn tick_windup(
             base_rifle_cooldown
         };
         attacker.set_attack_cd(rifle_cooldown);
-        set_panzerfaust_state(
-            attacker,
-            PanzerfaustState::InFlight {
-                target,
-                impact_x,
-                impact_y,
-                ticks_remaining: config::PANZERFAUST_TRAVEL_TICKS,
-            },
-        );
+        attacker.spend_panzerfaust();
     }
     emit_launch(
         events,
@@ -187,79 +154,6 @@ fn tick_windup(
             to_pos: (impact_x, impact_y),
         },
     );
-}
-
-#[allow(clippy::too_many_arguments)]
-fn tick_in_flight(
-    entities: &mut EntityStore,
-    methamphetamines_researched: &dyn Fn(u32) -> bool,
-    id: u32,
-    target: u32,
-    stored_impact: (f32, f32),
-    ticks_remaining: u32,
-) {
-    if ticks_remaining > 1 {
-        if let Some(attacker) = entities.get_mut(id) {
-            set_panzerfaust_state(
-                attacker,
-                PanzerfaustState::InFlight {
-                    target,
-                    impact_x: stored_impact.0,
-                    impact_y: stored_impact.1,
-                    ticks_remaining: ticks_remaining - 1,
-                },
-            );
-        }
-        return;
-    }
-
-    if let Some(attacker) = entities.get_mut(id) {
-        let owner = attacker.owner;
-        set_panzerfaust_state(
-            attacker,
-            PanzerfaustState::Recovery {
-                target,
-                ticks_remaining: recovery_ticks(methamphetamines_researched(owner)),
-            },
-        );
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn tick_recovery(
-    entities: &mut EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    events: &mut HashMap<u32, Vec<Event>>,
-    id: u32,
-    target: u32,
-    ticks_remaining: u16,
-) {
-    if ticks_remaining > 1 {
-        if let Some(attacker) = entities.get_mut(id) {
-            set_panzerfaust_state(
-                attacker,
-                PanzerfaustState::Recovery {
-                    target,
-                    ticks_remaining: ticks_remaining - 1,
-                },
-            );
-        }
-        return;
-    }
-    let Some((owner, x, y)) = entities
-        .get(id)
-        .map(|entity| (entity.owner, entity.pos_x, entity.pos_y))
-    else {
-        return;
-    };
-    let converted = entities
-        .get_mut(id)
-        .is_some_and(|entity| convert_panzerfaust_to_rifleman(entity, target));
-    if converted {
-        emit_conversion(events, fog, smokes, teams, owner, id, (x, y));
-    }
 }
 
 fn cancel_windup(entities: &mut EntityStore, id: u32) {

@@ -171,55 +171,55 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
 
 function validateScenarioNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
   if (command === "scenario-open") {
-    exact(value, ["workspaceRoot", "id", "unit", "count", "blocker", "case", "renderer", "viewport"], "scenario open");
-    if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("scenario open.workspaceRoot", "must be a non-empty string");
-    scenarioToken(value.id, "scenario open.id");
-    scenarioToken(value.unit, "scenario open.unit");
-    integer(value.count, "scenario open.count", 1, 400);
-    if (value.blocker != null) scenarioToken(value.blocker, "scenario open.blocker");
-    if (value.case != null) scenarioToken(value.case, "scenario open.case");
-    if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("scenario open.renderer", "must be pixi or babylon");
-    if (value.viewport != null) viewport(value.viewport, 4096, "scenario open.viewport");
+    exact(value, ["workspaceRoot", "id", "unit", "count", "blocker", "case", "renderer", "viewport"], "dev-scenario open");
+    if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("dev-scenario open.workspaceRoot", "must be a non-empty string");
+    scenarioToken(value.id, "dev-scenario open.id");
+    scenarioToken(value.unit, "dev-scenario open.unit");
+    integer(value.count, "dev-scenario open.count", 1, 400);
+    if (value.blocker != null) scenarioToken(value.blocker, "dev-scenario open.blocker");
+    if (value.case != null) scenarioToken(value.case, "dev-scenario open.case");
+    if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("dev-scenario open.renderer", "must be pixi or babylon");
+    if (value.viewport != null) viewport(value.viewport, 4096, "dev-scenario open.viewport");
     return value;
   }
   session();
   if (command === "scenario-inspect") {
-    exact(value, ["sessionId", "ids", "kinds", "cameraViewport", "limit"], "scenario inspect");
-    if (value.ids != null) idArray(value.ids, "scenario inspect.ids", 0, INTERACT_LIMITS.maxInspectRefs);
-    if (value.kinds != null) array(value.kinds, "scenario inspect.kinds", 0, 32, (entry: unknown) => token(entry, "scenario inspect.kind"));
-    optionalBoolean(value.cameraViewport, "scenario inspect.cameraViewport");
-    if (value.limit != null) integer(value.limit, "scenario inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
+    exact(value, ["sessionId", "ids", "kinds", "cameraViewport", "limit"], "dev-scenario inspect");
+    if (value.ids != null) idArray(value.ids, "dev-scenario inspect.ids", 0, INTERACT_LIMITS.maxInspectRefs);
+    if (value.kinds != null) array(value.kinds, "dev-scenario inspect.kinds", 0, 32, (entry: unknown) => token(entry, "dev-scenario inspect.kind"));
+    optionalBoolean(value.cameraViewport, "dev-scenario inspect.cameraViewport");
+    if (value.limit != null) integer(value.limit, "dev-scenario inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
   } else if (command === "scenario-camera") {
-    exact(value, ["sessionId", "camera"], "scenario camera");
+    exact(value, ["sessionId", "camera"], "dev-scenario camera");
     validateGameCamera(value.camera);
   } else if (command === "scenario-screenshot") {
-    exact(value, ["sessionId", "name", "presentation", "viewport", "region", "subjects"], "scenario screenshot");
-    artifactToken(value.name, "scenario screenshot.name");
-    presentation(value.presentation, "scenario screenshot.presentation");
-    if (value.viewport != null) viewport(value.viewport, 2048, "scenario screenshot.viewport");
-    if (value.region != null) captureRegion(value.region, "scenario screenshot.region");
-    if (value.subjects != null) idArray(value.subjects, "scenario screenshot.subjects", 0, INTERACT_LIMITS.maxScreenshotSubjects);
+    exact(value, ["sessionId", "name", "presentation", "viewport", "region", "subjects"], "dev-scenario screenshot");
+    artifactToken(value.name, "dev-scenario screenshot.name");
+    presentation(value.presentation, "dev-scenario screenshot.presentation");
+    if (value.viewport != null) viewport(value.viewport, 2048, "dev-scenario screenshot.viewport");
+    if (value.region != null) captureRegion(value.region, "dev-scenario screenshot.region");
+    if (value.subjects != null) idArray(value.subjects, "dev-scenario screenshot.subjects", 0, INTERACT_LIMITS.maxScreenshotSubjects);
   } else if (command === "scenario-record-start") {
-    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "region", "scale", "presentation"], "scenario record-start");
-    artifactToken(value.name, "scenario record-start.name");
-    if (value.maxDurationMs != null) integer(value.maxDurationMs, "scenario record-start.maxDurationMs", 1_000, INTERACT_LIMITS.maxRecordingDurationMs);
-    if (value.viewport != null) viewport(value.viewport, 2048, "scenario record-start.viewport");
+    exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "region", "scale", "presentation"], "dev-scenario record-start");
+    artifactToken(value.name, "dev-scenario record-start.name");
+    if (value.maxDurationMs != null) integer(value.maxDurationMs, "dev-scenario record-start.maxDurationMs", 1_000, INTERACT_LIMITS.maxRecordingDurationMs);
+    if (value.viewport != null) viewport(value.viewport, 2048, "dev-scenario record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
-    if (value.region != null) captureRegion(value.region, "scenario record-start.region");
-    if (value.crop != null && value.region != null) invalid("scenario record-start", "cannot combine crop with region");
-    if (value.scale != null) boundedNumber(value.scale, "scenario record-start.scale", 0.25, 1);
-    presentation(value.presentation, "scenario record-start.presentation");
+    if (value.region != null) captureRegion(value.region, "dev-scenario record-start.region");
+    if (value.crop != null && value.region != null) invalid("dev-scenario record-start", "cannot combine crop with region");
+    if (value.scale != null) boundedNumber(value.scale, "dev-scenario record-start.scale", 0.25, 1);
+    presentation(value.presentation, "dev-scenario record-start.presentation");
   } else if (command === "scenario-capture-timelapse") {
-    exact(value, ["sessionId", "name", "maxDurationMs", "sampleEveryMs", "fps", "speed", "viewport", "region", "presentation"], "scenario capture-timelapse");
-    artifactToken(value.name, "scenario capture-timelapse.name");
-    const duration = value.maxDurationMs == null ? GAME_TIMELAPSE_LIMITS.defaultDurationMs : integer(value.maxDurationMs, "scenario capture-timelapse.maxDurationMs", 1_000, GAME_TIMELAPSE_LIMITS.maxDurationMs);
-    const sampleEvery = value.sampleEveryMs == null ? GAME_TIMELAPSE_LIMITS.defaultSampleEveryMs : integer(value.sampleEveryMs, "scenario capture-timelapse.sampleEveryMs", GAME_TIMELAPSE_LIMITS.minSampleEveryMs, GAME_TIMELAPSE_LIMITS.maxSampleEveryMs);
-    if (timelapseFrameBound(duration, sampleEvery) > GAME_TIMELAPSE_LIMITS.maxFrames) invalid("scenario capture-timelapse", `may capture at most ${GAME_TIMELAPSE_LIMITS.maxFrames} sampled frames`);
-    if (value.fps != null) integer(value.fps, "scenario capture-timelapse.fps", GAME_TIMELAPSE_LIMITS.minFps, GAME_TIMELAPSE_LIMITS.maxFps);
-    if (value.speed != null) boundedNumber(value.speed, "scenario capture-timelapse.speed", GAME_TIMELAPSE_LIMITS.minSpeed, GAME_TIMELAPSE_LIMITS.maxSpeed);
-    if (value.viewport != null) viewport(value.viewport, 2048, "scenario capture-timelapse.viewport");
-    if (value.region != null) captureRegion(value.region, "scenario capture-timelapse.region");
-    presentation(value.presentation, "scenario capture-timelapse.presentation");
+    exact(value, ["sessionId", "name", "maxDurationMs", "sampleEveryMs", "fps", "speed", "viewport", "region", "presentation"], "dev-scenario capture-timelapse");
+    artifactToken(value.name, "dev-scenario capture-timelapse.name");
+    const duration = value.maxDurationMs == null ? GAME_TIMELAPSE_LIMITS.defaultDurationMs : integer(value.maxDurationMs, "dev-scenario capture-timelapse.maxDurationMs", 1_000, GAME_TIMELAPSE_LIMITS.maxDurationMs);
+    const sampleEvery = value.sampleEveryMs == null ? GAME_TIMELAPSE_LIMITS.defaultSampleEveryMs : integer(value.sampleEveryMs, "dev-scenario capture-timelapse.sampleEveryMs", GAME_TIMELAPSE_LIMITS.minSampleEveryMs, GAME_TIMELAPSE_LIMITS.maxSampleEveryMs);
+    if (timelapseFrameBound(duration, sampleEvery) > GAME_TIMELAPSE_LIMITS.maxFrames) invalid("dev-scenario capture-timelapse", `may capture at most ${GAME_TIMELAPSE_LIMITS.maxFrames} sampled frames`);
+    if (value.fps != null) integer(value.fps, "dev-scenario capture-timelapse.fps", GAME_TIMELAPSE_LIMITS.minFps, GAME_TIMELAPSE_LIMITS.maxFps);
+    if (value.speed != null) boundedNumber(value.speed, "dev-scenario capture-timelapse.speed", GAME_TIMELAPSE_LIMITS.minSpeed, GAME_TIMELAPSE_LIMITS.maxSpeed);
+    if (value.viewport != null) viewport(value.viewport, 2048, "dev-scenario capture-timelapse.viewport");
+    if (value.region != null) captureRegion(value.region, "dev-scenario capture-timelapse.region");
+    presentation(value.presentation, "dev-scenario capture-timelapse.presentation");
   } else {
     throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
   }

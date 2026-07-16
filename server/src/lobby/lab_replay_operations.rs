@@ -94,7 +94,7 @@ fn update_to_protocol(update: &LabUpdate) -> LabUpdateSpec {
     }
 }
 
-fn lab_replay_operation_kind(op: &LabReplayOperation) -> &'static str {
+pub(super) fn lab_replay_operation_kind(op: &LabReplayOperation) -> &'static str {
     match op {
         LabReplayOperation::SpawnEntities { .. } => "spawnEntities",
         LabReplayOperation::ApplyUpdates { .. } => "applyUpdates",

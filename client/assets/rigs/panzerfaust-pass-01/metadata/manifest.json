@@ -1,9 +1,9 @@
 {
   "pipelineVersion": 1,
   "source": "built-in image_gen",
-  "status": "lab visual preview",
-  "enabled": true,
-  "unit": "panzerfaust",
+  "status": "archived source art",
+  "enabled": false,
+  "unit": "loaded_rifleman",
   "sourceSheets": {
     "styleReference": "client/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-style-reference-rifleman-mg.png",
     "baseCarrySource": "client/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-source.png",
@@ -11,30 +11,14 @@
     "baseCarryLongAlpha": "client/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-long-alpha.png",
     "baseCarryLongAlphaTrimmed": "client/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-long-alpha-trimmed.png"
   },
-  "runtime": {
-    "profile": "client/src/visual_profiles.js",
-    "visualProfileId": "panzerfaust-long-preview-1",
-    "stripImageUrl": "/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-long-alpha-trimmed.png?v=pass01-long-alpha-trimmed-scale03174-bright69-sat83-team",
-    "imageVersion": "pass01-long-alpha-trimmed-scale03174-bright69-sat83-team",
-    "frameWidth": 1210,
-    "frameHeight": 571,
-    "frameCount": 1,
-    "worldScale": 0.03174,
-    "tintSlot": "team-light",
-    "targetColorAdjustment": {
-      "brightness": 69,
-      "saturation": 83,
-      "hue": 100
-    }
-  },
   "originalGeneratedSources": {
     "baseCarrySource": "/Users/az/.codex/generated_images/019f32fd-a3dd-7812-bc8e-9e596ced79bc/ig_054e815aa7eb2b08016a4a7ee64c408196a97106e646c11e90.png",
     "baseCarryLongSource": "/Users/az/.codex/generated_images/019f32fd-a3dd-7812-bc8e-9e596ced79bc/ig_0db59fe61b8fb30d016a4a7ffb605481938886df980f463940.png"
   },
   "promptSummary": "client/assets/rigs/panzerfaust-pass-01/metadata/prompt-summary.md",
   "notes": [
-    "The checked-in visual profile is lab-only and overrides Panzerfaust units in the render-preview scenario with the accepted one-frame PNG cutout.",
+    "These checked-in generated sources are archived references for a future loaded-Rifleman sprite pass; the runtime currently uses its synthetic loaded Rifleman rig instead.",
     "The generated art uses a white-painted uniform and an exaggerated long Panzerfaust for small-scale readability.",
-    "Scale and color were tuned in lab preview against normal and occupied-trench Panzerfaust instances."
+    "Scale and color were originally tuned in Lab preview against normal and occupied-trench launcher carriers."
   ]
 }

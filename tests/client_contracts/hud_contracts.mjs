@@ -535,12 +535,7 @@ function fakeHudRootWithoutResourceSpans() {
       { id: 2304, owner: 1, kind: KIND.WORKER },
       ownResearchState,
     );
-    const panzerfaustStatus = entrenchmentSelectionStatus(
-      { id: 2305, owner: 1, kind: KIND.PANZERFAUST },
-      ownResearchState,
-    );
     assert(ownStatus?.value === "Hold still 3s to dig", "HUD status explains researched dig-in availability");
-    assert(panzerfaustStatus?.value === "Hold still 3s to dig", "HUD status includes Panzerfaust eligibility");
     assert(
       occupiedStatus?.value.includes("+1 range") &&
         occupiedStatus.value.includes("-50% direct") &&
@@ -948,7 +943,7 @@ function fakeHudRootWithoutResourceSpans() {
     trainCard.slots[0].contextIntent.type === "adjustProductionRepeat" &&
       trainCard.slots[0].contextIntent.buildingIds.join(",") === "20,21" &&
       trainCard.slots[0].contextIntent.unit === KIND.RIFLEMAN &&
-      trainCard.slots[0].contextHotkeyModifiers.join(",") === "ctrl,shift",
+      trainCard.slots[0].contextHotkeyModifiers.join(",") === "alt,ctrl,shift",
     "train buttons should adjust repeat production across selected compatible producers",
   );
   assert(
@@ -966,14 +961,7 @@ function fakeHudRootWithoutResourceSpans() {
       trainCard.slots[1].title.includes("Shift+hotkey removes one"),
     "train locked tooltip should name its requirement and allocation controls",
   );
-  assert(trainCard.slots[2].label === "Panzerfaust", "Barracks third train slot should be Panzerfaust");
-  assert(trainCard.slots[2].commandId === defaultFactionCommandId("train", KIND.PANZERFAUST), "Panzerfaust train button should expose stable train identity");
-  assert(trainCard.slots[2].hotkey === "E", "Panzerfaust train button should use E in the third Barracks slot");
-  assert(!trainCard.slots[2].enabled, "Panzerfaust train button should be locked before Training Centre");
-  assert(
-    trainCard.slots[2].title.startsWith("Requires Training Centre"),
-    "Panzerfaust locked tooltip should name Training Centre",
-  );
+  assert(trainCard.slots[2] == null, "Barracks should no longer expose a standalone Panzerfaust unit");
 
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
@@ -988,37 +976,6 @@ function fakeHudRootWithoutResourceSpans() {
     "authoritative repeat production should show one swirl and its partial allocation count",
   );
   delete producingBarracks.prodRepeatKinds;
-
-  const completedTrainingCentre = { id: 22, owner: 1, kind: KIND.TRAINING_CENTRE, buildProgress: null };
-  const unlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [barracks],
-    entities: [cityCentre, barracks, completedTrainingCentre],
-    resources: { steel: 60, oil: 15, supplyUsed: 9, supplyCap: 10 },
-  }));
-  assert(unlockedPanzerfaustCard.slots[2].enabled, "completed Training Centre should unlock Panzerfaust training");
-  assert(unlockedPanzerfaustCard.slots[2].cost.steel === 60, "Panzerfaust train button should show 60 steel");
-  assert(unlockedPanzerfaustCard.slots[2].cost.oil === 15, "Panzerfaust train button should show 15 oil");
-  assert(
-    unlockedPanzerfaustCard.slots[2].onUnavailableIntent.supply === STATS[KIND.PANZERFAUST].supply,
-    "Panzerfaust train button should carry supply for unavailable feedback",
-  );
-
-  const oilBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [barracks],
-    entities: [cityCentre, barracks, completedTrainingCentre],
-    resources: { steel: 60, oil: 14, supplyUsed: 0, supplyCap: 10 },
-  }));
-  assert(oilBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should queue when oil is short");
-  assert(oilBlockedPanzerfaustCard.slots[2].unaffordable, "resource-blocked Panzerfaust should stay clickable for feedback");
-  assert(oilBlockedPanzerfaustCard.slots[2].title.startsWith("Queue now; production waits for resources"), "Panzerfaust resource-blocked tooltip should explain waiting");
-
-  const supplyBlockedPanzerfaustCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [barracks],
-    entities: [cityCentre, barracks, completedTrainingCentre],
-    resources: { steel: 60, oil: 15, supplyUsed: 10, supplyCap: 10 },
-  }));
-  assert(supplyBlockedPanzerfaustCard.slots[2].enabled, "Panzerfaust train should queue when supply is capped");
-  assert(supplyBlockedPanzerfaustCard.slots[2].title.startsWith("Queue now; production waits for supply"), "Panzerfaust supply-blocked tooltip should explain waiting");
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [cityCentre],

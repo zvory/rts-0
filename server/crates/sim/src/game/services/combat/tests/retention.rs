@@ -119,12 +119,14 @@ fn lingering_death_vision_feeds_auto_acquisition() {
     let source = LingeringSightSource::new(1, target_pos.0, target_pos.1, 2, 99)
         .expect("death vision source should be valid");
     live_fog.stamp_lingering_sources(&[source], &map, &entities);
+    let blockers = ShotBlockerIndex::build(&map, &entities);
 
     assert!(live_fog.is_visible_world(1, target_pos.0, target_pos.1));
     assert_eq!(
         resolve_target_with_obstruction(
             &map,
             &entities,
+            &blockers,
             &teams,
             &spatial,
             &los,

@@ -254,7 +254,7 @@ pub(super) fn command_car_building_corner_map() -> (
         (EntityKind::TrainingCentre, 3440.0, 3648.0),
         (EntityKind::Barracks, 3536.0, 3584.0),
     ];
-    let unit_start = (3536.0, 3664.0);
+    let unit_start = (3507.0, 3664.0);
     let unit_facing = 2.823_079_3;
     let goal = (3216.0, 3472.0);
     let start_tile = (

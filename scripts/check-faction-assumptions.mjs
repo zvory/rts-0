@@ -245,9 +245,6 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/artillery.rs",
   "server/crates/sim/src/game/building_memory.rs",
   "server/crates/sim/src/game/command.rs",
-  // Panzerfaust conversion is a phase-scoped special case: the one-shot unit downgrades in place
-  // to a Rifleman after firing and remains intentionally outside normal production catalog flow.
-  "server/crates/sim/src/game/entity/mod.rs",
   "server/crates/sim/src/game/entity/entity.rs",
   "server/crates/sim/src/game/entity/store.rs",
   "server/crates/sim/src/game/fog.rs",
@@ -269,8 +266,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/mod.rs",
   // Tank coax is a Tank-only secondary weapon until catalog combat roles/weapon slots exist.
   "server/crates/sim/src/game/services/combat/coax.rs",
-  // Panzerfaust conversion events announce the post-shot Rifleman kind to visible clients.
-  "server/crates/sim/src/game/services/combat/panzerfaust/events.rs",
+  // Panzerfaust research installs Rifleman-specific disposable-weapon behavior; the global
+  // catalog still owns Rifleman admission while this service owns its loaded-shot runtime.
+  "server/crates/sim/src/game/services/combat/panzerfaust.rs",
   // Declarative combat target policy owns current-roster ranking groups until catalog combat roles exist.
   "server/crates/sim/src/game/services/combat/target_policy.rs",
   // Default combat target policy is still current-roster based until catalog combat roles exist.
@@ -299,6 +297,8 @@ const approvedCurrentFactionFiles = new Set([
   // Setup and artillery command execution is still global-kind based.
   "server/crates/sim/src/game/services/order_execution.rs",
   "server/crates/sim/src/game/services/order_queue.rs",
+  // Queued direct attacks account for the Rifleman's optional loaded Panzerfaust cycle.
+  "server/crates/sim/src/game/services/order_queue/attack.rs",
   "server/crates/sim/src/game/services/occupancy.rs",
   "server/crates/sim/src/game/services/pathing.rs",
   "server/crates/sim/src/game/services/production.rs",
@@ -308,17 +308,13 @@ const approvedCurrentFactionFiles = new Set([
   // Pump Jack placement is deliberately constrained to current oil resource nodes.
   "server/crates/sim/src/game/services/standability/pump_jack.rs",
   "server/crates/sim/src/game/services/world_query.rs",
+  // Inline occupancy cache coverage uses a representative current-catalog Rifleman.
+  "server/crates/sim/src/game/systems/occupancy_phase_cache.rs",
   "server/crates/sim/src/game/setup.rs",
   "server/crates/sim/src/game/setup/dev_scenarios.rs",
   // Replay-derived Factory fixture intentionally enumerates today's vehicle roster; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/factory_wall_rally_spawn.rs",
-  // Panzerfaust inspection scenarios deliberately seed current Tank/Rifleman interactions as
-  // no-fog dev fixtures; public faction admission still routes through the dev scenario launcher.
-  "server/crates/sim/src/game/setup/dev_scenarios/panzerfaust.rs",
-  // Frame-budget stress setup deliberately pins one mixed current-roster force while public
-  // faction admission remains routed through the catalog-aware dev scenario launcher.
-  "server/crates/sim/src/game/setup/dev_scenarios/supply_stress.rs",
   // Tank coax inspection deliberately seeds current roster targets as a no-fog dev fixture;
   // public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/tank_coax.rs",
@@ -329,11 +325,18 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/protocol.rs",
   "server/crates/sim/src/rules/projection.rs",
   "server/src/dev_scenarios.rs",
+  // This catalog entry is an intentionally Kriegsia-specific Command Car corner fixture; public
+  // faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/src/dev_scenarios/command_car_corner.rs",
   // The frame-budget hellhole generator deliberately materializes a fixed current-roster Kriegsia
   // Lab checkpoint for benchmarking; runtime faction admission remains outside this offline tool.
   "server/src/bin/generate_supply_300_hellhole.rs",
+  // The matching Lab driver deliberately churns that fixed current-roster stress fixture.
+  "server/src/lobby/lab_scenario_driver.rs",
   "server/src/lobby/room_task.rs",
   "server/src/protocol.rs",
+  // Deterministic Hellhole stress fixtures intentionally construct the current Kriegsia roster.
+  "server/src/tools/hellhole_spec.rs",
   // Server-rendered wiki examples intentionally cite current catalog kinds.
   "server/src/wiki.rs",
 ]);

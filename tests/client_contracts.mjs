@@ -7,6 +7,7 @@ import { runScoreboardContracts } from "./client_contracts/scoreboard_contracts.
 
 await import("./client_contracts/settings_contracts.mjs");
 await import("./client_contracts/hud_contracts.mjs");
+await import("./client_contracts/client_flamegraph_contracts.mjs");
 runFrameProfilerContracts();
 await import("./client_contracts/frame_entity_contracts.mjs");
 await import("./client_contracts/presentation_frame_contracts.mjs");
@@ -39,8 +40,8 @@ await import("./client_contracts/match_history_contracts.mjs");
 runScoreboardContracts();
 await import("./client_contracts/net_contracts.mjs");
 await import("./client_contracts/snapshot_stream_contracts.mjs");
+await import("./client_contracts/lab_scenario_submission_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");
-await import("./client_contracts/lab_perf_contracts.mjs");
 await import("./interact_driver_contracts.mjs");
 await import("./interact_cli_contracts.mjs");
 await import("./interact_tailnet_preview_contracts.mjs");

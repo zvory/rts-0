@@ -602,11 +602,6 @@ hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start t
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 
-The bundled `supply-300-hellhole` row is the canonical client stress setup. It launches the authored
-`1v1` map with two exact 300-used-supply, full-research Kriegsia armies, full-world Lab vision, and
-god mode for both players. Its generated checkpoint and exact composition are versioned benchmark
-inputs; regenerate or version the setup instead of hand-editing its embedded checkpoint payload.
-
 `interact_bridge.js`
 ```js
 export const INTERACT_BRIDGE_KEY = "__rtsInteract"
@@ -869,7 +864,11 @@ box-selection, and teardown paths. Starting ordinary placement, command targetin
 build menus cancels the active lab tool so setup tools do not share state with gameplay command
 modes. Unit and building spawning are lab panel palettes backed by the client faction catalog mirror
 and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
-clicking or dragging sends the chosen world positions through `LabClient` until cancelled. The lab does
+clicking or dragging sends the chosen world positions through `LabClient` until cancelled. Changing
+the target player while a spawn tool is armed immediately retargets that tool, including its cursor
+preview and subsequent placements, without requiring the operator to select the unit or building again.
+Target-player changes re-render the complete Tools surface from that player's authoritative resources,
+god mode, and completed research instead of incrementally patching only the player colors. The lab does
 not expose a secondary advanced spawn fallback; the panel spawn affordance is limited to playable
 faction unit and building palettes. The visible map-editing surface is limited to the remove tool:
 it arms a persistent `removeSelectableUnits` setup tool; clicking deletes the selectable unit or
@@ -1212,7 +1211,16 @@ export class Fog {
 before calling `fog.update`; those views are rendered as intel, not as local fog sources. Normal
 match snapshots provide `visibleTiles`, so the overlay follows server-authoritative fog including
 smoke blockers and five-second lingering death sight; local stamping remains a fallback for
-older/dev object snapshots.
+older/dev object snapshots. That fallback still rebuilds the complete visibility union on every
+rendered frame. It may reuse one entity's previously computed tile stamp only while identity, kind,
+exact world position, tile size, sight, footprint, and terrain are unchanged; any changed input
+invalidates the stamp and performs the ordinary line-of-sight rays in the same frame. This is exact
+memoization, not a lower fog cadence or stale-state allowance.
+
+The checked-in Hellhole client-performance stream follows the normal path: it is active Player 1's
+fog-filtered projection from the canonical `1+3` versus `2+4` scenario and carries the full
+server-authored visibility grid. It must not be converted to a full-world spectator projection,
+which would benchmark local fallback ray casting instead of ordinary player presentation.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
 `command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the
@@ -1416,7 +1424,7 @@ only those repeatable command-card buttons. Legal manual build, train, and resea
 actionable while their red cost is unaffordable: build enters placement and relies on the worker's
 authoritative wait at the site, while train/research append an unpaid queue entry. Selected producers
 render `prodWaiting` as a striped zero-progress bar labeled `waiting for resources / supply`, and
-progress extrapolation stays disabled until the server reports the item paid. Alt-clicking a train button or pressing Ctrl with its
+progress extrapolation stays disabled until the server reports the item paid. Alt-clicking a train button or pressing Alt or Ctrl with its
 resolved hotkey adds that unit to one selected compatible producer's ordered standing repeat list;
 pressing Shift with the resolved hotkey removes it from one producer. The server applies each signed
 adjustment atomically so rapid inputs allocate distinct producers from current authoritative state.
@@ -1751,8 +1759,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remains perceptible and broadly directional without preserving exact event location or
   composition. Non-combat spatial behavior and the global 48-voice pool remain unchanged.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
-  buckets; generic Panzerfaust attack events, projectile travel, reload, and legacy conversion
-  events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
+  buckets; generic Rifleman Panzerfaust attack events and projectile travel stay silent so the
+  weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
   fights.
   Existing spoken server notices explicitly duck ambient and combat buses while they play; nested
   notice voices hold the duck until the final voice ends, then release over two seconds.
@@ -1799,15 +1807,15 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
   experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
-  experiment with carried movement frames and setup/deployed frames; Panzerfaust: distinct loaded infantry
-  rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  experiment with carried movement frames and setup/deployed frames; Panzerfausts-upgraded Riflemen:
+  distinct loaded infantry rig until launch, then the normal Rifleman rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).
-  Riflemen carry a rifle, loaded Panzerfaust infantry carry a tube launcher with a team-colored
-  band, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
+  Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
+  with a team-colored band and switch immediately to normal rifle art after launch. Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
@@ -1949,8 +1957,8 @@ Import rules:
   `app.js` instead of importing collaborators from feature modules.
 - Lab UI and transport lifetimes stay in `App`: `match.js` may receive lab metadata/control policy,
   but must not import `lab_client.js` or `lab_panel.js`. Lab setup tools may include inspection
-  spawn entries such as Panzerfaust; normal faction catalog membership and production command-card
-  exposure are still owned by the Rust rules catalog and client rules mirror.
+  units and completed-research toggles; normal faction catalog membership and production/research
+  command-card exposure are still owned by the Rust rules catalog and client rules mirror.
 - Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
   or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
   `scripts/check-client-architecture.mjs` with a reason.

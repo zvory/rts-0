@@ -155,12 +155,13 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(abilities::EKAT_MAGIC_ANCHOR, "ekatMagicAnchor");
     assert_eq!(ability_object_kinds::RETURN_MARKER, "returnMarker");
     assert_eq!(upgrades::METHAMPHETAMINES, "methamphetamines");
+    assert_eq!(upgrades::PANZERFAUSTS, "panzerfausts");
     assert_eq!(upgrades::ENTRENCHMENT, "entrenchment");
     assert_eq!(upgrades::SMOKE_PLUS, "smoke_plus");
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 40);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 41);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");

@@ -49,7 +49,7 @@ mod dev_replay;
 mod dev_scenario_id;
 mod faction_validation;
 mod lab_replay_operations;
-mod lab_scenario_driver;
+pub(crate) mod lab_scenario_driver;
 mod lab_timeline;
 mod launch;
 mod live_tick;

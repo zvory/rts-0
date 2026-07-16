@@ -54,6 +54,7 @@ export class LabPanel {
     this.lastResult = labClient?.lastResult || null;
     this.targetPlayerId = null;
     this.playerState = {
+      playerId: null,
       steel: null,
       oil: null,
       researchUpgrade: "",
@@ -72,8 +73,6 @@ export class LabPanel {
     this.authoringValidation = { errors: [], preview: null };
     this.submission = createLabScenarioSubmissionState();
     this.setSubmissionCapability(submissionCapability);
-    this.playerButtons = new Map();
-    this.spawnPanels = new Map();
     this.fields = new Map();
     this.listeners = [];
     this.unsubscribeState = null;
@@ -116,8 +115,6 @@ export class LabPanel {
     this.removeListeners();
     this.optionsWindowChrome.clearRenderListeners();
     this.toolsWindowChrome.clearRenderListeners();
-    this.playerButtons.clear();
-    this.spawnPanels.clear();
     this.fields.clear();
 
     this.renderOptionsWindow();
@@ -569,7 +566,6 @@ export class LabPanel {
       button.style.setProperty("--lab-player-bg", hexToRgba(color, 0.18));
       button.style.setProperty("--lab-player-bg-active", hexToRgba(color, 0.42));
       button.style.setProperty("--lab-player-ring", hexToRgba(color, 0.72));
-      this.playerButtons.set(playerId, button);
       group.appendChild(button);
     });
     return group;
@@ -578,25 +574,12 @@ export class LabPanel {
   selectTargetPlayer(owner) {
     this.captureVisibleSetupFields();
     this.targetPlayerId = this.validOwner(owner);
-    this.syncTargetPlayerButtons();
-    this.syncSpawnPanelTargetColors();
-  }
-
-  syncTargetPlayerButtons() {
-    const selected = this.targetPlayer();
-    const field = this.fields.get("lab-player");
-    if (field) field.value = String(selected);
-    for (const [playerId, button] of this.playerButtons.entries()) {
-      const isSelected = playerId === selected;
-      button.dataset.selected = isSelected ? "true" : "false";
-      button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    const active = this.activeLabTool();
+    if (active?.kind === "spawnEntity" && typeof this.match?.updateLabToolPayload === "function") {
+      this.match.updateLabToolPayload({ ...active.payload, owner: this.targetPlayerId });
+      return;
     }
-  }
-
-  syncSpawnPanelTargetColors() {
-    for (const [kind, section] of this.spawnPanels.entries()) {
-      this.applySpawnTargetFieldsetOptions(section, kind);
-    }
+    this.render();
   }
 
   renderSpawnPalette() {
@@ -623,7 +606,6 @@ export class LabPanel {
       this.spawnPaletteGrid(unitKinds),
     ];
     const section = this.fieldset("Unit Spawn", controls, this.spawnTargetFieldsetOptions("units"));
-    this.spawnPanels.set("units", section);
     return section;
   }
 
@@ -651,7 +633,6 @@ export class LabPanel {
       this.buildingSpawnPaletteGrid(buildingKinds),
     ];
     const section = this.fieldset("Building Spawn", controls, this.spawnTargetFieldsetOptions("buildings"));
-    this.spawnPanels.set("buildings", section);
     return section;
   }
 
@@ -670,16 +651,6 @@ export class LabPanel {
         "--lab-spawn-player-ring": hexToRgba(target.color, 0.72),
       },
     };
-  }
-
-  applySpawnTargetFieldsetOptions(section, kind) {
-    const options = this.spawnTargetFieldsetOptions(kind);
-    for (const [key, value] of Object.entries(options.dataset)) {
-      section.dataset[key] = String(value);
-    }
-    for (const [key, value] of Object.entries(options.styles)) {
-      section.style.setProperty(key, String(value));
-    }
   }
 
   spawnPaletteGrid(unitKinds) {
@@ -860,14 +831,17 @@ export class LabPanel {
   }
 
   normalizePlayerState() {
-    this.targetPlayer();
+    const target = this.targetPlayer();
+    if (this.playerState.playerId === target) return;
     const resources = this.resourcesForTargetPlayer();
-    if (this.playerState.steel == null) this.playerState.steel = resources.steel;
-    if (this.playerState.oil == null) this.playerState.oil = resources.oil;
+    this.playerState.playerId = target;
+    this.playerState.steel = resources.steel;
+    this.playerState.oil = resources.oil;
   }
 
   capturePlayerStateFields() {
     this.captureTargetPlayerField();
+    this.playerState.playerId = this.targetPlayer();
     this.playerState.steel = this.uint("resource-steel");
     this.playerState.oil = this.uint("resource-oil");
   }

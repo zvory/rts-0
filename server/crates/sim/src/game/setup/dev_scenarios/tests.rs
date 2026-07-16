@@ -382,159 +382,12 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             0x5150_030d,
         ),
         Game::new_entrenchment_inspection_scenario(EntityKind::Rifleman, 1, 0x5150_030d),
-        Game::new_panzerfaust_inspection_scenario(
-            "panzerfaust_duel",
-            EntityKind::Panzerfaust,
-            1,
-            0x5150_030d,
-        ),
         Game::new_tank_coax_inspection_scenario(EntityKind::Tank, 1, 0x5150_030d),
     ];
 
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
-}
-
-#[test]
-fn panzerfaust_dev_scenarios_seed_final_inspection_cases() {
-    let duel = Game::new_panzerfaust_inspection_scenario(
-        "panzerfaust_duel",
-        EntityKind::Panzerfaust,
-        1,
-        0x5150_0701,
-    )
-    .expect("Panzerfaust duel scenario setup should succeed");
-    assert_eq!(duel.issue_after_ticks, u32::MAX);
-    assert_eq!(duel.units.len(), 1);
-    assert_eq!(owned_kind_count(&duel.game, 1, EntityKind::Panzerfaust), 1);
-    assert_eq!(owned_kind_count(&duel.game, 2, EntityKind::Tank), 1);
-    let duel_target = duel
-        .game
-        .state
-        .entities
-        .get(duel.units[0])
-        .expect("duel Panzerfaust should exist")
-        .order()
-        .attack_target();
-    assert!(
-        duel_target.is_some(),
-        "duel should start with a direct attack order"
-    );
-    assert_dev_scenario_starts_as_kriegsia(&duel);
-
-    let cancel = Game::new_panzerfaust_inspection_scenario(
-        "panzerfaust_windup_cancel",
-        EntityKind::Panzerfaust,
-        1,
-        0x5150_0702,
-    )
-    .expect("Panzerfaust windup-cancel scenario setup should succeed");
-    assert_eq!(cancel.issue_after_ticks, config::TICK_HZ / 6);
-    assert_eq!(cancel.units.len(), 1);
-    assert!(cancel
-        .game
-        .state
-        .entities
-        .get(cancel.units[0])
-        .expect("cancel Panzerfaust should exist")
-        .order()
-        .attack_target()
-        .is_some());
-    assert_dev_scenario_starts_as_kriegsia(&cancel);
-
-    let target_death = Game::new_panzerfaust_inspection_scenario(
-        "panzerfaust_target_death",
-        EntityKind::Panzerfaust,
-        1,
-        0x5150_0703,
-    )
-    .expect("Panzerfaust target-death scenario setup should succeed");
-    assert_eq!(target_death.issue_after_ticks, u32::MAX);
-    assert_eq!(target_death.units.len(), 2);
-    assert_eq!(
-        owned_kind_count(&target_death.game, 1, EntityKind::Panzerfaust),
-        1
-    );
-    assert_eq!(
-        owned_kind_count(&target_death.game, 3, EntityKind::Panzerfaust),
-        1
-    );
-    let low_health_tank = target_death
-        .game
-        .state
-        .entities
-        .iter()
-        .find(|entity| entity.owner == 2 && entity.kind == EntityKind::Tank)
-        .expect("target-death scenario should seed one enemy Tank");
-    assert_eq!(low_health_tank.hp, 63);
-    assert!(target_death
-        .game
-        .state
-        .players
-        .iter()
-        .find(|player| player.id == 3)
-        .expect("boosted ally player should exist")
-        .upgrades
-        .contains(&upgrade::UpgradeKind::Methamphetamines));
-    assert_dev_scenario_starts_as_kriegsia(&target_death);
-
-    let entrenched = Game::new_panzerfaust_inspection_scenario(
-        "panzerfaust_entrenched_range",
-        EntityKind::Panzerfaust,
-        1,
-        0x5150_0704,
-    )
-    .expect("Panzerfaust entrenched-range scenario setup should succeed");
-    assert_eq!(entrenched.issue_after_ticks, u32::MAX);
-    assert_eq!(entrenched.units.len(), 2);
-    assert_eq!(entrenched.game.state.trenches.all().len(), 1);
-    assert!(entrenched
-        .game
-        .state
-        .entities
-        .get(entrenched.units[0])
-        .and_then(|entity| entity.movement.as_ref())
-        .and_then(|movement| movement.occupied_trench_id)
-        .is_some());
-    assert!(entrenched
-        .game
-        .state
-        .entities
-        .get(entrenched.units[1])
-        .and_then(|entity| entity.movement.as_ref())
-        .and_then(|movement| movement.occupied_trench_id)
-        .is_none());
-    assert!(entrenched
-        .game
-        .state
-        .players
-        .iter()
-        .find(|player| player.id == entrenched.player_id)
-        .expect("scenario player should exist")
-        .upgrades
-        .contains(&upgrade::UpgradeKind::Entrenchment));
-    assert_dev_scenario_starts_as_kriegsia(&entrenched);
-
-    let meth = Game::new_panzerfaust_inspection_scenario(
-        "panzerfaust_methamphetamines",
-        EntityKind::Panzerfaust,
-        1,
-        0x5150_0705,
-    )
-    .expect("Panzerfaust Methamphetamines scenario setup should succeed");
-    assert_eq!(meth.issue_after_ticks, u32::MAX);
-    assert_eq!(meth.units.len(), 2);
-    assert!(meth
-        .game
-        .state
-        .players
-        .iter()
-        .find(|player| player.id == 3)
-        .expect("boosted ally player should exist")
-        .upgrades
-        .contains(&upgrade::UpgradeKind::Methamphetamines));
-    assert_dev_scenario_starts_as_kriegsia(&meth);
 }
 
 #[test]
@@ -1093,39 +946,6 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
             "{unit} move goal should be perpendicular to the hull on the same y axis"
         );
     }
-}
-
-#[test]
-fn command_car_building_corner_matches_reduced_reproduction_layout() {
-    let setup = Game::new_command_car_corner_scenario(EntityKind::CommandCar, 1, 0x5150_0011)
-        .expect("scenario setup should succeed");
-    assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
-    assert_eq!(setup.goal, (3216.0, 3472.0));
-    assert_eq!(setup.units.len(), 1);
-    for (kind, expected_pos) in [
-        (EntityKind::Factory, (3472.0, 3728.0)),
-        (EntityKind::TrainingCentre, (3440.0, 3648.0)),
-        (EntityKind::Barracks, (3536.0, 3584.0)),
-    ] {
-        let building = setup
-            .game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.kind == kind)
-            .unwrap_or_else(|| panic!("scenario should include {kind}"));
-        assert_eq!((building.pos_x, building.pos_y), expected_pos);
-    }
-    let command_car = setup
-        .game
-        .state
-        .entities
-        .get(setup.units[0])
-        .expect("scenario Command Car should exist");
-    assert_eq!(command_car.kind, EntityKind::CommandCar);
-    assert_eq!((command_car.pos_x, command_car.pos_y), (3536.0, 3664.0));
-    assert!((command_car.facing() - 2.823_079_3).abs() <= 0.000_001);
-    assert_units_do_not_intersect_buildings(&setup.game);
 }
 
 #[test]

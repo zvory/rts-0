@@ -63,11 +63,7 @@ impl TechRequirement {
 
 const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
-const BARRACKS_UNITS: &[EntityKind] = &[
-    EntityKind::Rifleman,
-    EntityKind::MachineGunner,
-    EntityKind::Panzerfaust,
-];
+const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -163,26 +159,6 @@ pub const UNITS: &[UnitDef] = &[
             supply: 2,
             build_ticks: 400,
             radius: 10.0,
-        },
-        armor_class: ArmorClass::Small,
-        weapon: WeaponClass::SmallArms,
-        trained_at: Some(EntityKind::Barracks),
-        train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
-    },
-    UnitDef {
-        kind: EntityKind::Panzerfaust,
-        stats: balance::UnitStats {
-            hp: 45,
-            dmg: 5,
-            range_tiles: 4,
-            cooldown: 16,
-            speed: 1.6,
-            sight_tiles: 11,
-            cost_steel: 60,
-            cost_oil: 15,
-            supply: 1,
-            build_ticks: 400,
-            radius: 9.0,
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
@@ -624,7 +600,6 @@ mod tests {
                 EntityKind::Golem,
                 EntityKind::Rifleman,
                 EntityKind::MachineGunner,
-                EntityKind::Panzerfaust,
                 EntityKind::AntiTankGun,
                 EntityKind::MortarTeam,
                 EntityKind::Artillery,
@@ -725,40 +700,6 @@ mod tests {
         assert_eq!(artillery.armor_class, ArmorClass::Small);
         assert_eq!(command_car.stats.hp, 150);
         assert_eq!(command_car.armor_class, ArmorClass::Small);
-    }
-
-    #[test]
-    fn panzerfaust_stats_use_rifle_defaults_and_barracks_training() {
-        let def = unit_def(EntityKind::Panzerfaust).expect("panzerfaust def");
-        let rifleman_speed = unit_def(EntityKind::Rifleman)
-            .expect("rifleman def")
-            .stats
-            .speed;
-
-        assert_eq!(def.stats.hp, 45);
-        assert_eq!(def.stats.dmg, 5);
-        assert_eq!(def.stats.range_tiles, 4);
-        assert_eq!(def.stats.cooldown, 16);
-        assert_eq!(def.stats.speed, rifleman_speed);
-        assert_eq!(def.stats.sight_tiles, 11);
-        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (60, 15));
-        assert_eq!(def.stats.supply, 1);
-        assert_eq!(def.stats.build_ticks, 400);
-        assert_eq!(def.stats.radius, 9.0);
-        assert_eq!(def.armor_class, ArmorClass::Small);
-        assert_eq!(def.weapon, WeaponClass::SmallArms);
-        assert_eq!(def.trained_at, Some(EntityKind::Barracks));
-        assert_eq!(
-            def.train_requirement,
-            TechRequirement::All(TRAINING_CENTRE_REQUIRED)
-        );
-        assert!(
-            building_def(EntityKind::Barracks)
-                .expect("barracks def")
-                .trains
-                .contains(&EntityKind::Panzerfaust),
-            "Panzerfaust should be exposed through Barracks production"
-        );
     }
 
     #[test]

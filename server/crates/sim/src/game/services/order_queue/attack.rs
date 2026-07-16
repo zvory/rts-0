@@ -7,17 +7,13 @@ use crate::game::services::dist2;
 const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
 
 pub(super) fn panzerfaust_attack_cycle_active(attacker: &Entity) -> bool {
-    attacker.kind == EntityKind::Panzerfaust
+    attacker.kind == EntityKind::Rifleman
         && matches!(
             attacker
                 .combat
                 .as_ref()
                 .and_then(|combat| combat.panzerfaust),
-            Some(
-                PanzerfaustState::Windup { .. }
-                    | PanzerfaustState::InFlight { .. }
-                    | PanzerfaustState::Recovery { .. }
-            )
+            Some(PanzerfaustState::Windup { .. })
         )
 }
 
@@ -33,7 +29,7 @@ pub(super) fn attack_can_fire_now(
     let Some(stats) = config::unit_stats(attacker.kind) else {
         return false;
     };
-    let uses_loaded_panzerfaust = attacker.kind == EntityKind::Panzerfaust
+    let uses_loaded_panzerfaust = attacker.kind == EntityKind::Rifleman
         && crate::rules::combat::is_panzerfaust_loaded_shot_target(target.kind)
         && matches!(
             attacker

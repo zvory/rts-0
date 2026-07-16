@@ -40,7 +40,7 @@ export function interactScenarioLaunchEnabled(locationLike = globalThis.location
     const blocker = params.get("blocker") || "";
     const scenarioCase = params.get("case") || "";
     return (pathname === "/" || pathname === "") &&
-      params.get("interact") === "scenario" &&
+      params.get("interact") === "dev-scenario" &&
       params.get("watchScenario") === "1" &&
       DEV_SCENARIO_TOKEN_RE.test(params.get("id") || "") &&
       DEV_SCENARIO_TOKEN_RE.test(params.get("unit") || "") &&

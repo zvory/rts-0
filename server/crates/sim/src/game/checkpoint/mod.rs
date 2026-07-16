@@ -248,9 +248,7 @@ impl GameCheckpointV1 {
     ) -> Result<GameState, CheckpointPayloadError> {
         self.validate_against(&map, &map_metadata)?;
         let entities = self.entities.into_store();
-        let panzerfaust_shots = self
-            .panzerfaust_shots
-            .backfill_legacy_in_flight(&entities, self.tick);
+        let panzerfaust_shots = self.panzerfaust_shots;
         Ok(GameState {
             map,
             entities,

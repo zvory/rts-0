@@ -12,42 +12,47 @@ import {
   parsePositiveNumberList,
 } from "../../scripts/client-perf-harness.mjs";
 import { FrameProfiler, collectMatchFrameContext } from "../../client/src/frame_profiler.js";
-import { validateActiveSupplyStressSample } from "../../scripts/client-perf/workload_setup.mjs";
+import { validateLiveLabScenarioSample } from "../../scripts/client-perf/workload_setup.mjs";
 import {
   buildClientPerfWorkloads,
-  SUPPLY_ACTIVE_WORKLOADS,
+  defaultClientPerfWorkloads,
 } from "../../scripts/client-perf/workloads.mjs";
 
 export function runFrameProfilerContracts() {
   {
-    const expected = SUPPLY_ACTIVE_WORKLOADS[200];
-    const sample = {
-      source: "server-authoritative-dev-scenario",
-      clientMutated: false,
-      scenarioId: expected.scenarioId,
-      scenarioSeed: expected.scenarioSeed,
-      playerId: expected.playerId,
-      spectator: false,
-      predictionEnabled: true,
-      predictionReady: true,
-      predictionMode: "tracking",
-      supplyUsed: expected.targetSupply,
-      supplyCap: expected.supplyCap,
-      projectedEntityCount: expected.projectedEntityCount,
-      countsByOwner: expected.countsByOwner,
+    const workloads = buildClientPerfWorkloads({});
+    const ids = workloads.map((workload) => workload.id);
+    assert(
+      ids.filter((id) => id.startsWith("supply-") && !id.includes("hellhole")).length === 0,
+      "Hellhole is the sole supply-scale client renderer benchmark",
+    );
+    const defaultIds = defaultClientPerfWorkloads(workloads).map((workload) => workload.id);
+    assert(defaultIds.includes("supply-300-hellhole-stream"), "client-only Hellhole remains in the default renderer workload set");
+    const stream = workloads.find((workload) => workload.id === "supply-300-hellhole-stream");
+    assert(
+      stream?.setup?.snapshotStreamPlayerId === 1
+        && stream?.setup?.snapshotStreamSpectator === false
+        && JSON.stringify(stream?.setup?.snapshotStreamTeamIds) === JSON.stringify([1, 2, 1, 2])
+        && stream?.setup?.snapshotStreamVisibilityTileCount === 126 * 126
+        && stream?.setup?.waitForMinEntities === 288,
+      "client-only Hellhole measures the full-cadence Player 1 2v2 projection",
+    );
+    assert(!defaultIds.includes("supply-300-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");
+    const integrated = workloads.find((workload) => workload.id === "supply-300-hellhole-integrated");
+    assert(integrated?.kind === "labScenario" && integrated?.setup?.waitForMinEntities === 380, "integrated Hellhole retains an explicit canonical Lab view");
+    const expectedLab = integrated.setup.liveLabScenario;
+    const liveLabSample = {
+      scenarioId: expectedLab.scenarioId,
+      mapWidth: expectedLab.mapWidth,
+      mapHeight: expectedLab.mapHeight,
+      projectedEntityCount: expectedLab.projectedEntityCount,
+      labMode: true,
+      offline: false,
+      websocketOpen: true,
     };
-    assert(validateActiveSupplyStressSample(sample, expected).length === 0, "active supply workload accepts exact authoritative player evidence");
-    for (const mutation of [
-      { spectator: true },
-      { predictionEnabled: false, predictionMode: "disabled" },
-      { supplyUsed: 199 },
-      { projectedEntityCount: 1 },
-      { clientMutated: true },
-    ]) {
-      assert(validateActiveSupplyStressSample({ ...sample, ...mutation }, expected).length > 0, "active supply workload rejects invalid authority, prediction, supply, or projection evidence");
-    }
-    const ids = buildClientPerfWorkloads({}).map((workload) => workload.id);
-    assert(ids.includes("supply-200-active") && ids.includes("supply-300-active"), "paired active 200/300 workloads are checked in");
+    assert(validateLiveLabScenarioSample(liveLabSample, expectedLab).length === 0, "integrated Hellhole accepts exact live Lab identity");
+    assert(validateLiveLabScenarioSample({ ...liveLabSample, offline: true }, expectedLab).length > 0, "integrated Hellhole rejects an offline client lane");
+    assert(validateLiveLabScenarioSample({ ...liveLabSample, websocketOpen: false }, expectedLab).length > 0, "integrated Hellhole rejects a non-open WebSocket");
   }
 
   {
@@ -179,7 +184,8 @@ export function runFrameProfilerContracts() {
       ],
     });
 
-    assert(report.target.frameBudgetMs === RENDER_FRAME_BUDGET_MS, "render budget report exposes the 120 FPS frame budget");
+    assert(report.target.fps === 240, "render budget report exposes the 240 FPS target");
+    assert(report.target.frameBudgetMs === RENDER_FRAME_BUDGET_MS, "render budget report exposes the 240 FPS frame budget");
     assert(report.target.frameBudgets.length === RENDER_FRAME_BUDGET_TARGETS.length, "render budget report exposes all FPS frame budgets");
     assert(report.status === "warn", "render budget report warns without failing on over-budget frame work");
     assert(report.frameWork.avgMs === 7.5, "render budget report includes frame.work average");
@@ -223,10 +229,30 @@ export function runFrameProfilerContracts() {
       ],
     });
 
-    assert(report.frameWork.nextMissedBudget.fps === 240, "120 FPS work can still miss the next headroom target");
+    assert(report.frameWork.nextMissedBudget.fps === 240, "120 FPS work can still miss the 240 FPS target");
     assert(
-      report.warnings.some((warning) => warning.kind === "frame_work_p95_misses_headroom_budget"),
-      "render budget report warns when local p95 clears 120 but misses higher headroom",
+      report.warnings.some((warning) => warning.kind === "frame_work_p95_over_budget" && warning.severity === "high"),
+      "render budget report treats a missed 240 FPS target as high severity",
+    );
+  }
+
+  {
+    const report = buildRenderBudgetReport({
+      schemaVersion: 1,
+      frameCount: 120,
+      slowFrameCount: 0,
+      phases: [
+        { label: "frame.work", count: 120, avgMs: 3, maxMs: 5, p50Ms: 2, p95Ms: 4, slowCount: 0 },
+      ],
+    });
+
+    assert(report.frameWork.nextMissedBudget.fps === 480, "240 FPS work can still miss the next headroom target");
+    assert(
+      report.warnings.some((warning) =>
+        warning.kind === "frame_work_p95_misses_headroom_budget"
+          && warning.message.includes("clears 240 FPS locally")
+      ),
+      "render budget report reserves headroom warnings for budgets above the 240 FPS target",
     );
   }
 

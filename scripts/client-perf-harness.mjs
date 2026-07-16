@@ -9,12 +9,16 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
+import { initializeWorkloadSetup } from "./client-perf/workload_setup.mjs";
 import {
-  initializeWorkloadSetup,
-  labHellholeSampleErrors,
-  validateActiveSupplyStressSample,
-} from "./client-perf/workload_setup.mjs";
-import { buildClientPerfWorkloads } from "./client-perf/workloads.mjs";
+  cleanupBrowserProfile,
+  configurePageEmulation,
+  parseCpuProfileInterval,
+  puppeteerViewport,
+  startCpuProfile,
+  stopCpuProfile,
+} from "./client-perf/browser_profile.mjs";
+import { buildClientPerfWorkloads, defaultClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
@@ -35,8 +39,8 @@ export const MATRIX_VIEWPORT_PRESETS = Object.freeze({
   large: Object.freeze({ label: "large", width: 1920, height: 1080 }),
 });
 const DEFAULT_MATRIX_VIEWPORTS = Object.freeze([MATRIX_VIEWPORT_PRESETS.default]);
-export const RENDER_TARGET_FPS = 120;
-export const RENDER_FRAME_BUDGET_MS = 8.33;
+export const RENDER_TARGET_FPS = 240;
+export const RENDER_FRAME_BUDGET_MS = 4.17;
 export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
   Object.freeze({ fps: 60, frameBudgetMs: 16.67 }),
   Object.freeze({ fps: 120, frameBudgetMs: 8.33 }),
@@ -47,13 +51,13 @@ export const RECURRING_PHASE_WARN_MS = 1;
 export const RECURRING_PHASE_HIGH_WARN_MS = 2;
 const MAX_RECURRING_WARNINGS = 8;
 const WORKLOADS = buildClientPerfWorkloads();
-const RENDER_LAG_WORKLOAD_IDS = Object.freeze(WORKLOADS.map((workload) => workload.id));
-
+const DEFAULT_WORKLOADS = defaultClientPerfWorkloads(WORKLOADS);
+const RENDER_LAG_WORKLOAD_IDS = Object.freeze(DEFAULT_WORKLOADS.map((workload) => workload.id));
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.list) {
     for (const workload of WORKLOADS) {
-      console.log(`${workload.id}\t${workload.description}`);
+      console.log(`${workload.id}${workload.defaultEnabled === false ? " [opt-in]" : ""}\t${workload.description}`);
     }
     return;
   }
@@ -63,7 +67,7 @@ async function main() {
   fs.mkdirSync(outputRoot, { recursive: true });
   const puppeteer = await loadPuppeteer();
   const chrome = findChrome(args.chrome);
-  const server = await startOrReuseServer(args, selected);
+  const server = await startOrReuseServer(args);
   const browser = await launchBrowser(puppeteer, chrome, args);
 
   try {
@@ -183,14 +187,18 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   const requestFailures = [];
   const errors = [];
   let tracePath = null;
+  let cpuProfile = null;
+  let cpuProfilePath = null;
+  let page = null;
+  let cdpSession = null;
   let summary = null;
   let snapshotCodecBakeoff = null;
   let workloadSetup = null;
 
   try {
     await prepareWorkload(workload);
-    const page = await browser.newPage();
-    const cdpSession = await configurePageEmulation(page, args);
+    page = await browser.newPage();
+    cdpSession = await configurePageEmulation(page, args.cpuThrottleRate);
     if (args.snapshotCodecBakeoff) {
       await installSnapshotCodecCapture(page, args.snapshotCodecMaxSamples);
     }
@@ -235,7 +243,10 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
     );
+    cpuProfile = await startCpuProfile(page, args.cpuProfileIntervalUs, cdpSession);
     await sleep(args.durationMs);
+    cpuProfilePath = cpuProfile ? path.join(artifactDir, "cpu-profile.cpuprofile") : null;
+    await stopCpuProfile(cpuProfile, cpuProfilePath);
 
     summary = await collectPageSummary(page);
     if (args.snapshotCodecBakeoff) {
@@ -302,6 +313,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         baseUrl: server.baseUrl,
         reusedServer: server.reused,
         cpuThrottleRate: args.cpuThrottleRate,
+        cpuProfileIntervalUs: args.cpuProfileIntervalUs,
       },
       workloadSetup,
       stressMatrix: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
@@ -332,6 +344,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       artifacts: {
         summaryJson: path.join(artifactDir, "summary.json"),
         traceJson: tracePath,
+        cpuProfile: cpuProfilePath,
       },
       notes: [
         "This harness fails on runtime errors and missing summaries, not absolute FPS thresholds.",
@@ -345,14 +358,12 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     if (!summary.clientNetReport) {
       errors.push("ClientNetReport snapshot could not be generated");
     }
-    errors.push(...workloadSetupErrors(workload, workloadSetup, summary));
+    errors.push(...workloadSetupErrors(workload, workloadSetup));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
 
     if (args.trace) await page.tracing.stop();
-    await cdpSession?.detach?.().catch(() => {});
-    await page.close().catch(() => {});
 
     if (errors.length > 0) artifact.status = "failed";
     fs.writeFileSync(path.join(artifactDir, "summary.json"), `${JSON.stringify(artifact, null, 2)}\n`);
@@ -373,11 +384,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     };
   } catch (err) {
     errors.push(err.stack || err.message);
-    try {
-      if (args.trace) await browser.pages().then((pages) => pages.at(-1)?.tracing?.stop?.()).catch(() => {});
-    } catch {
-      // Best effort cleanup only.
-    }
+    if (args.trace) await page?.tracing?.stop?.().catch(() => {});
     const artifact = {
       schemaVersion: 1,
       status: "failed",
@@ -398,6 +405,8 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       deviceScaleFactor: args.deviceScaleFactor,
       matrixCell: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
     };
+  } finally {
+    await cleanupBrowserProfile({ controller: cpuProfile, emulationSession: cdpSession, page });
   }
 }
 
@@ -477,7 +486,7 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
   const warnings = [];
   if (nextMissedBudget) {
     const missedByMs = Math.abs(nextMissedBudget.p95MarginMs);
-    const clears120 = frameWorkP95Ms != null && frameWorkP95Ms <= RENDER_FRAME_BUDGET_MS;
+    const clearsTarget = frameWorkP95Ms != null && frameWorkP95Ms <= RENDER_FRAME_BUDGET_MS;
     warnings.push({
       kind: nextMissedBudget.fps <= RENDER_TARGET_FPS
         ? "frame_work_p95_over_budget"
@@ -486,8 +495,8 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
       fps: nextMissedBudget.fps,
       frameBudgetMs: nextMissedBudget.frameBudgetMs,
       p95MarginMs: nextMissedBudget.p95MarginMs,
-      message: clears120
-        ? `frame.work p95 ${formatMs(frameWorkP95Ms)} clears 120 FPS locally but misses the ${nextMissedBudget.fps} FPS headroom budget by ${formatMs(missedByMs)}`
+      message: clearsTarget
+        ? `frame.work p95 ${formatMs(frameWorkP95Ms)} clears ${RENDER_TARGET_FPS} FPS locally but misses the ${nextMissedBudget.fps} FPS headroom budget by ${formatMs(missedByMs)}`
         : `frame.work p95 ${formatMs(frameWorkP95Ms)} misses the ${nextMissedBudget.fps} FPS budget by ${formatMs(missedByMs)}`,
     });
   }
@@ -1448,7 +1457,7 @@ async function setWorkloadRoomTimeSpeed(page, speed) {
   }, speed);
 }
 
-function workloadSetupErrors(workload, setupResult, summary = null) {
+function workloadSetupErrors(workload, setupResult) {
   const minSelected = Number(workload.setup?.minSelectedCount || 0);
   if (!setupResult) return workload.setup ? [`${workload.id} setup did not run`] : [];
   const errors = [];
@@ -1456,11 +1465,6 @@ function workloadSetupErrors(workload, setupResult, summary = null) {
   if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
-  errors.push(...labHellholeSampleErrors(workload.setup, setupResult, summary));
-  errors.push(...validateActiveSupplyStressSample(
-    setupResult.activeSupplyStress,
-    workload.setup?.activeSupplyStress,
-  ));
   return errors;
 }
 
@@ -1471,7 +1475,7 @@ async function prepareWorkload(workload) {
   fs.copyFileSync(workload.source, path.join(targetDir, "replay.json"));
 }
 
-async function startOrReuseServer(args, selectedWorkloads = []) {
+async function startOrReuseServer(args) {
   const fromEnv = args.baseUrl || process.env.RTS_URL;
   if (fromEnv && await isHealthy(fromEnv)) {
     return {
@@ -1512,12 +1516,7 @@ async function startOrReuseServer(args, selectedWorkloads = []) {
     env: {
       ...process.env,
       RTS_ADDR: `127.0.0.1:${port}`,
-      // Active prediction must be measured against the production 30 Hz
-      // cadence. The accelerated 5 ms harness clock outruns the browser WASM
-      // predictor and turns the active-player workload into disabled-prediction
-      // evidence before sampling begins.
-      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS
-        || (selectedWorkloads.some((workload) => workload.kind === "activeDevScenario") ? "33" : "5"),
+      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS || "5",
       RTS_MATCH_SEED: process.env.RTS_MATCH_SEED || "1",
     },
     stdio: ["ignore", log, log],
@@ -1547,7 +1546,7 @@ async function launchBrowser(puppeteer, chrome, args) {
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-client-perf-chrome-"));
   return puppeteer.launch({
     executablePath: chrome,
-    headless: "new",
+    headless: process.env.RTS_CLIENT_PERF_HEADED === "1" ? false : "new",
     defaultViewport: args.viewport,
     args: [
       "--no-sandbox",
@@ -1555,22 +1554,6 @@ async function launchBrowser(puppeteer, chrome, args) {
       `--user-data-dir=${profileDir}`,
     ],
   });
-}
-
-async function configurePageEmulation(page, args) {
-  const rate = Number(args.cpuThrottleRate || DEFAULT_CPU_THROTTLE_RATE);
-  if (!Number.isFinite(rate) || rate <= 1) return null;
-  const session = await page.target().createCDPSession();
-  await session.send("Emulation.setCPUThrottlingRate", { rate });
-  return session;
-}
-
-function puppeteerViewport(viewport, deviceScaleFactor = DEFAULT_DEVICE_SCALE_FACTOR) {
-  return {
-    width: viewport.width,
-    height: viewport.height,
-    deviceScaleFactor,
-  };
 }
 
 async function installSnapshotCodecCapture(page, maxSamples) {
@@ -1649,10 +1632,8 @@ async function loadPuppeteer() {
 }
 
 function selectedWorkloads(args) {
-  const ids = args.activeSupplyPair
-    ? ["supply-200-active", "supply-300-active"]
-    : args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
-  if (ids.length === 0) return WORKLOADS;
+  const ids = args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
+  if (ids.length === 0) return DEFAULT_WORKLOADS;
   const byId = new Map(WORKLOADS.map((workload) => [workload.id, workload]));
   return ids.map((id) => {
     const workload = byId.get(id);
@@ -1665,13 +1646,13 @@ function parseArgs(argv) {
   const args = {
     list: false,
     renderLagSuite: false,
-    activeSupplyPair: false,
     workloads: [],
     durationMs: DEFAULT_DURATION_MS,
     outputRoot: DEFAULT_OUTPUT_ROOT,
     viewport: { ...DEFAULT_VIEWPORT },
     deviceScaleFactor: DEFAULT_DEVICE_SCALE_FACTOR,
     cpuThrottleRate: DEFAULT_CPU_THROTTLE_RATE,
+    cpuProfileIntervalUs: null,
     stressMatrix: false,
     matrixRepeatCount: DEFAULT_MATRIX_REPEAT_COUNT,
     matrixCpuThrottles: [...DEFAULT_MATRIX_CPU_THROTTLES],
@@ -1696,7 +1677,6 @@ function parseArgs(argv) {
     };
     if (arg === "--list") args.list = true;
     else if (arg === "--render-lag-suite") args.renderLagSuite = true;
-    else if (arg === "--active-supply-pair") args.activeSupplyPair = true;
     else if (arg === "--stress-matrix") args.stressMatrix = true;
     else if (arg === "--trace") args.trace = true;
     else if (arg === "--snapshot-codec-bakeoff") args.snapshotCodecBakeoff = true;
@@ -1723,6 +1703,8 @@ function parseArgs(argv) {
     else if (arg.startsWith("--dpr=")) args.deviceScaleFactor = parsePositiveNumber(arg.slice("--dpr=".length), "--dpr");
     else if (arg === "--cpu-throttle") args.cpuThrottleRate = parsePositiveNumber(value(), arg);
     else if (arg.startsWith("--cpu-throttle=")) args.cpuThrottleRate = parsePositiveNumber(arg.slice("--cpu-throttle=".length), "--cpu-throttle");
+    else if (arg === "--cpu-profile-interval-us") args.cpuProfileIntervalUs = parseCpuProfileInterval(value(), arg);
+    else if (arg.startsWith("--cpu-profile-interval-us=")) args.cpuProfileIntervalUs = parseCpuProfileInterval(arg.slice("--cpu-profile-interval-us=".length), "--cpu-profile-interval-us");
     else if (arg === "--matrix-repeat") args.matrixRepeatCount = parsePositiveInt(value(), arg);
     else if (arg.startsWith("--matrix-repeat=")) args.matrixRepeatCount = parsePositiveInt(arg.slice("--matrix-repeat=".length), "--matrix-repeat");
     else if (arg === "--matrix-cpu") args.matrixCpuThrottles = parsePositiveNumberList(value(), arg);
@@ -1741,9 +1723,6 @@ function parseArgs(argv) {
   if (args.renderLagSuite && args.workloads.length > 0) {
     throw new Error("--render-lag-suite cannot be combined with --workload");
   }
-  if (args.activeSupplyPair && (args.renderLagSuite || args.workloads.length > 0)) {
-    throw new Error("--active-supply-pair cannot be combined with --render-lag-suite or --workload");
-  }
   return args;
 }
 
@@ -1753,9 +1732,8 @@ function printHelp() {
 Options:
   --list                         List available workloads.
   --render-lag-suite             Run the full render-lag comparison workload set.
-  --active-supply-pair           Run exact active-player 200/300 workloads with identical settings.
   --stress-matrix                Run workloads across CPU, viewport, DPR, and repeat matrix cells.
-  --workload <id>                Run one workload; repeatable. Defaults to all workloads.
+  --workload <id>                Run one workload; repeatable. Defaults to all non-opt-in workloads.
   --seconds <n>                  Browser collection time per workload. Default: ${DEFAULT_DURATION_MS / 1000}.
   --duration-ms <n>              Browser collection time per workload in milliseconds.
   --output-root <path>           Artifact root. Default: target/client-perf.
@@ -1768,6 +1746,7 @@ Options:
   --viewport <width>x<height>    Browser viewport. Default: ${DEFAULT_VIEWPORT.width}x${DEFAULT_VIEWPORT.height}.
   --dpr <n>                      Device scale factor for a single workload run. Default: ${DEFAULT_DEVICE_SCALE_FACTOR}.
   --cpu-throttle <n>             Chrome CPU throttle factor for a single workload run. Default: ${DEFAULT_CPU_THROTTLE_RATE}.
+  --cpu-profile-interval-us <n>  Also write a V8 CPU profile using a 100-100000 microsecond interval.
   --matrix-repeat <n>            Repeat count per stress-matrix cell. Default: ${DEFAULT_MATRIX_REPEAT_COUNT}.
   --matrix-cpu <list>            Comma list such as 1,2,4. Default: ${DEFAULT_MATRIX_CPU_THROTTLES.join(",")}.
   --matrix-viewport <list>       Comma list of small,default,large or WxH. Default: default.

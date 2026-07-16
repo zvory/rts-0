@@ -50,6 +50,12 @@ path = "src/bin/ai_perf_harness.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "hellhole-perf-harness"
+path = "src/bin/hellhole_perf_harness.rs"
+test = false
+bench = false
+
 [dependencies]
 rts-contract = { path = "crates/contract" }
 rts-ai = { path = "crates/ai" }

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pointer Lock Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">ISOLATED · LOCAL ONLY · NO GAME CODE</p>
+          <h1>Pointer Lock Lab</h1>
+        </div>
+        <output id="lockHeadline" class="headline-status" data-state="unlocked" aria-live="assertive">
+          UNLOCKED
+        </output>
+      </header>
+
+      <section class="operator-guide" aria-labelledby="guideTitle">
+        <h2 id="guideTitle">Agent recipe</h2>
+        <ol>
+          <li><strong>Click the striped box</strong> to request raw lock.</li>
+          <li><strong>Move, jump, or drag right</strong> while locked.</li>
+          <li>Verify <strong>RIGHT</strong> and a positive X delta.</li>
+          <li>Press <kbd>Esc</kbd> to unlock.</li>
+        </ol>
+      </section>
+
+      <div class="toolbar" aria-label="Pointer lock controls">
+        <button id="rawLockButton" class="primary-action" type="button">
+          Lock raw (goal)
+        </button>
+        <button id="standardLockButton" type="button">
+          Lock standard (control)
+        </button>
+        <button id="exitLockButton" type="button">Exit lock</button>
+        <button id="resetButton" type="button">Reset telemetry</button>
+        <span class="shortcut-note">Keys: <kbd>R</kbd> raw · <kbd>S</kbd> standard · <kbd>C</kbd> clear</span>
+      </div>
+
+      <section
+        id="captureZone"
+        class="capture-zone"
+        role="button"
+        tabindex="0"
+        aria-label="Raw pointer lock capture surface. Click here to request raw pointer lock."
+        aria-describedby="captureInstructions"
+      >
+        <p id="captureInstructions" class="capture-instructions">
+          <span>1. CLICK HERE TO LOCK RAW</span>
+          <small>Then move, jump, or drag toward the right edge.</small>
+        </p>
+        <span class="edge-label edge-label-left" aria-hidden="true">← LEFT</span>
+        <span class="edge-label edge-label-right" aria-hidden="true">RIGHT →</span>
+        <div id="virtualCursor" class="virtual-cursor" aria-hidden="true"></div>
+        <output id="directionDisplay" class="direction-display" aria-live="polite">WAITING FOR MOVEMENT</output>
+      </section>
+
+      <section class="lower-grid">
+        <div class="telemetry-panel" aria-labelledby="telemetryTitle">
+          <h2 id="telemetryTitle">Live telemetry</h2>
+          <dl class="telemetry-grid">
+            <div>
+              <dt>Request</dt>
+              <dd id="requestMode">NONE</dd>
+            </div>
+            <div>
+              <dt>Movement</dt>
+              <dd id="movementStatus" data-state="waiting">WAITING</dd>
+            </div>
+            <div>
+              <dt>Last delta</dt>
+              <dd id="lastDelta">X +0 · Y +0</dd>
+            </div>
+            <div>
+              <dt>Last direction</dt>
+              <dd id="lastDirection">STILL</dd>
+            </div>
+            <div>
+              <dt>Non-zero events</dt>
+              <dd id="eventCount">0</dd>
+            </div>
+            <div>
+              <dt>Cumulative</dt>
+              <dd id="cumulativeDelta">X +0 · Y +0</dd>
+            </div>
+          </dl>
+          <p id="environment" class="environment-line">Checking Pointer Lock API…</p>
+        </div>
+
+        <div class="event-panel" aria-labelledby="eventTitle">
+          <h2 id="eventTitle">Event log <span>(newest first)</span></h2>
+          <ol id="eventLog" class="event-log" aria-live="polite"></ol>
+        </div>
+      </section>
+
+      <output id="liveAnnouncement" class="screen-reader-only" aria-live="assertive"></output>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

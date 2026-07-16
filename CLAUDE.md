@@ -127,6 +127,7 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
 ## Specialized workflows
 
+- Never use the in-app browser skill.
 - Balance or gameplay changes: collect factual patch-note bullets covering changed stats, economy,
   combat behavior, UI affordances, and what should be watched in playtests.
 - New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
@@ -134,16 +135,26 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   checklist, and design documents.
 - Deployed behavior: use the `fly-logs` skill early for beta/mainline differences, WebSocket or lobby
   failures, match history, crashes, restarts, and performance spikes.
-- Graphics or rendering changes: use the project-local `interact` skill and its `interact lab`
-  command namespace to arrange one small
-  authoritative scene, capture a clean Pixi PNG, inspect that returned artifact once, and share only
-  its returned Tailnet Preview URL. Keep captures under `target/interact/lab/`; do not use
-  Browser/Computer Use, commit image bytes,
-  or accept a missing-texture fallback as review evidence.
 - Planned implementation phases: use the `phase-runner` skill only for an existing phase file.
 - Pre-alpha/prototype plans: keep expensive-to-reverse architecture and authority/security on the
   critical path. Let actual scope determine the phase count, use playtests or measured checkpoints
   where they reduce risk, and keep speculative hardening/content in a deferred backlog.
+- Client performance planning: before proposing browser optimization phases, run
+  `node scripts/client-flamegraph.mjs --preview` from a clean worktree on current `origin/main`.
+  Inspect the returned PNG and ranked JSON together with the harness frame-budget summary, then
+  read the hottest functions before writing phases. Use `supply-300-hellhole-stream` as the sole
+  supply-scale client renderer benchmark. Treat production-hardware claims as separate evidence
+  rather than adding a competing checked-in supply fixture. The 240 FPS/4.17 ms reference-machine target is a
+  headroom proxy for roughly 60 FPS on hardware with one quarter of the performance, not a license
+  to reduce presentation fidelity or cadence. Do not claim progress by reconciling entities, fog,
+  animation, or overlays less often; intentionally presenting stale state; staggering one logical
+  frame across multiple frames; or moving main-thread work outside the measured frame without
+  accounting for its scheduling impact. Exact caching, batching, culling, or redundant-work
+  elimination is valid only when every frame keeps the same state, timing semantics, and pixels.
+- Rendering optimization parity: sample at least 12 randomly selected deterministic ticks and
+  capture each tick before and after with identical state, viewport, DPR, render clock, and ready
+  assets. Compare decoded pixels exactly; any changed pixel must fail the check unless the visual
+  change is intentional, reviewed, and documented.
 - Testing and self-play: follow `docs/context/testing.md`, including its replay-inspection workflow.
   For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
   so debug-only simulation invariants do not interrupt play; use a replay only when requested or

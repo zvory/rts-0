@@ -107,7 +107,7 @@ mod tests {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let unit = entities
-            .spawn_unit(1, EntityKind::Panzerfaust, 96.0, 96.0)
+            .spawn_unit(1, EntityKind::Rifleman, 96.0, 96.0)
             .expect("infantry should spawn");
         let mut cache = OccupancyPhaseCache::new(&map);
 

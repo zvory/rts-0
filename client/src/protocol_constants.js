@@ -137,7 +137,6 @@ export const KIND = Object.freeze({
   GOLEM: "golem",
   RIFLEMAN: "rifleman",
   MACHINE_GUNNER: "machine_gunner",
-  PANZERFAUST: "panzerfaust",
   ANTI_TANK_GUN: "anti_tank_gun",
   MORTAR_TEAM: "mortar_team",
   ARTILLERY: "artillery",
@@ -164,7 +163,6 @@ export const UNIT_KINDS = Object.freeze([
   KIND.GOLEM,
   KIND.RIFLEMAN,
   KIND.MACHINE_GUNNER,
-  KIND.PANZERFAUST,
   KIND.ANTI_TANK_GUN,
   KIND.MORTAR_TEAM,
   KIND.ARTILLERY,
@@ -225,7 +223,6 @@ export const EVENT = Object.freeze({
   ARTILLERY_FIRING: "artilleryFiring",
   PANZERFAUST_LAUNCH: "panzerfaustLaunch",
   PANZERFAUST_IMPACT: "panzerfaustImpact",
-  PANZERFAUST_CONVERSION: "panzerfaustConversion",
   OVERPENETRATION: "overpenetration",
   MISS: "miss",
 });
@@ -291,7 +288,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 40;
+export const COMPACT_SNAPSHOT_VERSION = 41;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -307,7 +304,6 @@ export const KIND_CODE = Object.freeze({
   [KIND.GOLEM]: 22,
   [KIND.RIFLEMAN]: 2,
   [KIND.MACHINE_GUNNER]: 3,
-  [KIND.PANZERFAUST]: 24,
   [KIND.ANTI_TANK_GUN]: 4,
   [KIND.MORTAR_TEAM]: 15,
   [KIND.ARTILLERY]: 16,
@@ -350,6 +346,7 @@ export const SETUP_CODE = Object.freeze({
 
 export const UPGRADE = Object.freeze({
   METHAMPHETAMINES: "methamphetamines",
+  PANZERFAUSTS: "panzerfausts",
   ENTRENCHMENT: "entrenchment",
   ANTI_TANK_GUN_UNLOCK: "anti_tank_gun_unlock",
   TANK_UNLOCK: "tank_unlock",
@@ -361,6 +358,7 @@ export const UPGRADE = Object.freeze({
 
 export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.METHAMPHETAMINES]: 1,
+  [UPGRADE.PANZERFAUSTS]: 10,
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: 2,
   [UPGRADE.TANK_UNLOCK]: 3,
   [UPGRADE.ARTILLERY_UNLOCK]: 4,
@@ -398,7 +396,6 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.ARTILLERY_FIRING]: 11,
   [EVENT.PANZERFAUST_LAUNCH]: 12,
   [EVENT.PANZERFAUST_IMPACT]: 13,
-  [EVENT.PANZERFAUST_CONVERSION]: 14,
   [EVENT.MISS]: 15,
 });
 

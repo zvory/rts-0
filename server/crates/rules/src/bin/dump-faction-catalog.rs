@@ -396,16 +396,8 @@ fn print_client_constants(indent: &str) {
         balance::PANZERFAUST_TRAVEL_TICKS
     );
     println!(
-        "{indent}    \"panzerfaustRecoveryTicks\": {},",
-        balance::PANZERFAUST_RECOVERY_TICKS
-    );
-    println!(
         "{indent}    \"methamphetaminesPanzerfaustWindupTicks\": {},",
         balance::METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS
-    );
-    println!(
-        "{indent}    \"methamphetaminesPanzerfaustRecoveryTicks\": {},",
-        balance::METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS
     );
     println!(
         "{indent}    \"entrenchmentDigInTicks\": {},",
@@ -556,6 +548,15 @@ fn print_upgrades(indent: &str) {
         balance::MORTAR_AUTOCAST_COST_STEEL,
         balance::MORTAR_AUTOCAST_COST_OIL,
         balance::MORTAR_AUTOCAST_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::PANZERFAUSTS_UPGRADE,
+        balance::PANZERFAUSTS_COST_STEEL,
+        balance::PANZERFAUSTS_COST_OIL,
+        balance::PANZERFAUSTS_RESEARCH_TICKS,
         None,
         true,
     );

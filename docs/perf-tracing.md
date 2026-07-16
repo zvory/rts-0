@@ -240,6 +240,52 @@ exercises simulation, per-player snapshot fanout, snapshot compaction, and the a
 usual `RTS_PERF*` and `RUST_LOG` environment variables when you need a different trace shape, or pass
 `--perf full` for every tick.
 
+Hellhole isolation pair:
+
+```bash
+# Server only: Game API in/out, no listener, socket, browser, or real-time pacing.
+scripts/hellhole-perf-harness.sh --ticks 900
+
+# Client only: checked-in snapshots, no WebSocket or live simulation.
+node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 30
+```
+
+The server command restores the canonical four-player 2v2 scenario (Players 1 and 3 versus Players
+2 and 4) and measures each direct API round
+trip as `Game::tick()` plus one full-world snapshot, production compaction, and MessagePack
+encoding. Before each tick it also measures deterministic Hellhole driver work: one 43-of-85 move
+command per shuttle player every 30 ticks and a bounded nearest-center respawn batch for missing
+central units. It runs as fast as the server can complete work, reports aggregate
+average/p95/p99/max timings, payload size, command/selection/death/respawn counters, and the minimum
+outgoing entity count, and accepts `--json` for machine-readable output. It deliberately omits the
+room scheduler, WebSocket send, and browser so client speed cannot throttle it.
+
+The old `realtime_factor >= 8.0` target described a materially different static fixture and is not a
+pass/fail threshold for this churn version. Record the reference host, revision, release profile,
+repeat count, full counter shape, and timing distribution, then compare like-for-like runs. Keep all
+driver, simulation, projection, compaction, and encoding work on the measured serial lane. A later
+optimization pass should establish a new headroom target from repeated reference-machine churn runs
+rather than reusing the static fixture's number.
+
+Regenerate the paired assets after changing the scenario or driver:
+
+```bash
+cargo run --release --manifest-path server/Cargo.toml --bin generate_supply_300_hellhole
+cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream
+```
+
+For an explicitly combined visual check, run:
+
+```bash
+scripts/hellhole-perf-harness.sh --integrated --seconds 60
+```
+
+Integrated mode builds a release server, runs the canonical live Lab workload at the ordinary 30
+Hz cadence, and opens the controlled Chrome window visibly. It is useful for seeing both halves in
+tandem, but its result is end-to-end evidence rather than an isolated server or client measurement.
+The integrated workload is opt-in and is excluded from the default workload set and
+`--render-lag-suite`.
+
 Browser client performance harness:
 
 ```bash
@@ -247,45 +293,82 @@ node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
-node scripts/client-perf-harness.mjs --active-supply-pair --seconds 10
-node scripts/client-perf-harness.mjs --workload supply-300-lab-hellhole --seconds 10
 node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
 ```
+
+Canonical client CPU flame graph:
+
+```bash
+git fetch origin main
+node scripts/client-flamegraph.mjs --preview
+```
+
+The flame-graph command runs Player 1's deterministic 2v2 `supply-300-hellhole-stream` projection for 15 seconds
+at the default viewport, DPR 1, CPU throttle 1, and a 500 microsecond V8 sampling interval. The
+harness completes workload assertions, resets its local performance window, and observes at least
+30 rendered frames before CPU sampling begins, so module loading and setup do not dominate the
+profile. It writes the raw `.cpuprofile`, the ordinary harness `summary.json`, a ranked function
+summary, and SVG/PNG flame graphs under ignored `target/client-perf/flamegraphs/`; `--preview`
+publishes the PNG through the normal 24-hour Tailnet Preview service.
+
+Flame width is inclusive sampled CPU time. The heading and ranked JSON use self time aggregated by
+function, source URL, and line so the same function reached through multiple call stacks is not
+understated. Read both views: a wide parent identifies an expensive subsystem, while high self time
+identifies the function doing the work. The colors distinguish game-client JavaScript, Pixi,
+browser/native work, and idle/garbage collection; they are navigation aids rather than performance
+budgets.
+
+Useful variants retain the same one-command workflow:
+
+```bash
+node scripts/client-flamegraph.mjs --cpu-throttle 4 --viewport 1440x900 --dpr 1 --preview
+```
+
+Before writing client optimization phases, capture from a clean worktree on current `origin/main`,
+inspect the ranked self/inclusive functions and their source, and pair the result with
+`frame.work`/renderer/fog phase evidence from the same harness summary. Use the snapshot stream as
+the sole supply-scale client renderer benchmark. Prediction or production-shaped active-player
+claims require separate evidence rather than a competing checked-in supply fixture. A page cannot
+grant itself V8 Profiler access, so remote playtester function profiles require a later DevTools,
+extension, or launcher workflow rather than a silent in-page upload.
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
 points at an already-healthy server. It drives headless Chrome with the repository-root
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
 under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
-`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios,
-the active-player `supply-200-active`/`supply-300-active` pair, `supply-300-lab-hellhole`, and
-`supply-300-hellhole-stream`. The active pair uses the same fixed local seed (`0x5a000300`),
-viewport, DPR, CPU throttle, duration, and repeat settings. Both measured browsers join as player 1
-with compatible WASM prediction enabled; sampling fails for spectator/disabled prediction,
-client-mutated setup, wrong supply/cap/composition, or wrong projected regular-entity count. The
-authoritative per-player 200-supply mix is worker/rifleman/machine gunner/panzerfaust/anti-tank
-gun/mortar/artillery/scout car/tank/command car = `7/7/7/7/7/7/6/7/6/6`, with 135 regular entities
-in player 1's projection. The 300-supply mix is `12/10/10/10/10/10/10/10/9/9`, with 201 projected
-regular entities. Both preserve the normal production supply cap of 50; the fixture bypasses no
-production rule because simulation setup creates the units directly. Assertions complete before
-the profiler/report windows reset, then two successful explicit presents must occur before sampling.
+`vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios and the client-only
+`supply-300-hellhole-stream`. The opt-in `supply-300-hellhole-integrated` workload is not included
+in default or render-lag-suite runs. Hellhole is the sole checked-in supply-scale client renderer
+benchmark.
 
-The live Hellhole workload starts the
-bundled setup through the ordinary Lab room path and rejects sampling unless scenario/map identity,
-both 300-supply compositions, god mode, full-world projection, MessagePack delivery, rendered
-frames, stable entity count, and continuing combat all match its checked-in descriptor. It is a
-spectator-shaped comparative stress lane, not an active-player supply-cap certification.
-
-The snapshot-stream workload remains a separate client-only isolation lane. It fetches the generated
+The snapshot-stream workload is the client-only isolation lane. It fetches the generated
 `client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
-MessagePack snapshots into the normal decoder and renderer at 30 Hz. Its setup assertion fails unless
-the page reports no WebSocket and no live simulation. Regenerate the thirty-second, 900-frame artifact
+MessagePack snapshots into the normal decoder and renderer at 30 Hz. The stream is the ordinary
+fog-filtered projection for active Player 1 on the 1+3 team, including the server-authored 126x126
+visibility grid and only Player 1's recipient event bucket. It starts with 295 projected entities
+and retains at least 288 through the deterministic death/respawn churn. Its setup assertion fails
+unless the page reports Player 1, non-spectator mode, team ids `[1,2,1,2]`, the complete visibility
+grid, no WebSocket, and no live simulation. Regenerate the thirty-second, 900-frame artifact
 with `cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream`.
+The canonical checkpoint materializes 470 deterministic isolated stone occluders across the No
+Terrain base map, including the central scrum and two diagonal shuttle lanes. Two formations are
+dense and interleaved around the central stones by a deterministic body-aware compact packer; the
+other two repeatedly shuttle diagonally through the obstructed field. Only the minimum shuttle
+collision footprints and building footprints needed for a valid tick-zero setup are excluded before
+terrain selection. The rocks shape authoritative team visibility and force the scripted formations
+through pathfinding obstacles; the client benchmark consumes the resulting server visibility grid
+rather than reconstructing spectator fog locally.
 Preserved schema 2
 incident replays are analysis evidence only and are not replay-harness workloads. The
 `--render-lag-suite` path runs the current workload set, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
-per-budget margins and the next missed p95 budget. The same block includes `frameAttribution`,
+per-budget margins and the next missed p95 budget. The actual target is 240 FPS (4.17 ms of
+frame work) on the reference machine. This is a headroom proxy: if the same complete frame costs
+roughly four times as much on materially slower hardware, 4.17 ms becomes approximately the 16.67 ms
+budget for 60 FPS. It is not a claim that the reference browser must literally present at 240 Hz,
+nor a portable certification of a particular player machine. The 60 and 120 FPS bands remain lower
+diagnostics, while 480 FPS is the headroom band. The same block includes `frameAttribution`,
 which reports top-level named work, `frame.unattributed` average/p95/max, `frame.rafDispatch`, and
 the average percentage of `frame.work` covered by named top-level phases. It also includes a local-only
 `renderDiagnostics` block with the counter groups above, recent long-frame context, and the largest
@@ -323,9 +406,20 @@ optimization branches on the same machine, not as a portable guarantee for other
 For render-lag comparisons, read `renderBudget.frameWork` first: `frame.work` is total browser work
 inside the RAF and should be compared to the 16.67 ms, 8.33 ms, 4.17 ms, and 2.08 ms frame-work
 budgets for 60, 120, 240, and 480 FPS. A positive margin means the measured frame-work metric was
-under that budget; a negative margin shows how far it missed. The 120 FPS result remains useful,
-but a workload with p95 near 8 ms is only barely clearing 120 locally and should still be treated as
-risky for weaker hardware if it misses the 240 FPS headroom target.
+under that budget; a negative margin shows how far it missed. The 240 FPS/4.17 ms band is the actual
+target. The 60 and 120 FPS results remain useful intermediate diagnostics, but clearing either does
+not satisfy the target. A workload with p95 near 4.17 ms is only barely clearing 240 locally and
+should still be treated as risky for weaker hardware if it misses the 480 FPS headroom band.
+
+The target applies to the full-fidelity frame, not a reduced-cadence approximation. An optimization
+does not count toward the 4.17 ms goal if it reconciles entities, fog, animation, or overlays less
+often; intentionally shows stale state; staggers one logical frame's work across multiple frames; or
+moves main-thread work outside measured `frame.work` without accounting for the resulting dispatch,
+frame-gap, and end-to-end presentation cost. Exact caching, batching, offscreen culling, and other
+redundant-work elimination are valid only when each frame reflects the same current state with no
+added latency and the deterministic pixel-parity gate remains exact. Use average, p95, max, frame
+gaps, and RAF-dispatch evidence together so an infrequent expensive path cannot masquerade as a
+four-times throughput improvement.
 
 Use `frame.work` average, p95, and max instead of literal local `requestAnimationFrame` FPS for
 branch comparisons. Local RAF FPS is constrained by display refresh rate, browser scheduling,
@@ -341,8 +435,8 @@ workload is more useful evidence than projecting the same millisecond or FPS del
 laptops.
 
 CPU-throttle results are synthetic scheduling-pressure evidence on the machine running Chrome, not
-real-device certification. In particular, neither active 300 supply nor the Lab full-world baseline
-claims that 300 supply is safe on player hardware.
+real-device certification. In particular, neither the Hellhole stream nor the Lab full-world
+baseline claims that 300 supply is safe on player hardware.
 
 Recurring top-level `match.*` phases above 1-2 ms p95 are advisory follow-up candidates;
 `match.renderer` and `match.minimap` are top-level phases, while `renderer.*` rows are nested

@@ -1,100 +1,5 @@
 import path from "node:path";
 
-export const SUPPLY_300_LAB_HELLHOLE = Object.freeze({
-  scenarioId: "supply-300-hellhole",
-  map: "1v1",
-  playerIds: Object.freeze([1, 2]),
-  teamByPlayer: Object.freeze({ 1: 1, 2: 2 }),
-  godModePlayers: Object.freeze([1, 2]),
-  supplyUsed: 300,
-  projectedEntityCount: 224,
-  requiredUnitKinds: Object.freeze([
-    "worker",
-    "golem",
-    "rifleman",
-    "machine_gunner",
-    "panzerfaust",
-    "anti_tank_gun",
-    "mortar_team",
-    "artillery",
-    "scout_car",
-    "tank",
-    "command_car",
-  ]),
-  countsByOwner: Object.freeze({
-    1: Object.freeze({
-      worker: 11,
-      golem: 11,
-      rifleman: 11,
-      machine_gunner: 10,
-      panzerfaust: 10,
-      anti_tank_gun: 10,
-      mortar_team: 10,
-      artillery: 10,
-      scout_car: 10,
-      tank: 9,
-      command_car: 9,
-    }),
-    2: Object.freeze({
-      worker: 11,
-      golem: 11,
-      rifleman: 11,
-      machine_gunner: 10,
-      panzerfaust: 10,
-      anti_tank_gun: 10,
-      mortar_team: 10,
-      artillery: 10,
-      scout_car: 10,
-      tank: 9,
-      command_car: 9,
-    }),
-  }),
-});
-
-const ACTIVE_UNIT_ORDER = Object.freeze([
-  "worker",
-  "rifleman",
-  "machine_gunner",
-  "panzerfaust",
-  "anti_tank_gun",
-  "mortar_team",
-  "artillery",
-  "scout_car",
-  "tank",
-  "command_car",
-]);
-
-export const SUPPLY_ACTIVE_WORKLOADS = Object.freeze({
-  200: Object.freeze({
-    scenarioId: "supply_stress_active",
-    scenarioSeed: 0x5a000300,
-    targetSupply: 200,
-    playerId: 1,
-    spectator: false,
-    predictionRequired: true,
-    supplyCap: 50,
-    projectedEntityCount: 135,
-    countsByOwner: Object.freeze({
-      1: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [7, 7, 7, 7, 7, 7, 6, 7, 6, 6][index]]))),
-      2: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [7, 7, 7, 7, 7, 7, 6, 7, 6, 6][index]]))),
-    }),
-  }),
-  300: Object.freeze({
-    scenarioId: "supply_stress_active",
-    scenarioSeed: 0x5a000300,
-    targetSupply: 300,
-    playerId: 1,
-    spectator: false,
-    predictionRequired: true,
-    supplyCap: 50,
-    projectedEntityCount: 201,
-    countsByOwner: Object.freeze({
-      1: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [12, 10, 10, 10, 10, 10, 10, 10, 9, 9][index]]))),
-      2: Object.freeze(Object.fromEntries(ACTIVE_UNIT_ORDER.map((kind, index) => [kind, [12, 10, 10, 10, 10, 10, 10, 10, 9, 9][index]]))),
-    }),
-  }),
-});
-
 export function buildClientPerfWorkloads(env = process.env) {
   const incidentReplaySource = env.RTS_CLIENT_PERF_INCIDENT_REPLAY
     ? path.resolve(env.RTS_CLIENT_PERF_INCIDENT_REPLAY)
@@ -118,44 +23,35 @@ export function buildClientPerfWorkloads(env = process.env) {
       },
     },
     {
-      id: "supply-200-active",
-      description: "Active predicted player on the exact server-authoritative 200-supply stress setup.",
-      kind: "activeDevScenario",
-      url: "/dev/scenarios?id=supply_stress_active&unit=worker&count=200",
-      setup: {
-        activeSupplyStress: SUPPLY_ACTIVE_WORKLOADS[200],
-        resetPerfAfterSetup: true,
-      },
-    },
-    {
-      id: "supply-300-active",
-      description: "Active predicted player on the exact server-authoritative 300-supply stress setup.",
-      kind: "activeDevScenario",
-      url: "/dev/scenarios?id=supply_stress_active&unit=worker&count=300",
-      setup: {
-        activeSupplyStress: SUPPLY_ACTIVE_WORKLOADS[300],
-        resetPerfAfterSetup: true,
-      },
-    },
-    {
-      id: "supply-300-lab-hellhole",
-      description: "Server-authoritative 1v1 Lab fight with two exact 300-supply god-mode armies.",
-      kind: "labScenario",
-      url: "/lab?room=client-perf-hellhole&map=1v1&scenario=supply-300-hellhole",
-      setup: {
-        labHellhole: SUPPLY_300_LAB_HELLHOLE,
-        resetPerfAfterSetup: true,
-      },
-    },
-    {
       id: "supply-300-hellhole-stream",
-      description: "Client-only playback of 900 Hellhole snapshots at the authored 30 Hz cadence.",
+      description: "Client-only playback of Player 1's 2v2 Hellhole projection at the authored 30 Hz cadence.",
       kind: "snapshotStream",
       url: "/?snapshotStream=supply-300-hellhole",
       setup: {
         snapshotStreamId: "supply-300-hellhole",
         snapshotStreamFrameCount: 900,
-        waitForMinEntities: SUPPLY_300_LAB_HELLHOLE.projectedEntityCount,
+        snapshotStreamPlayerId: 1,
+        snapshotStreamSpectator: false,
+        snapshotStreamTeamIds: Object.freeze([1, 2, 1, 2]),
+        snapshotStreamVisibilityTileCount: 126 * 126,
+        waitForMinEntities: 288,
+        resetPerfAfterSetup: true,
+      },
+    },
+    {
+      id: "supply-300-hellhole-integrated",
+      description: "Opt-in live Lab view with the authoritative Hellhole server and Pixi client in tandem.",
+      kind: "labScenario",
+      defaultEnabled: false,
+      url: "/lab?room=client-perf-hellhole&map=1v1&scenario=supply-300-hellhole",
+      setup: {
+        liveLabScenario: {
+          scenarioId: "supply-300-hellhole",
+          mapWidth: 126,
+          mapHeight: 126,
+          projectedEntityCount: 380,
+        },
+        waitForMinEntities: 380,
         resetPerfAfterSetup: true,
       },
     },
@@ -178,4 +74,8 @@ export function buildClientPerfWorkloads(env = process.env) {
       },
     }] : []),
   ]);
+}
+
+export function defaultClientPerfWorkloads(workloads = buildClientPerfWorkloads()) {
+  return Object.freeze(workloads.filter((workload) => workload.defaultEnabled !== false));
 }

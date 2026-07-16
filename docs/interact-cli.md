@@ -3,7 +3,7 @@
 Interact is a project-local, namespaced command-line tool. The `lab` namespace arranges and
 inspects small authoritative Lab scenes. The `game` namespace opens either one isolated normal
 human-vs-AI match or a spectator-only AI-vs-AI match for bounded inspection, screenshots, real-time
-video, and sampled time-lapse video. The observation-only `scenario` namespace opens the existing
+video, and sampled time-lapse video. The observation-only `dev-scenario` namespace opens the existing
 server-authored dev scenarios for screenshots, before/after stills, real-time video, and sampled
 time lapses. All three
 start this worktree's normal Rust server and a headless client using Pixi by default; `open` accepts
@@ -69,17 +69,17 @@ node scripts/interact/cli.mjs game shutdown
 Dev scenarios use their existing server-owned launch fields and expose no gameplay mutations:
 
 ```bash
-node scripts/interact/cli.mjs scenario open '{"id":"direct_reverse_order","unit":"tank","count":1,"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
-node scripts/interact/cli.mjs scenario inspect '{"sessionId":"<id>","limit":100}'
-node scripts/interact/cli.mjs scenario camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
-node scripts/interact/cli.mjs scenario screenshot '{"sessionId":"<id>","name":"before"}'
-node scripts/interact/cli.mjs scenario record-start '{"sessionId":"<id>","name":"full-run","maxDurationMs":10000}'
-node scripts/interact/cli.mjs scenario record-wait '{"sessionId":"<id>"}'
-node scripts/interact/cli.mjs scenario screenshot '{"sessionId":"<id>","name":"after"}'
-node scripts/interact/cli.mjs scenario capture-timelapse '{"sessionId":"<id>","name":"pathing","maxDurationMs":30000,"sampleEveryMs":500,"speed":4}'
-node scripts/interact/cli.mjs scenario capture-cancel '{"sessionId":"<id>"}'
-node scripts/interact/cli.mjs scenario close '{"sessionId":"<id>"}'
-node scripts/interact/cli.mjs scenario shutdown
+node scripts/interact/cli.mjs dev-scenario open '{"id":"direct_reverse_order","unit":"tank","count":1,"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs dev-scenario inspect '{"sessionId":"<id>","limit":100}'
+node scripts/interact/cli.mjs dev-scenario camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
+node scripts/interact/cli.mjs dev-scenario screenshot '{"sessionId":"<id>","name":"before"}'
+node scripts/interact/cli.mjs dev-scenario record-start '{"sessionId":"<id>","name":"full-run","maxDurationMs":10000}'
+node scripts/interact/cli.mjs dev-scenario record-wait '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs dev-scenario screenshot '{"sessionId":"<id>","name":"after"}'
+node scripts/interact/cli.mjs dev-scenario capture-timelapse '{"sessionId":"<id>","name":"pathing","maxDurationMs":30000,"sampleEveryMs":500,"speed":4}'
+node scripts/interact/cli.mjs dev-scenario capture-cancel '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs dev-scenario close '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs dev-scenario shutdown
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
@@ -102,11 +102,11 @@ surrender flow and returns only after the score screen appears. Spectator sessio
 move nor surrender; their only mutation is the AI-only room's existing bounded speed control used
 internally by time-lapse capture.
 
-The complete `scenario` surface is `open`, `close`, `status`, `inspect`, `camera`, `screenshot`,
+The complete `dev-scenario` surface is `open`, `close`, `status`, `inspect`, `camera`, `screenshot`,
 `record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, and `shutdown`.
-`scenario open` accepts the same `id`, `unit`, `count`, optional `blocker`, and optional `case`
+`dev-scenario open` accepts the same `id`, `unit`, `count`, optional `blocker`, and optional `case`
 fields listed by `/dev/scenarios`. Its launch gate requires `watchScenario=1` and
-`interact=scenario`; the server still selects and constructs the scenario. The namespace exposes no
+`interact=dev-scenario`; the server still selects and constructs the scenario. The namespace exposes no
 spawn, order, move, build, arbitrary protocol, input-event, DOM-selector, or browser-evaluation
 surface. Scenario media defaults to clean presentation; use `presentation:"normal"` when the HUD
 or minimap is part of the review.
@@ -395,10 +395,10 @@ Tailnet video/contact-sheet previews, sampled ticks and hashes in the withheld m
 stop reason, and the selected region. `status` reports progress and `capture-cancel` interrupts at
 the next wait/frame boundary.
 
-`scenario capture-timelapse` uses the same sampling, region, encoder, progress, cancellation, and
+`dev-scenario capture-timelapse` uses the same sampling, region, encoder, progress, cancellation, and
 preview contracts against an authored dev-scenario watcher room. It defaults to clean presentation,
 records the scenario launch fields in the withheld manifest, and temporarily restores the prior
-authoritative speed after capture. Run `scenario camera` with `action:"overview"` first when a fixed
+authoritative speed after capture. Run `dev-scenario camera` with `action:"overview"` first when a fixed
 whole-map view is more useful than the normal watcher camera.
 
 ## Fixed-step capture

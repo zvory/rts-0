@@ -15,7 +15,8 @@ export function commandHelp(command: string, namespace = "lab") {
 }
 
 export function helpCatalog(namespace = "lab") {
-  return (INTERACT_NAMESPACES[namespace] || []).map((command) => ({
+  const commands = Object.hasOwn(INTERACT_NAMESPACES, namespace) ? INTERACT_NAMESPACES[namespace] : [];
+  return commands.map((command) => ({
     command,
     summary: commandHelp(command, namespace)?.summary || "",
   }));

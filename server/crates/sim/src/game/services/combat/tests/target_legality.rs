@@ -18,9 +18,11 @@ fn direct_fire_legal(
     let fog = visible_fog(map, entities);
     let los = LineOfSight::with_smoke(map, smokes);
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    let blockers = ShotBlockerIndex::build(map, entities);
     direct_fire_target_legal(
         map,
         entities,
+        &blockers,
         &teams,
         &los,
         &fog,
@@ -45,9 +47,11 @@ fn secondary_weapon_activation_legal(
     let fog = visible_fog(map, entities);
     let los = LineOfSight::with_smoke(map, smokes);
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    let blockers = ShotBlockerIndex::build(map, entities);
     secondary_weapon_target_passes_activation(
         map,
         entities,
+        &blockers,
         &teams,
         &los,
         &fog,

@@ -2,7 +2,10 @@ import fs from "node:fs";
 
 import { assert, assertThrows } from "./assertions.mjs";
 import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
-import { initializeWorkloadSetup } from "../../scripts/client-perf/workload_setup.mjs";
+import {
+  initializeWorkloadSetup,
+  validateSnapshotStreamSample,
+} from "../../scripts/client-perf/workload_setup.mjs";
 import { COMPACT_SNAPSHOT_VERSION, S } from "../../client/src/protocol.js";
 import {
   SnapshotStreamNet,
@@ -53,6 +56,29 @@ function snapshotFrame(tick) {
   });
 }
 
+const EXPECTED_PLAYER_STREAM = Object.freeze({
+  id: "fixture",
+  frameCount: 2,
+  playerId: 1,
+  spectator: false,
+  teamIds: Object.freeze([1, 2, 1, 2]),
+  visibilityTileCount: 16,
+});
+
+const PLAYER_STREAM_SAMPLE = Object.freeze({
+  id: "fixture",
+  frameCount: 2,
+  offline: true,
+  netOffline: true,
+  serverSimulation: false,
+  websocket: false,
+  websocketAttached: false,
+  playerId: 1,
+  spectator: false,
+  teamIds: Object.freeze([1, 2, 1, 2]),
+  visibilityTileCount: 16,
+});
+
 {
   assert(
     snapshotStreamAssetUrl("supply-300-hellhole") ===
@@ -79,14 +105,39 @@ function snapshotFrame(tick) {
     "checked-in Hellhole snapshot stream contains the expected 30 seconds at 30 Hz",
   );
   assert(
-    checkedArtifact.header.initialEntityCount === 224 &&
-      checkedArtifact.header.start?.players?.length === 2 &&
-      checkedArtifact.header.start.players[0]?.teamId === 1 &&
-      checkedArtifact.header.start.players[1]?.teamId === 2 &&
+    checkedArtifact.header.initialEntityCount === 295 &&
+      checkedArtifact.header.start?.playerId === 1 &&
+      checkedArtifact.header.start?.spectator === false &&
+      checkedArtifact.header.start?.players?.length === 4 &&
+      checkedArtifact.header.start.players.every(
+        (player, index) => player.teamId === [1, 2, 1, 2][index],
+      ) &&
       checkedArtifact.header.start?.map?.width === 126 &&
       checkedArtifact.header.start?.map?.height === 126 &&
+      checkedArtifact.header.start.map.terrain.filter((tile) => tile === 1).length === 470 &&
       checkedArtifact.header.start?.snapshotStream?.sourceScenario === "supply-300-hellhole",
-    "checked-in Hellhole snapshot stream matches the canonical two-player scenario",
+    "checked-in Hellhole snapshot stream matches the canonical Player 1 2v2 projection",
+  );
+}
+
+{
+  assert(
+    validateSnapshotStreamSample(PLAYER_STREAM_SAMPLE, EXPECTED_PLAYER_STREAM).length === 0,
+    "performance setup accepts the expected isolated active-player stream",
+  );
+  assert(
+    validateSnapshotStreamSample(
+      { ...PLAYER_STREAM_SAMPLE, spectator: true, visibilityTileCount: 0 },
+      EXPECTED_PLAYER_STREAM,
+    ).length === 2,
+    "performance setup rejects the wrong recipient mode and a missing visibility grid",
+  );
+  assert(
+    validateSnapshotStreamSample(
+      { ...PLAYER_STREAM_SAMPLE, offline: false, frameCount: 1 },
+      EXPECTED_PLAYER_STREAM,
+    ).length === 2,
+    "performance setup rejects live transport and a stale frame table",
   );
 }
 

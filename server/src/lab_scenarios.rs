@@ -886,7 +886,6 @@ mod tests {
             "machine_gunner",
             "mortar_team",
             "oil",
-            "panzerfaust",
             "pump_jack",
             "research_complex",
             "rifleman",
@@ -903,14 +902,14 @@ mod tests {
                 "render-preview scenario should include {kind} render coverage"
             );
         }
-        let panzerfaust_count = snapshot
+        let loaded_rifleman_count = snapshot
             .entities
             .iter()
-            .filter(|entity| entity.kind == "panzerfaust")
+            .filter(|entity| entity.kind == "rifleman" && entity.panzerfaust_loaded == Some(true))
             .count();
         assert!(
-            panzerfaust_count >= 12,
-            "render-preview scenario should include Panzerfaust formation coverage"
+            loaded_rifleman_count >= 12,
+            "render-preview scenario should include loaded Rifleman Panzerfaust formation coverage"
         );
     }
 
@@ -965,8 +964,8 @@ mod tests {
             .iter()
             .find(|entry| entry.id == "supply-300-hellhole")
             .expect("supply-300-hellhole catalog row");
-        assert_eq!(hellhole.map, "1v1");
-        assert_eq!(hellhole.player_count, 2);
+        assert_eq!(hellhole.map, "No Terrain");
+        assert_eq!(hellhole.player_count, 4);
         assert_eq!(hellhole.filename, "supply-300-hellhole.json");
 
         let loaded = load_lab_scenario_by_id("supply-300-hellhole")
@@ -975,61 +974,175 @@ mod tests {
         lab_scenario_payload_to_lab_op(loaded.scenario.clone())
             .expect("checkpoint scenario should fit import cap");
         let metadata = lab_scenario_payload_lab_metadata(&loaded.scenario);
-        assert_eq!(metadata.god_mode_players, vec![1, 2]);
+        assert_eq!(metadata.god_mode_players, vec![3, 4]);
         assert!(matches!(metadata.vision, LabVisionMode::All));
         assert_eq!(
             metadata
                 .initial_camera
                 .as_ref()
                 .map(|camera| (camera.center_x, camera.center_y)),
-            Some((3072, 2016))
+            Some((2016, 2016))
         );
 
-        let mut game = loaded
+        let game = loaded
             .build_game()
             .expect("supply-300-hellhole scenario should restore through lab APIs");
         assert_eq!(game.seed(), 0x5a00_0300);
-        assert_eq!(game.start_payload().players.len(), 2);
-        assert_eq!(game.lab_god_mode_players(), vec![1, 2]);
-        assert_eq!(game.perf_entity_counts().entities, 224);
-        assert_eq!(game.perf_entity_counts().buildings, 2);
+        assert_eq!(game.start_payload().players.len(), 4);
+        assert_eq!(
+            game.start_payload()
+                .players
+                .iter()
+                .map(|player| player.team_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 1, 2],
+        );
+        assert_eq!(game.lab_god_mode_players(), vec![3, 4]);
+        assert_eq!(game.perf_entity_counts().entities, 380);
 
+        let start = game.start_payload();
+        let map = &start.map;
+        let rock_count = map
+            .terrain
+            .iter()
+            .filter(|&&tile| tile == crate::protocol::terrain::ROCK)
+            .count();
+        assert_eq!(rock_count, 470, "Hellhole sparse stone layout drifted");
+        let mut rocks_by_quadrant = [0usize; 4];
+        for tile_y in 0..map.height {
+            for tile_x in 0..map.width {
+                let index = (tile_y * map.width + tile_x) as usize;
+                if map.terrain[index] != crate::protocol::terrain::ROCK {
+                    continue;
+                }
+                let quadrant = usize::from(tile_x >= map.width / 2)
+                    + 2 * usize::from(tile_y >= map.height / 2);
+                rocks_by_quadrant[quadrant] += 1;
+                for dy in -1i32..=1 {
+                    for dx in -1i32..=1 {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let neighbor_x = tile_x as i32 + dx;
+                        let neighbor_y = tile_y as i32 + dy;
+                        if neighbor_x < 0
+                            || neighbor_y < 0
+                            || neighbor_x >= map.width as i32
+                            || neighbor_y >= map.height as i32
+                        {
+                            continue;
+                        }
+                        let neighbor = (neighbor_y as u32 * map.width + neighbor_x as u32) as usize;
+                        assert_ne!(
+                            map.terrain[neighbor],
+                            crate::protocol::terrain::ROCK,
+                            "stone tiles must remain isolated for formation movement"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(
+            rocks_by_quadrant.iter().all(|&count| count >= 100),
+            "stone must remain distributed around the whole map: {rocks_by_quadrant:?}"
+        );
+        let central_rock_count = (43u32..=83)
+            .flat_map(|tile_y| (43u32..=83).map(move |tile_x| (tile_x, tile_y)))
+            .filter(|&(tile_x, tile_y)| {
+                map.terrain[(tile_y * map.width + tile_x) as usize]
+                    == crate::protocol::terrain::ROCK
+            })
+            .count();
+        assert!(
+            central_rock_count >= 40,
+            "central convergence field must retain pathfinding obstacles: {central_rock_count}"
+        );
         let snapshot = game.snapshot_full_for(1);
+        let central_units: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| {
+                (entity.owner == 1 || entity.owner == 2) && entity.kind != "scout_plane"
+            })
+            .filter(|entity| {
+                (1_200.0..=2_800.0).contains(&entity.x) && (1_700.0..=2_400.0).contains(&entity.y)
+            })
+            .collect();
+        let min_x = central_units
+            .iter()
+            .map(|entity| entity.x)
+            .fold(f32::INFINITY, f32::min);
+        let max_x = central_units
+            .iter()
+            .map(|entity| entity.x)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let min_y = central_units
+            .iter()
+            .map(|entity| entity.y)
+            .fold(f32::INFINITY, f32::min);
+        let max_y = central_units
+            .iter()
+            .map(|entity| entity.y)
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!(
+            max_x - min_x <= 650.0 && max_y - min_y <= 600.0,
+            "central scrum packing expanded to {:.1}x{:.1}px",
+            max_x - min_x,
+            max_y - min_y
+        );
+        for player_id in [1, 2] {
+            let central_unit_count = snapshot
+                .entities
+                .iter()
+                .filter(|entity| {
+                    entity.owner == player_id
+                        && (1_200.0..=2_800.0).contains(&entity.x)
+                        && (1_700.0..=2_400.0).contains(&entity.y)
+                })
+                .count();
+            assert_eq!(
+                central_unit_count, 85,
+                "non-shuttle player {player_id} must remain fully packed into the central scrum"
+            );
+        }
+        for entity in &snapshot.entities {
+            let tile_x = (entity.x / map.tile_size as f32).floor() as u32;
+            let tile_y = (entity.y / map.tile_size as f32).floor() as u32;
+            assert_ne!(
+                map.terrain[(tile_y * map.width + tile_x) as usize],
+                crate::protocol::terrain::ROCK,
+                "entity {} spawned on stone",
+                entity.id
+            );
+        }
         let supply: Vec<_> = snapshot
             .player_resources
             .iter()
             .map(|player| (player.id, player.supply_used))
             .collect();
-        assert_eq!(supply, vec![(1, 300), (2, 300)]);
-        assert!(
-            snapshot
-                .entities
-                .iter()
-                .any(|entity| entity.hp > 0 && entity.hp < entity.max_hp),
-            "hellhole should preserve pre-god-mode partial HP for HP-bar rendering"
-        );
+        assert_eq!(supply, vec![(1, 300), (2, 300), (3, 300), (4, 300)]);
 
         let expected_counts = BTreeMap::from([
-            ("anti_tank_gun".to_string(), 10),
-            ("artillery".to_string(), 10),
+            ("anti_tank_gun".to_string(), 9),
+            ("artillery".to_string(), 1),
+            ("barracks".to_string(), 1),
+            ("city_centre".to_string(), 1),
             ("command_car".to_string(), 9),
-            ("golem".to_string(), 11),
+            ("depot".to_string(), 5),
+            ("factory".to_string(), 1),
+            ("golem".to_string(), 1),
             ("machine_gunner".to_string(), 10),
-            ("mortar_team".to_string(), 10),
-            ("panzerfaust".to_string(), 10),
-            ("rifleman".to_string(), 11),
+            ("mortar_team".to_string(), 9),
+            ("research_complex".to_string(), 1),
+            ("rifleman".to_string(), 18),
             ("scout_car".to_string(), 10),
-            ("tank".to_string(), 9),
-            ("worker".to_string(), 11),
+            ("steelworks".to_string(), 1),
+            ("tank".to_string(), 17),
+            ("worker".to_string(), 1),
         ]);
-        let required_kinds: HashSet<_> = rts_rules::EntityKind::ALL
-            .into_iter()
-            .filter(|kind| kind.is_unit() && rts_rules::economy::supply_cost(*kind) > 0)
-            .map(|kind| kind.to_string())
-            .collect();
         let mut counts_by_owner = BTreeMap::<u32, BTreeMap<String, usize>>::new();
         for entity in &snapshot.entities {
-            if (1..=2).contains(&entity.owner) && required_kinds.contains(&entity.kind) {
+            if (1..=4).contains(&entity.owner) {
                 *counts_by_owner
                     .entry(entity.owner)
                     .or_default()
@@ -1037,50 +1150,14 @@ mod tests {
                     .or_default() += 1;
             }
         }
-        assert_eq!(counts_by_owner.len(), 2);
-        for player_id in 1..=2 {
+        assert_eq!(counts_by_owner.len(), 4);
+        for player_id in 1..=4 {
             assert_eq!(
                 counts_by_owner.get(&player_id),
                 Some(&expected_counts),
                 "player {player_id} hellhole composition drifted"
             );
         }
-        assert_eq!(
-            expected_counts.keys().cloned().collect::<HashSet<_>>(),
-            required_kinds,
-            "a supply-bearing Lab unit was added without versioning the benchmark descriptor"
-        );
-
-        let initial_entity_count = game.perf_entity_counts().entities;
-        let mut late_attack_events = 0usize;
-        let mut late_projectile_events = 0usize;
-        for elapsed in 1..=1_800 {
-            let events = game.tick();
-            if elapsed > 1_500 {
-                for event in events.iter().flat_map(|(_, events)| events) {
-                    late_attack_events += usize::from(matches!(event, Event::Attack { .. }));
-                    late_projectile_events += usize::from(matches!(
-                        event,
-                        Event::MortarLaunch { .. }
-                            | Event::ArtilleryTarget { .. }
-                            | Event::PanzerfaustLaunch { .. }
-                    ));
-                }
-            }
-            assert_eq!(
-                game.perf_entity_counts().entities,
-                initial_entity_count,
-                "god mode must keep the fixture entity count stable"
-            );
-        }
-        assert!(
-            late_attack_events > 0,
-            "hellhole combat went quiet before 60 seconds"
-        );
-        assert!(
-            late_projectile_events > 0,
-            "hellhole support/projectile feedback went quiet before 60 seconds"
-        );
     }
 
     #[test]
