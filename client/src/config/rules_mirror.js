@@ -141,7 +141,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
-  [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 13, body: COMMAND_CAR_BODY,
+  [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 8, body: COMMAND_CAR_BODY,
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires Tank Production" },
