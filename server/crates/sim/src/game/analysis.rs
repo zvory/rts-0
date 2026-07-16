@@ -15,9 +15,7 @@ impl Game {
         ObserverAnalysisPayload {
             tick: self.tick_count(),
             map_analysis: None,
-            players: self
-                .state
-                .players
+            players: self.state.players
                 .iter()
                 .map(|player| ObserverAnalysisPlayer {
                     id: player.id,
