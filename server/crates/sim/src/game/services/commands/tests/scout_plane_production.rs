@@ -19,11 +19,7 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
         .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
         .expect("city centre should spawn");
     let mut players = vec![player_state(1), player_state(2)];
-    let resources_before = (
-        players[0].steel,
-        players[0].oil,
-        players[0].supply_used,
-    );
+    let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
 
     let events = apply_with_players(
         &map,
@@ -47,11 +43,7 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
         "Scout Plane should not enter the City Centre production queue"
     );
     assert_eq!(
-        (
-            players[0].steel,
-            players[0].oil,
-            players[0].supply_used,
-        ),
+        (players[0].steel, players[0].oil, players[0].supply_used,),
         resources_before,
         "rejected Scout Plane training must not spend resources or reserve supply"
     );

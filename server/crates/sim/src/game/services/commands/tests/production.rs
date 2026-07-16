@@ -215,11 +215,7 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
     let research_complex = entities
         .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
         .expect("research complex should spawn");
-    let resources_before = (
-        players[0].steel,
-        players[0].oil,
-        players[0].supply_used,
-    );
+    let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
 
     let events = apply_with_players(
         &map,
