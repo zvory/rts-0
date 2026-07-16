@@ -717,4 +717,6 @@ mod command_car_corner_tests;
 #[cfg(test)]
 mod factory_wall_rally_spawn_tests;
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;
