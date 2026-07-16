@@ -88,6 +88,13 @@ export function shouldWarnBeforeUnload({
   return !allowUnloadWithoutWarning && isLivePlayerMatch(match);
 }
 
+export function shouldReturnToLobbyBrowserAfterDisconnect({
+  match = null,
+  requiresConnectionOnStart = false,
+} = {}) {
+  return !match && !requiresConnectionOnStart;
+}
+
 /**
  * The whole application. A single instance is created on load. It can host
  * many sequential matches: a live match can roll straight into post-match replay
@@ -520,6 +527,14 @@ export class App {
     this.socketOpen = false;
     if (this.intentionalIdleDisconnect) {
       this.intentionalIdleDisconnect = false;
+      return;
+    }
+    if (shouldReturnToLobbyBrowserAfterDisconnect({
+      match: this.match,
+      requiresConnectionOnStart: this.requiresConnectionOnStart(),
+    })) {
+      this.lobby?.resetToBrowser();
+      this.lobby?.show();
       return;
     }
     const text = this.hasConnected

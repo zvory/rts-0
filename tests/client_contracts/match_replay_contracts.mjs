@@ -75,7 +75,11 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
   const { ReplayControls, RoomTimeControls } = await import("../../client/src/replay_controls.js");
   const { applyMatchUnitRanges } = await import("../../client/src/match_settings_toggles.js");
-  const { shouldWarnBeforeUnload } = await import("../../client/src/app.js");
+  const {
+    App,
+    shouldReturnToLobbyBrowserAfterDisconnect,
+    shouldWarnBeforeUnload,
+  } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
@@ -388,6 +392,38 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(!listeners.has("window:keydown"), "Shared camera navigation removes key listeners on destroy");
   }
   assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
+  assert(
+    shouldReturnToLobbyBrowserAfterDisconnect(),
+    "an ordinary lobby socket close returns to the main lobby browser",
+  );
+  assert(
+    !shouldReturnToLobbyBrowserAfterDisconnect({ match: {} }),
+    "an in-game socket close remains on the match disconnect path",
+  );
+  assert(
+    !shouldReturnToLobbyBrowserAfterDisconnect({ requiresConnectionOnStart: true }),
+    "an explicit connected launch keeps its dedicated disconnect handling",
+  );
+  {
+    const app = Object.create(App.prototype);
+    let resetCount = 0;
+    let showCount = 0;
+    let warningCount = 0;
+    app.stopHeartbeat = () => {};
+    app.socketOpen = true;
+    app.intentionalIdleDisconnect = false;
+    app.match = null;
+    app.requiresConnectionOnStart = () => false;
+    app.lobby = {
+      resetToBrowser() { resetCount += 1; },
+      show() { showCount += 1; },
+    };
+    app.showConnectionWarning = () => { warningCount += 1; };
+    app.onClose();
+    assert(resetCount === 1 && showCount === 1,
+      "an ordinary lobby disconnect resets and shows the main lobby browser");
+    assert(warningCount === 0, "an ordinary lobby disconnect does not show a warning");
+  }
   assert(
     shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),
     "live player match warns before unload",

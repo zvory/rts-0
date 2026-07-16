@@ -52,9 +52,11 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   scaffold and become a ghost active builder.
   The client placement ghost mirrors the intent policy for the first selected worker, but remains
   advisory; the server is authoritative.
-- **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
-  (`main.rs`); the client pings every 15s (`main.js`). This evicts half-open/stuck clients so a
-  silent player can't wedge a shared room, and frees the room slot.
+- **Connection liveness + player inactivity**: the server drops connections with no inbound frame
+  for `IDLE_TIMEOUT = 40s` (`main.rs`), while the client pings every 15s (`app.js`) to keep healthy
+  sockets alive. Independently, `PLAYER_INACTIVITY_TIMEOUT = 5m` closes any connection that sends
+  no player action; automatic `ping` and `netReport` traffic does not extend that deadline. This
+  bounds abandoned lobby and match connections while still evicting half-open/stuck clients.
 - **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Replay artifact and seek limits**: production `ReplaySession` construction rejects malformed or
