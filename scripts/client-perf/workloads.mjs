@@ -50,8 +50,10 @@ export function buildClientPerfWorkloads(env = process.env) {
           mapWidth: 126,
           mapHeight: 126,
           projectedEntityCount: 500,
+          // The 900-tick full-world harness reaches 487 between deaths and next-tick respawns.
+          minimumProjectedEntityCount: 487,
         },
-        waitForMinEntities: 500,
+        waitForMinEntities: 487,
         resetPerfAfterSetup: true,
       },
     },
