@@ -1,9 +1,12 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
+  MAP_EDITOR_DEFAULT_SIZE,
   MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_SIZE,
   MAP_EDITOR_MAX_START_LOCATIONS,
+  MAP_EDITOR_MIN_SIZE,
   MAP_EDITOR_SYMMETRY,
   removeDraftLocation,
 } from "./map_editor_session.js";
@@ -34,6 +37,8 @@ export class MapEditorPanel {
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
+    this.blankMapSize = String(MAP_EDITOR_DEFAULT_SIZE);
+    this.observedMapSize = null;
     this.pending = false;
     this.status = "Ready to edit the map.";
     this.statusError = false;
@@ -48,8 +53,20 @@ export class MapEditorPanel {
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
-    this.unsubscribe = session.subscribe(() => this.render());
+    this.unsubscribe = session.subscribe((snapshot) => this.applySessionSnapshot(snapshot));
     void this.loadCatalog();
+  }
+
+  applySessionSnapshot(snapshot) {
+    const size = snapshot?.draft?.terrain?.length;
+    const loadedMap = snapshot?.reason === "loaded"
+      || snapshot?.reason === "initialized"
+      || snapshot?.lastAction === "Loaded local map";
+    if (Number.isInteger(size) && (this.observedMapSize === null || size !== this.observedMapSize || loadedMap)) {
+      this.blankMapSize = String(size);
+    }
+    if (Number.isInteger(size)) this.observedMapSize = size;
+    this.render();
   }
 
   render() {
@@ -100,10 +117,20 @@ export class MapEditorPanel {
     }
     select.value = this.selectedMapFile;
     select.addEventListener("change", () => { this.selectedMapFile = select.value; });
+    const blankSize = document.createElement("input");
+    blankSize.type = "number";
+    blankSize.min = String(MAP_EDITOR_MIN_SIZE);
+    blankSize.max = String(MAP_EDITOR_MAX_SIZE);
+    blankSize.step = "1";
+    blankSize.value = this.blankMapSize;
+    blankSize.className = "map-editor-blank-size";
+    blankSize.setAttribute("aria-label", "Blank map size");
+    blankSize.addEventListener("input", () => { this.blankMapSize = blankSize.value; });
     section.append(
       field("Bundled map", select),
       button("Load bundled map", () => void this.loadBundledMap(), { disabled: !this.selectedMapFile || this.pending }),
-      button("New blank 126 × 126", () => this.newBlankMap(), { disabled: this.pending }),
+      field("Blank map size", blankSize),
+      button("New blank map", () => this.newBlankMap(), { disabled: this.pending }),
     );
     if (this.catalogError) section.appendChild(readout(this.catalogError, true));
     return section;
@@ -175,6 +202,7 @@ export class MapEditorPanel {
       [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
       [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
       [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
+      [MAP_EDITOR_SYMMETRY.THREE_WAY, "3-way rotation (120°, square-grid approximation)"],
       [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
       [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
       [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
@@ -311,11 +339,17 @@ export class MapEditorPanel {
   }
 
   newBlankMap() {
-    this.session.initializeBlank({ size: 126, playerCount: 2 });
+    const size = Number(this.blankMapSize);
+    if (!Number.isInteger(size) || size < MAP_EDITOR_MIN_SIZE || size > MAP_EDITOR_MAX_SIZE) {
+      this.setStatus(`Blank map size must be a whole number from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`, true);
+      return false;
+    }
+    this.session.initializeBlank({ size, playerCount: 2 });
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.viewport.armTool(null);
-    this.setStatus("Created a blank two-player map.");
+    this.setStatus(`Created a blank ${size} × ${size} two-player map.`);
+    return true;
   }
 
   async loadCatalog() {

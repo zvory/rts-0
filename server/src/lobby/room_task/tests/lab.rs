@@ -62,26 +62,20 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
 
 #[test]
 fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
-    let size = 126;
+    let size = 48;
     let mut config = lab_config();
     config.map_draft = Some(crate::protocol::LabMapDraft {
         name: "Room map".to_string(),
         size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         starts: vec![
-            crate::protocol::LabMapTile { x: 16, y: 16 },
+            crate::protocol::LabMapTile { x: 8, y: 8 },
             crate::protocol::LabMapTile {
-                x: size - 17,
-                y: size - 17,
+                x: size - 9,
+                y: size - 9,
             },
-            crate::protocol::LabMapTile {
-                x: size - 17,
-                y: 16,
-            },
-            crate::protocol::LabMapTile {
-                x: 16,
-                y: size - 17,
-            },
+            crate::protocol::LabMapTile { x: size - 9, y: 8 },
+            crate::protocol::LabMapTile { x: 8, y: size - 9 },
         ],
         base_sites: vec![crate::protocol::LabMapTile {
             x: size / 2,
@@ -104,7 +98,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
     assert_eq!(starts[0].tick, 0);
     assert_eq!(starts[0].map.width, size);
     assert_eq!(starts[0].players.len(), 4);
-    assert_eq!(starts[0].players[0].start_tile_x, 16);
+    assert_eq!(starts[0].players[0].start_tile_x, 8);
     assert_eq!(starts[0].players[3].name, "Lab Delta");
 
     task.on_lab_request(99, 701, LabClientOp::ExportMap);

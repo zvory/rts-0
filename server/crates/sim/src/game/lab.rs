@@ -509,15 +509,6 @@ impl Game {
                 reason: "name must contain 1 to 80 bytes".to_string(),
             });
         }
-        if draft.size != self.state.map.size {
-            return Err(LabError::InvalidMap {
-                name: name.to_string(),
-                reason: format!(
-                    "proof-of-concept map size must remain {}; got {}",
-                    self.state.map.size, draft.size
-                ),
-            });
-        }
         let tile_count = draft
             .size
             .checked_mul(draft.size)
