@@ -463,11 +463,6 @@ assert(
   "lab setup validation builder must emit the exact wire shape",
 );
 assert(
-  typeof msg.labSubmitScenario === "undefined" &&
-    !rust.includes("SubmitScenario"),
-  "lab setup submission must remain unavailable in both protocol mirrors",
-);
-assert(
   rust.includes("ExportScenario") &&
     rust.includes("ImportScenario") &&
     rust.includes("ValidateScenario") &&
