@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, PanzerfaustState};
+use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
@@ -49,49 +49,6 @@ impl PanzerfaustShotStore {
                 shot.impact_tick,
             )
         })
-    }
-
-    pub(in crate::game) fn backfill_legacy_in_flight(
-        mut self,
-        entities: &EntityStore,
-        tick: u32,
-    ) -> Self {
-        if !self.shots.is_empty() {
-            return self;
-        }
-        for entity in entities.iter() {
-            let Some(PanzerfaustState::InFlight {
-                target,
-                impact_x,
-                impact_y,
-                ticks_remaining,
-            }) = entity.combat.as_ref().and_then(|combat| combat.panzerfaust)
-            else {
-                continue;
-            };
-            if entity.kind != EntityKind::Panzerfaust
-                || entity.owner == 0
-                || entity.hp == 0
-                || target == 0
-                || !entity.pos_x.is_finite()
-                || !entity.pos_y.is_finite()
-                || !impact_x.is_finite()
-                || !impact_y.is_finite()
-            {
-                continue;
-            }
-            self.shots.push(PanzerfaustShot {
-                owner: entity.owner,
-                attacker: entity.id,
-                target,
-                source_x: entity.pos_x,
-                source_y: entity.pos_y,
-                impact_x,
-                impact_y,
-                impact_tick: tick.saturating_add(ticks_remaining),
-            });
-        }
-        self
     }
 
     pub(in crate::game) fn schedule(
@@ -244,13 +201,14 @@ fn push_under_attack_notice(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::EntityKind;
 
     #[test]
     fn enemy_panzerfaust_impact_records_launch_origin_after_attacker_displacement() {
         let mut entities = EntityStore::new();
         let attacker = entities
-            .spawn_unit(1, EntityKind::Panzerfaust, 100.0, 100.0)
-            .expect("Panzerfaust should spawn");
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("Rifleman should spawn");
         let tank = entities
             .spawn_unit(2, EntityKind::Tank, 140.0, 100.0)
             .expect("Tank should spawn");
@@ -258,7 +216,7 @@ mod tests {
         shots.schedule(1, attacker, tank, (100.0, 100.0), (140.0, 100.0), 0);
         entities
             .get_mut(attacker)
-            .expect("Panzerfaust should still exist")
+            .expect("Rifleman should still exist")
             .set_position(220.0, 100.0);
         let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
         let fog = Fog::new(24);

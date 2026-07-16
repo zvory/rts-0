@@ -240,8 +240,7 @@ pub struct CombatState {
     /// The first direct-AP source this Tank committed to during the current reaction window.
     #[serde(default)]
     pub(in crate::game) tank_armor_reaction_lock: Option<TankArmorReactionLock>,
-    /// Panzerfaust loaded-shot runtime. Only Panzerfaust entities carry this; the projectile is
-    /// hidden after launch while the spent carrier completes its one-shot lifecycle.
+    /// Disposable Panzerfaust runtime for Riflemen whose owner completed the Panzerfausts upgrade.
     pub panzerfaust: Option<PanzerfaustState>,
 }
 
@@ -337,21 +336,8 @@ impl CombatState {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PanzerfaustState {
     Loaded,
-    Windup {
-        target: u32,
-        ticks_remaining: u16,
-    },
-    InFlight {
-        target: u32,
-        impact_x: f32,
-        impact_y: f32,
-        ticks_remaining: u32,
-    },
-    Recovery {
-        #[serde(default)]
-        target: u32,
-        ticks_remaining: u16,
-    },
+    Windup { target: u32, ticks_remaining: u16 },
+    Spent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

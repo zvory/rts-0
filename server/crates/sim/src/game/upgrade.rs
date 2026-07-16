@@ -4,6 +4,7 @@ use crate::game::entity::EntityKind;
 use serde::{Deserialize, Serialize};
 
 const METHAMPHETAMINES: &str = "methamphetamines";
+const PANZERFAUSTS: &str = "panzerfausts";
 const ENTRENCHMENT: &str = "entrenchment";
 const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
 const ARTILLERY_UNLOCK: &str = "artillery_unlock";
@@ -15,6 +16,7 @@ const SMOKE_PLUS: &str = "smoke_plus";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum UpgradeKind {
     Methamphetamines,
+    Panzerfausts,
     Entrenchment,
     AntiTankGunUnlock,
     ArtilleryUnlock,
@@ -28,6 +30,7 @@ impl UpgradeKind {
     pub fn to_protocol_str(self) -> &'static str {
         match self {
             UpgradeKind::Methamphetamines => METHAMPHETAMINES,
+            UpgradeKind::Panzerfausts => PANZERFAUSTS,
             UpgradeKind::Entrenchment => ENTRENCHMENT,
             UpgradeKind::AntiTankGunUnlock => ANTI_TANK_GUN_UNLOCK,
             UpgradeKind::ArtilleryUnlock => ARTILLERY_UNLOCK,
@@ -45,6 +48,7 @@ impl FromStr for UpgradeKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             METHAMPHETAMINES => Ok(UpgradeKind::Methamphetamines),
+            PANZERFAUSTS => Ok(UpgradeKind::Panzerfausts),
             ENTRENCHMENT => Ok(UpgradeKind::Entrenchment),
             ANTI_TANK_GUN_UNLOCK => Ok(UpgradeKind::AntiTankGunUnlock),
             ARTILLERY_UNLOCK => Ok(UpgradeKind::ArtilleryUnlock),
@@ -70,6 +74,7 @@ pub struct UpgradeDefinition {
 /// All upgrade ids the simulation can decode from protocol or replay data.
 pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
+    UpgradeKind::Panzerfausts,
     UpgradeKind::Entrenchment,
     UpgradeKind::AntiTankGunUnlock,
     UpgradeKind::ArtilleryUnlock,
@@ -81,6 +86,7 @@ pub const ALL: &[UpgradeKind] = &[
 
 const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
+    UpgradeKind::Panzerfausts,
     UpgradeKind::Entrenchment,
     UpgradeKind::AntiTankGunUnlock,
     UpgradeKind::BallisticTables,
@@ -107,6 +113,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_steel: crate::config::METHAMPHETAMINES_COST_STEEL,
             cost_oil: crate::config::METHAMPHETAMINES_COST_OIL,
             research_ticks: crate::config::METHAMPHETAMINES_RESEARCH_TICKS,
+        },
+        UpgradeKind::Panzerfausts => UpgradeDefinition {
+            kind,
+            researched_at: EntityKind::TrainingCentre,
+            requires_upgrade: None,
+            cost_steel: crate::config::PANZERFAUSTS_COST_STEEL,
+            cost_oil: crate::config::PANZERFAUSTS_COST_OIL,
+            research_ticks: crate::config::PANZERFAUSTS_RESEARCH_TICKS,
         },
         UpgradeKind::Entrenchment => UpgradeDefinition {
             kind,
@@ -182,10 +196,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn researchable_upgrades_include_current_gun_unlocks() {
+    fn researchable_upgrades_match_current_building_catalogs() {
         assert_eq!(
             researchable_upgrades(EntityKind::TrainingCentre),
-            vec![UpgradeKind::Methamphetamines, UpgradeKind::Entrenchment]
+            vec![
+                UpgradeKind::Methamphetamines,
+                UpgradeKind::Panzerfausts,
+                UpgradeKind::Entrenchment
+            ]
         );
         assert_eq!(
             researchable_upgrades(EntityKind::ResearchComplex),

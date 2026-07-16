@@ -69,10 +69,9 @@ export const PANZERFAUST_DAMAGE = 100;
 export const PANZERFAUST_ARMOR_PENETRATION = 0.5;
 export const PANZERFAUST_WINDUP_TICKS = TICK_HZ / 2;
 export const PANZERFAUST_TRAVEL_TICKS = TICK_HZ / 2;
-export const PANZERFAUST_RECOVERY_TICKS = TICK_HZ * 2;
 export const METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS = 12;
-export const METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS = PANZERFAUST_RECOVERY_TICKS;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
+export const PANZERFAUSTS_RESEARCH_TICKS = TICK_HZ * 20;
 export const ENTRENCHMENT_RESEARCH_TICKS = TICK_HZ * 30;
 export const ENTRENCHMENT_DIG_IN_TICKS = TICK_HZ * 3;
 export const ENTRENCHMENT_RANGE_BONUS_TILES = 1;
@@ -120,10 +119,6 @@ export const STATS = Object.freeze({
     rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
-  [KIND.PANZERFAUST]: { label: "Panzerfaust", icon: "PF", size: 9, sight: 11,
-    rangeTiles: 4, cost: { steel: 60, oil: 15 }, supply: 1, buildTicks: 400,
-    requires: KIND.TRAINING_CENTRE,
-    description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-tank shot. Fights with normal rifle fire, but prioritizes visible Tanks and can launch at vehicles and buildings for ${PANZERFAUST_DAMAGE} damage with ${PANZERFAUST_ARMOR_PENETRATION * 100}% armor penetration before becoming a Rifleman. Methamphetamines improves its rifle fire and movement and shortens the launcher windup.` },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
@@ -160,10 +155,10 @@ export const STATS = Object.freeze({
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 300, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 1,
-    cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.PANZERFAUST], requires: KIND.CITY_CENTRE },
+    cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER], requires: KIND.CITY_CENTRE },
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 1,
     cost: { steel: 100, oil: 50 }, buildTicks: 560, trains: [],
-    researches: [UPGRADE.METHAMPHETAMINES, UPGRADE.ENTRENCHMENT],
+    researches: [UPGRADE.METHAMPHETAMINES, UPGRADE.PANZERFAUSTS, UPGRADE.ENTRENCHMENT],
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.RESEARCH_COMPLEX]: { label: "R&D Complex", icon: "RD", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
@@ -371,7 +366,16 @@ export const UPGRADES = Object.freeze({
     icon: "METH",
     cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
-    description: "Boost Riflemen and Panzerfausts; speed up Machine Gunner movement and setup",
+    description: "Boost Riflemen; speed up Machine Gunner movement and setup",
+    researchedAt: KIND.TRAINING_CENTRE,
+  }),
+  [UPGRADE.PANZERFAUSTS]: Object.freeze({
+    upgrade: UPGRADE.PANZERFAUSTS,
+    label: "Panzerfausts",
+    icon: "PF+",
+    cost: Object.freeze({ steel: 100, oil: 100 }),
+    researchTicks: PANZERFAUSTS_RESEARCH_TICKS,
+    description: `Give every current and future Rifleman one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot`,
     researchedAt: KIND.TRAINING_CENTRE,
   }),
   [UPGRADE.ENTRENCHMENT]: Object.freeze({

@@ -281,7 +281,7 @@ architecture failures.
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
-| `panzerfaust_shots` | `authoritative/serialized` | Serialize all launched Panzerfaust loaded shots with owner/source facts, locked target id, launch-safe impact point, and impact tick. | `PanzerfaustShotStore::schedule` records detached loaded-shot impacts; later ticks resolve the direct damage/event even if the firing Panzerfaust dies before impact. |
+| `panzerfaust_shots` | `authoritative/serialized` | Serialize all launched Panzerfaust loaded shots with owner/source facts, locked target id, launch-safe impact point, and impact tick. | `PanzerfaustShotStore::schedule` records detached loaded-shot impacts; later ticks resolve the direct damage/event even if the firing Rifleman dies before impact. |
 | `seed` | `compatibility metadata` | Serialize the original match seed as setup/replay metadata. Do not use it as a substitute for `rng`. | Constructors and replay artifacts expose `seed`; the current map is stored separately and the current random stream lives in `rng`. |
 | `starting_loadouts` | `compatibility metadata` | Serialize per-player starting loadout records for replay/setup compatibility. | Replay constructors and artifacts persist these records so mixed faction/resource starts can be reconstructed without a global resource pair. |
 | `map_metadata` | `compatibility metadata` | Serialize stable authored map identity/version metadata alongside the map. | Replay/lab setup paths expose map metadata; it identifies the authored map but is not the live terrain grid used by systems. |
@@ -892,7 +892,7 @@ policy is centralized instead of scattered through services.
   as `effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain) -> u32`. The
   Tank coax profile is a live secondary Tank weapon (`tank_coax`, 6 tiles, 4 damage, 6-tick
   cooldown, small arms, direct-fire overpenetration). The Panzerfaust loaded-shot target predicate
-  for Tanks and Scout Cars lives here as rules vocabulary while the one-shot state machine stays in
+  for Scout Cars, Tanks, and Command Cars lives here as rules vocabulary while the one-shot state machine stays in
   the sim combat service.
 - `rules::target` — pure `TargetFacts` snapshots for target policy consumers. Facts include unit,
   building, resource-node, armor class, weapon class, anti-armor threat, support weapon, field
@@ -945,13 +945,13 @@ adding only the effect-specific code that the registry cannot express.
 effect shapes that actually exist today: legacy no-op (`charge` compatibility), reserved no-op
 (`blanketFire`), owned area status (`breakthrough`), delayed world effects (`smoke`,
 `mortarFire`), Scout Plane dispatch, dash return, line projectile, Magic Anchor placement, Golem
-consumption, and the intentionally one-off artillery point-fire path. Panzerfaust damage resolves against the locked live Tank when it is enemy-owned or owned by the
+consumption, and the intentionally one-off artillery point-fire path. Panzerfaust damage resolves against the locked live vehicle when it is enemy-owned or owned by the
 firing player; allied teammate and neutral targets remain non-damageable. Deliberate same-owner
 hits do not emit under-attack notices or receive enemy kill attribution. Impact feedback uses the
 stored launch endpoint when a damageable target has moved outside the firing team's current
 visibility; enemy victim under-attack notices use the victim's actual position.
-Dead Panzerfaust entities do not advance pending loaded-shot windup or recovery state, so they
-cannot launch or convert a shot before normal death cleanup. The reserved Blanket Fire hook returns before
+Dead loaded Riflemen do not advance pending Panzerfaust windup state, so they cannot launch before
+normal death cleanup. The reserved Blanket Fire hook returns before
 command planning, so commands do not spend resources, start cooldowns, or replace artillery
 orders. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
@@ -1025,7 +1025,7 @@ it becomes fogged. That remembered trench record is terrain-only; it does not ex
 owner, current occupants, or hidden unit state.
 
 `services::entrenchment` updates unit-facing trench state after normal collision cleanup and before
-final snapshot indexing. Riflemen, Machine Gunners, and Panzerfausts owned by a player with
+final snapshot indexing. Riflemen and Machine Gunners owned by a player with
 completed Entrenchment research create a neutral trench after holding ground on untrenched terrain
 for 90 consecutive simulation ticks. Engineers/Workers are not eligible: they neither dig new
 trenches nor occupy existing trenches. Holding ground means the unit has no movement path, no path
@@ -1035,7 +1035,7 @@ arrived Attack Move. Firing, target changes, body/weapon facing, and Machine Gun
 do not reset that timer; Move, Attack Move while still travelling, Gather, Build, Deconstruct,
 ability movement, artillery point-fire, path movement, and non-slotting forced movement reset it.
 
-Existing trenches are neutral. Any eligible Rifleman, Machine Gunner, or Panzerfaust can occupy an empty
+Existing trenches are neutral. Any eligible Rifleman or Machine Gunner can occupy an empty
 one without owning Entrenchment research when it is stopped in the trench footprint. Each trench can
 actively hold only one infantry unit; once occupied, it is skipped as an occupation candidate for
 other units. A stopped eligible unit within one tile of an empty trench may be slotted by at most
@@ -1054,8 +1054,9 @@ occupied units project `occupiedTrenchId`; remembered trench terrain never expos
 occupants.
 
 Entrenched combat benefits consume only active occupation through
-`entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen, Machine Gunners, and
-Panzerfausts gain one tile of weapon range through `entrenchment_combat::attack_range_tiles`, and idle
+`entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen and Machine Gunners gain
+one tile of weapon range through `entrenchment_combat::attack_range_tiles`, including the loaded
+Rifleman's Panzerfaust shot, and idle
 target acquisition treats them like Hold Position: they can acquire and fire at legal targets inside
 current weapon range but do not request idle chase paths. Explicit Attack and other player orders
 remain authoritative and may move or chase the unit out of the trench; command application and lab
@@ -1261,8 +1262,8 @@ rotation resets the ramp to base range; turret aiming and external pushes do not
 
 Team-current visibility, including an ally's lingering death vision, permits explicit immediate and
 queued attack targeting, but death-vision-only targets remain ineligible for general combat
-auto-acquisition. A consumed direct Panzerfaust attack completes when the unit converts into a
-Rifleman, allowing queued movement to promote instead of remaining behind the one-shot target.
+auto-acquisition. A consumed direct Panzerfaust attack spends the Rifleman's launcher immediately
+at launch, allowing queued movement to promote while the detached projectile continues travelling.
 
 Combat weapon cooldowns and firing-reveal response delays are keyed by
 `rules::combat::WeaponKind` inside `CombatState`. The legacy `Entity::attack_cd()`,
@@ -1395,20 +1396,19 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
-- Spawned Panzerfaust entities use a hidden server-only one-shot state in combat state:
-  `Loaded -> Windup -> InFlight -> Recovery -> Rifleman conversion`. Their normal default weapon is
-  the Rifleman rifle. Direct `Attack` commands, queued attack
-  promotion, idle acquisition, hold-position acquisition, and attack-move acquisition all share the
-  visible-enemy target predicate for vehicle and building targets, while the ranker prioritizes
-  visible Tanks before those fallbacks. Plain `Move` does not auto-fire. Windup cancels without
-  spending the shot if the order changes or the target stops being legal, visible, in range, or
-  fireable; after launch, the shot is spent and recorded as a detached `panzerfaust_shots` impact
+- Riflemen owned by a player with completed Panzerfausts research use a hidden server-only one-shot
+  state in combat state: `Loaded -> Windup -> Spent`. Research completion arms all current
+  Riflemen, and later Rifleman production spawns loaded; spent Riflemen are not rearmed. Direct
+  `Attack` commands may chase a valid target, while idle, Hold Position, and Attack Move only fire
+  automatically when a valid target is already inside the current 5-tile launcher range. The exact
+  target whitelist is Scout Car, Tank, and Command Car; buildings, Mortar Teams, Artillery, and
+  infantry are excluded. Targeting is intentionally independent per Rifleman with no overkill
+  coordination. Windup cancels without spending the shot if the order changes or the target stops
+  being legal, visible, in range, or fireable. At launch the Rifleman becomes `Spent`, resumes
+  normal movement and rifle combat immediately, and records a detached `panzerfaust_shots` impact
   that survives the firing entity's death. Impact applies 100 base damage with 50% armor
-  penetration only to the locked live vehicle/building target. During InFlight and Recovery, the
-  unit may move and use its normal rifle, while snapshots project `panzerfaustLoaded = false` so the
-  client hides the warhead. After 15 travel ticks plus 60 recovery ticks, the same entity converts
-  to a Rifleman, preserving surviving HP, queued movement, control-group identity, and active trench
-  occupation while consuming a completed direct launcher attack.
+  penetration only to the locked live vehicle. Snapshots project `panzerfaustLoaded = true` while
+  loaded/winding up and `false` after launch; unupgraded Riflemen omit the field.
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,

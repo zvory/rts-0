@@ -1759,8 +1759,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remains perceptible and broadly directional without preserving exact event location or
   composition. Non-combat spatial behavior and the global 48-voice pool remain unchanged.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
-  buckets; generic Panzerfaust attack events, projectile travel, reload, and legacy conversion
-  events stay silent so the weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
+  buckets; generic Rifleman Panzerfaust attack events and projectile travel stay silent so the
+  weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
   fights.
   Existing spoken server notices explicitly duck ambient and combat buses while they play; nested
   notice voices hold the duck until the final voice ends, then release over two seconds.
@@ -1807,15 +1807,15 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
   experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
-  experiment with carried movement frames and setup/deployed frames; Panzerfaust: distinct loaded infantry
-  rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  experiment with carried movement frames and setup/deployed frames; Panzerfausts-upgraded Riflemen:
+  distinct loaded infantry rig until launch, then the normal Rifleman rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).
-  Riflemen carry a rifle, loaded Panzerfaust infantry carry a tube launcher with a team-colored
-  band, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
+  Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
+  with a team-colored band and switch immediately to normal rifle art after launch. Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
@@ -1957,8 +1957,8 @@ Import rules:
   `app.js` instead of importing collaborators from feature modules.
 - Lab UI and transport lifetimes stay in `App`: `match.js` may receive lab metadata/control policy,
   but must not import `lab_client.js` or `lab_panel.js`. Lab setup tools may include inspection
-  spawn entries such as Panzerfaust; normal faction catalog membership and production command-card
-  exposure are still owned by the Rust rules catalog and client rules mirror.
+  units and completed-research toggles; normal faction catalog membership and production/research
+  command-card exposure are still owned by the Rust rules catalog and client rules mirror.
 - Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
   or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
   `scripts/check-client-architecture.mjs` with a reason.

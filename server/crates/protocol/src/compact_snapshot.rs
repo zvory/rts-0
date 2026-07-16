@@ -1072,13 +1072,6 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(y)?;
                 seq.end()
             }
-            Event::PanzerfaustConversion { id, to_kind } => {
-                let mut seq = serializer.serialize_seq(Some(3))?;
-                seq.serialize_element(&event_code("panzerfaustConversion"))?;
-                seq.serialize_element(id)?;
-                seq.serialize_element(&kind_code(to_kind))?;
-                seq.end()
-            }
             Event::Notice {
                 msg,
                 x,

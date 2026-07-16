@@ -758,10 +758,6 @@ pub enum Event {
         x: f32,
         y: f32,
     },
-    PanzerfaustConversion {
-        id: u32,
-        to_kind: String,
-    },
     Notice {
         msg: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]

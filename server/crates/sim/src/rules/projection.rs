@@ -257,7 +257,7 @@ pub fn project_entity(
                 Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
     }
-    if entity.kind == EntityKind::Panzerfaust {
+    if entity.kind == EntityKind::Rifleman {
         view.panzerfaust_loaded = entity
             .combat
             .as_ref()

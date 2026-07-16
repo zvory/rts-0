@@ -404,16 +404,12 @@ await withFakeDocument(() => {
     "LabPanel spawn palette excludes buildings from primary unit options",
   );
   assert(
-    labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
-    "LabPanel spawn palette includes trainable Kriegsia Panzerfaust",
-  );
-  assert(
     labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.SCOUT_PLANE),
     "LabPanel spawn palette includes Kriegsia Scout Plane for direct lab spawning",
   );
   assert(
-    STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST),
-    "LabPanel Panzerfaust inspection exposure now matches normal Barracks production exposure",
+    STATS[KIND.BARRACKS].trains.length === 2,
+    "LabPanel uses the Barracks catalog without a standalone Panzerfaust unit",
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),

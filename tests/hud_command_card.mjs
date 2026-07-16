@@ -241,36 +241,6 @@ function buttonSlots(card) {
 }
 
 {
-  const barracks = { id: 28, owner: 1, kind: KIND.BARRACKS, buildProgress: null };
-  const panzerfaustCard = buildCommandCardDescriptors({
-    playerId: 1,
-    selection: [barracks],
-    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
-    upgrades: [],
-    playerHasCompleteKind: (kind) => kind === KIND.TRAINING_CENTRE,
-    groupCooldownClocks: () => [],
-  });
-  const panzerfaustCommandId = kriegsiaCommandId("train", KIND.PANZERFAUST);
-  assert.deepEqual(panzerfaustCard.slots[0].contextIntent, {
-    type: "adjustProductionRepeat",
-    buildingIds: [barracks.id],
-    unit: KIND.RIFLEMAN,
-  });
-  assert.deepEqual(buttonSlots(panzerfaustCard).slice(0, 3), [
-    { commandId: kriegsiaCommandId("train", KIND.RIFLEMAN), slotIndex: 0, hotkey: "Q" },
-    { commandId: kriegsiaCommandId("train", KIND.MACHINE_GUNNER), slotIndex: 1, hotkey: "W" },
-    { commandId: panzerfaustCommandId, slotIndex: 2, hotkey: "E" },
-  ]);
-  assert.deepEqual(commandCardActivationCandidates(panzerfaustCard, panzerfaustCommandId), [{
-    commandId: panzerfaustCommandId,
-    slotIndex: 2,
-    hotkey: "E",
-    label: "Panzerfaust",
-    enabled: true,
-  }]);
-}
-
-{
   const scoutCar = {
     id: 30,
     owner: 1,
@@ -534,6 +504,7 @@ function buttonSlots(card) {
     "barracks-train",
     "factory-train",
     "gun-works-train",
+    "training-centre",
     "research-complex",
     "research-complex-medium-guns",
   ]);

@@ -161,16 +161,11 @@ Current scenario ids:
   `explicit_infantry_attack`.
 - `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
-- `panzerfaust_duel` — one loaded Panzerfaust versus one Tank for launch, impact, damage, reload,
-  and repeated-fire inspection.
-- `panzerfaust_windup_cancel` — starts a Panzerfaust attack, then issues movement during windup to
-  inspect cancellation without shot consumption.
-- `panzerfaust_target_death` — pairs normal and boosted Panzerfausts against one low-health Tank so
-  a projectile reaches a target that died during travel.
-- `panzerfaust_entrenched_range` — compares occupied-trench and exposed Panzerfausts holding
-  position against Tanks at four-tile range.
-- `panzerfaust_methamphetamines` — compares normal and Methamphetamines Panzerfaust firing and
-  reload timing side by side.
+- Rifleman Panzerfaust inspection is composed in Lab: enable `panzerfausts` research for the owner,
+  spawn Riflemen plus Scout Car/Tank/Command Car targets, and compare loaded versus spent art,
+  cancellable windup, detached impact, exact target filtering, and explicit-Attack chase behavior.
+  The bundled `render-preview` and `supply-300-hellhole` scenarios include loaded Riflemen for
+  renderer and high-density coverage.
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
   and buildings around the coax arc for secondary-machine-gun inspection.

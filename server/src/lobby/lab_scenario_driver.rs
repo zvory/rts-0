@@ -143,10 +143,7 @@ impl LabScenarioDriver {
             for (expected_owner, expected_kind) in self.pending_replacements.drain(..) {
                 let Some(index) = unknown_ids.iter().position(|entity_id| {
                     current.get(entity_id).is_some_and(|(owner, current_kind)| {
-                        *owner == expected_owner
-                            && (*current_kind == expected_kind
-                                || (expected_kind == EntityKind::Panzerfaust
-                                    && *current_kind == EntityKind::Rifleman))
+                        *owner == expected_owner && *current_kind == expected_kind
                     })
                 }) else {
                     continue;
@@ -222,7 +219,6 @@ impl LabScenarioDriver {
                 .filter(|(_, (owner, _))| *owner == player_id)
                 .map(|(entity_id, _)| *entity_id)
                 .collect();
-            let mut unmatched_targets = Vec::new();
             for &target_kind in &self.target_composition {
                 if let Some(index) = unknown_ids.iter().position(|entity_id| {
                     current
@@ -232,28 +228,7 @@ impl LabScenarioDriver {
                     let entity_id = unknown_ids.remove(index);
                     self.central_unit_provenance
                         .insert(entity_id, (player_id, target_kind));
-                } else {
-                    unmatched_targets.push(target_kind);
                 }
-            }
-
-            // A fired Panzerfaust remains the same entity id but becomes a Rifleman. After a seek,
-            // exact-kind matching leaves those surplus Riflemen available to refill Panzerfaust
-            // provenance without creating an extra unit.
-            for target_kind in unmatched_targets {
-                if target_kind != EntityKind::Panzerfaust {
-                    continue;
-                }
-                let Some(index) = unknown_ids.iter().position(|entity_id| {
-                    current
-                        .get(entity_id)
-                        .is_some_and(|(_, current_kind)| *current_kind == EntityKind::Rifleman)
-                }) else {
-                    continue;
-                };
-                let entity_id = unknown_ids.remove(index);
-                self.central_unit_provenance
-                    .insert(entity_id, (player_id, target_kind));
             }
         }
     }

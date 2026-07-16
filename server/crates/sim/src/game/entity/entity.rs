@@ -83,8 +83,7 @@ impl Entity {
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
-            combat: if s.dmg > 0 || matches!(kind, EntityKind::Artillery | EntityKind::Panzerfaust)
-            {
+            combat: if s.dmg > 0 || kind == EntityKind::Artillery {
                 Some(initial_combat_state(kind))
             } else {
                 None
@@ -1163,13 +1162,6 @@ impl Entity {
 
     /// Whether this entity can deal damage.
     pub fn can_attack(&self) -> bool {
-        if self.kind == EntityKind::Panzerfaust {
-            return self
-                .combat
-                .as_ref()
-                .and_then(|combat| combat.panzerfaust)
-                .is_some();
-        }
         if let Some(s) = config::unit_stats(self.kind) {
             s.dmg > 0
         } else if let Some(s) = config::building_stats(self.kind) {
@@ -1301,6 +1293,30 @@ impl Entity {
             }
         }
     }
+
+    pub(in crate::game) fn set_panzerfaust_upgrade(&mut self, enabled: bool) {
+        if self.kind != EntityKind::Rifleman {
+            return;
+        }
+        let Some(combat) = self.combat.as_mut() else {
+            return;
+        };
+        if enabled {
+            if combat.panzerfaust.is_none() {
+                combat.panzerfaust = Some(PanzerfaustState::Loaded);
+            }
+        } else {
+            combat.panzerfaust = None;
+        }
+    }
+
+    pub(in crate::game) fn spend_panzerfaust(&mut self) {
+        if self.kind == EntityKind::Rifleman {
+            if let Some(combat) = self.combat.as_mut() {
+                combat.panzerfaust = Some(PanzerfaustState::Spent);
+            }
+        }
+    }
 }
 
 fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u32) -> u32 {
@@ -1344,9 +1360,6 @@ fn initial_combat_state(kind: EntityKind) -> CombatState {
     let mut combat = CombatState::default();
     if kind == EntityKind::MortarTeam {
         combat.autocast_enabled = false;
-    }
-    if kind == EntityKind::Panzerfaust {
-        combat.panzerfaust = Some(PanzerfaustState::Loaded);
     }
     combat
 }

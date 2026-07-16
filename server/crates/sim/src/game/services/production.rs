@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{EntityStore, OrderIntent, ProdItem, RallyIntent, RallyKind};
+use crate::game::entity::{Entity, EntityStore, OrderIntent, ProdItem, RallyIntent, RallyKind};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -187,9 +187,7 @@ pub(crate) fn production_system(
         if let Some((owner, upgrade)) = completed_research {
             if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                 player.upgrades.insert(upgrade);
-            }
-            if upgrade == UpgradeKind::MortarAutocast {
-                set_owned_mortar_autocast(entities, owner, true);
+                sync_owned_upgrade_effects(entities, owner, &player.upgrades);
             }
             if let Some(b) = entities.get_mut(id) {
                 if let Some(queue) = b.research_queue_mut() {
@@ -226,14 +224,7 @@ pub(crate) fn production_system(
             let spawn_facing = first_rally
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
-                let mortar_autocast_researched = players
-                    .iter()
-                    .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast));
-                if unit == EntityKind::MortarTeam && mortar_autocast_researched {
-                    if let Some(e) = entities.get_mut(spawned) {
-                        e.set_autocast_enabled(AbilityKind::MortarFire, true);
-                    }
-                }
+                sync_spawned_upgrade_effects(entities, players, owner, spawned);
                 if let Some(facing) = spawn_facing {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_facing(facing);
@@ -279,26 +270,53 @@ fn rally_order_intent(unit_can_gather: bool, rally: RallyIntent) -> OrderIntent 
     }
 }
 
-fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bool) {
-    for id in entities.ids() {
-        if let Some(e) = entities.get_mut(id) {
-            if e.owner == owner && e.kind == EntityKind::MortarTeam {
-                e.set_autocast_enabled(AbilityKind::MortarFire, enabled);
-            }
-        }
+fn sync_entity_upgrade_effects(
+    entity: &mut Entity,
+    upgrades: &std::collections::BTreeSet<UpgradeKind>,
+) {
+    if entity.kind == EntityKind::MortarTeam {
+        entity.set_autocast_enabled(
+            AbilityKind::MortarFire,
+            upgrades.contains(&UpgradeKind::MortarAutocast),
+        );
     }
+    entity.set_panzerfaust_upgrade(upgrades.contains(&UpgradeKind::Panzerfausts));
 }
 
-pub(crate) fn sync_owned_autocast_from_upgrades(
+pub(crate) fn sync_owned_upgrade_effects(
     entities: &mut EntityStore,
     owner: u32,
     upgrades: &std::collections::BTreeSet<UpgradeKind>,
 ) {
-    set_owned_mortar_autocast(
-        entities,
-        owner,
-        upgrades.contains(&UpgradeKind::MortarAutocast),
-    );
+    for id in entities.ids() {
+        if let Some(entity) = entities.get_mut(id).filter(|entity| entity.owner == owner) {
+            sync_entity_upgrade_effects(entity, upgrades);
+        }
+    }
+}
+
+pub(crate) fn sync_all_owned_upgrade_effects(entities: &mut EntityStore, players: &[PlayerState]) {
+    for player in players {
+        sync_owned_upgrade_effects(entities, player.id, &player.upgrades);
+    }
+}
+
+pub(crate) fn sync_spawned_upgrade_effects(
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    owner: u32,
+    entity_id: u32,
+) {
+    let Some(upgrades) = players
+        .iter()
+        .find(|player| player.id == owner)
+        .map(|player| &player.upgrades)
+    else {
+        return;
+    };
+    if let Some(entity) = entities.get_mut(entity_id) {
+        sync_entity_upgrade_effects(entity, upgrades);
+    }
 }
 
 #[cfg(test)]
@@ -312,6 +330,7 @@ mod tests {
     use crate::protocol::terrain;
 
     mod rally;
+    mod upgrades;
     mod waiting;
     use std::collections::HashMap;
 
@@ -377,37 +396,6 @@ mod tests {
                 .expect("mortar should exist")
                 .autocast_enabled(AbilityKind::MortarFire),
             Some(true)
-        );
-    }
-
-    #[test]
-    fn panzerfaust_production_completes_from_barracks_queue() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        let barracks = spawn_building_training(
-            &map,
-            &mut entities,
-            10,
-            10,
-            EntityKind::Barracks,
-            EntityKind::Panzerfaust,
-        );
-        let mut players = vec![player(1)];
-
-        tick_production(&map, &mut entities, &mut players);
-
-        assert!(entities
-            .get(barracks)
-            .expect("barracks")
-            .prod_queue()
-            .is_empty());
-        let panzerfaust = entities
-            .iter()
-            .find(|e| e.owner == 1 && e.kind == EntityKind::Panzerfaust && e.hp > 0)
-            .expect("Panzerfaust should spawn from completed Barracks queue");
-        assert!(
-            matches!(panzerfaust.order(), Order::Idle),
-            "without a rally point the produced Panzerfaust should stay idle"
         );
     }
 

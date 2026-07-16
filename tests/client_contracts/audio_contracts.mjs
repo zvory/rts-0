@@ -570,16 +570,12 @@ assert(
     "tank coax attack events play machine-gun combat sound",
   );
   assert(
-    defaultWeaponKindForAttackerKind(KIND.PANZERFAUST) === WEAPON_KIND.PANZERFAUST_LOADED_SHOT,
-    "Panzerfaust attack feedback resolves to its loaded-shot weapon id",
+    attackFeedbackKind(KIND.RIFLEMAN, WEAPON_KIND.PANZERFAUST_LOADED_SHOT) === KIND.RIFLEMAN,
+    "Panzerfaust loaded-shot weapon hint preserves Rifleman feedback",
   );
   assert(
-    attackFeedbackKind(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT) === KIND.PANZERFAUST,
-    "Panzerfaust loaded-shot weapon hint preserves Panzerfaust feedback",
-  );
-  assert(
-    !attackKindHasCombatSound(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT),
-    "generic Panzerfaust attack events stay silent instead of reusing rifle or tank sounds",
+    !attackKindHasCombatSound(KIND.RIFLEMAN, WEAPON_KIND.PANZERFAUST_LOADED_SHOT),
+    "generic Rifleman Panzerfaust attack events stay silent instead of reusing rifle or tank sounds",
   );
   assert(
     panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH) === PANZERFAUST_LAUNCH_SOUND_ID,
@@ -588,10 +584,6 @@ assert(
   assert(
     panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_IMPACT) === PANZERFAUST_IMPACT_SOUND_ID,
     "Panzerfaust impact events map to a dedicated impact cue",
-  );
-  assert(
-    panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_CONVERSION) === null,
-    "Legacy Panzerfaust conversion stays silent",
   );
   assert(
     ![
@@ -703,7 +695,7 @@ assert(
 {
   const plays = [];
   const entities = new Map([
-    [31, { id: 31, owner: 1, kind: KIND.PANZERFAUST, x: 300, y: 340 }],
+    [31, { id: 31, owner: 1, kind: KIND.RIFLEMAN, x: 300, y: 340 }],
   ]);
   const combatAudio = new MatchCombatAudio({
     state: {
@@ -743,9 +735,6 @@ assert(
   assert(plays.at(-1).opts.category === "combat_other", "Panzerfaust impacts without a visible source avoid claiming self ownership");
   assert(plays.at(-1).opts.gain < plays[0].opts.gain, "Panzerfaust impact cue is quieter than the launch cue");
 
-  const playCount = plays.length;
-  combatAudio.playPointFireSound({ e: EVENT.PANZERFAUST_CONVERSION, id: 31 });
-  assert(plays.length === playCount, "Legacy Panzerfaust conversion does not play a combat cue");
 }
 
 // ---------------------------------------------------------------------------
