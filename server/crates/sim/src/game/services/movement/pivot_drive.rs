@@ -17,7 +17,7 @@ pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const PIVOT_VEHICLE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
 pub(super) const VEHICLE_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-const PIVOT_VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
+const VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
 const PIVOT_VEHICLE_CRAWL_ANGLE_RAD: f32 = 0.55;
 const PIVOT_VEHICLE_PIVOT_ANGLE_RAD: f32 = 1.25;
 const VEHICLE_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
@@ -204,13 +204,34 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
         let reversing = entity
             .movement
             .as_ref()
-            .is_some_and(|movement| movement.scout_car_reverse_waypoint.is_some());
+            .is_some_and(|movement| movement.scout_car_reverse_waypoint.is_some())
+            || car_will_start_reverse_to_final_waypoint(entity, facing);
         return (!reversing).then_some(forward);
     }
     let next = entity.next_waypoint()?;
     let to_next = (next.0 - entity.pos_x, next.1 - entity.pos_y);
     let forward_progress = to_next.0 * forward.0 + to_next.1 * forward.1;
     (forward_progress > 0.0).then_some(forward)
+}
+
+fn car_will_start_reverse_to_final_waypoint(entity: &Entity, facing: f32) -> bool {
+    let Some(movement) = entity.movement.as_ref() else {
+        return false;
+    };
+    if movement.path.len() != 1 {
+        return false;
+    }
+    let Some(next) = entity.next_waypoint() else {
+        return false;
+    };
+    let dx = next.0 - entity.pos_x;
+    let dy = next.1 - entity.pos_y;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if !dist.is_finite() || dist <= 1.0e-4 || dist > VEHICLE_REVERSE_GOAL_DISTANCE_PX {
+        return false;
+    }
+    let desired = dy.atan2(dx);
+    angle_delta(facing, desired).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
 }
 
 fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
@@ -262,7 +283,7 @@ pub(super) fn pivot_drive_intent(
     if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
         && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX
         && angle_delta(e.facing(), forward_desired).abs()
-            > PIVOT_VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
+            > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
     {
         return Some(PivotDriveIntent {
             desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),

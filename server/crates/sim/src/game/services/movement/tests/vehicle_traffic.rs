@@ -96,3 +96,53 @@ fn head_on_vehicle_traffic_keeps_existing_reciprocal_response() {
     assert!(eastbound_adjustment.throttle_scale < 1.0);
     assert!(westbound_adjustment.throttle_scale < 1.0);
 }
+
+#[test]
+fn first_reverse_tick_keeps_existing_reciprocal_traffic_response() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (x, y) = map.tile_center(20, 20);
+    let heading_delta = std::f32::consts::PI / 12.0;
+    let upper = entities
+        .spawn_unit(1, EntityKind::ScoutCar, x, y)
+        .expect("upper vehicle spawn");
+    let lower = entities
+        .spawn_unit(2, EntityKind::CommandCar, x, y - 20.0)
+        .expect("lower vehicle spawn");
+    for (id, pos_y, facing) in [(upper, y, -heading_delta), (lower, y - 20.0, heading_delta)] {
+        if let Some(entity) = entities.get_mut(id) {
+            entity.set_facing(facing);
+        }
+        mark_moving(
+            &mut entities,
+            id,
+            (
+                x - 2.0 * config::TILE_SIZE as f32 * facing.cos(),
+                pos_y - 2.0 * config::TILE_SIZE as f32 * facing.sin(),
+            ),
+        );
+    }
+    let spatial = SpatialIndex::build(&entities, map.size);
+
+    let upper_adjustment = vehicle_traffic_adjustment(
+        &entities,
+        &spatial,
+        upper,
+        EntityKind::ScoutCar,
+        x,
+        y,
+        -heading_delta,
+    );
+    let lower_adjustment = vehicle_traffic_adjustment(
+        &entities,
+        &spatial,
+        lower,
+        EntityKind::CommandCar,
+        x,
+        y - 20.0,
+        heading_delta,
+    );
+
+    assert!(upper_adjustment.throttle_scale < 1.0);
+    assert!(lower_adjustment.throttle_scale < 1.0);
+}
