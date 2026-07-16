@@ -77,3 +77,45 @@ fn elimination_prunes_firing_reveal_sources_and_reaction_gates_before_checkpoint
     game.checkpoint_payload_text_for_test()
         .expect("eliminated reveal sources must not leave checkpoint-invalid provenance");
 }
+
+#[test]
+fn unscheduled_tick_prunes_firing_reveal_for_entity_killed_during_systems() {
+    let mut game = empty_flat_game(&human_vs_ai_players());
+    let shooter_pos = game.state.map.tile_center(30, 30);
+    let shooter = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::MachineGunner, shooter_pos.0, shooter_pos.1)
+        .expect("hidden shooter");
+    // Make the shell's even-duration flight land on an unscheduled (odd) fog tick.
+    game.state.tick = 1;
+    let fired_at_tick = game.tick_count();
+    let teams = game.team_relations();
+    firing_reveal::record_global_firing_reveals_for_enemy_players(
+        &mut game.state.firing_reveals,
+        &[1, 2],
+        &teams,
+        2,
+        shooter,
+        fired_at_tick,
+        config::ARTILLERY_SHELL_DELAY_TICKS + config::TICK_HZ,
+    );
+    refresh_visibility_for_test(&mut game);
+    game.state
+        .artillery_shells
+        .schedule(1, u32::MAX, shooter_pos.0, shooter_pos.1, fired_at_tick);
+
+    for _ in 0..config::ARTILLERY_SHELL_DELAY_TICKS - 1 {
+        game.tick();
+    }
+    assert!(game.state.entities.get(shooter).is_some());
+    assert!(!game.state.firing_reveals.is_empty());
+
+    game.tick();
+
+    assert!(!game.tick_count().is_multiple_of(FOG_UPDATE_INTERVAL_TICKS));
+    assert!(game.state.entities.get(shooter).is_none());
+    assert!(game.state.firing_reveals.is_empty());
+    game.checkpoint_payload_text_for_test()
+        .expect("same-tick deaths must not leave checkpoint-invalid reveal provenance");
+}

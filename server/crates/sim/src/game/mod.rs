@@ -291,6 +291,11 @@ impl Game {
             &mut self.state.world_combat_position,
         );
 
+        // Systems can remove a firing-revealed entity during this tick. Prune those stale
+        // sources before either fog path rebuilds reveal provenance; otherwise an unscheduled
+        // overlay-only refresh can leave checkpoint-invalid references until the next tick.
+        self.retain_active_visibility_sources();
+
         let smoke_changed = smoke_ids_before
             != self
                 .state

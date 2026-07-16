@@ -70,8 +70,8 @@ impl LingeringSightSource {
     }
 }
 
-/// Visible-tile grids, one per player. Recomputed every tick from scratch (cheap at our map
-/// sizes) so it always reflects current entity positions and never leaks stale visibility.
+/// Visible-tile grids, one per player. Ordinary sight is held between scheduled base refreshes;
+/// event-driven visibility is rebuilt over that base every tick.
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Fog {
     size: u32,
@@ -245,6 +245,9 @@ impl Fog {
         store: &EntityStore,
         smokes: Option<&SmokeCloudStore>,
     ) {
+        if sources.is_empty() {
+            return;
+        }
         let size = self.size;
         let building_mask = BuildingLosMask::new(store, map);
         let los = match smokes {
@@ -276,6 +279,9 @@ impl Fog {
         smokes: &SmokeCloudStore,
         teams: &TeamRelations,
     ) {
+        if sources.is_empty() {
+            return;
+        }
         let size = self.size;
         let building_mask = BuildingLosMask::new(store, map);
         let los =
@@ -305,35 +311,34 @@ impl Fog {
         smokes: &SmokeCloudStore,
         teams: &TeamRelations,
     ) {
+        let mut seen_owners = BTreeSet::new();
+        let planes = store
+            .iter()
+            .filter(|plane| {
+                plane.kind == EntityKind::ScoutPlane
+                    && plane.owner != 0
+                    && plane.hp > 0
+                    && !smokes.point_inside(plane.pos_x, plane.pos_y)
+                    && seen_owners.insert(plane.owner)
+            })
+            .map(|plane| (plane.owner, plane.pos_x, plane.pos_y, plane.sight_tiles()))
+            .collect::<Vec<_>>();
+        if planes.is_empty() {
+            return;
+        }
         let size = self.size;
         let building_mask = BuildingLosMask::new(store, map);
         let los = LineOfSight::with_smoke_only(map, smokes);
-        let mut seen_owners = BTreeSet::new();
-        for plane in store.iter() {
-            if plane.kind != EntityKind::ScoutPlane
-                || plane.owner == 0
-                || plane.hp == 0
-                || smokes.point_inside(plane.pos_x, plane.pos_y)
-                || !seen_owners.insert(plane.owner)
-            {
-                continue;
-            }
-            let mut recipients = teams.same_team_player_ids(plane.owner);
+        for (owner, x, y, sight_tiles) in planes {
+            let mut recipients = teams.same_team_player_ids(owner);
             if recipients.is_empty() {
-                recipients.push(plane.owner);
+                recipients.push(owner);
             }
             for recipient in recipients {
                 let Some(grid) = self.grids.get_mut(&recipient) else {
                     continue;
                 };
-                stamp_sight_at(
-                    grid,
-                    size,
-                    plane.pos_x,
-                    plane.pos_y,
-                    plane.sight_tiles(),
-                    &los,
-                );
+                stamp_sight_at(grid, size, x, y, sight_tiles, &los);
             }
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
