@@ -127,8 +127,9 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   process is exiting. Detachment is load-bearing: a slow Supabase write must never stall the room
   transitioning back to lobby. The tracker snapshots pending writes at shutdown wait start, so
   writes started later do not extend that wait forever.
-- `client/src/match_history.js` — fetches and renders the lobby table; row click expands the
-  score screen and, when compatible, exposes a replay launch action.
+- `client/src/match_history.js` — performs one fetch when mounted, renders the lobby table, and
+  exposes a manual Refresh button without polling; row click expands the score screen and, when
+  compatible, exposes a replay launch action.
 - `client/src/app.js` — mounts `MatchHistory` when the lobby shows; `refresh()` is called from
   normal-room `onBackToLobby` so the freshly-written row appears without a page reload.
   `?replayRoom=...` auto-joins a server-created replay staging lobby through the normal WebSocket

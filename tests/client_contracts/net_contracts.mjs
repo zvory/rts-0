@@ -86,6 +86,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   const net = new Net("ws://example.test/ws");
   assert(net instanceof Net, "Net constructor should return an instance");
   assertHasMethod(net, "connect", "Net");
+  assertHasMethod(net, "disconnect", "Net");
   assertHasMethod(net, "on", "Net");
   assertHasMethod(net, "off", "Net");
   assertHasMethod(net, "join", "Net");
@@ -306,6 +307,16 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     msg.visionSelectionPlayers([1, 2]).selection.playerIds.join(",") === "1,2",
     "replay subset vision builder payload",
   );
+}
+
+{
+  const net = new Net("ws://example.test/ws");
+  let closes = 0;
+  net._playerId = 7;
+  net.ws = { close() { closes += 1; } };
+  net.disconnect();
+  assert(closes === 1, "Net.disconnect closes the current socket");
+  assert(net.ws === null && net.playerId === null, "Net.disconnect clears pre-join connection state");
 }
 
 // ---------------------------------------------------------------------------

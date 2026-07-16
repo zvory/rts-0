@@ -752,7 +752,13 @@ input[type="text"]:focus {
   line-height: 1;
 }
 
-.lobby-browser-refresh {
+.lobby-browser-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobby-browser-refresh-status {
   align-self: center;
   min-width: 94px;
   padding: 6px 8px;
@@ -765,8 +771,7 @@ input[type="text"]:focus {
   text-transform: uppercase;
 }
 
-.lobby-browser.has-error .lobby-browser-refresh,
-.lobby-browser.is-disconnected .lobby-browser-refresh {
+.lobby-browser.has-error .lobby-browser-refresh-status {
   border-color: rgba(182, 74, 63, 0.58);
   color: var(--bad);
 }
@@ -1481,7 +1486,7 @@ input[type="text"]:focus {
     align-items: start;
   }
 
-  .lobby-browser-refresh {
+  .lobby-browser-header-actions {
     justify-self: start;
   }
 
@@ -5403,6 +5408,10 @@ input[type="text"]:focus {
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .match-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--panel-edge);
 }
@@ -5412,6 +5421,10 @@ input[type="text"]:focus {
   font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+.match-history-refresh {
+  padding: 5px 9px;
+  font-size: 11px;
 }
 .match-history-table-host {
   padding: 8px 0;

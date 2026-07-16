@@ -26,6 +26,7 @@ export class MatchHistory {
     this._launchingId = null;
     /** Per-row replay launch errors. */
     this._launchErrors = new Map();
+    this._loading = false;
 
     this._render();
     this.refresh();
@@ -35,6 +36,7 @@ export class MatchHistory {
   async refresh() {
     if (this._ac) this._ac.abort();
     this._ac = new AbortController();
+    this._loading = true;
     this._setLoading();
     try {
       const url = `/api/matches?limit=${encodeURIComponent(this.limit)}`;
@@ -43,9 +45,11 @@ export class MatchHistory {
       const rows = await res.json();
       if (!Array.isArray(rows)) throw new Error("malformed response");
       this._rows = rows;
+      this._loading = false;
       this._renderRows();
     } catch (err) {
       if (err && err.name === "AbortError") return;
+      this._loading = false;
       this._setError(err && err.message ? String(err.message) : "Failed to load");
     }
   }
@@ -68,7 +72,13 @@ export class MatchHistory {
     header.className = "match-history-header";
     const title = document.createElement("h2");
     title.textContent = "Recent matches";
+    this._refreshButton = document.createElement("button");
+    this._refreshButton.type = "button";
+    this._refreshButton.className = "btn match-history-refresh";
+    this._refreshButton.textContent = "Refresh";
+    this._refreshButton.addEventListener("click", () => void this.refresh());
     header.appendChild(title);
+    header.appendChild(this._refreshButton);
     wrap.appendChild(header);
 
     this._tableHost = document.createElement("div");
@@ -79,10 +89,12 @@ export class MatchHistory {
   }
 
   _setLoading() {
+    this._reflectRefreshButton();
     this._tableHost.innerHTML = `<p class="match-history-status">Loading…</p>`;
   }
 
   _setError(msg) {
+    this._reflectRefreshButton();
     const p = document.createElement("p");
     p.className = "match-history-status error";
     p.textContent = `Could not load match history (${msg}).`;
@@ -91,6 +103,7 @@ export class MatchHistory {
   }
 
   _renderRows() {
+    this._reflectRefreshButton();
     this._tableHost.innerHTML = "";
     if (this._rows.length === 0) {
       const p = document.createElement("p");
@@ -150,6 +163,12 @@ export class MatchHistory {
     }
     table.appendChild(tbody);
     this._tableHost.appendChild(table);
+  }
+
+  _reflectRefreshButton() {
+    if (!this._refreshButton) return;
+    this._refreshButton.disabled = this._loading;
+    this._refreshButton.textContent = this._loading ? "Refreshing..." : "Refresh";
   }
 
   _toggleRow(id) {
@@ -213,7 +232,7 @@ export class MatchHistory {
       const room = typeof payload?.room === "string" ? payload.room : "";
       if (!room) throw new Error("Replay launch did not return a room.");
       if (this.onReplayRoom) {
-        const handled = this.onReplayRoom(room);
+        const handled = await this.onReplayRoom(room);
         if (handled === false) throw new Error("Replay lobby could not be joined.");
         this._launchingId = null;
         this._renderRows();

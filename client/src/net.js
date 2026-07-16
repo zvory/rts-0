@@ -112,6 +112,19 @@ export class Net {
     throw lastError;
   }
 
+  /** Close the current socket without scheduling a reconnect. */
+  disconnect() {
+    const ws = this.ws;
+    if (!ws) return;
+    this.ws = null;
+    this._playerId = null;
+    try {
+      ws.close();
+    } catch {
+      // The socket is already unusable; clearing our reference is sufficient.
+    }
+  }
+
   _connectOnce(timeoutMs) {
     return new Promise((resolve, reject) => {
       let settled = false;

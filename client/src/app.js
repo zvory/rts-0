@@ -101,7 +101,7 @@ export class App {
     snapshotStreamLaunch = null,
     stressTestLaunch = null,
   } = {}) {
-    /** @type {Net} persistent connection across lobby + matches. */
+    /** @type {Net} connection opened on demand and retained across an active room + match. */
     this.net = net || new Net(wsUrl(), diagnostics);
     this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.stressTestLaunch = stressTestLaunch;
@@ -134,7 +134,10 @@ export class App {
       menu: dom.settingsMenu,
     });
     /** @type {Lobby} */
-    this.lobby = new Lobby(dom.lobbyScreen, this.net, this.audio);
+    this.lobby = new Lobby(dom.lobbyScreen, this.net, this.audio, {
+      ensureConnected: () => this.ensureConnected(),
+      disconnectWhenIdle: () => this.disconnectIdleConnection(),
+    });
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
     this.matchHistory = null;
@@ -158,6 +161,9 @@ export class App {
     this.heartbeatTimer = undefined;
     /** Whether the WebSocket has ever reached open in this page session. */
     this.hasConnected = false;
+    this.socketOpen = false;
+    this.connectionPromise = null;
+    this.intentionalIdleDisconnect = false;
 
     // Bind handlers once so we can off() them symmetrically.
     this.onStart = this.onStart.bind(this);
@@ -174,6 +180,7 @@ export class App {
     this.onLobbyForMatchLaunch = this.onLobbyForMatchLaunch.bind(this);
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
+    this.onVisibilityChange = this.onVisibilityChange.bind(this);
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
@@ -190,7 +197,7 @@ export class App {
     if (this.labCatalogLaunch) this.lobby.hide();
   }
 
-  /** Connect, wire global server messages, and show the lobby. */
+  /** Wire global server messages and connect immediately only for launch URLs that require it. */
   async start() {
     this.stressTestRunner?.mount();
     this.net.on(S.START, this.onStart);
@@ -207,6 +214,7 @@ export class App {
     dom.gameOverClose?.addEventListener("click", this.onCloseScorePanel);
     dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
     window.addEventListener("beforeunload", this.onBeforeUnload);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
 
     void this.loadVersion();
     if (this.labCatalogLaunch) {
@@ -217,8 +225,9 @@ export class App {
       this._mountMatchHistory();
     }
     this.applyDevBanner();
+    if (!this.requiresConnectionOnStart()) return;
     try {
-      await this.net.connect();
+      await this.ensureConnected();
       if (this.labHandoffLaunch) await this.prepareLabHandoff();
       if (this.replayLaunch) this.maybeAutoJoinReplay();
       else if (this.labLaunch) this.maybeAutoJoinLab();
@@ -231,6 +240,40 @@ export class App {
         "Unable to connect after several attempts. Refresh to try again.",
       );
     }
+  }
+
+  requiresConnectionOnStart() {
+    return !!(
+      this.snapshotStreamLaunch ||
+      this.stressTestLaunch ||
+      this.devWatch ||
+      this.labCatalogLaunch ||
+      this.labHandoffLaunch ||
+      this.labLaunch ||
+      this.replayLaunch ||
+      this.matchLaunch
+    );
+  }
+
+  async ensureConnected() {
+    if (this.socketOpen) return;
+    if (this.connectionPromise) return this.connectionPromise;
+    this.intentionalIdleDisconnect = false;
+    this.connectionPromise = this.net.connect().finally(() => {
+      this.connectionPromise = null;
+    });
+    return this.connectionPromise;
+  }
+
+  disconnectIdleConnection() {
+    if (!this.socketOpen || this.match || this.lobby?.isJoinedOrJoining()) return;
+    this.intentionalIdleDisconnect = true;
+    this.net.disconnect?.();
+  }
+
+  onVisibilityChange() {
+    if (!document.hidden || this.requiresConnectionOnStart()) return;
+    this.disconnectIdleConnection();
   }
 
   async prepareLabHandoff() {
@@ -462,6 +505,7 @@ export class App {
    */
   onOpen() {
     this.hasConnected = true;
+    this.socketOpen = true;
     this.stopHeartbeat();
     if (!this.net.offline) {
       this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
@@ -472,6 +516,11 @@ export class App {
   /** Socket closed: stop the heartbeat so we don't leak the interval. */
   onClose() {
     this.stopHeartbeat();
+    this.socketOpen = false;
+    if (this.intentionalIdleDisconnect) {
+      this.intentionalIdleDisconnect = false;
+      return;
+    }
     const text = this.hasConnected
       ? "Server connection lost. Refresh when the server is available."
       : "Unable to connect to the server. Make sure it is running, then refresh.";
@@ -818,6 +867,7 @@ export class App {
     if (dom.devLinks) dom.devLinks.hidden = false;
     this.lobby.resetToBrowser();
     this.lobby.show();
+    this.disconnectIdleConnection();
     this.mountLobbySettings();
     // A new match row may have just been written server-side; pull the freshest list.
     if (this.matchHistory) this.matchHistory.refresh();
@@ -939,11 +989,11 @@ export class App {
     });
   }
 
-  joinReplayLobby(room) {
+  async joinReplayLobby(room) {
     if (!this.lobby) return false;
     dom.lobbyScreen.hidden = false;
     this.lobby.show();
-    return this.lobby.joinReplayLobby(room);
+    return await this.lobby.joinReplayLobby(room);
   }
 
   /**

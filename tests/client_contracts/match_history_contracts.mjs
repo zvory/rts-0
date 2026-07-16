@@ -32,6 +32,22 @@ assert(
   "match history winner label falls back for empty rows",
 );
 
+withFakeHudDocument(() => {
+  let refreshes = 0;
+  const host = document.createElement("div");
+  const history = Object.assign(Object.create(MatchHistory.prototype), {
+    host,
+    refresh() {
+      refreshes += 1;
+    },
+  });
+  history._render();
+  const button = host.querySelectorAll("button")[0];
+  assert(button?.textContent === "Refresh", "match history exposes a manual refresh button");
+  button.listeners.click();
+  assert(refreshes === 1, "match history refresh button performs one request");
+});
+
 {
   let joinedRoom = "";
   let renderedRows = 0;
