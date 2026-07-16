@@ -35,7 +35,9 @@ import {
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
-const PING_MS = 900;
+const PING_MS = 1100;
+const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
+const ALERT_PING_INNER_RIM_INSET_PX = 2;
 const BORDER_PULSE_MS = 700;
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const IMPASSABLE_FOG_SCALE = 0.56;
@@ -866,6 +868,13 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.stroke();
+      if (ping.severity !== "warn") {
+        ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(1, radius - ALERT_PING_INNER_RIM_INSET_PX), 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
     if (now < this._borderPulseUntil) {
