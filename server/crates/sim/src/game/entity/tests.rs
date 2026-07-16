@@ -107,38 +107,89 @@ fn weapon_cooldowns_keep_default_attack_cd_shim_isolated() {
 }
 
 #[test]
-fn firing_reveal_response_delay_is_tracked_per_weapon() {
+fn firing_reveal_reaction_gates_are_episode_target_and_weapon_scoped() {
     let mut tank = Entity::new_unit(1, EntityKind::Tank, 10.0, 20.0).expect("tank should spawn");
+    let cannon = crate::rules::combat::WeaponKind::TankCannon;
+    let coax = crate::rules::combat::WeaponKind::TankCoax;
+    tank.set_weapon_cooldown(cannon, 5);
+    let episode = |source_entity, started_at_tick| super::FiringRevealEpisode {
+        viewer: 1,
+        source_entity,
+        started_at_tick,
+    };
 
-    assert!(tank.start_weapon_firing_reveal_response_delay(
-        crate::rules::combat::WeaponKind::TankCannon,
-        42,
-        30
-    ));
     assert!(
-        !tank.start_weapon_firing_reveal_response_delay(
-            crate::rules::combat::WeaponKind::TankCannon,
-            42,
-            30
-        ),
-        "same weapon should not pay the same revealed-target delay twice"
-    );
-    assert!(
-        tank.start_weapon_firing_reveal_response_delay(
-            crate::rules::combat::WeaponKind::TankCoax,
-            42,
-            30
-        ),
-        "a separate weapon must pay its own revealed-target delay"
+        !tank.weapon_firing_reveal_reaction_ready(cannon, 42, episode(42, 7), 10, 30),
+        "a new reveal episode should start a reaction gate"
     );
     assert_eq!(
-        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCannon),
-        30
+        tank.weapon_cooldown(cannon),
+        5,
+        "reaction time must not be mixed into the real weapon reload"
+    );
+
+    tank.set_target_id(Some(42));
+    tank.set_target_id(None);
+    tank.set_target_id(Some(42));
+    assert!(
+        !tank.weapon_firing_reveal_reaction_ready(cannon, 42, episode(42, 7), 44, 30),
+        "transient target clears must retain the original gate deadline"
     );
     assert_eq!(
-        tank.weapon_cooldown(crate::rules::combat::WeaponKind::TankCoax),
-        30
+        tank.combat
+            .as_ref()
+            .and_then(|combat| combat.firing_reveal_reaction_gates.get(&cannon))
+            .and_then(|gates| gates.get(&42))
+            .map(|gate| gate.ready_at_tick),
+        Some(45)
     );
+
+    assert!(
+        !tank.weapon_firing_reveal_reaction_ready(cannon, 43, episode(43, 8), 20, 30),
+        "switching to another target should start that target's own gate"
+    );
+    assert!(
+        tank.weapon_firing_reveal_reaction_ready(cannon, 42, episode(42, 7), 45, 30),
+        "switching back in the same episode must reuse the original deadline"
+    );
+    assert!(
+        !tank.weapon_firing_reveal_reaction_ready(cannon, 42, episode(42, 50), 50, 30),
+        "a later reveal episode should charge a new reaction gate"
+    );
+    assert!(
+        !tank.weapon_firing_reveal_reaction_ready(coax, 42, episode(42, 50), 50, 30),
+        "cannon and coax reaction gates must remain independent"
+    );
+}
+
+#[test]
+fn firing_reveal_reaction_gates_evict_oldest_at_the_runtime_bound() {
+    let mut tank = Entity::new_unit(1, EntityKind::Tank, 10.0, 20.0).expect("tank should spawn");
+    let cannon = crate::rules::combat::WeaponKind::TankCannon;
+    for target in 1..=65 {
+        assert!(!tank.weapon_firing_reveal_reaction_ready(
+            cannon,
+            target,
+            super::FiringRevealEpisode {
+                viewer: 1,
+                source_entity: target,
+                started_at_tick: target,
+            },
+            target,
+            30,
+        ));
+    }
+    let gates = tank
+        .combat
+        .as_ref()
+        .and_then(|combat| combat.firing_reveal_reaction_gates.get(&cannon))
+        .expect("cannon gates should exist");
+    assert_eq!(
+        gates.len(),
+        super::MAX_FIRING_REVEAL_REACTION_GATES_PER_WEAPON
+    );
+    assert!(!gates.contains_key(&1));
+    assert!(gates.contains_key(&65));
 }
 
 #[test]

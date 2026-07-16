@@ -8,7 +8,7 @@ use super::building_memory::{BuildingMemory, BuildingMemoryEntry};
 use super::commands::PendingCommand;
 use super::entity::{Entity, EntityStore};
 use super::firing_reveal::FiringRevealSource;
-use super::fog::{Fog, LingeringSightSource};
+use super::fog::{FiringRevealVisibility, Fog, LingeringSightSource};
 use super::map::Map;
 use super::mortar::MortarShellStore;
 use super::panzerfaust_shot::PanzerfaustShotStore;
@@ -55,7 +55,7 @@ const CHECKPOINT_VERSION: u32 = 1;
 // Construction funding provenance is authoritative state: restoring a scaffold without it can
 // either lose a legitimate refund or mint resources for an authored scaffold. Keep older payloads
 // outside this compatibility boundary instead of silently defaulting the receipt.
-const SIM_SCHEMA_VERSION: u32 = 2;
+const SIM_SCHEMA_VERSION: u32 = 3;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const RNG_ALGORITHM: &str = "rts-small-rng-0.8-draws-v1";
@@ -358,7 +358,19 @@ impl GameCheckpointV1 {
         let player_ids = validate_players(&self.players, self.tick)?;
         let entity_ids = validate_entities(&self.entities, &player_ids, map, self.tick)?;
         validate_player_supply(&self.players, &self.entities)?;
-        validate_fog(&self.fog, &player_ids, map)?;
+        validate_fog(
+            &self.fog,
+            &player_ids,
+            &entity_ids,
+            &self.firing_reveals,
+            map,
+            self.tick,
+        )?;
+        validate_reaction_gates_against_visibility(
+            &self.entities.entities,
+            &entity_ids,
+            &self.fog,
+        )?;
         validate_building_memory(&self.building_memory, &player_ids)?;
         validate_pending_commands(&self.pending_commands, &player_ids)?;
         validate_command_log(&self.command_log, self.tick, &player_ids)?;
@@ -413,6 +425,7 @@ impl EntityStoreV1 {
 struct FogStateV1 {
     size: u32,
     grids: BTreeMap<u32, Vec<bool>>,
+    firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
 }
 
 impl FogStateV1 {
@@ -420,11 +433,12 @@ impl FogStateV1 {
         Self {
             size: fog.checkpoint_size(),
             grids: fog.checkpoint_grids(),
+            firing_reveal_visibility: fog.checkpoint_firing_reveal_visibility(),
         }
     }
 
     fn into_fog(self) -> Fog {
-        Fog::from_checkpoint_grids(self.size, self.grids)
+        Fog::from_checkpoint_grids(self.size, self.grids, self.firing_reveal_visibility)
     }
 }
 

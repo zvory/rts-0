@@ -25,7 +25,7 @@ const OUT: &str = concat!(
 );
 const MAP_NAME: &str = "No Terrain";
 const SCENARIO_NAME: &str = "Supply 300 2v2 Hellhole";
-const BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
+const BUILD_SHA: &str = "bundled-lab-scenario-asset-v2";
 const ROCK_CELL_TILES: u32 = 5;
 const TARGET_ROCK_TILES: usize = 470;
 const UNIT_FOOTPRINT_CLEARANCE_TILES: i32 = 1;

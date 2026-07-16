@@ -8,9 +8,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order};
-use crate::game::firing_reveal::{
-    active_firing_reveal_source, record_firing_reveals_for_victim_team, FiringRevealSource,
-};
+use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
@@ -145,6 +143,12 @@ pub(in crate::game) fn combat_system(
             e.tick_weapon_cooldowns();
             tick_deployed_weapon_setup(e);
             weapons::tick_tank_stationary_range(e);
+            e.retain_firing_reveal_reaction_gates(
+                |target_id, reveal_viewer, episode_started_at_tick| {
+                    fog.active_firing_reveal_episode(reveal_viewer, target_id)
+                        == Some(episode_started_at_tick)
+                },
+            );
         }
     }
     let blockers = ShotBlockerIndex::build(map, entities);
@@ -418,15 +422,22 @@ pub(in crate::game) fn combat_system(
             if !deployed_weapon_ready_to_fire(entities, id) {
                 continue;
             }
-            if active_firing_reveal_source(firing_reveals, owner, tid, tick) {
-                let delay_started = entities.get_mut(id).is_some_and(|e| {
-                    e.start_weapon_firing_reveal_response_delay(
+            let reveal_only_source = if mode == CombatMode::Ordered {
+                fog.team_firing_reveal_only_source(owner, (tx, ty), teams)
+            } else {
+                fog.firing_reveal_only_source_at_world(owner, tx, ty)
+            };
+            if let Some(episode) = reveal_only_source {
+                let reaction_ready = entities.get_mut(id).is_some_and(|e| {
+                    e.weapon_firing_reveal_reaction_ready(
                         weapon_profile.id,
                         tid,
+                        episode,
+                        tick,
                         FIRING_REVEAL_RESPONSE_DELAY_TICKS,
                     )
                 });
-                if delay_started {
+                if !reaction_ready {
                     continue;
                 }
             }

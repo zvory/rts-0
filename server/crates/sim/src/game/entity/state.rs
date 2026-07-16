@@ -5,12 +5,12 @@ use crate::game::upgrade::UpgradeKind;
 use crate::rules::combat::WeaponKind;
 use serde::{Deserialize, Serialize};
 
+use super::reveal_reaction::FiringRevealReactionGate;
 use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
 /// Maximum number of explicit unit or research entries stored on one production building.
 /// Unpaid manual entries need an authority-side cap because resources no longer bound queue size.
 pub(crate) const MAX_PRODUCTION_QUEUE: usize = 8;
-
 /// A queued production order on a building.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProdItem {
@@ -214,8 +214,12 @@ pub struct CombatState {
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
-    /// Per-weapon target id this combatant has already spent its firing-reveal reaction delay on.
-    pub firing_reveal_response_targets: BTreeMap<WeaponKind, u32>,
+    /// Per-weapon, per-target reaction gates for active firing-reveal episodes.
+    ///
+    /// These are deliberately separate from reload cooldowns: ordinary sight can bypass a reveal
+    /// reaction gate without erasing or shortening the weapon's real reload.
+    pub(in crate::game) firing_reveal_reaction_gates:
+        BTreeMap<WeaponKind, BTreeMap<u32, FiringRevealReactionGate>>,
     /// Consecutive no-target ticks while a deployed/setup support weapon is trying to resume an
     /// unfinished attack-move order.
     pub attack_move_no_target_ticks: u16,
@@ -251,7 +255,7 @@ impl Default for CombatState {
             artillery_shots_fired: 0,
             artillery_blanket_shots_fired: 0,
             target_id: None,
-            firing_reveal_response_targets: BTreeMap::new(),
+            firing_reveal_reaction_gates: BTreeMap::new(),
             attack_move_no_target_ticks: 0,
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
@@ -306,30 +310,6 @@ impl CombatState {
             *ticks = ticks.saturating_sub(1);
             *ticks > 0
         });
-    }
-
-    pub(in crate::game) fn start_firing_reveal_response_delay(
-        &mut self,
-        weapon: WeaponKind,
-        target_id: u32,
-        ticks: u32,
-    ) -> bool {
-        if ticks == 0
-            || self
-                .firing_reveal_response_targets
-                .get(&weapon)
-                .is_some_and(|previous_target| *previous_target == target_id)
-        {
-            return false;
-        }
-        self.firing_reveal_response_targets
-            .insert(weapon, target_id);
-        self.set_weapon_cooldown(weapon, self.weapon_cooldown(weapon).saturating_add(ticks));
-        true
-    }
-
-    pub(in crate::game) fn clear_firing_reveal_response_targets(&mut self) {
-        self.firing_reveal_response_targets.clear();
     }
 }
 

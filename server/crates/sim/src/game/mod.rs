@@ -606,9 +606,14 @@ impl Game {
         self.state
             .lingering_sight
             .retain(|source| source.is_active_at(self.state.tick));
-        self.state
-            .firing_reveals
-            .retain(|source| source.is_active_at(self.state.tick));
+        let tick = self.state.tick;
+        let entities = &self.state.entities;
+        self.state.firing_reveals.retain(|source| {
+            source.is_active_at(tick)
+                && entities
+                    .get(source.entity_id())
+                    .is_some_and(|entity| entity.hp > 0)
+        });
         lingering_before != self.state.lingering_sight.len()
             || firing_before != self.state.firing_reveals.len()
     }

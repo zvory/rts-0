@@ -13,6 +13,7 @@ mod armor_reaction;
 mod entity;
 mod kind;
 mod order;
+mod reveal_reaction;
 mod state;
 mod store;
 
@@ -36,6 +37,9 @@ pub use order::{
     DeconstructPhase, GatherExecution, GatherIntent, GatherOrder, GatherPhase, MoveExecution,
     MoveOrder, MovePhase, Order, OrderIntent, PointIntent, RallyIntent, RallyKind, TargetIntent,
     MAX_QUEUED_ORDERS,
+};
+pub(in crate::game) use reveal_reaction::{
+    FiringRevealEpisode, MAX_FIRING_REVEAL_REACTION_GATES_PER_WEAPON,
 };
 #[cfg(test)]
 pub use state::EntityStateGroups;

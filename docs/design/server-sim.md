@@ -263,8 +263,8 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, cooldowns, combat state, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping; dedicated aerial vision is not active. |
-| `fog` | `authoritative/serialized` | Serialize current live visibility grids for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `systems::run_tick` receives `&self.state.fog` for command/combat visibility decisions, snapshots project through current team fog, and Phase 0.5 compares per-player visible tiles as semantic state. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, episode-keyed firing-reveal reaction gates, combat state, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping; dedicated aerial vision is not active. |
+| `fog` | `authoritative/serialized` | Serialize current live visibility grids and the bounded per-viewer firing-reveal provenance map for now. A later phase may reclassify live fog as rebuildable only after proving an exact deterministic rebuild before every command, combat, and snapshot surface. | `recompute_live_fog` atomically records whether each active revealed entity needed its firing reveal before stamping the actionable tile. Combat consumes that canonical provenance; snapshots and commands consume the flattened actionable grid. Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, and snapshot resource rows are all read from `players`. |
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
@@ -275,7 +275,7 @@ architecture failures.
 | `world_combat_active_through_tick` | `authoritative/serialized` | Serialize the last published 15-tick boundary through which the global signal is active. | Keeping published state separate from exact observation prevents new activity inside a quantization bucket from suppressing an already-active signal while preserving boundary-only changes. |
 | `world_combat_position` | `authoritative/serialized` | Serialize the published coarse combat point used while the global signal is active. | The point is snapped to a 32-tile grid and shared identically with all projections for direction-only background audio. |
 | `lingering_sight` | `authoritative/serialized` | Serialize all active death-vision sources and their expiry ticks. | `retain_active_visibility_sources` prunes by `tick`; `recompute_live_fog` stamps these sources into team fog, affecting command legality, combat visibility, and snapshots. |
-| `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight; `recompute_live_fog` stamps sources into viewer fog until expiry. |
+| `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources with stable episode-start and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight. Repeated shots extend one continuous episode without changing its start; `recompute_live_fog` stamps sources into viewer fog until expiry. |
 | `smokes` | `authoritative/serialized` | Serialize the full `SmokeCloudStore`, including next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks. | Smoke blocks authoritative fog, line of sight, combat projection, and delayed smoke scheduling; `tick_inner` retains active smoke and systems may resolve pending smoke. |
 | `trenches` | `authoritative/serialized` | Serialize the full `TrenchStore`, including deterministic trench ids, terrain positions, discovery/memory data, and any store allocator state. | Trenches are persistent neutral terrain outside `EntityStore`; entrenchment services create/discover/update them and snapshots project current plus remembered trench terrain. |
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
@@ -448,7 +448,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 2,
+    "simSchemaVersion": 3,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -529,8 +529,8 @@ Field map for Phase 2 DTO conversion:
 | Runtime field | `GameCheckpointV1` strategy |
 | --- | --- |
 | `map` | Excluded as a body; represented by `mapBinding`. Import writes the exact container-supplied `Map` into `GameState.map` only after binding validation succeeds. |
-| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state (including whether an unfinished scaffold's construction cost was paid), combat cooldowns and targets, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
-| `fog` | `FogStateV1` live visibility grids per player/team. It is serialized for version 1; a later rebuild-only policy needs a proof before changing this row. |
+| `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state (including whether an unfinished scaffold's construction cost was paid), combat cooldowns, targets, bounded reveal-reaction gates, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
+| `fog` | `FogStateV1` live visibility grids plus complete per-viewer firing-reveal provenance. It is serialized for version 1; a later rebuild-only policy needs a proof before changing this row. Import rejects either orphan provenance or an active firing-reveal source missing its provenance row. |
 | `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
 | `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. |
 | `pending` | `pendingCommands` entries with issuer, command DTO, admission/lab context, and original order. Import preserves them so the first post-restore tick drains them exactly once. |
@@ -538,7 +538,7 @@ Field map for Phase 2 DTO conversion:
 | `tick` | Top-level `tick`, serialized exactly. Timers and expiry ticks remain absolute tick values. |
 | `last_world_combat_tick`, `last_world_combat_position`, `world_combat_active_through_tick`, `world_combat_position` | Optional top-level activity tick, pre-publication point, bounded 15-tick publication deadline, and published coarse point. Points must be finite and inside the bound map. |
 | `lingering_sight` | `LingeringSightSourceV1` entries with owner/team visibility, position/radius, and expiry tick. |
-| `firing_reveals` | `FiringRevealSourceV1` entries with revealer, viewer/team policy, position or source facts, and expiry tick. |
+| `firing_reveals` | `FiringRevealSourceV1` entries with revealer, viewer/team policy, stable episode-start tick, position or source facts, and expiry tick. |
 | `smokes` | `SmokeCloudStoreV1` with next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks, and owner/source facts. |
 | `trenches` | `TrenchStoreV1` with deterministic trench ids, geometry, occupation/discovery/memory state, and allocator state. |
 | `ability_runtime` | `AbilityRuntimeV1` with active ability instance ids, cooldown-linked runtime payloads, world objects, projectiles, return/expiry data, owner facts, and any visibility-relevant projection state. |
@@ -1266,11 +1266,18 @@ queued attack targeting, but death-vision-only targets remain ineligible for gen
 auto-acquisition. A consumed direct Panzerfaust attack spends the Rifleman's launcher immediately
 at launch, allowing queued movement to promote while the detached projectile continues travelling.
 
-Combat weapon cooldowns and firing-reveal response delays are keyed by
-`rules::combat::WeaponKind` inside `CombatState`. The legacy `Entity::attack_cd()`,
+Combat weapon cooldowns and firing-reveal reaction gates are independently keyed by
+`rules::combat::WeaponKind` inside `CombatState`. A reaction gate is additionally keyed by target
+and the stable reveal source/episode, so transient target clears and switching back within one
+episode do not restart it. Its absolute readiness deadline includes any reload remaining when the
+gate begins, preserving the prior additive timing without mixing reaction time into reload state.
+Ordinary sight bypasses the gate immediately while leaving the real reload unchanged; explicit
+ordered fire uses the same team-current ordinary-sight scope as its target-legality check, while
+auto-acquisition remains owner-local. Each weapon retains at most 64 active reaction gates and
+deterministically evicts the oldest if that defensive bound is reached. The legacy `Entity::attack_cd()`,
 `set_attack_cd()`, and `tick_attack_cd()` shims operate only on an entity kind's default weapon;
 new multi-weapon code should use `weapon_cooldown`, `set_weapon_cooldown`,
-`tick_weapon_cooldowns`, and `start_weapon_firing_reveal_response_delay`. Ability cooldowns,
+`tick_weapon_cooldowns`, and `weapon_firing_reveal_reaction_ready`. Ability cooldowns,
 lockouts, and uses remain separate from weapon cooldown state. Tanks use this keyed state to keep
 the `tank_cannon` and `tank_coax` reloads independent.
 
@@ -1582,9 +1589,17 @@ sources to live fog for players on the victim's team, not for third-party observ
 the combat event. These sources reveal only the firing unit's current tile, are actionable for
 command validation and combat targeting, and expire at
 `fired_at_tick + firing_cycle_cooldown + TICK_HZ / 2` so the duration tracks the weapon's firing
-cycle plus 0.5 seconds. Combatants that first engage a target through one of these firing-reveal
-sources spend a one-second response delay before their first counter-shot, so firing-reveal
-counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
+cycle plus 0.5 seconds. The fog rebuild records each source's stamped tile and whether that tile was
+already visible before any firing reveals were stamped, keeping source provenance attached to the
+authoritative fog result rather than inferred later from the flattened grid. This tile-level record
+also covers colocated entities and does not follow a source that moves to a different tile during
+the next tick. Combatants that first engage a target
+through reveal-only sight spend a one-second response delay before their first counter-shot, so
+firing-reveal counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
+An active reveal does not delay a combatant that has ordinary sight, and gaining ordinary sight
+bypasses an in-progress reaction gate without changing the weapon's reload. For explicit attacks,
+ordinary allied sight counts because the firing legality and reaction provenance queries share the
+same team-current scope; autonomous target acquisition remains owner-local.
 Lingering death sight is stamped into live fog as ordinary temporary team sight for five seconds.
 The invisible source stays at the dead unit/building's final position, uses that entity's sight
 radius, respects smoke and line-of-sight blockers, and is stamped into every tracked teammate fog

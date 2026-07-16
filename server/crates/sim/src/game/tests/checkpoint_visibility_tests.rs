@@ -15,7 +15,6 @@ use crate::game::firing_reveal;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::{Map, MapMetadata};
 use crate::game::services::occupancy::footprint_center;
-use crate::rules::combat::WeaponKind;
 
 #[test]
 fn visibility_combat_checkpoint_preserves_fog_memory_trenches_and_reveals() {
@@ -553,7 +552,6 @@ fn seed_combat_state(
         tank.set_attack_cd(5);
         tank.set_weapon_facing(0.4);
         tank.set_desired_weapon_facing(0.7);
-        tank.start_weapon_firing_reveal_response_delay(WeaponKind::TankCannon, target, 3);
         tank.lock_tank_armor_reaction_source((640.0, 384.0), reaction_tick);
         let combat = tank.combat.as_mut().expect("tank should have combat");
         combat.attack_move_no_target_ticks = 2;

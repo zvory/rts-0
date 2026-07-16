@@ -1001,12 +1001,8 @@ impl Game {
         systems::recompute_supply(&mut self.state.players, &self.state.entities);
         self.reset_derived_state();
         let ids = self.state.player_ids();
-        self.state.fog.recompute_with_smoke(
-            &ids,
-            &self.state.entities,
-            &self.state.map,
-            &self.state.smokes,
-        );
+        self.retain_active_visibility_sources();
+        self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
         self.refresh_trench_memory(&ids);
         #[cfg(debug_assertions)]

@@ -666,7 +666,15 @@ Anti-Tank Guns that fire from fog create actionable temporary live fog for the r
 the attack event. The revealed gun is projected as a normal non-`visionOnly` snapshot entity and
 can validate direct attack commands or combat target acquisition until the firing reveal expires.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
-0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration.
+0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The one-second counterfire
+reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
+actionable sight;
+ordinary live vision takes precedence and bypasses that reaction gate without changing weapon
+reload timing. Explicit attacks use team-current ordinary sight for both legality and reaction
+bypass, while autonomous acquisition remains owner-local. Repeated shots extend one stable reveal
+episode, so move orders or transient target switches cannot restart the same episode's reaction
+deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
+the firing entity moves before the next fog rebuild.
 Artillery Point Fire creates the same kind of actionable temporary live fog for every enemy player,
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
 as a normal snapshot entity without exposing the target point, surrounding terrain, or pre-impact
