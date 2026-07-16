@@ -709,7 +709,8 @@ mod tests {
     use std::str::FromStr;
 
     use super::{
-        building_blocks_unit_body, location_context, unit_body_rect_overlap_depth,
+        building_blocks_unit_body, location_context, movement_body_class, static_blocker_class,
+        unit_body_rect_overlap_depth, MovementBodyClass, StaticBlockerClass,
         STATIC_BODY_OVERLAP_TOLERANCE_PX,
     };
     use crate::config;
@@ -822,22 +823,30 @@ mod tests {
 
     #[test]
     fn unit_building_invariant_matches_partial_static_blocker_policy() {
-        assert!(!building_blocks_unit_body(
-            EntityKind::Rifleman,
-            EntityKind::TankTrap
-        ));
-        assert!(building_blocks_unit_body(
-            EntityKind::Tank,
-            EntityKind::TankTrap
-        ));
-        assert!(!building_blocks_unit_body(
-            EntityKind::Rifleman,
-            EntityKind::PumpJack
-        ));
-        assert!(building_blocks_unit_body(
-            EntityKind::Rifleman,
-            EntityKind::Depot
-        ));
+        let kind_with_body = |body_class| {
+            EntityKind::ALL
+                .iter()
+                .copied()
+                .find(|kind| kind.is_unit() && movement_body_class(*kind) == body_class)
+                .expect("representative movement body class")
+        };
+        let building_with_blocker = |blocker_class| {
+            EntityKind::ALL
+                .iter()
+                .copied()
+                .find(|kind| kind.is_building() && static_blocker_class(*kind) == blocker_class)
+                .expect("representative static blocker class")
+        };
+        let infantry = kind_with_body(MovementBodyClass::InfantryLike);
+        let vehicle = kind_with_body(MovementBodyClass::VehicleBody);
+        let non_blocker = building_with_blocker(StaticBlockerClass::None);
+        let all_ground_blocker = building_with_blocker(StaticBlockerClass::AllGround);
+        let vehicle_blocker = building_with_blocker(StaticBlockerClass::VehicleBodyOnly);
+
+        assert!(!building_blocks_unit_body(infantry, vehicle_blocker));
+        assert!(building_blocks_unit_body(vehicle, vehicle_blocker));
+        assert!(!building_blocks_unit_body(infantry, non_blocker));
+        assert!(building_blocks_unit_body(infantry, all_ground_blocker));
     }
 
     #[test]
