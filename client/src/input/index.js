@@ -230,6 +230,7 @@ export class Input {
     this._postQuickCastSelectionGuard = null;
     // Current Shift modifier state for hover previews that need queued-command semantics.
     this._shiftKeyDown = false;
+    this._shiftKeysDown = new Set();
     // Last recalled control-group slot for number-key double-tap camera jumps.
     this._lastControlGroupTap = null;
     // Cursor-lock state. While locked, `this.mouse` is a viewport-local virtual
@@ -351,7 +352,9 @@ export class Input {
     return this.clientIntent;
   }
 
-  isShiftHeld() { return this._shiftKeyDown; }
+  isShiftHeld() {
+    return this._shiftKeyDown;
+  }
 
   _commandTarget() {
     return this._intent()?.commandTarget;

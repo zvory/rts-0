@@ -52,7 +52,10 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       }
     });
     if (!capture) time("match.input", () => match.input.update(dt));
-    time("match.minimapIntent", () => match.minimap.updateCommandTargetPreview?.(match.input?.isShiftHeld?.() === true));
+    time(
+      "match.minimapIntent",
+      () => match.minimap.updateCommandTargetPreview?.(match.input?.isShiftHeld?.()),
+    );
     time("match.predictionVisual", () => match.advancePredictionVisual());
     const frameViews = time(
       "match.frameEntityViews",

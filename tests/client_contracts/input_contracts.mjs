@@ -306,6 +306,30 @@ import {
   assert(calls.join(",") === "cursor", "minimap ownership prevents viewport-underlay preview refreshes");
 }
 
+{
+  let releasedShift = 0;
+  const input = Object.create(Input.prototype);
+  input._shiftKeyDown = false;
+  input._shiftKeysDown = new Set();
+  input.clientIntent = {
+    releaseCommandTargetShift() { releasedShift += 1; },
+  };
+  const keyEvent = (code) => ({
+    code,
+    target: null,
+    preventDefault() {},
+  });
+
+  input._handleKeyDown(keyEvent("ShiftLeft"));
+  input._handleKeyDown(keyEvent("ShiftRight"));
+  input._handleKeyUp(keyEvent("ShiftLeft"));
+  assert(input.isShiftHeld(), "releasing one Shift key preserves live Shift state while the other remains held");
+  assert(releasedShift === 0, "partial Shift release does not end Shift-preserved command targeting");
+  input._handleKeyUp(keyEvent("ShiftRight"));
+  assert(!input.isShiftHeld(), "releasing the final Shift key clears live Shift state");
+  assert(releasedShift === 1, "final Shift release updates Shift-preserved command targeting once");
+}
+
 // ---------------------------------------------------------------------------
 // Context-sensitive hover previews
 // ---------------------------------------------------------------------------

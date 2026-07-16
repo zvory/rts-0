@@ -758,6 +758,18 @@ function pointerEvent(canvas, clientX, clientY, {
   leave(pointerEvent(h.canvas, 350, 280, { pointerId: 60, pointerType: "mouse" }));
   assert(h.router.activePreviewSurface() === null, "native leave releases minimap preview-surface ownership");
 
+  down(pointerEvent(h.canvas, 180, 280, { pointerId: 62, pointerType: "mouse" }));
+  leave(pointerEvent(h.canvas, 350, 280, { pointerId: 62, pointerType: "mouse" }));
+  assert(
+    h.router.activePreviewSurface() === "minimap",
+    "native pointer capture keeps minimap preview-surface ownership after a drag leaves the canvas",
+  );
+  up(pointerEvent(h.canvas, 350, 280, { pointerId: 62, pointerType: "mouse" }));
+  assert(
+    h.router.activePreviewSurface() === null,
+    "a native drag released outside the canvas relinquishes minimap preview-surface ownership",
+  );
+
   down(pointerEvent(h.canvas, 180, 280, { pointerId: 61, pointerType: "mouse" }));
   move(pointerEvent(h.canvas, 200, 300, { pointerId: 61, pointerType: "mouse" }));
   up(pointerEvent(h.canvas, 200, 300, { pointerId: 61, pointerType: "mouse" }));

@@ -31,7 +31,9 @@ export class MatchInputRouter {
     if (this.hoverZone === zone) this._setHoverZone(null);
   }
 
-  activePreviewSurface() { return this.captureZone?.previewSurface || this.hoverZone?.previewSurface || null; }
+  activePreviewSurface() {
+    return this.captureZone?.previewSurface || this.hoverZone?.previewSurface || null;
+  }
 
   pointerDown(event) {
     const e = this._normalize(event);
