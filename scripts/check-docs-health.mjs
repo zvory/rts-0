@@ -13,7 +13,11 @@ const fixedPhaseLimitPatterns = [
     "i"
   ),
   new RegExp(
-    `\\b(?:name|plan|include|create)\\s+only\\s+(?:the\\s+next\\s+)?${phaseNumber}(?:\\s+or\\s+${phaseNumber})?\\s+(?:evidence-backed\\s+|executable\\s+|implementation\\s+)?phases?\\b`,
+    `\\b(?:limit|restrict|cap)\\s+(?:[\\w-]+\\s+){0,4}?(?:to|at)\\s+${phaseNumber}\\s+(?:executable\\s+|implementation\\s+)?phases?\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b(?:name|plan|include|create|have)\\s+only\\s+(?:the\\s+next\\s+)?${phaseNumber}(?:\\s+or\\s+${phaseNumber})?\\s+(?:evidence-backed\\s+|executable\\s+|implementation\\s+)?phases?\\b`,
     "i"
   ),
 ];
