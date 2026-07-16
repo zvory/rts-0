@@ -491,7 +491,9 @@ folded into default targeting.
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
   each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
   nearest whole-unit node capacity to the 2.6:1 target).
-- Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
+- Supply: every active player has an intrinsic `200` supply allowance, which is also the hard cap.
+  Buildings do not provide supply: City Centres, Zamoks, and legacy fixture/replay Depots all grant
+  `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
   player's economy only if the resource node is within `MINING_CC_RANGE_TILES = 9.0` tiles of a
@@ -548,9 +550,9 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 450 steel + 150 oil | 3x3  | 750       | trains workers; +50 supply; players start with one free |
-| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +50 supply; trains Golem; no research in first playable slice |
-| depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; +8 supply if present |
+| city_centre                | City Centre        | 600 | 1     | 450 steel + 150 oil | 3x3  | 750       | trains workers; no supply; players start with one free |
+| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
+| depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; Machine Gunner requires completed Training Centre; no building prerequisite |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a City Centre and Barracks |
 | research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |

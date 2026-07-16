@@ -295,7 +295,6 @@ impl Game {
                 steel: initial_steel,
                 oil: initial_oil,
                 supply_used: 0,
-                supply_cap: 0,
                 is_ai: p.is_ai,
                 score: ScoreState::default(),
                 upgrades: Default::default(),

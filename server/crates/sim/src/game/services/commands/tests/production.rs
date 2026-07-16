@@ -219,7 +219,6 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
         players[0].steel,
         players[0].oil,
         players[0].supply_used,
-        players[0].supply_cap,
     );
 
     let events = apply_with_players(
@@ -259,7 +258,6 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
             players[0].steel,
             players[0].oil,
             players[0].supply_used,
-            players[0].supply_cap,
         ),
         resources_before,
         "fixture-faction illegal build/train/research commands must not spend Steel/Oil or reserve Supply"

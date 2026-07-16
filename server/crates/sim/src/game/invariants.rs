@@ -3,7 +3,6 @@
 //! These assertions run in debug builds and tests after every tick. They are intentionally
 //! panic-on-failure so broken assumptions surface immediately during development.
 
-use crate::config;
 use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -90,16 +89,12 @@ impl Game {
         // ------------------------------------------------------------------
         for ps in &self.state.players {
             let catalog = rules::faction::catalog_for(&ps.faction_id);
-            let mut expected_cap = 0u32;
             let mut expected_used = 0u32;
             for e in self.state.entities.iter() {
                 if e.owner != ps.id {
                     continue;
                 }
                 if e.is_building() && !e.under_construction() {
-                    if catalog.is_some_and(|catalog| catalog.allows_building(e.kind)) {
-                        expected_cap += rules::economy::supply_provided(e.kind);
-                    }
                     for item in e.prod_queue().iter().filter(|item| item.paid) {
                         if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
                             expected_used += rules::economy::supply_cost(item.unit);
@@ -110,12 +105,6 @@ impl Game {
                     expected_used += rules::economy::supply_cost(e.kind);
                 }
             }
-            expected_cap = expected_cap.min(config::SUPPLY_CAP_MAX);
-            assert_eq!(
-                ps.supply_cap, expected_cap,
-                "invariant: player {} supply_cap {} != expected {}",
-                ps.id, ps.supply_cap, expected_cap
-            );
             assert_eq!(
                 ps.supply_used, expected_used,
                 "invariant: player {} supply_used {} != expected {}",

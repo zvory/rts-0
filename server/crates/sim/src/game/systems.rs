@@ -459,7 +459,6 @@ mod tests {
             steel: 1_000,
             oil: 1_000,
             supply_used: 0,
-            supply_cap: 20,
             is_ai: false,
             score: crate::game::ScoreState::default(),
             upgrades: Default::default(),
