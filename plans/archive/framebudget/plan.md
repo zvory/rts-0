@@ -53,9 +53,10 @@ Before creating replacement implementation phases:
    alone.
 4. Profile `supply-300-active` as well when a conclusion depends on prediction, active-player fog,
    or production-cap safety.
-5. Create a fresh `plans/framebudget/` with no more than three executable phases before the next
-   measured checkpoint. Order work by current function-level evidence, architectural dependency,
-   and reversibility rather than by the retired phase numbers.
+5. Create a fresh `plans/framebudget/` whose phase count follows the current evidence and coherent
+   implementation boundaries. Add a measured checkpoint where it reduces uncertainty, and order
+   work by current function-level evidence, architectural dependency, and reversibility rather than
+   by the retired phase numbers.
 
 ## Preserved Constraints
 
