@@ -18,15 +18,14 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
     renderer._recordRenderDiagnostic?.(`renderer.frameStrip.instance.rebuilt.${options.poolName}`);
   }
   if (!instance) {
-    const pixiFactory = renderer._rigPixiFactory ?? createDefaultFrameStripPixiFactory();
     instance = new FrameStripUnitInstance(
       entity.kind,
       strip,
       texture,
-      pixiFactory,
-      sharedFrameTextures(renderer, strip, texture, pixiFactory),
+      renderer._rigPixiFactory ?? createDefaultFrameStripPixiFactory()
     );
     renderer._recordRenderDiagnostic?.(`renderer.frameStrip.instance.created.${options.poolName}`);
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.frameStripContainer");
     renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.frameStripSprite");
   } else {
     renderer._recordRenderDiagnostic?.(`renderer.frameStrip.instance.reused.${options.poolName}`);
@@ -128,6 +127,7 @@ export function frameStripWorldScale(strip, entity, renderContext = null) {
 
 function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
   return {
+    createContainer: () => new pixi.Container(),
     createRectangle: (x, y, width, height) => new pixi.Rectangle(x, y, width, height),
     createTexture: (baseTexture, rectangle) => new pixi.Texture(baseTexture, rectangle),
     createSprite: (spriteTexture) => new pixi.Sprite(spriteTexture),
@@ -135,20 +135,29 @@ function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
 }
 
 class FrameStripUnitInstance {
-  constructor(kind, strip, texture, pixiFactory, frameTextures) {
+  constructor(kind, strip, texture, pixiFactory) {
     this.kind = kind;
     this.strip = strip;
     this.texture = texture;
-    this.frameTextures = frameTextures;
+    this._pixiFactory = pixiFactory;
+    this.container = pixiFactory.createContainer();
+    this.frameTextures = [];
     this._frameIndex = -1;
     this._destroyed = false;
 
+    const frameWidth = Math.max(1, finite(strip.frameWidth, 1));
+    const frameHeight = Math.max(1, finite(strip.frameHeight, 1));
+    const frameCount = Math.max(1, Math.trunc(finite(strip.frameCount, 1)));
+    const baseTexture = texture.baseTexture ?? texture;
+    for (let i = 0; i < frameCount; i += 1) {
+      const rectangle = pixiFactory.createRectangle(i * frameWidth, 0, frameWidth, frameHeight);
+      this.frameTextures.push(pixiFactory.createTexture(baseTexture, rectangle));
+    }
+
     this.sprite = pixiFactory.createSprite(this.frameTextures[0]);
-    // Frame-strip bodies have no local offset from their per-unit containers.
-    // Make the Sprite the pooled display object directly so Pixi traverses one
-    // object per body while preserving its exact position in the units layer.
-    this.container = this.sprite;
     this.sprite.anchor?.set?.(0.5, 0.5);
+    this.sprite.position?.set?.(0, 0);
+    this.container.addChild(this.sprite);
   }
 
   matchesFrameStripUnit(kind, strip, texture) {
@@ -161,6 +170,7 @@ class FrameStripUnitInstance {
     this.container.alpha = renderContext.shotRevealAlpha ?? options.alpha ?? 1;
     setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
     const occupiedScale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
+    setPoint(this.container.scale, occupiedScale, occupiedScale);
     this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext);
 
     const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext);
@@ -170,8 +180,8 @@ class FrameStripUnitInstance {
     }
 
     const worldScale = frameStripWorldScale(this.strip, entity, renderContext);
-    const displayScale = occupiedScale * worldScale;
-    setPoint(this.sprite.scale, displayScale, displayScale);
+    setPoint(this.sprite.scale, worldScale, worldScale);
+    this.sprite.alpha = 1;
     this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
     options.diagnostics?.("renderer.frameStrip.redraw.completed");
@@ -182,45 +192,10 @@ class FrameStripUnitInstance {
     this._destroyed = true;
     this.container.parent?.removeChild?.(this.container);
     this.sprite?.destroy?.({ texture: false, baseTexture: false });
+    for (const texture of this.frameTextures) texture?.destroy?.(false);
     this.frameTextures = [];
+    this.container.destroy?.({ children: true });
   }
-}
-
-function sharedFrameTextures(renderer, strip, texture, pixiFactory) {
-  const cache = renderer._frameStripTextureSets ??= new Map();
-  let stripTextures = cache.get(strip);
-  if (!stripTextures) {
-    stripTextures = new Map();
-    cache.set(strip, stripTextures);
-  }
-
-  let entry = stripTextures.get(texture);
-  if (!entry) {
-    const frames = [];
-    const frameWidth = Math.max(1, finite(strip.frameWidth, 1));
-    const frameHeight = Math.max(1, finite(strip.frameHeight, 1));
-    const frameCount = Math.max(1, Math.trunc(finite(strip.frameCount, 1)));
-    const baseTexture = texture.baseTexture ?? texture;
-    for (let i = 0; i < frameCount; i += 1) {
-      const rectangle = pixiFactory.createRectangle(i * frameWidth, 0, frameWidth, frameHeight);
-      frames.push(pixiFactory.createTexture(baseTexture, rectangle));
-    }
-    entry = frames;
-    stripTextures.set(texture, entry);
-  }
-  return entry;
-}
-
-export function destroySharedFrameTextures(renderer) {
-  const cache = renderer?._frameStripTextureSets;
-  if (!cache) return;
-  for (const stripTextures of cache.values()) {
-    for (const frameTextures of stripTextures.values()) {
-      for (const frameTexture of frameTextures) frameTexture?.destroy?.(false);
-    }
-    stripTextures.clear();
-  }
-  cache.clear();
 }
 
 function tintForSlot(slot, context) {

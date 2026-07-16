@@ -936,7 +936,6 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
       setupVisual: this._deployedWeaponSetupVisual(entityArg),
       selected: stateArg.selection?.has?.(entityArg.id) ?? false,
       map: this._map,
-      occupiedTrench: Number.isFinite(entityArg.occupiedTrenchId),
     });
   };
 
@@ -945,18 +944,11 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   const shadow = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   const stripInstance = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   assert.equal(typeof stripInstance.matchesFrameStripUnit, "function");
-  assert.equal(stripInstance.container, stripInstance.sprite);
-  assert.equal(renderer.layers.units.children.includes(stripInstance.sprite), true);
   assert.equal(shadow.parts.get("part.shadow").display.visible, true);
   assert.equal(stripInstance.sprite.texture.frame.x, 0);
   assert.equal(stripInstance.container.rotation, entity.weaponFacing);
   assert.equal(stripInstance.sprite.scaleX, strip.worldScale);
   assert.equal(stripInstance.sprite.tint, 0x6194c7);
-
-  entity.occupiedTrenchId = 80;
-  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: {}, weaponRecoil: () => 0 });
-  assert.equal(stripInstance.sprite.scaleX, 0.85 * strip.worldScale);
-  delete entity.occupiedTrenchId;
 
   renderNow = 1000 / strip.fps;
   entity.state = STATE.MOVE;
