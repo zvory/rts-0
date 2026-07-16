@@ -102,10 +102,35 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 const PLAYER_INACTIVITY_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 fn is_player_activity(message: &ClientMessage) -> bool {
-    !matches!(
-        message,
-        ClientMessage::Ping { .. } | ClientMessage::NetReport { .. }
-    )
+    match message {
+        ClientMessage::Ping { .. } | ClientMessage::NetReport { .. } => false,
+        ClientMessage::Join { .. }
+        | ClientMessage::Ready { .. }
+        | ClientMessage::Start
+        | ClientMessage::SetTeamPreset { .. }
+        | ClientMessage::SetTeam { .. }
+        | ClientMessage::SetFaction { .. }
+        | ClientMessage::AddAi { .. }
+        | ClientMessage::SetAiProfile { .. }
+        | ClientMessage::RemoveAi { .. }
+        | ClientMessage::SetSpectator { .. }
+        | ClientMessage::Command { .. }
+        | ClientMessage::GiveUp
+        | ClientMessage::PauseGame
+        | ClientMessage::UnpauseGame
+        | ClientMessage::ReturnToLobby
+        | ClientMessage::SetRoomTimeSpeed { .. }
+        | ClientMessage::StepRoomTime
+        | ClientMessage::SeekRoomTime { .. }
+        | ClientMessage::SeekRoomTimeTo { .. }
+        | ClientMessage::SetVisionSelection { .. }
+        | ClientMessage::Lab { .. }
+        | ClientMessage::RequestBranchFromTick
+        | ClientMessage::ClaimBranchSeat { .. }
+        | ClientMessage::ReleaseBranchSeat { .. }
+        | ClientMessage::StartBranch
+        | ClientMessage::SelectMap { .. } => true,
+    }
 }
 
 /// On deploy shutdown, keep the process alive long enough for in-progress matches to finish.
