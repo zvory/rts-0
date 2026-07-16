@@ -21,6 +21,12 @@ pub(super) fn human_vs_ai_players() -> [PlayerInit; 2] {
     ]
 }
 
+pub(super) fn advance_to_fog_refresh(game: &mut Game) {
+    while !game.tick_count().is_multiple_of(FOG_UPDATE_INTERVAL_TICKS) {
+        game.tick();
+    }
+}
+
 pub(super) fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -> Vec<EntityView> {
     let mut entities = Vec::new();
     for id in game.final_spatial().all_ids() {

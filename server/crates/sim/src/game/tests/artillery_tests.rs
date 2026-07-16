@@ -120,6 +120,7 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
         },
     );
     game.tick();
+    advance_to_fog_refresh(&mut game);
 
     for viewer in [2, 3] {
         let view = game

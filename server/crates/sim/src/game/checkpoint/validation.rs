@@ -239,7 +239,7 @@ fn validate_tank_armor_reaction_lock(
 pub(super) fn validate_fog(
     fog: &FogStateV1,
     player_ids: &BTreeSet<u32>,
-    entity_ids: &BTreeSet<u32>,
+    entity_next_id: u32,
     firing_reveals: &[FiringRevealSource],
     map: &Map,
     tick: u32,
@@ -261,7 +261,7 @@ pub(super) fn validate_fog(
             return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
         }
     }
-    validate_firing_reveal_visibility(fog, player_ids, entity_ids, firing_reveals, tick)?;
+    validate_firing_reveal_visibility(fog, player_ids, entity_next_id, firing_reveals, tick)?;
     Ok(())
 }
 

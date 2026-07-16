@@ -1,7 +1,8 @@
 //! Per-player fog of war. See `docs/design/server-sim.md` (`fog.rs`).
 //!
-//! The server is authoritative about visibility: each tick we recompute, for every player, a
-//! boolean grid of which tiles that player can currently see. A tile is visible if it falls
+//! The server is authoritative about visibility: at 15 Hz we recompute, for every player, a
+//! boolean grid of which tiles that player can see in the latest visibility sample. A tile is
+//! visible if it falls
 //! within the sight area of any of that player's entities (`sight_tiles`) and the line from
 //! the entity to that tile is not blocked by stone, smoke, or sight-blocking building footprints.
 //! Units stamp a circle from their body center; buildings stamp their full footprint plus
@@ -14,7 +15,7 @@
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
-//! the per-tick visible set.
+//! the sampled visible set.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -69,12 +70,11 @@ impl LingeringSightSource {
     }
 }
 
-/// Visible-tile grids, one per player. Recomputed every tick from scratch (cheap at our map
-/// sizes) so it always reflects current entity positions and never leaks stale visibility.
+/// Visible-tile grids, one per player. Recomputed from scratch at 15 Hz and held between samples.
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Fog {
     size: u32,
-    /// player id -> row-major visibility grid (`true` = visible this tick).
+    /// player id -> row-major visibility grid (`true` = visible in the latest sample).
     grids: HashMap<u32, Vec<bool>>,
     /// Active firing-reveal provenance, rebuilt atomically with `grids`.
     ///

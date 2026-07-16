@@ -462,6 +462,7 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     while game.tick_count() <= config::TICK_HZ * 5 {
         game.tick();
     }
+    advance_to_fog_refresh(&mut game);
     let expired_snapshot = game.snapshot_for(1);
     assert!(
         expired_snapshot.entities.iter().all(|e| e.id != enemy),
@@ -590,6 +591,7 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         .expect("spotter should exist")
         .hp = 0;
     game.tick();
+    advance_to_fog_refresh(&mut game);
 
     let allied_linger = game
         .snapshot_for(1)

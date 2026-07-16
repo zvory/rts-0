@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::tests::fixtures::{empty_flat_game, human_vs_ai_players};
+use crate::game::tests::fixtures::{advance_to_fog_refresh, empty_flat_game, human_vs_ai_players};
 use crate::protocol::DEFAULT_FACTION_ID;
 
 mod visibility_reaction;
@@ -168,6 +168,7 @@ fn anti_tank_gun_firing_from_fog_projects_as_actionable_snapshot_entity() {
     let (mut game, enemy_at, tank) = hidden_enemy_at_gun_fixture();
 
     let events = game.tick();
+    advance_to_fog_refresh(&mut game);
 
     assert!(
         events.iter().any(|(player, events)| {
@@ -223,6 +224,7 @@ fn tank_firing_from_fog_projects_as_actionable_snapshot_entity() {
     let (mut game, enemy_tank, tank) = hidden_enemy_tank_fixture();
 
     let events = game.tick();
+    advance_to_fog_refresh(&mut game);
 
     assert!(
         events.iter().any(|(player, events)| {
@@ -318,6 +320,7 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
     );
 
     game.tick();
+    advance_to_fog_refresh(&mut game);
 
     assert!(
         game.snapshot_for(3)
@@ -362,6 +365,7 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
     let (mut game, enemy_at, counter_at) = hidden_enemy_at_gun_with_counter_fixture();
 
     game.tick();
+    advance_to_fog_refresh(&mut game);
     let hp_after_reveal = game
         .state
         .entities

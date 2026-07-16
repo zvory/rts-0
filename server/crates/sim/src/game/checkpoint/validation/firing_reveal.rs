@@ -42,7 +42,7 @@ pub(super) fn validate_firing_reveal_reaction_gates(
 pub(super) fn validate_firing_reveal_visibility(
     fog: &FogStateV1,
     player_ids: &BTreeSet<u32>,
-    entity_ids: &BTreeSet<u32>,
+    entity_next_id: u32,
     firing_reveals: &[FiringRevealSource],
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
@@ -66,39 +66,17 @@ pub(super) fn validate_firing_reveal_visibility(
             });
         }
         for (&entity_id, visibility) in by_entity {
-            if !entity_ids.contains(&entity_id) {
-                return Err(CheckpointPayloadError::InvalidReference {
-                    field: "fog.firingRevealVisibility",
-                    id: entity_id,
-                });
-            }
-            if visibility.episode_started_at_tick > tick
+            if entity_id == 0
+                || entity_id >= entity_next_id
+                || visibility.episode_started_at_tick > tick
                 || visibility
                     .revealed_tile
                     .is_some_and(|tile| tile >= fog.size.saturating_mul(fog.size))
-                || !source_episodes.contains(&(
-                    viewer,
-                    entity_id,
-                    visibility.episode_started_at_tick,
-                ))
             {
                 return Err(CheckpointPayloadError::InvalidValue {
                     field: "fog.firingRevealVisibility",
                 });
             }
-        }
-    }
-    for (viewer, entity_id, episode_started_at_tick) in source_episodes {
-        if fog
-            .firing_reveal_visibility
-            .get(&viewer)
-            .and_then(|by_entity| by_entity.get(&entity_id))
-            .map(|visibility| visibility.episode_started_at_tick)
-            != Some(episode_started_at_tick)
-        {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "fog.firingRevealVisibility",
-            });
         }
     }
     Ok(())
