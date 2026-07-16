@@ -10,22 +10,30 @@ use super::teams::TeamRelations;
 /// Temporary actionable sight granted to a recipient when a hostile unit exposes itself by firing.
 ///
 /// Like lingering death sight, this is stamped into live fog so command validation, combat
-/// targeting, and snapshot projection all treat the revealed unit as currently visible.
+/// targeting, and snapshot projection all treat the revealed unit as currently visible. The
+/// stable start tick identifies one continuous episode even when later shots extend its expiry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(in crate::game) struct FiringRevealSource {
     viewer: u32,
     entity_id: u32,
+    started_at_tick: u32,
     expires_at_tick: u32,
 }
 
 impl FiringRevealSource {
-    fn new(viewer: u32, entity_id: u32, expires_at_tick: u32) -> Option<Self> {
+    fn new(
+        viewer: u32,
+        entity_id: u32,
+        started_at_tick: u32,
+        expires_at_tick: u32,
+    ) -> Option<Self> {
         if viewer == 0 || entity_id == 0 {
             return None;
         }
         Some(Self {
             viewer,
             entity_id,
+            started_at_tick,
             expires_at_tick,
         })
     }
@@ -42,19 +50,35 @@ impl FiringRevealSource {
         self.entity_id
     }
 
+    pub(in crate::game) fn started_at_tick(self) -> u32 {
+        self.started_at_tick
+    }
+
     fn expires_at_tick(self) -> u32 {
         self.expires_at_tick
     }
 
-    fn upsert(sources: &mut Vec<Self>, viewer: u32, entity_id: u32, expires_at_tick: u32) {
-        let Some(source) = Self::new(viewer, entity_id, expires_at_tick) else {
+    fn upsert(
+        sources: &mut Vec<Self>,
+        viewer: u32,
+        entity_id: u32,
+        started_at_tick: u32,
+        expires_at_tick: u32,
+    ) {
+        let Some(source) = Self::new(viewer, entity_id, started_at_tick, expires_at_tick) else {
             return;
         };
         match sources.iter_mut().find(|existing| {
             existing.viewer() == source.viewer() && existing.entity_id() == source.entity_id()
         }) {
-            Some(existing) if source.expires_at_tick() > existing.expires_at_tick() => {
+            Some(existing) if !existing.is_active_at(started_at_tick) => {
                 *existing = source;
+            }
+            Some(existing) if source.expires_at_tick() > existing.expires_at_tick() => {
+                // Repeated shots extend one continuous reveal episode. Keeping the original
+                // start tick prevents target switching or move spam from charging a fresh
+                // reaction delay for every extension.
+                existing.expires_at_tick = source.expires_at_tick();
             }
             Some(_) => {}
             None => sources.push(source),
@@ -82,12 +106,21 @@ pub(in crate::game) fn record_firing_reveals_for_victim_team(
         .saturating_add(firing_cycle_ticks)
         .saturating_add(config::TICK_HZ / 2);
     for viewer in player_ids {
-        if !teams.same_team_or_same_owner(viewer, victim_owner)
-            || fog.is_visible_world(viewer, attacker_pos.0, attacker_pos.1)
-        {
+        if !teams.same_team_or_same_owner(viewer, victim_owner) {
             continue;
         }
-        FiringRevealSource::upsert(firing_reveals, viewer, entity_id, expires_at_tick);
+        let already_visible_without_reveal =
+            fog.is_visible_without_firing_reveal_world(viewer, attacker_pos.0, attacker_pos.1);
+        if already_visible_without_reveal {
+            continue;
+        }
+        FiringRevealSource::upsert(
+            firing_reveals,
+            viewer,
+            entity_id,
+            fired_at_tick,
+            expires_at_tick,
+        );
     }
 }
 
@@ -137,7 +170,13 @@ pub(in crate::game) fn record_global_firing_reveals_for_enemy_players(
         .saturating_add(config::TICK_HZ / 2);
     for &viewer in player_ids {
         if teams.is_enemy_owner(attacker_owner, viewer) {
-            FiringRevealSource::upsert(firing_reveals, viewer, entity_id, expires_at_tick);
+            FiringRevealSource::upsert(
+                firing_reveals,
+                viewer,
+                entity_id,
+                fired_at_tick,
+                expires_at_tick,
+            );
         }
     }
 }
@@ -171,15 +210,4 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
         tick,
         firing_cycle_ticks,
     );
-}
-
-pub(in crate::game) fn active_firing_reveal_source(
-    firing_reveals: &[FiringRevealSource],
-    viewer: u32,
-    entity_id: u32,
-    tick: u32,
-) -> bool {
-    firing_reveals.iter().any(|source| {
-        source.viewer() == viewer && source.entity_id() == entity_id && source.is_active_at(tick)
-    })
 }

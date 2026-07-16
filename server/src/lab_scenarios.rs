@@ -22,7 +22,7 @@ use crate::protocol::{
 const LAB_SCENARIO_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/lab-scenarios");
 const LAB_SCENARIO_MANIFEST: &str = "manifest.json";
 const LAB_CHECKPOINT_SCENARIO_KIND: &str = "labCheckpointScenario";
-const LAB_CHECKPOINT_ASSET_BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
+const LAB_CHECKPOINT_ASSET_BUILD_SHA: &str = "bundled-lab-scenario-asset-v2";
 const MAX_SCENARIO_ID_LEN: usize = 48;
 const MAX_SCENARIO_FILENAME_LEN: usize = 80;
 const MAX_SCENARIO_TITLE_LEN: usize = 96;

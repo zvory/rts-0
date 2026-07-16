@@ -284,7 +284,6 @@ impl Game {
         // Live fog last, from the post-systems world state. Lingering death vision is stamped as
         // ordinary temporary sight so snapshots, commands, and combat all consume one visibility
         // model.
-        self.retain_active_visibility_sources();
         crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
             self.recompute_live_fog(&player_ids);
         });
@@ -571,6 +570,7 @@ impl Game {
     }
 
     fn recompute_live_fog(&mut self, player_ids: &[u32]) {
+        self.retain_active_visibility_sources();
         self.state.fog.recompute_with_smoke(
             player_ids,
             &self.state.entities,
@@ -598,6 +598,29 @@ impl Game {
             &self.state.entities,
             &self.state.smokes,
         );
+        self.retain_active_firing_reveal_reaction_gates();
+    }
+
+    fn retain_active_firing_reveal_reaction_gates(&mut self) {
+        let live_entity_ids = self
+            .state
+            .entities
+            .ids()
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        let fog = &self.state.fog;
+        for entity_id in self.state.entities.ids() {
+            let Some(entity) = self.state.entities.get_mut(entity_id) else {
+                continue;
+            };
+            entity.retain_firing_reveal_reaction_gates(
+                |target_id, source_entity, viewer, episode_started_at_tick| {
+                    live_entity_ids.contains(&target_id)
+                        && fog.active_firing_reveal_episode(viewer, source_entity)
+                            == Some(episode_started_at_tick)
+                },
+            );
+        }
     }
 
     fn retain_active_visibility_sources(&mut self) -> bool {
@@ -606,9 +629,14 @@ impl Game {
         self.state
             .lingering_sight
             .retain(|source| source.is_active_at(self.state.tick));
-        self.state
-            .firing_reveals
-            .retain(|source| source.is_active_at(self.state.tick));
+        let tick = self.state.tick;
+        let entities = &self.state.entities;
+        self.state.firing_reveals.retain(|source| {
+            source.is_active_at(tick)
+                && entities
+                    .get(source.entity_id())
+                    .is_some_and(|entity| entity.hp > 0)
+        });
         lingering_before != self.state.lingering_sight.len()
             || firing_before != self.state.firing_reveals.len()
     }

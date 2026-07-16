@@ -64,8 +64,11 @@ fn ability_objects_are_projected_only_when_position_is_visible() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
     let p1_visible = first_tile_matching(&game, |x, y| game.state.fog.is_visible_world(1, x, y));
-    let hidden_from_p1 = first_tile_matching(&game, |x, y| !game.state.fog.is_visible_world(1, x, y));
-    let caster = game.state.entities
+    let hidden_from_p1 =
+        first_tile_matching(&game, |x, y| !game.state.fog.is_visible_world(1, x, y));
+    let caster = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Ekat, p1_visible.0, p1_visible.1)
         .expect("caster should spawn");
     let visible_object = game
@@ -107,7 +110,9 @@ fn enemy_ability_object_projection_does_not_leak_owner_only_fields() {
     let p2_visible_p1_hidden = first_tile_matching(&game, |x, y| {
         game.state.fog.is_visible_world(2, x, y) && !game.state.fog.is_visible_world(1, x, y)
     });
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .spawn_unit(
             2,
             EntityKind::Ekat,
@@ -148,7 +153,9 @@ fn spectator_and_full_snapshots_project_ability_objects() {
     let hidden_from_all = first_tile_matching(&game, |x, y| {
         !game.state.fog.is_visible_world(1, x, y) && !game.state.fog.is_visible_world(2, x, y)
     });
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Ekat, p1_visible.0, p1_visible.1)
         .expect("caster should spawn");
     let visible_id = game
@@ -189,12 +196,16 @@ fn spectator_and_full_snapshots_project_ability_objects() {
 fn owner_entity_abilities_project_active_return_affordance() {
     let players = ekat_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
         .map(|entity| entity.id)
         .expect("Ekat loadout should spawn a caster");
-    let (x, y) = game.state.entities
+    let (x, y) = game
+        .state
+        .entities
         .get(caster)
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("caster should exist");
@@ -229,12 +240,16 @@ fn owner_entity_abilities_project_active_return_affordance() {
 fn recast_return_execution_accepts_active_marker() {
     let players = ekat_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
         .map(|entity| entity.id)
         .expect("Ekat loadout should spawn a caster");
-    let (x, y) = game.state.entities
+    let (x, y) = game
+        .state
+        .entities
         .get(caster)
         .map(|entity| (entity.pos_x + 96.0, entity.pos_y))
         .expect("caster should exist");
@@ -261,12 +276,16 @@ fn recast_return_execution_accepts_active_marker() {
 fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
     let players = ekat_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
-    let caster = game.state.entities
+    let caster = game
+        .state
+        .entities
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
         .map(|entity| entity.id)
         .expect("Ekat loadout should spawn a caster");
-    let (x, y) = game.state.entities
+    let (x, y) = game
+        .state
+        .entities
         .get(caster)
         .map(|entity| (entity.pos_x + 96.0, entity.pos_y))
         .expect("caster should exist");

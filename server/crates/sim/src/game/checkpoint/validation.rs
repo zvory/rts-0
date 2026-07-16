@@ -16,6 +16,10 @@ use super::{
     MAX_COMPLETED_UPGRADES_PER_PLAYER, MAX_UNITS_PER_CHECKPOINT_COMMAND,
 };
 
+mod firing_reveal;
+pub(super) use firing_reveal::validate_reaction_gates_against_visibility;
+use firing_reveal::{validate_firing_reveal_reaction_gates, validate_firing_reveal_visibility};
+
 const MAX_RESOURCE_INCOME_HISTORY_PER_PLAYER: usize = (config::TICK_HZ as usize * 60) + 1;
 
 pub(super) fn validate_supplied_map(map: &Map) -> Result<(), CheckpointPayloadError> {
@@ -197,6 +201,7 @@ fn validate_entity(
         MAX_PRODUCTION_QUEUE,
     )?;
     validate_tank_armor_reaction_lock(entity, world, tick)?;
+    validate_firing_reveal_reaction_gates(entity, next_id, tick)?;
     Ok(())
 }
 
@@ -234,7 +239,10 @@ fn validate_tank_armor_reaction_lock(
 pub(super) fn validate_fog(
     fog: &FogStateV1,
     player_ids: &BTreeSet<u32>,
+    entity_ids: &BTreeSet<u32>,
+    firing_reveals: &[FiringRevealSource],
     map: &Map,
+    tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
     if fog.size != map.size {
         return Err(CheckpointPayloadError::InvalidValue { field: "fog.size" });
@@ -253,6 +261,7 @@ pub(super) fn validate_fog(
             return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
         }
     }
+    validate_firing_reveal_visibility(fog, player_ids, entity_ids, firing_reveals, tick)?;
     Ok(())
 }
 
@@ -355,9 +364,9 @@ pub(super) fn validate_active_sources(
                 id: source.entity_id(),
             });
         }
-        if !source.is_active_at(tick) {
+        if source.started_at_tick() > tick || !source.is_active_at(tick) {
             return Err(CheckpointPayloadError::InvalidValue {
-                field: "firingReveals.expiresAtTick",
+                field: "firingReveals.startedAtTick",
             });
         }
     }

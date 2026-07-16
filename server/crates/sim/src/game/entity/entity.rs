@@ -745,9 +745,6 @@ impl Entity {
 
     pub fn set_target_id(&mut self, target_id: Option<u32>) {
         if let Some(c) = self.combat.as_mut() {
-            if c.target_id != target_id {
-                c.clear_firing_reveal_response_targets();
-            }
             c.target_id = target_id;
             if target_id.is_some() {
                 c.attack_move_no_target_ticks = 0;
@@ -755,23 +752,27 @@ impl Entity {
         }
     }
 
-    pub fn start_firing_reveal_response_delay(&mut self, target_id: u32, ticks: u32) -> bool {
-        let Some(weapon) = self.default_weapon_kind() else {
-            return false;
-        };
-        self.start_weapon_firing_reveal_response_delay(weapon, target_id, ticks)
-    }
-
-    pub(in crate::game) fn start_weapon_firing_reveal_response_delay(
+    pub(in crate::game) fn weapon_firing_reveal_reaction_ready(
         &mut self,
         weapon: rules::combat::WeaponKind,
         target_id: u32,
+        episode: super::FiringRevealEpisode,
+        tick: u32,
         ticks: u32,
     ) -> bool {
         let Some(c) = self.combat.as_mut() else {
             return false;
         };
-        c.start_firing_reveal_response_delay(weapon, target_id, ticks)
+        c.firing_reveal_reaction_ready(weapon, target_id, episode, tick, ticks)
+    }
+
+    pub(in crate::game) fn retain_firing_reveal_reaction_gates(
+        &mut self,
+        gate_is_active: impl FnMut(u32, u32, u32, u32) -> bool,
+    ) {
+        if let Some(combat) = self.combat.as_mut() {
+            combat.retain_firing_reveal_reaction_gates(gate_is_active);
+        }
     }
 
     pub fn reset_attack_move_no_target_ticks(&mut self) {

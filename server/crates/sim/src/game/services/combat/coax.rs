@@ -4,9 +4,7 @@ use rand::Rng;
 
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
-use crate::game::firing_reveal::{
-    active_firing_reveal_source, record_firing_reveals_for_victim_team, FiringRevealSource,
-};
+use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
@@ -74,15 +72,21 @@ pub(super) fn fire_tank_coax_system(
         ) else {
             continue;
         };
-        if active_firing_reveal_source(firing_reveals, snapshot.owner, tid, tick) {
-            let delay_started = entities.get_mut(id).is_some_and(|e| {
-                e.start_weapon_firing_reveal_response_delay(
+        let (tx, ty) = match entities.get(tid) {
+            Some(target) => (target.pos_x, target.pos_y),
+            None => continue,
+        };
+        if let Some(episode) = fog.firing_reveal_only_source_at_world(snapshot.owner, tx, ty) {
+            let reaction_ready = entities.get_mut(id).is_some_and(|e| {
+                e.weapon_firing_reveal_reaction_ready(
                     weapon_profile.id,
                     tid,
+                    episode,
+                    tick,
                     FIRING_REVEAL_RESPONSE_DELAY_TICKS,
                 )
             });
-            if delay_started {
+            if !reaction_ready {
                 continue;
             }
         }
@@ -91,10 +95,6 @@ pub(super) fn fire_tank_coax_system(
         if !ready {
             continue;
         }
-        let (tx, ty) = match entities.get(tid) {
-            Some(target) => (target.pos_x, target.pos_y),
-            None => continue,
-        };
         let shot_victim_owner = apply_damage(
             map,
             entities,

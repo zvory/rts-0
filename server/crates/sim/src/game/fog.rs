@@ -8,7 +8,9 @@
 //! `sight_tiles` around the footprint edge. Scout Planes add a separate team aerial sight pass
 //! that ignores stone and building blockers but still respects active smoke clouds. The snapshot
 //! layer uses this to withhold neutral/enemy entities standing on non-visible tiles, making the fog
-//! cheat-proof.
+//! cheat-proof. During the same rebuild, firing-reveal stamps retain bounded entity-level
+//! provenance so combat can distinguish ordinary visibility from reveal-only visibility without
+//! maintaining a duplicate fog grid.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
@@ -18,13 +20,15 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
-use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use serde::{Deserialize, Serialize};
+
+mod reveal_provenance;
+pub(in crate::game) use reveal_provenance::FiringRevealVisibility;
 
 /// Temporary sight left behind by an owned unit/building after it dies.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -72,6 +76,12 @@ pub struct Fog {
     size: u32,
     /// player id -> row-major visibility grid (`true` = visible this tick).
     grids: HashMap<u32, Vec<bool>>,
+    /// Active firing-reveal provenance, rebuilt atomically with `grids`.
+    ///
+    /// The nested keys are viewer id -> revealed entity id. `reveal_only` means the entity's
+    /// tile was dark immediately before its firing reveal was stamped. Combat uses this instead
+    /// of trying to infer provenance from the flattened actionable grid.
+    firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
 }
 
 impl Fog {
@@ -79,16 +89,19 @@ impl Fog {
         Fog {
             size,
             grids: HashMap::new(),
+            firing_reveal_visibility: BTreeMap::new(),
         }
     }
 
     pub(in crate::game) fn from_checkpoint_grids(
         size: u32,
         grids: BTreeMap<u32, Vec<bool>>,
+        firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
         Fog {
             size,
             grids: grids.into_iter().collect(),
+            firing_reveal_visibility,
         }
     }
 
@@ -101,6 +114,12 @@ impl Fog {
             .iter()
             .map(|(&player, grid)| (player, grid.clone()))
             .collect()
+    }
+
+    pub(in crate::game) fn checkpoint_firing_reveal_visibility(
+        &self,
+    ) -> BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>> {
+        self.firing_reveal_visibility.clone()
     }
 
     /// Recompute visibility for all `players` from the union of their entities' sight circles.
@@ -127,6 +146,7 @@ impl Fog {
         map: &Map,
         smokes: Option<&SmokeCloudStore>,
     ) {
+        self.firing_reveal_visibility.clear();
         let size = self.size;
         let cells = (self.size * self.size) as usize;
         // Reset / allocate a grid per player.
@@ -250,27 +270,6 @@ impl Fog {
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
-    pub(in crate::game) fn stamp_firing_reveal_sources_with_smoke(
-        &mut self,
-        sources: &[FiringRevealSource],
-        store: &EntityStore,
-        smokes: &SmokeCloudStore,
-    ) {
-        let size = self.size;
-        for source in sources {
-            let Some(entity) = store.get(source.entity_id()) else {
-                continue;
-            };
-            if entity.hp == 0 || smokes.point_inside(entity.pos_x, entity.pos_y) {
-                continue;
-            }
-            let Some(grid) = self.grids.get_mut(&source.viewer()) else {
-                continue;
-            };
-            stamp_point(grid, size, entity.pos_x, entity.pos_y);
-        }
-    }
-
     pub(in crate::game) fn stamp_scout_plane_sources_for_teams_with_smoke(
         &mut self,
         map: &Map,
@@ -375,18 +374,25 @@ fn entity_grants_standard_sight(entity: &Entity) -> bool {
 }
 
 fn stamp_point(grid: &mut [bool], size: u32, x: f32, y: f32) {
-    let ts = config::TILE_SIZE as f32;
-    if x < 0.0 || y < 0.0 {
+    let Some(tile) = world_tile_index(size, x, y) else {
         return;
+    };
+    if let Some(visible) = grid.get_mut(tile as usize) {
+        *visible = true;
+    }
+}
+
+fn world_tile_index(size: u32, x: f32, y: f32) -> Option<u32> {
+    let ts = config::TILE_SIZE as f32;
+    if !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 {
+        return None;
     }
     let tx = (x / ts).floor() as i64;
     let ty = (y / ts).floor() as i64;
     if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
-        return;
+        return None;
     }
-    if let Some(visible) = grid.get_mut((ty as u32 * size + tx as u32) as usize) {
-        *visible = true;
-    }
+    Some(ty as u32 * size + tx as u32)
 }
 
 /// Mark every tile within an entity's sight area as visible.
