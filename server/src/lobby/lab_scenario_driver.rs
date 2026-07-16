@@ -405,6 +405,7 @@ pub(crate) struct LabScenarioCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::hellhole_spec::INITIAL_ENTITY_COUNT;
     use std::collections::BTreeSet;
 
     use rts_sim::game::entity::EntityKind;
@@ -575,7 +576,7 @@ mod tests {
         game.tick();
 
         let low = game.snapshot_full_for(1);
-        assert!(low.entities.len() < 380);
+        assert!(low.entities.len() < INITIAL_ENTITY_COUNT);
         assert!(low
             .player_resources
             .iter()
@@ -594,7 +595,7 @@ mod tests {
             })
             .collect();
         assert_eq!(respawns.len(), 1);
-        assert_eq!(respawns[0].len(), 380 - low.entities.len());
+        assert_eq!(respawns[0].len(), INITIAL_ENTITY_COUNT - low.entities.len());
         assert!(respawns[0]
             .iter()
             .any(|spawn| (spawn.owner, spawn.kind) == (1, EntityKind::Tank)));
@@ -610,7 +611,7 @@ mod tests {
             }
         }
         let restored = game.snapshot_full_for(1);
-        assert_eq!(restored.entities.len(), 380);
+        assert_eq!(restored.entities.len(), INITIAL_ENTITY_COUNT);
         assert!(restored
             .player_resources
             .iter()

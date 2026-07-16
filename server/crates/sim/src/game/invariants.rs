@@ -3,7 +3,10 @@
 //! These assertions run in debug builds and tests after every tick. They are intentionally
 //! panic-on-failure so broken assumptions surface immediately during development.
 
-use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
+use crate::game::entity::{
+    movement_body_class, static_blocker_class, Entity, EntityKind, MovementBodyClass, Order,
+    StaticBlockerClass, NEUTRAL,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -183,6 +186,9 @@ impl Game {
             }
             if let Some(body) = unit_body_for_entity(e) {
                 for &(building_id, building_kind, rect) in &building_rects {
+                    if !building_blocks_unit_body(e.kind, building_kind) {
+                        continue;
+                    }
                     let overlap_depth = unit_body_rect_overlap_depth(body, rect);
                     assert!(
                         overlap_depth <= STATIC_BODY_OVERLAP_TOLERANCE_PX,
@@ -418,6 +424,16 @@ impl Game {
             visible_players.push(player);
         }
         fog.union_for(player, &visible_players)
+    }
+}
+
+fn building_blocks_unit_body(unit_kind: EntityKind, building_kind: EntityKind) -> bool {
+    match static_blocker_class(building_kind) {
+        StaticBlockerClass::None => false,
+        StaticBlockerClass::AllGround => true,
+        StaticBlockerClass::VehicleBodyOnly => {
+            movement_body_class(unit_kind) == MovementBodyClass::VehicleBody
+        }
     }
 }
 
@@ -692,7 +708,10 @@ mod tests {
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::str::FromStr;
 
-    use super::{location_context, unit_body_rect_overlap_depth, STATIC_BODY_OVERLAP_TOLERANCE_PX};
+    use super::{
+        building_blocks_unit_body, location_context, unit_body_rect_overlap_depth,
+        STATIC_BODY_OVERLAP_TOLERANCE_PX,
+    };
     use crate::config;
     use crate::game::entity::EntityKind;
     use crate::game::map::Map;
@@ -799,6 +818,26 @@ mod tests {
         assert!(message.contains("half_len="));
         assert!(message.contains("half_width="));
         assert!(message.contains("facing="));
+    }
+
+    #[test]
+    fn unit_building_invariant_matches_partial_static_blocker_policy() {
+        assert!(!building_blocks_unit_body(
+            EntityKind::Rifleman,
+            EntityKind::TankTrap
+        ));
+        assert!(building_blocks_unit_body(
+            EntityKind::Tank,
+            EntityKind::TankTrap
+        ));
+        assert!(!building_blocks_unit_body(
+            EntityKind::Rifleman,
+            EntityKind::PumpJack
+        ));
+        assert!(building_blocks_unit_body(
+            EntityKind::Rifleman,
+            EntityKind::Depot
+        ));
     }
 
     #[test]

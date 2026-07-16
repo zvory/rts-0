@@ -1,6 +1,7 @@
 use super::support::*;
 use crate::lobby::lab_scenario_driver::{LabScenarioAction, LabScenarioDriver};
 use crate::lobby::room_task::types::LabSeekTarget;
+use crate::tools::hellhole_spec::INITIAL_ENTITY_COUNT;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{LabCommandOptions, LabOp, LabSpawnEntity};
 
@@ -102,7 +103,7 @@ fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
         )
         .ok
     );
-    assert_eq!(lab_snapshot(&task).entities.len(), 379);
+    assert_eq!(lab_snapshot(&task).entities.len(), INITIAL_ENTITY_COUNT - 1);
 
     task.on_tick(tokio::time::Instant::now());
     task.apply_lab_scenario_actions();
@@ -125,10 +126,10 @@ fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
         &entry.op,
         crate::protocol::LabReplayOperation::SpawnEntities { spawns } if !spawns.is_empty()
     )));
-    assert_eq!(lab_snapshot(&task).entities.len(), 380);
+    assert_eq!(lab_snapshot(&task).entities.len(), INITIAL_ENTITY_COUNT);
 
     task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(1));
-    assert_eq!(lab_snapshot(&task).entities.len(), 380);
+    assert_eq!(lab_snapshot(&task).entities.len(), INITIAL_ENTITY_COUNT);
     task.apply_lab_scenario_actions();
     assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 4);
 
@@ -136,7 +137,7 @@ fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
         .export_lab_replay_artifact(99, Some("Hellhole churn replay"))
         .unwrap();
     task.load_lab_replay_artifact(99, artifact).unwrap();
-    assert_eq!(lab_snapshot(&task).entities.len(), 380);
+    assert_eq!(lab_snapshot(&task).entities.len(), INITIAL_ENTITY_COUNT);
     assert!(task.lab_driver.is_none());
 }
 

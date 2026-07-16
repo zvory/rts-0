@@ -17,6 +17,8 @@ use super::hellhole_snapshot_stream::{
     apply_hellhole_scenario_actions, build_hellhole_game, union_events, HellholeActionCounts,
     TICK_RATE_HZ,
 };
+#[cfg(test)]
+use super::hellhole_spec::INITIAL_ENTITY_COUNT;
 
 const DEFAULT_TICKS: u32 = 900;
 const MAX_TICKS: u32 = 10_000;
@@ -154,7 +156,8 @@ pub fn run_from_env() {
 
 fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
     let (mut game, mut driver) = build_hellhole_game()?;
-    let initial_entities = game.perf_entity_counts().entities;
+    let initial_counts = game.perf_entity_counts();
+    let initial_entities = initial_counts.entities;
     let started = Instant::now();
     let mut tick_series = DurationSeries::default();
     let mut snapshot_build_series = DurationSeries::default();
@@ -174,14 +177,20 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         let round_trip_started = Instant::now();
         action_counts.add(apply_hellhole_scenario_actions(&mut game, &mut driver)?);
         let post_action_counts = game.perf_entity_counts();
-        let post_action_entities = post_action_counts.entities;
-        if post_action_entities != initial_entities {
+        if post_action_counts.units != initial_counts.units
+            || post_action_counts.resources != initial_counts.resources
+            || post_action_counts.buildings > initial_counts.buildings
+        {
             return Err(format!(
-                "Hellhole pre-tick entity count changed at tick {}: {post_action_entities} != {initial_entities} (units={}, buildings={}, resources={}, respawn_batches={}, respawned_units={})",
+                "Hellhole pre-tick shape changed at tick {}: entities={}, units={} (expected {}), buildings={} (expected at most {}), resources={} (expected {}), respawn_batches={}, respawned_units={}",
                 game.tick_count(),
+                post_action_counts.entities,
                 post_action_counts.units,
+                initial_counts.units,
                 post_action_counts.buildings,
+                initial_counts.buildings,
                 post_action_counts.resources,
+                initial_counts.resources,
                 action_counts.respawn_batches,
                 action_counts.respawned_units,
             ));
@@ -470,8 +479,8 @@ mod tests {
         assert!(!summary.network_transport);
         assert_eq!(summary.ticks, 2);
         assert_eq!(summary.serialized_snapshots, 2);
-        assert_eq!(summary.initial_entities, 380);
-        assert_eq!(summary.final_entities, 380);
+        assert_eq!(summary.initial_entities, INITIAL_ENTITY_COUNT);
+        assert_eq!(summary.final_entities, INITIAL_ENTITY_COUNT - 1);
         assert!(summary.snapshot_bytes > 0);
     }
 }

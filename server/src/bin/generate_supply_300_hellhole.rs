@@ -8,7 +8,8 @@ use rts_protocol::{
 use rts_rules::balance::building_stats;
 use rts_rules::terrain::MAP_TERRAIN_ROCK;
 use rts_server::tools::hellhole_spec::{
-    composition_300_supply, respawn_candidates, CENTER, SEED, SHUTTLE_OFFSET_TILES, TILE,
+    composition_300_supply, respawn_candidates, CENTER, SCATTERED_TANK_TRAP_COUNT, SEED,
+    SHUTTLE_OFFSET_TILES, TILE,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
@@ -28,6 +29,7 @@ const SCENARIO_NAME: &str = "Supply 300 2v2 Hellhole";
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
 const ROCK_CELL_TILES: u32 = 5;
 const TARGET_ROCK_TILES: usize = 470;
+const TANK_TRAP_OWNER: u32 = 1;
 const UNIT_FOOTPRINT_CLEARANCE_TILES: i32 = 1;
 const BUILDING_CLUSTERS: [(u32, u32, u32); 4] = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
 const BUILDING_LAYOUT: [(EntityKind, u32, u32); 10] = [
@@ -62,6 +64,7 @@ fn run(out: PathBuf) -> Result<(), String> {
 
     let mut units_by_player = BTreeMap::<u32, Vec<(u32, EntityKind)>>::new();
     spawn_building_rings(&mut game)?;
+    spawn_scattered_tank_traps(&mut game, &composition)?;
     spawn_dense_central_scrum(&mut game, &composition, &mut units_by_player)?;
     for player_id in [3, 4] {
         for (kind, (x, y)) in composition
@@ -312,6 +315,45 @@ fn spawn_dense_central_scrum(
         }
     }
     Ok(())
+}
+
+fn spawn_scattered_tank_traps(game: &mut Game, composition: &[EntityKind]) -> Result<(), String> {
+    let map = &game.start_payload().map;
+    let occupied = occupied_spawn_tiles(map.width, composition)?;
+    let mut candidates = Vec::new();
+    for cell_y in (0..map.height).step_by(ROCK_CELL_TILES as usize) {
+        for cell_x in (0..map.width).step_by(ROCK_CELL_TILES as usize) {
+            let hash = (SEED ^ 0x7472_6170)
+                ^ cell_x.wrapping_mul(0x85eb_ca6b)
+                ^ cell_y.wrapping_mul(0xc2b2_ae35);
+            let tile_x = cell_x + 1 + hash.rotate_left(7) % (ROCK_CELL_TILES - 2);
+            let tile_y = cell_y + 1 + hash.rotate_left(19) % (ROCK_CELL_TILES - 2);
+            if tile_x >= map.width - 1
+                || tile_y >= map.height - 1
+                || occupied.contains(&(tile_x, tile_y))
+                || map.terrain[(tile_y * map.width + tile_x) as usize] == MAP_TERRAIN_ROCK
+            {
+                continue;
+            }
+            candidates.push((hash, tile_x, tile_y));
+        }
+    }
+    candidates.sort_unstable();
+
+    let mut spawned = 0usize;
+    for (_, tile_x, tile_y) in candidates {
+        let x = (tile_x as f32 + 0.5) * TILE;
+        let y = (tile_y as f32 + 0.5) * TILE;
+        if try_spawn(game, TANK_TRAP_OWNER, EntityKind::TankTrap, x, y, true)?.is_some() {
+            spawned += 1;
+            if spawned == SCATTERED_TANK_TRAP_COUNT {
+                return Ok(());
+            }
+        }
+    }
+    Err(format!(
+        "Hellhole tank-trap field spawned only {spawned} traps, below target {SCATTERED_TANK_TRAP_COUNT}"
+    ))
 }
 
 fn try_spawn(
