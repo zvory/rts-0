@@ -282,8 +282,7 @@ pub(super) fn pivot_drive_intent(
     let forward_desired = dy.atan2(dx);
     if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
         && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX
-        && angle_delta(e.facing(), forward_desired).abs()
-            > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
+        && angle_delta(e.facing(), forward_desired).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
     {
         return Some(PivotDriveIntent {
             desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),
