@@ -151,6 +151,50 @@ fn checkpoint_payload_rejects_invalid_tank_armor_reaction_lock() {
 }
 
 #[test]
+fn checkpoint_payload_rejects_multiple_active_reveal_episodes_for_one_entity() {
+    let mut game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2009);
+    game.tick();
+    let attacker = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 2 && entity.is_unit())
+        .map(|entity| entity.id)
+        .expect("player two should have a unit");
+    let tick = game.tick_count();
+    let teams = game.team_relations();
+    crate::game::firing_reveal::record_global_firing_reveals_for_enemy_players(
+        &mut game.state.firing_reveals,
+        &[1, 2],
+        &teams,
+        2,
+        attacker,
+        tick,
+        config::TICK_HZ,
+    );
+    let text = checkpoint_payload_text_for(&game, "duplicate firing reveal fixture");
+    let duplicate_reveal = mutate_payload(&text, |value| {
+        let reveals = value["firingReveals"]
+            .as_array_mut()
+            .expect("firing reveal array");
+        let mut duplicate = reveals[0].clone();
+        duplicate["started_at_tick"] = serde_json::json!(tick - 1);
+        reveals.push(duplicate);
+    });
+
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &duplicate_reveal,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "firingReveals",
+        })
+    ));
+}
+
+#[test]
 fn checkpoint_payload_serializes_entities_in_stable_id_order() {
     let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2006);
     let text = checkpoint_payload_text_for(&game, "stable entity ordering fixture");

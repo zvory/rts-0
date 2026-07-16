@@ -194,9 +194,9 @@ fn validate_materialized_map(draft: &LabMapDraft, player_count: usize) -> Result
             is_ai: false,
         })
         .collect();
-    let map = Map::load("Default", player_count, 0)
+    let map = Map::load("Chokes", player_count, 0)
         .map_err(|error| format!("Could not prepare map validation: {error}"))?;
-    let metadata = Map::metadata_for_name("Default")
+    let metadata = Map::metadata_for_name("Chokes")
         .map_err(|error| format!("Could not prepare map metadata: {error}"))?;
     let mut game = Game::new_lab(&players, 0, map, metadata);
     game.apply_lab_op(LabOp::ApplyMapDraft(draft.clone()))
@@ -251,7 +251,7 @@ mod tests {
 
     fn valid_request() -> CreateMapHandoffRequest {
         let authored_map: serde_json::Value =
-            serde_json::from_str(include_str!("../assets/maps/no-terrain.json"))
+            serde_json::from_str(include_str!("../assets/maps/1v1-no-terrain.json"))
                 .expect("map fixture");
         let tile = |value: &serde_json::Value| LabMapTile {
             x: value["x"].as_u64().expect("x") as u32,
@@ -273,7 +273,7 @@ mod tests {
             destination: HandoffDestination::Lab,
             authored_map,
             materialized_map: LabMapDraft {
-                name: "No Terrain".to_string(),
+                name: "1v1 No Terrain".to_string(),
                 size: 126,
                 terrain: vec![terrain::GRASS; 126 * 126],
                 starts,
@@ -325,6 +325,34 @@ mod tests {
         chars[..road_chars.len()].copy_from_slice(&road_chars);
         request.authored_map["terrain"][0] = chars.into_iter().collect::<String>().into();
         request.materialized_map.terrain[..road_codes.len()].copy_from_slice(&road_codes);
+
+        assert_eq!(validate_request(&request), Ok(()));
+    }
+
+    #[test]
+    fn handoff_validation_accepts_a_non_default_map_size() {
+        let size = 48_u32;
+        let starts = [LabMapTile { x: 8, y: 8 }, LabMapTile { x: 39, y: 39 }];
+        let locations = starts
+            .iter()
+            .map(|tile| serde_json::json!({ "x": tile.x, "y": tile.y }))
+            .collect::<Vec<_>>();
+        let mut request = valid_request();
+        request.authored_map["name"] = "Custom size".into();
+        request.authored_map["terrain"] = serde_json::Value::Array(
+            (0..size)
+                .map(|_| ".".repeat(size as usize).into())
+                .collect(),
+        );
+        request.authored_map["startLocations"] = locations.clone().into();
+        request.authored_map["baseSites"] = locations.into();
+        request.materialized_map = LabMapDraft {
+            name: "Custom size".to_string(),
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: starts.to_vec(),
+            base_sites: starts.to_vec(),
+        };
 
         assert_eq!(validate_request(&request), Ok(()));
     }

@@ -27,7 +27,7 @@ pub const CURRENT_MAP_VERSION: u32 = 3;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
-const DEFAULT_MAP_NAME: &str = "Default";
+const DEFAULT_MAP_NAME: &str = "Chokes";
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
@@ -385,6 +385,7 @@ mod tests {
     use std::collections::HashSet;
 
     mod base_limits;
+    mod four_player;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {
@@ -412,10 +413,8 @@ mod tests {
             "lobby map catalog must expose at least one selectable map"
         );
         let names: Vec<&str> = available.iter().map(|e| e.name.as_str()).collect();
-        assert!(names.contains(&"Default"), "got: {names:?}");
+        assert!(names.contains(&"Chokes"), "got: {names:?}");
         assert!(names.contains(&"1v1"), "got: {names:?}");
-        assert!(names.contains(&"Low Econ"), "got: {names:?}");
-        assert!(names.contains(&"No Terrain"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         assert!(names.contains(&"4 Player Map"), "got: {names:?}");
         // Every entry must have a non-empty description.
@@ -434,7 +433,7 @@ mod tests {
             );
         }
 
-        let map = Map::load("Default", 2, 0x1234_5678)
+        let map = Map::load("Chokes", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
         assert_eq!(map.size, 126);
         assert_eq!(map.starts.len(), 2);
@@ -501,17 +500,12 @@ mod tests {
             .expect("four-player map should be listed");
         assert_eq!(four_player.min_players, 1);
         assert_eq!(four_player.max_players, 4);
-        let expected_starts = vec![(29, 29), (29, 136), (136, 29), (136, 136)];
         for player_count in 1..=4 {
-            let mut map = Map::load("4 Player Map", player_count, 0x1234_5678)
+            let map = Map::load("4 Player Map", player_count, 0x1234_5678)
                 .expect("four-player map should load for every supported player count");
             assert_eq!(map.size, 166);
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.base_sites.len(), 16);
-            if player_count == 4 {
-                map.starts.sort_unstable();
-                assert_eq!(map.starts, expected_starts);
-            }
         }
     }
 

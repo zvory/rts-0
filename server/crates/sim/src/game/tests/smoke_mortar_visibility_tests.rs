@@ -156,6 +156,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         )),
         "victim should receive a mortar impact reveal after being hit: {enemy_events:?}"
     );
+    advance_to_fog_refresh(&mut game);
     let snapshot = game.snapshot_for(2);
     let view = snapshot
         .entities

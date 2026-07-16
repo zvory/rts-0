@@ -6,7 +6,7 @@ use rts_protocol::{
     LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, DEFAULT_FACTION_ID,
 };
 use rts_rules::balance::building_stats;
-use rts_rules::terrain::MAP_TERRAIN_ROCK;
+use rts_rules::terrain::{MAP_TERRAIN_GRASS, MAP_TERRAIN_ROCK};
 use rts_server::tools::hellhole_spec::{
     composition_300_supply, respawn_candidates, CENTER, SCATTERED_TANK_TRAP_COUNT, SEED,
     SHUTTLE_OFFSET_TILES, TILE,
@@ -24,7 +24,7 @@ const OUT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/lab-scenarios/supply-300-hellhole.json"
 );
-const MAP_NAME: &str = "No Terrain";
+const MAP_NAME: &str = "Chokes";
 const SCENARIO_NAME: &str = "Supply 300 2v2 Hellhole";
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v2";
 const ROCK_CELL_TILES: u32 = 5;
@@ -139,6 +139,10 @@ fn blank_hellhole_lab(composition: &[EntityKind]) -> Result<Game, String> {
         .map_err(|err| format!("cannot load map metadata {MAP_NAME:?}: {err}"))?;
     let mut map = Map::load_for_players(MAP_NAME, &start_players, SEED)
         .map_err(|err| format!("cannot load map {MAP_NAME:?}: {err}"))?;
+    // Hellhole owns its terrain: begin with a flat canvas, then add the deterministic sparse
+    // occluders below. This keeps the stress fixture independent of incidental terrain on the
+    // selectable four-player base map.
+    map.terrain.fill(MAP_TERRAIN_GRASS);
     let rock_count = populate_sparse_rock_occluders(&mut map, composition)?;
     if rock_count < 128 {
         return Err(format!(

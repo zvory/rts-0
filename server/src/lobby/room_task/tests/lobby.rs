@@ -58,13 +58,13 @@ fn lobby_summary_includes_live_normal_rooms_as_non_joinable() {
     let mut task = summary_task("ingame-summary");
     let players = replay_test_players(2);
     task.phase = Phase::InGame(Box::new(replay_test_game(&players, 0)));
-    task.match_map_name = "Default".to_string();
+    task.match_map_name = "Chokes".to_string();
 
     let summary = task
         .lobby_summary()
         .expect("normal live room should remain visible");
 
-    assert_eq!(summary.map, "Default");
+    assert_eq!(summary.map, "Chokes");
     assert_eq!(summary.phase, LobbySummaryPhase::InGame);
     assert_eq!(summary.join_state, LobbyJoinState::InGame);
 }
@@ -93,7 +93,7 @@ fn lobby_summary_marks_persisted_replay_lobbies() {
 
     assert_eq!(summary.room, "__match_replay__:00000001");
     assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
-    assert_eq!(summary.map, "Default");
+    assert_eq!(summary.map, "Chokes");
     assert_eq!(summary.occupied_slots, 0);
     assert_eq!(summary.max_slots, 0);
     assert_eq!(summary.spectator_count, 1);
@@ -107,7 +107,7 @@ fn lobby_summary_hides_internal_room_modes() {
     let branch_seed = replay_branch_test_seed(&replay_players, 0);
 
     let mut lab = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -376,7 +376,7 @@ fn default_ai_team_appends_after_occupied_teams_when_possible() {
 #[test]
 fn selecting_two_player_map_trims_excess_active_seats() {
     let mut task = summary_task("two-player-map-cap");
-    task.on_select_map(1, "Default".to_string());
+    task.on_select_map(1, "Chokes".to_string());
     for id in 2..=3 {
         add_test_room_player(&mut task, id, true);
         task.assign_missing_team_for(id);

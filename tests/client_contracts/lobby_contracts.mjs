@@ -260,7 +260,7 @@ import { textWithin } from "./dom_text.mjs";
     elSetupTitle: { textContent: "Match setup" },
     elPlayers: { innerHTML: "occupied" },
     elRoomDisplay: { textContent: "Old room" },
-    elMapSummary: { textContent: "No Terrain", hidden: true },
+    elMapSummary: { textContent: "Chokes", hidden: true },
     elSeatsSummary: { textContent: "2 / 4" },
     elObserversSummary: { textContent: "1" },
     btnJoin: { textContent: "Switch room" },
@@ -282,8 +282,8 @@ import { textWithin } from "./dom_text.mjs";
     _hostId: 7,
     _canStart: true,
     _teamPreset: "custom",
-    _selectedMap: "No Terrain",
-    _availableMaps: [{ name: "No Terrain" }],
+    _selectedMap: "Chokes",
+    _availableMaps: [{ name: "Chokes" }],
     _playerCount: 2,
     _browserActionPending: true,
     _browserConnected: true,
@@ -767,13 +767,25 @@ import { textWithin } from "./dom_text.mjs";
     });
     assert(textWithin(rowsRoot).includes("Refresh to load lobbies"),
       "lobby browser waits for an explicit first refresh");
-    assert(statusEl.textContent === "Not refreshed", "unrefreshed lobby browser labels its state");
+    assert(statusEl.textContent === "Not refreshed" && statusEl.hidden === false,
+      "unrefreshed lobby browser shows its state");
     view.render({
       rows: [],
       nowMs: now,
       onCreateLobby: () => { createClicks += 1; },
       onJoinLobby: (row, options) => joins.push({ room: row.room, spectator: !!options?.spectator }),
     });
+    assert(statusEl.textContent === "" && statusEl.hidden,
+      "a settled lobby browser hides the redundant refresh status");
+    view.render({ loading: true });
+    assert(statusEl.textContent === "Refreshing" && statusEl.hidden === false,
+      "refreshing shows the status again after the settled state hid it");
+    view.render({ error: "Lobby list unavailable." });
+    assert(statusEl.textContent === "Refresh failed" && statusEl.hidden === false,
+      "refresh failures keep the refresh status visible");
+    view.render();
+    assert(statusEl.textContent === "" && statusEl.hidden,
+      "a successful recovery hides the refresh status again");
     assert(textWithin(rowsRoot).includes("No lobbies"), "lobby browser renders compact empty state");
     findFakes(rowsRoot, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0]?.click();
     assert(createClicks === 1, "empty lobby browser create action opens the create flow");
@@ -782,7 +794,7 @@ import { textWithin } from "./dom_text.mjs";
         {
           room: "Open Lobby",
           hostName: "Host A",
-          map: "Default",
+          map: "Chokes",
           createdAtUnixMs: now - 30_000,
           occupiedSlots: 1,
           maxSlots: 4,
@@ -792,7 +804,7 @@ import { textWithin } from "./dom_text.mjs";
         {
           room: "Alpha Long Lobby",
           hostName: "Host",
-          map: "No Terrain",
+          map: "Chokes",
           createdAtUnixMs: now - 60_000,
           occupiedSlots: 4,
           maxSlots: 4,
@@ -813,7 +825,7 @@ import { textWithin } from "./dom_text.mjs";
         {
           room: "Locked Match",
           hostName: "Host C",
-          map: "Default",
+          map: "Chokes",
           createdAtUnixMs: now - 90_000,
           occupiedSlots: 4,
           maxSlots: 4,
@@ -823,7 +835,7 @@ import { textWithin } from "./dom_text.mjs";
         {
           room: "Countdown Match",
           hostName: "Host D",
-          map: "Default",
+          map: "Chokes",
           createdAtUnixMs: now - 10_000,
           occupiedSlots: 2,
           maxSlots: 4,
@@ -833,7 +845,7 @@ import { textWithin } from "./dom_text.mjs";
         {
           room: "Unknown State",
           hostName: "Host E",
-          map: "Default",
+          map: "Chokes",
           createdAtUnixMs: now - 20_000,
           occupiedSlots: 1,
           maxSlots: 4,
@@ -844,7 +856,7 @@ import { textWithin } from "./dom_text.mjs";
       nowMs: now,
     });
     assert(textWithin(rowsRoot).includes("Alpha Long Lobby"), "lobby browser renders lobby names");
-    assert(textWithin(rowsRoot).includes("No Terrain"), "lobby browser renders map names");
+    assert(textWithin(rowsRoot).includes("Chokes"), "lobby browser renders map names");
     assert(textWithin(rowsRoot).includes("4 / 4 +1 obs"), "lobby browser renders active slots and spectators");
     assert(textWithin(rowsRoot).includes("2 spectators"), "lobby browser renders replay spectator counts");
     assert(textWithin(rowsRoot).includes("Join as spectator"), "lobby browser renders row action state");
@@ -881,7 +893,7 @@ import { textWithin } from "./dom_text.mjs";
         {
           room: "Refresh Failed",
           hostName: "Host F",
-          map: "Default",
+          map: "Chokes",
           createdAtUnixMs: now,
           occupiedSlots: 1,
           maxSlots: 4,

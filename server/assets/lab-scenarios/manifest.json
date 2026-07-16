@@ -23,7 +23,7 @@
       "title": "Supply 300 2v2 Hellhole",
       "description": "Four-player 2v2 Lab stress setup with 470 isolated stone occluders, two dense interleaved central armies, and two scripted diagonal shuttle armies.",
       "tags": ["four-player", "2v2", "stress", "frame-budget"],
-      "map": "No Terrain",
+      "map": "Chokes",
       "playerCount": 4,
       "filename": "supply-300-hellhole.json"
     }

@@ -35,9 +35,9 @@ fn default_lab_game(seed: u32) -> Game {
         .iter()
         .map(|player| (player.id, player.team_id))
         .collect();
-    let map = Map::load_for_players("Default", &start_players, seed)
-        .expect("Default map should load for lab checkpoint tests");
-    let metadata = Map::metadata_for_name("Default").expect("Default metadata should load");
+    let map = Map::load_for_players("Chokes", &start_players, seed)
+        .expect("Chokes map should load for lab checkpoint tests");
+    let metadata = Map::metadata_for_name("Chokes").expect("Chokes metadata should load");
     Game::new_lab(&players, seed, map, metadata)
 }
 

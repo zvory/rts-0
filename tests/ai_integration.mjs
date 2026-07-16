@@ -77,8 +77,8 @@ const { ok } = assertions;
 
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.
-  A.send({ t: "selectMap", map: "Default" });
-  await A.waitNext((m) => m.t === "lobby" && m.map === "Default", 3000, "four-seat map selection");
+  A.send({ t: "selectMap", map: "Chokes" });
+  await A.waitNext((m) => m.t === "lobby" && m.map === "Chokes", 3000, "four-seat map selection");
   const beforeHandBuiltIds = new Set(withAi.players.map((player) => player.id));
   A.send({ t: "addAi", factionId: "ekat" });
   await sleep(400);

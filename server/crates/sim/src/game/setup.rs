@@ -432,7 +432,7 @@ pub(in crate::game) fn live_derived_state(
 }
 
 fn default_map_metadata() -> MapMetadata {
-    Map::metadata_for_name("Default").unwrap_or_else(|_| dev_map_metadata("Default"))
+    Map::metadata_for_name("Chokes").unwrap_or_else(|_| dev_map_metadata("Chokes"))
 }
 
 fn dev_map_metadata(name: &str) -> MapMetadata {

@@ -57,7 +57,7 @@ fn replay_artifact_captures_live_game_contract() {
         REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION
     );
     assert_eq!(artifact.server_build_sha, "test-sha");
-    assert_eq!(artifact.map_name, "Default");
+    assert_eq!(artifact.map_name, "Chokes");
     assert_eq!(artifact.seed, 0x1234_5678);
     assert_eq!(artifact.player_loadouts.len(), 1);
     assert_eq!(artifact.player_loadouts[0].starting_steel, 777);
@@ -103,7 +103,7 @@ fn replay_artifact_requires_faction_schema_and_defaults_missing_winner_team() {
     let json = serde_json::json!({
         "artifactSchemaVersion": 3,
         "serverBuildSha": "test-sha",
-        "mapName": "Default",
+        "mapName": "Chokes",
         "mapSchemaVersion": 1,
         "mapContentHash": "hash",
         "seed": 1,
@@ -138,7 +138,7 @@ fn replay_artifact_requires_faction_schema_and_defaults_missing_winner_team() {
     let old_json = serde_json::json!({
         "artifactSchemaVersion": 1,
         "serverBuildSha": "test-sha",
-        "mapName": "Default",
+        "mapName": "Chokes",
         "mapSchemaVersion": 1,
         "mapContentHash": "hash",
         "seed": 1,

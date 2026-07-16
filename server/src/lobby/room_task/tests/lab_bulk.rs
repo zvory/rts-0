@@ -3,7 +3,7 @@ use super::support::*;
 #[test]
 fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,

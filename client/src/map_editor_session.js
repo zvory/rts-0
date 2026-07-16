@@ -3,6 +3,9 @@ import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
 export const MAP_EDITOR_MAX_BASE_SITES = 32;
+export const MAP_EDITOR_DEFAULT_SIZE = 126;
+export const MAP_EDITOR_MIN_SIZE = 16;
+export const MAP_EDITOR_MAX_SIZE = 166;
 // Mirror the authored-map clearance contract enforced by the simulation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
@@ -11,6 +14,7 @@ export const MAP_EDITOR_SYMMETRY = Object.freeze({
   HORIZONTAL: "horizontal",
   VERTICAL: "vertical",
   HALF_TURN: "halfTurn",
+  THREE_WAY: "threeWay",
   RADIAL: "radial",
   DIAGONAL_MAIN: "diagonalMain",
   DIAGONAL_ANTI: "diagonalAnti",
@@ -37,11 +41,19 @@ const CHAR_TO_TERRAIN = Object.freeze({
   "/": TERRAIN.ROAD_DIAGONAL_NE_SW,
 });
 const ROAD_TERRAIN_CHARS = new Set(ROAD_TERRAIN_CODES.map((code) => TERRAIN_TO_CHAR[code]));
+const ROAD_TERRAIN_ANGLES = new Map([
+  [TERRAIN.ROAD_HORIZONTAL, 0],
+  [TERRAIN.ROAD_DIAGONAL_NW_SE, 45],
+  [TERRAIN.ROAD_VERTICAL, 90],
+  [TERRAIN.ROAD_DIAGONAL_NE_SW, 135],
+]);
+const SIN_120 = Math.sqrt(3) / 2;
 const SYMMETRY_TRANSFORMS = Object.freeze({
   [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
   [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
   [MAP_EDITOR_SYMMETRY.VERTICAL]: ["identity", "vertical"],
   [MAP_EDITOR_SYMMETRY.HALF_TURN]: ["identity", "rotate180"],
+  [MAP_EDITOR_SYMMETRY.THREE_WAY]: ["identity", "rotate120", "rotate240"],
   [MAP_EDITOR_SYMMETRY.RADIAL]: ["identity", "rotate90", "rotate180", "rotate270"],
   [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN]: ["identity", "diagonalMain"],
   [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI]: ["identity", "diagonalAnti"],
@@ -100,8 +112,11 @@ export class MapEditorSession {
     return true;
   }
 
-  initializeBlank({ size = 126, playerCount = 2, name = "Untitled map" } = {}) {
-    const mapSize = Math.max(16, Math.min(126, Math.trunc(Number(size)) || 126));
+  initializeBlank({ size = MAP_EDITOR_DEFAULT_SIZE, playerCount = 2, name = "Untitled map" } = {}) {
+    const mapSize = Math.max(
+      MAP_EDITOR_MIN_SIZE,
+      Math.min(MAP_EDITOR_MAX_SIZE, Math.trunc(Number(size)) || MAP_EDITOR_DEFAULT_SIZE),
+    );
     const count = Math.max(1, Math.min(MAP_EDITOR_MAX_START_LOCATIONS, Math.trunc(Number(playerCount)) || 2));
     const startTile = (fraction) => Math.max(
       MAP_EDITOR_MAIN_CLEARANCE_TILES,
@@ -392,14 +407,19 @@ export function moveSymmetricDraftLocation(draft, {
   const source = collection?.[Math.trunc(Number(locationIndex))];
   const target = normalizedDraftTile(draft, tile, radius);
   if (!source || !target) return draftEditError("Choose a valid location and map tile.");
+  if (sameLocation(source, target)) return { ok: true, count: 0 };
   const transforms = SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)];
   const plannedSources = new Set();
   const plans = [];
   for (const transform of transforms) {
-    const from = transformMapTile(source, draft.terrain.length, transform);
+    const transformedFrom = transformMapTile(source, draft.terrain.length, transform);
+    const index = transformedLocationIndex(collection, transformedFrom, plannedSources, symmetry);
+    if (index < 0 || plannedSources.has(index)) continue;
+    const from = collection[index];
     const to = transformMapTile(target, draft.terrain.length, transform);
-    const index = collection.findIndex((candidate) => sameLocation(candidate, from));
-    if (index < 0 || !to || plannedSources.has(index)) continue;
+    if (!draftLocationTileWithinClearance(draft, to, radius)) {
+      return draftEditError("That location's symmetric copies do not fit within the map edge clearance.");
+    }
     plannedSources.add(index);
     plans.push({
       index,
@@ -458,7 +478,10 @@ export function addSymmetricDraftLocations(draft, {
   const radius = locationRadius(kind);
   const target = normalizedDraftTile(draft, tile, radius);
   if (!target) return draftEditError("Choose a valid map tile.");
-  const locations = symmetricMapTiles(draft.terrain.length, [target], symmetry);
+  const locations = symmetricDraftLocationTiles(draft, target, symmetry, radius);
+  if (!locations) {
+    return draftEditError("That location's symmetric copies do not fit within the map edge clearance.");
+  }
   if (kind === "start") {
     const additions = locations.filter((location) => (
       !draft.startLocations.some((start) => sameLocation(start, location))
@@ -642,6 +665,54 @@ function normalizedDraftTile(draft, tile, radius) {
   if (!valid || size <= radius * 2) return null;
   return { x: Math.max(radius, Math.min(size - radius - 1, valid.x)), y: Math.max(radius, Math.min(size - radius - 1, valid.y)) };
 }
+function symmetricDraftLocationTiles(draft, tile, symmetry, radius) {
+  const locations = [];
+  const seen = new Set();
+  for (const transform of SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)]) {
+    const transformed = transformMapTile(tile, draft.terrain.length, transform);
+    if (!draftLocationTileWithinClearance(draft, transformed, radius)) return null;
+    const key = locationKey(transformed);
+    if (!seen.has(key)) {
+      seen.add(key);
+      locations.push(transformed);
+    }
+  }
+  return locations;
+}
+function draftLocationTileWithinClearance(draft, tile, radius) {
+  const size = draft?.terrain?.length || 0;
+  const valid = validMapTile(tile, size);
+  return !!valid
+    && valid.x >= radius
+    && valid.y >= radius
+    && valid.x < size - radius
+    && valid.y < size - radius;
+}
+function transformedLocationIndex(collection, target, excluded, symmetry) {
+  if (!target) return -1;
+  const exact = collection.findIndex((candidate, index) => (
+    !excluded.has(index) && sameLocation(candidate, target)
+  ));
+  if (exact >= 0 || symmetry !== MAP_EDITOR_SYMMETRY.THREE_WAY) return exact;
+
+  // Snapping a 120-degree rotation to square-grid tiles can move a rotated copy by one
+  // tile when that copy is used as the next rotation's source. Match that bounded drift so
+  // every member of a generated three-location group remains a valid drag handle.
+  let nearest = -1;
+  let nearestDistance = Infinity;
+  for (let index = 0; index < collection.length; index++) {
+    if (excluded.has(index)) continue;
+    const candidate = collection[index];
+    const dx = candidate.x - target.x;
+    const dy = candidate.y - target.y;
+    const distance = dx * dx + dy * dy;
+    if (distance <= 2 && distance < nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
 function validMapTile(tile, size) {
   const x = Math.trunc(Number(tile?.x)); const y = Math.trunc(Number(tile?.y));
   return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < size && y < size ? { x, y } : null;
@@ -652,13 +723,30 @@ function transformMapTile(tile, size, transform) {
   if (transform === "horizontal") return { x: tile.x, y: max - tile.y };
   if (transform === "vertical") return { x: max - tile.x, y: tile.y };
   if (transform === "rotate90") return { x: max - tile.y, y: tile.x };
+  if (transform === "rotate120") return rotateAndSnapMapTile(tile, size, -0.5, SIN_120);
   if (transform === "rotate180") return { x: max - tile.x, y: max - tile.y };
+  if (transform === "rotate240") return rotateAndSnapMapTile(tile, size, -0.5, -SIN_120);
   if (transform === "rotate270") return { x: tile.y, y: max - tile.x };
   if (transform === "diagonalMain") return { x: tile.y, y: tile.x };
   if (transform === "diagonalAnti") return { x: max - tile.y, y: max - tile.x };
   return copyLocation(tile);
 }
+function rotateAndSnapMapTile(tile, size, cosine, sine) {
+  const centre = (size - 1) / 2;
+  const dx = tile.x - centre;
+  const dy = tile.y - centre;
+  const rotated = {
+    x: Math.round(centre + dx * cosine - dy * sine),
+    y: Math.round(centre + dx * sine + dy * cosine),
+  };
+  // A square has no exact three-fold rotational symmetry. Keep the closest tile-centre
+  // projection when it remains on the map and omit copies that rotate beyond its corners.
+  return validMapTile(rotated, size);
+}
 function transformTerrainCode(code, transform) {
+  if (transform === "rotate120" || transform === "rotate240") {
+    return closestRotatedRoadTerrain(code, transform === "rotate120" ? 120 : 240);
+  }
   if (code === TERRAIN.ROAD_HORIZONTAL) {
     return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
       ? TERRAIN.ROAD_VERTICAL
@@ -680,6 +768,22 @@ function transformTerrainCode(code, transform) {
       : code;
   }
   return code;
+}
+function closestRotatedRoadTerrain(code, degrees) {
+  const sourceAngle = ROAD_TERRAIN_ANGLES.get(code);
+  if (sourceAngle === undefined) return code;
+  const targetAngle = (sourceAngle + degrees) % 180;
+  let closestCode = code;
+  let closestDistance = Infinity;
+  for (const [candidateCode, candidateAngle] of ROAD_TERRAIN_ANGLES) {
+    const difference = Math.abs(targetAngle - candidateAngle);
+    const distance = Math.min(difference, 180 - difference);
+    if (distance < closestDistance) {
+      closestCode = candidateCode;
+      closestDistance = distance;
+    }
+  }
+  return closestCode;
 }
 function normalizeMapEditorSymmetry(value) { return SYMMETRY_TRANSFORMS[value] ? value : MAP_EDITOR_SYMMETRY.NONE; }
 function locationKey(location) { return `${location?.x},${location?.y}`; }

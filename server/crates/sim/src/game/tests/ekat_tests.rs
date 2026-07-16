@@ -608,6 +608,8 @@ fn ekat_dash_return_marker_projection_respects_fog() {
         .entities
         .spawn_unit(2, EntityKind::Worker, target.0 + 500.0, target.1 + 500.0)
         .expect("enemy should spawn");
+    let player_ids = game.state.player_ids();
+    game.recompute_live_fog(&player_ids);
 
     enqueue_ekat_dash(&mut game, hero, target);
     game.tick();

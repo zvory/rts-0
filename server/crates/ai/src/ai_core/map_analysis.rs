@@ -18,7 +18,7 @@ use regions::{build_regions, nearest_region, region_id_for_tile};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
 const RESOURCE_CLUSTER_RADIUS_MARGIN_TILES: f32 = 0.75;
-// Region seeds require a 10-tile centered open square so Default/Low Econ ignore obstacle-edge
+// Region seeds require a 10-tile centered open square so Chokes ignores obstacle-edge
 // ripples and expose only broad maneuver areas. The lower body threshold lets regions fill their
 // shoulders while leaving <=4-clearance necks available for choke extraction.
 const REGION_CORE_CLEARANCE_TILES: u16 = 10;

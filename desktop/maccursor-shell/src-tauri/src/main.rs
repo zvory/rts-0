@@ -1296,7 +1296,7 @@ mod tests {
 
         let beta_url: tauri::Url = "https://rts-0-zvorygin-beta.fly.dev/rooms".parse().unwrap();
         let beta_lab_url: tauri::Url =
-            "https://rts-0-zvorygin-beta.fly.dev/lab?room=default&map=Default"
+            "https://rts-0-zvorygin-beta.fly.dev/lab?room=default&map=Chokes"
                 .parse()
                 .unwrap();
         let mainline_url: tauri::Url = "https://rts-0-zvorygin.fly.dev/?room=test".parse().unwrap();

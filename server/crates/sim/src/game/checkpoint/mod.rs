@@ -361,8 +361,7 @@ impl GameCheckpointV1 {
         validate_fog(
             &self.fog,
             &player_ids,
-            &entity_ids,
-            &self.firing_reveals,
+            self.entities.next_id,
             map,
             self.tick,
         )?;

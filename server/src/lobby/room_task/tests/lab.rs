@@ -6,7 +6,7 @@ use rts_sim::game::lab::LabOp;
 fn lab_start_payload_initial_operator_uses_policy_metadata() {
     let drain = DrainHandle::default();
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -62,26 +62,20 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
 
 #[test]
 fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
-    let size = 126;
+    let size = 48;
     let mut config = lab_config();
     config.map_draft = Some(crate::protocol::LabMapDraft {
         name: "Room map".to_string(),
         size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         starts: vec![
-            crate::protocol::LabMapTile { x: 16, y: 16 },
+            crate::protocol::LabMapTile { x: 8, y: 8 },
             crate::protocol::LabMapTile {
-                x: size - 17,
-                y: size - 17,
+                x: size - 9,
+                y: size - 9,
             },
-            crate::protocol::LabMapTile {
-                x: size - 17,
-                y: 16,
-            },
-            crate::protocol::LabMapTile {
-                x: 16,
-                y: size - 17,
-            },
+            crate::protocol::LabMapTile { x: size - 9, y: 8 },
+            crate::protocol::LabMapTile { x: 8, y: size - 9 },
         ],
         base_sites: vec![crate::protocol::LabMapTile {
             x: size / 2,
@@ -89,7 +83,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
         }],
     });
     let mut task = RoomTask::new(
-        "__lab__:map-editor:map=Default".to_string(),
+        "__lab__:map-editor:map=Chokes".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -104,7 +98,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
     assert_eq!(starts[0].tick, 0);
     assert_eq!(starts[0].map.width, size);
     assert_eq!(starts[0].players.len(), 4);
-    assert_eq!(starts[0].players[0].start_tile_x, 16);
+    assert_eq!(starts[0].players[0].start_tile_x, 8);
     assert_eq!(starts[0].players[3].name, "Lab Delta");
 
     task.on_lab_request(99, 701, LabClientOp::ExportMap);
@@ -124,7 +118,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
 #[test]
 fn lab_start_payload_can_use_bundled_lategame_scenario() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=lategame".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=lategame".to_string(),
         RoomMode::Lab(lategame_lab_config()),
         None,
         false,
@@ -189,7 +183,7 @@ fn lab_start_payload_uses_bundled_render_preview_god_mode() {
     let mut config = lab_config();
     config.scenario = Some("render-preview".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=render-preview".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=render-preview".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -226,7 +220,7 @@ fn lab_start_payload_uses_bundled_render_preview_god_mode() {
 #[test]
 fn lab_authoring_validation_returns_catalog_preview_without_mutating_lab() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -279,7 +273,7 @@ fn lab_room_first_join_during_drain_is_rejected_without_starting_session() {
     let drain = DrainHandle::default();
     drain.begin_draining(Duration::from_secs(295));
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -343,7 +337,7 @@ fn failed_lab_room_start_does_not_increment_drain_accounting() {
 #[test]
 fn lab_start_payload_additional_joiner_uses_policy_metadata() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -393,7 +387,7 @@ fn lab_start_payload_additional_joiner_uses_policy_metadata() {
 fn running_lab_room_collaborator_can_join_during_drain() {
     let drain = DrainHandle::default();
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -457,7 +451,7 @@ fn running_lab_room_collaborator_can_join_during_drain() {
 #[test]
 fn lab_room_full_vision_uses_all_player_fog_union() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -635,7 +629,7 @@ fn prepare_player_two_lab_mortar(
 #[test]
 fn lab_all_team_operator_receives_player_two_mortar_launch_event() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -675,7 +669,7 @@ fn lab_all_team_operator_receives_player_two_mortar_launch_event() {
 #[test]
 fn multiple_lab_all_team_viewers_receive_same_mortar_launch_event() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -744,7 +738,7 @@ fn multiple_lab_all_team_viewers_receive_same_mortar_launch_event() {
 #[test]
 fn lab_team_vision_receives_only_selected_player_mortar_events() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -861,7 +855,7 @@ fn lab_team_vision_receives_only_selected_player_mortar_events() {
 #[test]
 fn lab_start_payload_advertises_room_time_controls() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -913,7 +907,7 @@ fn lab_start_payload_advertises_room_time_controls() {
 #[test]
 fn paused_lab_room_steps_one_live_tick_and_shares_room_time_state() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -997,7 +991,7 @@ fn paused_lab_room_steps_one_live_tick_and_shares_room_time_state() {
 #[test]
 fn lab_operator_mutation_returns_result_broadcasts_state_and_logs() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -1052,7 +1046,7 @@ fn lab_operator_mutation_returns_result_broadcasts_state_and_logs() {
 #[test]
 fn lab_collaborators_can_mutate_issue_commands_and_log_requester() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -1141,7 +1135,7 @@ fn lab_collaborators_can_mutate_issue_commands_and_log_requester() {
 #[test]
 fn lab_read_only_role_rejects_privileged_ops() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -1275,7 +1269,7 @@ fn replay_viewer_rejects_lab_requests_and_gameplay_commands() {
 fn empty_lab_room_resets_session_without_changing_lab_mode() {
     let drain = DrainHandle::default();
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,

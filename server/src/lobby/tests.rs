@@ -783,7 +783,7 @@ async fn create_lobby_rejects_invalid_and_reserved_names() {
         "__replay_artifact__:demo",
         "__match_replay__:00000001",
         "__replay_branch__:00000001",
-        "__lab__:sandbox:map=Default",
+        "__lab__:sandbox:map=Chokes",
     ] {
         assert!(
             matches!(
@@ -961,7 +961,7 @@ async fn empty_recreatable_internal_rooms_are_disposed_and_hidden_from_browser()
             "__dev_scenario__:direct_reverse_order:unit=tank:count=1".to_string(),
             false,
         ),
-        ("__lab__:phase3-lab:map=Default:seed=123".to_string(), false),
+        ("__lab__:phase3-lab:map=Chokes:seed=123".to_string(), false),
         (
             "__replay_artifact__:phase3-missing-artifact".to_string(),
             true,

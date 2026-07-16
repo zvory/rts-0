@@ -151,8 +151,8 @@ fn add_vertical_wall_with_gaps(
 }
 
 #[test]
-fn no_terrain_fixture_is_one_clear_component() {
-    let debug = fixture_analysis("No Terrain");
+fn one_v_one_no_terrain_fixture_is_one_clear_component() {
+    let debug = fixture_analysis("1v1 No Terrain");
 
     assert_eq!(debug.map_width, 126);
     assert_eq!(debug.map_height, 126);
@@ -171,32 +171,14 @@ fn no_terrain_fixture_is_one_clear_component() {
 
 #[test]
 fn bundled_fixture_counts_are_deterministic() {
-    let expected = [
-        ExpectedFixture {
-            name: "Default",
-            component_count: 43,
-            passable_tiles: 14_634,
-            blocked_tiles: 1_242,
-            largest_component_tiles: 14_476,
-            resource_clusters: 12,
-        },
-        ExpectedFixture {
-            name: "Low Econ",
-            component_count: 45,
-            passable_tiles: 14_615,
-            blocked_tiles: 1_261,
-            largest_component_tiles: 14_451,
-            resource_clusters: 8,
-        },
-        ExpectedFixture {
-            name: "No Terrain",
-            component_count: 1,
-            passable_tiles: 126 * 126,
-            blocked_tiles: 0,
-            largest_component_tiles: 126 * 126,
-            resource_clusters: 8,
-        },
-    ];
+    let expected = [ExpectedFixture {
+        name: "Chokes",
+        component_count: 43,
+        passable_tiles: 14_634,
+        blocked_tiles: 1_242,
+        largest_component_tiles: 14_476,
+        resource_clusters: 12,
+    }];
 
     for fixture in expected {
         let debug = fixture_analysis(fixture.name);
@@ -233,26 +215,12 @@ fn bundled_fixture_counts_are_deterministic() {
 
 #[test]
 fn bundled_fixture_region_and_choke_counts_are_legible() {
-    let expected = [
-        ExpectedRegionFixture {
-            name: "Default",
-            regions: 5,
-            chokes_min: 12,
-            chokes_max: 12,
-        },
-        ExpectedRegionFixture {
-            name: "Low Econ",
-            regions: 5,
-            chokes_min: 12,
-            chokes_max: 12,
-        },
-        ExpectedRegionFixture {
-            name: "No Terrain",
-            regions: 1,
-            chokes_min: 0,
-            chokes_max: 0,
-        },
-    ];
+    let expected = [ExpectedRegionFixture {
+        name: "Chokes",
+        regions: 5,
+        chokes_min: 12,
+        chokes_max: 12,
+    }];
 
     for fixture in expected {
         let debug = fixture_analysis(fixture.name);
@@ -359,8 +327,8 @@ struct TargetBox {
 }
 
 #[test]
-fn default_chokes_cover_marked_gameplay_passages() {
-    let debug = fixture_analysis("Default");
+fn chokes_cover_marked_gameplay_passages() {
+    let debug = fixture_analysis("Chokes");
     let targets = [
         TargetBox {
             id: "T0",
@@ -461,7 +429,7 @@ fn default_chokes_cover_marked_gameplay_passages() {
 
     assert!(
         missing.is_empty(),
-        "Default gameplay chokes should cover marked passages; missing {missing:?}; chokes {:?}",
+        "Chokes gameplay passages should be covered; missing {missing:?}; chokes {:?}",
         debug
             .chokes
             .iter()
@@ -591,7 +559,7 @@ fn resource_clusters_cover_all_static_nodes_with_expected_base_shape() {
     let expected_nodes_per_cluster =
         (config::STEEL_PATCHES_PER_BASE + config::OIL_PATCHES_PER_BASE) as usize;
 
-    for map_name in ["Default", "Low Econ", "No Terrain"] {
+    for map_name in ["Chokes", "1v1 No Terrain"] {
         let debug = fixture_analysis(map_name);
         let total_clustered_nodes: usize = debug
             .resource_clusters
@@ -629,7 +597,7 @@ fn resource_clusters_cover_all_static_nodes_with_expected_base_shape() {
 
 #[test]
 fn player_starts_map_to_components_and_nearby_resource_clusters() {
-    for map_name in ["Default", "Low Econ", "No Terrain"] {
+    for map_name in ["Chokes", "1v1 No Terrain"] {
         let debug = fixture_analysis(map_name);
 
         assert_eq!(debug.starts.len(), 2);

@@ -3,7 +3,7 @@ use super::support::*;
 #[test]
 fn lab_timeline_records_mutations_and_issue_as_commands() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -135,7 +135,7 @@ fn lab_timeline_records_mutations_and_issue_as_commands() {
 #[test]
 fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -245,7 +245,7 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
 #[test]
 fn lab_seek_replays_issue_as_commands_through_rebuild() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -306,7 +306,7 @@ fn lab_seek_replays_issue_as_commands_through_rebuild() {
 #[test]
 fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -398,7 +398,7 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
     let reopened_artifact: crate::protocol::LabReplayArtifactV1 =
         serde_json::from_str(&json).expect("process-cold artifact parse");
     let mut reopened = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -461,7 +461,7 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
 #[test]
 fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -557,7 +557,7 @@ fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
 #[test]
 fn lab_seek_rejects_read_only_and_rapid_repeat_requests() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -609,7 +609,7 @@ fn lab_seek_rejects_read_only_and_rapid_repeat_requests() {
 #[test]
 fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -767,7 +767,7 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
 #[test]
 fn lab_timeline_resets_on_scenario_import() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -896,7 +896,7 @@ fn lab_timeline_resets_on_scenario_import() {
 #[test]
 fn lab_issue_as_accepts_single_owner_and_rejects_mixed_owner_commands() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -965,7 +965,7 @@ fn lab_issue_as_accepts_single_owner_and_rejects_mixed_owner_commands() {
 #[test]
 fn lab_team_vision_uses_server_projection() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,
@@ -1009,7 +1009,7 @@ fn lab_team_vision_uses_server_projection() {
 #[test]
 fn lab_vision_state_and_snapshots_are_per_operator() {
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
+        "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
         None,
         false,

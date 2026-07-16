@@ -26,7 +26,7 @@ fn singleton_team_assignment_matches_legacy_ffa_shuffle() {
 fn two_vs_two_team_starts_are_adjacent_on_default_map() {
     let players = start_players(&[(1, 1), (2, 1), (3, 2), (4, 2)]);
     let map =
-        Map::load_for_players("Default", &players, 0x1020_3040).expect("default map should load");
+        Map::load_for_players("Chokes", &players, 0x1020_3040).expect("default map should load");
 
     let team_one_distance = tile_distance_sq(map.starts[0], map.starts[1]);
     let team_two_distance = tile_distance_sq(map.starts[2], map.starts[3]);
@@ -48,7 +48,7 @@ fn two_vs_two_team_starts_are_adjacent_on_default_map() {
 fn one_vs_two_keeps_larger_team_together_when_map_supports_it() {
     let players = start_players(&[(1, 1), (2, 2), (3, 2)]);
     let map =
-        Map::load_for_players("Default", &players, 0x5566_7788).expect("default map should load");
+        Map::load_for_players("Chokes", &players, 0x5566_7788).expect("default map should load");
 
     let teammate_distance = tile_distance_sq(map.starts[1], map.starts[2]);
     let solo_to_first_teammate = tile_distance_sq(map.starts[0], map.starts[1]);
@@ -65,9 +65,9 @@ fn one_vs_two_keeps_larger_team_together_when_map_supports_it() {
 fn one_vs_three_is_deterministic_on_four_start_map() {
     let players = start_players(&[(1, 1), (2, 2), (3, 2), (4, 2)]);
     let a =
-        Map::load_for_players("Default", &players, 0xfeed_cafe).expect("default map should load");
+        Map::load_for_players("Chokes", &players, 0xfeed_cafe).expect("default map should load");
     let b =
-        Map::load_for_players("Default", &players, 0xfeed_cafe).expect("default map should load");
+        Map::load_for_players("Chokes", &players, 0xfeed_cafe).expect("default map should load");
 
     assert_eq!(a.starts, b.starts);
     assert_eq!(a.base_sites, b.base_sites);

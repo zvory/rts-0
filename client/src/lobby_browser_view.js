@@ -47,7 +47,7 @@ export function normalizeLobbySummary(row = {}) {
     room,
     kind,
     hostName: boundedText(row.hostName, "No host"),
-    map: boundedText(row.map, "Default"),
+    map: boundedText(row.map, "Chokes"),
     createdAtUnixMs: Math.max(0, integerOr(row.createdAtUnixMs, 0)),
     occupiedSlots: Math.max(0, integerOr(row.occupiedSlots, 0)),
     maxSlots,
@@ -163,7 +163,9 @@ export class LobbyBrowserView {
     this.actionsDisabled = !!actionsDisabled || !!error;
     this.root.classList.toggle("has-error", !!error);
     if (this.statusEl) {
-      this.statusEl.textContent = statusText({ loading, loaded, error });
+      const text = statusText({ loading, loaded, error });
+      this.statusEl.textContent = text;
+      this.statusEl.hidden = !text;
     }
     if (loading && this.rows.length === 0) {
       this.rowsRoot.replaceChildren(this._buildStateRow("Loading lobbies..."));
@@ -476,7 +478,7 @@ function statusText({ loading, loaded, error }) {
   if (error) return "Refresh failed";
   if (loading) return "Refreshing";
   if (!loaded) return "Not refreshed";
-  return "Live";
+  return "";
 }
 
 function slotsLabel(row) {

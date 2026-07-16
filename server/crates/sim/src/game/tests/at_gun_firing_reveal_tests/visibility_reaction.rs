@@ -364,6 +364,7 @@ fn checkpoint_restore_preserves_active_reveal_reaction_fire_tick() {
         .expect("enemy AT gun")
         .set_attack_cd(u32::MAX);
     baseline.tick();
+    baseline.tick();
 
     let checkpoint = baseline
         .checkpoint_payload_text_for_test()

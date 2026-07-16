@@ -122,7 +122,7 @@ withFakeHudDocument(() => {
   const row = {
     id: 7,
     startedAt: new Date().toISOString(),
-    mapName: "Default",
+    mapName: "Chokes",
     participants: ["Alice", "Bravo"],
     winnerName: null,
     outcome: "aborted",
@@ -166,7 +166,7 @@ withFakeHudDocument(() => {
       id: 42,
       replayNumber: 105,
       startedAt: new Date().toISOString(),
-      mapName: "Default",
+      mapName: "Chokes",
       participants: ["Alice", "Bravo"],
       durationMs: 12_000,
     },

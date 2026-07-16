@@ -241,8 +241,8 @@ async function soloStart(room) {
     await host.waitFor((m) => m.t === "welcome", 3000, "fog host welcome");
     host.send({ t: "join", name: "Fog" + host.playerId, room });
     await host.waitFor((m) => m.t === "lobby", 4000, "fog host lobby");
-    host.send({ t: "selectMap", map: "No Terrain" });
-    await host.waitFor((m) => m.t === "lobby" && m.map === "No Terrain", 4000, "fog map selection");
+    host.send({ t: "selectMap", map: "Chokes" });
+    await host.waitFor((m) => m.t === "lobby" && m.map === "Chokes", 4000, "fog map selection");
     for (const c of clients.slice(1)) {
       await c.open();
       await c.waitFor((m) => m.t === "welcome", 3000, "fog welcome");
