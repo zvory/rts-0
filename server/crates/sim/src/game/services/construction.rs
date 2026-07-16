@@ -452,8 +452,9 @@ pub(crate) fn resumable_site_for_build_intent(
 /// there would shelter it inside the building for the entire construction period. Tight placement
 /// against neighbouring buildings can also leave the worker clipping an adjacent footprint.
 ///
-/// We spiral outward from the worker's current tile and snap it to the first tile center where
-/// its body is fully static-standable (terrain passable, outside every building footprint).
+/// We snap it to the closest tile center where its body is fully static-standable (terrain
+/// passable, outside every building footprint). The scan covers the whole map: construction is
+/// infrequent, and an arbitrary local radius can strand a released worker in a dense base.
 fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worker: u32) {
     let (wx, wy, wkind) = match entities.get(worker) {
         Some(w) => (w.pos_x, w.pos_y, w.kind),
@@ -465,29 +466,22 @@ fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worke
         return;
     }
 
-    let (wtx, wty) = map.tile_of(wx, wy);
-    let ts = config::TILE_SIZE as f32;
-    for r in 1i32..=8 {
-        for dy in -r..=r {
-            for dx in -r..=r {
-                if dx.abs().max(dy.abs()) != r {
-                    continue;
-                }
-                let tx = wtx as i32 + dx;
-                let ty = wty as i32 + dy;
-                if !map.in_bounds(tx, ty) {
-                    continue;
-                }
-                let cx = tx as f32 * ts + ts * 0.5;
-                let cy = ty as f32 * ts + ts * 0.5;
-                if standability::unit_static_standable(map, &occ, wkind, cx, cy) {
-                    if let Some(w) = entities.get_mut(worker) {
-                        w.set_position(cx, cy);
-                    }
-                    return;
-                }
+    let mut destination: Option<((f32, f32), f32)> = None;
+    for ty in 0..map.size {
+        for tx in 0..map.size {
+            let (cx, cy) = map.tile_center(tx, ty);
+            if !standability::unit_static_standable(map, &occ, wkind, cx, cy) {
+                continue;
+            }
+            let distance2 = dist2(wx, wy, cx, cy);
+            if destination.is_none_or(|(_, best_distance2)| distance2 < best_distance2) {
+                destination = Some(((cx, cy), distance2));
             }
         }
+    }
+
+    if let (Some(w), Some(((x, y), _))) = (entities.get_mut(worker), destination) {
+        w.set_position(x, y);
     }
 }
 
