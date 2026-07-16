@@ -1,4 +1,4 @@
-import { sampleRigAnimation } from "./animation.js";
+import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
@@ -76,13 +76,19 @@ export class UnitRigInstance {
     const routeParts = normalizedPartSet(options.includeParts);
     this._routeParts = routeParts ? new Set(routeParts) : null;
     this._routePartKey = partSelectionKey(this._routeParts);
+    this._animationStage = createRigAnimationStage(definition, { includeParts: this._routeParts });
     this._destroyed = false;
 
     for (const part of definition.parts || []) {
       if (this._routeParts && !this._routeParts.has(part.id)) continue;
       const display = pixiFactory.createGraphics();
       display.rtsRigPartId = part.id;
-      this.parts.set(part.id, { definition: part, display });
+      this.parts.set(part.id, {
+        definition: part,
+        display,
+        transform: { initialized: false },
+        appearance: { initialized: false },
+      });
       this.container.addChild(display);
     }
   }
@@ -105,12 +111,7 @@ export class UnitRigInstance {
     this.container.rotation = 0;
 
     const includeParts = this._routeParts ?? normalizedPartSet(options.includeParts);
-    const sampled = options.sampledAnimation ?? sampleRigAnimation(
-      this.definition,
-      entity,
-      renderContext,
-      { includeParts },
-    );
+    const sampled = options.sampledAnimation ?? sampleRigAnimationInto(this._animationStage, entity, renderContext);
     for (const [partId, rec] of this.parts) {
       const partState = sampled.parts[partId];
       if (!partState || (includeParts && !includeParts.has(partId))) {
@@ -118,7 +119,7 @@ export class UnitRigInstance {
         options.diagnostics?.("renderer.rig.redraw.skipped.hidden");
         continue;
       }
-      applyPartState(rec.display, rec.definition, partState, sampled.context, options.diagnostics);
+      applyPartState(rec, partState, sampled.context, options.diagnostics);
     }
   }
 
@@ -134,96 +135,100 @@ export class UnitRigInstance {
   }
 }
 
-function applyPartState(display, part, state, context, diagnostics = null) {
+function applyPartState(rec, state, context, diagnostics = null) {
+  const { display, definition: part } = rec;
   display.visible = state.visible;
   if (!state.visible) {
     diagnostics?.("renderer.rig.redraw.skipped.hidden");
     return;
   }
 
-  applyDisplayTransform(display, displayTransform(state));
-  const tint = tintForSlot(state.tintSlot, context);
-  const drawKey = partDrawKey(state, tint);
+  applyDisplayTransform(rec, state);
+  const teamColor = hexToInt(context.teamColor);
+  const tintFill = tintFillForSlot(state.tintSlot, teamColor);
+  const tintStroke = tintStrokeForSlot(state.tintSlot, teamColor);
+  const geometryScaleX = state.geometryScale?.x ?? 1;
+  const geometryScaleY = state.geometryScale?.y ?? 1;
   diagnostics?.("renderer.rig.redraw.attempted");
-  if (display.rtsRigDrawKey === drawKey) {
+  const appearance = rec.appearance;
+  if (
+    appearance.initialized &&
+    appearance.tintFill === tintFill &&
+    appearance.tintStroke === tintStroke &&
+    appearance.geometryScaleX === geometryScaleX &&
+    appearance.geometryScaleY === geometryScaleY
+  ) {
     diagnostics?.("renderer.rig.redraw.skipped.unchanged");
     return;
   }
 
   display.clear?.();
   diagnostics?.("renderer.graphics.clear.liveRigPart");
-  drawPart(display, part.geometry, part.paint, tint, state.geometryScale);
-  display.rtsRigDrawKey = drawKey;
+  drawPart(display, part.geometry, part.paint, tintFill, tintStroke, geometryScaleX, geometryScaleY);
+  appearance.initialized = true;
+  appearance.tintFill = tintFill;
+  appearance.tintStroke = tintStroke;
+  appearance.geometryScaleX = geometryScaleX;
+  appearance.geometryScaleY = geometryScaleY;
   diagnostics?.("renderer.rig.redraw.completed");
 }
 
-function displayTransform(state) {
-  const localOffset = rotateOffset(state.localOffset, state.transform.rotation);
-  return {
-    x: state.transform.x + localOffset.x,
-    y: state.transform.y + localOffset.y,
-    pivotX: state.pivot.x,
-    pivotY: state.pivot.y,
-    scaleX: state.transform.scaleX,
-    scaleY: state.transform.scaleY,
-    rotation: state.transform.rotation,
-    alpha: state.alpha,
-  };
-}
+function applyDisplayTransform(rec, state) {
+  const { display, transform: last } = rec;
+  const rotation = state.transform.rotation;
+  const localX = state.localOffset?.x ?? 0;
+  const localY = state.localOffset?.y ?? 0;
+  let x = state.transform.x;
+  let y = state.transform.y;
+  if (localX !== 0 || localY !== 0) {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    x += localX * cos - localY * sin;
+    y += localX * sin + localY * cos;
+  }
+  const pivotX = state.pivot.x;
+  const pivotY = state.pivot.y;
+  const scaleX = state.transform.scaleX;
+  const scaleY = state.transform.scaleY;
+  const alpha = state.alpha;
 
-function applyDisplayTransform(display, transform) {
-  const last = display.rtsRigTransform;
-  if (!last || !nearly(last.alpha, transform.alpha)) display.alpha = transform.alpha;
-  if (!last || !nearly(last.x, transform.x) || !nearly(last.y, transform.y)) {
-    setPoint(display.position, transform.x, transform.y);
+  if (!last.initialized || !nearly(last.alpha, alpha)) display.alpha = alpha;
+  if (!last.initialized || !nearly(last.x, x) || !nearly(last.y, y)) {
+    setPoint(display.position, x, y);
   }
-  if (!last || !nearly(last.pivotX, transform.pivotX) || !nearly(last.pivotY, transform.pivotY)) {
-    setPoint(display.pivot, transform.pivotX, transform.pivotY);
+  if (!last.initialized || !nearly(last.pivotX, pivotX) || !nearly(last.pivotY, pivotY)) {
+    setPoint(display.pivot, pivotX, pivotY);
   }
-  if (!last || !nearly(last.scaleX, transform.scaleX) || !nearly(last.scaleY, transform.scaleY)) {
-    setPoint(display.scale, transform.scaleX, transform.scaleY);
+  if (!last.initialized || !nearly(last.scaleX, scaleX) || !nearly(last.scaleY, scaleY)) {
+    setPoint(display.scale, scaleX, scaleY);
   }
-  if (!last || !nearly(last.rotation, transform.rotation)) display.rotation = transform.rotation;
-  display.rtsRigTransform = transform;
+  if (!last.initialized || !nearly(last.rotation, rotation)) display.rotation = rotation;
+  last.initialized = true;
+  last.x = x;
+  last.y = y;
+  last.pivotX = pivotX;
+  last.pivotY = pivotY;
+  last.scaleX = scaleX;
+  last.scaleY = scaleY;
+  last.rotation = rotation;
+  last.alpha = alpha;
 }
 
 function nearly(a, b) {
   return Math.abs(a - b) <= 1e-9;
 }
 
-function rotateOffset(offset, rotation) {
-  if (!offset || (offset.x === 0 && offset.y === 0)) return { x: 0, y: 0 };
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
-  return {
-    x: offset.x * cos - offset.y * sin,
-    y: offset.x * sin + offset.y * cos,
-  };
-}
-
-function drawPart(g, geometry, paint, tint, geometryScale = null) {
-  const fill = paint.fill == null ? null : tint?.fill ?? hexToInt(paint.fill);
-  const stroke = paint.stroke == null ? null : tint?.stroke ?? hexToInt(paint.stroke);
+function drawPart(g, geometry, paint, tintFill, tintStroke, geometryScaleX = 1, geometryScaleY = 1) {
+  const fill = paint.fill == null ? null : tintFill ?? hexToInt(paint.fill);
+  const stroke = paint.stroke == null ? null : tintStroke ?? hexToInt(paint.stroke);
   if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
   else g.lineStyle?.(0, 0, 0);
   if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
-  drawGeometry(g, geometry, geometryScale);
+  drawGeometry(g, geometry, geometryScaleX, geometryScaleY);
   if (fill !== null) g.endFill?.();
 }
 
-function partDrawKey(state, tint) {
-  const geometryScale = state.geometryScale || {};
-  return [
-    tint?.fill ?? "",
-    tint?.stroke ?? "",
-    geometryScale.x ?? 1,
-    geometryScale.y ?? 1,
-  ].join("|");
-}
-
-function drawGeometry(g, geometry, geometryScale = null) {
-  const sx = geometryScale?.x ?? 1;
-  const sy = geometryScale?.y ?? 1;
+function drawGeometry(g, geometry, sx = 1, sy = 1) {
   if (geometry.type === "rect") drawRectAsPolygon(g, geometry, sx, sy);
   else if (geometry.type === "circle") {
     if (nearly(sx, sy)) g.drawCircle(geometry.cx * sx, geometry.cy * sy, geometry.r * sx);
@@ -272,22 +277,21 @@ function scalePathValues(values, sx, sy) {
   return values.map((value, index) => value * (index % 2 === 0 ? sx : sy));
 }
 
-function tintForSlot(slot, context) {
-  if (slot === "team") return { fill: hexToInt(context.teamColor) };
-  if (slot === "team-light") return { fill: lightenColor(hexToInt(context.teamColor), 0.12) };
-  if (slot === "team-light-soft") return { fill: lightenColor(hexToInt(context.teamColor), 0.06) };
-  if (slot === "team-light-strong") return { fill: lightenColor(hexToInt(context.teamColor), 0.16) };
-  if (slot === "team-light-08") return { fill: lightenColor(hexToInt(context.teamColor), 0.08) };
-  if (slot === "team-light-10") return { fill: lightenColor(hexToInt(context.teamColor), 0.10) };
-  if (slot === "team-light-14") return { fill: lightenColor(hexToInt(context.teamColor), 0.14) };
-  if (slot === "team-light-24") return { fill: lightenColor(hexToInt(context.teamColor), 0.24) };
-  if (slot === "team-stroke") return { stroke: hexToInt(context.teamColor) };
-  if (slot === "team-fill-stroke") {
-    const team = hexToInt(context.teamColor);
-    return { fill: team, stroke: team };
-  }
-  if (slot === "neutral") return { fill: 0x9aa0a8 };
+function tintFillForSlot(slot, team) {
+  if (slot === "team" || slot === "team-fill-stroke") return team;
+  if (slot === "team-light") return lightenColor(team, 0.12);
+  if (slot === "team-light-soft") return lightenColor(team, 0.06);
+  if (slot === "team-light-strong") return lightenColor(team, 0.16);
+  if (slot === "team-light-08") return lightenColor(team, 0.08);
+  if (slot === "team-light-10") return lightenColor(team, 0.10);
+  if (slot === "team-light-14") return lightenColor(team, 0.14);
+  if (slot === "team-light-24") return lightenColor(team, 0.24);
+  if (slot === "neutral") return 0x9aa0a8;
   return null;
+}
+
+function tintStrokeForSlot(slot, team) {
+  return slot === "team-stroke" || slot === "team-fill-stroke" ? team : null;
 }
 
 function setPoint(point, x, y) {

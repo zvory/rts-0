@@ -18,8 +18,10 @@ import {
 import { compileVisualUnitRigCandidates } from "../client/src/renderer/rigs/visual_override_rigs.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import {
+  createRigAnimationStage,
   createRigRenderContext,
   sampleRigAnimation,
+  sampleRigAnimationInto,
   transformedRigAnchorPoint,
 } from "../client/src/renderer/rigs/animation.js";
 import {
@@ -106,6 +108,45 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   assert.equal(sampled.parts["part.hull"].transform.rotation, Math.PI / 2);
   assert.equal(sampled.parts["part.turret"].transform.rotation, Math.PI);
   assert.equal(sampled.parts["part.barrel"].transform.rotation, Math.PI);
+});
+
+test("reusable animation staging preserves sampled values while reusing storage", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 71,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 80,
+    y: 90,
+    hp: 60,
+    maxHp: 100,
+    state: STATE.MOVE,
+    facing: Math.PI / 2,
+    weaponFacing: Math.PI,
+  };
+  const includeParts = new Set(["part.hull", "part.turret", "part.barrel"]);
+  const stage = createRigAnimationStage(definition, { includeParts });
+  const idleContext = createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0 },
+    colorByOwner: new Map([[1, 0x336699]]),
+  });
+  const idle = sampleRigAnimationInto(stage, entity, idleContext);
+  const idleParts = idle.parts;
+  const barrelState = idle.parts["part.barrel"];
+  const firingContext = createRigRenderContext(entity, {
+    now: fixedNow + 16,
+    state: { weaponRecoil: () => 1 },
+    colorByOwner: new Map([[1, 0x336699]]),
+  });
+  const firing = sampleRigAnimationInto(stage, entity, firingContext);
+  const fresh = sampleRigAnimation(definition, entity, firingContext, { includeParts });
+
+  assert.equal(firing, idle, "stage output record is reused");
+  assert.equal(firing.parts, idleParts, "part lookup is reused");
+  assert.equal(firing.parts["part.barrel"], barrelState, "part state is overwritten in place");
+  assert.deepEqual(firing, fresh, "staged sampling preserves public sampler values");
+  assert.notEqual(firing.parts, fresh.parts, "public sampling remains detached");
 });
 
 test("tank rig exposes transformed main and coax muzzle anchors", () => {
