@@ -30,7 +30,6 @@ const MAX_SCENARIO_DESCRIPTION_LEN: usize = 320;
 const MAX_SCENARIO_TAGS: usize = 8;
 const MAX_SCENARIO_TAG_LEN: usize = 32;
 const MAX_SCENARIO_NAME_LEN: usize = 80;
-const MAX_REVIEW_NOTES_LEN: usize = 2000;
 const MAX_SCENARIO_CATALOG_ENTRIES: usize = 256;
 const MAX_AUTHORING_SCENARIO_ENTITIES: usize = 2000;
 pub const MAX_LAB_SCENARIO_IMPORT_JSON_BYTES: usize = 1_000_000;
@@ -57,7 +56,6 @@ pub struct LabScenarioAuthoringPreview {
     pub manifest_path: String,
     pub manifest_entry: LabScenarioCatalogEntry,
     pub scenario_json: String,
-    pub review_notes: String,
     pub summary: String,
 }
 
@@ -150,19 +148,12 @@ pub fn validate_lab_scenario_authoring(
         .map(|tag| tag.trim().to_string())
         .filter(|tag| !tag.is_empty())
         .collect();
-    let review_notes = metadata.review_notes.unwrap_or_default().trim().to_string();
 
     if name.is_empty() || name.len() > MAX_SCENARIO_NAME_LEN {
         return Err(format!(
             "setup name must be non-empty and at most {MAX_SCENARIO_NAME_LEN} bytes"
         ));
     }
-    if review_notes.len() > MAX_REVIEW_NOTES_LEN {
-        return Err(format!(
-            "review notes must be at most {MAX_REVIEW_NOTES_LEN} bytes"
-        ));
-    }
-
     let scenario = checkpoint_backed_authoring_scenario(scenario, &name)?;
     let facts = validate_protocol_checkpoint_scenario("authoring", &scenario)?;
     validate_authoring_entity_count(facts.entity_count)?;
@@ -209,7 +200,6 @@ pub fn validate_lab_scenario_authoring(
         manifest_path: "server/assets/lab-scenarios/manifest.json".to_string(),
         manifest_entry: entry,
         scenario_json,
-        review_notes,
         summary: format!("Checkpoint setup ready for server/assets/lab-scenarios/{filename}."),
     })
 }
@@ -1217,7 +1207,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_scenario_authoring_validation_accepts_repo_ready_metadata() {
+    fn lab_scenario_authoring_validation_accepts_catalog_ready_metadata() {
         let loaded =
             load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
         let preview = validate_lab_scenario_authoring(
@@ -1227,7 +1217,6 @@ mod tests {
                 title: "Fresh Lab Scenario".to_string(),
                 description: "A deterministic lab setup ready for catalog review.".to_string(),
                 tags: vec!["two-player".to_string(), "test".to_string()],
-                review_notes: Some("Check army positioning before merge.".to_string()),
             },
             loaded.scenario,
         )
@@ -1259,7 +1248,6 @@ mod tests {
                 title: "Duplicate".to_string(),
                 description: "Duplicates the bundled lategame scenario id.".to_string(),
                 tags: vec!["test".to_string()],
-                review_notes: None,
             },
             loaded.scenario,
         )
@@ -1282,7 +1270,6 @@ mod tests {
                 title: "Bad Tag Scenario".to_string(),
                 description: "Uses malformed authoring tags.".to_string(),
                 tags: vec!["bad tag".to_string()],
-                review_notes: None,
             },
             loaded.scenario,
         )
@@ -1312,7 +1299,6 @@ mod tests {
                 title: "Oversized Payload".to_string(),
                 description: "Exercises the authoring JSON byte cap.".to_string(),
                 tags: vec!["test".to_string()],
-                review_notes: None,
             },
             LabScenarioPayload::Checkpoint(scenario),
         )

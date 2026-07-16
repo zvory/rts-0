@@ -66,22 +66,11 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   before the target tick and fast-forward from there. Replay setup and accepted seeks log
   build/rebuild duration, viewer/player counts, duration, and command counts so long artifacts and
   expensive controls are visible in server logs.
-- **Lab scenario PR submission boundary**: draft PR creation is disabled unless
-  `RTS_SCENARIO_PR_ENABLED` is truthy and server-side GitHub credentials/repo config are present.
-  The browser sees only `GET /api/lab-scenarios/submission` capability metadata. Actual
-  `submitScenario` requests originate in a lab room, export the current authoritative `Game`, apply
-  validated authoring metadata, and write only `server/assets/lab-scenarios/<slug>.json` plus
-  `server/assets/lab-scenarios/manifest.json` through a background job. The client never supplies
-  credentials, repository paths, branch names, commit text, or scenario snapshots as authority.
-  Catalog manifests are capped, scenario filenames must match their safe ids, authoring previews are
-  capped by entity count and formatted JSON bytes, and PR requests must contain exactly one scenario
-  JSON plus the manifest. Duplicate catalog ids/filenames, path traversal, unsafe branch prefixes,
-  branch collisions, missing credentials, rate limits, and GitHub failures return structured errors;
-  each lab room can start at most one PR submission job. Operators enable the service with
-  `RTS_SCENARIO_PR_ENABLED=1`, `RTS_SCENARIO_PR_GITHUB_TOKEN`, `RTS_SCENARIO_PR_REPO`, optional
-  `RTS_SCENARIO_PR_BASE_BRANCH`, and optional `RTS_SCENARIO_PR_BRANCH_PREFIX`. Live submission
-  currently shells out to `git` and GitHub CLI (`gh`) on the server host; missing tools fail the job
-  instead of falling back to browser credentials.
+- **Authoring is non-persistent**: lab setup validation exports and validates the current
+  authoritative `Game` in memory, then returns a bounded JSON preview to the requesting operator.
+  The map editor stores drafts in browser storage or exports JSON locally. Public HTTP and
+  WebSocket surfaces do not write maps, setup files, repository branches, or pull requests on the
+  server.
 - **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
   The lobby flips into a draining state, existing room tasks continue ticking active normal
   matches, and new match starts are rejected while lobby clients see `can_start: false`. Fly's

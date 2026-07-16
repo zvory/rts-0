@@ -33,7 +33,6 @@ use tokio::time::{interval, sleep_until, Instant as TokioInstant, MissedTickBeha
 
 use crate::config;
 use crate::db::Db;
-use crate::lab_scenario_submission::LabScenarioSubmissionService;
 use crate::protocol::{
     Event, LabClientOp, LabMapDraft, LabReplayArtifactV1, LobbyKind, ReplayBranchSeat,
     ReplayStartMetadata, ResourceDelta, ServerMessage, Snapshot, TeamId, VisionSelectionRequest,
@@ -726,7 +725,6 @@ pub struct Lobby {
     match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
     match_history_local_only: bool,
     drain: DrainHandle,
-    lab_scenario_submission: LabScenarioSubmissionService,
 }
 
 impl Lobby {
@@ -741,7 +739,6 @@ impl Lobby {
             match_history_writer: None,
             match_history_local_only: false,
             drain: DrainHandle::default(),
-            lab_scenario_submission: LabScenarioSubmissionService::disabled(),
         }
     }
 
@@ -769,11 +766,6 @@ impl Lobby {
     ) -> Self {
         self.match_history_writer = writer;
         self.match_history_local_only = local_only;
-        self
-    }
-
-    pub fn with_lab_scenario_submission(mut self, service: LabScenarioSubmissionService) -> Self {
-        self.lab_scenario_submission = service;
         self
     }
 
@@ -954,7 +946,6 @@ impl Lobby {
         let match_history_writer = self.match_history_writer.clone();
         let match_history_local_only = self.match_history_local_only;
         let drain = self.drain.clone();
-        let lab_scenario_submission = self.lab_scenario_submission.clone();
         let lifecycle = RoomLifecycle::new(name.clone(), identity, self.disposal_tx.clone());
         tokio::spawn(async move {
             let mut task = RoomTask::new_with_lifecycle(
@@ -964,8 +955,7 @@ impl Lobby {
                 match_history_local_only,
                 drain,
                 lifecycle,
-            )
-            .with_lab_scenario_submission(lab_scenario_submission);
+            );
             task.run(event_rx, shutdown_rx).await;
             crate::log_info!(room = %name, "room task exited");
         });

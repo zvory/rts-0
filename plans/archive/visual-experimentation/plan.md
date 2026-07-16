@@ -35,7 +35,7 @@ initial camera view from the profile, but it does not draw candidates yet.
 
 Render profile-owned, renderer-only entrenchment samples and lightweight labels inside the real lab
 renderer. The samples must live outside `GameState`, snapshots, selection, commands, minimap blips,
-fog sources, and scenario submission data. This is the first shippable visual iteration loop for
+fog sources, and scenario authoring data. This is the first shippable visual iteration loop for
 comparing trench candidates at gameplay scale.
 
 ### [Phase 3 - Real Unit Visual Overrides](phase-3.md)
@@ -52,7 +52,7 @@ workflow against the visual experimentation requirements and documenting any def
   multiplayer synchronization, hot reload, remote asset loading, file pickers, uploads, or public
   catalog persistence.
 - Do not change the server wire protocol, compact snapshot shape, checkpoint payloads,
-  checkpoint-backed lab setup JSON, lab setup PR submission data, balance values, commands, combat,
+  checkpoint-backed lab setup JSON, local lab setup exports, balance values, commands, combat,
   fog, pathing, minimap authority, or simulation state for this local workflow.
 - Treat the URL as an id selector only. `visualProfile` must be sanitized, must not enter the lab
   room string as executable data, and must never be interpreted as a path, URL, SVG body, module

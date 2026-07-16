@@ -8,7 +8,6 @@ pub mod build_info;
 pub(crate) mod config;
 pub mod db;
 pub mod dev_scenarios;
-pub mod lab_scenario_submission;
 pub mod lab_scenarios;
 pub mod lobby;
 pub mod protocol;

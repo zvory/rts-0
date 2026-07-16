@@ -6,8 +6,8 @@
 
 ## Objective
 
-Make the lab authoring panel produce scenario submissions that are valid, reviewable, and catalog
-ready before any GitHub PR action exists.
+Make the lab authoring panel produce scenario exports that are valid, reviewable, and catalog
+ready without any server-side write path.
 
 ## Work
 
@@ -22,9 +22,8 @@ ready before any GitHub PR action exists.
 - Preserve existing browser JSON export/import and download behavior as a local authoring fallback.
 - Decide where authoring state lives in the client. It should stay in app-owned lab UI or a small
   injected helper, not in `GameState`.
-- Add deterministic JSON formatting so a future PR diff is readable.
-- If useful, add a generated preview of the files that would be added or changed, but do not create
-  a GitHub branch in this phase.
+- Add deterministic JSON formatting so locally exported files are readable.
+- If useful, add a generated preview of the files that would be added or changed locally.
 
 ## Expected Touch Points
 
@@ -52,9 +51,9 @@ ready before any GitHub PR action exists.
 ## Manual Test Focus
 
 Create a lab setup, enter valid metadata, run validation, and confirm the panel reports it as ready.
-Then try an invalid slug and a duplicate existing scenario id and confirm submission remains blocked.
+Then try an invalid slug and a duplicate existing scenario id and confirm export remains blocked.
 
 ## Handoff Expectations
 
-Summarize the authoring fields, validation rules, exact error behavior, and the repo-ready payload
-shape that Phase 3 should send to GitHub.
+Summarize the authoring fields, validation rules, exact error behavior, and the catalog-ready local
+export shape.

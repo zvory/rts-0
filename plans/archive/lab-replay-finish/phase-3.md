@@ -11,10 +11,9 @@ setup checkpoints from lab replays while legacy setup compatibility waits for Ph
 
 - `client/src/lab_panel.js`
 - `client/src/lab_scenario_authoring.js`
-- `client/src/lab_scenario_submission_flow.js`
+- `client/src/lab_scenario_authoring_flow.js`
 - `client/src/lab_catalog.js`
 - `server/src/lab_scenarios.rs`
-- `server/src/lab_scenario_submission.rs`
 - `docs/design/protocol.md`
 - `docs/design/server-sim.md`
 - `tests/client_contracts/lab_contracts.mjs`
@@ -28,7 +27,7 @@ setup checkpoints from lab replays while legacy setup compatibility waits for Ph
   compatibility/setup internals with clear comments, or add new lab replay-specific helpers so new
   save/open behavior does not extend the legacy scenario vocabulary.
 - Keep old legacy setup imports readable during this phase with explicit compatibility wording.
-- Ensure bundled catalog entries and submission previews use checkpoint-backed setup artifacts.
+- Ensure bundled catalog entries and authoring previews use checkpoint-backed setup artifacts.
 - Update protocol parity/client contract tests to prevent new UI or docs from extending legacy
   setup DTOs as the preferred path.
 - Add client contract coverage for the lab replay save/open labels and for the setup-vs-replay

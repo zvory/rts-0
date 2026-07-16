@@ -10,7 +10,7 @@ should be able to emit checkpoint-backed setup data behind a test/debug or
 explicit internal option.
 
 This phase is compatibility-first. Preserve current lab import/export UI behavior, id remap
-responses, validation messages, authoring metadata, submission guardrails, and catalog behavior
+responses, validation messages, authoring metadata, export guardrails, and catalog behavior
 while proving the checkpoint path restores the same lab world.
 
 Explicit non-goals:
@@ -29,7 +29,7 @@ Explicit non-goals:
   optionally export checkpoint-backed lab setup data.
 - `server/src/lab_scenarios.rs`: validate checkpoint-backed previews beside existing setup
   previews if needed.
-- `server/src/lobby/room_task/lab.rs` and lab submission helpers: read-only unless an internal
+- `server/src/lobby/room_task/lab.rs` and lab authoring helpers: read-only unless an internal
   option is needed to exercise the adapter.
 - `server/crates/protocol` and `client/src/lab_*`: avoid changes unless the phase explicitly adds a
   compatibility metadata field or exposes checkpoint-backed setup JSON; do not alter UI copy
@@ -37,7 +37,7 @@ Explicit non-goals:
 - `docs/design/protocol.md` and `docs/context/protocol.md`: update if any import/export scenario
   shape, metadata field, or validation response changes.
 - Tests covering setup import/export parity, validation failures, id remap behavior, and
-  authoring/submission guardrails.
+  authoring/export guardrails.
 
 ## Verification
 

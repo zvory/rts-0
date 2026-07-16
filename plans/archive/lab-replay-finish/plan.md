@@ -37,7 +37,7 @@ lab replay can be reopened and reaches the same observable lab state.
 
 Move user-facing lab setup/export/import wording and flows away from "lab scenarios" as the primary
 concept. Setup-only artifacts should be treated as lab checkpoint setups, while evolving sessions
-should be lab replays. This phase updates client copy, catalog/submission naming, docs, tests, and
+should be lab replays. This phase updates client copy, catalog/authoring naming, docs, tests, and
 fixtures so new work no longer extends the legacy scenario concept.
 
 ### [Phase 4 - Retire Compatibility And Final Cleanup](phase-4.md)

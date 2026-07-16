@@ -1201,7 +1201,6 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "exportScenario", name?: string }
 { op: "importScenario", scenario: LabScenarioPayload }
 { op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
-{ op: "submitScenario", metadata: LabScenarioAuthoringMetadata }
 ```
 `LabVisionMode` is `{ mode: "all" }` or `{ mode: "team", teamId }`. `all` is translated to every
 current real player id and projects the union of their authoritative fog; `team` is translated to
@@ -1261,7 +1260,7 @@ zero on the edited map. Editor-directed records return only the map; simulation 
 timeline state, and replay history are not part of the contract.
 
 `LabScenarioPayload` accepts only the current checkpoint-backed setup container. Setup exports,
-validation previews, submissions, imports, and bundled catalog assets use `LabCheckpointScenarioV1`:
+validation previews, imports, and bundled catalog assets use `LabCheckpointScenarioV1`:
 ```
 {
   schemaVersion: 1,
@@ -1311,7 +1310,7 @@ embedded checkpoint payload, and returns the container `sourceEntityIdMap`.
 applies authoring metadata, pretty formats the setup JSON, checks duplicate catalog
 ids/filenames, id-matched filenames, manifest limits, setup entity count, and setup JSON byte
 limits, validates map metadata and checkpoint map binding, and restores through the same lab `Game`
-API without mutating the room or creating any Git branch.
+API without mutating the room or writing server state.
 `LabScenarioAuthoringMetadata` is:
 ```
 {
@@ -1319,8 +1318,7 @@ API without mutating the room or creating any Git branch.
   name: string,        // exported setup name, max 80 bytes
   title: string,       // catalog title, max 96 bytes
   description: string, // catalog description, max 320 bytes
-  tags?: string[],     // up to 8 catalog-safe tags, max 32 bytes each
-  reviewNotes?: string // PR/reviewer context, max 2000 bytes
+  tags?: string[]      // up to 8 catalog-safe tags, max 32 bytes each
 }
 ```
 `LabReplayArtifactV1` is the portable lab-session artifact contract owned by `rts-protocol`
@@ -1386,7 +1384,7 @@ schema-version-1 artifacts containing singular spawn/delete/move/owner/player op
 readable.
 `setVision` is excluded because it is per-operator projection metadata; reopening a lab replay
 starts from `initialSetup.metadata.lab.vision` and connected viewers may choose their own current
-lab vision afterward. `exportScenario`, `validateScenario`, and `submitScenario` are checkpoint
+lab vision afterward. `exportScenario` and `validateScenario` are checkpoint
 setup UI/control requests and never enter the durable stream. Checkpoint setup import uses rebase semantics: the
 artifact replaces `initialSetup` with the imported `LabCheckpointScenarioV1` and clears prior
 operations instead of storing an import operation. That keeps later entity references unambiguous:
@@ -1402,19 +1400,8 @@ unit caps (`256` normally, `4096` when `ignoreCommandLimits` is true), timeline 
 excluded session/setup/import operations before mutating a live lab game.
 
 Accepted setup validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
-`manifestEntry`, `manifestPath`, `scenarioPath`, deterministic `scenarioJson`, and `reviewNotes`
-for the server-side setup PR submission flow.
-`submitScenario` uses the same authoritative export and validation path, then hands the validated
-preview to the disabled-by-default server-side PR submission service. It does not accept browser
-supplied setup JSON, branch names, paths, commit content, or credentials. The room returns one
-final async `labResult` for the request: success has
-`{ status: "submitted", prUrl, branchName, scenarioPath, manifestPath }`; failure has `error` plus
-`outcome.code` using one of `credentialsMissing`, `configurationError`, `validationFailure`,
-`duplicateSlug`, `branchCollision`, `githubApiError`, `rateLimit`, or `ioError`. Each lab room can
-start at most one setup PR submission job so a bad client cannot spam repository writes; failed
-credential/capability checks happen before a job is counted. Generated draft PR bodies include
-setup metadata, validation summary, author notes, and a reviewer checklist for setup name,
-map, player/faction setup, entity count, intended use, and manual lab smoke after merge.
+`manifestEntry`, `manifestPath`, `scenarioPath`, and deterministic `scenarioJson`. The preview is
+returned to the requesting operator only; no lab request writes setup files or repository state.
 `facing` serializes unit body orientation, and `weaponFacing` serializes stable combat
 weapon/turret orientation for entities with combat state. `setUp` serializes only stable deployed
 support-weapon state for machine gunners, anti-tank guns, mortar teams, and artillery; omitted
@@ -1443,20 +1430,6 @@ iteration hot reload, and `/dev/scenario` migration. Bundled prebuilt setups are
 join through the HTTP lab setup catalog and direct lab URL `scenario=<id>` tokens, not through a
 normal-lobby command or a lab client op. Pause, speed, step, and room-local timeline metadata use
 the neutral room-time messages instead of overloading `LabClientOp`.
-
-`GET /api/lab-scenarios/submission` is the HTTP capability probe for the PR service:
-```
-{
-  available: bool,
-  unavailableCode?: string,
-  unavailableReason?: string,
-  branchPrefix: string,
-  scenarioPathPrefix: "server/assets/lab-scenarios/",
-  manifestPath: "server/assets/lab-scenarios/manifest.json"
-}
-```
-The endpoint never exposes GitHub tokens or repository credentials. When unavailable, local lab
-setup import/export and validation remain usable.
 
 ### 2.7 Observer analysis state
 

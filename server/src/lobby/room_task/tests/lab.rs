@@ -1,49 +1,6 @@
 use super::support::*;
-use crate::lab_scenario_submission::{
-    LabScenarioPrRequest, LabScenarioSubmissionService, LabScenarioSubmissionSuccess,
-    ScenarioPrBackend, ScenarioPrFuture, LAB_SCENARIO_SUBMISSION_MANIFEST_PATH,
-};
 use rts_rules::{faction::CURRENT_CATALOG, EntityKind};
 use rts_sim::game::lab::LabOp;
-use std::sync::{Arc, Mutex as StdMutex};
-
-#[derive(Clone)]
-struct RecordingSubmissionBackend {
-    captured: Arc<StdMutex<Vec<LabScenarioPrRequest>>>,
-}
-
-impl ScenarioPrBackend for RecordingSubmissionBackend {
-    fn create_draft_pr(&self, request: LabScenarioPrRequest) -> ScenarioPrFuture {
-        let captured = self.captured.clone();
-        Box::pin(async move {
-            let scenario_path = request
-                .files
-                .iter()
-                .find(|file| file.path != LAB_SCENARIO_SUBMISSION_MANIFEST_PATH)
-                .map(|file| file.path.clone())
-                .unwrap_or_default();
-            let success = LabScenarioSubmissionSuccess {
-                pr_url: "https://github.com/example/rts/pull/17".to_string(),
-                branch_name: request.branch_name.clone(),
-                scenario_path,
-                manifest_path: LAB_SCENARIO_SUBMISSION_MANIFEST_PATH.to_string(),
-            };
-            captured.lock().unwrap().push(request);
-            Ok(success)
-        })
-    }
-}
-
-fn authoring_metadata(slug: &str) -> crate::protocol::LabScenarioAuthoringMetadata {
-    crate::protocol::LabScenarioAuthoringMetadata {
-        slug: slug.to_string(),
-        name: "Submitted Lab Scenario".to_string(),
-        title: "Submitted Lab Scenario".to_string(),
-        description: "A submitted lab scenario for room-task tests.".to_string(),
-        tags: vec!["test".to_string()],
-        review_notes: Some("Verify the submitted state.".to_string()),
-    }
-}
 
 #[test]
 fn lab_start_payload_initial_operator_uses_policy_metadata() {
@@ -267,7 +224,7 @@ fn lab_start_payload_uses_bundled_render_preview_god_mode() {
 }
 
 #[test]
-fn lab_authoring_validation_returns_repo_preview_without_mutating_lab() {
+fn lab_authoring_validation_returns_catalog_preview_without_mutating_lab() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Default".to_string(),
         RoomMode::Lab(lab_config()),
@@ -290,7 +247,6 @@ fn lab_authoring_validation_returns_repo_preview_without_mutating_lab() {
                 title: "Room Dry Run".to_string(),
                 description: "Dry-run validation from the authoritative lab game.".to_string(),
                 tags: vec!["test".to_string()],
-                review_notes: Some("No branch should be created in phase two.".to_string()),
             },
         },
     );
@@ -316,152 +272,6 @@ fn lab_authoring_validation_returns_repo_preview_without_mutating_lab() {
     let session = task.lab_session.as_ref().expect("lab session");
     assert!(!session.dirty);
     assert!(session.operation_log.is_empty());
-}
-
-#[test]
-fn lab_scenario_submission_without_credentials_returns_structured_error() {
-    let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
-        RoomMode::Lab(lab_config()),
-        None,
-        false,
-        DrainHandle::default(),
-    );
-    let (msg_tx, mut writer) = ConnectionSink::new();
-    let (ack, _ack_rx) = tokio::sync::oneshot::channel();
-    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
-    drain_reliable_messages(&mut writer);
-
-    task.on_lab_request(
-        99,
-        8,
-        LabClientOp::SubmitScenario {
-            metadata: authoring_metadata("missing-credentials-submit"),
-        },
-    );
-
-    let result = lab_results(&mut writer).pop().expect("submission result");
-    assert!(!result.ok);
-    assert_eq!(result.op, "submitScenario");
-    assert!(result
-        .error
-        .as_deref()
-        .is_some_and(|error| error.contains("disabled")));
-    assert_eq!(
-        result
-            .outcome
-            .as_ref()
-            .and_then(|outcome| outcome.get("code"))
-            .and_then(serde_json::Value::as_str),
-        Some("credentialsMissing")
-    );
-}
-
-#[tokio::test]
-async fn lab_scenario_submission_dispatches_authoritative_export_and_rate_limits_room() {
-    let captured = Arc::new(StdMutex::new(Vec::new()));
-    let service = LabScenarioSubmissionService::enabled_for_test(RecordingSubmissionBackend {
-        captured: captured.clone(),
-    });
-    let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default".to_string(),
-        RoomMode::Lab(lab_config()),
-        None,
-        false,
-        DrainHandle::default(),
-    )
-    .with_lab_scenario_submission(service);
-    let (msg_tx, mut writer) = ConnectionSink::new();
-    let (ack, _ack_rx) = tokio::sync::oneshot::channel();
-    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
-    drain_reliable_messages(&mut writer);
-
-    task.on_lab_request(
-        99,
-        9,
-        LabClientOp::SetPlayerResources {
-            player_id: LAB_PLAYER_ONE_ID,
-            steel: 777,
-            oil: 66,
-        },
-    );
-    assert!(lab_results(&mut writer)[0].ok);
-
-    task.on_lab_request(
-        99,
-        10,
-        LabClientOp::SubmitScenario {
-            metadata: authoring_metadata("successful-submit"),
-        },
-    );
-
-    let result = tokio::time::timeout(Duration::from_secs(1), async {
-        loop {
-            if let ServerMessage::LabResult(result) =
-                writer.reliable_rx.recv().await.expect("lab result message")
-            {
-                break result;
-            }
-        }
-    })
-    .await
-    .expect("submission result should arrive");
-    assert!(result.ok, "submission should succeed: {result:?}");
-    assert_eq!(
-        result
-            .outcome
-            .as_ref()
-            .and_then(|outcome| outcome.get("prUrl"))
-            .and_then(serde_json::Value::as_str),
-        Some("https://github.com/example/rts/pull/17")
-    );
-
-    let captured = captured.lock().unwrap();
-    assert_eq!(captured.len(), 1);
-    let request = &captured[0];
-    assert_eq!(
-        request.branch_name,
-        "zvorygin/lab-scenario-successful-submit"
-    );
-    let scenario_file = request
-        .files
-        .iter()
-        .find(|file| file.path == "server/assets/lab-scenarios/successful-submit.json")
-        .expect("scenario file should be part of PR request");
-    let scenario: crate::protocol::LabCheckpointScenarioV1 =
-        serde_json::from_str(&scenario_file.contents).expect("submitted checkpoint scenario JSON");
-    assert_eq!(scenario.kind, "labCheckpointScenario");
-    let checkpoint: serde_json::Value =
-        serde_json::from_str(&scenario.checkpoint_payload).expect("embedded checkpoint payload");
-    let player = checkpoint["players"]
-        .as_array()
-        .expect("checkpoint players")
-        .iter()
-        .find(|player| player["id"].as_u64() == Some(u64::from(LAB_PLAYER_ONE_ID)))
-        .expect("lab player one in checkpoint payload");
-    assert_eq!(player["steel"].as_u64(), Some(777));
-    assert_eq!(player["oil"].as_u64(), Some(66));
-    drop(captured);
-
-    task.on_lab_request(
-        99,
-        11,
-        LabClientOp::SubmitScenario {
-            metadata: authoring_metadata("second-submit"),
-        },
-    );
-    let rate_limited = lab_results(&mut writer)
-        .pop()
-        .expect("rate-limit result should be immediate");
-    assert!(!rate_limited.ok);
-    assert_eq!(
-        rate_limited
-            .outcome
-            .as_ref()
-            .and_then(|outcome| outcome.get("code"))
-            .and_then(serde_json::Value::as_str),
-        Some("rateLimit")
-    );
 }
 
 #[test]

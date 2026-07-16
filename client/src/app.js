@@ -54,9 +54,6 @@ import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_contro
 import { LabPanel } from "./lab_panel.js";
 import { MapEditorSession, authoredMapFromMaterialized } from "./map_editor_session.js";
 import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
-import {
-  fetchLabScenarioSubmissionCapability as fetchLabScenarioSubmissionCapabilityRequest,
-} from "./lab_scenario_submission_capability.js";
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
@@ -605,8 +602,6 @@ export class App {
         startPayload: payload,
         match: this.match,
         onEditMap: () => this.openCurrentLabMapInEditor(),
-        submissionCapability: this.fetchLabScenarioSubmissionCapability(),
-        openWindow: (url) => window.open(url, "_blank", "noopener,noreferrer"),
       });
     }
     diagnostics.mark("app.onStart.end");
@@ -631,10 +626,6 @@ export class App {
     url.searchParams.set("workspace", this.labLaunch?.workspaceId || "default");
     this.allowUnloadWithoutWarning = true;
     window.location.assign(url.toString());
-  }
-
-  async fetchLabScenarioSubmissionCapability() {
-    return fetchLabScenarioSubmissionCapabilityRequest();
   }
 
   onBranchFromTickCreated(m) {

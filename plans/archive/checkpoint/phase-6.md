@@ -4,12 +4,12 @@ Status: Done.
 
 ## Scope
 
-Migrate bundled lab setup assets and lab export/submission defaults to checkpoint-backed setup
+Migrate bundled lab setup assets and lab export defaults to checkpoint-backed setup
 containers. This is the first phase that may intentionally change the lab setup JSON shape, but
 it should do so only after Phase 5 proves side-by-side parity.
 
 Old legacy lab setup files should remain readable during the transition unless the implementation
-adds a deliberate, documented rejection policy and updates every catalog/submission caller. Any
+adds a deliberate, documented rejection policy and updates every catalog/import caller. Any
 conversion script must be deterministic, reviewable, and keep generated noise out of unrelated
 files.
 
@@ -37,8 +37,6 @@ Explicit non-goals:
 - `server/lab_scenarios/**` or the current bundled setup asset directory: convert assets to the
   checkpoint-backed format.
 - `server/src/lab_scenarios.rs`: load, validate, preview, and catalog checkpoint-backed assets.
-- `server/src/lab_scenario_submission.rs`: default new submissions to checkpoint-backed setup
-  files and preserve path allowlists.
 - `server/src/lobby/room_task/lab.rs` and lab import/export handlers: update setup import, export,
   validation, and result mapping only through the existing lab setup surface; preserve
   operator permissions, id-remap behavior, room dirty/timeline semantics, and user-facing validation
@@ -56,7 +54,7 @@ Explicit non-goals:
   snapshots to its pre-cutover version.
 - Old legacy setup compatibility fixtures still load or fail with the deliberate policy chosen in
   this phase.
-- Lab setup submission still rejects path traversal, duplicate ids/slugs, invalid metadata,
+- Lab setup export validation still rejects path traversal, duplicate ids/slugs, invalid metadata,
   unsupported maps/factions, over-cap entity counts, and malformed checkpoint payloads.
 - Setup import/export still validates map identity/hash before restore, rejects oversized setup
   containers and embedded payloads, preserves entity id-remap responses expected by current import
@@ -94,6 +92,6 @@ The handoff must name:
 - old-format compatibility policy;
 - public lab scenario import/export hardening added for checkpoint-backed JSON, including byte/count
   caps, map binding checks, path allowlists, id-remap compatibility, and malformed-payload failures;
-- validation and submission tests that passed;
+- validation and local export/import tests that passed;
 - any client-facing copy or behavior changes;
 - manual catalog/import/export focus for Phase 7.

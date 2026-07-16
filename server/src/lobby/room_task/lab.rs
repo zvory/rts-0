@@ -38,7 +38,6 @@ use rts_sim::game::{Game, PlayerInit};
 use replay::LabReplayRebaseSource;
 
 mod replay;
-mod submission;
 
 pub(super) struct LabSession {
     pub(super) public_id: String,
@@ -50,7 +49,6 @@ pub(super) struct LabSession {
     pub(super) dirty: bool,
     pub(super) operation_log: Vec<LabOperationLogEntry>,
     pub(super) view_player_id: u32,
-    pub(super) scenario_submission_jobs_started: u8,
 }
 
 #[allow(dead_code)]
@@ -91,7 +89,6 @@ impl LabSession {
             dirty: false,
             operation_log: Vec::new(),
             view_player_id: LAB_PLAYER_ONE_ID,
-            scenario_submission_jobs_started: 0,
         }
     }
 
@@ -180,7 +177,6 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
         LabClientOp::ExportScenario { .. } => "exportScenario",
         LabClientOp::ImportScenario { .. } => "importScenario",
         LabClientOp::ValidateScenario { .. } => "validateScenario",
-        LabClientOp::SubmitScenario { .. } => "submitScenario",
         LabClientOp::SpawnEntity { .. } => "spawnEntity",
         LabClientOp::SpawnEntities { .. } => "spawnEntities",
         LabClientOp::DeleteEntity { .. } => "deleteEntity",
@@ -318,7 +314,6 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
         LabClientOp::ExportMap
         | LabClientOp::ExportScenario { .. }
         | LabClientOp::ValidateScenario { .. }
-        | LabClientOp::SubmitScenario { .. }
         | LabClientOp::SetVision { .. }
         | LabClientOp::IssueCommandAs { .. } => Err(("not a lab mutation".to_string(), None)),
     }
@@ -945,7 +940,6 @@ impl RoomTask {
             LabClientOp::ExportScenario { .. }
                 | LabClientOp::ImportScenario { .. }
                 | LabClientOp::ValidateScenario { .. }
-                | LabClientOp::SubmitScenario { .. }
         ) && !policy.allows_lab_scenario_io()
         {
             self.send_lab_result_to(
@@ -995,9 +989,6 @@ impl RoomTask {
             }
             LabClientOp::ValidateScenario { metadata } => {
                 Some(self.validate_lab_scenario(player_id, request_id, metadata))
-            }
-            LabClientOp::SubmitScenario { metadata } => {
-                self.submit_lab_scenario(player_id, request_id, metadata)
             }
             LabClientOp::IssueCommandAs {
                 player_id: command_player_id,

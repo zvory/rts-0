@@ -5,7 +5,6 @@ export const LAB_SCENARIO_AUTHORING_LIMITS = Object.freeze({
   description: 320,
   tags: 8,
   tag: 32,
-  reviewNotes: 2000,
 });
 
 export function createLabScenarioAuthoringState({ defaultName = "Untitled lab setup" } = {}) {
@@ -16,7 +15,6 @@ export function createLabScenarioAuthoringState({ defaultName = "Untitled lab se
     slug: slugifyLabScenario(name),
     description: "",
     tags: "",
-    reviewNotes: "",
     scenarioJson: "",
   };
 }
@@ -36,7 +34,6 @@ export function validateLabScenarioAuthoringState(state) {
   const title = cleanAuthoringText(state?.title);
   const slug = cleanAuthoringText(state?.slug);
   const description = cleanAuthoringText(state?.description);
-  const reviewNotes = cleanAuthoringText(state?.reviewNotes);
   const { tags, errors: tagErrors } = parseLabScenarioTags(state?.tags);
   const errors = [];
 
@@ -52,9 +49,6 @@ export function validateLabScenarioAuthoringState(state) {
   if (!description || description.length > LAB_SCENARIO_AUTHORING_LIMITS.description) {
     errors.push(`Description must be 1-${LAB_SCENARIO_AUTHORING_LIMITS.description} bytes.`);
   }
-  if (reviewNotes.length > LAB_SCENARIO_AUTHORING_LIMITS.reviewNotes) {
-    errors.push(`Review notes must be at most ${LAB_SCENARIO_AUTHORING_LIMITS.reviewNotes} bytes.`);
-  }
   errors.push(...tagErrors);
 
   const metadata = {
@@ -64,7 +58,6 @@ export function validateLabScenarioAuthoringState(state) {
     description,
     tags,
   };
-  if (reviewNotes) metadata.reviewNotes = reviewNotes;
   return { ok: errors.length === 0, errors, metadata };
 }
 

@@ -463,22 +463,14 @@ assert(
   "lab setup validation builder must emit the exact wire shape",
 );
 assert(
-  JSON.stringify(msg.labSubmitScenario(17, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] })) ===
-    JSON.stringify({
-      t: "lab",
-      requestId: 17,
-      op: {
-        op: "submitScenario",
-        metadata: { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] },
-      },
-    }),
-  "lab setup submission builder must emit the exact wire shape",
+  typeof msg.labSubmitScenario === "undefined" &&
+    !rust.includes("SubmitScenario"),
+  "lab setup submission must remain unavailable in both protocol mirrors",
 );
 assert(
   rust.includes("ExportScenario") &&
     rust.includes("ImportScenario") &&
     rust.includes("ValidateScenario") &&
-    rust.includes("SubmitScenario") &&
     rust.includes("LabScenarioPayload") &&
     rust.includes("LabCheckpointScenarioV1") &&
     !rust.includes("LabScenarioV1") &&
@@ -512,8 +504,7 @@ assert(
     !protocolDoc.includes("LabScenarioOrder") &&
     protocolDoc.includes("godModePlayers") &&
     protocolDoc.includes("initialCamera") &&
-    protocolDoc.includes("validateScenario") &&
-    protocolDoc.includes("submitScenario"),
+    protocolDoc.includes("validateScenario"),
   "lab setup/replay protocol surface must be documented and mirrored",
 );
 assert(
