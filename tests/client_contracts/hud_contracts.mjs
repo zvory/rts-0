@@ -1098,6 +1098,10 @@ function fakeHudRootWithoutResourceSpans() {
   const lockedSmoke = buttonByAction(lockedAbilityCard, "ability");
   assert(!lockedSmoke.enabled, "Smoke should be disabled until the player completes an R&D Complex");
   assert(lockedSmoke.title === "Requires R&D Complex", "locked Smoke should explain its R&D requirement");
+  assert(
+    lockedSmoke.tooltipHtml.includes("Requires R&D Complex"),
+    "locked Smoke hover content should explain its R&D requirement",
+  );
   const abilityCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutCar],
     entities: [smokeResearchComplex, scoutCar],
@@ -1308,6 +1312,24 @@ function fakeHudRootWithoutResourceSpans() {
     assert(button.title === "Not enough resources", "command title should preserve disabled reason");
     button.listeners.click({ preventDefault() {} });
     assert(unavailable, "unaffordable command click should dispatch unavailable handler");
+  });
+
+  withFakeDocument(() => {
+    const button = HUD.prototype._cmdButton({
+      icon: "SMK",
+      label: "Smoke",
+      enabled: false,
+      title: "Requires R&D Complex",
+      tooltipHtml:
+        `<span class="cmd-tooltip-title">Smoke</span>` +
+        `<span class="cmd-tooltip-desc">Requires R&D Complex</span>`,
+      onClick() {},
+    });
+    assert(button.disabled, "locked Smoke command should remain disabled");
+    assert(
+      button.innerHTML.includes("Requires R&D Complex"),
+      "locked Smoke button should render its requirement in visible hover content",
+    );
   });
 
   withFakeDocument(() => {
