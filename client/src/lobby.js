@@ -729,9 +729,10 @@ export class Lobby {
       this._reflectRefreshButton();
       return normalizedRows;
     } catch (err) {
+      if (controller && this._browserAbort !== controller) return null;
       if (err?.name === "AbortError") {
-        if (controller && this._browserAbort !== controller) return null;
         this._browserLoading = false;
+        this._browserAbort = null;
         this._reflectRefreshButton();
         return null;
       }

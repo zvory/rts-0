@@ -35,21 +35,29 @@ export class MatchHistory {
   /** Re-fetch and re-render. Safe to call multiple times. */
   async refresh() {
     if (this._ac) this._ac.abort();
-    this._ac = new AbortController();
+    const controller = new AbortController();
+    this._ac = controller;
     this._loading = true;
     this._setLoading();
     try {
       const url = `/api/matches?limit=${encodeURIComponent(this.limit)}`;
-      const res = await this.fetchImpl(url, { signal: this._ac.signal });
+      const res = await this.fetchImpl(url, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const rows = await res.json();
       if (!Array.isArray(rows)) throw new Error("malformed response");
+      if (this._ac !== controller) return;
+      this._ac = null;
       this._rows = rows;
       this._loading = false;
       this._renderRows();
     } catch (err) {
-      if (err && err.name === "AbortError") return;
+      if (this._ac !== controller) return;
+      this._ac = null;
       this._loading = false;
+      if (err && err.name === "AbortError") {
+        this._reflectRefreshButton();
+        return;
+      }
       this._setError(err && err.message ? String(err.message) : "Failed to load");
     }
   }

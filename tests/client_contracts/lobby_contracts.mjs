@@ -531,6 +531,42 @@ import { textWithin } from "./dom_text.mjs";
     "lobby create suggestion avoids reserved internal prefixes");
 
   {
+    const requests = [];
+    const renders = [];
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _joined: false,
+      root: { hidden: false },
+      browserView: {},
+      _browserLoading: false,
+      _browserLoaded: false,
+      _browserAbort: null,
+      _fetchImpl(_url, { signal }) {
+        return new Promise((resolve, reject) => requests.push({ resolve, reject, signal }));
+      },
+      _renderLobbyBrowser(state = {}) {
+        renders.push(state);
+      },
+      _reflectRefreshButton() {},
+    });
+    const staleRefresh = lobby._refreshLobbyBrowser({ force: true });
+    const currentRefresh = lobby._refreshLobbyBrowser({ force: true });
+    assert(requests[0].signal.aborted, "a forced lobby refresh aborts the older request");
+
+    requests[1].resolve({
+      ok: true,
+      async json() { return [{ room: "Current lobby" }]; },
+    });
+    await currentRefresh;
+    requests[0].reject(new Error("stale request failed after abort"));
+    await staleRefresh;
+
+    assert(renders.at(-1).rows?.[0]?.room === "Current lobby",
+      "a stale lobby refresh error cannot overwrite the latest rows");
+    assert(!lobby._browserLoading && lobby._browserAbort === null,
+      "the latest lobby refresh owns the loading state");
+  }
+
+  {
     let connectionChecks = 0;
     let joinedRoom = "";
     const lobby = Object.assign(Object.create(Lobby.prototype), {
