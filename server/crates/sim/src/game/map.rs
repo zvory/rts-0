@@ -27,7 +27,7 @@ pub const CURRENT_MAP_VERSION: u32 = 3;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
-const DEFAULT_MAP_NAME: &str = "Default";
+const DEFAULT_MAP_NAME: &str = "Chokes";
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
@@ -412,10 +412,8 @@ mod tests {
             "lobby map catalog must expose at least one selectable map"
         );
         let names: Vec<&str> = available.iter().map(|e| e.name.as_str()).collect();
-        assert!(names.contains(&"Default"), "got: {names:?}");
+        assert!(names.contains(&"Chokes"), "got: {names:?}");
         assert!(names.contains(&"1v1"), "got: {names:?}");
-        assert!(names.contains(&"Low Econ"), "got: {names:?}");
-        assert!(names.contains(&"No Terrain"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         assert!(names.contains(&"4 Player Map"), "got: {names:?}");
         // Every entry must have a non-empty description.
@@ -434,7 +432,7 @@ mod tests {
             );
         }
 
-        let map = Map::load("Default", 2, 0x1234_5678)
+        let map = Map::load("Chokes", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
         assert_eq!(map.size, 126);
         assert_eq!(map.starts.len(), 2);

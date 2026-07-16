@@ -455,7 +455,7 @@ Top-level shape:
     "optionalFeatures": []
   },
   "mapBinding": {
-    "name": "Default",
+    "name": "Chokes",
     "schemaVersion": 2,
     "contentHash": "...",
     "materializedMapHash": "...",

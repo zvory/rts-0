@@ -18,7 +18,7 @@ fn checkpoint_payload(
         "schema": "rts.gameCheckpoint",
         "version": 1,
         "mapBinding": {
-            "name": "Default",
+            "name": "Chokes",
             "schemaVersion": 2,
             "contentHash": content_hash,
             "materializedMapHash": materialized_hash,
@@ -50,7 +50,7 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
         name: "Initial lab setup".to_string(),
         seed,
         map: LabCheckpointScenarioMap {
-            name: "Default".to_string(),
+            name: "Chokes".to_string(),
             schema_version: 2,
             content_hash: content_hash.to_string(),
             materialized_hash: materialized_hash.to_string(),

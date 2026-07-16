@@ -90,7 +90,7 @@ import { textWithin } from "./dom_text.mjs";
     title: "Lategame Arsenal",
     description: "Full tech setup",
     tags: ["two-player", "lategame"],
-    map: "Default",
+    map: "Chokes",
     playerCount: 2,
     scenario: { kind: LAB_CHECKPOINT_SCENARIO.KIND },
   });
@@ -151,7 +151,7 @@ await withFakeDocument(async () => {
               title: "Lategame Arsenal",
               description: "Full tech setup",
               tags: ["two-player", "lategame"],
-              map: "Default",
+              map: "Chokes",
               playerCount: 2,
               filename: "lategame.json",
             },
@@ -177,7 +177,7 @@ await withFakeDocument(async () => {
   scenarioButton.listeners.click();
   assert(
     starts[0]?.room === "sandbox" &&
-      starts[0]?.map === "Default" &&
+      starts[0]?.map === "Chokes" &&
       starts[0]?.scenario === "lategame",
     "LabCatalogScreen reports the selected room, map, and catalog setup id",
   );
@@ -225,7 +225,7 @@ await withFakeDocument(() => {
     observedResult = result;
   });
   labClient.setInitialState({
-    room: "__lab__:sandbox:map=Default",
+    room: "__lab__:sandbox:map=Chokes",
     operatorId: 1,
     role: LAB_ROLE.OPERATOR,
     vision: labVision.all(),
@@ -429,7 +429,7 @@ await withFakeDocument(async () => {
     const net = new Net("ws://example.test/ws");
     const labClient = new LabClient(net);
     labClient.setInitialState({
-      room: "__lab__:sandbox:map=Default",
+      room: "__lab__:sandbox:map=Chokes",
       operatorId: 1,
       role,
       vision: labVision.all(),
@@ -459,7 +459,7 @@ await withFakeDocument(async () => {
     },
   });
   const startPayload = {
-    map: { name: "Default" },
+    map: { name: "Chokes" },
     players: [
       { id: 1, teamId: 1, color: "#2255aa" },
       { id: 2, teamId: 2, color: "#bb4422" },
@@ -578,7 +578,7 @@ await withFakeDocument(async () => {
     },
   };
   labClient.setInitialState({
-    room: "__lab__:sandbox:map=Default",
+    room: "__lab__:sandbox:map=Chokes",
     operatorId: 1,
     role: LAB_ROLE.OPERATOR,
     vision: labVision.all(),
@@ -589,9 +589,9 @@ await withFakeDocument(async () => {
   panel = new LabPanel({
     root,
     labClient,
-    launch: { publicRoom: "sandbox", map: "Default" },
+    launch: { publicRoom: "sandbox", map: "Chokes" },
     startPayload: {
-      map: { name: "Default" },
+      map: { name: "Chokes" },
       players: [
         { id: 1, teamId: 1, color: "#2255aa" },
         { id: 2, teamId: 2, color: "#bb4422" },

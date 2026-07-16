@@ -175,7 +175,7 @@ const COMMAND_RECORDS = Object.freeze({
   "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats"],
-    defaults: ["workspaceRoot=current worktree", "map=Default", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
+    defaults: ["workspaceRoot=current worktree", "map=Chokes", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
     bounds: ["one session across Lab, game, and dev-scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
     example: { spectate: ["ai_2_1", "ai_turtle"], viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),

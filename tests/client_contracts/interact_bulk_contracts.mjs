@@ -40,7 +40,7 @@ const state = {
   currRecvTime: 1,
   tick: 10,
   players: [],
-  map: { name: "Default", width: 64, height: 64, tileSize: 32 },
+  map: { name: "Chokes", width: 64, height: 64, tileSize: 32 },
   entityById: (id) => entities.get(id) || null,
 };
 const labClient = {

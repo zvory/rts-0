@@ -10,7 +10,7 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -74,7 +74,7 @@ fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -146,7 +146,7 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -221,7 +221,7 @@ fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -279,7 +279,7 @@ fn scripted_action_batch_rebases_before_crossing_timeline_cap() {
     let mut config = lab_config();
     config.scenario = Some("supply-300-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Default:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,

@@ -1336,7 +1336,7 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"legacy-v1","title":"Legacy V1","description":"Legacy compatibility fixture","tags":["test"],"map":"Default","playerCount":2,"filename":"legacy-v1.json"}
+                {"id":"legacy-v1","title":"Legacy V1","description":"Legacy compatibility fixture","tags":["test"],"map":"Chokes","playerCount":2,"filename":"legacy-v1.json"}
               ]
             }"#,
         )
@@ -1348,7 +1348,7 @@ mod tests {
               "kind": "labScenario",
               "name": "Legacy V1",
               "seed": 1,
-              "map": {"name": "Default", "schemaVersion": 2, "contentHash": "legacy"},
+              "map": {"name": "Chokes", "schemaVersion": 2, "contentHash": "legacy"},
               "players": [],
               "entities": [],
               "metadata": {"exportedTick": 0, "lab": {"vision": {"mode": "all"}}}
@@ -1372,8 +1372,8 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"dupe","title":"One","description":"First","tags":[],"map":"Default","playerCount":2,"filename":"dupe.json"},
-                {"id":"dupe","title":"Two","description":"Second","tags":[],"map":"Default","playerCount":2,"filename":"dupe.json"}
+                {"id":"dupe","title":"One","description":"First","tags":[],"map":"Chokes","playerCount":2,"filename":"dupe.json"},
+                {"id":"dupe","title":"Two","description":"Second","tags":[],"map":"Chokes","playerCount":2,"filename":"dupe.json"}
               ]
             }"#,
         )
@@ -1394,7 +1394,7 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"safe-id","title":"Safe","description":"Filename mismatch","tags":[],"map":"Default","playerCount":2,"filename":"other-safe-id.json"}
+                {"id":"safe-id","title":"Safe","description":"Filename mismatch","tags":[],"map":"Chokes","playerCount":2,"filename":"other-safe-id.json"}
               ]
             }"#,
         )
@@ -1412,7 +1412,7 @@ mod tests {
         let entries = (0..=MAX_SCENARIO_CATALOG_ENTRIES)
             .map(|index| {
                 format!(
-                    r#"{{"id":"scenario-{index}","title":"Scenario {index}","description":"Catalog cap test","tags":[],"map":"Default","playerCount":2,"filename":"scenario-{index}.json"}}"#
+                    r#"{{"id":"scenario-{index}","title":"Scenario {index}","description":"Catalog cap test","tags":[],"map":"Chokes","playerCount":2,"filename":"scenario-{index}.json"}}"#
                 )
             })
             .collect::<Vec<_>>()
@@ -1436,7 +1436,7 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"../bad","title":"Bad","description":"Bad id","tags":[],"map":"Default","playerCount":2,"filename":"bad.json"}
+                {"id":"../bad","title":"Bad","description":"Bad id","tags":[],"map":"Chokes","playerCount":2,"filename":"bad.json"}
               ]
             }"#,
         )

@@ -1179,7 +1179,7 @@ export class LabPanel {
   }
 
   mapName() {
-    return this.launch?.map || this.startPayload?.map?.name || "Default";
+    return this.launch?.map || this.startPayload?.map?.name || "Chokes";
   }
 
   defaultScenarioName() {

@@ -194,9 +194,9 @@ fn validate_materialized_map(draft: &LabMapDraft, player_count: usize) -> Result
             is_ai: false,
         })
         .collect();
-    let map = Map::load("Default", player_count, 0)
+    let map = Map::load("Chokes", player_count, 0)
         .map_err(|error| format!("Could not prepare map validation: {error}"))?;
-    let metadata = Map::metadata_for_name("Default")
+    let metadata = Map::metadata_for_name("Chokes")
         .map_err(|error| format!("Could not prepare map metadata: {error}"))?;
     let mut game = Game::new_lab(&players, 0, map, metadata);
     game.apply_lab_op(LabOp::ApplyMapDraft(draft.clone()))
@@ -251,7 +251,7 @@ mod tests {
 
     fn valid_request() -> CreateMapHandoffRequest {
         let authored_map: serde_json::Value =
-            serde_json::from_str(include_str!("../assets/maps/no-terrain.json"))
+            serde_json::from_str(include_str!("../assets/maps/1v1-no-terrain.json"))
                 .expect("map fixture");
         let tile = |value: &serde_json::Value| LabMapTile {
             x: value["x"].as_u64().expect("x") as u32,
@@ -273,7 +273,7 @@ mod tests {
             destination: HandoffDestination::Lab,
             authored_map,
             materialized_map: LabMapDraft {
-                name: "No Terrain".to_string(),
+                name: "1v1 No Terrain".to_string(),
                 size: 126,
                 terrain: vec![terrain::GRASS; 126 * 126],
                 starts,

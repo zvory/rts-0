@@ -60,7 +60,7 @@ export function interactLaunchUrl({
     url.searchParams.set("rtsAi", `2:${opponent}`);
   }
   url.searchParams.set("rtsStart", "1");
-  if (map && map !== "Default") url.searchParams.set("rtsMap", map);
+  if (map && map !== "Chokes") url.searchParams.set("rtsMap", map);
   if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
   url.searchParams.set("interact", "game");
   url.searchParams.set("rtsNoAutoPointerLock", "1");

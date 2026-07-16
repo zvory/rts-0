@@ -21,7 +21,7 @@ fn replay_summary_for(
         started_at: chrono::Utc::now(),
         ended_at: chrono::Utc::now(),
         duration_ms: 1_000,
-        map_name: "Default".to_string(),
+        map_name: "Chokes".to_string(),
         winner_name: Some("Alpha".to_string()),
         outcome: "win".to_string(),
         participants: vec!["Alpha".to_string(), "Bravo".to_string()],
@@ -51,7 +51,7 @@ fn replay_artifact_for_faction(faction_id: &str) -> ReplayArtifactV1 {
 
 #[test]
 fn replay_summary_marks_current_build_and_map_available() {
-    let map = Map::metadata_for_name("Default").unwrap();
+    let map = Map::metadata_for_name("Chokes").unwrap();
     let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
         artifact_schema_version: replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
         build_sha: "current-build".to_string(),
@@ -68,7 +68,7 @@ fn replay_summary_marks_current_build_and_map_available() {
 
 #[test]
 fn replay_summary_warns_but_allows_incompatible_build() {
-    let map = Map::metadata_for_name("Default").unwrap();
+    let map = Map::metadata_for_name("Chokes").unwrap();
     let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
         artifact_schema_version: replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
         build_sha: "old-build".to_string(),
@@ -90,7 +90,7 @@ fn replay_summary_warns_but_allows_incompatible_build() {
 
 #[test]
 fn replay_summary_rejects_map_drift_before_build_warning() {
-    let map = Map::metadata_for_name("Default").unwrap();
+    let map = Map::metadata_for_name("Chokes").unwrap();
     let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
         artifact_schema_version: replay::REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION as i32,
         build_sha: "old-build".to_string(),

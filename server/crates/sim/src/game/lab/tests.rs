@@ -26,7 +26,7 @@ fn lab_players() -> [PlayerInit; 2] {
 
 fn lab_metadata() -> MapMetadata {
     MapMetadata {
-        name: "Default".to_string(),
+        name: "Chokes".to_string(),
         schema_version: crate::game::map::CURRENT_MAP_VERSION,
         content_hash: "test-map".to_string(),
     }
@@ -187,8 +187,8 @@ fn default_map_game() -> Game {
         .iter()
         .map(|player| (player.id, player.team_id))
         .collect();
-    let map = Map::load_for_players("Default", &start_players, 0xABCD).expect("default lab map");
-    let metadata = Map::metadata_for_name("Default").expect("default map metadata");
+    let map = Map::load_for_players("Chokes", &start_players, 0xABCD).expect("default lab map");
+    let metadata = Map::metadata_for_name("Chokes").expect("default map metadata");
     Game::new_lab(&players, 0xABCD, map, metadata)
 }
 

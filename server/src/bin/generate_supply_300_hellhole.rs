@@ -24,7 +24,7 @@ const OUT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/lab-scenarios/supply-300-hellhole.json"
 );
-const MAP_NAME: &str = "No Terrain";
+const MAP_NAME: &str = "Chokes";
 const SCENARIO_NAME: &str = "Supply 300 2v2 Hellhole";
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v2";
 const ROCK_CELL_TILES: u32 = 5;

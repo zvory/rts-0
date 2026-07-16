@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "name": "Default",
-  "description": "Four-start map with twelve permanent resource base locations.",
+  "name": "Chokes",
+  "description": "Four-start map with twelve permanent resource base locations and contested choke points.",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry always spawns its resource cluster.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",

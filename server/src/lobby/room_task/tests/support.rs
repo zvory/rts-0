@@ -46,7 +46,7 @@ pub(super) fn replay_test_players(count: usize) -> Vec<PlayerInit> {
 }
 
 pub(super) fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
-    let metadata = Map::metadata_for_name("Default").unwrap();
+    let metadata = Map::metadata_for_name("Chokes").unwrap();
     let start_players: Vec<_> = players
         .iter()
         .map(|player| {
@@ -58,7 +58,7 @@ pub(super) fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
             (player.id, team_id)
         })
         .collect();
-    let map = Map::load_for_players("Default", &start_players, seed).unwrap();
+    let map = Map::load_for_players("Chokes", &start_players, seed).unwrap();
     Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
 }
 
@@ -157,7 +157,7 @@ pub(super) fn add_test_room_spectator(task: &mut RoomTask, id: u32) -> Connectio
 pub(super) fn lab_config() -> LabRoomConfig {
     LabRoomConfig {
         public_id: "sandbox".to_string(),
-        map_name: "Default".to_string(),
+        map_name: "Chokes".to_string(),
         seed: Some(0x1A2B_3C4D),
         scenario: None,
         map_draft: None,

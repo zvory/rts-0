@@ -47,7 +47,7 @@ export function normalizeLobbySummary(row = {}) {
     room,
     kind,
     hostName: boundedText(row.hostName, "No host"),
-    map: boundedText(row.map, "Default"),
+    map: boundedText(row.map, "Chokes"),
     createdAtUnixMs: Math.max(0, integerOr(row.createdAtUnixMs, 0)),
     occupiedSlots: Math.max(0, integerOr(row.occupiedSlots, 0)),
     maxSlots,

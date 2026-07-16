@@ -688,7 +688,7 @@ fn persisted_replay_room_join_waits_in_spectator_lobby() {
         } if room == "persisted-replay-test"
             && players.len() == 1
             && players[0].is_spectator
-            && map == "Default"
+            && map == "Chokes"
             && maps.is_empty()
     ));
 }
@@ -776,7 +776,7 @@ fn persisted_replay_lobby_ignores_active_seat_controls() {
     task.on_set_team(99, 99, 2);
     task.on_set_faction(99, EKAT_FACTION_ID.to_string());
     task.on_add_ai(99, Some(2), None);
-    task.on_select_map(99, "No Terrain".to_string());
+    task.on_select_map(99, "Chokes".to_string());
 
     let player = task.players.get(&99).expect("viewer should remain present");
     assert!(player.spectator);
