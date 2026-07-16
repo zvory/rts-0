@@ -364,6 +364,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
     let scenarios = [
         Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_direct_reverse_order_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_030d),
         Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
         Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
         Game::new_vehicle_small_block_baseline_scenario(
@@ -388,6 +389,76 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
+}
+
+#[test]
+fn replay_142_vehicle_lock_scenario_clears_without_slow_overlap() {
+    let setup = Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_0142)
+        .expect("replay-142 scenario setup should succeed");
+    assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
+    assert_eq!(setup.units.len(), 5);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::CommandCar), 1);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::ScoutCar), 2);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 1);
+    assert_eq!(
+        owned_kind_count(&setup.game, 1, EntityKind::MachineGunner),
+        1
+    );
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::CityCentre), 1);
+
+    let mut game = setup.game;
+    while game.tick_count() < setup.issue_after_ticks {
+        game.tick();
+    }
+    let command_car_id = setup.units[0];
+    let colliding_scout_id = setup.units[2];
+    game.enqueue(
+        setup.player_id,
+        SimCommand::Move {
+            units: setup.units,
+            x: setup.goal.0,
+            y: setup.goal.1,
+            queued: false,
+        },
+    );
+
+    let mut saw_contact = false;
+    let mut clear_tick = None;
+    let mut final_separation = 0.0;
+    for elapsed in 1..=180 {
+        game.tick();
+        let scout = game
+            .state
+            .entities
+            .get(colliding_scout_id)
+            .expect("colliding Scout Car should survive");
+        let command_car = game
+            .state
+            .entities
+            .get(command_car_id)
+            .expect("Command Car should survive");
+        let separation = (scout.pos_x - command_car.pos_x).hypot(scout.pos_y - command_car.pos_y);
+        if separation < 30.0 {
+            saw_contact = true;
+        } else if saw_contact && separation >= 40.0 && clear_tick.is_none() {
+            clear_tick = Some(elapsed);
+        }
+        final_separation = separation;
+    }
+
+    assert!(
+        saw_contact,
+        "replay-142 fixture should recreate vehicle contact"
+    );
+    let clear_tick = clear_tick.expect("replay-142 pair should separate after making contact");
+    assert!(
+        clear_tick <= 90,
+        "replay-142 pair should clear within three seconds, cleared after {clear_tick} ticks"
+    );
+    assert!(
+        final_separation >= 40.0,
+        "replay-142 pair should remain separated, final separation was {final_separation:.2}px"
+    );
 }
 
 #[test]
@@ -559,7 +630,7 @@ fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
             7usize,
             7usize,
         ),
-        ("enemy_vehicle_breach", EntityKind::Tank, 7usize, 8usize),
+        ("enemy_vehicle_reroute", EntityKind::Tank, 7usize, 8usize),
         (
             "infantry_pass_through",
             EntityKind::MachineGunner,
@@ -641,9 +712,9 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
 }
 
 #[test]
-fn tank_trap_enemy_breach_scenario_closes_sparse_vehicle_gaps() {
+fn tank_trap_enemy_reroute_scenario_closes_sparse_vehicle_gaps() {
     let setup = Game::new_tank_trap_pathing_scenario(
-        "enemy_vehicle_breach",
+        "enemy_vehicle_reroute",
         EntityKind::ScoutCar,
         1,
         0x5150_0103,

@@ -257,6 +257,79 @@ import {
   assert(calls.at(-1) === "lowDown", "unregistered zone no longer receives events");
 }
 
+{
+  const viewport = {
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+  };
+  const router = new MatchInputRouter(viewport);
+  const leaves = [];
+  router.registerZone({
+    previewSurface: "minimap",
+    contains: (ev) => ev.clientX < 200,
+    pointerDown: () => true,
+    pointerMove: () => false,
+    pointerLeave: (ev) => leaves.push(ev.source),
+    pointerCancel: (ev) => leaves.push(`cancel:${ev.source}`),
+  });
+
+  router.pointerMove({ clientX: 100, clientY: 100, source: "locked" });
+  assert(router.activePreviewSurface() === "minimap", "router exposes the hovered preview surface");
+  router.pointerDown({ clientX: 100, clientY: 100, source: "locked" });
+  assert(!router.releaseSource("dom"), "a different event source cannot release routed ownership");
+  assert(router.releaseSource("locked"), "the ending event source releases routed ownership");
+  assert(
+    leaves.join(",") === "cancel:locked,locked",
+    "source release cancels capture and leaves hover exactly once",
+  );
+  assert(!router.pointerMove({ clientX: 500, clientY: 500, source: "locked" }),
+    "released source no longer retains pointer capture");
+  assert(router.activePreviewSurface() === null, "source release relinquishes preview-surface ownership");
+
+  router.pointerDown({ clientX: 100, clientY: 100, source: "locked" });
+  assert(router.activePreviewSurface() === "minimap", "pointerDown alone establishes preview-surface ownership");
+  router.pointerUp({ clientX: 100, clientY: 100, source: "locked" });
+}
+
+{
+  const calls = [];
+  const coveredInput = Object.create(Input.prototype);
+  coveredInput.inputRouter = { activePreviewSurface: () => "minimap" };
+  coveredInput._flushPointerLockCursor = () => calls.push("cursor");
+  coveredInput._refreshAttackTargetPreview = () => calls.push("attack");
+  coveredInput._refreshResourceMiningPreview = () => calls.push("resource");
+  coveredInput._refreshAbilityTargetPreview = () => calls.push("ability");
+  coveredInput._refreshPlacement = () => calls.push("placement");
+  coveredInput._refreshLabToolPreview = () => calls.push("lab");
+  coveredInput.update(0);
+  assert(calls.join(",") === "cursor", "minimap ownership prevents viewport-underlay preview refreshes");
+}
+
+{
+  let releasedShift = 0;
+  const input = Object.create(Input.prototype);
+  input._shiftKeyDown = false;
+  input._shiftKeysDown = new Set();
+  input.clientIntent = {
+    releaseCommandTargetShift() { releasedShift += 1; },
+  };
+  const keyEvent = (code) => ({
+    code,
+    target: null,
+    preventDefault() {},
+  });
+
+  input._handleKeyDown(keyEvent("ShiftLeft"));
+  input._handleKeyDown(keyEvent("ShiftRight"));
+  input._handleKeyUp(keyEvent("ShiftLeft"));
+  assert(input.isShiftHeld(), "releasing one Shift key preserves live Shift state while the other remains held");
+  assert(releasedShift === 0, "partial Shift release does not end Shift-preserved command targeting");
+  input._handleKeyUp(keyEvent("ShiftRight"));
+  assert(!input.isShiftHeld(), "releasing the final Shift key clears live Shift state");
+  assert(releasedShift === 1, "final Shift release updates Shift-preserved command targeting once");
+}
+
 // ---------------------------------------------------------------------------
 // Context-sensitive hover previews
 // ---------------------------------------------------------------------------
@@ -348,6 +421,10 @@ import {
   assert(router.pointerDown({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone consumes locked pointerDown over HUD button");
   assert(router.pointerUp({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone consumes locked pointerUp over HUD button");
   assert(button.clickCount === 1, "DOM zone forwards locked pointer click to the HUD button");
+  assert(router.pointerDown({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone captures a second locked button press");
+  assert(router.releaseSource("locked"), "ending pointer lock cancels the captured DOM press");
+  assert(!router.pointerUp({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "cancelled DOM capture ignores a later pointerUp");
+  assert(button.clickCount === 1, "cancelling locked input cannot synthesize a stale HUD click");
   assert(router.pointerDown({ clientX: 760, clientY: 560, button: 0, source: "locked" }), "DOM zone consumes empty HUD panel space");
   assert(router.pointerUp({ clientX: 760, clientY: 560, button: 0, source: "locked" }), "empty HUD panel click releases capture");
   assert(button.clickCount === 1, "empty HUD panel space does not click the prior button");
@@ -764,6 +841,49 @@ import {
   timeoutCallback();
   assert((await pending) === false, "pending Pointer Lock promise resolves false on timeout");
   assert(pendingInput._lastPointerLockRequest.outcome === "timeout", "pending Pointer Lock timeout is recorded");
+  assert(
+    pendingInput._pointerLockTrace.some((entry) => entry.phase === "browser-request-finish" && entry.details.outcome === "timeout"),
+    "pending Pointer Lock timeout is retained in the lifecycle trace",
+  );
+  if (priorWindow === undefined) delete globalThis.window;
+  else globalThis.window = priorWindow;
+  if (priorDocument === undefined) delete globalThis.document;
+  else globalThis.document = priorDocument;
+}
+
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const doc = new EventTarget();
+  const target = {};
+  doc.pointerLockElement = null;
+  globalThis.window = { setTimeout: globalThis.setTimeout };
+  globalThis.document = doc;
+  const eventConfirmedInput = Object.create(Input.prototype);
+  eventConfirmedInput.dom = target;
+  eventConfirmedInput._pointerLockAttempt = 4;
+  eventConfirmedInput._lastPointerLockRequest = {
+    attempt: 4,
+    rawInputRequested: true,
+    returnedPromise: true,
+    outcome: "pending",
+  };
+  eventConfirmedInput._browserPointerLockElement = () => doc.pointerLockElement;
+  eventConfirmedInput._pointerLockTarget = () => target;
+  eventConfirmedInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  const waiting = eventConfirmedInput._waitForPointerLockPromise(Promise.resolve());
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+  assert(
+    eventConfirmedInput._pointerLockTrace.some((entry) => entry.phase === "browser-promise-resolved-awaiting-event"),
+    "resolved Pointer Lock promises wait for the authoritative browser event",
+  );
+  doc.pointerLockElement = target;
+  doc.dispatchEvent(new Event("pointerlockchange"));
+  assert(await waiting, "Pointer Lock succeeds when pointerlockchange follows an early promise resolution");
+  assert(
+    eventConfirmedInput._lastPointerLockRequest.outcome === "resolved-pointerlockchange",
+    "event-confirmed Pointer Lock records both promise and browser-event completion",
+  );
   if (priorWindow === undefined) delete globalThis.window;
   else globalThis.window = priorWindow;
   if (priorDocument === undefined) delete globalThis.document;
@@ -796,11 +916,18 @@ import {
       return false;
     }
   };
+  let rawFailure = null;
+  rawOnlyInput.onPointerLockError = (err) => { rawFailure = err; };
   assert(!(await rawOnlyInput._requestBrowserPointerLock()), "Pointer Lock fails closed after raw input rejection");
   assert(requests.length === 1, "Pointer Lock does not request plain fallback after raw rejection");
   assert(requests[0]?.unadjustedMovement === true, "first Pointer Lock request asks for unadjusted movement");
   assert(rawOnlyInput._lastPointerLockRequest.rawInputRequested === true, "raw rejection records the raw request");
   assert(rawOnlyInput._lastPointerLockRequest.outcome === "rejected", "raw rejection outcome is recorded");
+  assert(rawFailure?.message === "raw input unavailable", "raw rejection reaches installed-app diagnostics instead of failing silently");
+  assert(
+    rawOnlyInput._pointerLockTrace.some((entry) => entry.phase === "failure"),
+    "raw rejection retains an explicit failure in the lifecycle trace",
+  );
 }
 
 {
@@ -824,6 +951,109 @@ import {
   assert(await rawSuccessInput._requestBrowserPointerLock(), "Pointer Lock succeeds with raw input");
   assert(rawSuccessRequests.length === 1, "raw Pointer Lock success does not make a fallback request");
   assert(rawSuccessInput._lastPointerLockRequest.rawInputRequested === true, "raw request is recorded for diagnostics");
+  assert(
+    rawSuccessInput._pointerLockTrace.some((entry) => entry.phase === "browser-request-complete" && entry.details.locked === true),
+    "raw Pointer Lock success retains the completed lifecycle result",
+  );
+}
+
+{
+  const priorRuntimeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__RTS_DESKTOP_RUNTIME");
+  const priorTauriDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__TAURI__");
+  const priorTraceDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__rtsPointerLockTrace");
+  const calls = [];
+  Object.defineProperty(globalThis, "__RTS_DESKTOP_RUNTIME", {
+    configurable: true,
+    value: { shell: "tauri", platform: "windows" },
+  });
+  Object.defineProperty(globalThis, "__TAURI__", {
+    configurable: true,
+    value: {
+      core: {
+        invoke(command, payload) {
+          calls.push({ command, payload });
+          return Promise.resolve();
+        },
+      },
+    },
+  });
+  const loggedInput = Object.create(Input.prototype);
+  loggedInput._pointerLockAttempt = 9;
+  loggedInput._recordPointerLockTrace("attempt-start", {
+    browserSupported: true,
+    focus: { documentHasFocus: true, activeElement: { tag: "CANVAS", id: "game" } },
+  });
+  await Promise.resolve();
+  assert(calls.length === 1, "installed-app Pointer Lock trace writes through the existing Tauri shell command");
+  assert(calls[0].command === "desktop_log_client_event", "Pointer Lock trace uses the bounded client-event logger");
+  assert(calls[0].payload.event === "pointer_lock_attempt-start", "shell log records the lifecycle phase in its source field");
+  assert(calls[0].payload.message.length <= 560, "Pointer Lock shell log payload stays within the installed shell bound");
+  assert(
+    globalThis.__rtsPointerLockTrace.records.at(-1)?.phase === "attempt-start",
+    "latest Pointer Lock lifecycle trace is published for live inspection",
+  );
+  assert(loggedInput._pointerLockShellLog.succeeded === 1, "successful shell persistence is visible in the debug snapshot");
+  if (priorRuntimeDescriptor) Object.defineProperty(globalThis, "__RTS_DESKTOP_RUNTIME", priorRuntimeDescriptor);
+  else delete globalThis.__RTS_DESKTOP_RUNTIME;
+  if (priorTauriDescriptor) Object.defineProperty(globalThis, "__TAURI__", priorTauriDescriptor);
+  else delete globalThis.__TAURI__;
+  if (priorTraceDescriptor) Object.defineProperty(globalThis, "__rtsPointerLockTrace", priorTraceDescriptor);
+  else delete globalThis.__rtsPointerLockTrace;
+}
+
+{
+  const tracedInput = Object.create(Input.prototype);
+  tracedInput._pointerLockAttempt = 10;
+  for (let i = 0; i < 90; i += 1) tracedInput._recordPointerLockTrace("bounded", { index: i });
+  assert(tracedInput._pointerLockTrace.length === 80, "Pointer Lock lifecycle trace keeps a bounded in-memory ring");
+  assert(tracedInput._pointerLockTrace[0].details.index === 10, "Pointer Lock trace discards only the oldest records");
+}
+
+{
+  const eventInput = Object.create(Input.prototype);
+  eventInput._pointerLockAttempt = 11;
+  eventInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  eventInput._pointerLockErrorSummary = Input.prototype._pointerLockErrorSummary;
+  let reported = null;
+  eventInput.onPointerLockError = (err) => { reported = err; };
+  eventInput._handlePointerLockError({ type: "pointerlockerror" });
+  assert(reported?.message === "Pointer Lock emitted pointerlockerror.", "Pointer Lock error events gain an actionable synthetic message");
+  assert(
+    eventInput._pointerLockTrace.some((entry) => entry.phase === "browser-event-error"),
+    "Pointer Lock error events are retained separately from the final failure",
+  );
+  assert(
+    eventInput._pointerLockTrace.some((entry) => entry.phase === "failure"),
+    "Pointer Lock error events reach the common failure diagnostic path",
+  );
+}
+
+{
+  const guardedInput = Object.create(Input.prototype);
+  let browserRequests = 0;
+  let resolveBrowserRequest;
+  const target = {};
+  guardedInput.pointerLocked = false;
+  guardedInput._pointerLockAttempt = 0;
+  guardedInput.desktopCursor = null;
+  guardedInput._browserPointerLockSupported = () => true;
+  guardedInput._prepareCursorLock = () => {};
+  guardedInput._nativeCursorBounds = () => ({ width: 100, height: 80 });
+  guardedInput._browserPointerLockElement = () => null;
+  guardedInput._pointerLockTarget = () => target;
+  guardedInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  guardedInput._requestBrowserPointerLock = () => {
+    browserRequests += 1;
+    return new Promise((resolve) => { resolveBrowserRequest = resolve; });
+  };
+  const firstRequest = guardedInput.requestPointerLock();
+  const overlappingRequest = guardedInput.requestPointerLock();
+  assert(firstRequest === overlappingRequest, "overlapping Pointer Lock requests share the pending request");
+  assert(browserRequests === 1, "overlapping Pointer Lock requests do not issue a second browser call");
+  assert(guardedInput._pointerLockAttempt === 1, "overlapping Pointer Lock requests keep one attempt identity");
+  resolveBrowserRequest(true);
+  assert(await firstRequest, "shared pending Pointer Lock request resolves for both callers");
+  assert(guardedInput._pointerLockRequestInFlight === null, "Pointer Lock pending state clears after settlement");
 }
 
 {
@@ -920,6 +1150,25 @@ import {
   assert(nativeMoveInput.mouse.x === 14 && nativeMoveInput.mouse.y === 15, "native move updates virtual cursor coordinates from native event coordinates");
   assert(painted.style.transform === "translate(14px, 15px)", "native move paints the DOM cursor during the native event handler");
   assert(nativeMoveInput._pendingPointerLockCursor === null, "native move does not wait for Input.update to flush the cursor visual");
+}
+
+{
+  const releasedSources = [];
+  const unlockedInput = Object.create(Input.prototype);
+  unlockedInput.pointerLocked = true;
+  unlockedInput._cursorLockMode = "browser";
+  unlockedInput.mouse = { x: 25, y: 30 };
+  unlockedInput.dom = { classList: { toggle() {} } };
+  unlockedInput.inputRouter = { releaseSource: (source) => releasedSources.push(source) };
+  unlockedInput._pointerLockCursor = { hidden: false };
+  unlockedInput._nativeButtonsMask = 1;
+  unlockedInput._panDrag = null;
+  unlockedInput._drag = null;
+  unlockedInput._placementDrag = null;
+
+  unlockedInput._setCursorLockState(false, null);
+  assert(releasedSources.length === 1 && releasedSources[0] === "locked",
+    "leaving pointer lock releases hover owned by the locked input source");
 }
 
 {

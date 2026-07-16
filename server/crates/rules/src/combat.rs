@@ -167,7 +167,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::ScoutCarMg,
-        range_tiles: 6,
+        range_tiles: 7,
         dmg: 6,
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
@@ -901,6 +901,12 @@ mod tests {
         assert_eq!(machine_gunner.range_tiles, 6);
         assert_eq!(machine_gunner.dmg, 4);
         assert_eq!(machine_gunner.cooldown, 6);
+
+        let scout_car = weapon_profile(WeaponKind::ScoutCarMg).expect("Scout Car MG profile");
+        assert_eq!(scout_car.weapon_class, WeaponClass::SmallArms);
+        assert_eq!(scout_car.range_tiles, 7);
+        assert_eq!(scout_car.dmg, 6);
+        assert_eq!(scout_car.cooldown, 6);
 
         let tank_coax = weapon_profile(WeaponKind::TankCoax).expect("Tank coax profile");
         assert_eq!(tank_coax.weapon_class, WeaponClass::SmallArms);

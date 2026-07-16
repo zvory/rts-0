@@ -37,13 +37,13 @@ async function testDevWatchScenarioConfig() {
     );
 
     globalThis.window.location = new URL(
-      "http://localhost/?watchScenario=1&id=tank_trap_pathing_matrix&unit=scout_car&count=1&case=enemy_vehicle_breach",
+      "http://localhost/?watchScenario=1&id=tank_trap_pathing_matrix&unit=scout_car&count=1&case=enemy_vehicle_reroute",
     );
     config = devWatchConfig();
     assert(config, "tank_trap_pathing_matrix case variant should be recognized");
     assert(
       config.room ===
-        "__dev_scenario__:tank_trap_pathing_matrix:unit=scout_car:count=1:case=enemy_vehicle_breach",
+        "__dev_scenario__:tank_trap_pathing_matrix:unit=scout_car:count=1:case=enemy_vehicle_reroute",
       "dev scenario should include matrix case variants in the server scenario room",
     );
 

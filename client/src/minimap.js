@@ -32,6 +32,12 @@ import {
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
+import {
+  commandTargetsMatch,
+  plannedEntityForIntent,
+  resourceRallyTargetAt,
+  supportWeaponSetupPreviewEntity,
+} from "./minimap_targeting.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
@@ -97,12 +103,6 @@ const resourceLayoutSignature = (resources) => {
     signature += `|${node.id}:${node.kind}:${node.x}:${node.y}:${node.remaining ?? ""}`;
   }
   return signature;
-};
-
-const commandTargetsMatch = (left, right) => {
-  if (left === right) return true;
-  if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
-  return left.kind === right.kind && left.ability === right.ability;
 };
 
 const minimapArtillerySvg = (svgText) => {
@@ -251,6 +251,7 @@ export class Minimap {
     };
     this._onCanvasPointerDown = this._handleCanvasPointerDown.bind(this);
     this._onCanvasPointerMove = this._handleCanvasPointerMove.bind(this);
+    this._onCanvasPointerLeave = this._handleCanvasPointerLeave.bind(this);
     this._onCanvasPointerUp = this._handleCanvasPointerUp.bind(this);
     this._onCanvasPointerCancel = this._handleCanvasPointerCancel.bind(this);
     this._onWindowBlur = this._handleWindowBlur.bind(this);
@@ -977,6 +978,7 @@ export class Minimap {
     c.addEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     c.addEventListener("pointerdown", this._onCanvasPointerDown);
     c.addEventListener("pointermove", this._onCanvasPointerMove);
+    c.addEventListener("pointerleave", this._onCanvasPointerLeave);
     c.addEventListener("pointerup", this._onCanvasPointerUp);
     c.addEventListener("pointercancel", this._onCanvasPointerCancel);
     window.addEventListener("blur", this._onWindowBlur);
@@ -996,6 +998,7 @@ export class Minimap {
     c.removeEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     c.removeEventListener("pointerdown", this._onCanvasPointerDown);
     c.removeEventListener("pointermove", this._onCanvasPointerMove);
+    c.removeEventListener("pointerleave", this._onCanvasPointerLeave);
     c.removeEventListener("pointerup", this._onCanvasPointerUp);
     c.removeEventListener("pointercancel", this._onCanvasPointerCancel);
     window.removeEventListener("blur", this._onWindowBlur);
@@ -1036,22 +1039,25 @@ export class Minimap {
     );
   }
 
-  updateCommandTargetPreview() {
+  updateCommandTargetPreview(shiftKey = this._hoverShiftKey) {
     if (this._intent()?.commandTarget !== "setupAntiTankGuns") {
       this._clearMinimapSetupPreview();
       return false;
     }
     if (!this._hoverWorld) return false;
-    return this._refreshSetupPreviewAt(this._hoverWorld.x, this._hoverWorld.y, this._hoverShiftKey);
+    return this._refreshSetupPreviewAt(this._hoverWorld.x, this._hoverWorld.y, shiftKey);
   }
 
   inputZone() {
     return {
       priority: 100,
+      previewSurface: "minimap",
       contains: (ev) => this._containsClientPoint(ev.clientX, ev.clientY),
       pointerDown: (ev) => this._handlePointerDown(ev),
       pointerMove: (ev) => this._handlePointerMove(ev),
+      pointerLeave: () => this._clearSetupPreviewHover(),
       pointerUp: () => this._handlePointerUp(),
+      pointerCancel: () => this._handlePointerUp(),
     };
   }
 
@@ -1083,6 +1089,7 @@ export class Minimap {
   }
 
   _handleCanvasPointerDown(ev) {
+    this.inputRouter?.pointerMove(this._routerEvent(ev, "dom"));
     if (this._activePointerGesture) {
       // A second contact is a pinch or multi-touch inspection, never a target tap.
       if (this._activePointerGesture.pointerId !== ev.pointerId) this._cancelActivePointerGesture();
@@ -1153,13 +1160,24 @@ export class Minimap {
 
   _handleCanvasPointerMove(ev) {
     const gesture = this._activePointerGesture;
-    if (!gesture || gesture.pointerId !== ev.pointerId) return;
+    if (!gesture) {
+      const routedEvent = this._routerEvent(ev, "dom");
+      return this.inputRouter
+        ? this.inputRouter.pointerMove(routedEvent)
+        : this._handlePointerMove(routedEvent);
+    }
+    if (gesture.pointerId !== ev.pointerId) return;
     if (!gesture.moved && this._gestureMovedBeyondTapSlop(gesture, ev)) {
       gesture.moved = true;
       this._dragging = true;
     }
     this._handlePointerMove(this._routerEvent(ev, "dom"));
     ev.preventDefault();
+  }
+
+  _handleCanvasPointerLeave() {
+    this._clearSetupPreviewHover();
+    if (!this._activePointerGesture) this.inputRouter?.releaseSource?.("dom");
   }
 
   _handlePointerMove(ev) {
@@ -1192,6 +1210,9 @@ export class Minimap {
         const point = this._eventToCanvas(ev);
         this._issuePrimaryTarget(this._canvasToWorld(point.x, point.y), actionEvent);
       }
+    }
+    if (!this._containsClientPoint(ev.clientX, ev.clientY)) {
+      this.inputRouter?.releaseSource?.("dom");
     }
     ev.preventDefault();
   }
@@ -1238,9 +1259,11 @@ export class Minimap {
     if (gesture) this._releasePointer(gesture.pointerId);
     this._activePointerGesture = null;
     this._dragging = false;
-    this._hoverWorld = null;
-    this._clearMinimapSetupPreview();
+    this.inputRouter?.releaseSource?.("dom");
+    this._clearSetupPreviewHover();
   }
+
+  _clearSetupPreviewHover() { this._hoverWorld = null; this._clearMinimapSetupPreview(); }
 
   _updateHoverFromEvent(ev) {
     if (!this._ensureTransform()) return false;
@@ -1383,51 +1406,6 @@ export class Minimap {
     this._issueCommand(cmd.move(landUnitIds, wx, wy, queued));
     this._addCommandFeedback("move", wx, wy, queued);
   }
-}
-
-function resourceRallyTargetAt(map, x, y) {
-  const radius = Math.max(0, Number(map?.tileSize) || 0) * 0.5;
-  const radius2 = radius * radius;
-  let best = null;
-  let bestDist2 = Infinity;
-  for (const node of map?.resources || []) {
-    if (node?.remaining === 0 || !isResource(node?.kind)) continue;
-    const dx = Number(node.x) - x;
-    const dy = Number(node.y) - y;
-    const dist2 = dx * dx + dy * dy;
-    if (!Number.isFinite(dist2) || dist2 > radius2) continue;
-    if (dist2 < bestDist2 || (dist2 === bestDist2 && node.id < best?.id)) {
-      best = node;
-      bestDist2 = dist2;
-    }
-  }
-  return best;
-}
-
-function supportWeaponSetupPreviewEntity(entity) {
-  const origin = latestMovementOrderPlanPoint(entity);
-  return origin ? { ...entity, x: origin.x, y: origin.y } : entity;
-}
-
-function plannedEntityForIntent(intent, entity) {
-  return typeof intent?.entityWithPlannedOrder === "function"
-    ? intent.entityWithPlannedOrder(entity)
-    : entity;
-}
-
-function latestMovementOrderPlanPoint(entity) {
-  if (!Array.isArray(entity?.orderPlan)) return null;
-  let origin = null;
-  for (const marker of entity.orderPlan) {
-    if (
-      (marker?.kind === ORDER_STAGE.MOVE || marker?.kind === ORDER_STAGE.ATTACK_MOVE) &&
-      Number.isFinite(marker.x) &&
-      Number.isFinite(marker.y)
-    ) {
-      origin = { x: marker.x, y: marker.y };
-    }
-  }
-  return origin;
 }
 
 function ownOwner(state, owner) {

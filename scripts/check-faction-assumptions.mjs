@@ -315,6 +315,9 @@ const approvedCurrentFactionFiles = new Set([
   // Replay-derived Factory fixture intentionally enumerates today's vehicle roster; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/factory_wall_rally_spawn.rs",
+  // Replay-derived vehicle-lock fixture intentionally recreates a current Kriegsia formation and
+  // base landmark; public faction admission remains routed through the dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/replay_142_vehicle_lock.rs",
   // Tank coax inspection deliberately seeds current roster targets as a no-fog dev fixture;
   // public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/tank_coax.rs",

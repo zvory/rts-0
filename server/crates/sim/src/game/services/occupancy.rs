@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::config;
@@ -27,11 +27,10 @@ pub(crate) struct Occupancy<'a> {
 struct OccupancyData {
     all_ground_blocked: Vec<bool>,
     vehicle_body_blocked: Vec<bool>,
-    tank_trap_owner_by_tile: Vec<Option<u32>>,
+    tank_trap_tiles: Vec<bool>,
     all_ground_clearance_tiles: Vec<u16>,
     vehicle_body_clearance_tiles: Vec<u16>,
     all_ground_static_fingerprint: u64,
-    #[cfg(test)]
     vehicle_body_static_fingerprint: u64,
 }
 
@@ -49,8 +48,7 @@ impl OccupancyData {
         let size = map.size;
         let mut all_ground_blocked = vec![false; (size * size) as usize];
         let mut vehicle_body_blocked = vec![false; (size * size) as usize];
-        let mut tank_trap_owner_by_tile = vec![None; (size * size) as usize];
-        let mut tank_trap_tiles = HashSet::new();
+        let mut tank_trap_tiles = vec![false; (size * size) as usize];
         for e in entities.iter() {
             if !e.is_building() {
                 continue;
@@ -64,8 +62,7 @@ impl OccupancyData {
                         StaticBlockerClass::None => {}
                     }
                     if e.kind == EntityKind::TankTrap {
-                        tank_trap_tiles.insert((tx, ty));
-                        tank_trap_owner_by_tile[idx] = Some(e.owner);
+                        tank_trap_tiles[idx] = true;
                     }
                 }
             }
@@ -86,18 +83,16 @@ impl OccupancyData {
         let vehicle_body_clearance_tiles = build_clearance_field(map, &vehicle_body_static_blocked);
         let all_ground_static_fingerprint =
             static_blocked_fingerprint(size, &all_ground_static_blocked);
-        #[cfg(test)]
         let vehicle_body_static_fingerprint =
             static_blocked_fingerprint(size, &vehicle_body_static_blocked);
 
         OccupancyData {
             all_ground_blocked,
             vehicle_body_blocked,
-            tank_trap_owner_by_tile,
+            tank_trap_tiles,
             all_ground_clearance_tiles,
             vehicle_body_clearance_tiles,
             all_ground_static_fingerprint,
-            #[cfg(test)]
             vehicle_body_static_fingerprint,
         }
     }
@@ -178,35 +173,10 @@ impl Occupancy<'_> {
         self.static_fingerprint_for_movement_body(MovementBodyClass::InfantryLike)
     }
 
-    #[cfg(test)]
     pub(crate) fn static_fingerprint_for_kind(&self, kind: EntityKind) -> u64 {
         self.static_fingerprint_for_movement_body(movement_body_class(kind))
     }
 
-    pub(super) fn static_fingerprint_for_kind_and_relation(
-        &self,
-        kind: EntityKind,
-        relation: &StaticPathingRelation,
-    ) -> u64 {
-        let movement_body_class = movement_body_class(kind);
-        if movement_body_class == MovementBodyClass::InfantryLike {
-            return self.data.all_ground_static_fingerprint;
-        }
-
-        let mut hash = FNV_OFFSET_BASIS;
-        hash = fnv_mix(hash, self.map.size as u64);
-        for ty in 0..self.map.size as i32 {
-            for tx in 0..self.map.size as i32 {
-                if self.static_blocked_for_pathing(tx, ty, movement_body_class, relation) {
-                    let idx = (ty as u32 * self.map.size + tx as u32) as usize;
-                    hash = fnv_mix(hash, idx as u64 + 1);
-                }
-            }
-        }
-        hash
-    }
-
-    #[cfg(test)]
     pub(crate) fn static_fingerprint_for_movement_body(
         &self,
         movement_body_class: MovementBodyClass,
@@ -230,11 +200,11 @@ impl Occupancy<'_> {
         &self,
         attacker: &Entity,
         tank_trap: &Entity,
-        relation: &StaticPathingRelation,
+        teams: &TeamRelations,
     ) -> bool {
         if movement_body_class(attacker.kind) != MovementBodyClass::VehicleBody
             || tank_trap.kind != EntityKind::TankTrap
-            || relation.blocks_tank_trap_owned_by(tank_trap.owner)
+            || teams.same_team_or_same_owner(attacker.owner, tank_trap.owner)
         {
             return false;
         }
@@ -272,63 +242,6 @@ impl Occupancy<'_> {
         self.passable_for_movement_body(tx, ty, movement_body_class(kind))
     }
 
-    pub(super) fn passable_for_kind_and_relation(
-        &self,
-        tx: i32,
-        ty: i32,
-        kind: EntityKind,
-        relation: &StaticPathingRelation,
-    ) -> bool {
-        self.passable_for_movement_body_and_relation(tx, ty, movement_body_class(kind), relation)
-    }
-
-    pub(super) fn clearance_at_tile_for_kind_and_relation(
-        &self,
-        tx: i32,
-        ty: i32,
-        kind: EntityKind,
-        relation: &StaticPathingRelation,
-    ) -> u16 {
-        let movement_body_class = movement_body_class(kind);
-        if movement_body_class == MovementBodyClass::InfantryLike {
-            return self.clearance_at_tile_for_movement_body(tx, ty, movement_body_class);
-        }
-        if self.static_blocked_for_pathing(tx, ty, movement_body_class, relation) {
-            return 0;
-        }
-
-        let size = self.map.size as i32;
-        let edge_clearance = (tx + 1).min(ty + 1).min(size - tx).min(size - ty);
-        let mut best = edge_clearance.max(0) as u16;
-        for radius in 1i32..=3 {
-            let mut found = false;
-            for dy in -radius..=radius {
-                for dx in -radius..=radius {
-                    if dx.abs().max(dy.abs()) != radius {
-                        continue;
-                    }
-                    if self.static_blocked_for_pathing(
-                        tx + dx,
-                        ty + dy,
-                        movement_body_class,
-                        relation,
-                    ) {
-                        found = true;
-                        break;
-                    }
-                }
-                if found {
-                    break;
-                }
-            }
-            if found {
-                best = best.min(radius as u16);
-                break;
-            }
-        }
-        best
-    }
-
     pub(crate) fn passable_for_movement_body(
         &self,
         tx: i32,
@@ -349,81 +262,12 @@ impl Occupancy<'_> {
         }
     }
 
-    fn passable_for_movement_body_and_relation(
-        &self,
-        tx: i32,
-        ty: i32,
-        movement_body_class: MovementBodyClass,
-        relation: &StaticPathingRelation,
-    ) -> bool {
-        let size = self.map.size as i32;
-        if tx < 0 || ty < 0 || tx >= size || ty >= size {
+    fn tank_trap_at(&self, tx: i32, ty: i32) -> bool {
+        if !self.map.in_bounds(tx, ty) {
             return false;
         }
-        let idx = (ty * self.map.size as i32 + tx) as usize;
-        if self.data.all_ground_blocked[idx] {
-            return false;
-        }
-        match movement_body_class {
-            MovementBodyClass::InfantryLike => true,
-            MovementBodyClass::VehicleBody => {
-                !self.tank_trap_blocks_vehicle_pathing(tx, ty, relation)
-            }
-        }
-    }
-
-    fn static_blocked_for_pathing(
-        &self,
-        tx: i32,
-        ty: i32,
-        movement_body_class: MovementBodyClass,
-        relation: &StaticPathingRelation,
-    ) -> bool {
-        if !self.map.in_bounds(tx, ty) {
-            return true;
-        }
         let idx = (ty as u32 * self.map.size + tx as u32) as usize;
-        if !self.map.is_passable(tx, ty) || self.data.all_ground_blocked[idx] {
-            return true;
-        }
-        movement_body_class == MovementBodyClass::VehicleBody
-            && self.tank_trap_blocks_vehicle_pathing(tx, ty, relation)
-    }
-
-    fn tank_trap_blocks_vehicle_pathing(
-        &self,
-        tx: i32,
-        ty: i32,
-        relation: &StaticPathingRelation,
-    ) -> bool {
-        if self
-            .tank_trap_owner_at(tx, ty)
-            .is_some_and(|owner| relation.blocks_tank_trap_owned_by(owner))
-        {
-            return true;
-        }
-        for ((ax, ay), (bx, by)) in [((tx - 1, ty), (tx + 1, ty)), ((tx, ty - 1), (tx, ty + 1))] {
-            let Some(owner_a) = self.tank_trap_owner_at(ax, ay) else {
-                continue;
-            };
-            let Some(owner_b) = self.tank_trap_owner_at(bx, by) else {
-                continue;
-            };
-            if relation.blocks_tank_trap_owned_by(owner_a)
-                && relation.blocks_tank_trap_owned_by(owner_b)
-            {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn tank_trap_owner_at(&self, tx: i32, ty: i32) -> Option<u32> {
-        if !self.map.in_bounds(tx, ty) {
-            return None;
-        }
-        let idx = (ty as u32 * self.map.size + tx as u32) as usize;
-        self.data.tank_trap_owner_by_tile[idx]
+        self.data.tank_trap_tiles[idx]
     }
 
     fn tank_trap_pinches_route(
@@ -438,10 +282,7 @@ impl Occupancy<'_> {
             ((tx, ty - 2), (tx, ty - 1)),
             ((tx, ty + 2), (tx, ty + 1)),
         ] {
-            if self
-                .tank_trap_owner_at(other_tile.0, other_tile.1)
-                .is_none()
-            {
+            if !self.tank_trap_at(other_tile.0, other_tile.1) {
                 continue;
             }
             if !self.map.in_bounds(midpoint_tile.0, midpoint_tile.1) {
@@ -498,57 +339,29 @@ fn distance_sq_to_segment(point: (f32, f32), from: (f32, f32), to: (f32, f32)) -
     dx * dx + dy * dy
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) struct StaticPathingRelation {
-    blocking_tank_trap_owners: Vec<u32>,
-}
-
-impl StaticPathingRelation {
-    pub(super) fn for_player(player: u32, teams: &TeamRelations) -> Self {
-        let mut owners = teams.same_team_player_ids(player);
-        if player != 0 {
-            owners.push(player);
-        }
-        owners.sort_unstable();
-        owners.dedup();
-        Self {
-            blocking_tank_trap_owners: owners,
-        }
-    }
-
-    #[cfg(test)]
-    pub(super) fn single_owner(player: u32) -> Self {
-        let owners = if player == 0 {
-            Vec::new()
-        } else {
-            vec![player]
-        };
-        Self {
-            blocking_tank_trap_owners: owners,
-        }
-    }
-
-    fn blocks_tank_trap_owned_by(&self, owner: u32) -> bool {
-        owner != 0 && self.blocking_tank_trap_owners.binary_search(&owner).is_ok()
-    }
-}
-
 fn close_tank_trap_vehicle_gaps(
     size: u32,
-    tank_trap_tiles: &HashSet<(u32, u32)>,
+    tank_trap_tiles: &[bool],
     vehicle_body_blocked: &mut [bool],
 ) {
-    for &(tx, ty) in tank_trap_tiles {
-        for (target, midpoint) in [
-            ((tx.saturating_add(2), ty), (tx.saturating_add(1), ty)),
-            ((tx, ty.saturating_add(2)), (tx, ty.saturating_add(1))),
-        ] {
-            if target.0 >= size || target.1 >= size || midpoint.0 >= size || midpoint.1 >= size {
+    for ty in 0..size {
+        for tx in 0..size {
+            let source_idx = (ty * size + tx) as usize;
+            if !tank_trap_tiles[source_idx] {
                 continue;
             }
-            if tank_trap_tiles.contains(&target) {
-                let idx = (midpoint.1 * size + midpoint.0) as usize;
-                vehicle_body_blocked[idx] = true;
+            for (target, midpoint) in [
+                ((tx.saturating_add(2), ty), (tx.saturating_add(1), ty)),
+                ((tx, ty.saturating_add(2)), (tx, ty.saturating_add(1))),
+            ] {
+                if target.0 >= size || target.1 >= size {
+                    continue;
+                }
+                let target_idx = (target.1 * size + target.0) as usize;
+                if tank_trap_tiles[target_idx] {
+                    let midpoint_idx = (midpoint.1 * size + midpoint.0) as usize;
+                    vehicle_body_blocked[midpoint_idx] = true;
+                }
             }
         }
     }
@@ -763,7 +576,7 @@ mod tests {
     }
 
     #[test]
-    fn enemy_tank_traps_are_breachable_for_vehicle_pathing_only() {
+    fn enemy_tank_traps_block_vehicle_pathing_like_friendly_traps() {
         let map = flat_test_map(12);
         let mut entities = EntityStore::new();
         let (bx, by) = footprint_center(&map, EntityKind::TankTrap, 5, 5);
@@ -771,14 +584,7 @@ mod tests {
             .spawn_building(2, EntityKind::TankTrap, bx, by, true)
             .expect("tank trap should spawn");
         let occ = Occupancy::build(&map, &entities);
-        let enemies = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
-        let allies = TeamRelations::from_player_teams([(1, 7), (2, 7)]);
-        let enemy_relation = StaticPathingRelation::for_player(1, &enemies);
-        let allied_relation = StaticPathingRelation::for_player(1, &allies);
-
         assert!(!occ.passable_for_kind(5, 5, EntityKind::Tank));
-        assert!(occ.passable_for_kind_and_relation(5, 5, EntityKind::Tank, &enemy_relation));
-        assert!(!occ.passable_for_kind_and_relation(5, 5, EntityKind::Tank, &allied_relation));
     }
 
     #[test]
@@ -824,10 +630,8 @@ mod tests {
     }
 
     #[test]
-    fn owner_aware_tank_trap_gap_closure_uses_only_non_enemy_pairs() {
+    fn enemy_tank_trap_pairs_close_one_tile_vehicle_gaps() {
         let map = flat_test_map(12);
-        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2), (3, 1)]);
-        let player_one_relation = StaticPathingRelation::for_player(1, &teams);
         let mut enemy_entities = EntityStore::new();
         for tile_y in [4, 6] {
             let (x, y) = footprint_center(&map, EntityKind::TankTrap, 5, tile_y);
@@ -836,36 +640,13 @@ mod tests {
                 .expect("enemy tank trap should spawn");
         }
         let enemy_occ = Occupancy::build(&map, &enemy_entities);
-        assert!(enemy_occ.passable_for_kind_and_relation(
-            5,
-            5,
-            EntityKind::ScoutCar,
-            &player_one_relation
-        ));
-
-        let mut allied_entities = EntityStore::new();
-        for (owner, tile_y) in [(1, 4), (3, 6)] {
-            let (x, y) = footprint_center(&map, EntityKind::TankTrap, 5, tile_y);
-            allied_entities
-                .spawn_building(owner, EntityKind::TankTrap, x, y, true)
-                .expect("allied tank trap should spawn");
-        }
-        let allied_occ = Occupancy::build(&map, &allied_entities);
-        assert!(!allied_occ.passable_for_kind_and_relation(
-            5,
-            5,
-            EntityKind::ScoutCar,
-            &player_one_relation
-        ));
+        assert!(!enemy_occ.passable_for_kind(5, 5, EntityKind::ScoutCar));
     }
 
     #[test]
     fn tank_trap_route_obstruction_distinguishes_forward_from_irrelevant_traps() {
         let map = flat_test_map(12);
-        let relation = StaticPathingRelation::for_player(
-            1,
-            &TeamRelations::from_player_teams([(1, 1), (2, 2)]),
-        );
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
         let mut entities = EntityStore::new();
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -886,22 +667,19 @@ mod tests {
         assert!(occ.tank_trap_obstructs_vehicle_route(
             attacker,
             entities.get(forward).expect("forward trap should exist"),
-            &relation
+            &teams
         ));
         assert!(!occ.tank_trap_obstructs_vehicle_route(
             attacker,
             entities.get(side).expect("side trap should exist"),
-            &relation
+            &teams
         ));
     }
 
     #[test]
     fn tank_trap_route_obstruction_marks_closed_gap_on_route() {
         let map = flat_test_map(12);
-        let relation = StaticPathingRelation::for_player(
-            1,
-            &TeamRelations::from_player_teams([(1, 1), (2, 2)]),
-        );
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
         let mut entities = EntityStore::new();
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -921,7 +699,7 @@ mod tests {
         assert!(occ.tank_trap_obstructs_vehicle_route(
             entities.get(tank).expect("tank should exist"),
             entities.get(upper).expect("upper trap should exist"),
-            &relation
+            &teams
         ));
     }
 

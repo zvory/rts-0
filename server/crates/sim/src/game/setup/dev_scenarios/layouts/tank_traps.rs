@@ -10,7 +10,7 @@ pub(in crate::game::setup::dev_scenarios) enum TankTrapLineLayout {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::game::setup::dev_scenarios) enum TankTrapPathingLayout {
     FriendlyVehicleReroute,
-    EnemyVehicleBreach,
+    EnemyVehicleReroute,
     InfantryPassThrough,
     ExplicitInfantryAttack,
 }
@@ -38,7 +38,7 @@ impl TankTrapPathingLayout {
     pub(in crate::game::setup::dev_scenarios) fn from_case(case: &str) -> Option<Self> {
         match case {
             "friendly_vehicle_reroute" => Some(Self::FriendlyVehicleReroute),
-            "enemy_vehicle_breach" => Some(Self::EnemyVehicleBreach),
+            "enemy_vehicle_reroute" => Some(Self::EnemyVehicleReroute),
             "infantry_pass_through" => Some(Self::InfantryPassThrough),
             "explicit_infantry_attack" => Some(Self::ExplicitInfantryAttack),
             _ => None,
@@ -48,7 +48,7 @@ impl TankTrapPathingLayout {
     pub(in crate::game::setup::dev_scenarios) fn scenario_case(self) -> &'static str {
         match self {
             Self::FriendlyVehicleReroute => "friendly_vehicle_reroute",
-            Self::EnemyVehicleBreach => "enemy_vehicle_breach",
+            Self::EnemyVehicleReroute => "enemy_vehicle_reroute",
             Self::InfantryPassThrough => "infantry_pass_through",
             Self::ExplicitInfantryAttack => "explicit_infantry_attack",
         }
@@ -63,18 +63,18 @@ impl TankTrapPathingLayout {
                     2
                 }
             }
-            Self::EnemyVehicleBreach | Self::InfantryPassThrough | Self::ExplicitInfantryAttack => {
-                2
-            }
+            Self::EnemyVehicleReroute
+            | Self::InfantryPassThrough
+            | Self::ExplicitInfantryAttack => 2,
         }
     }
 
     pub(in crate::game::setup::dev_scenarios) fn player_teams(self) -> [(u32, u32); 2] {
         match self {
             Self::FriendlyVehicleReroute => [(1, 1), (2, 1)],
-            Self::EnemyVehicleBreach | Self::InfantryPassThrough | Self::ExplicitInfantryAttack => {
-                [(1, 1), (2, 2)]
-            }
+            Self::EnemyVehicleReroute
+            | Self::InfantryPassThrough
+            | Self::ExplicitInfantryAttack => [(1, 1), (2, 2)],
         }
     }
 }
@@ -199,7 +199,7 @@ pub(in crate::game::setup::dev_scenarios) fn tank_trap_pathing_map(
         .collect();
     let enemy_base = matches!(
         layout,
-        TankTrapPathingLayout::EnemyVehicleBreach
+        TankTrapPathingLayout::EnemyVehicleReroute
             | TankTrapPathingLayout::InfantryPassThrough
             | TankTrapPathingLayout::ExplicitInfantryAttack
     )

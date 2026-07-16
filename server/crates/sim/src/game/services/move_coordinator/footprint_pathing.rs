@@ -71,10 +71,7 @@ impl MoveCoordinator<'_> {
     ) -> Option<FootprintRouting> {
         let entity = entities.get(id)?;
         let start_tile = self.map.tile_of(entity.pos_x, entity.pos_y);
-        let relation = StaticPathingRelation::for_player(entity.owner, &self.teams);
-        let static_fingerprint = self
-            .occ
-            .static_fingerprint_for_kind_and_relation(entity.kind, &relation);
+        let static_fingerprint = self.occ.static_fingerprint_for_kind(entity.kind);
         let current = footprint_routing(entity)?;
         let routing = if current.static_fingerprint == Some(static_fingerprint)
             && current.start_tile == Some(start_tile)
@@ -153,17 +150,16 @@ impl MoveCoordinator<'_> {
         source: PathingRequestSource,
     ) -> PathAttempt<Vec<(i32, i32)>> {
         let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
-        let (unit_owner, unit_kind, sx, sy) = match entities.get(id) {
+        let (unit_kind, sx, sy) = match entities.get(id) {
             Some(e) if e.is_unit() => {
                 let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
-                (e.owner, e.kind, sx, sy)
+                (e.kind, sx, sy)
             }
             _ => return PathAttempt::Failed,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         let radius_tiles = config::unit_radius_tiles(unit_kind);
         let req = PathRequest {
-            relation: StaticPathingRelation::for_player(unit_owner, &self.teams),
             kind: unit_kind,
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),

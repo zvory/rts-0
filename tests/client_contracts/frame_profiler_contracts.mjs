@@ -34,23 +34,37 @@ export function runFrameProfilerContracts() {
         && stream?.setup?.snapshotStreamSpectator === false
         && JSON.stringify(stream?.setup?.snapshotStreamTeamIds) === JSON.stringify([1, 2, 1, 2])
         && stream?.setup?.snapshotStreamVisibilityTileCount === 126 * 126
-        && stream?.setup?.waitForMinEntities === 288,
+        && stream?.setup?.waitForMinEntities === 408,
       "client-only Hellhole measures the full-cadence Player 1 2v2 projection",
     );
     assert(!defaultIds.includes("supply-300-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");
     const integrated = workloads.find((workload) => workload.id === "supply-300-hellhole-integrated");
-    assert(integrated?.kind === "labScenario" && integrated?.setup?.waitForMinEntities === 380, "integrated Hellhole retains an explicit canonical Lab view");
+    assert(
+      integrated?.kind === "labScenario"
+        && integrated?.setup?.waitForMinEntities === 487
+        && integrated?.setup?.liveLabScenario?.minimumProjectedEntityCount === 487
+        && integrated?.setup?.liveLabScenario?.projectedEntityCount === 500,
+      "integrated Hellhole retains the canonical Lab range through deterministic death/respawn churn",
+    );
     const expectedLab = integrated.setup.liveLabScenario;
     const liveLabSample = {
       scenarioId: expectedLab.scenarioId,
       mapWidth: expectedLab.mapWidth,
       mapHeight: expectedLab.mapHeight,
-      projectedEntityCount: expectedLab.projectedEntityCount,
+      projectedEntityCount: expectedLab.minimumProjectedEntityCount,
       labMode: true,
       offline: false,
       websocketOpen: true,
     };
-    assert(validateLiveLabScenarioSample(liveLabSample, expectedLab).length === 0, "integrated Hellhole accepts exact live Lab identity");
+    assert(validateLiveLabScenarioSample(liveLabSample, expectedLab).length === 0, "integrated Hellhole accepts the measured live Lab floor");
+    assert(
+      validateLiveLabScenarioSample({ ...liveLabSample, projectedEntityCount: expectedLab.minimumProjectedEntityCount - 1 }, expectedLab).length > 0,
+      "integrated Hellhole rejects a projection below its measured workload floor",
+    );
+    assert(
+      validateLiveLabScenarioSample({ ...liveLabSample, projectedEntityCount: expectedLab.projectedEntityCount + 1 }, expectedLab).length > 0,
+      "integrated Hellhole rejects unexpected extra entities",
+    );
     assert(validateLiveLabScenarioSample({ ...liveLabSample, offline: true }, expectedLab).length > 0, "integrated Hellhole rejects an offline client lane");
     assert(validateLiveLabScenarioSample({ ...liveLabSample, websocketOpen: false }, expectedLab).length > 0, "integrated Hellhole rejects a non-open WebSocket");
   }

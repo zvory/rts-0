@@ -405,6 +405,7 @@ pub(crate) struct LabScenarioCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::hellhole_spec::INITIAL_ENTITY_COUNT;
     use std::collections::BTreeSet;
 
     use rts_sim::game::entity::EntityKind;
@@ -575,7 +576,7 @@ mod tests {
         game.tick();
 
         let low = game.snapshot_full_for(1);
-        assert!(low.entities.len() < 380);
+        assert!(low.entities.len() < INITIAL_ENTITY_COUNT);
         assert!(low
             .player_resources
             .iter()
@@ -594,7 +595,7 @@ mod tests {
             })
             .collect();
         assert_eq!(respawns.len(), 1);
-        assert_eq!(respawns[0].len(), 380 - low.entities.len());
+        assert_eq!(respawns[0].len(), INITIAL_ENTITY_COUNT - low.entities.len());
         assert!(respawns[0]
             .iter()
             .any(|spawn| (spawn.owner, spawn.kind) == (1, EntityKind::Tank)));
@@ -610,7 +611,7 @@ mod tests {
             }
         }
         let restored = game.snapshot_full_for(1);
-        assert_eq!(restored.entities.len(), 380);
+        assert_eq!(restored.entities.len(), INITIAL_ENTITY_COUNT);
         assert!(restored
             .player_resources
             .iter()
@@ -630,6 +631,13 @@ mod tests {
     fn extra_unit_does_not_mask_a_different_kind_deficit_or_enlarge_canonical_roster() {
         let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
         let mut game = scenario.build_game().unwrap();
+        for player_id in [1, 2] {
+            game.apply_lab_op(LabOp::SetPlayerGodMode {
+                player_id,
+                enabled: true,
+            })
+            .unwrap();
+        }
         let mut driver = LabScenarioDriver::supply_300_hellhole().unwrap();
         driver.actions_for_tick(&game);
         let canonical_slot_count = driver.central_unit_provenance.len();

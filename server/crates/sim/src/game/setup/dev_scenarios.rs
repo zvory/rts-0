@@ -3,6 +3,7 @@ use crate::game::state::TrackedRng;
 
 mod factory_wall_rally_spawn;
 mod layouts;
+mod replay_142_vehicle_lock;
 mod tank_coax;
 
 use layouts::*;
@@ -433,7 +434,7 @@ impl Game {
             TankTrapPathingLayout::FriendlyVehicleReroute => {
                 matches!(unit, EntityKind::ScoutCar | EntityKind::Tank)
             }
-            TankTrapPathingLayout::EnemyVehicleBreach => matches!(
+            TankTrapPathingLayout::EnemyVehicleReroute => matches!(
                 unit,
                 EntityKind::AntiTankGun
                     | EntityKind::MortarTeam
@@ -716,5 +717,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
 mod command_car_corner_tests;
 #[cfg(test)]
 mod factory_wall_rally_spawn_tests;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;

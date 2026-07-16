@@ -73,6 +73,7 @@ export class SnapshotStreamNet extends Net {
     now = () => performance.now(),
     setTimeoutFn = (...args) => setTimeout(...args),
     clearTimeoutFn = (timer) => clearTimeout(timer),
+    autoStart = true,
   }) {
     super(snapshotStreamAssetUrl(id), diagnostics);
     this.id = id;
@@ -81,6 +82,7 @@ export class SnapshotStreamNet extends Net {
     this.now = now;
     this.setTimeoutFn = setTimeoutFn;
     this.clearTimeoutFn = clearTimeoutFn;
+    this.autoStart = autoStart;
     this.header = null;
     this.frames = [];
     this.frameIndex = 0;
@@ -126,8 +128,20 @@ export class SnapshotStreamNet extends Net {
     });
     this._emit("open");
     this._emit(S.START, this.header.start);
-    this.startedAt = this.now();
-    this._schedule(0);
+    if (this.autoStart) this._startFrames();
+  }
+
+  restartFromBeginning() {
+    if (!this.header) throw new Error("Snapshot stream is not loaded");
+    if (this.closed) throw new Error("Snapshot stream is closed");
+    if (this.timer !== null) this.clearTimeoutFn(this.timer);
+    this.timer = null;
+    this.frameIndex = 0;
+    this.loopCount = 0;
+    this.publicState.frameIndex = 0;
+    this.publicState.loopCount = 0;
+    this._emit(S.START, this.header.start);
+    this._startFrames();
   }
 
   close() {
@@ -139,6 +153,11 @@ export class SnapshotStreamNet extends Net {
   _schedule(delayMs) {
     if (this.closed) return;
     this.timer = this.setTimeoutFn(() => this._deliver(), Math.max(0, delayMs));
+  }
+
+  _startFrames() {
+    this.startedAt = this.now();
+    this._schedule(0);
   }
 
   _deliver() {

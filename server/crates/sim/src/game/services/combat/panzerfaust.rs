@@ -12,7 +12,7 @@ use super::shot_blocker_index::ShotBlockerIndex;
 use super::weapons::mirror_weapon_to_body;
 use super::{
     dist2, Fog, LineOfSight, Map, MoveCoordinator, Occupancy, SmokeCloudStore, SpatialIndex,
-    StaticPathingRelation, TeamRelations, RANGE_SLACK,
+    TeamRelations, RANGE_SLACK,
 };
 
 mod events;
@@ -213,9 +213,8 @@ fn resolve_panzerfaust_target(
                 panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, *target)
             });
     }
-    let tank_trap_relation = StaticPathingRelation::for_player(owner, teams);
     let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-        occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
+        occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
     };
     resolve_target_for_weapon(
         map,

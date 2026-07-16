@@ -1,4 +1,4 @@
-//! Match-history persistence backed by Postgres (Supabase).
+//! Match-history and bounded diagnostics persistence backed by Postgres (Supabase).
 //!
 //! - The server is the only writer; clients never touch the DB.
 //! - Writes happen at match end. Failures are logged but never propagate into the room task —
@@ -142,6 +142,25 @@ pub struct Db {
     pool: PgPool,
 }
 
+#[derive(Debug, Clone)]
+pub struct ClientStressTestRecord {
+    pub run_id: String,
+    pub artifact_label: String,
+    pub received_at: DateTime<Utc>,
+    pub build_id: String,
+    pub status: String,
+    pub user_label: String,
+    pub device_id: String,
+    pub fingerprint: String,
+    pub platform: String,
+    pub average_fps_x100: i32,
+    pub frame_work_p95_ms: i32,
+    pub renderer_p95_ms: i32,
+    pub profile_kind: String,
+    pub profile_sample_count: i32,
+    pub artifact_json: serde_json::Value,
+}
+
 impl Db {
     /// Connect to Postgres, run migrations, and return a pool wrapper.
     ///
@@ -156,6 +175,49 @@ impl Db {
         sqlx::migrate!("./migrations").run(&pool).await?;
         crate::log_info!("database connected and migrations applied");
         Ok(Self { pool })
+    }
+
+    pub async fn record_client_stress_test(
+        &self,
+        rec: &ClientStressTestRecord,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            insert into client_stress_tests
+                (run_id, artifact_label, received_at, build_id, status, user_label,
+                 device_id, fingerprint, platform, average_fps_x100, frame_work_p95_ms,
+                 renderer_p95_ms, profile_kind, profile_sample_count, artifact_json)
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            "#,
+        )
+        .bind(&rec.run_id)
+        .bind(&rec.artifact_label)
+        .bind(rec.received_at)
+        .bind(&rec.build_id)
+        .bind(&rec.status)
+        .bind(&rec.user_label)
+        .bind(&rec.device_id)
+        .bind(&rec.fingerprint)
+        .bind(&rec.platform)
+        .bind(rec.average_fps_x100)
+        .bind(rec.frame_work_p95_ms)
+        .bind(rec.renderer_p95_ms)
+        .bind(&rec.profile_kind)
+        .bind(rec.profile_sample_count)
+        .bind(&rec.artifact_json)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn client_stress_test_by_run_id(
+        &self,
+        run_id: &str,
+    ) -> Result<Option<serde_json::Value>, sqlx::Error> {
+        sqlx::query_scalar("select artifact_json from client_stress_tests where run_id = $1")
+            .bind(run_id)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Insert one match-history row. Logs on error and swallows it — the caller never blocks.
@@ -429,14 +491,14 @@ pub async fn try_connect_from_env() -> Option<Arc<Db>> {
     let url = match std::env::var("DATABASE_URL") {
         Ok(u) if !u.trim().is_empty() => u,
         _ => {
-            crate::log_warn!("DATABASE_URL not set; match history disabled");
+            crate::log_warn!("DATABASE_URL not set; database-backed features disabled");
             return None;
         }
     };
     match Db::connect(&url).await {
         Ok(db) => Some(Arc::new(db)),
         Err(err) => {
-            crate::log_error!(%err, "failed to connect to database; match history disabled");
+            crate::log_error!(%err, "failed to connect to database; database-backed features disabled");
             None
         }
     }

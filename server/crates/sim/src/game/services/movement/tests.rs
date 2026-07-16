@@ -26,6 +26,7 @@ use super::pivot_drive::{
 use super::scout_car::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
 };
+mod vehicle_traffic;
 
 /// Distance (px) between two entity centers.
 fn dist(entities: &EntityStore, a: u32, b: u32) -> f32 {

@@ -1625,17 +1625,17 @@ checked without adding any wire-protocol fields.
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their
 body `facing`, configured length/width, and a small clearance margin, building bodies are
 axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
-build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, physical
-vehicle-body-only blockers, and the owner-aware path-planning view of vehicle-body-only blockers.
+build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, and
+physical vehicle-body-only blockers.
 Pump Jacks remain buildings for placement, targeting, economy, and fog memory, but they do not
 populate static occupancy layers, so units and vehicles can stand on and path through their
 footprints.
 Tank Trap pairs exactly two tiles apart close the single tile between them for physical vehicle body
-legality while remaining infantry-passable and shot-transparent. Vehicle path planning keeps own and
-allied Tank Traps in the static blocker layer but treats enemy Tank Traps as breachable obstacles, so
-paths can route into an enemy wall and combat can attack it. Path-cache fingerprints include the same
-owner/team relation as the path request. Movement, collision, and standability still use physical
-legality, so live enemy Tank Traps are not globally non-colliding.
+legality while remaining infantry-passable and shot-transparent. Vehicle path planning uses that
+same blocker layer for every Tank Trap regardless of owner, team, visibility, or prior scouting, so
+vehicles route around enemy walls even when their player has never seen the traps. Path-cache
+fingerprints include the vehicle-only blocker layer. Movement, collision, and standability use the
+same physical legality.
 `services::standability` owns reusable legality predicates for unit bodies and building sites.
 Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability

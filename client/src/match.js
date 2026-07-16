@@ -32,6 +32,7 @@ import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
+import { recordPointerLockDiagnostic } from "./match_pointer_lock_diagnostics.js";
 import {
   applyLivePauseState as applyLivePauseStateModel,
   clearPredictedMovementOverlay,
@@ -860,85 +861,11 @@ export class Match {
 
   handlePointerLockError(err) {
     if (this.input?.installedAppRuntime()) {
-      this.recordPointerLockDiagnostic(err);
+      recordPointerLockDiagnostic(this, err);
     } else {
       this.toast("Cursor lock was blocked. Click the game view and try again.");
     }
     this.syncPointerLockUi();
-  }
-
-  recordPointerLockDiagnostic(err = null) {
-    if (!this.input?.installedAppRuntime()) return;
-    const snapshot = {
-      at: new Date().toISOString(),
-      error: this.pointerLockErrorSummary(err),
-      support: this.input.pointerLockDebugSnapshot(),
-    };
-    if (typeof window !== "undefined") window.__rtsPointerLockDebug = snapshot;
-    this.showPointerLockDiagnostic(snapshot);
-    if (this.pointerLockDiagnosticShown) return;
-    this.pointerLockDiagnosticShown = true;
-    console.warn("[RTS_POINTER_LOCK_INSTALLED_APP]", snapshot);
-    this.toast(this.pointerLockDiagnosticToast(snapshot));
-  }
-
-  showPointerLockDiagnostic(snapshot) {
-    if (typeof document === "undefined") return;
-    let panel = document.getElementById("desktop-cursor-diagnostic");
-    if (!panel) {
-      panel = document.createElement("pre");
-      panel.id = "desktop-cursor-diagnostic";
-      panel.style.position = "fixed";
-      panel.style.left = "12px";
-      panel.style.bottom = "12px";
-      panel.style.zIndex = "99999";
-      panel.style.maxWidth = "760px";
-      panel.style.maxHeight = "240px";
-      panel.style.overflow = "auto";
-      panel.style.padding = "10px 12px";
-      panel.style.margin = "0";
-      panel.style.border = "1px solid rgba(255,255,255,0.35)";
-      panel.style.background = "rgba(18, 22, 28, 0.94)";
-      panel.style.color = "#f4f7fb";
-      panel.style.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace";
-      panel.style.whiteSpace = "pre-wrap";
-      panel.style.pointerEvents = "none";
-      document.body.appendChild(panel);
-    }
-    const native = snapshot?.support?.nativeCursor || {};
-    panel.textContent = [
-      "Installed-app cursor lock diagnostic",
-      `error: ${this.pointerLockDiagnosticToast(snapshot)}`,
-      `nativeBridgePresent: ${!!snapshot?.support?.nativeCursorBridgePresent}`,
-      `nativeSupported: ${native.supported !== false}`,
-      `nativeBackend: ${native.backend || "none"}`,
-      `nativeLastError: ${native.lastError || "none"}`,
-      `tauriGlobals: ${(snapshot?.support?.tauriGlobals || []).join(", ") || "none"}`,
-      `desktopRuntime: ${JSON.stringify(snapshot?.support?.desktopRuntime || null)}`,
-    ].join("\n");
-  }
-
-  pointerLockDiagnosticToast(snapshot) {
-    const native = snapshot?.support?.nativeCursor;
-    const nativeError = native?.lastError || null;
-    const error = snapshot?.error?.message || snapshot?.error?.name || null;
-    if (nativeError) return `Installed-app cursor lock failed: ${nativeError}`;
-    if (native?.supported === false) return "Installed-app cursor lock failed: native bridge missing.";
-    if (error) return `Installed-app cursor lock failed: ${error}`;
-    return "Installed-app cursor lock failed.";
-  }
-
-  pointerLockErrorSummary(err) {
-    if (!err) return null;
-    if (err instanceof Error) return { name: err.name, message: err.message };
-    if (typeof err === "object") {
-      return {
-        type: err.type || null,
-        name: err.name || null,
-        message: err.message || null,
-      };
-    }
-    return { message: String(err) };
   }
 
   syncPointerLockUi() {

@@ -719,6 +719,7 @@ fn lab_setup_error_text(reason: &str) -> String {
 mod tests {
     use super::*;
     use crate::protocol::Event;
+    use crate::tools::hellhole_spec::{INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT};
     use std::collections::BTreeMap;
 
     fn temp_catalog_dir(name: &str) -> PathBuf {
@@ -998,7 +999,7 @@ mod tests {
             vec![1, 2, 1, 2],
         );
         assert_eq!(game.lab_god_mode_players(), vec![3, 4]);
-        assert_eq!(game.perf_entity_counts().entities, 380);
+        assert_eq!(game.perf_entity_counts().entities, INITIAL_ENTITY_COUNT);
 
         let start = game.start_payload();
         let map = &start.map;
@@ -1062,7 +1063,9 @@ mod tests {
             .entities
             .iter()
             .filter(|entity| {
-                (entity.owner == 1 || entity.owner == 2) && entity.kind != "scout_plane"
+                (entity.owner == 1 || entity.owner == 2)
+                    && entity.kind != "scout_plane"
+                    && entity.kind != "tank_trap"
             })
             .filter(|entity| {
                 (1_200.0..=2_800.0).contains(&entity.x) && (1_700.0..=2_400.0).contains(&entity.y)
@@ -1085,7 +1088,7 @@ mod tests {
             .map(|entity| entity.y)
             .fold(f32::NEG_INFINITY, f32::max);
         assert!(
-            max_x - min_x <= 650.0 && max_y - min_y <= 600.0,
+            max_x - min_x <= 750.0 && max_y - min_y <= 625.0,
             "central scrum packing expanded to {:.1}x{:.1}px",
             max_x - min_x,
             max_y - min_y
@@ -1096,6 +1099,7 @@ mod tests {
                 .iter()
                 .filter(|entity| {
                     entity.owner == player_id
+                        && entity.kind != "tank_trap"
                         && (1_200.0..=2_800.0).contains(&entity.x)
                         && (1_700.0..=2_400.0).contains(&entity.y)
                 })
@@ -1105,6 +1109,54 @@ mod tests {
                 "non-shuttle player {player_id} must remain fully packed into the central scrum"
             );
         }
+        let tank_traps: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == "tank_trap")
+            .collect();
+        assert_eq!(
+            tank_traps.len(),
+            SCATTERED_TANK_TRAP_COUNT,
+            "Hellhole tank-trap count drifted"
+        );
+        let tank_traps_by_quadrant = tank_traps.iter().fold([0usize; 4], |mut counts, trap| {
+            let quadrant = usize::from(trap.x >= map.width as f32 * map.tile_size as f32 * 0.5)
+                + 2 * usize::from(trap.y >= map.height as f32 * map.tile_size as f32 * 0.5);
+            counts[quadrant] += 1;
+            counts
+        });
+        assert!(
+            tank_traps_by_quadrant.iter().all(|&count| count >= 20),
+            "tank traps must remain distributed around the whole map: {tank_traps_by_quadrant:?}"
+        );
+        let central_tank_traps = tank_traps
+            .iter()
+            .filter(|trap| {
+                (1_200.0..=2_800.0).contains(&trap.x) && (1_700.0..=2_400.0).contains(&trap.y)
+            })
+            .count();
+        assert!(
+            central_tank_traps >= 6,
+            "central unit clump must retain scattered tank traps: {central_tank_traps}"
+        );
+        let open_field_tank_traps = tank_traps
+            .iter()
+            .filter(|trap| {
+                snapshot
+                    .entities
+                    .iter()
+                    .filter(|entity| entity.kind != "tank_trap")
+                    .all(|entity| {
+                        let dx = entity.x - trap.x;
+                        let dy = entity.y - trap.y;
+                        dx * dx + dy * dy >= 160.0 * 160.0
+                    })
+            })
+            .count();
+        assert!(
+            open_field_tank_traps >= 60,
+            "open field must retain tank traps away from unit/building clumps: {open_field_tank_traps}"
+        );
         for entity in &snapshot.entities {
             let tile_x = (entity.x / map.tile_size as f32).floor() as u32;
             let tile_y = (entity.y / map.tile_size as f32).floor() as u32;
@@ -1152,6 +1204,10 @@ mod tests {
         }
         assert_eq!(counts_by_owner.len(), 4);
         for player_id in 1..=4 {
+            let mut expected_counts = expected_counts.clone();
+            if player_id == 1 {
+                expected_counts.insert("tank_trap".to_string(), SCATTERED_TANK_TRAP_COUNT);
+            }
             assert_eq!(
                 counts_by_owner.get(&player_id),
                 Some(&expected_counts),

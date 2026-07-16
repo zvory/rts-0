@@ -1,4 +1,5 @@
 import { nativeCursorDebugSnapshot } from "./cursor_lock.js";
+import { pointerLockTraceSnapshot } from "./pointer_lock_diagnostics.js";
 
 const POINTER_LOCK_RESULT_TIMEOUT_MS = 700;
 const POINTER_LOCK_RAW_INPUT_OPTIONS = Object.freeze({ unadjustedMovement: true });
@@ -72,6 +73,7 @@ export function pointerLockDebugSnapshot() {
     attempts: this._pointerLockAttempt,
     lastFocusAttempt: this._lastPointerLockFocusAttempt,
     lastRequest: this._lastPointerLockRequest,
+    trace: pointerLockTraceSnapshot(this),
     location: globalThis.location?.href || null,
     userAgent: navigator.userAgent,
   };
@@ -80,25 +82,48 @@ export function pointerLockDebugSnapshot() {
 export function _focusPointerLockTarget() {
   const before = this._focusDebugState();
   const target = this._pointerLockTarget();
+  const errors = [];
+  let windowFocusCalled = false;
   if (typeof target.hasAttribute === "function" && !target.hasAttribute("tabindex")) target.tabIndex = -1;
   if (typeof globalThis.window?.focus === "function") {
+    windowFocusCalled = true;
     try {
       globalThis.window.focus();
-    } catch {
+    } catch (err) {
+      errors.push({ source: "window.focus", error: this._pointerLockErrorSummary(err) });
       // Some embedded webviews expose focus but reject it; the element focus below is still useful.
     }
   }
   if (typeof target.focus !== "function") {
-    this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled: false };
+    this._lastPointerLockFocusAttempt = {
+      before,
+      after: this._focusDebugState(),
+      windowFocusCalled,
+      elementFocusCalled: false,
+      errors,
+    };
+    this._recordPointerLockTrace("focus", this._lastPointerLockFocusAttempt);
     return;
   }
   const elementFocusCalled = true;
   try {
     target.focus({ preventScroll: true });
-  } catch {
-    target.focus();
+  } catch (err) {
+    errors.push({ source: "target.focus-options", error: this._pointerLockErrorSummary(err) });
+    try {
+      target.focus();
+    } catch (fallbackErr) {
+      errors.push({ source: "target.focus", error: this._pointerLockErrorSummary(fallbackErr) });
+    }
   }
-  this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled };
+  this._lastPointerLockFocusAttempt = {
+    before,
+    after: this._focusDebugState(),
+    windowFocusCalled,
+    elementFocusCalled,
+    errors,
+  };
+  this._recordPointerLockTrace("focus", this._lastPointerLockFocusAttempt);
 }
 
 export function _focusDebugState() {
@@ -116,14 +141,23 @@ export function _focusDebugState() {
 }
 
 export async function _requestBrowserPointerLock() {
-  if (!this._browserPointerLockSupported()) {
-    if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
+  const supported = this._browserPointerLockSupported();
+  const target = this._pointerLockTarget();
+  this._recordPointerLockTrace("browser-request-start", {
+    supported,
+    target: this._elementDebugSummary(target),
+    pointerLockElement: this._elementDebugSummary(this._browserPointerLockElement()),
+    pointerLockElementMatches: this._browserPointerLockElement() === target,
+    focus: this._focusDebugState(),
+  });
+  if (!supported) {
+    this._reportPointerLockFailure(new Error("Pointer Lock API is unavailable."));
     return false;
   }
   try {
     const requestPointerLock = this._browserRequestPointerLock();
     if (!requestPointerLock) {
-      if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
+      this._reportPointerLockFailure(new Error("Pointer Lock API is unavailable."));
       return false;
     }
     const rawLocked = await this._requestBrowserPointerLockWithOptions(
@@ -131,10 +165,18 @@ export async function _requestBrowserPointerLock() {
       POINTER_LOCK_RAW_INPUT_OPTIONS,
       true,
     );
-    return rawLocked || this._browserPointerLockElement() === this._pointerLockTarget();
+    const locked = rawLocked || this._browserPointerLockElement() === this._pointerLockTarget();
+    this._recordPointerLockTrace("browser-request-complete", {
+      locked,
+      helperResult: rawLocked,
+      outcome: this._lastPointerLockRequest?.outcome || null,
+      pointerLockElementMatches: this._browserPointerLockElement() === this._pointerLockTarget(),
+    });
+    if (!locked) this._reportPointerLockFailure(pointerLockFailureFromRequest(this._lastPointerLockRequest));
+    return locked;
   } catch (err) {
     this._finishPointerLockRequest("exception", err);
-    if (this.onPointerLockError) this.onPointerLockError(err);
+    this._reportPointerLockFailure(err);
     return false;
   }
 }
@@ -163,6 +205,11 @@ export async function _requestBrowserPointerLockWithOptions(requestPointerLock, 
     before: this._focusDebugState(),
     outcome: "pending",
   };
+  this._recordPointerLockTrace("browser-request-invoked", {
+    rawInputRequested,
+    returnedPromise: this._lastPointerLockRequest.returnedPromise,
+    focus: this._lastPointerLockRequest.before,
+  });
   if (result && typeof result.then === "function") {
     return await this._waitForPointerLockPromise(result);
   }
@@ -179,11 +226,24 @@ export function _waitForPointerLockPromise(pointerLockPromise) {
       this._finishPointerLockRequest(outcome, err);
       resolve(locked);
     };
-    const timer = window.setTimeout(() => {
+    let timer = window.setTimeout(() => {
       finish("timeout", this._browserPointerLockElement() === this._pointerLockTarget(), null);
     }, POINTER_LOCK_RESULT_TIMEOUT_MS);
     pointerLockPromise.then(
-      () => finish("resolved", this._browserPointerLockElement() === this._pointerLockTarget(), null),
+      async () => {
+        clearTimeout(timer);
+        timer = null;
+        if (this._browserPointerLockElement() === this._pointerLockTarget()) {
+          finish("resolved", true, null);
+          return;
+        }
+        this._recordPointerLockTrace("browser-promise-resolved-awaiting-event", {
+          focus: this._focusDebugState(),
+          pointerLockElement: this._elementDebugSummary(this._browserPointerLockElement()),
+        });
+        const result = await waitForBrowserPointerLockEvent(this);
+        finish(`resolved-${result.outcome}`, result.locked, result.error);
+      },
       (err) => finish("rejected", false, err),
     );
   });
@@ -198,6 +258,27 @@ export function _finishPointerLockRequest(outcome, err = null) {
     pointerLockElementMatches: this._browserPointerLockElement() === this._pointerLockTarget(),
     error: err ? this._pointerLockErrorSummary(err) : null,
   };
+  this._recordPointerLockTrace("browser-request-finish", {
+    outcome,
+    rawInputRequested: this._lastPointerLockRequest.rawInputRequested,
+    returnedPromise: this._lastPointerLockRequest.returnedPromise,
+    pointerLockElementMatches: this._lastPointerLockRequest.pointerLockElementMatches,
+    focus: this._lastPointerLockRequest.after,
+    error: this._lastPointerLockRequest.error,
+  });
+}
+
+export function _reportPointerLockFailure(err) {
+  const attempt = Number.isFinite(this._pointerLockAttempt) ? this._pointerLockAttempt : 0;
+  if (this._lastPointerLockFailureAttempt === attempt) return false;
+  this._lastPointerLockFailureAttempt = attempt;
+  const error = normalizePointerLockError(err);
+  this._recordPointerLockTrace("failure", {
+    error: this._pointerLockErrorSummary(error),
+    lastRequest: this._lastPointerLockRequest,
+  });
+  if (this.onPointerLockError) this.onPointerLockError(error);
+  return true;
 }
 
 export function _pointerLockErrorSummary(err) {
@@ -212,11 +293,23 @@ export function _pointerLockErrorSummary(err) {
   return err == null ? null : { message: String(err) };
 }
 
-export function _waitForBrowserPointerLockResult() {
-  if (this._browserPointerLockElement() === this._pointerLockTarget()) return Promise.resolve(true);
+export async function _waitForBrowserPointerLockResult() {
+  const result = await waitForBrowserPointerLockEvent(this);
+  this._finishPointerLockRequest(result.outcome, result.error);
+  return result.locked;
+}
+
+function waitForBrowserPointerLockEvent(input) {
+  if (input._browserPointerLockElement() === input._pointerLockTarget()) {
+    return Promise.resolve({ outcome: "already-locked", locked: true, error: null });
+  }
+  input._recordPointerLockTrace("browser-event-wait-start", {
+    timeoutMs: 350,
+    focus: input._focusDebugState(),
+  });
   return new Promise((resolve) => {
     let done = false;
-    const finish = (locked) => {
+    const finish = (outcome, locked, err = null) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
@@ -224,11 +317,17 @@ export function _waitForBrowserPointerLockResult() {
       document.removeEventListener("pointerlockerror", onError);
       document.removeEventListener("webkitpointerlockchange", onChange);
       document.removeEventListener("webkitpointerlockerror", onError);
-      resolve(locked);
+      resolve({ outcome, locked, error: err });
     };
-    const onChange = () => finish(this._browserPointerLockElement() === this._pointerLockTarget());
-    const onError = () => finish(false);
-    const timer = window.setTimeout(() => finish(this._browserPointerLockElement() === this._pointerLockTarget()), 350);
+    const onChange = (ev) => finish(
+      ev?.type || "pointerlockchange",
+      input._browserPointerLockElement() === input._pointerLockTarget(),
+    );
+    const onError = (ev) => finish(ev?.type || "pointerlockerror", false, ev);
+    const timer = window.setTimeout(() => finish(
+      "event-timeout",
+      input._browserPointerLockElement() === input._pointerLockTarget(),
+    ), 350);
     document.addEventListener("pointerlockchange", onChange);
     document.addEventListener("pointerlockerror", onError);
     document.addEventListener("webkitpointerlockchange", onChange);
@@ -237,17 +336,55 @@ export function _waitForBrowserPointerLockResult() {
 }
 
 export function _exitBrowserPointerLock() {
-  if (this._browserPointerLockElement() === this._pointerLockTarget()) {
-    const exitPointerLock = this._browserExitPointerLockFn();
-    if (exitPointerLock) exitPointerLock();
-  }
+  const locked = this._browserPointerLockElement() === this._pointerLockTarget();
+  const exitPointerLock = this._browserExitPointerLockFn();
+  this._recordPointerLockTrace("browser-exit", {
+    locked,
+    exitFunctionAvailable: typeof exitPointerLock === "function",
+  });
+  if (locked && exitPointerLock) exitPointerLock();
 }
 
-export function _handlePointerLockChange() {
+export function _handlePointerLockChange(ev) {
   const locked = this._browserPointerLockElement() === this._pointerLockTarget();
+  this._recordPointerLockTrace("browser-event-change", {
+    eventType: ev?.type || "pointerlockchange",
+    locked,
+    pointerLockElement: this._elementDebugSummary(this._browserPointerLockElement()),
+    focus: this._focusDebugState(),
+  });
   this._setCursorLockState(locked, locked ? "browser" : null);
 }
 
 export function _handlePointerLockError(ev) {
-  if (this.onPointerLockError) this.onPointerLockError(ev);
+  this._recordPointerLockTrace("browser-event-error", {
+    eventType: ev?.type || "pointerlockerror",
+    error: this._pointerLockErrorSummary(ev),
+    focus: this._focusDebugState(),
+  });
+  this._reportPointerLockFailure(ev);
+}
+
+function pointerLockFailureFromRequest(request) {
+  const outcome = request?.outcome || "finished";
+  const message = request?.error?.message || `Pointer Lock request ${outcome} without locking the target.`;
+  const error = new Error(message);
+  if (request?.error?.name) error.name = request.error.name;
+  return error;
+}
+
+function normalizePointerLockError(err) {
+  if (err instanceof Error) return err;
+  const summary = err && typeof err === "object"
+    ? {
+        name: err.name || null,
+        message: err.message || null,
+        type: err.type || null,
+      }
+    : null;
+  const error = new Error(
+    summary?.message || (summary?.type ? `Pointer Lock emitted ${summary.type}.` : "Pointer Lock failed."),
+  );
+  if (summary?.name) error.name = summary.name;
+  return error;
 }

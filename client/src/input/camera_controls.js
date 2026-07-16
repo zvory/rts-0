@@ -3,11 +3,13 @@ import { ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent, isTextEntry } from "./placement.js";
 
 export function _handleKeyDown(ev) {
-  // Never hijack typing in inputs (lobby name field, etc.).
-  if (isTextEntry(ev.target)) return;
   if (ev.code === "ShiftLeft" || ev.code === "ShiftRight") {
+    this._shiftKeysDown?.add(ev.code);
     this._shiftKeyDown = true;
   }
+  // Never hijack typing in inputs (lobby name field, etc.). Modifier state still
+  // needs to stay current if focus changes while the key remains held.
+  if (isTextEntry(ev.target)) return;
 
   switch (ev.code) {
     case "ArrowUp":
@@ -94,7 +96,14 @@ export function _handleKeyUp(ev) {
       return;
     case "ShiftLeft":
     case "ShiftRight":
-      this._shiftKeyDown = false;
+      this._shiftKeysDown?.delete(ev.code);
+      this._shiftKeyDown = this._shiftKeysDown
+        ? this._shiftKeysDown.size > 0
+        : !!ev.shiftKey;
+      if (this._shiftKeyDown) {
+        ev.preventDefault();
+        return;
+      }
       if (typeof clientIntent(this)?.releaseCommandTargetShift === "function") {
         clientIntent(this).releaseCommandTargetShift();
       }
@@ -114,6 +123,7 @@ export function _handleKeyUp(ev) {
 
 export function _handleBlur() {
   if (this.pointerLocked) this.exitPointerLock();
+  this._shiftKeysDown?.clear();
   this._shiftKeyDown = false;
   if (this.cameraNavigation) {
     this.cameraNavigation.release();

@@ -133,7 +133,7 @@ export const STATS = Object.freeze({
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
-    rangeTiles: 6, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
+    rangeTiles: 7, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 15, body: SCOUT_PLANE_BODY,
     blocksGroundPlacement: false,
     rangeTiles: 0, cost: { steel: 50, oil: 75 }, supply: 0, buildTicks: 0 },

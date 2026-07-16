@@ -5,6 +5,14 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   limits accommodate valid checkpoint-backed scenario round trips, while lab scenario import JSON
   has a separate explicit cap. Oversized frames are rejected before serde, and oversized scenario
   imports are rejected before checkpoint restore.
+- **Client stress-test report caps** (`stress_tests.rs`): the public client-only benchmark POST is
+  capped at 2 MiB before JSON extraction and validates its fixed schema/workload, scalar lengths,
+  duration/status, bounded profiler tables, and 750 KiB SVG limit. Server-issued unguessable run ids
+  are the only retrieval keys; the server stores no raw client IP and exposes no run-list endpoint.
+  Scriptable SVG elements, handler attributes, and links are rejected before the same-origin
+  attachment endpoint can serve a submitted flame graph. Database writes require the separate
+  `RTS_RECORD_STRESS_TESTS` gate. See
+  [`client-stress-tests.md`](client-stress-tests.md).
 - **Command unit cap and budget** (`services/commands.rs`, with mirrored budget scalars in
   `command_budget.rs`): ordinary unit-list commands inspect at most
   `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject

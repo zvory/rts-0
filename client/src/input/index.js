@@ -44,6 +44,7 @@ import {
   _handlePointerLockChange,
   _handlePointerLockError,
   _pointerLockErrorSummary,
+  _reportPointerLockFailure,
   _pointerLockTarget,
   _requestBrowserPointerLock,
   _requestBrowserPointerLockWithOptions,
@@ -51,6 +52,7 @@ import {
   _waitForPointerLockPromise,
   pointerLockDebugSnapshot,
 } from "./browser_pointer_lock.js";
+import { _recordPointerLockTrace } from "./pointer_lock_diagnostics.js";
 import {
   _activateCommandHotkey,
   _cancel,
@@ -110,13 +112,16 @@ import {
   _setNativeCursorPoint,
   configureNativeCursorBounds,
 } from "./native_cursor.js";
+import { nativeDesktopCursorBridge } from "./cursor_lock.js";
 import {
-  cursorLockSupported,
+  _prepareCursorLock,
+  _setCursorLockState,
+  exitPointerLock,
   installedAppRuntime,
-  enterCursorLock,
-  exitCursorLock,
-  nativeDesktopCursorBridge,
-} from "./cursor_lock.js";
+  pointerLockSupported,
+  requestPointerLock,
+  togglePointerLock,
+} from "./pointer_lock_controller.js";
 import {
   _closestOwnUnitKindInViewport,
   _commitBoxSelection,
@@ -225,6 +230,7 @@ export class Input {
     this._postQuickCastSelectionGuard = null;
     // Current Shift modifier state for hover previews that need queued-command semantics.
     this._shiftKeyDown = false;
+    this._shiftKeysDown = new Set();
     // Last recalled control-group slot for number-key double-tap camera jumps.
     this._lastControlGroupTap = null;
     // Cursor-lock state. While locked, `this.mouse` is a viewport-local virtual
@@ -237,6 +243,11 @@ export class Input {
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
     this._lastPointerLockRequest = null;
+    this._lastPointerLockFailureAttempt = null;
+    this._pointerLockRequestInFlight = null;
+    this._pointerLockTrace = [];
+    this._pointerLockTraceSequence = 0;
+    this._pointerLockShellLog = { attempted: 0, succeeded: 0, failed: 0, lastError: null };
     this._nativeButtonsMask = 0;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
@@ -341,6 +352,10 @@ export class Input {
     return this.clientIntent;
   }
 
+  isShiftHeld() {
+    return this._shiftKeyDown;
+  }
+
   _commandTarget() {
     return this._intent()?.commandTarget;
   }
@@ -381,6 +396,7 @@ export class Input {
   update(dt) {
     void dt;
     this._flushPointerLockCursor();
+    if (this.inputRouter?.activePreviewSurface?.()) return;
     if (this._labTool()) {
       this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
@@ -537,83 +553,6 @@ export class Input {
   _routeLockedPointerUp(ev, p) {
     if (!this.pointerLocked || !this.inputRouter) return false;
     return this.inputRouter.pointerUp(this._routedPointerEvent(ev, p, "locked"));
-  }
-
-  pointerLockSupported() {
-    return cursorLockSupported(this._browserPointerLockSupported(), this.desktopCursor);
-  }
-
-  installedAppRuntime() {
-    return installedAppRuntime();
-  }
-
-  _prepareCursorLock() {
-    this._focusPointerLockTarget();
-    const p = this.mouse || this._viewportCenter();
-    this.mouse = this._clampViewportPoint(p);
-    this._setPointerLockCursor(this.mouse);
-  }
-
-  requestPointerLock() {
-    if (this.pointerLocked) return Promise.resolve(true);
-    this._pointerLockAttempt += 1;
-    if (!this.pointerLockSupported()) {
-      if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
-      return Promise.resolve(false);
-    }
-    this._prepareCursorLock();
-    return enterCursorLock(
-      () => this._requestBrowserPointerLock(),
-      this.mouse,
-      this.desktopCursor,
-      this._nativeCursorBounds(),
-    ).then((mode) => {
-      if (!mode && this.onPointerLockError) {
-        this.onPointerLockError(new Error("Pointer Lock request finished without locking the viewport."));
-      }
-      if (mode && mode !== "browser") this._setCursorLockState(true, mode);
-      return !!mode;
-    }).catch((err) => {
-      if (this.onPointerLockError) this.onPointerLockError(err);
-      return false;
-    });
-  }
-
-  exitPointerLock() {
-    const mode = this._cursorLockMode;
-    return exitCursorLock(mode, () => this._exitBrowserPointerLock(), this.desktopCursor, "input-exit").then(() => {
-      if (mode && mode !== "browser") this._setCursorLockState(false, null);
-      return true;
-    }).catch((err) => {
-      if (this.onPointerLockError) this.onPointerLockError(err);
-      return false;
-    });
-  }
-
-  togglePointerLock() {
-    return this.pointerLocked ? (this.exitPointerLock(), Promise.resolve(false)) : this.requestPointerLock();
-  }
-
-  _setCursorLockState(locked, mode) {
-    this.pointerLocked = locked;
-    this._cursorLockMode = locked ? mode : null;
-    this.dom.classList.toggle("pointer-locked", locked);
-    if (this._pointerLockCursor) this._pointerLockCursor.hidden = !locked;
-    if (locked) {
-      this.mouse = this._clampViewportPoint(this.mouse || this._viewportCenter());
-      this._setPointerLockCursor(this.mouse);
-    } else {
-      this.mouse = null;
-      this._nativeButtonsMask = 0;
-      this._panDrag = null;
-      if (this._drag) {
-        this._drag = null;
-        this._dragging = false;
-        this.screenOverlay?.clearMarquee?.();
-      }
-      this._placementDrag = null;
-    }
-    if (this.onPointerLockChange) this.onPointerLockChange(locked);
   }
 
   // --- Mouse: press / move / release --------------------------------------
@@ -1057,10 +996,19 @@ Object.assign(Input.prototype, {
   _waitForPointerLockPromise,
   _finishPointerLockRequest,
   _pointerLockErrorSummary,
+  _reportPointerLockFailure,
+  _recordPointerLockTrace,
   _waitForBrowserPointerLockResult,
   _exitBrowserPointerLock,
   _handlePointerLockChange,
   _handlePointerLockError,
+  pointerLockSupported,
+  installedAppRuntime,
+  _prepareCursorLock,
+  requestPointerLock,
+  exitPointerLock,
+  togglePointerLock,
+  _setCursorLockState,
   _activateCommandHotkey,
   _cancel,
   _handleWheel,
