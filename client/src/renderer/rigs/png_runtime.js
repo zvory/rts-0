@@ -1,5 +1,6 @@
 import { hexToInt, lightenColor } from "../shared.js";
 import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
+import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { isImmutablePartSelection, normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
@@ -200,7 +201,7 @@ class PngAtlasRigInstance {
       if (rec.display.texture !== frameRecord.texture) rec.display.texture = frameRecord.texture;
       applySpriteState(rec, frameRecord.frame, partState, sampled.context, diagnosticCounts);
     }
-    flushDiagnosticCounts(options, PNG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
+    flushRigDiagnosticCounts(options, PNG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }
 
   destroy() {
@@ -253,26 +254,6 @@ function applySpriteState(rec, frame, state, context, diagnosticCounts) {
   display.alpha = state.alpha;
   display.tint = tintForSlot(part.tintSlot ?? state.tintSlot, context, part);
   diagnosticCounts[PNG_RIG_COMPLETED] += 1;
-}
-
-function flushDiagnosticCounts(options, labels, counts) {
-  if (typeof options.diagnosticRecorder?._recordKnownRenderDiagnostics === "function") {
-    options.diagnosticRecorder._recordKnownRenderDiagnostics(labels, counts);
-    return;
-  }
-  if (typeof options.diagnosticBatch === "function") {
-    options.diagnosticBatch(labels, counts);
-    return;
-  }
-  const diagnostic = typeof options.diagnostics === "function"
-    ? options.diagnostics
-    : options.diagnosticRecorder?._recordRenderDiagnostic?.bind?.(options.diagnosticRecorder);
-  if (!diagnostic) return;
-  for (let i = 0; i < labels.length; i += 1) {
-    for (let remaining = counts[i]; remaining > 0; remaining -= 1) {
-      diagnostic(labels[i], 1);
-    }
-  }
 }
 
 function atlasSprites(definition, atlas) {

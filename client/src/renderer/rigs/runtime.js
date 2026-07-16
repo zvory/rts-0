@@ -1,5 +1,6 @@
 import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
+import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
@@ -142,7 +143,7 @@ export class UnitRigInstance {
       }
       applyPartState(rec, partState, sampled.context, diagnosticCounts);
     }
-    flushDiagnosticCounts(options, SVG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
+    flushRigDiagnosticCounts(options, SVG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }
 
   destroy() {
@@ -193,26 +194,6 @@ function applyPartState(rec, state, context, diagnosticCounts) {
   appearance.geometryScaleX = geometryScaleX;
   appearance.geometryScaleY = geometryScaleY;
   diagnosticCounts[SVG_RIG_COMPLETED] += 1;
-}
-
-function flushDiagnosticCounts(options, labels, counts) {
-  if (typeof options.diagnosticRecorder?._recordKnownRenderDiagnostics === "function") {
-    options.diagnosticRecorder._recordKnownRenderDiagnostics(labels, counts);
-    return;
-  }
-  if (typeof options.diagnosticBatch === "function") {
-    options.diagnosticBatch(labels, counts);
-    return;
-  }
-  const diagnostic = typeof options.diagnostics === "function"
-    ? options.diagnostics
-    : options.diagnosticRecorder?._recordRenderDiagnostic?.bind?.(options.diagnosticRecorder);
-  if (!diagnostic) return;
-  for (let i = 0; i < labels.length; i += 1) {
-    for (let remaining = counts[i]; remaining > 0; remaining -= 1) {
-      diagnostic(labels[i], 1);
-    }
-  }
 }
 
 function applyDisplayTransform(rec, state) {

@@ -3,13 +3,15 @@ import { KIND, SETUP, STATE } from "../protocol.js";
 import { liveRigDefinitionFor, liveRigKeyForEntity, liveRigRoutePlanFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
+import { createRigRenderContext, sampleRigAnimationInto } from "./rigs/animation.js";
 import {
-  createRigAnimationStage,
-  createRigRenderContext,
-  sampleRigAnimationInto,
-} from "./rigs/animation.js";
+  animationStageFor,
+  frameStripDrawPlanFor,
+  pngDrawPlanFor,
+  reconcileActiveLiveRigPools,
+} from "./rigs/draw_plans.js";
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
-import { pngAtlasRouteCoverage, renderPngUnitRig } from "./rigs/png_runtime.js";
+import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
@@ -196,7 +198,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       alpha: pools.alpha,
       renderContext,
     });
-    reconcileActiveLiveRigPools(this, e.id, routePlan, drawPlan.activePoolNames);
+    reconcileActiveLiveRigPools(this, e.id, drawPlan.activePoolNames);
     return null;
   }
 
@@ -233,11 +235,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         });
       }
     }
-    reconcileActiveLiveRigPools(this, e.id, routePlan, drawPlan.activePoolNames);
+    reconcileActiveLiveRigPools(this, e.id, drawPlan.activePoolNames);
     return null;
   }
 
-  reconcileActiveLiveRigPools(this, e.id, routePlan, routePlan.poolNames);
+  reconcileActiveLiveRigPools(this, e.id, routePlan.poolNames);
   const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
   applyRigAlpha(renderContext, pools.alpha);
   const sampledAnimation = sampleRigAnimationInto(
@@ -256,135 +258,6 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
 
 function applyRigAlpha(renderContext, alpha) {
   if (typeof alpha === "number") renderContext.shotRevealAlpha = alpha;
-}
-
-const UNIT_RIG_POOL_NAMES = Object.freeze([
-  "liveUnitRigShadows",
-  "liveUnitRigs",
-  "liveUnitRigOverlays",
-  "liveUnitRigEffects",
-  "liveShotRevealRigShadows",
-  "liveShotRevealRigs",
-  "liveShotRevealRigOverlays",
-  "liveShotRevealRigEffects",
-]);
-
-const UNIT_RIG_POOL_BITS = Object.freeze(Object.fromEntries(
-  UNIT_RIG_POOL_NAMES.map((poolName, index) => [poolName, 1 << index]),
-));
-const FRAME_STRIP_DRAW_PLAN_CACHE = new WeakMap();
-const PNG_DRAW_PLAN_CACHE = new WeakMap();
-const ANIMATION_STAGE_CACHE = new WeakMap();
-
-function animationStageFor(definition, sampledParts) {
-  let byParts = ANIMATION_STAGE_CACHE.get(definition);
-  if (!byParts) {
-    byParts = new WeakMap();
-    ANIMATION_STAGE_CACHE.set(definition, byParts);
-  }
-  let stage = byParts.get(sampledParts);
-  if (!stage) {
-    stage = createRigAnimationStage(definition, { includeParts: sampledParts });
-    byParts.set(sampledParts, stage);
-  }
-  return stage;
-}
-
-function frameStripDrawPlanFor(routePlan) {
-  const cached = FRAME_STRIP_DRAW_PLAN_CACHE.get(routePlan);
-  if (cached) return cached;
-  const shadowRoute = routePlan.shadowRoute;
-  const unitRoute = routePlan.routes[1];
-  const plan = Object.freeze({
-    shadowRoute,
-    unitRoute,
-    sampledParts: new Set(shadowRoute?.parts || []),
-    activePoolNames: Object.freeze([
-      ...(shadowRoute ? [shadowRoute.poolName] : []),
-      unitRoute.poolName,
-    ]),
-  });
-  FRAME_STRIP_DRAW_PLAN_CACHE.set(routePlan, plan);
-  return plan;
-}
-
-function pngDrawPlanFor(definition, atlas, routePlan) {
-  let byAtlas = PNG_DRAW_PLAN_CACHE.get(definition);
-  if (!byAtlas) {
-    byAtlas = new WeakMap();
-    PNG_DRAW_PLAN_CACHE.set(definition, byAtlas);
-  }
-  let byRoutePlan = byAtlas.get(atlas);
-  if (!byRoutePlan) {
-    byRoutePlan = new WeakMap();
-    byAtlas.set(atlas, byRoutePlan);
-  }
-  const cached = byRoutePlan.get(routePlan);
-  if (cached) return cached;
-
-  const sampledParts = new Set();
-  const activePoolNames = new Set();
-  const steps = [];
-  for (const route of routePlan.routes) {
-    const coverage = pngAtlasRouteCoverage(definition, atlas, route);
-    for (const partId of coverage.animationParts) sampledParts.add(partId);
-    for (const partId of coverage.missingParts) sampledParts.add(partId);
-    if (coverage.coveredParts.length > 0) {
-      const pngRoute = coverage.missingParts.length === 0
-        ? route
-        : freezeRoute(route.poolName, route.layerName, coverage.coveredParts);
-      activePoolNames.add(pngRoute.poolName);
-      steps.push(Object.freeze({ runtime: "png", route: pngRoute }));
-    }
-    if (coverage.missingParts.length > 0) {
-      const svgRoute = coverage.coveredParts.length > 0
-        ? freezeRoute(routePlan.overlayPoolName, routePlan.overlayLayerName, coverage.missingParts)
-        : freezeRoute(route.poolName, route.layerName, coverage.missingParts);
-      activePoolNames.add(svgRoute.poolName);
-      steps.push(Object.freeze({ runtime: "svg", route: svgRoute }));
-    }
-  }
-  const plan = Object.freeze({
-    sampledParts,
-    activePoolNames: Object.freeze([...activePoolNames]),
-    steps: Object.freeze(steps),
-  });
-  byRoutePlan.set(routePlan, plan);
-  return plan;
-}
-
-function freezeRoute(poolName, layerName, parts) {
-  return Object.freeze({ poolName, layerName, parts });
-}
-
-function reconcileActiveLiveRigPools(renderer, entityId, routePlan, activePoolNames) {
-  destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames);
-}
-
-function destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames) {
-  const activeMask = poolMask(activePoolNames);
-  const allMask = (1 << UNIT_RIG_POOL_NAMES.length) - 1;
-  destroyRigPoolsInMask(renderer, entityId, allMask & ~activeMask);
-}
-
-function destroyRigPoolsInMask(renderer, entityId, mask) {
-  for (let index = 0; index < UNIT_RIG_POOL_NAMES.length; index += 1) {
-    if ((mask & (1 << index)) === 0) continue;
-    const poolName = UNIT_RIG_POOL_NAMES[index];
-    const pool = renderer._liveRigPools?.[poolName];
-    const instance = pool?.get?.(entityId);
-    if (!instance) continue;
-    instance.destroy?.();
-    pool.delete(entityId);
-    renderer._seen?.[poolName]?.delete?.(entityId);
-    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
-  }
-}
-
-function poolMask(poolNames) {
-  let mask = 0;
-  for (const poolName of poolNames || []) mask |= UNIT_RIG_POOL_BITS[poolName] || 0;
-  return mask;
 }
 
 export function _rigRenderContextFor(e, colorByOwner, state) {

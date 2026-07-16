@@ -161,9 +161,21 @@ export function sampleRigAnimation(definition, entity, renderContext = {}, optio
   return sampleRigAnimationInto(stage, entity, renderContext);
 }
 
-// Renderer-private staging path. A caller may retain one stage and overwrite it for each
-// synchronously consumed entity. The ordinary sampleRigAnimation API intentionally allocates a
-// fresh stage so its returned snapshot remains stable for public callers and tests.
+/**
+ * @typedef {object} AnimationStage
+ * @property {object} definition Definition identity this stage was compiled from.
+ * @property {object[]} partPlans Immutable baselines paired with reusable mutable part states.
+ * @property {object[]} bindings Precompiled numeric animation operations.
+ * @property {{context: object|null, parts: Object<string, object>}} output Mutable sampled result.
+ */
+
+/**
+ * Compile a renderer-private staging object. Sampling overwrites the same part-state graph, so a
+ * stage must only be sampled and consumed synchronously. The public sampleRigAnimation API creates
+ * a fresh stage and therefore continues to return independently stable snapshots.
+ *
+ * @returns {AnimationStage}
+ */
 export function createRigAnimationStage(definition, options = {}) {
   const includeParts = normalizedPartSet(options.includeParts);
   const partPlans = [];

@@ -232,6 +232,25 @@ export function liveRigRoutesFor(kind, pools = {}) {
   return liveRigRoutePlanFor(kind, pools).routes;
 }
 
+/**
+ * @typedef {object} LiveRigRoute
+ * @property {string} poolName
+ * @property {string} layerName
+ * @property {readonly string[]} parts Immutable part selection; its identity is a cache key.
+ */
+
+/**
+ * @typedef {object} RoutePlan
+ * @property {readonly LiveRigRoute[]} routes Ordered immutable render routes.
+ * @property {ReadonlySet<string>} allParts Stable union used as an animation-stage cache key.
+ * @property {readonly string[]} poolNames Complete active SVG pool set.
+ * @property {string|null} familyKey
+ * @property {LiveRigRoute|null} shadowRoute
+ * @property {string} overlayPoolName
+ * @property {string} overlayLayerName
+ */
+
+/** @returns {RoutePlan} */
 export function liveRigRoutePlanFor(kind, pools = {}) {
   const parts = LIVE_RIG_PARTS[kind];
   if (!parts) return EMPTY_ROUTE_PLAN;
