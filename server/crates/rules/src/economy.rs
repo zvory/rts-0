@@ -262,10 +262,8 @@ mod tests {
             "Scout Plane is not exposed through any production building"
         );
 
-        assert!(
-            build_requirement_met(barracks, &[]),
-            "Barracks should remain buildable without a completed City Centre"
-        );
+        assert!(!build_requirement_met(barracks, &[]));
+        assert!(build_requirement_met(barracks, &[EntityKind::CityCentre]));
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
@@ -376,10 +374,15 @@ mod tests {
             ),
             "non-workers cannot build contextual Pump Jacks"
         );
-        assert!(build_requirement_met_for_faction(
+        assert!(!build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
             barracks,
             &[]
+        ));
+        assert!(build_requirement_met_for_faction(
+            DEFAULT_FACTION_ID,
+            barracks,
+            &[EntityKind::CityCentre]
         ));
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,

@@ -221,8 +221,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Training Centre should require a Barracks in the command card",
   );
   assert(
-    STATS[KIND.BARRACKS].requires == null,
-    "Barracks should be available in the command card without a City Centre",
+    STATS[KIND.BARRACKS].requires === KIND.CITY_CENTRE,
+    "Barracks should require a City Centre in the command card",
   );
   assert(STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre build time mirrors server");
   assert(
