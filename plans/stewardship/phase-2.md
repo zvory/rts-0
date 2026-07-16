@@ -1,84 +1,64 @@
-# Phase 2 - Consolidate Server Invariants
+# Phase 2 - Make Documentation Stewardship Recoverable
 
-Status: Incomplete
+Status: Incomplete.
 
 ## Objective
 
-Remove a few high-risk duplicate server contracts and give replay/Lab reconstruction one safe
-failure boundary. Keep gameplay, wire shapes, fog projection, and ordinary command semantics
-unchanged; this is a focused authority cleanup, not a server rewrite.
+Restore trust in the scheduled documentation stewardship flow. Make stale runner state recoverable,
+preserve generated sweep work, and make the route map truthful for the known split source families
+without attempting to map every file in the repository.
 
-## Work Themes
+## Work
 
-- Make `rts-rules` the typed authority for upgrade and ability identities, stable string ids, and
-  ability target modes. Remove the competing exhaustive identity registries from `rts-sim` (or
-  retain only thin compatibility re-exports where they materially reduce churn).
-- Keep simulation-specific ability effect dispatch in the simulation. Declarative catalog data
-  should come from rules, and registry lookup must return a normal error or typed absence instead
-  of panicking when definitions drift.
-- Put the ordinary and Lab-bypass command unit-list caps in one dependency-safe shared location and
-  consume those values from both runtime command admission and Lab replay validation. Preserve the
-  existing limits and whole-command rejection behavior.
-- Add one reusable panic-contained reconstruction boundary for replay seeking, Lab timeline seeks,
-  and Lab replay import. Rebuild a candidate game/session, return a structured failure on error or
-  panic, and replace authoritative room state only after the candidate succeeds.
-- Add focused parity and failure tests that make these authority boundaries difficult to duplicate
-  accidentally. Update the relevant server-simulation and hardening design sections to name the
-  final owners.
+- Separate recovery policy for the disposable detached runner from policy for the sweep branch that
+  may contain generated documentation commits.
+- For a clean stale runner worktree, safely recreate it or detach it at current `origin/main`; the
+  runner owns no generated documentation that needs preservation.
+- For a clean diverged sweep branch, preserve its commits and existing PR/run identity. Resume that
+  work when safe or start a clearly recorded new run branch from current `origin/main`; never reset
+  or discard generated commits merely to unblock the schedule.
+- For dirty worktrees or merge/rebase conflicts, fail closed with concise state and exact recovery
+  instructions. Do not automatically stash, reset, or delete work.
+- Refresh `docs/doc-map.json` only for the reviewed split config, protocol, replay, match-history,
+  and deployment source families. Do not broaden this into a comprehensive repository mapping pass.
+- Make docs health reject a configured source route that matches no tracked files, and add focused
+  coverage for representative valid and stale routes.
+- Cover clean stale-runner recovery, clean diverged-sweep preservation, and dirty/conflicted
+  fail-closed behavior in focused tests.
 
 ## Non-goals
 
-- Do not broadly narrow or reorganize the `Game` API, decompose `RoomTask`, or restructure tick
-  services.
-- Do not consolidate AI profile registries in this phase.
-- Do not change balance values, ability effects, research availability, command budgets, replay
-  formats, protocol payloads, or fog/visibility behavior.
-- Do not introduce a generalized registry framework or compatibility layer beyond what current
-  callers need.
+- Do not rewrite the doc-drift classifier, generation prompts, PR lifecycle, or checkpoint model.
+- Do not auto-resolve documentation merge conflicts or perform destructive Git recovery.
+- Do not map every presently unmapped source file.
 
-## Likely Touch Points
+## Expected Touch Points
 
-- `server/crates/rules/src/faction.rs` and a small adjacent rules module if that gives the typed
-  identities a clearer home
-- `server/crates/sim/src/game/{ability,upgrade,command}.rs` and direct typed-kind consumers
-- `server/crates/contract/src/lib.rs` or another existing dependency-safe contract module for
-  shared command-list limits
-- `server/crates/sim/src/game/services/commands.rs`
-- `server/crates/protocol/src/lab_replay.rs`
-- `server/src/lobby/replay_session.rs`
-- `server/src/lobby/lab_timeline.rs`
-- `server/src/lobby/room_task/lab/replay.rs`
-- focused Rust tests near those modules
-- `docs/design/server-sim.md` and `docs/design/hardening.md`
+- `scripts/docdrift-daily.sh`
+- `scripts/docdrift-sweep.mjs`
+- `tests/docdrift_sweeper.mjs`
+- `docs/doc-map.json`
+- `scripts/check-docs-health.mjs` and focused docs-health tests
+- documentation for the doc-drift operator flow only where recovery behavior changes
 
 ## Verification
 
-- Focused Rust tests proving:
-  - every typed upgrade and ability round-trips through its stable id and resolves to one rules row
-  - all catalog entries have valid, total simulation handling without a panic-on-drift path
-  - runtime admission and replay validation consume the same ordinary/Lab cap values
-  - replay and Lab reconstruction leave the prior authoritative state intact after an injected
-    error or panic, while successful rebuilds still commit at the requested tick
-- `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default -p rts-rules -p rts-protocol -p rts-sim -p rts-server`
-- `node tests/protocol_parity.mjs`
-- `node scripts/check-wiki.mjs`
-- `node scripts/check-crate-boundaries.mjs`
-- `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`
+- `node tests/docdrift_sweeper.mjs`
+- `node scripts/check-docs-health.mjs`
+- Run the doc-drift flow in safe preview/dry-run mode against a realistic stale runner and confirm it
+  reaches current `origin/main` without opening a PR.
+- Exercise a fixture with a diverged sweep branch containing a generated commit and prove the commit
+  remains reachable after recovery handling.
+- Exercise a dirty fixture and confirm the flow stops without modifying its worktree.
 - `git diff --check`
 
-## Manual Focus
+## Manual Test Focus
 
-In one local session, confirm representative research plus self-targeted and world-targeted
-abilities behave as before. Exercise an ordinary replay seek, a Lab rewind/seek, and a Lab replay
-import; a rejected or malformed reconstruction should report an error and leave the current room
-usable. Spot-check that ordinary and Lab-bypass command limits still accept and reject at the
-documented boundaries.
+No gameplay test is expected. Read the preview lifecycle once and confirm it clearly distinguishes
+runner refresh, preserved sweep work, and a human-required conflict.
 
 ## Handoff
 
-Mark this phase done in its implementation commit. Report the final authority location for typed
-rules and command-list caps, any compatibility re-exports retained, every reconstruction caller
-moved behind the safe boundary, and the focused failure evidence. Call out remaining duplicate
-registries or panic-prone reconstruction paths as explicit follow-up observations without expanding
-this phase into broader server cleanup, and name the core research, ability, replay, and Lab flows
-the next agent should manually test.
+Mark this phase done in its implementation commit. Report each recovery case, preserved-commit
+evidence, the exact source families added to the route map, and focused verification. Tell the Phase
+3 agent that source-size policy remains unchanged.

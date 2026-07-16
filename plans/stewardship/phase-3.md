@@ -1,84 +1,56 @@
-# Phase 3 - Client command and session seams
+# Phase 3 - Refresh Source-Size Guardrails
 
-## Status
-
-- [ ] Incomplete.
+Status: Incomplete.
 
 ## Objective
 
-Give live command surfaces one explicit owner for command policy, issuance, and local feedback, then
-make match startup failures cleanly recoverable. Preserve current gameplay, Lab issue-as behavior,
-prediction, visuals, and subscriber isolation while removing hidden discovery through `GameState`.
+Make the source-size inventory accurately describe the current tree without turning ordinary file
+shrinkage into recurring CI bookkeeping. Add CSS coverage and refresh obsolete exceptions only; do
+not split or refactor runtime files in this phase.
 
-## Work themes
+## Work
 
-### One command interaction seam
+- Include production CSS in the source-size inventory and freeze the existing large stylesheet at
+  its current intentional size with a reviewable reason.
+- Remove exceptions whose files are gone or now at or below the ordinary 1,500-line cap.
+- Lower the checked-in above-cap exception values to the current intentional sizes as a one-time
+  baseline refresh.
+- Keep above-cap shrinkage advisory after that refresh. CI should continue to fail on growth beyond
+  the baseline, a missing justification, or an obsolete exception whose file is now at or below the
+  cap, but not on every small above-cap reduction.
+- Keep generated, vendored, dependency, and build-output exclusions explicit.
+- Update focused checker tests so growth, obsolete exceptions, CSS inclusion, and advisory shrinkage
+  are each proven.
 
-- Have `Match` compose a narrow command interaction/context and inject it into Input, HUD, Minimap,
-  and the small number of feedback/audio ownership consumers that need the same policy answers.
-- Centralize gameplay command issuance and associated local planned-order/feedback recording so
-  viewport, command-card, and minimap paths do not each maintain an issue-and-record variant.
-- Remove `state.controlPolicy` assignment, fallback reads, and duplicate command/policy helper paths.
-  Keep authoritative snapshot data in `GameState` and browser-local intent in `ClientIntent`.
-- Preserve ordinary players, spectators, read-only Lab viewers, Lab operators, command budgets,
-  prediction sequencing, queued commands, and owner-relative feedback. Add a small architecture or
-  contract guard that prevents the hidden state path from returning.
+## Non-goals
 
-The exact collaborator shape is an implementation choice. Prefer one small explicit object over a
-general service locator, DI container, or compatibility layer.
+- Do not split `client/styles.css` or any oversized Rust, JavaScript, or test file.
+- Do not restyle the client or change pixels.
+- Do not add public API, prototype-graft, fan-out, or command-policy checks; later phases own those
+  boundaries.
 
-### Rollback-safe session assembly
+## Expected Touch Points
 
-- Make `Match` construction transactional enough that a failure after allocating listeners, timers,
-  audio helpers, DOM, or Pixi resources unwinds everything already created and leaves App able to
-  return to a usable lobby or start another match.
-- Keep teardown idempotent and safe for partially initialized sessions. Do not broadly split
-  `Match`, Input, Renderer, or other large client modules as part of this phase.
-- Keep `Net` subscribers isolated, but report subscriber exceptions through a bounded diagnostic or
-  logging seam with message type and useful context. Reporting must not recurse into dispatch,
-  alter the wire protocol, or prevent later subscribers from running.
-
-### Proportionate contracts
-
-- Cover ordinary and Lab command paths through the shared interaction, including local planned
-  feedback being recorded once.
-- Add failure-injection coverage for a late Match-construction failure, complete cleanup, and a
-  successful subsequent session.
-- Verify that a throwing Net subscriber is observable while later subscribers still receive the
-  event. Keep tests at module boundaries; do not build an exhaustive lifecycle framework.
-
-## Likely touch points
-
-- `client/src/match.js`, `client/src/app.js`, and `client/src/net.js`
-- A small new command-interaction and/or construction-cleanup helper under `client/src/`
-- `client/src/input/`, `client/src/hud.js`, and `client/src/minimap.js`
-- Relevant renderer feedback-ownership and combat-audio helpers
-- Focused files under `tests/client_contracts/`, plus the client architecture checker if it owns the
-  regression guard
-- `docs/design/client-ui.md` and its capsule only where the documented module contract changes
+- `scripts/check-source-file-sizes.mjs`
+- `scripts/source-file-size-baseline.json`
+- focused source-size checker tests
+- testing or architecture documentation only where the enforcement policy changes
 
 ## Verification
 
-- `node scripts/check-client-architecture.mjs`
-- `node tests/client_contracts.mjs`
-- `node tests/minimap_input_contracts.mjs`
-- `node tests/hud_command_card.mjs`
-- `node tests/select-suites.mjs --verify`
-- Run any additional focused suite selected for the final touched files; GitHub's `Main test gate`
-  remains the authoritative full validation.
+- `node scripts/check-source-file-sizes.mjs`
+- Focused negative fixtures proving a new oversized CSS file and growth above an exception fail.
+- Focused fixtures proving above-cap shrinkage remains non-failing while an exception at or below the
+  ordinary cap fails until removed.
+- `git diff --check`
 
-## Manual testing focus
+## Manual Test Focus
 
-- In a normal match, issue representative move/attack/build or ability commands from the viewport,
-  HUD, and minimap, including one queued command, and confirm previews do not duplicate or linger.
-- In Lab, confirm an operator can issue as the selected owner while a read-only viewer remains
-  passive and owner-relative visual/audio feedback is unchanged.
-- Return to the lobby and start another match to confirm teardown and rematch behavior remain clean.
+No gameplay test is expected. Inspect checker output once and confirm failures explain the path,
+current size, allowed size, and intended remedy without treating beneficial shrinkage as an error.
 
-## Handoff expectations
+## Handoff
 
-Mark this phase done in its implementation commit. Report the final command-interaction boundary,
-the hidden/duplicate paths removed, rollback and subscriber-error behavior, focused verification,
-and the three manual checks above. Push the phase as an owned PR with auto-merge armed, wait for a
-definite merge, and verify the phase head is reachable from `origin/main` before handing off the
-next phase.
+Mark this phase done in its implementation commit. Report the CSS inventory rule, removed or lowered
+exceptions, final failure policy, and focused negative evidence. Tell the Phase 4 agent which size
+metrics are now owned here so it does not duplicate them in architecture seam checks.
