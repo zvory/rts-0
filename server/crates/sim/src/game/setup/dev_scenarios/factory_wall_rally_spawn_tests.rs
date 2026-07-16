@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn uses_rotation_clear_exit_and_starts_moving() {
+fn uses_rotation_clear_exit_and_escapes_wall() {
     for unit in [
         EntityKind::ScoutCar,
         EntityKind::Tank,
@@ -41,21 +41,49 @@ fn uses_rotation_clear_exit_and_starts_moving() {
             "{unit} should spawn facing its rally point"
         );
         let start = (spawned.pos_x, spawned.pos_y);
+        let rally_delta = (rally.0 - start.0, rally.1 - start.1);
+        let rally_distance = (rally_delta.0.powi(2) + rally_delta.1.powi(2)).sqrt();
+        let rally_direction = (
+            rally_delta.0 / rally_distance,
+            rally_delta.1 / rally_distance,
+        );
+        let escape_distance_px = config::TILE_SIZE as f32;
+        let deadline_ticks = speed_scaled_escape_deadline_ticks(unit, escape_distance_px, 4);
+        let mut escaped = false;
+        let mut progress_px = 0.0;
 
-        for _ in 0..15 {
+        for _ in 0..deadline_ticks {
             game.tick();
+            let moved = game
+                .state
+                .entities
+                .iter()
+                .find(|entity| entity.owner == 1 && entity.kind == unit && entity.hp > 0)
+                .expect("produced vehicle should remain alive");
+            let occupancy =
+                services::occupancy::Occupancy::build(&game.state.map, &game.state.entities);
+            assert!(
+                services::standability::unit_static_standable_with_facing(
+                    &game.state.map,
+                    &occupancy,
+                    unit,
+                    moved.pos_x,
+                    moved.pos_y,
+                    moved.facing(),
+                ),
+                "{unit} should not clip the factory or terrain wall while escaping"
+            );
+            progress_px = (moved.pos_x - start.0) * rally_direction.0
+                + (moved.pos_y - start.1) * rally_direction.1;
+            if progress_px >= escape_distance_px {
+                escaped = true;
+                break;
+            }
         }
 
-        let moved = game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.owner == 1 && entity.kind == unit && entity.hp > 0)
-            .expect("produced vehicle should remain alive");
-        let distance = ((moved.pos_x - start.0).powi(2) + (moved.pos_y - start.1).powi(2)).sqrt();
         assert!(
-            distance > 1.0,
-            "{unit} should immediately make progress toward the rally, moved {distance:.3}px"
+            escaped,
+            "{unit} should move one tile away from the wall toward its rally within {deadline_ticks} speed-scaled ticks, progressed {progress_px:.3}px"
         );
     }
 }
