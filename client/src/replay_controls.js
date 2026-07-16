@@ -1,4 +1,5 @@
 import { dom } from "./bootstrap.js";
+import { TICK_HZ } from "./config.js";
 import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
 import { VISION_SELECTION } from "./protocol.js";
 import { FloatingRoomTimePanel } from "./room_time_panel.js";
@@ -24,6 +25,7 @@ export class RoomTimeControls {
     this.roomTimeTimedOutAction = null;
     this.roomTimeNotice = "";
     this.controlActivationBindings = [];
+    this.timelineHoverBindings = [];
     this.roomTimeAccessDenied = state?.controlPolicy?.kind === "lab" && state.controlPolicy.isOperator?.() === false;
     this.lastRoomTimeSpeed = 2;
     this.floatingPanel = null;
@@ -398,6 +400,23 @@ export class RoomTimeControls {
       clientX: event?.clientX,
     }));
 
+    const hover = document.createElement("span");
+    hover.className = "room-time-timeline-hover";
+    hover.setAttribute("role", "tooltip");
+    hover.setAttribute("aria-hidden", "true");
+    hover.hidden = true;
+    const onMouseMove = (event) => this.updateRoomTimeTimelineHover({
+      currentTarget: track,
+      clientX: event?.clientX,
+    });
+    const onMouseLeave = () => this.hideRoomTimeTimelineHover();
+    track.addEventListener("mousemove", onMouseMove);
+    track.addEventListener("mouseleave", onMouseLeave);
+    this.timelineHoverBindings.push(
+      [track, "mousemove", onMouseMove],
+      [track, "mouseleave", onMouseLeave],
+    );
+
     const progress = document.createElement("span");
     progress.className = "room-time-timeline-progress";
     track.appendChild(progress);
@@ -407,20 +426,70 @@ export class RoomTimeControls {
     track.appendChild(marks);
 
     wrap.appendChild(track);
+    wrap.appendChild(hover);
     surface.appendChild(wrap);
     this.updateRoomTimeTimeline();
+  }
+
+  roomTimeTimelineTarget(track, clientX) {
+    const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
+    if (!track || duration <= 0 || !Number.isFinite(clientX)) return null;
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return null;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return { ratio, tick: Math.round(ratio * duration) };
+  }
+
+  formatRoomTimeTimelineTarget(tick) {
+    const totalSeconds = Math.floor(Math.max(0, tick) / TICK_HZ);
+    const seconds = totalSeconds % 60;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const minutes = totalMinutes % 60;
+    const hours = Math.floor(totalMinutes / 60);
+    const two = (value) => String(value).padStart(2, "0");
+    const time = hours > 0
+      ? `${hours}:${two(minutes)}:${two(seconds)}`
+      : `${two(minutes)}:${two(seconds)}`;
+    return `${time} · tick ${tick}`;
+  }
+
+  updateRoomTimeTimelineHover(ev) {
+    const track = ev.currentTarget;
+    if (track?.disabled || this.roomTimeAccessDenied) {
+      this.hideRoomTimeTimelineHover();
+      return;
+    }
+    const target = this.roomTimeTimelineTarget(track, ev.clientX);
+    const hover = dom.roomTimeControls?.querySelector(".room-time-timeline-hover");
+    if (!target || !hover) {
+      this.hideRoomTimeTimelineHover();
+      return;
+    }
+    const text = this.formatRoomTimeTimelineTarget(target.tick);
+    hover.textContent = text;
+    hover.style.setProperty("--room-time-hover", `${target.ratio * 100}%`);
+    hover.hidden = false;
+    hover.setAttribute("aria-hidden", "false");
+    track.title = `Seek to ${text}`;
+  }
+
+  hideRoomTimeTimelineHover() {
+    const track = dom.roomTimeControls?.querySelector(".room-time-timeline-track");
+    const hover = dom.roomTimeControls?.querySelector(".room-time-timeline-hover");
+    if (track) track.title = `Click to seek ${this.label.toLowerCase()}`;
+    if (!hover) return;
+    hover.hidden = true;
+    hover.setAttribute("aria-hidden", "true");
   }
 
   onRoomTimeTimelineClick(ev) {
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
     const track = ev.currentTarget;
     if (track?.disabled || this.roomTimeAccessDenied) return;
-    const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
-    if (!track || duration <= 0) return;
-    const rect = track.getBoundingClientRect();
-    if (!rect.width) return;
-    const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
-    const tick = Math.round(ratio * duration);
+    const target = this.roomTimeTimelineTarget(track, ev.clientX);
+    if (!target) return;
+    const tick = target.tick;
+    this.hideRoomTimeTimelineHover();
     const baselineTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : null;
     this.requestRoomTimeAction(
       { kind: "seek", mode: "absolute", baselineTick, expectedTick: tick },
@@ -535,6 +604,10 @@ export class RoomTimeControls {
     this.clearRoomTimePending();
     this.roomTimeTimedOutAction = null;
     this.clearRoomTimeActivations();
+    for (const [target, type, handler] of this.timelineHoverBindings) {
+      target.removeEventListener(type, handler);
+    }
+    this.timelineHoverBindings = [];
     dom.roomTimeControls.hidden = true;
     this.setRoomTimeConcluded(false);
     for (const btn of dom.roomTimeControls.querySelectorAll(".spd-btn")) {

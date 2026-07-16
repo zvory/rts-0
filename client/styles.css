@@ -4584,11 +4584,34 @@ input[type="text"]:focus {
   margin-top: 4px;
 }
 .room-time-timeline {
+  position: relative;
   flex-basis: 100%;
   display: flex;
   justify-content: stretch;
   order: 10;
   margin-top: 3px;
+}
+.room-time-timeline-hover {
+  position: absolute;
+  left: clamp(58px, var(--room-time-hover, 50%), calc(100% - 58px));
+  bottom: calc(100% + 5px);
+  z-index: 2;
+  padding: 3px 6px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.98);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.room-time-timeline-hover[hidden] {
+  display: none;
 }
 .room-time-timeline-track {
   position: relative;

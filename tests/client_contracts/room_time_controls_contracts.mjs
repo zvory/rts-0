@@ -467,6 +467,22 @@ assert(
 );
 const timelineTrack = replayControls.querySelector(".room-time-timeline-track");
 assert(timelineTrack._listeners.has("pointerdown"), "timeline seek installs the scoped pointer activation path");
+timelineTrack._listeners.get("mousemove")({ clientX: 100 });
+const timelineHover = replayControls.querySelector(".room-time-timeline-hover");
+assert(
+  timelineHover.textContent === "00:16 · tick 500" && timelineHover.hidden === false,
+  "replay timeline hover previews the click destination in minutes, seconds, and ticks",
+);
+assert(
+  replayUi.formatRoomTimeTimelineTarget(3_660) === "02:02 · tick 3660",
+  "timeline target formatting carries elapsed time into minutes",
+);
+assert(
+  timelineHover.style["--room-time-hover"] === "50%" && timelineTrack.title.includes("00:16 · tick 500"),
+  "replay timeline hover follows the cursor and mirrors the destination in the native title",
+);
+timelineTrack._listeners.get("mouseleave")({});
+assert(timelineHover.hidden === true, "replay timeline hover hides when the pointer leaves the scrubber");
 timelineTrack._listeners.get("pointerdown")({ button: 0, isPrimary: true, pointerId: 25, pointerType: "touch" });
 timelineTrack._listeners.get("pointerup")({
   pointerId: 25,
@@ -476,6 +492,7 @@ timelineTrack._listeners.get("pointerup")({
   stopPropagation() {},
 });
 assert(replayNet.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
+assert(timelineHover.hidden === true, "replay timeline click dismisses the hover preview");
 assert(
   replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking 500"),
   "replay timeline shows a pending seek indicator",
