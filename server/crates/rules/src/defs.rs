@@ -338,7 +338,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 750,
-            provides_supply: balance::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -358,7 +357,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 0,
-            provides_supply: balance::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -378,7 +376,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 2,
             foot_h: 2,
             build_ticks: 300,
-            provides_supply: balance::DEPOT_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -398,7 +395,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 2,
             build_ticks: 200,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -418,7 +414,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 2,
             build_ticks: 560,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -438,7 +433,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 749,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -458,7 +452,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: balance::TICK_HZ * 15,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -478,7 +471,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 599,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -498,7 +490,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 1,
             foot_h: 1,
             build_ticks: balance::TICK_HZ * 10,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -518,7 +509,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 1,
             foot_h: 1,
             build_ticks: balance::TICK_HZ * 20,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -722,15 +712,6 @@ mod tests {
     }
 
     #[test]
-    fn city_centre_provides_start_supply() {
-        let city_centre = building_def(EntityKind::CityCentre)
-            .expect("city centre def")
-            .stats;
-
-        assert_eq!(city_centre.provides_supply, balance::CITY_CENTRE_SUPPLY);
-    }
-
-    #[test]
     fn non_obstacle_buildings_grant_only_local_sight() {
         for building in BUILDINGS {
             if building.kind == EntityKind::TankTrap {
@@ -753,7 +734,6 @@ mod tests {
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (30, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
         assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
-        assert_eq!(def.stats.provides_supply, 0);
         assert_eq!(def.armor_class, ArmorClass::Armored);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());
@@ -769,7 +749,6 @@ mod tests {
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (50, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
         assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 20);
-        assert_eq!(def.stats.provides_supply, 0);
         assert_eq!(def.armor_class, ArmorClass::Small);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());

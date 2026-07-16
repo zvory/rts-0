@@ -1769,10 +1769,7 @@ fn order_train(
     let queue_empty = entities
         .get(building)
         .is_some_and(|producer| producer.prod_queue().is_empty());
-    let can_reserve_supply = ps
-        .supply_used
-        .checked_add(supply)
-        .is_some_and(|used| used <= ps.supply_cap);
+    let can_reserve_supply = ps.can_reserve_supply(supply);
     let mut paid = false;
     if queue_empty && can_reserve_supply && ps.spend_cost(cost) {
         if ps.reserve_supply(supply) {

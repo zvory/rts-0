@@ -18,7 +18,6 @@ fn unpaid_manual_unit_waits_then_pays_and_starts() {
             paid: false,
         });
     let mut players = vec![player(1)];
-    players[0].set_supply_counts(0, 10);
 
     tick_production(&map, &mut entities, &mut players);
     let waiting = &entities.get(barracks).expect("barracks").prod_queue()[0];
@@ -124,7 +123,6 @@ fn dead_producers_do_not_pay_waiting_unit_or_research_items() {
 
     let mut players = vec![player(1)];
     players[0].set_resources(1_000, 1_000);
-    players[0].set_supply_counts(0, 10);
     tick_production(&map, &mut entities, &mut players);
 
     assert!(!entities.get(barracks).expect("barracks").prod_queue()[0].paid);
@@ -152,7 +150,6 @@ fn standing_repeat_does_not_create_unpaid_queue_items() {
         .expect("barracks")
         .set_repeat_production(Some(EntityKind::Rifleman), true);
     let mut players = vec![player(1)];
-    players[0].set_supply_counts(0, 10);
 
     tick_production(&map, &mut entities, &mut players);
     assert!(entities

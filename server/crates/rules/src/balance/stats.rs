@@ -52,7 +52,6 @@ pub struct BuildingStats {
     pub foot_w: u32,
     pub foot_h: u32,
     pub build_ticks: u32,
-    pub provides_supply: u32,
     pub dmg: u32,
     pub range_tiles: u32,
     pub cooldown: u32,

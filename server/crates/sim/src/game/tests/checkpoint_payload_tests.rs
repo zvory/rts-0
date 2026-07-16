@@ -464,6 +464,20 @@ fn checkpoint_payload_rejects_inconsistent_metadata_rng_and_supply() {
             field: "players.supplyUsed",
         })
     ));
+
+    let inconsistent_supply_cap = mutate_payload(&text, |value| {
+        value["players"][0]["supplyCap"] = serde_json::json!(199);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &inconsistent_supply_cap,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "players.supplyCap",
+        })
+    ));
 }
 
 fn mutate_payload(text: &str, mutate: impl FnOnce(&mut serde_json::Value)) -> String {

@@ -11,9 +11,9 @@ pub(super) fn validate_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,
 ) -> Result<(), SelfPlayFailure> {
-    if snapshot.supply_cap > config::SUPPLY_CAP_MAX {
+    if snapshot.supply_cap != config::PLAYER_SUPPLY_CAP {
         return Err(SelfPlayFailure::new(format!(
-            "player {player_id} exceeded supply cap max: {}",
+            "player {player_id} has invalid intrinsic supply cap: {}",
             snapshot.supply_cap
         )));
     }
