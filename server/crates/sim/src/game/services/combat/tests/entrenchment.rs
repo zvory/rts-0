@@ -167,6 +167,59 @@ fn entrenched_idle_rifleman_does_not_chase_enemies_outside_weapon_range() {
 }
 
 #[test]
+fn entrenched_arrived_attack_move_units_do_not_leave_to_chase() {
+    let map = open_map(20);
+    for kind in [EntityKind::Rifleman, EntityKind::MachineGunner] {
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("eligible infantry should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 360.0, 100.0)
+            .expect("enemy should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+        {
+            let unit = entities.get_mut(unit_id).expect("unit should exist");
+            unit.set_order(Order::attack_move_to(100.0, 100.0));
+            unit.mark_move_phase(MovePhase::Arrived);
+            if kind == EntityKind::MachineGunner {
+                unit.set_weapon_setup(WeaponSetup::Deployed);
+            }
+        }
+        mark_entrenched(&mut entities, unit_id);
+
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+
+        let unit = entities.get(unit_id).expect("unit should exist");
+        assert!(matches!(unit.order(), Order::AttackMove(_)));
+        assert_eq!(unit.move_phase(), Some(MovePhase::Arrived));
+        assert_eq!(
+            unit.target_id(),
+            None,
+            "{kind:?} should not acquire a chase target"
+        );
+        assert_eq!(
+            unit.path_goal(),
+            None,
+            "{kind:?} should not request a chase path"
+        );
+        assert!(unit.path_is_empty(), "{kind:?} should remain in the trench");
+        if kind == EntityKind::MachineGunner {
+            assert_eq!(unit.weapon_setup(), WeaponSetup::Deployed);
+        }
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp,
+            "{kind:?} should not fire beyond entrenched weapon range"
+        );
+    }
+}
+
+#[test]
 fn non_entrenched_idle_rifleman_keeps_normal_aggressive_pursuit() {
     let map = open_map(20);
     let mut entities = EntityStore::new();
