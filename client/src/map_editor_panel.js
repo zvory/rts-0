@@ -38,6 +38,7 @@ export class MapEditorPanel {
     this.paintShape = "brush";
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.blankMapSize = String(MAP_EDITOR_DEFAULT_SIZE);
+    this.observedMapSize = null;
     this.pending = false;
     this.status = "Ready to edit the map.";
     this.statusError = false;
@@ -52,8 +53,20 @@ export class MapEditorPanel {
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
-    this.unsubscribe = session.subscribe(() => this.render());
+    this.unsubscribe = session.subscribe((snapshot) => this.applySessionSnapshot(snapshot));
     void this.loadCatalog();
+  }
+
+  applySessionSnapshot(snapshot) {
+    const size = snapshot?.draft?.terrain?.length;
+    const loadedMap = snapshot?.reason === "loaded"
+      || snapshot?.reason === "initialized"
+      || snapshot?.lastAction === "Loaded local map";
+    if (Number.isInteger(size) && (this.observedMapSize === null || size !== this.observedMapSize || loadedMap)) {
+      this.blankMapSize = String(size);
+    }
+    if (Number.isInteger(size)) this.observedMapSize = size;
+    this.render();
   }
 
   render() {
@@ -110,6 +123,7 @@ export class MapEditorPanel {
     blankSize.max = String(MAP_EDITOR_MAX_SIZE);
     blankSize.step = "1";
     blankSize.value = this.blankMapSize;
+    blankSize.className = "map-editor-blank-size";
     blankSize.setAttribute("aria-label", "Blank map size");
     blankSize.addEventListener("input", () => { this.blankMapSize = blankSize.value; });
     section.append(

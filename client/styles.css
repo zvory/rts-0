@@ -5622,6 +5622,10 @@ input[type="text"]:focus {
   color: #eee6d4;
 }
 
+.map-editor-field input.map-editor-blank-size {
+  width: 80px;
+}
+
 .map-editor-button {
   min-height: 32px;
   border: 1px solid rgba(208, 184, 132, 0.3);

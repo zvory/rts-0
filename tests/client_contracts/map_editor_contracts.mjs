@@ -385,6 +385,27 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const panel = {
+    blankMapSize: "126", observedMapSize: null, renders: 0,
+    render() { this.renders += 1; },
+  };
+  const snapshot = (size, detail = {}) => ({
+    draft: { terrain: Array.from({ length: size }, () => ".".repeat(size)) },
+    ...detail,
+  });
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96));
+  assert.equal(panel.blankMapSize, "96", "the blank-size field starts from the active map size");
+  panel.blankMapSize = "72";
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, { reason: "changed" }));
+  assert.equal(panel.blankMapSize, "72", "ordinary map edits preserve an in-progress custom size");
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, { reason: "loaded" }));
+  assert.equal(panel.blankMapSize, "96", "loading a same-sized map restores its inferred size");
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(48, { reason: "undo" }));
+  assert.equal(panel.blankMapSize, "48", "size-changing history updates the inferred size");
+  assert.equal(panel.renders, 4);
+}
+
+{
   const starts = [{ x: 8, y: 8 }, { x: 117, y: 117 }, { x: 117, y: 8 }, { x: 8, y: 117 }];
   const baseSites = Array.from({ length: 32 }, (_, index) => ({ x: 20 + index, y: 20 }));
   const draft = authoredMapFromMaterialized({

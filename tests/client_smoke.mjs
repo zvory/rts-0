@@ -427,7 +427,13 @@ try {
         .map((option) => option.textContent),
       blankMapSize: (() => {
         const input = document.querySelector("input[aria-label='Blank map size']");
-        return input && { type: input.type, value: input.value, min: input.min, max: input.max };
+        return input && {
+          type: input.type,
+          value: input.value,
+          min: input.min,
+          max: input.max,
+          width: input.getBoundingClientRect().width,
+        };
       })(),
       clearanceSection: [...document.querySelectorAll(".map-editor-readout")]
         .find((node) => node.textContent === "Bases and starts reserve a passable grass area.")
@@ -458,6 +464,7 @@ try {
       editorUi.blankMapSize.value === "126" &&
       editorUi.blankMapSize.min === "16" &&
       editorUi.blankMapSize.max === "166" &&
+      editorUi.blankMapSize.width <= 80 &&
       editorUi.clearanceSection === "Start and base locations",
     "MAP EDITOR: symmetry, custom blank-map size, and grass-clearance controls are presented correctly",
   );
