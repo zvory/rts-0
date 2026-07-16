@@ -104,7 +104,7 @@ fn replay_summary_rejects_map_drift_before_build_warning() {
     assert!(!row.replay_available);
     assert_eq!(
         row.replay_unavailable_reason.as_deref(),
-        Some("Replay map \"Default\" has changed on this server.")
+        Some("Replay map \"Chokes\" has changed on this server.")
     );
 }
 
