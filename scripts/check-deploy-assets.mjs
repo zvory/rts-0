@@ -14,6 +14,12 @@ function assertIncludes(text, needle, message) {
   }
 }
 
+function assertNotIncludes(text, needle, message) {
+  if (text.includes(needle)) {
+    throw new Error(message);
+  }
+}
+
 function assertMatches(text, pattern, message) {
   if (!pattern.test(text)) {
     throw new Error(message);
@@ -118,8 +124,18 @@ assertIncludes(deployScript, 'config_file="fly.mainline.toml"', "mainline deploy
 assertIncludes(deployScript, 'config_file="fly.beta.toml"', "beta deploys must select the beta config");
 assertIncludes(
   betaDeployWorkflow,
-  'FLY_BETA_APP:-rts-0-zvorygin-beta',
-  "beta secret staging must target the beta app by default",
+  "./deploy.sh beta",
+  "beta workflow must select the beta deployment channel",
+);
+assertNotIncludes(
+  betaDeployWorkflow,
+  "flyctl secrets import",
+  "beta workflow must not stage application secrets during deploy",
+);
+assertNotIncludes(
+  dockerfile,
+  "ca-certificates git gh",
+  "runtime image must not install Git/GitHub tooling for removed scenario submission",
 );
 assertMatches(mainlineFlyConfig, /^app\s*=\s*"rts-0-zvorygin"/m, "mainline must target the canonical-domain app");
 assertMatches(betaFlyConfig, /^app\s*=\s*"rts-0-zvorygin-beta"/m, "beta must target the beta app");
