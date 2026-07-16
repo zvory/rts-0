@@ -387,10 +387,10 @@ fn in_range_smoke_launches_from_furthest_selected_carrier() {
     let far = entities
         .spawn_unit(1, EntityKind::ScoutCar, target.0 - 192.0, target.1)
         .expect("far scout car should spawn");
-    let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+    let (sx, sy) = footprint_center(&map, EntityKind::ResearchComplex, 4, 4);
     entities
-        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
-        .expect("steelworks should spawn");
+        .spawn_building(1, EntityKind::ResearchComplex, sx, sy, true)
+        .expect("R&D Complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
     let mut smokes = SmokeCloudStore::new();
     let events = apply_with_players_and_smokes(
@@ -467,10 +467,10 @@ fn in_range_smoke_preserves_active_move_and_future_queue() {
     let scout = entities
         .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
         .expect("scout car should spawn");
-    let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+    let (sx, sy) = footprint_center(&map, EntityKind::ResearchComplex, 4, 4);
     entities
-        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
-        .expect("steelworks should spawn");
+        .spawn_building(1, EntityKind::ResearchComplex, sx, sy, true)
+        .expect("R&D Complex should spawn");
 
     apply(
         &map,
@@ -645,10 +645,10 @@ fn queued_smoke_appends_to_eligible_carriers_until_charges_reserved() {
     let rifle = entities
         .spawn_unit(1, EntityKind::Rifleman, target.0 - 64.0, target.1)
         .expect("rifleman should spawn");
-    let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+    let (sx, sy) = footprint_center(&map, EntityKind::ResearchComplex, 4, 4);
     entities
-        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
-        .expect("steelworks should spawn");
+        .spawn_building(1, EntityKind::ResearchComplex, sx, sy, true)
+        .expect("R&D Complex should spawn");
 
     apply(
         &map,
@@ -711,10 +711,10 @@ fn queued_smoke_distributes_one_click_per_ready_scout_by_queue_length() {
         .get_mut(cooling)
         .unwrap()
         .start_ability_cooldown(AbilityKind::Smoke, 5);
-    let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+    let (sx, sy) = footprint_center(&map, EntityKind::ResearchComplex, 4, 4);
     entities
-        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
-        .expect("steelworks should spawn");
+        .spawn_building(1, EntityKind::ResearchComplex, sx, sy, true)
+        .expect("R&D Complex should spawn");
 
     apply(
         &map,
@@ -751,10 +751,10 @@ fn smoke_launches_without_resource_cost() {
     let scout = entities
         .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
         .expect("scout car should spawn");
-    let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+    let (sx, sy) = footprint_center(&map, EntityKind::ResearchComplex, 4, 4);
     entities
-        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
-        .expect("steelworks should spawn");
+        .spawn_building(1, EntityKind::ResearchComplex, sx, sy, true)
+        .expect("R&D Complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
     assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 1_000)));
     let mut smokes = SmokeCloudStore::new();

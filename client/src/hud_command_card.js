@@ -679,8 +679,9 @@ function factionResearchesOf(ctx, kind) {
 }
 
 function requirementsOf(definition) {
-  if (!definition || !definition.requires) return [];
-  return Array.isArray(definition.requires) ? definition.requires : [definition.requires];
+  const requirement = definition?.requires ?? definition?.techRequirement;
+  if (!requirement) return [];
+  return Array.isArray(requirement) ? requirement : [requirement];
 }
 
 function resourcesOf(ctx) {

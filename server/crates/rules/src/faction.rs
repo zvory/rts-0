@@ -223,7 +223,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
             balance::SMOKE_ABILITY_COST_STEEL,
             balance::SMOKE_ABILITY_COST_OIL,
         ),
-        tech_requirement: None,
+        tech_requirement: Some(EntityKind::ResearchComplex),
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -794,6 +794,11 @@ mod tests {
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
         assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES));
         assert_eq!(smoke.charges, Some(balance::SCOUT_CAR_SMOKE_USES));
+        assert_eq!(
+            smoke.tech_requirement,
+            Some(EntityKind::ResearchComplex),
+            "Smoke should require a completed R&D Complex"
+        );
         assert_eq!(
             smoke.cost,
             ResourceCost::new(

@@ -59,12 +59,15 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     let active_combat_target = matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
         || (e.is_building() && e.can_attack());
     let target_visible = if let Some(t) = e.target_id() {
-        game.state.entities
+        game.state
+            .entities
             .get(t)
             .map(|target| {
                 e.owner == viewer
                     || !fogged
-                    || game.state.fog
+                    || game
+                        .state
+                        .fog
                         .is_visible_world(viewer, target.pos_x, target.pos_y)
             })
             .unwrap_or(false)
@@ -179,13 +182,17 @@ pub(super) fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
 
     let start = game.state.map.tile_center(4, 4);
     let goal = game.state.map.tile_center(28, 17);
-    let tank = game.state.entities
+    let tank = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Tank, start.0, start.1)
         .expect("tank should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     game.assert_invariants();
 
     (game, tank, goal)
@@ -205,7 +212,9 @@ pub(super) fn empty_flat_game(players: &[PlayerInit]) -> Game {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     game
 }
 
@@ -229,14 +238,31 @@ pub(super) fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
     let scout_pos = game.state.map.tile_center(8, 8);
     let target = game.state.map.tile_center(24, 8);
     let second_target = game.state.map.tile_center(25, 10);
-    let scout = game.state.entities
+    let scout = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
         .expect("scout car should spawn");
+    let research_pos = game.state.map.tile_center(4, 4);
+    game.state
+        .entities
+        .spawn_building(
+            1,
+            EntityKind::ResearchComplex,
+            research_pos.0,
+            research_pos.1,
+            true,
+        )
+        .expect("completed R&D Complex should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog
-        .recompute_with_smoke(&ids, &game.state.entities, &game.state.map, &game.state.smokes);
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
     game.assert_invariants();
 
     (game, scout, target, second_target)
