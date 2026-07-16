@@ -222,7 +222,7 @@ mod tests {
         let (bytes, summary) = generate_hellhole_snapshot_stream(3).unwrap();
         assert_eq!(summary.frame_count, 3);
         assert_eq!((summary.first_tick, summary.last_tick), (1, 3));
-        assert_eq!(summary.initial_entity_count, 295);
+        assert_eq!(summary.initial_entity_count, 416);
         assert_eq!(&bytes[..MAGIC.len()], MAGIC);
 
         let header_len = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;

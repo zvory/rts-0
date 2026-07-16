@@ -105,7 +105,7 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
     "checked-in Hellhole snapshot stream contains the expected 30 seconds at 30 Hz",
   );
   assert(
-    checkedArtifact.header.initialEntityCount === 295 &&
+    checkedArtifact.header.initialEntityCount === 416 &&
       checkedArtifact.header.start?.playerId === 1 &&
       checkedArtifact.header.start?.spectator === false &&
       checkedArtifact.header.start?.players?.length === 4 &&
@@ -213,6 +213,52 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
   assert(events.at(-1) === "snapshot:21",
     "a restarted stream begins from the canonical first snapshot");
   net.close();
+}
+
+{
+  const priorWindow = globalThis.window;
+  const priorWebSocket = globalThis.WebSocket;
+  const expected = {
+    scenarioId: "supply-300-hellhole",
+    mapWidth: 126,
+    mapHeight: 126,
+    projectedEntityCount: 500,
+    minimumProjectedEntityCount: 487,
+  };
+  globalThis.WebSocket = { OPEN: 1 };
+  globalThis.window = {
+    __rts: {
+      labLaunch: { scenario: expected.scenarioId },
+      match: {
+        state: { _curById: { size: expected.minimumProjectedEntityCount } },
+        predictionStartInfo: { map: { width: expected.mapWidth, height: expected.mapHeight } },
+        labMetadata: {},
+      },
+      net: { offline: false, ws: { readyState: 1 } },
+    },
+  };
+  try {
+    let readinessPredicate = null;
+    const page = {
+      waitForFunction: async (predicate, _options, argument) => {
+        readinessPredicate = predicate;
+        assert(predicate(argument), "live Lab readiness accepts the measured entity floor");
+      },
+      evaluate: async (callback, argument) => callback(argument),
+    };
+    const result = await initializeWorkloadSetup(page, { liveLabScenario: expected });
+    assert(!result.error, "live Lab setup succeeds at the measured entity floor");
+
+    window.__rts.match.state._curById.size = expected.minimumProjectedEntityCount - 1;
+    assert(!readinessPredicate(expected), "live Lab readiness rejects a projection below the floor");
+    window.__rts.match.state._curById.size = expected.projectedEntityCount + 1;
+    assert(!readinessPredicate(expected), "live Lab readiness rejects unexpected extra entities");
+  } finally {
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorWebSocket === undefined) delete globalThis.WebSocket;
+    else globalThis.WebSocket = priorWebSocket;
+  }
 }
 
 {

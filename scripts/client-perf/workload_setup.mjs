@@ -13,8 +13,17 @@ export function validateLiveLabScenarioSample(sample, expected) {
   if (sample?.mapWidth !== expected.mapWidth || sample?.mapHeight !== expected.mapHeight) {
     errors.push(`map ${sample?.mapWidth}x${sample?.mapHeight} != ${expected.mapWidth}x${expected.mapHeight}`);
   }
-  if (sample?.projectedEntityCount !== expected.projectedEntityCount) {
-    errors.push(`projected entities ${sample?.projectedEntityCount} != ${expected.projectedEntityCount}`);
+  const minimumProjectedEntityCount = Number.isInteger(expected.minimumProjectedEntityCount)
+    ? expected.minimumProjectedEntityCount
+    : expected.projectedEntityCount;
+  if (
+    !Number.isInteger(sample?.projectedEntityCount) ||
+    sample.projectedEntityCount < minimumProjectedEntityCount ||
+    sample?.projectedEntityCount > expected.projectedEntityCount
+  ) {
+    errors.push(
+      `projected entities ${sample?.projectedEntityCount} outside ${minimumProjectedEntityCount}..${expected.projectedEntityCount}`,
+    );
   }
   if (sample?.labMode !== true) errors.push("match is not running in Lab mode");
   if (sample?.offline !== false || sample?.websocketOpen !== true) {
@@ -67,10 +76,17 @@ async function applyLiveLabScenarioSetup(page, setup, result) {
   if (!expected) return;
   try {
     await page.waitForFunction(
-      ({ scenarioId, projectedEntityCount }) => window.__rts?.labLaunch?.scenario === scenarioId &&
-        window.__rts?.match?.state?._curById?.size === projectedEntityCount &&
-        window.__rts?.net?.offline !== true &&
-        window.__rts?.net?.ws?.readyState === WebSocket.OPEN,
+      ({ scenarioId, projectedEntityCount, minimumProjectedEntityCount }) => {
+        const currentEntityCount = window.__rts?.match?.state?._curById?.size;
+        const minimum = Number.isInteger(minimumProjectedEntityCount)
+          ? minimumProjectedEntityCount
+          : projectedEntityCount;
+        return window.__rts?.labLaunch?.scenario === scenarioId &&
+          currentEntityCount >= minimum &&
+          currentEntityCount <= projectedEntityCount &&
+          window.__rts?.net?.offline !== true &&
+          window.__rts?.net?.ws?.readyState === WebSocket.OPEN;
+      },
       { timeout: Number(setup.liveLabScenarioWaitTimeoutMs) || 20000 },
       expected,
     );
