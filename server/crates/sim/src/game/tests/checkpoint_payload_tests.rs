@@ -304,6 +304,20 @@ fn checkpoint_payload_rejects_wrong_map_and_invalid_state_references() {
             id: 999
         })
     ));
+
+    let invalid_event_overlay = mutate_payload(&text, |value| {
+        value["fog"]["eventOverlayTiles"] = serde_json::json!({ "1": [u32::MAX] });
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &invalid_event_overlay,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "fog.eventOverlayTiles"
+        })
+    ));
 }
 
 #[test]

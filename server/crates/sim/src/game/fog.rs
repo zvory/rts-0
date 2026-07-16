@@ -100,16 +100,22 @@ impl Fog {
 
     pub(in crate::game) fn from_checkpoint_grids(
         size: u32,
-        base_grids: BTreeMap<u32, Vec<bool>>,
+        event_overlay_tiles: BTreeMap<u32, Vec<u32>>,
         grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
         let grids = grids.into_iter().collect::<HashMap<_, _>>();
-        let base_grids = if base_grids.is_empty() {
-            grids.clone()
-        } else {
-            base_grids.into_iter().collect()
-        };
+        let mut base_grids = grids.clone();
+        for (player, tiles) in event_overlay_tiles {
+            let Some(grid) = base_grids.get_mut(&player) else {
+                continue;
+            };
+            for tile in tiles {
+                if let Some(visible) = grid.get_mut(tile as usize) {
+                    *visible = false;
+                }
+            }
+        }
         Fog {
             size,
             base_grids,
@@ -129,10 +135,21 @@ impl Fog {
             .collect()
     }
 
-    pub(in crate::game) fn checkpoint_base_grids(&self) -> BTreeMap<u32, Vec<bool>> {
-        self.base_grids
+    pub(in crate::game) fn checkpoint_event_overlay_tiles(&self) -> BTreeMap<u32, Vec<u32>> {
+        self.grids
             .iter()
-            .map(|(&player, grid)| (player, grid.clone()))
+            .filter_map(|(&player, grid)| {
+                let base = self.base_grids.get(&player)?;
+                let tiles = grid
+                    .iter()
+                    .zip(base)
+                    .enumerate()
+                    .filter_map(|(index, (&visible, &base_visible))| {
+                        (visible && !base_visible).then_some(index as u32)
+                    })
+                    .collect::<Vec<_>>();
+                (!tiles.is_empty()).then_some((player, tiles))
+            })
             .collect()
     }
 

@@ -250,19 +250,6 @@ pub(super) fn validate_fog(
     let cells = (map.size as usize)
         .checked_mul(map.size as usize)
         .ok_or(CheckpointPayloadError::InvalidValue { field: "fog.size" })?;
-    for (&player, grid) in &fog.base_grids {
-        if !player_ids.contains(&player) {
-            return Err(CheckpointPayloadError::InvalidReference {
-                field: "fog.baseGrids",
-                id: player,
-            });
-        }
-        if grid.len() != cells {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "fog.baseGrids",
-            });
-        }
-    }
     for (&player, grid) in &fog.grids {
         if !player_ids.contains(&player) {
             return Err(CheckpointPayloadError::InvalidReference {
@@ -272,6 +259,30 @@ pub(super) fn validate_fog(
         }
         if grid.len() != cells {
             return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
+        }
+    }
+    for (&player, tiles) in &fog.event_overlay_tiles {
+        if !player_ids.contains(&player) || !fog.grids.contains_key(&player) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "fog.eventOverlayTiles",
+                id: player,
+            });
+        }
+        let Some(grid) = fog.grids.get(&player) else {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "fog.eventOverlayTiles",
+                id: player,
+            });
+        };
+        let mut previous = None;
+        for &tile in tiles {
+            let index = tile as usize;
+            if grid.get(index) != Some(&true) || previous.is_some_and(|value| value >= tile) {
+                return Err(CheckpointPayloadError::InvalidValue {
+                    field: "fog.eventOverlayTiles",
+                });
+            }
+            previous = Some(tile);
         }
     }
     validate_firing_reveal_visibility(fog, player_ids, entity_ids, firing_reveals, tick)?;

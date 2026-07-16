@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use super::checkpoint_helpers::{
-    assert_equivalent_games, player_ids, repair_after_authoritative_test_spawn,
-    restore_checkpoint_and_assert_equivalent, tick_pair_and_assert_equivalent, tick_pair_for,
+    assert_equivalent_games, checkpoint_payload_text_for, player_ids,
+    repair_after_authoritative_test_spawn, restore_checkpoint_and_assert_equivalent,
+    tick_pair_and_assert_equivalent, tick_pair_for,
 };
 use super::fixtures::empty_flat_game;
 use super::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
@@ -132,6 +133,22 @@ fn visibility_combat_checkpoint_preserves_fog_memory_trenches_and_reveals() {
     assert!(
         snapshot_entity(&baseline.snapshot_for(4), hidden_attacker).is_none(),
         "third-party players must not receive victim-team firing reveal visibility"
+    );
+    let checkpoint_text = checkpoint_payload_text_for(
+        &baseline,
+        "event-overlay checkpoint should use sparse fog encoding",
+    );
+    let checkpoint: serde_json::Value =
+        serde_json::from_str(&checkpoint_text).expect("checkpoint JSON");
+    assert!(
+        checkpoint["fog"].get("baseGrids").is_none(),
+        "held base fog must not duplicate every actionable grid in checkpoint JSON"
+    );
+    assert!(
+        checkpoint["fog"]["eventOverlayTiles"]
+            .as_object()
+            .is_some_and(|players| !players.is_empty()),
+        "event-only visibility should serialize as sparse tile differences"
     );
 
     let mut restored = restore_checkpoint_and_assert_equivalent(

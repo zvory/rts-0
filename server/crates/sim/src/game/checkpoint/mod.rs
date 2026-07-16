@@ -425,7 +425,7 @@ impl EntityStoreV1 {
 struct FogStateV1 {
     size: u32,
     #[serde(default)]
-    base_grids: BTreeMap<u32, Vec<bool>>,
+    event_overlay_tiles: BTreeMap<u32, Vec<u32>>,
     grids: BTreeMap<u32, Vec<bool>>,
     firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
 }
@@ -434,7 +434,7 @@ impl FogStateV1 {
     fn from_fog(fog: &Fog) -> Self {
         Self {
             size: fog.checkpoint_size(),
-            base_grids: fog.checkpoint_base_grids(),
+            event_overlay_tiles: fog.checkpoint_event_overlay_tiles(),
             grids: fog.checkpoint_grids(),
             firing_reveal_visibility: fog.checkpoint_firing_reveal_visibility(),
         }
@@ -443,7 +443,7 @@ impl FogStateV1 {
     fn into_fog(self) -> Fog {
         Fog::from_checkpoint_grids(
             self.size,
-            self.base_grids,
+            self.event_overlay_tiles,
             self.grids,
             self.firing_reveal_visibility,
         )
