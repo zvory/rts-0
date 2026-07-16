@@ -164,8 +164,9 @@ export class HUD {
    * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    * @param {object} [controlPolicy] policy that decides command-surface and owner control.
    * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
+   * @param {import("./apm_tracker.js").ApmTracker} [apmTracker] recent issued-command rate.
    */
-  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
+  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null) {
     this.root = rootEl;
     this.state = state;
     this.commandIssuer = commandIssuer;
@@ -174,6 +175,7 @@ export class HUD {
     this.clientIntent = clientIntent;
     this.controlPolicy = controlPolicy;
     this.camera = camera;
+    this.apmTracker = apmTracker;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -181,6 +183,7 @@ export class HUD {
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
     this.elGameTimer = rootEl.querySelector("#game-timer");
+    this.elApmCounter = rootEl.querySelector("#apm-counter");
     this.elIdleWorkers = rootEl.querySelector("#idle-workers");
     this.elIdleWorkersLabel = rootEl.querySelector(".idle-workers-label");
     this.elIdleWorkersCount = rootEl.querySelector("#idle-workers-count");
@@ -209,8 +212,10 @@ export class HUD {
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
     this._gameTimerSig = null;
+    this._apmSig = null;
     this._idleWorkersSig = null;
     this._renderGameTimer();
+    this._renderApm();
     this._renderIdleWorkers();
   }
 
@@ -221,6 +226,7 @@ export class HUD {
   update(frameViews = null, { profiler = null } = {}) {
     this._profiler = profiler || null;
     this._renderGameTimer();
+    this._renderApm();
     this._renderIdleWorkers(frameViews);
     this._renderResources();
     this._renderControlGroupTabs(frameViews);
@@ -241,6 +247,11 @@ export class HUD {
       this.elGameTimer.textContent = "00:00";
       this.elGameTimer.title = "Game time 00:00";
     }
+    if (this.elApmCounter) {
+      this.elApmCounter.textContent = "0";
+      this.elApmCounter.title = "Current actions per minute: 0";
+    }
+    this.apmTracker?.reset?.();
     if (this.elIdleWorkersCount) this.elIdleWorkersCount.textContent = "0";
     if (this.elIdleWorkersLabel) this.elIdleWorkersLabel.textContent = "Idle workers (T):";
     if (this.elIdleWorkers) {
@@ -255,6 +266,7 @@ export class HUD {
     this._resSig = null;
     this._controlGroupSig = null;
     this._gameTimerSig = null;
+    this._apmSig = null;
     this._idleWorkersSig = null;
   }
 
@@ -278,6 +290,16 @@ export class HUD {
     this.elGameTimer.textContent = text;
     this.elGameTimer.title = `Game time ${text}`;
     this._gameTimerSig = text;
+  }
+
+  _renderApm() {
+    if (!this.elApmCounter) return;
+    const apm = this.apmTracker?.currentApm?.(this.state?.tick ?? 0) ?? 0;
+    const text = String(Math.max(0, Math.trunc(Number(apm) || 0)));
+    if (text === this._apmSig) return;
+    this.elApmCounter.textContent = text;
+    this.elApmCounter.title = `Current actions per minute: ${text}`;
+    this._apmSig = text;
   }
 
   _renderIdleWorkers(frameViews = null) {

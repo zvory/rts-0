@@ -2966,15 +2966,15 @@ input[type="text"]:focus {
   width: 100%;
 }
 .game-timer {
-  flex: 1 1 auto;
+  flex: 0 1 66px;
   min-width: 0;
   min-height: 24px;
-  padding: 4px 8px;
+  padding: 4px 5px;
   border-radius: var(--radius-sm);
   background: rgba(15, 14, 12, 0.72);
   color: var(--ink);
   font-family: var(--mono);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -2982,10 +2982,25 @@ input[type="text"]:focus {
   text-align: center;
   text-shadow: 1px 1px 0 #191710;
 }
+.apm-counter {
+  flex: 0 0 42px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 4px 3px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 14, 12, 0.72);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 1px 1px 0 #191710;
+}
 .idle-workers-button {
   appearance: none;
-  flex: 0 1 50%;
-  max-width: 50%;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 24px;
   padding: 3px 6px;
@@ -5180,9 +5195,18 @@ input[type="text"]:focus {
     height: clamp(112px, 38vw, 170px);
   }
 
-  .game-timer {
+  .game-timer,
+  .apm-counter {
     min-height: 26px;
-    font-size: 14px;
+    font-size: 12px;
+  }
+
+  .game-timer {
+    flex-basis: 58px;
+  }
+
+  .apm-counter {
+    flex-basis: 34px;
   }
 
   .minimap-status-row {

@@ -390,6 +390,28 @@ function fakeHudRootWithoutResourceSpans() {
   assert(timerEl.title === "Game time 00:00", "HUD destroy resets the minimap game timer title");
 }
 
+{
+  const apmEl = { textContent: "", title: "" };
+  const state = { tick: 0 };
+  let reset = false;
+  const apmTracker = {
+    currentApm(tick) { return tick === TICK_HZ * 2 ? 42 : 0; },
+    reset() { reset = true; },
+  };
+  const hud = new HUD({
+    querySelector(selector) {
+      return selector === "#apm-counter" ? apmEl : null;
+    },
+  }, state, {}, null, null, null, null, null, apmTracker);
+  assert(apmEl.textContent === "0", "HUD initializes the unlabeled minimap APM counter");
+  state.tick = TICK_HZ * 2;
+  hud._renderApm();
+  assert(apmEl.textContent === "42", "HUD renders the current rolling command rate as a raw number");
+  assert(apmEl.title === "Current actions per minute: 42", "HUD explains the raw APM number accessibly");
+  hud.destroy();
+  assert(apmEl.textContent === "0" && reset, "HUD resets APM display state between matches");
+}
+
 // ---------------------------------------------------------------------------
 // HUD resource bar
 // ---------------------------------------------------------------------------

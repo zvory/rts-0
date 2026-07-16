@@ -308,6 +308,7 @@ function renderScoreScreen(scores) {
   table.innerHTML = `
     <thead><tr>
       <th scope="col">Player</th>
+      <th scope="col">APM</th>
       <th scope="col">Units</th>
       <th scope="col">Structures</th>
       <th scope="col">Kills</th>
@@ -326,6 +327,7 @@ function renderScoreScreen(scores) {
       nameTd.prepend(swatch);
     }
     tr.appendChild(nameTd);
+    tr.appendChild(td(String(s.apm ?? 0)));
     tr.appendChild(td(String(s.unitScore ?? 0)));
     tr.appendChild(td(String(s.structureScore ?? 0)));
     tr.appendChild(td(String(s.unitsKilled ?? 0)));

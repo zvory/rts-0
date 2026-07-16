@@ -401,11 +401,13 @@ removes overflow AI seats first, then moves overflow humans to spectators. In re
 lobbies, `canStart` is true when a host spectator is present and the server is not blocking new
 sessions for deploy drain.
 
-`PlayerScore`: `{ id: u32, teamId: u32, name: string, color: string, unitScore: u32, structureScore: u32,
+`PlayerScore`: `{ id: u32, teamId: u32, name: string, color: string, apm: u32, unitScore: u32, structureScore: u32,
 unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a
 frozen server snapshot taken when that recipient gets `gameOver`; it is not live-updated while a
 3-4 player match continues. Unit/structure score is the configured steel+oil value of every
-unit/building entity created for that player, including starting entities.
+unit/building entity created for that player, including starting entities. `apm` counts one action
+per authoritative gameplay command regardless of the number of units in that command, excludes the
+first 60 seconds, and averages the remaining actions over the remaining simulated match time.
 
 `winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. `winnerId` remains
 for FFA compatibility. During singleton-team FFA, `winnerTeamId` matches `winnerId`; during team

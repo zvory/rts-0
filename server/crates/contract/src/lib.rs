@@ -290,6 +290,8 @@ pub struct PlayerScore {
     pub team_id: TeamId,
     pub name: String,
     pub color: String,
+    #[serde(default)]
+    pub apm: u32,
     pub unit_score: u32,
     pub structure_score: u32,
     pub units_killed: u32,

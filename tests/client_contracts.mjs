@@ -4,6 +4,7 @@
 
 import { runFrameProfilerContracts } from "./client_contracts/frame_profiler_contracts.mjs";
 import { runScoreboardContracts } from "./client_contracts/scoreboard_contracts.mjs";
+import "./client_contracts/apm_tracker_contracts.mjs";
 
 await import("./client_contracts/settings_contracts.mjs");
 await import("./client_contracts/hud_contracts.mjs");
