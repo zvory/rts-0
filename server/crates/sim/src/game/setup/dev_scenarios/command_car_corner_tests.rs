@@ -1,3 +1,4 @@
+use super::test_support::speed_scaled_escape_deadline_ticks;
 use super::*;
 
 fn assert_units_do_not_intersect_buildings(game: &Game) {

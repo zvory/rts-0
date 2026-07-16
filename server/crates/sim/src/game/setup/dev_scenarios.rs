@@ -710,30 +710,13 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     game
 }
 
-#[cfg(test)]
-fn speed_scaled_escape_deadline_ticks(
-    unit: EntityKind,
-    escape_distance_px: f32,
-    route_multiplier: u32,
-) -> u32 {
-    let speed_px_per_tick = config::unit_stats(unit)
-        .unwrap_or_else(|| panic!("{unit} should have movement stats"))
-        .speed;
-    assert!(
-        speed_px_per_tick.is_finite() && speed_px_per_tick > 0.0,
-        "{unit} should have a positive finite movement speed"
-    );
-    let free_flow_ticks = (escape_distance_px.max(0.0) / speed_px_per_tick).ceil() as u32;
-    free_flow_ticks
-        .saturating_mul(route_multiplier)
-        .saturating_add(config::TICK_HZ * 2)
-}
-
 /// Spawn the steel and oil clusters for a base site. The clusters point inward toward the map
 /// center so the layout is the same regardless of whether a player occupies the site.
 #[cfg(test)]
 mod command_car_corner_tests;
 #[cfg(test)]
 mod factory_wall_rally_spawn_tests;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;

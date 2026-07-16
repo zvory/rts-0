@@ -1,3 +1,4 @@
+use super::test_support::speed_scaled_escape_deadline_ticks;
 use super::*;
 
 #[test]
