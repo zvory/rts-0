@@ -25,6 +25,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "auto_spectator.js": "app-shell",
   "match_health.js": "app-shell",
   "frame_profiler.js": "app-shell",
+  "stress_test.js": "app-shell",
+  "stress_test_profile.js": "app-shell",
   "frame_recovery.js": "app-shell",
   "match_fixed_capture.js": "app-shell",
   "visual_clock.js": "app-shell",
@@ -129,6 +131,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "camera_projection.js": "platform",
   "fixed_perspective_camera.js": "platform",
   "map_editor_launch.js": "platform",
+  "stress_test_launch.js": "platform",
 }));
 
 const AREA_PREFIXES = [

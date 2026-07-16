@@ -4,6 +4,8 @@ Use when changing server bind/config, the build pipeline, or the input-hardening
 
 ## Read first
 - [docs/design/hardening.md](../design/hardening.md) — full hardening section
+- [docs/design/client-stress-tests.md](../design/client-stress-tests.md) — bounded report ingestion
+  and the `RTS_RECORD_STRESS_TESTS` persistence gate
 
 ## Run / build
 ```bash
