@@ -362,7 +362,6 @@ impl GameCheckpointV1 {
             &self.fog,
             &player_ids,
             self.entities.next_id,
-            &self.firing_reveals,
             map,
             self.tick,
         )?;

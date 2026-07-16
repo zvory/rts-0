@@ -240,7 +240,6 @@ pub(super) fn validate_fog(
     fog: &FogStateV1,
     player_ids: &BTreeSet<u32>,
     entity_next_id: u32,
-    firing_reveals: &[FiringRevealSource],
     map: &Map,
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
@@ -261,7 +260,7 @@ pub(super) fn validate_fog(
             return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
         }
     }
-    validate_firing_reveal_visibility(fog, player_ids, entity_next_id, firing_reveals, tick)?;
+    validate_firing_reveal_visibility(fog, player_ids, entity_next_id, tick)?;
     Ok(())
 }
 
@@ -351,6 +350,7 @@ pub(super) fn validate_active_sources(
             });
         }
     }
+    let mut firing_reveal_entities = BTreeSet::new();
     for source in firing_reveals {
         if !player_ids.contains(&source.viewer()) {
             return Err(CheckpointPayloadError::InvalidReference {
@@ -367,6 +367,11 @@ pub(super) fn validate_active_sources(
         if source.started_at_tick() > tick || !source.is_active_at(tick) {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "firingReveals.startedAtTick",
+            });
+        }
+        if !firing_reveal_entities.insert((source.viewer(), source.entity_id())) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "firingReveals",
             });
         }
     }

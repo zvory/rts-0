@@ -205,8 +205,8 @@ impl Game {
     ///
     /// Ordered per `docs/design/server-sim.md`: drain+apply commands → movement → queued-order
     /// promotion → combat/economy/production → construction/deconstruction → projectile/death
-    /// cleanup → collision/supply → sample fog on 15 Hz boundaries. The whole method is panic-free: every entity
-    /// lookup is fallible and stale ids are ignored.
+    /// cleanup → collision/supply → sample fog on 15 Hz boundaries. The whole method is
+    /// panic-free: every entity lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
         self.tick_inner(None)
     }

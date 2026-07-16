@@ -1,9 +1,7 @@
 use std::collections::BTreeSet;
 
-use crate::game::entity::{Entity, MAX_FIRING_REVEAL_REACTION_GATES_PER_WEAPON};
-use crate::game::firing_reveal::FiringRevealSource;
-
 use super::super::{CheckpointPayloadError, FogStateV1};
+use crate::game::entity::{Entity, MAX_FIRING_REVEAL_REACTION_GATES_PER_WEAPON};
 
 pub(super) fn validate_firing_reveal_reaction_gates(
     entity: &Entity,
@@ -43,21 +41,8 @@ pub(super) fn validate_firing_reveal_visibility(
     fog: &FogStateV1,
     player_ids: &BTreeSet<u32>,
     entity_next_id: u32,
-    firing_reveals: &[FiringRevealSource],
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
-    let mut source_episodes = BTreeSet::new();
-    for source in firing_reveals {
-        if !source_episodes.insert((
-            source.viewer(),
-            source.entity_id(),
-            source.started_at_tick(),
-        )) {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "firingReveals",
-            });
-        }
-    }
     for (&viewer, by_entity) in &fog.firing_reveal_visibility {
         if !player_ids.contains(&viewer) {
             return Err(CheckpointPayloadError::InvalidReference {
