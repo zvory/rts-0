@@ -83,8 +83,7 @@ src/
   clean_presentation.js # app-shell reversible DOM chrome mode for Interact capture
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
-  lab_scenario_submission_capability.js # HTTP capability probe with transient-failure retry
-  lab_scenario_submission_flow.js # LabPanel scenario validation/submission orchestration
+  lab_scenario_authoring_flow.js # LabPanel setup validation and JSON authoring orchestration
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
@@ -580,7 +579,6 @@ export class LabClient {
   exportScenario(name?)                  // compatibility wire name for checkpoint setup export
   importScenario(scenario)               // compatibility wire name for checkpoint/legacy setup import
   validateScenario(metadata)             // sends {op:"validateScenario", metadata}
-  submitScenario(metadata, options?)      // sends {op:"submitScenario", metadata}
   resetScenario()                        // seeks lab room time to the current setup baseline
   request(op, options?)                  // allocates requestId, resolves with labResult/timeout
   destroy()
@@ -703,31 +701,15 @@ setup authoring field defaults, slug generation, client-side metadata limits tha
 catalog limits, comma-separated tag parsing, and local blocking errors before the panel sends a
 server dry-run validation request.
 
-`lab_scenario_submission_capability.js`
+`lab_scenario_authoring_flow.js`
 ```js
-export const LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH
-export function fetchLabScenarioSubmissionCapability({ fetchImpl?, retryDelaysMs?, sleep? })
-```
-`lab_scenario_submission_capability.js` is the app-owned HTTP probe for
-`/api/lab-scenarios/submission`. It returns the server capability JSON when available and retries
-transient network/proxy failures before reporting `capabilityCheckFailed` to the lab panel.
-
-`lab_scenario_submission_flow.js`
-```js
-export function createLabScenarioSubmissionState()
-export function defaultLabScenarioSubmissionWindow(url)
-export function setLabScenarioSubmissionCapability(panel, source)
 export function updateLabScenarioTitle(panel, value)
 export function captureLabScenarioAuthoringFields(panel)
 export function renderLabScenarioOptions(panel)
-export function labScenarioSubmissionDisabledReason(panel)
 export function validateLabScenario(panel)
-export function submitLabScenario(panel)
-export function destroyLabScenarioSubmission(panel)
 ```
-`lab_scenario_submission_flow.js` is the LabPanel-owned UI helper for checkpoint setup dry-run validation,
-submission capability normalization, duplicate-click guarding, draft PR progress/result rendering,
-and teardown of pending submission state.
+`lab_scenario_authoring_flow.js` is the LabPanel-owned UI helper for checkpoint setup dry-run
+validation, JSON preview rendering, and local setup import/export controls.
 
 `lab_panel.js`
 ```js
@@ -736,12 +718,12 @@ export function labSpawnUnitKindsForFaction(factionId)
 export function labBuildingSpawnFactionOptions()
 export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload, match?, onEditMap?, submissionCapability?, openWindow? })
+  constructor({ root, labClient, launch, startPayload, match?, onEditMap? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
   cancelActiveTool()
-  validateScenario(), submitScenario(), exportScenario(), importScenario()
+  validateScenario(), exportScenario(), importScenario()
   saveLabReplay(), openLabReplay()        // distinct replay affordances; not legacy scenario ops
   destroy()
 }
@@ -760,22 +742,16 @@ export class MapEditorSession {
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
-status, lab vision, command-limit policy, setup authoring metadata, validation, PR submission,
+status, lab vision, command-limit policy, setup authoring metadata, validation,
 setup import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
 active tool status, and the remove setup tool. Vision presents one `Full` button plus one button per
 team; `Full` requests the authoritative union of every current team's fog, and Lab exposes no
-omniscient/no-fog control. App passes the HTTP
-`/api/lab-scenarios/submission` capability probe into the panel; unavailable deployments keep the
-submit action disabled and leave local setup JSON export visible. Successful submissions open the draft PR
-when allowed and always render the PR URL in-panel so popup blocking does not hide the review link.
+omniscient/no-fog control.
 The supported author workflow starts at `/lab`: choose a bundled catalog setup or blank setup,
-edit authoritative state with lab tools, fill in setup name/title/slug/description/tags/review
-notes, run validation, then submit a draft PR when the backend capability is available. After human
-review and merge, the merged setup becomes selectable from the catalog on the next deployed build
-or local server restart that includes the new manifest entry. The browser never supplies setup
-JSON, target paths, branch names, credentials, or commit text for PR submission; local JSON
-export/import remains the fallback for setup iteration and for deployments with submission
-disabled. The lab replay controls are visually separate from setup checkpoint JSON controls; replay
+edit authoritative state with lab tools, fill in setup name/title/slug/description/tags, run
+validation, and export the setup JSON locally. Bundled setups remain build-time assets; the browser
+has no server-persistent setup or map write API. The lab replay controls are visually separate from
+setup checkpoint JSON controls; replay
 save/open uses the bounded lab replay artifact path instead of the legacy `exportScenario` and
 `importScenario` lab operations. Lab now exposes one `Edit map` action. It requests the current
 authoritative map-only payload, creates a server-validated editor handoff, and navigates away; no Lab
@@ -1950,7 +1926,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab setup authoring/submission helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Command discovery includes the completed-Medium-Guns command-card context so the direct-hotkey and settings catalogs include Heavy Guns after it replaces Medium Guns in the Q slot. Wait-until-ready ability descriptors remain available for queue-admissible carriers, including Mortar Fire while it is cooling down. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. Lab and room-time panel collapse controls activate immediately on touch release, suppress the follow-up synthesized click, cancel pending activation when the pointer leaves or cancels, and reset activation state on teardown or re-render. On narrow viewports, the default Lab Options and Tools headers sit below the expanded room-time controls, and their collapse buttons remain touch-friendly. Mobile restore ignores saved desktop coordinates for both Lab windows and room-time controls while preserving saved collapsed state. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab setup authoring helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Command discovery includes the completed-Medium-Guns command-card context so the direct-hotkey and settings catalogs include Heavy Guns after it replaces Medium Guns in the Q slot. Wait-until-ready ability descriptors remain available for queue-admissible carriers, including Mortar Fire while it is cooling down. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. Lab and room-time panel collapse controls activate immediately on touch release, suppress the follow-up synthesized click, cancel pending activation when the pointer leaves or cancels, and reset activation state on teardown or re-render. On narrow viewports, the default Lab Options and Tools headers sit below the expanded room-time controls, and their collapse buttons remain touch-friendly. Mobile restore ignores saved desktop coordinates for both Lab windows and room-time controls while preserving saved collapsed state. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match

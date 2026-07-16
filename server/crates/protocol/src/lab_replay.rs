@@ -993,7 +993,7 @@ fn reject_unsupported_session_ops(
                     "checkpoint setup imports must rebase initialSetup and clear prior lab replay operations to avoid ambiguous entity id remaps",
                 ));
             }
-            "exportScenario" | "validateScenario" | "submitScenario" => {
+            "exportScenario" | "validateScenario" => {
                 return Err(invalid(
                     "lab scenario authoring/export requests are UI control-plane operations, not durable lab replay operations",
                 ));

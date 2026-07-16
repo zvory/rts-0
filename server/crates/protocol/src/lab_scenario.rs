@@ -11,8 +11,6 @@ pub struct LabScenarioAuthoringMetadata {
     pub description: String,
     #[serde(default)]
     pub tags: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub review_notes: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

@@ -11,16 +11,10 @@ import { labToolDetailText } from "./lab_tool_detail.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
 import {
   captureLabScenarioAuthoringFields,
-  createLabScenarioSubmissionState,
-  defaultLabScenarioSubmissionWindow,
-  destroyLabScenarioSubmission,
-  labScenarioSubmissionDisabledReason,
   renderLabScenarioOptions,
-  setLabScenarioSubmissionCapability,
-  submitLabScenario,
   updateLabScenarioTitle,
   validateLabScenario,
-} from "./lab_scenario_submission_flow.js";
+} from "./lab_scenario_authoring_flow.js";
 
 const labVision = Object.freeze({
   all: () => msg.labVisionAll(),
@@ -38,8 +32,6 @@ export class LabPanel {
     startPayload = null,
     match = null,
     onEditMap = null,
-    submissionCapability = null,
-    openWindow = defaultLabScenarioSubmissionWindow,
   }) {
     this.root = root;
     this.labClient = labClient;
@@ -48,7 +40,6 @@ export class LabPanel {
     this.match = match;
     this.onEditMap = onEditMap;
     this.editMapPending = false;
-    this.openWindow = openWindow;
     this.destroyed = false;
     this.state = labClient?.state || startPayload?.lab || null;
     this.lastResult = labClient?.lastResult || null;
@@ -71,8 +62,6 @@ export class LabPanel {
     this.authoring = createLabScenarioAuthoringState({ defaultName: this.defaultScenarioName() });
     this.authoringSlugEdited = false;
     this.authoringValidation = { errors: [], preview: null };
-    this.submission = createLabScenarioSubmissionState();
-    this.setSubmissionCapability(submissionCapability);
     this.fields = new Map();
     this.listeners = [];
     this.unsubscribeState = null;
@@ -104,10 +93,6 @@ export class LabPanel {
     el.className = `lab-panel ${className}`;
     el.setAttribute("aria-label", ariaLabel);
     return el;
-  }
-
-  setSubmissionCapability(source) {
-    setLabScenarioSubmissionCapability(this, source);
   }
 
   render() {
@@ -928,16 +913,8 @@ export class LabPanel {
     captureLabScenarioAuthoringFields(this);
   }
 
-  submitScenarioDisabledReason() {
-    return labScenarioSubmissionDisabledReason(this);
-  }
-
   validateScenario() {
     return validateLabScenario(this);
-  }
-
-  submitScenario() {
-    return submitLabScenario(this);
   }
 
   ignoreCommandLimitsEnabled() {
@@ -1244,7 +1221,6 @@ export class LabPanel {
 
   destroy() {
     this.destroyed = true;
-    destroyLabScenarioSubmission(this);
     this.match?.cancelLabTool?.("panelDestroy");
     this.unsubscribeState?.();
     this.unsubscribeResult?.();

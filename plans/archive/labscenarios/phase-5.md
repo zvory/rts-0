@@ -36,7 +36,6 @@ Make scenario selection and authoring safe enough for normal use and document th
 - `docs/context/server-sim.md`
 - `docs/context/protocol.md`
 - `docs/context/deployment.md`
-- Generated PR body template or submission helper
 - Focused client/server tests from prior phases
 - `plans/labscenarios/*.md`
 
@@ -53,12 +52,11 @@ Use exact focused test names if broad filters would match too much or too little
 
 ## Manual Test Focus
 
-Start an existing catalog scenario, start a blank lab, author a new scenario, validate it, submit it
-through the configured test path, and confirm the draft PR is reviewable. After merge in a safe test
-case, confirm the scenario appears in the catalog and launches correctly.
+Start an existing catalog scenario, start a blank lab, author a new scenario, validate it, export
+it locally, and confirm it can be imported again.
 
 ## Handoff Expectations
 
-Summarize the completed selection/authoring workflow, exact verification, credential and deployment
-requirements, remaining non-goals, and any follow-up plan needed for public scenario libraries or
+Summarize the completed selection/authoring workflow, exact verification, remaining non-goals,
+and any follow-up plan needed for public scenario libraries or
 `/dev/scenario` migration.

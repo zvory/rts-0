@@ -2263,33 +2263,6 @@ input[type="text"]:focus {
 .lab-authoring-feedback[data-state="ok"] {
   color: #bde6ba;
 }
-.lab-submission-feedback {
-  display: grid;
-  gap: 6px;
-  grid-column: 1 / -1;
-}
-.lab-submission-feedback[data-state="disabled"] .lab-submission-status {
-  color: #f2d898;
-}
-.lab-submission-feedback[data-state="pending"] .lab-submission-status {
-  color: #d9e4ff;
-}
-.lab-submission-feedback[data-state="error"] .lab-submission-status {
-  color: #ffb4a6;
-}
-.lab-submission-feedback[data-state="ok"] .lab-submission-status,
-.lab-submission-feedback[data-state="ready"] .lab-submission-status {
-  color: #bde6ba;
-}
-.lab-submission-link {
-  display: grid;
-  gap: 6px;
-}
-.lab-submission-link a {
-  color: #a8d8ff;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-}
 .lab-field input[type="checkbox"] {
   justify-self: start;
   min-width: 16px;

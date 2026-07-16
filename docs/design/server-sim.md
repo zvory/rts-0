@@ -730,13 +730,8 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   speed/pause/controller state, and append-only operation log records stay in the room task rather
   than in `Game`. Bundled catalog and authoring validation restore checkpoint-backed
   `LabCheckpointScenarioV1` containers through the lab `Game` API; legacy lab setup JSON is
-  rejected before exposing a setup. Setup PR submission
-  also starts in `room_task/lab.rs`: the room exports the authoritative lab `Game` as a checkpoint
-  setup, validates authoring metadata, rate-limits the room to one
-  PR job, and then hands the already-validated preview to a bounded background service so GitHub or
-  git work never runs on the room tick path. The submission service rechecks catalog duplicates,
-  safe filenames, path allowlists, payload/entity caps, branch safety, and the exact setup plus
-  manifest file set before opening a draft PR with a reviewer checklist. Paused lab room-time
+  rejected before exposing a setup. Authoring validation exports the authoritative lab `Game` as a
+  checkpoint setup and returns a bounded preview without writing files or repository state. Paused lab room-time
   suppresses scheduled ticks; one-tick lab steps and running lab ticks use the same
   `LiveTickDriver` path as ordinary live simulation.
   Bundled scenario drivers may emit a bounded ordered sequence of typed issue-as commands and
@@ -779,8 +774,7 @@ split into focused room-local modules:
   attach, live start-payload glue, pending recipient notices, and live snapshot notice plumbing.
 - `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
   authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
-  state broadcasts, room-time controls, scenario export/import, and authoritative scenario PR
-  submission dispatch.
+  state broadcasts, room-time controls, and scenario export/import/validation.
 - `room_task/dev.rs` owns dev-watch and authored scenario rooms: dev joins, scenario launch, script
   driver glue, room-time controls, and dev start-payload sends.
 - `room_task/replay.rs` owns replay viewer rooms: replay joins and prompts, replay start-payload

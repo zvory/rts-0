@@ -40,8 +40,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   narrow bridges called only by `scripts/interact/`; none exposes app, match, transport, renderer,
   or state references.
 - **Setup authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
-  authoritative state before draft-PR submission, with setup JSON export/import as the disabled
-  fallback.
+  authoritative state and supports browser-side setup JSON export/import.
 - **Map Editor boundary.** `/map-editor` owns Pixi/camera/session state without `Net`, `Match`,
   `GameState`, or a simulation room. One-use two-minute Lab handoffs carry only map data.
 - **Room affordances are metadata-driven.** `room_capabilities.js` parses `startPayload.capabilities`

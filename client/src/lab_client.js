@@ -66,10 +66,6 @@ export class LabClient {
     return this.request({ op: "validateScenario", metadata });
   }
 
-  submitScenario(metadata, options = {}) {
-    return this.request({ op: "submitScenario", metadata }, options);
-  }
-
   resetScenario() {
     return this.net.seekRoomTimeTo(0);
   }

@@ -20,12 +20,11 @@ should produce a new baseline checkpoint and clear the current-branch action log
 - `server/crates/sim/src/game/lab.rs`
 - `server/src/lobby/room_task/lab.rs`
 - `server/src/lab_scenarios.rs`
-- `server/src/lab_scenario_submission.rs`
 - `server/assets/lab-scenarios/**` and manifest data if persisted setup shape changes
 - `client/src/lab_client.js`
 - `client/src/lab_panel.js`
 - `client/src/lab_scenario_authoring.js`
-- `client/src/lab_scenario_submission_flow.js`
+- `client/src/lab_scenario_authoring_flow.js`
 - Lab scenario tests
 - `docs/design/protocol.md` and `docs/design/client-ui.md` if lab artifact/import/export shape
   changes
@@ -34,7 +33,7 @@ should produce a new baseline checkpoint and clear the current-branch action log
 
 - Run focused lab import/export tests.
 - Add tests for blank lab, catalog lab, and imported setup baseline checkpoint creation.
-- Add or adjust catalog and authoring/submission tests if the persisted lab setup shape changes.
+- Add or adjust catalog and authoring tests if the persisted lab setup shape changes.
 
 ## Manual Testing Focus
 

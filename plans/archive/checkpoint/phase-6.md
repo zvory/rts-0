@@ -37,8 +37,6 @@ Explicit non-goals:
 - `server/lab_scenarios/**` or the current bundled setup asset directory: convert assets to the
   checkpoint-backed format.
 - `server/src/lab_scenarios.rs`: load, validate, preview, and catalog checkpoint-backed assets.
-- `server/src/lab_scenario_submission.rs`: default new submissions to checkpoint-backed setup
-  files and preserve path allowlists.
 - `server/src/lobby/room_task/lab.rs` and lab import/export handlers: update setup import, export,
   validation, and result mapping only through the existing lab setup surface; preserve
   operator permissions, id-remap behavior, room dirty/timeline semantics, and user-facing validation

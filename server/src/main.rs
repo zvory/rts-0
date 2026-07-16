@@ -34,9 +34,6 @@ mod stress_tests;
 mod wiki;
 
 use rts_server::db::Db;
-use rts_server::lab_scenario_submission::{
-    LabScenarioSubmissionService, SCENARIO_SUBMISSION_CAPABILITY_PATH,
-};
 use rts_server::lab_scenarios::catalog_handler as lab_scenarios_handler;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::protocol::{ClientMessage, ServerMessage};
@@ -116,7 +113,6 @@ struct AppState {
     /// Optional database for match history and explicitly gated diagnostics. `None` when
     /// `DATABASE_URL` is unset or the connection failed.
     db: Option<Arc<Db>>,
-    lab_scenario_submission: LabScenarioSubmissionService,
     interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge,
     map_handoffs: map_handoffs::MapHandoffStore,
     stress_tests: stress_tests::StressTestStore,
@@ -162,31 +158,12 @@ async fn main() {
     let index_html = build_versioned_index(&client_dir, &version);
     let maps_dir = configured_maps_dir();
     let stress_tests = stress_tests::StressTestStore::new(db.clone(), record_stress_tests);
-    let lab_scenario_submission = LabScenarioSubmissionService::from_env();
-    let submission_capability = lab_scenario_submission.capability();
-    if submission_capability.available {
-        rts_server::log_info!(
-            branch_prefix = %submission_capability.branch_prefix,
-            "lab scenario PR submission enabled"
-        );
-    } else {
-        rts_server::log_info!(
-            unavailable_code = submission_capability
-                .unavailable_code
-                .as_deref()
-                .unwrap_or("unknown"),
-            "lab scenario PR submission unavailable"
-        );
-    }
     let state = AppState {
-        lobby: Lobby::new()
-            .with_match_history(lobby_db, false)
-            .with_lab_scenario_submission(lab_scenario_submission.clone()),
+        lobby: Lobby::new().with_match_history(lobby_db, false),
         index_html,
         version,
         maps_dir: maps_dir.clone(),
         db,
-        lab_scenario_submission,
         interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge::from_env(),
         map_handoffs: map_handoffs::MapHandoffStore::default(),
         stress_tests,
@@ -256,12 +233,7 @@ async fn main() {
             "/api/map-handoffs/{handoff_id}",
             post(map_handoffs::consume_handler),
         )
-        .route(
-            SCENARIO_SUBMISSION_CAPABILITY_PATH,
-            get(lab_scenario_submission_capability_handler),
-        )
         .route("/maps/catalog", get(map_catalog_handler))
-        .route("/maps/save", post(map_save_handler))
         .route(
             "/api/lobbies",
             get(lobbies_handler).post(create_lobby_handler),
@@ -436,13 +408,6 @@ struct CreateLobbyResponse {
 /// GET /api/lobbies — browser-safe summaries for public normal rooms.
 async fn lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.lobby.summaries().await)
-}
-
-/// GET /api/lab-scenarios/submission — deployment capability for draft PR submission.
-async fn lab_scenario_submission_capability_handler(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    Json(state.lab_scenario_submission.capability())
 }
 
 /// POST /api/lobbies — reserve a new normal lobby name without joining an existing room.
@@ -1705,12 +1670,6 @@ fn sanitize_name(name: String) -> String {
     }
 }
 
-#[derive(Deserialize)]
-struct MapSaveRequest {
-    name: String,
-    payload: serde_json::Value,
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct MapCatalogEntry {
@@ -1783,47 +1742,4 @@ async fn map_catalog_handler(State(state): State<AppState>) -> impl IntoResponse
     }
     maps.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.file.cmp(&b.file)));
     Json(MapCatalogResponse { maps }).into_response()
-}
-
-/// POST /maps/save — write a map JSON file directly into the server's assets/maps directory.
-/// Only accepts filenames matching `[a-z0-9-]+` to prevent path traversal.
-async fn map_save_handler(
-    State(state): State<AppState>,
-    Json(req): Json<MapSaveRequest>,
-) -> impl IntoResponse {
-    let name = req.name.trim().to_string();
-    if name.is_empty()
-        || name.len() > 64
-        || !name
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        return (
-            StatusCode::BAD_REQUEST,
-            "name must be 1-64 lowercase alphanumeric or hyphen characters",
-        )
-            .into_response();
-    }
-
-    let filename = format!("{name}.json");
-    let path = std::path::Path::new(&state.maps_dir).join(&filename);
-
-    let json_bytes = match serde_json::to_vec_pretty(&req.payload) {
-        Ok(mut b) => {
-            b.push(b'\n');
-            b
-        }
-        Err(e) => {
-            rts_server::log_warn!(%e, "map save: payload serialization failed");
-            return (StatusCode::BAD_REQUEST, "invalid payload").into_response();
-        }
-    };
-
-    if let Err(e) = tokio::fs::write(&path, &json_bytes).await {
-        rts_server::log_warn!(%e, ?path, "map save: write failed");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "write failed").into_response();
-    }
-
-    rts_server::log_info!(?path, "map saved");
-    (StatusCode::OK, filename).into_response()
 }

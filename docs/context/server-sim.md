@@ -30,8 +30,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/crates/ai/src/` — AI opponents and self-play harnesses.
 - `server/src/lobby/room_task.rs` plus `room_task/{types,lobby,live,lab,dev,replay,branch,lifecycle,helpers}.rs` —
   the room actor, room-owned state/types, mode handlers, lifecycle, summaries, and send helpers.
-- `server/src/lab_scenarios.rs` and `server/src/lab_scenario_submission.rs` — bundled lab scenario
-  catalog/authoring validation and disabled-by-default draft PR submission guardrails.
+- `server/src/lab_scenarios.rs` — bundled lab scenario catalog and authoring validation.
 - `server/src/lobby/session_policy.rs`, `participants.rs`, `tick_control.rs`, and
   `lab_timeline.rs` — lifecycle policy, issuer resolution, room-time, and lab rewind.
 - `server/src/lobby/projection.rs`, `snapshot_fanout.rs`, and `snapshots.rs` — per-recipient

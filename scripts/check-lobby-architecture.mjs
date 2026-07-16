@@ -34,7 +34,6 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/helpers.rs": 140,
   "room_task/lab.rs": 1400,
   "room_task/lab/replay.rs": 650,
-  "room_task/lab/submission.rs": 180,
   "room_task/lifecycle.rs": 560,
   "room_task/live.rs": 750,
   "room_task/lobby.rs": 950,
