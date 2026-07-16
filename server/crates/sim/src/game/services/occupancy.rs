@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::config;
@@ -27,7 +27,7 @@ pub(crate) struct Occupancy<'a> {
 struct OccupancyData {
     all_ground_blocked: Vec<bool>,
     vehicle_body_blocked: Vec<bool>,
-    tank_trap_owner_by_tile: Vec<Option<u32>>,
+    tank_trap_tiles: Vec<bool>,
     all_ground_clearance_tiles: Vec<u16>,
     vehicle_body_clearance_tiles: Vec<u16>,
     all_ground_static_fingerprint: u64,
@@ -48,8 +48,7 @@ impl OccupancyData {
         let size = map.size;
         let mut all_ground_blocked = vec![false; (size * size) as usize];
         let mut vehicle_body_blocked = vec![false; (size * size) as usize];
-        let mut tank_trap_owner_by_tile = vec![None; (size * size) as usize];
-        let mut tank_trap_tiles = HashSet::new();
+        let mut tank_trap_tiles = vec![false; (size * size) as usize];
         for e in entities.iter() {
             if !e.is_building() {
                 continue;
@@ -63,8 +62,7 @@ impl OccupancyData {
                         StaticBlockerClass::None => {}
                     }
                     if e.kind == EntityKind::TankTrap {
-                        tank_trap_tiles.insert((tx, ty));
-                        tank_trap_owner_by_tile[idx] = Some(e.owner);
+                        tank_trap_tiles[idx] = true;
                     }
                 }
             }
@@ -91,7 +89,7 @@ impl OccupancyData {
         OccupancyData {
             all_ground_blocked,
             vehicle_body_blocked,
-            tank_trap_owner_by_tile,
+            tank_trap_tiles,
             all_ground_clearance_tiles,
             vehicle_body_clearance_tiles,
             all_ground_static_fingerprint,
@@ -264,12 +262,12 @@ impl Occupancy<'_> {
         }
     }
 
-    fn tank_trap_owner_at(&self, tx: i32, ty: i32) -> Option<u32> {
+    fn tank_trap_at(&self, tx: i32, ty: i32) -> bool {
         if !self.map.in_bounds(tx, ty) {
-            return None;
+            return false;
         }
         let idx = (ty as u32 * self.map.size + tx as u32) as usize;
-        self.data.tank_trap_owner_by_tile[idx]
+        self.data.tank_trap_tiles[idx]
     }
 
     fn tank_trap_pinches_route(
@@ -284,10 +282,7 @@ impl Occupancy<'_> {
             ((tx, ty - 2), (tx, ty - 1)),
             ((tx, ty + 2), (tx, ty + 1)),
         ] {
-            if self
-                .tank_trap_owner_at(other_tile.0, other_tile.1)
-                .is_none()
-            {
+            if !self.tank_trap_at(other_tile.0, other_tile.1) {
                 continue;
             }
             if !self.map.in_bounds(midpoint_tile.0, midpoint_tile.1) {
@@ -346,20 +341,27 @@ fn distance_sq_to_segment(point: (f32, f32), from: (f32, f32), to: (f32, f32)) -
 
 fn close_tank_trap_vehicle_gaps(
     size: u32,
-    tank_trap_tiles: &HashSet<(u32, u32)>,
+    tank_trap_tiles: &[bool],
     vehicle_body_blocked: &mut [bool],
 ) {
-    for &(tx, ty) in tank_trap_tiles {
-        for (target, midpoint) in [
-            ((tx.saturating_add(2), ty), (tx.saturating_add(1), ty)),
-            ((tx, ty.saturating_add(2)), (tx, ty.saturating_add(1))),
-        ] {
-            if target.0 >= size || target.1 >= size || midpoint.0 >= size || midpoint.1 >= size {
+    for ty in 0..size {
+        for tx in 0..size {
+            let source_idx = (ty * size + tx) as usize;
+            if !tank_trap_tiles[source_idx] {
                 continue;
             }
-            if tank_trap_tiles.contains(&target) {
-                let idx = (midpoint.1 * size + midpoint.0) as usize;
-                vehicle_body_blocked[idx] = true;
+            for (target, midpoint) in [
+                ((tx.saturating_add(2), ty), (tx.saturating_add(1), ty)),
+                ((tx, ty.saturating_add(2)), (tx, ty.saturating_add(1))),
+            ] {
+                if target.0 >= size || target.1 >= size {
+                    continue;
+                }
+                let target_idx = (target.1 * size + target.0) as usize;
+                if tank_trap_tiles[target_idx] {
+                    let midpoint_idx = (midpoint.1 * size + midpoint.0) as usize;
+                    vehicle_body_blocked[midpoint_idx] = true;
+                }
             }
         }
     }
