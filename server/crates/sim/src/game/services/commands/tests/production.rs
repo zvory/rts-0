@@ -211,11 +211,7 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
         .spawn_building(1, EntityKind::TrainingCentre, tc_x, tc_y, false)
         .expect("training centre should spawn under construction");
     let mut players = vec![player_state(1), player_state(2)];
-    let resources_before = (
-        players[0].steel,
-        players[0].oil,
-        players[0].supply_used,
-    );
+    let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
     let train_panzerfaust = SimCommand::Train {
         building: barracks,
         unit: EntityKind::Panzerfaust,
@@ -237,11 +233,7 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
         "under-construction Training Centre must not unlock Panzerfaust training"
     );
     assert_eq!(
-        (
-            players[0].steel,
-            players[0].oil,
-            players[0].supply_used,
-        ),
+        (players[0].steel, players[0].oil, players[0].supply_used,),
         resources_before,
         "failed Panzerfaust training must not spend resources or reserve supply"
     );
@@ -294,11 +286,7 @@ fn panzerfaust_training_requires_completed_training_centre_and_uses_barracks_que
         .prod_queue()
         .is_empty());
     assert_eq!(
-        (
-            players[0].steel,
-            players[0].oil,
-            players[0].supply_used,
-        ),
+        (players[0].steel, players[0].oil, players[0].supply_used,),
         resources_before,
         "canceling queued Panzerfaust should use normal Barracks refund and supply release"
     );
@@ -370,11 +358,7 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
     let research_complex = entities
         .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
         .expect("research complex should spawn");
-    let resources_before = (
-        players[0].steel,
-        players[0].oil,
-        players[0].supply_used,
-    );
+    let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
 
     let events = apply_with_players(
         &map,

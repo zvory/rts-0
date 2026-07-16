@@ -71,7 +71,9 @@ fn empty_flat_game_with_players(players: &[PlayerInit]) -> Game {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     game.refresh_building_memory(&ids);
     game
 }
@@ -81,10 +83,14 @@ fn exposes_hidden_remembered_building_without_live_entity() {
     let mut game = empty_flat_game();
     let scout_pos = game.state.map.tile_center(20, 20);
     let depot_pos = game.state.map.tile_center(22, 20);
-    let scout = game.state.entities
+    let scout = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
         .expect("scout should spawn");
-    let depot = game.state.entities
+    let depot = game
+        .state
+        .entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("depot should spawn");
     game.tick();
@@ -98,7 +104,8 @@ fn exposes_hidden_remembered_building_without_live_entity() {
 
     game.state.entities.remove(scout);
     let far = game.state.map.tile_center(40, 40);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, far.0, far.1)
         .expect("far scout should spawn");
     game.tick();
@@ -157,27 +164,36 @@ fn remembered_buildings_use_team_visible_observations() {
     let p1_base = game.state.map.tile_center(2, 2);
     let p2_base = game.state.map.tile_center(4, 2);
     let p3_base = game.state.map.tile_center(55, 55);
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
         .expect("p1 city centre should spawn");
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
         .expect("p2 city centre should spawn");
-    game.state.entities
+    game.state
+        .entities
         .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
         .expect("p3 city centre should spawn");
     let scout_pos = game.state.map.tile_center(20, 20);
     let depot_pos = game.state.map.tile_center(22, 20);
-    let scout = game.state.entities
+    let scout = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
         .expect("ally scout should spawn");
-    let depot = game.state.entities
+    let depot = game
+        .state
+        .entities
         .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("enemy depot should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
     game.refresh_building_memory(&ids);
 
     assert!(
@@ -190,12 +206,15 @@ fn remembered_buildings_use_team_visible_observations() {
 
     game.state.entities.remove(scout);
     let far = game.state.map.tile_center(40, 40);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, far.0, far.1)
         .expect("far ally scout should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
-    game.state.fog.recompute(&ids, &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
 
     let hidden = game.snapshot_for(1);
     assert!(hidden.entities.iter().all(|entity| entity.id != depot));
@@ -214,16 +233,22 @@ fn spectator_remembered_buildings_follow_selected_player_union() {
     let p1_scout_pos = game.state.map.tile_center(20, 20);
     let p2_scout_pos = game.state.map.tile_center(20, 20);
     let depot_pos = game.state.map.tile_center(22, 20);
-    let p1_scout = game.state.entities
+    let p1_scout = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, p1_scout_pos.0, p1_scout_pos.1)
         .expect("p1 scout should spawn");
-    let depot = game.state.entities
+    let depot = game
+        .state
+        .entities
         .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("enemy depot should spawn");
     game.tick();
 
     game.state.entities.remove(p1_scout);
-    let p2_scout = game.state.entities
+    let p2_scout = game
+        .state
+        .entities
         .spawn_unit(2, EntityKind::Rifleman, p2_scout_pos.0, p2_scout_pos.1)
         .expect("p2 scout should spawn");
     game.tick();
@@ -269,10 +294,13 @@ fn does_not_expose_never_scouted_building_memory() {
     let mut game = empty_flat_game();
     let scout_pos = game.state.map.tile_center(4, 4);
     let depot_pos = game.state.map.tile_center(40, 40);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
         .expect("scout should spawn");
-    let depot = game.state.entities
+    let depot = game
+        .state
+        .entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("depot should spawn");
     game.tick();
@@ -290,17 +318,22 @@ fn keeps_destroyed_hidden_building_as_stale_intel_until_scouted() {
     let mut game = empty_flat_game();
     let scout_pos = game.state.map.tile_center(8, 8);
     let depot_pos = game.state.map.tile_center(10, 8);
-    let scout = game.state.entities
+    let scout = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
         .expect("scout should spawn");
-    let depot = game.state.entities
+    let depot = game
+        .state
+        .entities
         .spawn_building(2, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
         .expect("depot should spawn");
     game.tick();
 
     game.state.entities.remove(scout);
     let far = game.state.map.tile_center(40, 40);
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, far.0, far.1)
         .expect("far scout should spawn");
     game.state.entities.remove(depot);
@@ -312,7 +345,8 @@ fn keeps_destroyed_hidden_building_as_stale_intel_until_scouted() {
         .iter()
         .any(|building| building.id == depot));
 
-    game.state.entities
+    game.state
+        .entities
         .spawn_unit(1, EntityKind::Rifleman, depot_pos.0, depot_pos.1)
         .expect("new scout should spawn");
     game.tick();
