@@ -10,6 +10,7 @@ const MAX_FRAME_DIAGNOSTIC_COUNTERS = 8;
 const MAX_REPORT_PHASE_GROUPS = 5;
 const MAX_REPORT_COUNTER_GROUPS = 5;
 const FRAME_UNATTRIBUTED_LABEL = "frame.unattributed";
+const KNOWN_DIAGNOSTIC_LABEL_CACHE = new Map();
 
 const REPORT_FRAME_PHASE_LABELS = new Set([
   "frame.rafDispatch",
@@ -160,6 +161,30 @@ export class FrameProfiler {
         actualLabel,
         (this.activeFrame.diagnosticCounters.get(actualLabel) || 0) + value,
       );
+    }
+  }
+
+  /**
+   * Record repeated unit-valued samples for a fixed set of trusted labels.
+   *
+   * Render hot loops use this after accumulating local counts so diagnostics retain the
+   * exact CounterAggregate shape of `count` calls to recordDiagnosticCounter(label, 1)
+   * without paying for one callback, normalization, and Map update per rendered part.
+   */
+  recordKnownDiagnosticCounters(labels, counts) {
+    const length = Math.min(labels?.length || 0, counts?.length || 0);
+    for (let i = 0; i < length; i += 1) {
+      const samples = clampCounterSamples(counts[i]);
+      if (samples == null) continue;
+      const safeLabel = knownDiagnosticLabel(labels[i]);
+      const actualLabel = this.counterFor(safeLabel).addRepeated(1, samples);
+      this.counterFor(actualLabel, this.reportDiagnosticCounters).addRepeated(1, samples);
+      if (this.activeFrame) {
+        this.activeFrame.diagnosticCounters.set(
+          actualLabel,
+          (this.activeFrame.diagnosticCounters.get(actualLabel) || 0) + samples,
+        );
+      }
     }
   }
 
@@ -451,8 +476,13 @@ class CounterAggregate {
   }
 
   add(amount) {
-    this.samples += 1;
-    this.total += amount;
+    this.addRepeated(amount, 1);
+    return this.label;
+  }
+
+  addRepeated(amount, samples) {
+    this.samples += samples;
+    this.total += amount * samples;
     this.maxSample = Math.max(this.maxSample, amount);
     return this.label;
   }
@@ -683,6 +713,15 @@ function normalizeLabel(label) {
   return normalized.slice(0, MAX_LABEL_LENGTH) || "unknown";
 }
 
+function knownDiagnosticLabel(label) {
+  if (KNOWN_DIAGNOSTIC_LABEL_CACHE.has(label)) return KNOWN_DIAGNOSTIC_LABEL_CACHE.get(label);
+  const normalized = normalizeLabel(label);
+  if (KNOWN_DIAGNOSTIC_LABEL_CACHE.size < MAX_DIAGNOSTIC_COUNTERS) {
+    KNOWN_DIAGNOSTIC_LABEL_CACHE.set(label, normalized);
+  }
+  return normalized;
+}
+
 function clampDuration(durationMs) {
   const ms = Number(durationMs);
   if (!Number.isFinite(ms) || ms < 0) return null;
@@ -693,6 +732,12 @@ function clampCounter(amount) {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) return null;
   return Math.min(value, 1_000_000);
+}
+
+function clampCounterSamples(samples) {
+  const value = Number(samples);
+  if (!Number.isSafeInteger(value) || value <= 0) return null;
+  return value;
 }
 
 function finiteOrNull(value) {

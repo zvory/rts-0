@@ -27,6 +27,35 @@ import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "./worker_svg.js";
 
 const LOADED_RIFLEMAN_RIG_KEY = "rifleman.panzerfaustLoaded";
 
+const DEFAULT_POOL_PROFILE = Object.freeze({
+  familyKey: "liveUnit",
+  liveRigShadow: "liveUnitRigShadows",
+  shadow: "unitShadows",
+  liveRigUnit: "liveUnitRigs",
+  unit: "units",
+  liveRigOverlay: "liveUnitRigOverlays",
+  overlay: "units",
+  liveRigEffects: "liveUnitRigEffects",
+  effects: "units",
+});
+
+const SHOT_REVEAL_POOL_PROFILE = Object.freeze({
+  familyKey: "shotReveal",
+  liveRigShadow: "liveShotRevealRigShadows",
+  shadow: "shotRevealShadows",
+  liveRigUnit: "liveShotRevealRigs",
+  unit: "shotReveals",
+  liveRigOverlay: "liveShotRevealRigOverlays",
+  overlay: "shotReveals",
+  liveRigEffects: "liveShotRevealRigEffects",
+  effects: "shotReveals",
+});
+
+const ROUTE_PLAN_CACHE = new Map([
+  [DEFAULT_POOL_PROFILE, new Map()],
+  [SHOT_REVEAL_POOL_PROFILE, new Map()],
+]);
+
 const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_RIG_SVG],
   [KIND.ARTILLERY, ARTILLERY_RIG_SVG],
@@ -200,33 +229,128 @@ export function liveRigDefinitionFor(definitions, kind) {
 }
 
 export function liveRigRoutesFor(kind, pools = {}) {
+  return liveRigRoutePlanFor(kind, pools).routes;
+}
+
+/**
+ * @typedef {object} LiveRigRoute
+ * @property {string} poolName
+ * @property {string} layerName
+ * @property {readonly string[]} parts Immutable part selection; its identity is a cache key.
+ */
+
+/**
+ * @typedef {object} RoutePlan
+ * @property {readonly LiveRigRoute[]} routes Ordered immutable render routes.
+ * @property {ReadonlySet<string>} allParts Stable union used as an animation-stage cache key.
+ * @property {readonly string[]} poolNames Complete active SVG pool set.
+ * @property {string|null} familyKey
+ * @property {LiveRigRoute|null} shadowRoute
+ * @property {string} overlayPoolName
+ * @property {string} overlayLayerName
+ */
+
+/** @returns {RoutePlan} */
+export function liveRigRoutePlanFor(kind, pools = {}) {
   const parts = LIVE_RIG_PARTS[kind];
-  if (!parts) return [];
+  if (!parts) return EMPTY_ROUTE_PLAN;
+  const profile = knownPoolProfile(pools);
+  if (profile) {
+    const cache = ROUTE_PLAN_CACHE.get(profile);
+    let plan = cache.get(kind);
+    if (!plan) {
+      plan = compileRoutePlan(parts, profile, profile.familyKey);
+      cache.set(kind, plan);
+    }
+    return plan;
+  }
+  return compileRoutePlan(parts, pools, null);
+}
+
+const EMPTY_ROUTE_PLAN = Object.freeze({
+  routes: Object.freeze([]),
+  allParts: new Set(),
+  poolNames: Object.freeze([]),
+  familyKey: null,
+  shadowRoute: null,
+  overlayPoolName: null,
+  overlayLayerName: null,
+});
+
+function compileRoutePlan(parts, pools, familyKey) {
   const routes = [
-    {
+    Object.freeze({
       poolName: pools.liveRigShadow || "liveUnitRigShadows",
       layerName: pools.shadow || "unitShadows",
       parts: parts.shadow,
-    },
-    {
+    }),
+    Object.freeze({
       poolName: pools.liveRigUnit || "liveUnitRigs",
       layerName: pools.unit || "units",
       parts: parts.unit,
-    },
+    }),
   ];
   if (Array.isArray(parts.overlay) && parts.overlay.length > 0) {
-    routes.push({
+    routes.push(Object.freeze({
       poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
       layerName: pools.overlay || pools.unit || "units",
       parts: parts.overlay,
-    });
+    }));
   }
   if (parts.effects?.length) {
-    routes.push({
+    routes.push(Object.freeze({
       poolName: pools.liveRigEffects || "liveUnitRigEffects",
       layerName: pools.effects || pools.unit || "units",
       parts: parts.effects,
-    });
+    }));
   }
-  return routes;
+  const allParts = new Set();
+  const poolNames = [];
+  for (const route of routes) {
+    poolNames.push(route.poolName);
+    for (const partId of route.parts || []) allParts.add(partId);
+  }
+  return Object.freeze({
+    routes: Object.freeze(routes),
+    allParts,
+    poolNames: Object.freeze(poolNames),
+    familyKey,
+    shadowRoute: routes.find((route) => route.parts?.includes?.("part.shadow")) ?? null,
+    overlayPoolName: pools.liveRigOverlay || "liveUnitRigOverlays",
+    overlayLayerName: pools.overlay || pools.unit || "units",
+  });
+}
+
+function knownPoolProfile(pools) {
+  if (usesProfile(pools, SHOT_REVEAL_POOL_PROFILE) && matchesPoolProfile(pools, SHOT_REVEAL_POOL_PROFILE)) {
+    return SHOT_REVEAL_POOL_PROFILE;
+  }
+  if (matchesPoolProfile(pools, DEFAULT_POOL_PROFILE)) return DEFAULT_POOL_PROFILE;
+  return null;
+}
+
+function usesProfile(pools, profile) {
+  return (
+    pools.liveRigShadow === profile.liveRigShadow ||
+    pools.shadow === profile.shadow ||
+    pools.liveRigUnit === profile.liveRigUnit ||
+    pools.unit === profile.unit ||
+    pools.liveRigOverlay === profile.liveRigOverlay ||
+    pools.overlay === profile.overlay ||
+    pools.liveRigEffects === profile.liveRigEffects ||
+    pools.effects === profile.effects
+  );
+}
+
+function matchesPoolProfile(pools, profile) {
+  return (
+    (pools.liveRigShadow == null || pools.liveRigShadow === profile.liveRigShadow) &&
+    (pools.shadow == null || pools.shadow === profile.shadow) &&
+    (pools.liveRigUnit == null || pools.liveRigUnit === profile.liveRigUnit) &&
+    (pools.unit == null || pools.unit === profile.unit) &&
+    (pools.liveRigOverlay == null || pools.liveRigOverlay === profile.liveRigOverlay) &&
+    (pools.overlay == null || pools.overlay === profile.overlay) &&
+    (pools.liveRigEffects == null || pools.liveRigEffects === profile.liveRigEffects) &&
+    (pools.effects == null || pools.effects === profile.effects)
+  );
 }

@@ -1,8 +1,21 @@
-import { sampleRigAnimation } from "./animation.js";
+import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
+import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
+const SVG_RIG_DIAGNOSTIC_LABELS = Object.freeze([
+  "renderer.rig.redraw.skipped.hidden",
+  "renderer.rig.redraw.attempted",
+  "renderer.rig.redraw.skipped.unchanged",
+  "renderer.graphics.clear.liveRigPart",
+  "renderer.rig.redraw.completed",
+]);
+const SVG_RIG_HIDDEN = 0;
+const SVG_RIG_ATTEMPTED = 1;
+const SVG_RIG_UNCHANGED = 2;
+const SVG_RIG_CLEAR = 3;
+const SVG_RIG_COMPLETED = 4;
 
 export function createDefaultPixiFactory(pixi = globalThis.PIXI) {
   return {
@@ -19,41 +32,51 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
   if (!definition) return null;
   const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
-  const rendered = [];
-  for (const route of options.routes || []) {
-    const pool = renderer._liveRigPools?.[route.poolName];
-    if (!pool) continue;
-    let instance = pool.get(entity.id);
-    if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition, route.parts))) {
-      instance.destroy();
-      pool.delete(entity.id);
-      instance = null;
-      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.rebuilt.${route.poolName}`);
+  const rendered = options.collectResults === false ? null : [];
+  if (options.route) {
+    const instance = renderLiveUnitRigRoute(renderer, entity, definition, context, options.route, options);
+    if (instance && rendered) rendered.push(instance);
+  } else {
+    for (const route of options.routes || []) {
+      const instance = renderLiveUnitRigRoute(renderer, entity, definition, context, route, options);
+      if (instance && rendered) rendered.push(instance);
     }
-    if (!instance) {
-      instance = createUnitRigInstance(
-        entity.kind,
-        definition,
-        renderer._rigPixiFactory ?? createDefaultPixiFactory(),
-        { includeParts: route.parts },
-      );
-      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigContainer");
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigPart", instance.parts?.size || 0);
-    } else {
-      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.reused.${route.poolName}`);
-    }
-    pool.set(entity.id, instance);
-    renderer._seen[route.poolName]?.add(entity.id);
-    const layer = renderer.layers[route.layerName];
-    if (!instance.container.parent && layer) layer.addChild(instance.container);
-    instance.update(entity, context, {
-      sampledAnimation: options.sampledAnimation,
-      diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
-    });
-    rendered.push(instance);
   }
   return rendered;
+}
+
+function renderLiveUnitRigRoute(renderer, entity, definition, context, route, options) {
+  const pool = renderer._liveRigPools?.[route.poolName];
+  if (!pool) return null;
+  let instance = pool.get(entity.id);
+  if (instance && (typeof instance.matches !== "function" || !instance.matches(entity.kind, definition, route.parts))) {
+    instance.destroy();
+    pool.delete(entity.id);
+    instance = null;
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.rebuilt.${route.poolName}`);
+  }
+  if (!instance) {
+    instance = createUnitRigInstance(
+      entity.kind,
+      definition,
+      renderer._rigPixiFactory ?? createDefaultPixiFactory(),
+      { includeParts: route.parts },
+    );
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigContainer");
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigPart", instance.parts?.size || 0);
+  } else {
+    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.reused.${route.poolName}`);
+  }
+  pool.set(entity.id, instance);
+  renderer._seen[route.poolName]?.add(entity.id);
+  const layer = renderer.layers[route.layerName];
+  if (!instance.container.parent && layer) layer.addChild(instance.container);
+  instance.update(entity, context, {
+    sampledAnimation: options.sampledAnimation,
+    diagnosticRecorder: renderer,
+  });
+  return instance;
 }
 
 export class UnitRigInstance {
@@ -66,13 +89,20 @@ export class UnitRigInstance {
     const routeParts = normalizedPartSet(options.includeParts);
     this._routeParts = routeParts ? new Set(routeParts) : null;
     this._routePartKey = partSelectionKey(this._routeParts);
+    this._animationStage = null;
+    this._diagnosticCounts = new Uint32Array(SVG_RIG_DIAGNOSTIC_LABELS.length);
     this._destroyed = false;
 
     for (const part of definition.parts || []) {
       if (this._routeParts && !this._routeParts.has(part.id)) continue;
       const display = pixiFactory.createGraphics();
       display.rtsRigPartId = part.id;
-      this.parts.set(part.id, { definition: part, display });
+      this.parts.set(part.id, {
+        definition: part,
+        display,
+        transform: { initialized: false },
+        appearance: { initialized: false },
+      });
       this.container.addChild(display);
     }
   }
@@ -95,21 +125,25 @@ export class UnitRigInstance {
     this.container.rotation = 0;
 
     const includeParts = this._routeParts ?? normalizedPartSet(options.includeParts);
-    const sampled = options.sampledAnimation ?? sampleRigAnimation(
-      this.definition,
-      entity,
-      renderContext,
-      { includeParts },
-    );
+    let sampled = options.sampledAnimation;
+    if (!sampled) {
+      if (!this._animationStage) {
+        this._animationStage = createRigAnimationStage(this.definition, { includeParts });
+      }
+      sampled = sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    }
+    const diagnosticCounts = this._diagnosticCounts;
+    diagnosticCounts.fill(0);
     for (const [partId, rec] of this.parts) {
       const partState = sampled.parts[partId];
       if (!partState || (includeParts && !includeParts.has(partId))) {
         rec.display.visible = false;
-        options.diagnostics?.("renderer.rig.redraw.skipped.hidden");
+        diagnosticCounts[SVG_RIG_HIDDEN] += 1;
         continue;
       }
-      applyPartState(rec.display, rec.definition, partState, sampled.context, options.diagnostics);
+      applyPartState(rec, partState, sampled.context, diagnosticCounts);
     }
+    flushRigDiagnosticCounts(options, SVG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }
 
   destroy() {
@@ -124,96 +158,100 @@ export class UnitRigInstance {
   }
 }
 
-function applyPartState(display, part, state, context, diagnostics = null) {
+function applyPartState(rec, state, context, diagnosticCounts) {
+  const { display, definition: part } = rec;
   display.visible = state.visible;
   if (!state.visible) {
-    diagnostics?.("renderer.rig.redraw.skipped.hidden");
+    diagnosticCounts[SVG_RIG_HIDDEN] += 1;
     return;
   }
 
-  applyDisplayTransform(display, displayTransform(state));
-  const tint = tintForSlot(state.tintSlot, context);
-  const drawKey = partDrawKey(state, tint);
-  diagnostics?.("renderer.rig.redraw.attempted");
-  if (display.rtsRigDrawKey === drawKey) {
-    diagnostics?.("renderer.rig.redraw.skipped.unchanged");
+  applyDisplayTransform(rec, state);
+  const teamColor = hexToInt(context.teamColor);
+  const tintFill = tintFillForSlot(state.tintSlot, teamColor);
+  const tintStroke = tintStrokeForSlot(state.tintSlot, teamColor);
+  const geometryScaleX = state.geometryScale?.x ?? 1;
+  const geometryScaleY = state.geometryScale?.y ?? 1;
+  diagnosticCounts[SVG_RIG_ATTEMPTED] += 1;
+  const appearance = rec.appearance;
+  if (
+    appearance.initialized &&
+    appearance.tintFill === tintFill &&
+    appearance.tintStroke === tintStroke &&
+    appearance.geometryScaleX === geometryScaleX &&
+    appearance.geometryScaleY === geometryScaleY
+  ) {
+    diagnosticCounts[SVG_RIG_UNCHANGED] += 1;
     return;
   }
 
   display.clear?.();
-  diagnostics?.("renderer.graphics.clear.liveRigPart");
-  drawPart(display, part.geometry, part.paint, tint, state.geometryScale);
-  display.rtsRigDrawKey = drawKey;
-  diagnostics?.("renderer.rig.redraw.completed");
+  diagnosticCounts[SVG_RIG_CLEAR] += 1;
+  drawPart(display, part.geometry, part.paint, tintFill, tintStroke, geometryScaleX, geometryScaleY);
+  appearance.initialized = true;
+  appearance.tintFill = tintFill;
+  appearance.tintStroke = tintStroke;
+  appearance.geometryScaleX = geometryScaleX;
+  appearance.geometryScaleY = geometryScaleY;
+  diagnosticCounts[SVG_RIG_COMPLETED] += 1;
 }
 
-function displayTransform(state) {
-  const localOffset = rotateOffset(state.localOffset, state.transform.rotation);
-  return {
-    x: state.transform.x + localOffset.x,
-    y: state.transform.y + localOffset.y,
-    pivotX: state.pivot.x,
-    pivotY: state.pivot.y,
-    scaleX: state.transform.scaleX,
-    scaleY: state.transform.scaleY,
-    rotation: state.transform.rotation,
-    alpha: state.alpha,
-  };
-}
+function applyDisplayTransform(rec, state) {
+  const { display, transform: last } = rec;
+  const rotation = state.transform.rotation;
+  const localX = state.localOffset?.x ?? 0;
+  const localY = state.localOffset?.y ?? 0;
+  let x = state.transform.x;
+  let y = state.transform.y;
+  if (localX !== 0 || localY !== 0) {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    x += localX * cos - localY * sin;
+    y += localX * sin + localY * cos;
+  }
+  const pivotX = state.pivot.x;
+  const pivotY = state.pivot.y;
+  const scaleX = state.transform.scaleX;
+  const scaleY = state.transform.scaleY;
+  const alpha = state.alpha;
 
-function applyDisplayTransform(display, transform) {
-  const last = display.rtsRigTransform;
-  if (!last || !nearly(last.alpha, transform.alpha)) display.alpha = transform.alpha;
-  if (!last || !nearly(last.x, transform.x) || !nearly(last.y, transform.y)) {
-    setPoint(display.position, transform.x, transform.y);
+  if (!last.initialized || !nearly(last.alpha, alpha)) display.alpha = alpha;
+  if (!last.initialized || !nearly(last.x, x) || !nearly(last.y, y)) {
+    setPoint(display.position, x, y);
   }
-  if (!last || !nearly(last.pivotX, transform.pivotX) || !nearly(last.pivotY, transform.pivotY)) {
-    setPoint(display.pivot, transform.pivotX, transform.pivotY);
+  if (!last.initialized || !nearly(last.pivotX, pivotX) || !nearly(last.pivotY, pivotY)) {
+    setPoint(display.pivot, pivotX, pivotY);
   }
-  if (!last || !nearly(last.scaleX, transform.scaleX) || !nearly(last.scaleY, transform.scaleY)) {
-    setPoint(display.scale, transform.scaleX, transform.scaleY);
+  if (!last.initialized || !nearly(last.scaleX, scaleX) || !nearly(last.scaleY, scaleY)) {
+    setPoint(display.scale, scaleX, scaleY);
   }
-  if (!last || !nearly(last.rotation, transform.rotation)) display.rotation = transform.rotation;
-  display.rtsRigTransform = transform;
+  if (!last.initialized || !nearly(last.rotation, rotation)) display.rotation = rotation;
+  last.initialized = true;
+  last.x = x;
+  last.y = y;
+  last.pivotX = pivotX;
+  last.pivotY = pivotY;
+  last.scaleX = scaleX;
+  last.scaleY = scaleY;
+  last.rotation = rotation;
+  last.alpha = alpha;
 }
 
 function nearly(a, b) {
   return Math.abs(a - b) <= 1e-9;
 }
 
-function rotateOffset(offset, rotation) {
-  if (!offset || (offset.x === 0 && offset.y === 0)) return { x: 0, y: 0 };
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
-  return {
-    x: offset.x * cos - offset.y * sin,
-    y: offset.x * sin + offset.y * cos,
-  };
-}
-
-function drawPart(g, geometry, paint, tint, geometryScale = null) {
-  const fill = paint.fill == null ? null : tint?.fill ?? hexToInt(paint.fill);
-  const stroke = paint.stroke == null ? null : tint?.stroke ?? hexToInt(paint.stroke);
+function drawPart(g, geometry, paint, tintFill, tintStroke, geometryScaleX = 1, geometryScaleY = 1) {
+  const fill = paint.fill == null ? null : tintFill ?? hexToInt(paint.fill);
+  const stroke = paint.stroke == null ? null : tintStroke ?? hexToInt(paint.stroke);
   if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
   else g.lineStyle?.(0, 0, 0);
   if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
-  drawGeometry(g, geometry, geometryScale);
+  drawGeometry(g, geometry, geometryScaleX, geometryScaleY);
   if (fill !== null) g.endFill?.();
 }
 
-function partDrawKey(state, tint) {
-  const geometryScale = state.geometryScale || {};
-  return [
-    tint?.fill ?? "",
-    tint?.stroke ?? "",
-    geometryScale.x ?? 1,
-    geometryScale.y ?? 1,
-  ].join("|");
-}
-
-function drawGeometry(g, geometry, geometryScale = null) {
-  const sx = geometryScale?.x ?? 1;
-  const sy = geometryScale?.y ?? 1;
+function drawGeometry(g, geometry, sx = 1, sy = 1) {
   if (geometry.type === "rect") drawRectAsPolygon(g, geometry, sx, sy);
   else if (geometry.type === "circle") {
     if (nearly(sx, sy)) g.drawCircle(geometry.cx * sx, geometry.cy * sy, geometry.r * sx);
@@ -262,22 +300,21 @@ function scalePathValues(values, sx, sy) {
   return values.map((value, index) => value * (index % 2 === 0 ? sx : sy));
 }
 
-function tintForSlot(slot, context) {
-  if (slot === "team") return { fill: hexToInt(context.teamColor) };
-  if (slot === "team-light") return { fill: lightenColor(hexToInt(context.teamColor), 0.12) };
-  if (slot === "team-light-soft") return { fill: lightenColor(hexToInt(context.teamColor), 0.06) };
-  if (slot === "team-light-strong") return { fill: lightenColor(hexToInt(context.teamColor), 0.16) };
-  if (slot === "team-light-08") return { fill: lightenColor(hexToInt(context.teamColor), 0.08) };
-  if (slot === "team-light-10") return { fill: lightenColor(hexToInt(context.teamColor), 0.10) };
-  if (slot === "team-light-14") return { fill: lightenColor(hexToInt(context.teamColor), 0.14) };
-  if (slot === "team-light-24") return { fill: lightenColor(hexToInt(context.teamColor), 0.24) };
-  if (slot === "team-stroke") return { stroke: hexToInt(context.teamColor) };
-  if (slot === "team-fill-stroke") {
-    const team = hexToInt(context.teamColor);
-    return { fill: team, stroke: team };
-  }
-  if (slot === "neutral") return { fill: 0x9aa0a8 };
+function tintFillForSlot(slot, team) {
+  if (slot === "team" || slot === "team-fill-stroke") return team;
+  if (slot === "team-light") return lightenColor(team, 0.12);
+  if (slot === "team-light-soft") return lightenColor(team, 0.06);
+  if (slot === "team-light-strong") return lightenColor(team, 0.16);
+  if (slot === "team-light-08") return lightenColor(team, 0.08);
+  if (slot === "team-light-10") return lightenColor(team, 0.10);
+  if (slot === "team-light-14") return lightenColor(team, 0.14);
+  if (slot === "team-light-24") return lightenColor(team, 0.24);
+  if (slot === "neutral") return 0x9aa0a8;
   return null;
+}
+
+function tintStrokeForSlot(slot, team) {
+  return slot === "team-stroke" || slot === "team-fill-stroke" ? team : null;
 }
 
 function setPoint(point, x, y) {

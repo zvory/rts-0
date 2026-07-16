@@ -3,16 +3,21 @@ import { KIND, SETUP, STATE } from "../../protocol.js";
 import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
 import { normalizedPartSet } from "./part_selection.js";
 
-const TRANSFORM_PROPERTIES = new Set([
-  "transform.x",
-  "transform.y",
-  "transform.rotation",
-  "transform.scaleX",
-  "transform.scaleY",
-]);
-const LOCAL_TRANSFORM_PROPERTIES = new Set(["transform.localX", "transform.localY"]);
-const GEOMETRY_SCALE_PROPERTIES = new Set(["geometry.scaleX", "geometry.scaleY"]);
 const RIG_CONTEXT_READY = Symbol("rtsRigContextReady");
+const RIG_ANIMATION_STAGE = Symbol("rtsRigAnimationStage");
+
+const BINDING_VISIBLE = 0;
+const BINDING_TINT_SLOT = 1;
+const BINDING_TRANSFORM_X = 2;
+const BINDING_TRANSFORM_Y = 3;
+const BINDING_TRANSFORM_ROTATION = 4;
+const BINDING_TRANSFORM_SCALE_X = 5;
+const BINDING_TRANSFORM_SCALE_Y = 6;
+const BINDING_LOCAL_X = 7;
+const BINDING_LOCAL_Y = 8;
+const BINDING_GEOMETRY_SCALE_X = 9;
+const BINDING_GEOMETRY_SCALE_Y = 10;
+const BINDING_ALPHA = 11;
 
 export function createRigRenderContext(entity, {
   state = {},
@@ -152,6 +157,96 @@ function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
 }
 
 export function sampleRigAnimation(definition, entity, renderContext = {}, options = {}) {
+  const stage = createRigAnimationStage(definition, options);
+  return sampleRigAnimationInto(stage, entity, renderContext);
+}
+
+/**
+ * @typedef {object} AnimationStage
+ * @property {object} definition Definition identity this stage was compiled from.
+ * @property {object[]} partPlans Immutable baselines paired with reusable mutable part states.
+ * @property {object[]} bindings Precompiled numeric animation operations.
+ * @property {{context: object|null, parts: Object<string, object>}} output Mutable sampled result.
+ */
+
+/**
+ * Compile a renderer-private staging object. Sampling overwrites the same part-state graph, so a
+ * stage must only be sampled and consumed synchronously. The public sampleRigAnimation API creates
+ * a fresh stage and therefore continues to return independently stable snapshots.
+ *
+ * @returns {AnimationStage}
+ */
+export function createRigAnimationStage(definition, options = {}) {
+  const includeParts = normalizedPartSet(options.includeParts);
+  const partPlans = [];
+  const partIndexById = new Map();
+  const parts = {};
+  for (const part of definition.parts || []) {
+    if (includeParts && !includeParts.has(part.id)) continue;
+    const index = partPlans.length;
+    const plan = {
+      id: part.id,
+      transformX: part.transform.x,
+      transformY: part.transform.y,
+      transformRotation: part.transform.rotation,
+      transformScaleX: part.transform.scaleX,
+      transformScaleY: part.transform.scaleY,
+      pivotX: part.pivot.x,
+      pivotY: part.pivot.y,
+      alpha: finite(part.paint?.opacity, 1),
+      tintSlot: part.tintSlot,
+      paint: part.paint,
+    };
+    const state = {
+      id: part.id,
+      transform: {
+        x: plan.transformX,
+        y: plan.transformY,
+        rotation: plan.transformRotation,
+        scaleX: plan.transformScaleX,
+        scaleY: plan.transformScaleY,
+      },
+      localOffset: { x: 0, y: 0 },
+      geometryScale: { x: 1, y: 1 },
+      pivot: { x: plan.pivotX, y: plan.pivotY },
+      alpha: plan.alpha,
+      visible: true,
+      tintSlot: plan.tintSlot,
+      paint: plan.paint,
+    };
+    plan.state = state;
+    partPlans.push(plan);
+    partIndexById.set(part.id, index);
+    parts[part.id] = state;
+  }
+
+  const bindings = [];
+  for (const binding of definition.animations || []) {
+    const partIndex = partIndexById.get(binding.partId);
+    if (partIndex === undefined) continue;
+    bindings.push({
+      partIndex,
+      operation: bindingOperation(binding.property),
+      input: binding.input,
+      factor: binding.factor,
+      offset: binding.offset,
+    });
+  }
+
+  const output = { context: null, parts };
+  return {
+    [RIG_ANIMATION_STAGE]: true,
+    definition,
+    partPlans,
+    bindings,
+    output,
+  };
+}
+
+export function sampleRigAnimationInto(stage, entity, renderContext = {}) {
+  if (!stage?.[RIG_ANIMATION_STAGE]) {
+    throw new TypeError("sampleRigAnimationInto requires a rig animation stage");
+  }
   const inputContext = renderContext || {};
   const context = inputContext[RIG_CONTEXT_READY]
     ? inputContext
@@ -159,56 +254,69 @@ export function sampleRigAnimation(definition, entity, renderContext = {}, optio
       ...createRigRenderContext(entity, { now: inputContext.now ?? 0 }),
       ...inputContext,
     };
-  const parts = {};
-  const includeParts = normalizedPartSet(options.includeParts);
-  for (const part of definition.parts || []) {
-    if (includeParts && !includeParts.has(part.id)) continue;
-    parts[part.id] = {
-      id: part.id,
-      transform: { ...part.transform },
-      localOffset: { x: 0, y: 0 },
-      geometryScale: { x: 1, y: 1 },
-      pivot: { ...part.pivot },
-      alpha: finite(part.paint?.opacity, 1),
-      visible: true,
-      tintSlot: part.tintSlot,
-      paint: part.paint,
-    };
+  for (const plan of stage.partPlans) {
+    const sampled = plan.state;
+    sampled.transform.x = plan.transformX;
+    sampled.transform.y = plan.transformY;
+    sampled.transform.rotation = plan.transformRotation;
+    sampled.transform.scaleX = plan.transformScaleX;
+    sampled.transform.scaleY = plan.transformScaleY;
+    sampled.localOffset.x = 0;
+    sampled.localOffset.y = 0;
+    sampled.geometryScale.x = 1;
+    sampled.geometryScale.y = 1;
+    sampled.alpha = plan.alpha;
+    sampled.visible = true;
+    sampled.tintSlot = plan.tintSlot;
   }
 
-  for (const binding of definition.animations || []) {
-    const sampled = parts[binding.partId];
-    if (!sampled) continue;
+  for (const binding of stage.bindings) {
+    const sampled = stage.partPlans[binding.partIndex].state;
     applyBinding(sampled, binding, inputValue(binding.input, context));
   }
 
-  return { context, parts };
+  stage.output.context = context;
+  return stage.output;
 }
 
 function applyBinding(sampled, binding, input) {
-  if (binding.property === "visible") {
+  if (binding.operation === BINDING_VISIBLE) {
     sampled.visible = Boolean(input);
     return;
   }
-  if (binding.property === "tintSlot") {
+  if (binding.operation === BINDING_TINT_SLOT) {
     if (input) sampled.tintSlot = String(input);
     return;
   }
 
   const value = numericInput(input) * binding.factor + binding.offset;
   if (!Number.isFinite(value)) return;
-  if (TRANSFORM_PROPERTIES.has(binding.property)) {
-    const key = binding.property.slice("transform.".length);
-    sampled.transform[key] = sampled.transform[key] + value;
-  } else if (LOCAL_TRANSFORM_PROPERTIES.has(binding.property)) {
-    const key = binding.property === "transform.localX" ? "x" : "y";
-    sampled.localOffset[key] = sampled.localOffset[key] + value;
-  } else if (GEOMETRY_SCALE_PROPERTIES.has(binding.property)) {
-    const key = binding.property === "geometry.scaleX" ? "x" : "y";
-    sampled.geometryScale[key] = sampled.geometryScale[key] + value;
-  } else if (binding.property === "alpha") {
-    sampled.alpha = clamp01(value);
-  }
+  if (binding.operation === BINDING_TRANSFORM_X) sampled.transform.x += value;
+  else if (binding.operation === BINDING_TRANSFORM_Y) sampled.transform.y += value;
+  else if (binding.operation === BINDING_TRANSFORM_ROTATION) sampled.transform.rotation += value;
+  else if (binding.operation === BINDING_TRANSFORM_SCALE_X) sampled.transform.scaleX += value;
+  else if (binding.operation === BINDING_TRANSFORM_SCALE_Y) sampled.transform.scaleY += value;
+  else if (binding.operation === BINDING_LOCAL_X) sampled.localOffset.x += value;
+  else if (binding.operation === BINDING_LOCAL_Y) sampled.localOffset.y += value;
+  else if (binding.operation === BINDING_GEOMETRY_SCALE_X) sampled.geometryScale.x += value;
+  else if (binding.operation === BINDING_GEOMETRY_SCALE_Y) sampled.geometryScale.y += value;
+  else if (binding.operation === BINDING_ALPHA) sampled.alpha = clamp01(value);
+}
+
+function bindingOperation(property) {
+  if (property === "visible") return BINDING_VISIBLE;
+  if (property === "tintSlot") return BINDING_TINT_SLOT;
+  if (property === "transform.x") return BINDING_TRANSFORM_X;
+  if (property === "transform.y") return BINDING_TRANSFORM_Y;
+  if (property === "transform.rotation") return BINDING_TRANSFORM_ROTATION;
+  if (property === "transform.scaleX") return BINDING_TRANSFORM_SCALE_X;
+  if (property === "transform.scaleY") return BINDING_TRANSFORM_SCALE_Y;
+  if (property === "transform.localX") return BINDING_LOCAL_X;
+  if (property === "transform.localY") return BINDING_LOCAL_Y;
+  if (property === "geometry.scaleX") return BINDING_GEOMETRY_SCALE_X;
+  if (property === "geometry.scaleY") return BINDING_GEOMETRY_SCALE_Y;
+  if (property === "alpha") return BINDING_ALPHA;
+  return -1;
 }
 
 function inputValue(input, context) {
