@@ -8,12 +8,12 @@ const EMPTY_ARRAY = Object.freeze([]);
  * transient effect markers stay behind one explicit boundary.
  *
  * @param {object} state GameState-compatible browser model.
- * @param {{clientIntent?:object|null, entities?:Array<object>, selectedEntities?:Array<object>, now?:number}=} options
+ * @param {{clientIntent?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, now?:number}=} options
  * @returns {object}
  */
 export function buildRendererFeedbackView(
   state,
-  { clientIntent = null, entities = EMPTY_ARRAY, selectedEntities = null, now = defaultNow() } = {},
+  { clientIntent = null, previewSurface = null, entities = EMPTY_ARRAY, selectedEntities = null, now = defaultNow() } = {},
 ) {
   const selectedStateEntities = Array.isArray(selectedEntities)
     ? selectedEntities
@@ -45,17 +45,18 @@ export function buildRendererFeedbackView(
     feedbackOwnerIds: controlOwner.feedbackOwnerIds,
     issueAsOwnerId: controlOwner.issueAsOwnerId,
     map: state?.map || null,
-    placement: intent?.placement || null,
-    labToolPreview: intent?.labToolPreview || null,
+    placement: previewSurface ? null : intent?.placement || null,
+    labToolPreview: previewSurface ? null : intent?.labToolPreview || null,
     commandFeedback,
-    attackTargetPreview: intent?.attackTargetPreview || null,
+    attackTargetPreview: previewSurface ? null : intent?.attackTargetPreview || null,
     selectedEntities: () => selected,
     showUnitRangesEnabled: state?.showUnitRangesEnabled !== false,
     showSelectedFieldOfFireEnabled: controlOwner.showSelectedFieldOfFireEnabled,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
     showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
-    antiTankGunSetupPreview: intent?.antiTankGunSetupPreview || null,
-    abilityTargetPreview: intent?.abilityTargetPreview || null,
+    antiTankGunSetupPreview: previewSurface && intent?.antiTankGunSetupPreview?.source !== previewSurface
+      ? null : intent?.antiTankGunSetupPreview || null,
+    abilityTargetPreview: previewSurface ? null : intent?.abilityTargetPreview || null,
     abilityObjects: arrayOrEmpty(state?.abilityObjects),
     smokes: arrayOrEmpty(state?.smokes),
     smokeCanisters,
@@ -68,7 +69,7 @@ export function buildRendererFeedbackView(
     artilleryImpacts,
     panzerfaustShots,
     panzerfaustImpacts,
-    resourceMiningPreview: intent?.resourceMiningPreview || null,
+    resourceMiningPreview: previewSurface ? null : intent?.resourceMiningPreview || null,
     muzzleFlashes,
     missToasts,
     liveCommandFeedback: () => commandFeedback,

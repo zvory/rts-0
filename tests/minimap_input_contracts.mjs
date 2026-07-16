@@ -750,11 +750,25 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(down && move && leave && up, "minimap installs native hover ownership lifecycle listeners");
 
   move(pointerEvent(h.canvas, 180, 280, { pointerId: 60, pointerType: "mouse" }));
+  assert(h.router.activePreviewSurface() === "minimap", "native hover gives minimap preview-surface ownership");
   assert(
     h.clientIntent.antiTankGunSetupPreview?.source === "minimap",
     "native mouse hover previews support-weapon setup with pointer-lock parity",
   );
   leave(pointerEvent(h.canvas, 350, 280, { pointerId: 60, pointerType: "mouse" }));
+  assert(h.router.activePreviewSurface() === null, "native leave releases minimap preview-surface ownership");
+
+  down(pointerEvent(h.canvas, 180, 280, { pointerId: 62, pointerType: "mouse" }));
+  leave(pointerEvent(h.canvas, 350, 280, { pointerId: 62, pointerType: "mouse" }));
+  assert(
+    h.router.activePreviewSurface() === "minimap",
+    "native pointer capture keeps minimap preview-surface ownership after a drag leaves the canvas",
+  );
+  up(pointerEvent(h.canvas, 350, 280, { pointerId: 62, pointerType: "mouse" }));
+  assert(
+    h.router.activePreviewSurface() === null,
+    "a native drag released outside the canvas relinquishes minimap preview-surface ownership",
+  );
 
   down(pointerEvent(h.canvas, 180, 280, { pointerId: 61, pointerType: "mouse" }));
   move(pointerEvent(h.canvas, 200, 300, { pointerId: 61, pointerType: "mouse" }));
@@ -802,6 +816,12 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(
     previewGun?.x === 150 && previewGun?.y === 160 && selected[0].x === 50 && selected[0].y === 60,
     "queued minimap setup preview uses movement endpoints without mutating selection",
+  );
+  h.minimap.updateCommandTargetPreview(false);
+  const unqueuedPreviewGun = h.clientIntent.antiTankGunSetupPreview?.guns[0];
+  assert(
+    unqueuedPreviewGun?.x === 50 && unqueuedPreviewGun?.y === 60,
+    "releasing Shift while stationary immediately restores the current setup origin",
   );
   h.minimap.destroy();
 }

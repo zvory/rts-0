@@ -1087,8 +1087,11 @@ accepted move or attack-move order-plan endpoints as their field-of-fire origin,
 move/setup stages when the command has been sent but no owner-only `orderPlan` echo has arrived;
 unqueued setup previews use the current support-weapon position. Minimap hover and click targeting
 feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns
-and Artillery. HUD command-target arming preserves Shift, and input hover previews track Shift so
-queued previews match the command that will be issued. Armed Point Fire and Blanket Fire previews
+and Artillery. The input router owns the active preview surface: while the minimap is hovered it
+suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
+hiding minimap-authored setup cones or issued-command feedback. HUD command-target arming preserves
+Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
+current and queued origins as Shift changes. Armed Point Fire and Blanket Fire previews
 compute advisory per-artillery locked effective points from the current gun origin, the authoritative
 or local pending planned origin, the 25-to-55 tile range band, the current or planned setup facing
 fallback, and same-ray map clamping when map bounds are available; command feedback marks those
@@ -1328,8 +1331,9 @@ drag restores normal selection.
 ```js
 export class MatchInputRouter {
   constructor(viewportEl)
-  registerZone(zone)                     // zone: {priority?, contains(ev), pointerDown?, pointerMove?, pointerUp?}
+  registerZone(zone)                     // zone: {priority?, previewSurface?, contains(ev), pointerDown?, pointerMove?, pointerUp?}
                                          // returns unregister()
+  activePreviewSurface() -> string|null  // hovered/captured surface currently covering the viewport
   pointerDown(ev) -> boolean             // routes to highest-priority matching zone
   pointerMove(ev) -> boolean             // captured zone receives moves until release
   pointerUp(ev) -> boolean               // releases capture after the originating source handles up
@@ -1487,6 +1491,7 @@ export class Minimap {
   render(frameViews?)                    // draw terrain + fog + entity blips + viewport rect
   markArtilleryFiring(event)             // transient global artillery icon from artilleryFiring events
   inputZone()                            // router zone for locked/unlocked minimap interaction
+  updateCommandTargetPreview(shiftKey?)  // stationary setup refresh using live modifier state
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
 ```

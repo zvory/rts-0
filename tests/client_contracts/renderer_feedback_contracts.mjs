@@ -355,7 +355,9 @@ function nearPoint(call, point, epsilon = 0.001) {
   };
   const feedbackIntent = {
     placement: { building: KIND.CITY_CENTRE, tileX: 2, tileY: 3, valid: true },
+    labToolPreview: { toolId: "tool-1", kind: "unitSpawn", x: 120, y: 120 },
     antiTankGunSetupPreview: {
+      source: "viewport",
       mouseX: 180,
       mouseY: 128,
       guns: [{ kind: KIND.ANTI_TANK_GUN, x: 128, y: 128 }],
@@ -411,6 +413,37 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(feedbackView.abilityObjects.length === 1, "feedback view exposes ability objects");
   assert(feedbackView.panzerfaustShots.length === 1, "feedback view exposes Panzerfaust launch/travel effects");
   assert(feedbackView.panzerfaustImpacts.length === 1, "feedback view exposes Panzerfaust impact effects");
+
+  const minimapView = buildRendererFeedbackView(feedbackState, {
+    clientIntent: feedbackIntent,
+    previewSurface: "minimap",
+    entities: selected,
+    now: 1500,
+  });
+  assert(minimapView.placement === null && minimapView.labToolPreview === null,
+    "minimap hover hides placement and Lab ghosts projected through the covered battlefield");
+  assert(
+    minimapView.attackTargetPreview === null &&
+      minimapView.resourceMiningPreview === null &&
+      minimapView.abilityTargetPreview === null,
+    "minimap hover hides attack, resource, and support previews projected through the covered battlefield",
+  );
+  assert(minimapView.antiTankGunSetupPreview === null,
+    "minimap hover rejects a stale viewport-authored support-weapon preview");
+  assert(minimapView.commandFeedback.length === 1,
+    "minimap hover preserves feedback for commands already issued at their real target");
+
+  const minimapSetupView = buildRendererFeedbackView(feedbackState, {
+    clientIntent: {
+      ...feedbackIntent,
+      antiTankGunSetupPreview: { ...feedbackIntent.antiTankGunSetupPreview, source: "minimap" },
+    },
+    previewSurface: "minimap",
+    entities: selected,
+    now: 1500,
+  });
+  assert(minimapSetupView.antiTankGunSetupPreview?.source === "minimap",
+    "minimap hover keeps the setup cone authored from the minimap world point");
 
   const placementGfx = new RecordingGraphics();
   const feedbackGfx = new RecordingGraphics();

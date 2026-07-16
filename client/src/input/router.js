@@ -31,11 +31,16 @@ export class MatchInputRouter {
     if (this.hoverZone === zone) this._setHoverZone(null);
   }
 
+  activePreviewSurface() {
+    return this.captureZone?.previewSurface || this.hoverZone?.previewSurface || null;
+  }
+
   pointerDown(event) {
     const e = this._normalize(event);
     for (const zone of this.zones) {
       if (!zone.contains(e)) continue;
       if (typeof zone.pointerDown === "function" && zone.pointerDown(e)) {
+        this._setHoverZone(zone, e);
         this.captureZone = zone;
         this.captureSource = e.source || null;
         return true;
