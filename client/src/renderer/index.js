@@ -80,6 +80,7 @@ import {
 } from "./visual_unit_overrides.js";
 import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
 import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
+import { destroySharedFrameTextures } from "./rigs/frame_strip_runtime.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { buildStaticMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
@@ -1061,6 +1062,7 @@ export class Renderer {
         pool.clear();
       }
     }
+    destroySharedFrameTextures(this);
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);

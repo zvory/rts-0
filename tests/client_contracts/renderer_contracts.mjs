@@ -787,8 +787,14 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       selection: new Set([entity.id]),
       resources: { oil: 100 },
     });
+    renderer._drawUnit({ ...entity, id: 508, x: 300 }, new Map([[1, 0x4878c8]]), {
+      playerId: 1,
+      selection: new Set(),
+      resources: { oil: 100 },
+    });
 
     const unitStrip = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const secondUnitStrip = renderer._liveRigPools.liveUnitRigs.get(508);
     const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
     const ring = renderer._ringRadius(entity);
     assert(unitStrip?.strip?.unit === KIND.SCOUT_PLANE, "Scout Plane live rendering uses the PNG frame strip");
@@ -796,6 +802,14 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(
       unitStrip?.frameTextures?.length === unitStrip?.strip?.frameCount,
       "Scout Plane frame strip exposes one runtime texture per declared frame",
+    );
+    assert(
+      unitStrip?.container === unitStrip?.sprite,
+      "frame-strip bodies use their Sprite directly instead of a per-unit Container",
+    );
+    assert(
+      unitStrip?.frameTextures === secondUnitStrip?.frameTextures,
+      "frame-strip units using the same atlas share one runtime frame-texture set",
     );
     assert(shadowRig?.parts.has("part.shadow"), "Scout Plane frame-strip rendering keeps the separate SVG shadow route");
     assert(
@@ -807,6 +821,10 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         renderer.layers.unitShadows.children.includes(shadowRig.container),
       "Scout Plane frame strip renders through the normal unit and shadow layers",
     );
+    const sharedFrameTexture = unitStrip.frameTextures[0];
+    renderer.destroy();
+    assert(sharedFrameTexture.destroyed, "renderer teardown releases shared frame textures");
+    assert(renderer._frameStripTextureSets.size === 0, "frame-texture sharing cache is empty after renderer teardown");
   } finally {
     restorePixi();
   }
