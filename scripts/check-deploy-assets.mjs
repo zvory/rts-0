@@ -20,6 +20,12 @@ function assertNotIncludes(text, needle, message) {
   }
 }
 
+function assertNotMatches(text, pattern, message) {
+  if (pattern.test(text)) {
+    throw new Error(message);
+  }
+}
+
 function assertMatches(text, pattern, message) {
   if (!pattern.test(text)) {
     throw new Error(message);
@@ -42,6 +48,8 @@ const wasmBindgenLockVersion = cargoLock.match(
   /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/,
 )?.[1];
 const wasmBindgenDockerVersion = dockerfile.match(/ARG WASM_BINDGEN_CLI_VERSION=([^\s]+)/)?.[1];
+const runtimeStage = dockerfile.slice(dockerfile.indexOf("FROM debian:bookworm-slim AS runtime"));
+const runtimePackages = runtimeStage.match(/apt-get install -y --no-install-recommends([\s\S]*?)&&/)?.[1] || "";
 const dockerignoreEntries = new Set(
   dockerignore
     .split(/\r?\n/)
@@ -129,12 +137,17 @@ assertIncludes(
 );
 assertNotIncludes(
   betaDeployWorkflow,
-  "flyctl secrets import",
-  "beta workflow must not stage application secrets during deploy",
+  "RTS_SCENARIO_PR_",
+  "beta workflow must not restore scenario-submission configuration or credentials",
 );
-assertNotIncludes(
-  dockerfile,
-  "ca-certificates git gh",
+assertNotMatches(
+  betaDeployWorkflow,
+  /\bfly(?:ctl)?\s+secrets\s+(?:import|set)\b/i,
+  "beta workflow must not mutate application secrets during deploy",
+);
+assertNotMatches(
+  runtimePackages,
+  /\b(?:git|gh)\b/,
   "runtime image must not install Git/GitHub tooling for removed scenario submission",
 );
 assertMatches(mainlineFlyConfig, /^app\s*=\s*"rts-0-zvorygin"/m, "mainline must target the canonical-domain app");
