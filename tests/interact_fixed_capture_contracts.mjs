@@ -117,7 +117,7 @@ try {
   await service.execute("close", { sessionId: spectator.sessionId });
 
   const scenario = await service.execute("scenario-open", {
-    id: "supply_stress_active", unit: "rifleman", count: 200,
+    id: "vehicle_corner_wall", unit: "tank", count: 1,
   });
   testArtifacts.ownScenarioSession(scenario.sessionId);
   assert.equal(scenario.capabilities.role, "observer", "scenario capabilities describe the observation namespace rather than its server seat");
@@ -126,7 +126,7 @@ try {
   const scenarioTimelapse = await service.execute("scenario-capture-timelapse", {
     sessionId: scenario.sessionId, maxDurationMs: 1_000, sampleEveryMs: 500,
   });
-  assert.equal(scenarioTimelapse.frameSummary.count, 2, "active-player dev scenarios retain the bounded time-lapse surface");
+  assert.equal(scenarioTimelapse.frameSummary.count, 2, "dev scenarios retain the bounded time-lapse surface");
 
   console.log("✅ interact_fixed_capture_contracts.mjs: bounds, tick mapping, service, and media passed");
 } finally {

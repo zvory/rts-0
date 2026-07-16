@@ -1,5 +1,4 @@
-//! Supply cap and provider constants.
+//! Player supply cap.
 
-pub const DEPOT_SUPPLY: u32 = 8;
-pub const CITY_CENTRE_SUPPLY: u32 = 50;
-pub const SUPPLY_CAP_MAX: u32 = 200;
+/// Every active player has the full match supply allowance without requiring a building.
+pub const PLAYER_SUPPLY_CAP: u32 = 200;

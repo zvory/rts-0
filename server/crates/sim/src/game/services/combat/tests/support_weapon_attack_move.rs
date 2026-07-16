@@ -1,6 +1,73 @@
 use super::*;
 
 #[test]
+fn idle_machine_gunner_holds_position_once_setup_begins() {
+    for setup in [WeaponSetup::SettingUp { ticks: 1 }, WeaponSetup::Deployed] {
+        let mut entities = EntityStore::new();
+        let mg_id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+            .expect("machine gunner should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 320.0, 100.0)
+            .expect("enemy should spawn");
+        {
+            let mg = entities.get_mut(mg_id).expect("mg should exist");
+            mg.set_order(Order::Idle);
+            mg.set_weapon_setup(setup);
+            assert!(matches!(combat_mode(mg), CombatMode::Opportunistic));
+        }
+
+        let map = open_map(16);
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+
+        let mg = entities.get(mg_id).expect("mg should exist");
+        assert!(matches!(mg.order(), Order::Idle));
+        assert_eq!(mg.target_id(), None);
+        assert!(mg.path_is_empty(), "idle machine gunner should not chase");
+        assert_eq!(
+            mg.weapon_setup(),
+            WeaponSetup::Deployed,
+            "idle machine gunner should finish setup or remain deployed"
+        );
+    }
+}
+
+#[test]
+fn explicit_orders_release_setup_machine_gunner_from_hold_position() {
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 330.0, 100.0)
+        .expect("target should spawn");
+    let mg_id = entities
+        .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+        .expect("machine gunner should spawn");
+    let mg = entities.get_mut(mg_id).expect("mg should exist");
+    mg.set_weapon_setup(WeaponSetup::Deployed);
+
+    mg.set_order(Order::attack(target_id));
+    assert!(matches!(combat_mode(mg), CombatMode::Ordered));
+
+    mg.set_order(Order::attack_move_to(330.0, 100.0));
+    assert!(matches!(combat_mode(mg), CombatMode::Aggressive));
+
+    mg.set_order(Order::attack(target_id));
+    let map = open_map(16);
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let mg = entities.get(mg_id).expect("mg should exist");
+    assert!(matches!(mg.order(), Order::Attack(_)));
+    assert!(matches!(mg.weapon_setup(), WeaponSetup::TearingDown { .. }));
+}
+
+#[test]
 fn unfinished_attack_move_machine_gunner_resumes_without_idle_setup() {
     let mut entities = EntityStore::new();
     let mg_id = entities

@@ -14,13 +14,7 @@ pub(in crate::lobby) enum DevScenarioId {
     TankTrapLineDiagonal,
     TankTrapPathingMatrix,
     EntrenchmentInspection,
-    PanzerfaustDuel,
-    PanzerfaustWindupCancel,
-    PanzerfaustTargetDeath,
-    PanzerfaustEntrenchedRange,
-    PanzerfaustMethamphetamines,
     TankCoaxInspection,
-    SupplyStressActive,
 }
 
 impl DevScenarioId {
@@ -42,13 +36,7 @@ impl DevScenarioId {
             "tank_trap_line_diagonal" => Some(Self::TankTrapLineDiagonal),
             "tank_trap_pathing_matrix" => Some(Self::TankTrapPathingMatrix),
             "entrenchment_inspection" => Some(Self::EntrenchmentInspection),
-            "panzerfaust_duel" => Some(Self::PanzerfaustDuel),
-            "panzerfaust_windup_cancel" => Some(Self::PanzerfaustWindupCancel),
-            "panzerfaust_target_death" => Some(Self::PanzerfaustTargetDeath),
-            "panzerfaust_entrenched_range" => Some(Self::PanzerfaustEntrenchedRange),
-            "panzerfaust_methamphetamines" => Some(Self::PanzerfaustMethamphetamines),
             "tank_coax_inspection" => Some(Self::TankCoaxInspection),
-            "supply_stress_active" => Some(Self::SupplyStressActive),
             _ => None,
         }
     }
@@ -71,13 +59,7 @@ impl DevScenarioId {
             Self::TankTrapLineDiagonal => "tank_trap_line_diagonal",
             Self::TankTrapPathingMatrix => "tank_trap_pathing_matrix",
             Self::EntrenchmentInspection => "entrenchment_inspection",
-            Self::PanzerfaustDuel => "panzerfaust_duel",
-            Self::PanzerfaustWindupCancel => "panzerfaust_windup_cancel",
-            Self::PanzerfaustTargetDeath => "panzerfaust_target_death",
-            Self::PanzerfaustEntrenchedRange => "panzerfaust_entrenched_range",
-            Self::PanzerfaustMethamphetamines => "panzerfaust_methamphetamines",
             Self::TankCoaxInspection => "tank_coax_inspection",
-            Self::SupplyStressActive => "supply_stress_active",
         }
     }
 }

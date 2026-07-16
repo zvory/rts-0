@@ -5,12 +5,11 @@ use rts_protocol::{
     Command, InitialCamera, LabCheckpointScenarioV1 as ProtocolLabCheckpointScenarioV1,
     LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, DEFAULT_FACTION_ID,
 };
-use rts_rules::balance::{
-    building_stats, TANK_BODY_CLEARANCE_PX, TANK_BODY_LENGTH_PX, TANK_BODY_WIDTH_PX,
-};
-use rts_rules::economy::supply_cost;
-use rts_rules::faction::catalog_for;
+use rts_rules::balance::building_stats;
 use rts_rules::terrain::MAP_TERRAIN_ROCK;
+use rts_server::tools::hellhole_spec::{
+    composition_300_supply, respawn_candidates, CENTER, SEED, SHUTTLE_OFFSET_TILES, TILE,
+};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
     LabCommandOptions, LabError, LabOp, LabOpOutcome, LabSetCompletedResearch,
@@ -25,19 +24,11 @@ const OUT: &str = concat!(
     "/assets/lab-scenarios/supply-300-hellhole.json"
 );
 const MAP_NAME: &str = "No Terrain";
-const SCENARIO_NAME: &str = "Supply 300 Hellhole";
-const SEED: u32 = 0x5a00_0300;
-const TILE: f32 = 32.0;
-const TARGET_SUPPLY: u32 = 300;
+const SCENARIO_NAME: &str = "Supply 300 2v2 Hellhole";
 const BUILD_SHA: &str = "bundled-lab-scenario-asset-v1";
-const CENTER: (f32, f32) = (63.0 * TILE, 63.0 * TILE);
-const SHUTTLE_OFFSET_TILES: f32 = 18.0;
 const ROCK_CELL_TILES: u32 = 5;
 const TARGET_ROCK_TILES: usize = 470;
 const UNIT_FOOTPRINT_CLEARANCE_TILES: i32 = 1;
-const DENSE_SCRUM_COLUMNS: usize = 28;
-const DENSE_SCRUM_ROWS: usize = 18;
-const DENSE_SCRUM_GAP_PX: f32 = 2.0;
 const BUILDING_CLUSTERS: [(u32, u32, u32); 4] = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
 const BUILDING_LAYOUT: [(EntityKind, u32, u32); 10] = [
     (EntityKind::CityCentre, 0, 0),
@@ -127,7 +118,7 @@ fn blank_hellhole_lab(composition: &[EntityKind]) -> Result<Game, String> {
     let players: Vec<_> = (1..=4)
         .map(|id| PlayerInit {
             id,
-            team_id: id,
+            team_id: if id == 1 || id == 3 { 1 } else { 2 },
             faction_id: DEFAULT_FACTION_ID.to_string(),
             name: format!("Hellhole {id}"),
             color: match id {
@@ -275,75 +266,17 @@ fn grant_lab_state(game: &mut Game) -> Result<(), String> {
                 }),
             )?;
         }
-        apply(
-            game,
-            LabOp::SetPlayerGodMode {
-                player_id,
-                enabled: true,
-            },
-        )?;
+        if player_id >= 3 {
+            apply(
+                game,
+                LabOp::SetPlayerGodMode {
+                    player_id,
+                    enabled: true,
+                },
+            )?;
+        }
     }
     Ok(())
-}
-
-fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
-    let required = [
-        EntityKind::Worker,
-        EntityKind::Golem,
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-        EntityKind::Panzerfaust,
-        EntityKind::AntiTankGun,
-        EntityKind::MortarTeam,
-        EntityKind::Artillery,
-        EntityKind::ScoutCar,
-        EntityKind::Tank,
-        EntityKind::CommandCar,
-    ];
-    let filler = [
-        EntityKind::Tank,
-        EntityKind::Tank,
-        EntityKind::ScoutCar,
-        EntityKind::CommandCar,
-        EntityKind::MachineGunner,
-        EntityKind::MortarTeam,
-        EntityKind::AntiTankGun,
-        EntityKind::Rifleman,
-        EntityKind::Panzerfaust,
-    ];
-    let mut out = required.to_vec();
-    let mut supply = supply_for(&out)?;
-    let mut index = 0;
-    while supply < TARGET_SUPPLY {
-        let kind = filler[index % filler.len()];
-        index += 1;
-        let cost = supply_of(kind)?;
-        if supply + cost > TARGET_SUPPLY {
-            continue;
-        }
-        out.push(kind);
-        supply += cost;
-    }
-    Ok(out)
-}
-
-fn supply_for(units: &[EntityKind]) -> Result<u32, String> {
-    units.iter().copied().map(supply_of).sum()
-}
-
-fn supply_of(kind: EntityKind) -> Result<u32, String> {
-    if !kind.is_unit() {
-        return Err(format!("{kind} is not a unit"));
-    }
-    let catalog = catalog_for(DEFAULT_FACTION_ID)
-        .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;
-    // Lab can spawn units from every playable faction. Authoritative supply only
-    // counts units available to the owning player's faction.
-    Ok(if catalog.allows_unit(kind) {
-        supply_cost(kind)
-    } else {
-        0
-    })
 }
 
 fn spawn_dense_central_scrum(
@@ -351,7 +284,7 @@ fn spawn_dense_central_scrum(
     composition: &[EntityKind],
     units_by_player: &mut BTreeMap<u32, Vec<(u32, EntityKind)>>,
 ) -> Result<(), String> {
-    let candidates = dense_scrum_candidates();
+    let candidates = respawn_candidates();
     let mut next_candidate = 0usize;
     for &kind in composition {
         for player_id in [1, 2] {
@@ -379,30 +312,6 @@ fn spawn_dense_central_scrum(
         }
     }
     Ok(())
-}
-
-fn dense_scrum_candidates() -> Vec<(f32, f32)> {
-    let spacing_x = TANK_BODY_LENGTH_PX + TANK_BODY_CLEARANCE_PX * 2.0 + DENSE_SCRUM_GAP_PX;
-    let spacing_y = TANK_BODY_WIDTH_PX + TANK_BODY_CLEARANCE_PX * 2.0 + DENSE_SCRUM_GAP_PX;
-    let width = (DENSE_SCRUM_COLUMNS - 1) as f32 * spacing_x;
-    let height = (DENSE_SCRUM_ROWS - 1) as f32 * spacing_y;
-    let mut candidates = Vec::with_capacity(DENSE_SCRUM_COLUMNS * DENSE_SCRUM_ROWS);
-    for row in 0..DENSE_SCRUM_ROWS {
-        for column in 0..DENSE_SCRUM_COLUMNS {
-            let x = CENTER.0 - width * 0.5 + column as f32 * spacing_x;
-            let y = CENTER.1 - height * 0.5 + row as f32 * spacing_y;
-            candidates.push((x, y));
-        }
-    }
-    candidates.sort_by(|a, b| {
-        let a_distance = (a.0 - CENTER.0).powi(2) + (a.1 - CENTER.1).powi(2);
-        let b_distance = (b.0 - CENTER.0).powi(2) + (b.1 - CENTER.1).powi(2);
-        a_distance
-            .total_cmp(&b_distance)
-            .then_with(|| a.1.total_cmp(&b.1))
-            .then_with(|| a.0.total_cmp(&b.0))
-    });
-    candidates
 }
 
 fn try_spawn(
@@ -438,8 +347,8 @@ fn shuttle_positions_for_player(player_id: u32, count: usize) -> Vec<(f32, f32)>
 
 fn shuttle_endpoint(x_dir: f32, y_dir: f32) -> (f32, f32) {
     (
-        CENTER.0 + x_dir * SHUTTLE_OFFSET_TILES * TILE,
-        CENTER.1 + y_dir * SHUTTLE_OFFSET_TILES * TILE,
+        CENTER.0 + x_dir * SHUTTLE_OFFSET_TILES as f32 * TILE,
+        CENTER.1 + y_dir * SHUTTLE_OFFSET_TILES as f32 * TILE,
     )
 }
 
@@ -595,7 +504,7 @@ fn add_protocol_lab_metadata(
         "lab".to_string(),
         serde_json::to_value(LabScenarioLabMetadata {
             vision: LabVisionMode::All,
-            god_mode_players: vec![1, 2, 3, 4],
+            god_mode_players: vec![3, 4],
             initial_camera: Some(InitialCamera {
                 center_x: CENTER.0 as u32,
                 center_y: CENTER.1 as u32,

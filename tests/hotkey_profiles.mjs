@@ -95,10 +95,10 @@ function commandCarCard() {
   const catalog = buildHotkeyCommandCatalog(buildCommandCardContextCatalog());
   assert(
     catalog.commands.some((command) =>
-      command.commandId === kriegsiaCommandId("train", KIND.PANZERFAUST) &&
-        command.slotIndex === 2
+      command.commandId === kriegsiaCommandId("research", UPGRADE.PANZERFAUSTS) &&
+        command.slotIndex === 1
     ),
-    "hotkey command catalog includes the exposed Panzerfaust train command in the E slot",
+    "hotkey command catalog includes Panzerfausts research in the Training Centre W slot",
   );
   assert(
     catalog.commands.some((command) =>

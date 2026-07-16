@@ -14,7 +14,8 @@ use crate::protocol::{default_snapshot_codec, encode_snapshot_frame, Event, Snap
 use rts_sim::perf;
 
 use super::hellhole_snapshot_stream::{
-    build_hellhole_game, enqueue_hellhole_shuttles, union_events, TICK_RATE_HZ,
+    apply_hellhole_scenario_actions, build_hellhole_game, union_events, HellholeActionCounts,
+    TICK_RATE_HZ,
 };
 
 const DEFAULT_TICKS: u32 = 900;
@@ -42,6 +43,12 @@ struct HarnessSummary {
     snapshot_bytes: u64,
     attack_events: usize,
     projectile_events: usize,
+    death_events: usize,
+    shuttle_commands: usize,
+    selected_units: usize,
+    respawn_batches: usize,
+    respawned_units: usize,
+    minimum_snapshot_entities: usize,
     last_combat_tick: u32,
     tick: DurationSummary,
     snapshot_build: DurationSummary,
@@ -159,10 +166,26 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
     let mut attack_events = 0usize;
     let mut projectile_events = 0usize;
     let mut last_combat_tick = 0u32;
+    let mut death_events = 0usize;
+    let mut action_counts = HellholeActionCounts::default();
+    let mut minimum_snapshot_entities = initial_entities;
 
     while game.tick_count() < config.ticks {
         let round_trip_started = Instant::now();
-        enqueue_hellhole_shuttles(&mut game, &mut driver)?;
+        action_counts.add(apply_hellhole_scenario_actions(&mut game, &mut driver)?);
+        let post_action_counts = game.perf_entity_counts();
+        let post_action_entities = post_action_counts.entities;
+        if post_action_entities != initial_entities {
+            return Err(format!(
+                "Hellhole pre-tick entity count changed at tick {}: {post_action_entities} != {initial_entities} (units={}, buildings={}, resources={}, respawn_batches={}, respawned_units={})",
+                game.tick_count(),
+                post_action_counts.units,
+                post_action_counts.buildings,
+                post_action_counts.resources,
+                action_counts.respawn_batches,
+                action_counts.respawned_units,
+            ));
+        }
 
         let tick_started = Instant::now();
         let event_sets = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()))
@@ -187,6 +210,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
             );
             attack_events += usize::from(attack);
             projectile_events += usize::from(projectile);
+            death_events += usize::from(matches!(event, Event::Death { .. }));
             combat_active |= attack || projectile;
         }
         if combat_active {
@@ -196,6 +220,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         let snapshot_started = Instant::now();
         let mut snapshot = game.snapshot_full_for(1);
         snapshot.events = events;
+        minimum_snapshot_entities = minimum_snapshot_entities.min(snapshot.entities.len());
         snapshot.net_status = Default::default();
         snapshot_build_series.record(snapshot_started.elapsed());
 
@@ -211,14 +236,6 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         payload_series.record(payload_len);
         snapshot_bytes = snapshot_bytes.saturating_add(payload_len as u64);
         api_round_trip_series.record(round_trip_started.elapsed());
-
-        let entities = game.perf_entity_counts().entities;
-        if entities != initial_entities {
-            return Err(format!(
-                "Hellhole entity count changed at tick {}: {entities} != {initial_entities}",
-                game.tick_count()
-            ));
-        }
     }
 
     if game.tick_count() > 90 && last_combat_tick < game.tick_count() - 90 {
@@ -248,6 +265,12 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         snapshot_bytes,
         attack_events,
         projectile_events,
+        death_events,
+        shuttle_commands: action_counts.shuttle_commands,
+        selected_units: action_counts.selected_units,
+        respawn_batches: action_counts.respawn_batches,
+        respawned_units: action_counts.respawned_units,
+        minimum_snapshot_entities,
         last_combat_tick,
         tick: tick_series.summarize(),
         snapshot_build: snapshot_build_series.summarize(),
@@ -347,8 +370,19 @@ fn print_summary(summary: &HarnessSummary) {
         summary.snapshot_bytes
     );
     println!(
-        "events: attacks={} projectiles={} last_combat_tick={}",
-        summary.attack_events, summary.projectile_events, summary.last_combat_tick
+        "events: attacks={} projectiles={} deaths={} last_combat_tick={}",
+        summary.attack_events,
+        summary.projectile_events,
+        summary.death_events,
+        summary.last_combat_tick
+    );
+    println!(
+        "churn: shuttle_commands={} selected_units={} respawn_batches={} respawned_units={} minimum_snapshot_entities={}",
+        summary.shuttle_commands,
+        summary.selected_units,
+        summary.respawn_batches,
+        summary.respawned_units,
+        summary.minimum_snapshot_entities
     );
     println!();
     println!(

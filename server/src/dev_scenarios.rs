@@ -712,14 +712,6 @@ const ENTRENCHMENT_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLau
     case: None,
 }];
 
-const PANZERFAUST_DUEL_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "panzerfaust_duel",
-    unit: EntityKind::Panzerfaust,
-    count: 1,
-    blocker: None,
-    case: None,
-}];
-
 const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     id: "tank_coax_inspection",
     unit: EntityKind::Tank,
@@ -728,56 +720,7 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     case: None,
 }];
 
-const SUPPLY_STRESS_ACTIVE_LAUNCHES: [DevScenarioLaunch; 2] = [
-    DevScenarioLaunch {
-        id: "supply_stress_active",
-        unit: EntityKind::Worker,
-        count: 200,
-        blocker: None,
-        case: None,
-    },
-    DevScenarioLaunch {
-        id: "supply_stress_active",
-        unit: EntityKind::Worker,
-        count: 300,
-        blocker: None,
-        case: None,
-    },
-];
-
-const PANZERFAUST_WINDUP_CANCEL_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "panzerfaust_windup_cancel",
-    unit: EntityKind::Panzerfaust,
-    count: 1,
-    blocker: None,
-    case: None,
-}];
-
-const PANZERFAUST_TARGET_DEATH_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "panzerfaust_target_death",
-    unit: EntityKind::Panzerfaust,
-    count: 1,
-    blocker: None,
-    case: None,
-}];
-
-const PANZERFAUST_ENTRENCHED_RANGE_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "panzerfaust_entrenched_range",
-    unit: EntityKind::Panzerfaust,
-    count: 1,
-    blocker: None,
-    case: None,
-}];
-
-const PANZERFAUST_METHAMPHETAMINES_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "panzerfaust_methamphetamines",
-    unit: EntityKind::Panzerfaust,
-    count: 1,
-    blocker: None,
-    case: None,
-}];
-
-const DEV_SCENARIOS: [DevScenarioSpec; 21] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 15] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -854,46 +797,10 @@ const DEV_SCENARIOS: [DevScenarioSpec; 21] = [
         launches: &ENTRENCHMENT_INSPECTION_LAUNCHES,
     },
     DevScenarioSpec {
-        id: "panzerfaust_duel",
-        title: "Panzerfaust Duel",
-        description: "One loaded Panzerfaust starts in range of one enemy Tank for checking launch, impact, damage, reload, and repeated fire.",
-        launches: &PANZERFAUST_DUEL_LAUNCHES,
-    },
-    DevScenarioSpec {
-        id: "panzerfaust_windup_cancel",
-        title: "Panzerfaust Windup Cancel",
-        description: "One loaded Panzerfaust starts a Tank attack, then receives a movement order during windup to verify the shot is not spent.",
-        launches: &PANZERFAUST_WINDUP_CANCEL_LAUNCHES,
-    },
-    DevScenarioSpec {
-        id: "panzerfaust_target_death",
-        title: "Panzerfaust Target Death",
-        description: "Normal and Methamphetamines Panzerfausts attack one low-health Tank so the normal projectile reaches a target that died during travel.",
-        launches: &PANZERFAUST_TARGET_DEATH_LAUNCHES,
-    },
-    DevScenarioSpec {
-        id: "panzerfaust_entrenched_range",
-        title: "Panzerfaust Entrenched Range",
-        description: "One occupied-trench Panzerfaust and one exposed Panzerfaust hold position against Tanks at four-tile range.",
-        launches: &PANZERFAUST_ENTRENCHED_RANGE_LAUNCHES,
-    },
-    DevScenarioSpec {
-        id: "panzerfaust_methamphetamines",
-        title: "Panzerfaust Methamphetamines Timing",
-        description: "Normal and Methamphetamines Panzerfausts fire side by side so launch and reload timing can be compared.",
-        launches: &PANZERFAUST_METHAMPHETAMINES_LAUNCHES,
-    },
-    DevScenarioSpec {
         id: "tank_coax_inspection",
         title: "Tank Coax Inspection",
         description: "One held Tank faces infantry-priority targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke, and buildings around the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
         launches: &TANK_COAX_INSPECTION_LAUNCHES,
-    },
-    DevScenarioSpec {
-        id: "supply_stress_active",
-        title: "Active Player Supply Stress",
-        description: "Deterministic two-player mixed late-game armies at exact 200 or 300 supply for local frame-budget measurement.",
-        launches: &SUPPLY_STRESS_ACTIVE_LAUNCHES,
     },
 ];
 
@@ -1015,7 +922,6 @@ pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
         EntityKind::Worker => "worker",
         EntityKind::Rifleman => "rifleman",
         EntityKind::MachineGunner => "machine gunner",
-        EntityKind::Panzerfaust => "panzerfaust",
         EntityKind::AntiTankGun => "anti-tank gun",
         EntityKind::MortarTeam => "mortar team",
         EntityKind::Artillery => "artillery",
@@ -1261,56 +1167,6 @@ mod tests {
             Some(DevScenarioLaunch {
                 id: "entrenchment_inspection",
                 unit: EntityKind::Rifleman,
-                count: 1,
-                blocker: None,
-                case: None,
-            })
-        );
-        assert_eq!(
-            parse_dev_scenario_room("panzerfaust_duel:unit=panzerfaust:count=1"),
-            Some(DevScenarioLaunch {
-                id: "panzerfaust_duel",
-                unit: EntityKind::Panzerfaust,
-                count: 1,
-                blocker: None,
-                case: None,
-            })
-        );
-        assert_eq!(
-            parse_dev_scenario_room("panzerfaust_windup_cancel:unit=panzerfaust:count=1"),
-            Some(DevScenarioLaunch {
-                id: "panzerfaust_windup_cancel",
-                unit: EntityKind::Panzerfaust,
-                count: 1,
-                blocker: None,
-                case: None,
-            })
-        );
-        assert_eq!(
-            parse_dev_scenario_room("panzerfaust_target_death:unit=panzerfaust:count=1"),
-            Some(DevScenarioLaunch {
-                id: "panzerfaust_target_death",
-                unit: EntityKind::Panzerfaust,
-                count: 1,
-                blocker: None,
-                case: None,
-            })
-        );
-        assert_eq!(
-            parse_dev_scenario_room("panzerfaust_entrenched_range:unit=panzerfaust:count=1"),
-            Some(DevScenarioLaunch {
-                id: "panzerfaust_entrenched_range",
-                unit: EntityKind::Panzerfaust,
-                count: 1,
-                blocker: None,
-                case: None,
-            })
-        );
-        assert_eq!(
-            parse_dev_scenario_room("panzerfaust_methamphetamines:unit=panzerfaust:count=1"),
-            Some(DevScenarioLaunch {
-                id: "panzerfaust_methamphetamines",
-                unit: EntityKind::Panzerfaust,
                 count: 1,
                 blocker: None,
                 case: None,

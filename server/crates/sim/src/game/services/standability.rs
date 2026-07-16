@@ -590,7 +590,6 @@ mod tests {
             EntityKind::Golem,
             EntityKind::Rifleman,
             EntityKind::MachineGunner,
-            EntityKind::Panzerfaust,
             EntityKind::AntiTankGun,
             EntityKind::MortarTeam,
             EntityKind::Artillery,

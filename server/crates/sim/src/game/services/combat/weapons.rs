@@ -200,8 +200,7 @@ pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
 
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
-        || (matches!(e.kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
-            && methamphetamines_researched)
+        || (e.kind == EntityKind::Rifleman && methamphetamines_researched)
 }
 
 pub(super) fn uses_vehicle_weapon_policy(e: &Entity) -> bool {

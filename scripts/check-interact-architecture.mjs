@@ -8,6 +8,8 @@ import {
   INTERACT_COMMAND_REGISTRY,
   INTERACT_COMMAND_KEYS,
   INTERACT_COMMANDS,
+  INTERACT_NAMESPACE_NAMES,
+  INTERACT_NAMESPACE_SUMMARIES,
   INTERACT_NAMESPACES,
 } from "./interact/command_registry.ts";
 import { SESSION_EXECUTION_LANES } from "./interact/session_coordinator.ts";
@@ -62,6 +64,14 @@ function checkRegistry() {
     }
     if (!help?.example || typeof help.example !== "object" || Array.isArray(help.example)) failures.push(`${name} help is missing an example object`);
   }
+  if (INTERACT_NAMESPACE_NAMES.join("\0") !== Object.keys(INTERACT_NAMESPACES).join("\0")) {
+    failures.push("namespace names and public command catalogs must come from the same registry records");
+  }
+  for (const namespace of INTERACT_NAMESPACE_NAMES) {
+    if (typeof INTERACT_NAMESPACE_SUMMARIES[namespace] !== "string" || !INTERACT_NAMESPACE_SUMMARIES[namespace]) {
+      failures.push(`${namespace} namespace is missing its help summary`);
+    }
+  }
 
   expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown", "game-open", "scenario-open"]);
   expectMetadata("observation lane", "lane", "observation", ["status", "record-wait", "game-inspect", "scenario-inspect"]);
@@ -76,11 +86,11 @@ function checkRegistry() {
 
 function checkCliNamespace() {
   const cli = sources.get("cli.ts") || "";
-  if (!cli.includes('const USAGE = "node scripts/interact/cli.mjs <lab|game|scenario> <command> [JSON-object]";')) {
-    failures.push("the Interact CLI usage must require an explicit supported namespace");
+  if (!cli.includes('INTERACT_NAMESPACE_NAMES.join("|")')) {
+    failures.push("the Interact CLI usage must derive its supported namespaces from the registry");
   }
-  if (!cli.includes("namespace in INTERACT_NAMESPACES") || !cli.includes('"unknownNamespace"')) {
-    failures.push("the Interact CLI must reject bare or unknown namespaces before command dispatch");
+  if (!cli.includes("Object.hasOwn(INTERACT_NAMESPACES, namespace)") || !cli.includes('"unknownNamespace"')) {
+    failures.push("the Interact CLI must reject bare, inherited, or unknown namespaces before command dispatch");
   }
 }
 

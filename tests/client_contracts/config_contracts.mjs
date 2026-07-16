@@ -14,12 +14,11 @@ import {
   SMOKE_CLOUD_RADIUS_TILES,
   SMOKE_PLUS_CLOUD_DURATION_TICKS,
   SMOKE_PLUS_CLOUD_RADIUS_TILES,
-  METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS,
   METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
   PANZERFAUST_ARMOR_PENETRATION,
   PANZERFAUST_DAMAGE,
   PANZERFAUST_RANGE_TILES,
-  PANZERFAUST_RECOVERY_TICKS,
+  PANZERFAUSTS_RESEARCH_TICKS,
   PANZERFAUST_TRAVEL_TICKS,
   PANZERFAUST_WINDUP_TICKS,
   ENTRENCHMENT_AREA_DAMAGE_REDUCTION,
@@ -111,7 +110,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "FOG_EXPLORED_ALPHA",
   "FOG_UNEXPLORED_ALPHA",
   "INTERP_DELAY_MS",
-  "METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS",
   "METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS",
   "METHAMPHETAMINES_RESEARCH_TICKS",
   "MINING_CC_RANGE_TILES",
@@ -121,10 +119,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "MORTAR_OUTER_RADIUS_TILES",
   "MORTAR_RANGE_TILES",
   "MORTAR_SHELL_DELAY_TICKS",
+  "PANZERFAUSTS_RESEARCH_TICKS",
   "PANZERFAUST_ARMOR_PENETRATION",
   "PANZERFAUST_DAMAGE",
   "PANZERFAUST_RANGE_TILES",
-  "PANZERFAUST_RECOVERY_TICKS",
   "PANZERFAUST_TRAVEL_TICKS",
   "PANZERFAUST_WINDUP_TICKS",
   "PLAYER_PALETTE",
@@ -222,6 +220,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
     "Training Centre should require a Barracks in the command card",
   );
+  assert(
+    STATS[KIND.BARRACKS].requires == null,
+    "Barracks should be available in the command card without a City Centre",
+  );
   assert(STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre build time mirrors server");
   assert(
     STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),
@@ -246,6 +248,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].rangeTiles === 6, "Scout Car weapon range mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 15, "Scout Car sight radius mirrors server");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
   assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Gun Works");
@@ -258,7 +261,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(KIND_CODE[KIND.EKAT] === 19, "Ekat compact kind code should be reserved");
   assert(KIND_CODE[KIND.ZAMOK] === 20, "Zamok compact kind code should be reserved");
   assert(KIND_CODE[KIND.TANK_TRAP] === 21, "Tank Trap compact kind code should be reserved");
-  assert(KIND_CODE[KIND.PANZERFAUST] === 24, "Panzerfaust compact kind code should be reserved");
   assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.BREAKTHROUGH] === 5, "Breakthrough compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_TELEPORT] === 6, "Ekat Teleport compact ability code should be reserved");
@@ -279,17 +281,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(EVENT_CODE[EVENT.ARTILLERY_FIRING] === 11, "Artillery firing compact event code should be reserved");
   assert(EVENT_CODE[EVENT.PANZERFAUST_LAUNCH] === 12, "Panzerfaust launch compact event code should be reserved");
   assert(EVENT_CODE[EVENT.PANZERFAUST_IMPACT] === 13, "Panzerfaust impact compact event code should be reserved");
-  assert(EVENT_CODE[EVENT.PANZERFAUST_CONVERSION] === 14, "Panzerfaust conversion compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MISS] === 15, "Miss compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.SMOKE_PLUS] === 9, "Smoke Plus compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.PANZERFAUSTS] === 10, "Panzerfausts compact upgrade code should be reserved");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
       STATS[KIND.COMMAND_CAR].supply === 4 &&
-      STATS[KIND.COMMAND_CAR].sight === 13 &&
+      STATS[KIND.COMMAND_CAR].sight === 8 &&
       STATS[KIND.COMMAND_CAR].size < STATS[KIND.SCOUT_CAR].size &&
       STATS[KIND.COMMAND_CAR].body.length < STATS[KIND.SCOUT_CAR].body.length &&
       STATS[KIND.COMMAND_CAR].body.width < STATS[KIND.SCOUT_CAR].body.width,
@@ -304,38 +306,28 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Breakthrough ability exposes Command Car carrier, self target, radius, duration, and cooldown",
   );
   assert(
-    STATS[KIND.PANZERFAUST].cost.steel === 60 &&
-      STATS[KIND.PANZERFAUST].cost.oil === 15 &&
-      STATS[KIND.PANZERFAUST].supply === 1 &&
-      STATS[KIND.PANZERFAUST].sight === 11 &&
-      STATS[KIND.PANZERFAUST].size === 9 &&
-      STATS[KIND.PANZERFAUST].rangeTiles === 4 &&
-      STATS[KIND.PANZERFAUST].buildTicks === 400 &&
-      PANZERFAUST_RANGE_TILES === 5 &&
+    PANZERFAUST_RANGE_TILES === 5 &&
       PANZERFAUST_DAMAGE === 100 &&
       PANZERFAUST_ARMOR_PENETRATION === 0.5 &&
       PANZERFAUST_WINDUP_TICKS === 15 &&
       PANZERFAUST_TRAVEL_TICKS === 15 &&
-      PANZERFAUST_RECOVERY_TICKS === 60 &&
-      METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS === 12 &&
-      METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS === 60,
-    "Panzerfaust stats and reload timing mirror server",
+      METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS === 12,
+    "Rifleman Panzerfaust shot stats and timing mirror server",
   );
   assert(
-    STATS[KIND.BARRACKS].trains[2] === KIND.PANZERFAUST &&
-      configExports.trainableUnitsForFaction("kriegsia", KIND.BARRACKS)[2] === KIND.PANZERFAUST,
-    "Barracks command card exposes Panzerfaust as the third Kriegsia train button",
+    STATS[KIND.BARRACKS].trains.length === 2 &&
+      configExports.trainableUnitsForFaction("kriegsia", KIND.BARRACKS).length === 2,
+    "Barracks no longer exposes a standalone Panzerfaust unit",
   );
   assert(
-    STATS[KIND.PANZERFAUST].requires === KIND.TRAINING_CENTRE &&
-      STATS[KIND.PANZERFAUST].description.includes("prioritizes visible Tanks") &&
-      STATS[KIND.PANZERFAUST].description.includes("vehicles and buildings") &&
-      STATS[KIND.PANZERFAUST].description.includes("50% armor penetration") &&
-      STATS[KIND.PANZERFAUST].description.includes("one disposable 5-tile anti-tank shot") &&
-      STATS[KIND.PANZERFAUST].description.includes("Fights with normal rifle fire") &&
-      STATS[KIND.PANZERFAUST].description.includes("becoming a Rifleman") &&
-      STATS[KIND.PANZERFAUST].description.includes("Methamphetamines improves its rifle fire"),
-    "Panzerfaust command-card metadata exposes its Training Centre requirement and approved tooltip copy",
+    UPGRADES[UPGRADE.PANZERFAUSTS].researchedAt === KIND.TRAINING_CENTRE &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].cost.steel === 100 &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].cost.oil === 100 &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].researchTicks === PANZERFAUSTS_RESEARCH_TICKS &&
+      PANZERFAUSTS_RESEARCH_TICKS === TICK_HZ * 20 &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("every current and future Rifleman") &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("one disposable 5-tile anti-vehicle shot"),
+    "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and Rifleman effect",
   );
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&
@@ -744,9 +736,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(researchButton && !researchButton.disabled, "Methamphetamines command-card button renders enabled");
     assert(researchButton.dataset.hotkey === "Q", "Methamphetamines command-card button uses Q as its hotkey");
     assert(researchButton.innerHTML.includes("Research time"), "Methamphetamines tooltip includes research time");
+    const panzerfaustsButton = renderedButtons.find((button) => button.innerHTML.includes("Panzerfausts"));
+    assert(panzerfaustsButton && !panzerfaustsButton.disabled, "Panzerfausts command-card button renders enabled");
+    assert(panzerfaustsButton.dataset.hotkey === "W", "Panzerfausts command-card button uses W as its hotkey");
+    assert(panzerfaustsButton.innerHTML.includes("100") && panzerfaustsButton.innerHTML.includes("Research time"), "Panzerfausts tooltip includes its cost and research time");
     const entrenchmentButton = renderedButtons.find((button) => button.innerHTML.includes("Entrenchment"));
     assert(entrenchmentButton && !entrenchmentButton.disabled, "Entrenchment command-card button renders enabled");
-    assert(entrenchmentButton.dataset.hotkey === "W", "Entrenchment command-card button uses W as its hotkey");
+    assert(entrenchmentButton.dataset.hotkey === "E", "Entrenchment command-card button uses E as its hotkey");
     researchButton.click({ shiftKey: true });
     assert(
       sent.length === 1 &&

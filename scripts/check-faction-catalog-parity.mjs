@@ -45,7 +45,6 @@ import {
   EKAT_TELEPORT_RANGE_TILES,
   FACTION_CATALOGS,
   MINING_CC_RANGE_TILES,
-  METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS,
   METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
   MORTAR_FIRE_COOLDOWN_TICKS,
   MORTAR_INNER_RADIUS_TILES,
@@ -54,7 +53,7 @@ import {
   PANZERFAUST_ARMOR_PENETRATION,
   PANZERFAUST_DAMAGE,
   PANZERFAUST_RANGE_TILES,
-  PANZERFAUST_RECOVERY_TICKS,
+  PANZERFAUSTS_RESEARCH_TICKS,
   PANZERFAUST_TRAVEL_TICKS,
   PANZERFAUST_WINDUP_TICKS,
   RESOURCE_AMOUNTS,
@@ -192,12 +191,10 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "mortarInnerRadiusTiles",
   "mortarOuterRadiusTiles",
   "mortarShellDelayTicks",
-  "methamphetaminesPanzerfaustRecoveryTicks",
   "methamphetaminesPanzerfaustWindupTicks",
   "panzerfaustArmorPenetration",
   "panzerfaustDamage",
   "panzerfaustRangeTiles",
-  "panzerfaustRecoveryTicks",
   "panzerfaustTravelTicks",
   "panzerfaustWindupTicks",
   "scoutCarSmokeUses",
@@ -255,7 +252,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   ]),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
 });
-const EXPECTED_EXTRA_UNIT_STATS = Object.freeze([KIND.PANZERFAUST]);
+const EXPECTED_EXTRA_UNIT_STATS = Object.freeze([]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -555,9 +552,7 @@ const clientConstants = {
   panzerfaustArmorPenetration: PANZERFAUST_ARMOR_PENETRATION,
   panzerfaustWindupTicks: PANZERFAUST_WINDUP_TICKS,
   panzerfaustTravelTicks: PANZERFAUST_TRAVEL_TICKS,
-  panzerfaustRecoveryTicks: PANZERFAUST_RECOVERY_TICKS,
   methamphetaminesPanzerfaustWindupTicks: METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
-  methamphetaminesPanzerfaustRecoveryTicks: METHAMPHETAMINES_PANZERFAUST_RECOVERY_TICKS,
   entrenchmentDigInTicks: ENTRENCHMENT_DIG_IN_TICKS,
   entrenchmentRangeBonusTiles: ENTRENCHMENT_RANGE_BONUS_TILES,
   entrenchmentDirectDamageReduction: ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION,
@@ -685,6 +680,7 @@ for (const [kind, expected] of Object.entries(rustClientConfig.bodies)) {
 
 const clientUpgradeResearchTicks = {
   [UPGRADE.METHAMPHETAMINES]: METHAMPHETAMINES_RESEARCH_TICKS,
+  [UPGRADE.PANZERFAUSTS]: PANZERFAUSTS_RESEARCH_TICKS,
   [UPGRADE.ENTRENCHMENT]: ENTRENCHMENT_RESEARCH_TICKS,
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
   [UPGRADE.ARTILLERY_UNLOCK]: ARTILLERY_UNLOCK_RESEARCH_TICKS,

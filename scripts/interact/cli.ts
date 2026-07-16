@@ -8,7 +8,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
-  INTERACT_NAMESPACES, namespaceCommandKey, requestTimeoutMs,
+  INTERACT_NAMESPACE_NAMES, INTERACT_NAMESPACE_SUMMARIES, INTERACT_NAMESPACES,
+  namespaceCommandKey, requestTimeoutMs,
 } from "./command_registry.ts";
 import { commandHelp, helpCatalog } from "./command_help.ts";
 import {
@@ -20,12 +21,7 @@ import type { RuntimePaths, RuntimeRecord } from "./runtime.ts";
 
 const STARTUP_TIMEOUT_MS = 15_000;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const USAGE = "node scripts/interact/cli.mjs <lab|game|scenario> <command> [JSON-object]";
-const NAMESPACE_SUMMARIES = Object.freeze({
-  lab: "Arrange and inspect authoritative Lab scenes.",
-  game: "Observe and minimally control one isolated human-vs-AI match.",
-  scenario: "Observe and capture one authored server-backed dev scenario.",
-});
+const USAGE = `node scripts/interact/cli.mjs <${INTERACT_NAMESPACE_NAMES.join("|")}> <command> [JSON-object]`;
 
 interface DaemonIdentity extends RuntimeRecord {
   protocolVersion: number;
@@ -59,16 +55,16 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
       ok: true,
       result: {
         usage: USAGE,
-        namespaces: Object.entries(NAMESPACE_SUMMARIES).map(([name, summary]) => ({ name, summary })),
+        namespaces: INTERACT_NAMESPACE_NAMES.map((name) => ({ name, summary: INTERACT_NAMESPACE_SUMMARIES[name] })),
         documentation: "docs/interact-cli.md",
       },
     };
   }
   const namespaceHelp = argv[0] === "help";
   const namespace = namespaceHelp ? argv[1] : argv[0];
-  if (!namespace || !(namespace in INTERACT_NAMESPACES)) {
+  if (!namespace || !Object.hasOwn(INTERACT_NAMESPACES, namespace)) {
     if (namespaceHelp && namespace) {
-      throw cliError("unknownNamespace", `Unknown Interact namespace ${JSON.stringify(namespace)}. Available namespaces: lab, game, scenario.`);
+      throw cliError("unknownNamespace", `Unknown Interact namespace ${JSON.stringify(namespace)}. Available namespaces: ${INTERACT_NAMESPACE_NAMES.join(", ")}.`);
     }
     throw cliError("unknownNamespace", `Interact requires a namespace. Usage: ${USAGE}`);
   }

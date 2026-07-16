@@ -886,7 +886,6 @@ mod tests {
             "machine_gunner",
             "mortar_team",
             "oil",
-            "panzerfaust",
             "pump_jack",
             "research_complex",
             "rifleman",
@@ -903,14 +902,14 @@ mod tests {
                 "render-preview scenario should include {kind} render coverage"
             );
         }
-        let panzerfaust_count = snapshot
+        let loaded_rifleman_count = snapshot
             .entities
             .iter()
-            .filter(|entity| entity.kind == "panzerfaust")
+            .filter(|entity| entity.kind == "rifleman" && entity.panzerfaust_loaded == Some(true))
             .count();
         assert!(
-            panzerfaust_count >= 12,
-            "render-preview scenario should include Panzerfaust formation coverage"
+            loaded_rifleman_count >= 12,
+            "render-preview scenario should include loaded Rifleman Panzerfaust formation coverage"
         );
     }
 
@@ -975,7 +974,7 @@ mod tests {
         lab_scenario_payload_to_lab_op(loaded.scenario.clone())
             .expect("checkpoint scenario should fit import cap");
         let metadata = lab_scenario_payload_lab_metadata(&loaded.scenario);
-        assert_eq!(metadata.god_mode_players, vec![1, 2, 3, 4]);
+        assert_eq!(metadata.god_mode_players, vec![3, 4]);
         assert!(matches!(metadata.vision, LabVisionMode::All));
         assert_eq!(
             metadata
@@ -990,7 +989,15 @@ mod tests {
             .expect("supply-300-hellhole scenario should restore through lab APIs");
         assert_eq!(game.seed(), 0x5a00_0300);
         assert_eq!(game.start_payload().players.len(), 4);
-        assert_eq!(game.lab_god_mode_players(), vec![1, 2, 3, 4]);
+        assert_eq!(
+            game.start_payload()
+                .players
+                .iter()
+                .map(|player| player.team_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 1, 2],
+        );
+        assert_eq!(game.lab_god_mode_players(), vec![3, 4]);
         assert_eq!(game.perf_entity_counts().entities, 380);
 
         let start = game.start_payload();
@@ -1126,9 +1133,8 @@ mod tests {
             ("golem".to_string(), 1),
             ("machine_gunner".to_string(), 10),
             ("mortar_team".to_string(), 9),
-            ("panzerfaust".to_string(), 9),
             ("research_complex".to_string(), 1),
-            ("rifleman".to_string(), 9),
+            ("rifleman".to_string(), 18),
             ("scout_car".to_string(), 10),
             ("steelworks".to_string(), 1),
             ("tank".to_string(), 17),

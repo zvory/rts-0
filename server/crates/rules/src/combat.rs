@@ -167,7 +167,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::ScoutCarMg,
-        range_tiles: 7,
+        range_tiles: 6,
         dmg: 6,
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
@@ -294,7 +294,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
-        EntityKind::Rifleman | EntityKind::Panzerfaust => Some(WeaponKind::RiflemanRifle),
+        EntityKind::Rifleman => Some(WeaponKind::RiflemanRifle),
         EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
         EntityKind::MortarTeam => Some(WeaponKind::MortarTeamMortar),
@@ -347,7 +347,7 @@ pub fn is_armored(kind: EntityKind) -> bool {
 
 /// Weapons with non-zero armor penetration count as AP threats for target ranking.
 pub fn is_ap(kind: EntityKind) -> bool {
-    kind == EntityKind::Panzerfaust || default_weapon_profile(kind).is_some_and(weapon_is_ap)
+    default_weapon_profile(kind).is_some_and(weapon_is_ap)
 }
 
 pub fn weapon_is_ap(profile: &WeaponProfile) -> bool {
@@ -401,7 +401,7 @@ pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar
-    ) || kind.is_building()
+    )
 }
 
 /// Pure default-weapon fit vocabulary for target ranking.
@@ -480,11 +480,7 @@ pub fn area_damage_after_entrenchment(
 fn direct_anti_tank_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker
-            | EntityKind::Golem
-            | EntityKind::Rifleman
-            | EntityKind::MachineGunner
-            | EntityKind::Panzerfaust
+        EntityKind::Worker | EntityKind::Golem | EntityKind::Rifleman | EntityKind::MachineGunner
     )
 }
 
@@ -797,7 +793,6 @@ mod tests {
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
-            (EntityKind::Panzerfaust, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
             (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
@@ -936,10 +931,6 @@ mod tests {
         );
         assert_eq!(panzerfaust.facing_damage_policy, FacingDamagePolicy::None);
         assert_eq!(panzerfaust.overpenetration, OverpenetrationPolicy::None);
-        assert_eq!(
-            default_weapon_profile(EntityKind::Panzerfaust),
-            weapon_profile(WeaponKind::RiflemanRifle)
-        );
         assert_eq!(
             panzerfaust_loaded_shot_damage(EntityKind::Tank, None),
             effective_damage_for_weapon(
@@ -1089,32 +1080,18 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_loaded_shot_targets_vehicles_and_buildings_with_half_penetration() {
+    fn panzerfaust_loaded_shot_targets_only_real_vehicles_with_half_penetration() {
         for kind in EntityKind::ALL {
             assert_eq!(
                 is_panzerfaust_loaded_shot_target(kind),
                 matches!(
                     kind,
                     EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar
-                ) || kind.is_building(),
+                ),
                 "{kind:?}"
             );
         }
-        assert_eq!(
-            facing_damage_multiplier(EntityKind::Panzerfaust, EntityKind::Tank, ArmorFacing::Rear),
-            1.0
-        );
         assert_eq!(panzerfaust_loaded_shot_damage(EntityKind::Tank, None), 63);
-        assert_eq!(
-            effective_damage(
-                EntityKind::Panzerfaust,
-                EntityKind::Tank,
-                crate::balance::PANZERFAUST_DAMAGE,
-                None,
-            ),
-            25,
-            "kind-based damage must use the Panzerfaust carrier's default rifle profile"
-        );
         assert_eq!(
             panzerfaust_loaded_shot_damage(EntityKind::ScoutCar, None),
             100
@@ -1201,12 +1178,6 @@ mod tests {
                 false,
                 false,
                 TargetThreatRole::Ordinary,
-            ),
-            (
-                EntityKind::Panzerfaust,
-                false,
-                true,
-                TargetThreatRole::AntiArmorThreat,
             ),
             (
                 EntityKind::AntiTankGun,
@@ -1329,7 +1300,6 @@ mod tests {
                 EntityKind::Golem,
                 EntityKind::Rifleman,
                 EntityKind::MachineGunner,
-                EntityKind::Panzerfaust,
             ] {
                 assert_eq!(
                     miss_chance(attacker, victim),

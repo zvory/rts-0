@@ -35,7 +35,10 @@ import {
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
-const PING_MS = 900;
+const DEFAULT_PING_MS = 900;
+const UNDER_ATTACK_PING_MS = 1100;
+const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
+const ALERT_PING_INNER_RIM_INSET_PX = 2;
 const BORDER_PULSE_MS = 700;
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const IMPASSABLE_FOG_SCALE = 0.56;
@@ -359,13 +362,14 @@ export class Minimap {
    * @param {number} x world px
    * @param {number} y world px
    * @param {"info"|"warn"|"alert"} [severity]
+   * @param {boolean} [isUnderAttack] whether to use the emphasized under-attack treatment
    */
-  ping(x, y, severity = "alert") {
+  ping(x, y, severity = "alert", isUnderAttack = false) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       this.pulseBorder();
       return;
     }
-    this._pings.push({ x, y, severity, startedAt: performance.now() });
+    this._pings.push({ x, y, severity, isUnderAttack, startedAt: performance.now() });
   }
 
   /** Add a globally visible short-lived artillery firing marker. */
@@ -854,9 +858,11 @@ export class Minimap {
   _drawPings(now) {
     const ctx = this.ctx;
     if (!ctx) return;
-    this._pings = this._pings.filter((p) => now - p.startedAt < PING_MS);
+    this._pings = this._pings.filter(
+      (ping) => now - ping.startedAt < this._pingDurationMs(ping),
+    );
     for (const ping of this._pings) {
-      const t = (now - ping.startedAt) / PING_MS;
+      const t = (now - ping.startedAt) / this._pingDurationMs(ping);
       const p = this._worldToCanvas(ping.x, ping.y);
       const radius = 4 + 15 * t;
       ctx.save();
@@ -866,6 +872,13 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.stroke();
+      if (ping.isUnderAttack) {
+        ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(1, radius - ALERT_PING_INNER_RIM_INSET_PX), 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
     if (now < this._borderPulseUntil) {
@@ -877,6 +890,10 @@ export class Minimap {
       ctx.strokeRect(1.5, 1.5, this.size - 3, this.size - 3);
       ctx.restore();
     }
+  }
+
+  _pingDurationMs(ping) {
+    return ping.isUnderAttack ? UNDER_ATTACK_PING_MS : DEFAULT_PING_MS;
   }
 
   _drawArtilleryFiringMarkers(now) {

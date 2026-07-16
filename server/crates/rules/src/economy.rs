@@ -177,13 +177,6 @@ pub fn supply_cost(kind: EntityKind) -> u32 {
     defs::unit_def(kind).map(|d| d.stats.supply).unwrap_or(0)
 }
 
-/// Supply provided by a building kind. Returns 0 for non-buildings.
-pub fn supply_provided(kind: EntityKind) -> u32 {
-    defs::building_def(kind)
-        .map(|d| d.stats.provides_supply)
-        .unwrap_or(0)
-}
-
 fn requirements_met(requirements: &[EntityKind], owned: &[EntityKind]) -> bool {
     requirements.iter().all(|req| owned.contains(req))
 }
@@ -195,6 +188,8 @@ mod tests {
 
     #[test]
     fn ww2_production_chain_matches_design() {
+        let barracks = EntityKind::Barracks;
+
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
@@ -202,12 +197,8 @@ mod tests {
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
-            trainable_units(EntityKind::Barracks),
-            &[
-                EntityKind::Rifleman,
-                EntityKind::MachineGunner,
-                EntityKind::Panzerfaust
-            ]
+            trainable_units(barracks),
+            &[EntityKind::Rifleman, EntityKind::MachineGunner]
         );
         assert_eq!(
             trainable_units(EntityKind::Factory),
@@ -229,7 +220,6 @@ mod tests {
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
-        assert!(!train_requirement_met(EntityKind::Panzerfaust, &[]));
         assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
         assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
@@ -272,6 +262,10 @@ mod tests {
             "Scout Plane is not exposed through any production building"
         );
 
+        assert!(
+            build_requirement_met(barracks, &[]),
+            "Barracks should remain buildable without a completed City Centre"
+        );
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
@@ -279,11 +273,11 @@ mod tests {
         ));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::Barracks]
+            &[barracks]
         ));
         assert!(build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::CityCentre, EntityKind::Barracks]
+            &[EntityKind::CityCentre, barracks]
         ));
 
         assert!(!build_requirement_met(EntityKind::Factory, &[]));
@@ -338,12 +332,6 @@ mod tests {
             Some(crate::balance::SCOUT_PLANE_SIGHT_TILES)
         );
         assert_eq!(
-            cost(EntityKind::Panzerfaust),
-            (60, 15),
-            "Panzerfaust cost should match the production exposure contract"
-        );
-        assert_eq!(supply_cost(EntityKind::Panzerfaust), 1);
-        assert_eq!(
             defs::unit_def(EntityKind::Artillery).map(|d| d.stats.radius),
             defs::unit_def(EntityKind::Tank).map(|d| d.stats.radius),
             "artillery should use the same selection/collision radius as tanks"
@@ -364,16 +352,6 @@ mod tests {
         assert_eq!(cost(EntityKind::Steelworks), (150, 100));
         assert_eq!(supply_cost(EntityKind::Tank), 8);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
-        assert_eq!(
-            supply_provided(EntityKind::CityCentre),
-            crate::balance::CITY_CENTRE_SUPPLY
-        );
-        assert_eq!(
-            supply_provided(EntityKind::Depot),
-            crate::balance::DEPOT_SUPPLY
-        );
-        assert_eq!(supply_provided(EntityKind::Tank), 0);
-
         assert_eq!(
             trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::Factory),
             vec![
@@ -398,6 +376,11 @@ mod tests {
             ),
             "non-workers cannot build contextual Pump Jacks"
         );
+        assert!(build_requirement_met_for_faction(
+            DEFAULT_FACTION_ID,
+            barracks,
+            &[]
+        ));
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
             EntityKind::Factory,

@@ -183,7 +183,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       [
         6,
         1,
-        KIND_CODE[KIND.PANZERFAUST],
+        KIND_CODE[KIND.RIFLEMAN],
         180,
         190,
         45,
@@ -222,7 +222,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     ],
     tr: [[80, 448, 480, 0.375]],
     wc: [1024, 2048],
-    u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
+    u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK], UPGRADE_CODE[UPGRADE.PANZERFAUSTS]],
     fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
@@ -238,13 +238,13 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
       [EVENT_CODE[EVENT.PANZERFAUST_LAUNCH], 11, [360, 384], [416, 384], 15],
       [EVENT_CODE[EVENT.PANZERFAUST_IMPACT], 416, 384],
-      [EVENT_CODE[EVENT.PANZERFAUST_CONVERSION], 11, KIND_CODE[KIND.RIFLEMAN]],
     ],
   });
 
   assert(decoded.t === "snapshot", "compact snapshot keeps the semantic tag");
   assert(decoded.upgrades[0] === UPGRADE.METHAMPHETAMINES, "compact upgrades decode");
   assert(decoded.upgrades[1] === UPGRADE.ARTILLERY_UNLOCK, "compact artillery upgrade decodes");
+  assert(decoded.upgrades[2] === UPGRADE.PANZERFAUSTS, "compact Panzerfausts upgrade decodes");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
   assert(
     decoded.worldCombatPosition.join(",") === "1024,2048",
@@ -439,13 +439,6 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       decoded.events[12].y === 384,
     "panzerfaust impact event decodes",
   );
-  assert(
-    decoded.events[13].e === EVENT.PANZERFAUST_CONVERSION &&
-      decoded.events[13].id === 11 &&
-      decoded.events[13].toKind === KIND.RIFLEMAN,
-    "legacy panzerfaust conversion event decodes",
-  );
-
   const abilityCommand = cmd.useAbility(ABILITY.SMOKE, [7, 8], 320, 384, true);
   assert(
     abilityCommand.c === "useAbility" &&

@@ -21,6 +21,10 @@ interface DescriptorOptions {
   bounds?: string[];
   example?: HelpExample;
 }
+interface NamespaceRecord {
+  summary: string;
+  commands: Readonly<Record<string, string>>;
+}
 
 export interface CommandDefinition {
   name: string;
@@ -50,6 +54,10 @@ function descriptor(summary: string, acceptedShape: string, {
     scope, lane, timeoutClass, sceneMutation, recordable,
     help: Object.freeze({ summary, acceptedShape, variants, defaults, bounds, example }),
   });
+}
+
+function namespace(summary: string, commands: Record<string, string>): NamespaceRecord {
+  return Object.freeze({ summary, commands: Object.freeze(commands) });
 }
 
 const COMMAND_RECORDS = Object.freeze({
@@ -168,7 +176,7 @@ const COMMAND_RECORDS = Object.freeze({
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats"],
     defaults: ["workspaceRoot=current worktree", "map=Default", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab, game, and scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    bounds: ["one session across Lab, game, and dev-scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
     example: { spectate: ["ai_2_1", "ai_turtle"], viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
@@ -218,7 +226,7 @@ const COMMAND_RECORDS = Object.freeze({
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["id/unit/count/blocker/case use the same bounded launch fields as /dev/scenarios", "the scenario remains server-authored and observation-only"],
     defaults: ["blocker/case=omitted", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab, game, and scenario", "safe lowercase scenario tokens", "count 1-400", "viewport 320-4096 x 240-4096"],
+    bounds: ["one session across Lab, game, and dev-scenario", "safe lowercase scenario tokens", "count 1-400", "viewport 320-4096 x 240-4096"],
     example: { id: "direct_reverse_order", unit: "tank", count: 1, viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
   }),
   "scenario-inspect": descriptor("Inspect bounded visible scenario entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],cameraViewport?:boolean,limit?:int}", {
@@ -248,7 +256,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   "scenario-capture-timelapse": descriptor("Capture sampled dev-scenario frames as a compact H.264 time-lapse and contact sheet.", "{sessionId:string,name?:token,maxDurationMs?:int,sampleEveryMs?:int,fps?:int,speed?:number,viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,presentation?:\"clean\"|\"normal\"}", {
     timeoutClass: "lifecycle-media", recordable: false,
-    variants: ["stops when the scenario concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use scenario camera overview first for a whole-map time-lapse"],
+    variants: ["stops when the scenario concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use dev-scenario camera overview first for a whole-map time-lapse"],
     defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "region=viewport", "presentation=clean"],
     bounds: ["duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<scenario-session-id>", name: "pathing", maxDurationMs: 30000, sampleEveryMs: 500, speed: 4 },
@@ -271,51 +279,66 @@ export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinitio
 
 export const INTERACT_COMMAND_KEYS = Object.freeze(Object.keys(INTERACT_COMMAND_REGISTRY));
 
-const NAMESPACE_COMMAND_KEYS = Object.freeze({
-  lab: Object.freeze(Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
-    (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
-  ).map((name) => [name, name]))),
-  game: Object.freeze({
-    open: "game-open",
-    close: "close",
-    status: "status",
-    inspect: "game-inspect",
-    move: "game-move",
-    camera: "game-camera",
-    screenshot: "game-screenshot",
-    "record-start": "game-record-start",
-    "record-stop": "record-stop",
-    "record-wait": "record-wait",
-    "capture-timelapse": "game-capture-timelapse",
-    "capture-cancel": "capture-cancel",
-    "give-up": "game-give-up",
-    shutdown: "shutdown",
-  }),
-  scenario: Object.freeze({
-    open: "scenario-open",
-    close: "close",
-    status: "status",
-    inspect: "scenario-inspect",
-    camera: "scenario-camera",
-    screenshot: "scenario-screenshot",
-    "record-start": "scenario-record-start",
-    "record-stop": "record-stop",
-    "record-wait": "record-wait",
-    "capture-timelapse": "scenario-capture-timelapse",
-    "capture-cancel": "capture-cancel",
-    shutdown: "shutdown",
-  }),
+const NAMESPACE_RECORDS = Object.freeze({
+  lab: namespace(
+    "Arrange and inspect authoritative Lab scenes.",
+    Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
+      (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
+    ).map((name) => [name, name])),
+  ),
+  game: namespace(
+    "Observe and minimally control one isolated human-vs-AI match.",
+    {
+      open: "game-open",
+      close: "close",
+      status: "status",
+      inspect: "game-inspect",
+      move: "game-move",
+      camera: "game-camera",
+      screenshot: "game-screenshot",
+      "record-start": "game-record-start",
+      "record-stop": "record-stop",
+      "record-wait": "record-wait",
+      "capture-timelapse": "game-capture-timelapse",
+      "capture-cancel": "capture-cancel",
+      "give-up": "game-give-up",
+      shutdown: "shutdown",
+    },
+  ),
+  "dev-scenario": namespace(
+    "Observe and capture one authored server-backed dev scenario.",
+    {
+      open: "scenario-open",
+      close: "close",
+      status: "status",
+      inspect: "scenario-inspect",
+      camera: "scenario-camera",
+      screenshot: "scenario-screenshot",
+      "record-start": "scenario-record-start",
+      "record-stop": "record-stop",
+      "record-wait": "record-wait",
+      "capture-timelapse": "scenario-capture-timelapse",
+      "capture-cancel": "capture-cancel",
+      shutdown: "shutdown",
+    },
+  ),
 });
 
+export const INTERACT_NAMESPACE_NAMES = Object.freeze(Object.keys(NAMESPACE_RECORDS));
 export const INTERACT_NAMESPACES = Object.freeze(Object.fromEntries(
-  Object.entries(NAMESPACE_COMMAND_KEYS).map(([namespace, commands]) => [namespace, Object.freeze(Object.keys(commands))]),
+  Object.entries(NAMESPACE_RECORDS).map(([namespace, record]) => [namespace, Object.freeze(Object.keys(record.commands))]),
+));
+export const INTERACT_NAMESPACE_SUMMARIES = Object.freeze(Object.fromEntries(
+  Object.entries(NAMESPACE_RECORDS).map(([namespace, record]) => [namespace, record.summary]),
 ));
 
 // Backward-compatible name for the original public Lab command catalog.
 export const INTERACT_COMMANDS = INTERACT_NAMESPACES.lab;
 
 export function namespaceCommandKey(namespace: string, command: string): string | null {
-  return (NAMESPACE_COMMAND_KEYS as Record<string, Readonly<Record<string, string>>>)[namespace]?.[command] || null;
+  if (!Object.hasOwn(NAMESPACE_RECORDS, namespace)) return null;
+  const commands = (NAMESPACE_RECORDS as Record<string, NamespaceRecord>)[namespace].commands;
+  return Object.hasOwn(commands, command) ? commands[command] : null;
 }
 
 export function namespaceCommandDefinition(namespace: string, command: string): CommandDefinition | null {
@@ -324,7 +347,7 @@ export function namespaceCommandDefinition(namespace: string, command: string): 
 }
 
 export function commandDefinition(command: string): CommandDefinition | null {
-  return INTERACT_COMMAND_REGISTRY[command] || null;
+  return Object.hasOwn(INTERACT_COMMAND_REGISTRY, command) ? INTERACT_COMMAND_REGISTRY[command] : null;
 }
 
 export function validateCommandInput(command: string, input: unknown) {

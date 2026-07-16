@@ -115,7 +115,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node; when its builder arrives, owned and allied units on that footprint are moved to nearby clear positions before placement is revalidated, while enemy units remain blockers. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a manual unit at a production building. A legal manual request is accepted without current Steel, Oil, or supply; an unpaid front item waits at zero progress until it can pay and reserve supply. Later FIFO items do not prepay. Standing repeat production remains separate and creates no queue item until it can pay. |
 | `adjustProductionRepeat` | `buildings: u32[]`, `unit: string`, `delta: -1\|1` | Atomically adjust `unit` across the selected owned completed compatible producers. `+1` enables it on one producer that does not already repeat it, preferring the producer with the fewest standing repeat units; `-1` removes it from one producer that repeats it, preferring the producer with the most standing repeat units so another automatic order survives when possible. Stable opposite entity-id tie-breaks make repeated additions followed by removals reversible. Other delta values are ignored. When a producer's ordinary unit queue is empty, it silently retries the ordered list's current entry. Each successful automatic enqueue advances to the next enabled unit, so two active units alternate. Once inserted, a repeated unit is an ordinary FIFO item, so later manual production queues behind it. Any production cancel clears the affected producer's whole repeat list. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available; prerequisite research must still already be complete when the command is accepted. Current Kriegsia upgrade ids: `methamphetamines` and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available; prerequisite research must still already be complete when the command is accepted. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `panzerfausts` gives current and future Riflemen one disposable launcher shot. `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
 | `cancel`     | `building: u32`, `construction?: bool` | With `construction: true`, cancel an owned unfinished building for a full construction-cost refund; otherwise cancel the latest item in a completed building's production queue. The explicit construction scope prevents a delayed scaffold action from cancelling production after the building completes. Attached builders return to ordinary order handling when a construction site is canceled. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]`, `queued?: bool` | Stand ground. Without `queued`, clear active and queued unit orders immediately. With `queued: true`, append a terminal hold-position intent so units complete earlier queued stages before standing ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
@@ -549,9 +549,8 @@ not become valid `setFaction`, AI-seat, replay-branch, or post-match replay ids 
 `docs/design/faction-architecture-inventory.md`, the lifecycle validator, and protocol parity in
 the same change.
 
-Prediction start compatibility metadata is present for live active players and for the bounded
-local-only active `supply_stress_active` dev recipient used by the frame-budget harness. Spectator,
-replay-viewer, Lab, and ordinary dev-watch recipients omit it. Clients MUST keep
+Prediction start compatibility metadata is present for live active players. Spectator,
+replay-viewer, Lab, and dev-watch recipients omit it. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
 and, when both sides know a build id, `predictionBuildId` matches the client bundle id. Mismatches
 fall back to authoritative snapshots/tracking instead of running local visual reconciliation.
@@ -685,7 +684,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 40. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 41. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -711,7 +710,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 40,
+  "v": 41,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -742,16 +741,16 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 25 `scout_plane` (24 removed with the standalone Panzerfaust unit) |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
-| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[14, id, toKind]` legacy Panzerfaust same-id conversion, `[15, to]` missed direct shot |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
 
 #### 2.4.1 Boundary inventory
 
@@ -821,9 +820,10 @@ range remains the fallback for render-only range overlays.
 `occupiedTrenchId` is present while a visible eligible infantry unit is actively stopped in a
 trench. It names the neutral trench terrain id already projected through `trenches`; it is omitted
 while the unit is digging in, slotting is unavailable, merely near a trench, or moving out.
-`panzerfaustLoaded` is present for visible Panzerfaust units. It is `false` while the fired
-projectile is in flight or the spent launcher is being discarded before Rifleman conversion, so the client can hide the warhead from unit art;
-omitted values should be treated as loaded for older data and non-Panzerfaust entities.
+`panzerfaustLoaded` is present for visible Riflemen owned by a player with completed Panzerfausts
+research. It is `true` until launch and `false` for the rest of that Rifleman's lifetime after
+launch, so the client swaps from loaded launcher art to normal Rifleman art. It is omitted for
+unupgraded Riflemen and all other entities.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center and source Command Car id; enemy projections that can see the plane omit
 this state. Scout Plane
@@ -924,7 +924,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
-  panzerfaustLoaded?: bool,       // Panzerfaust only; false after its disposable shot is launched
+  panzerfaustLoaded?: bool,       // upgraded Riflemen only; false after disposable launch
   scoutPlane?: {                 // owner/full-world diagnostics only; enemies omit this private state
     orbitCenter?: [f32, f32],
     sourceCommandCar?: u32
@@ -981,7 +981,6 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
 { e: "panzerfaustLaunch", from: u32, fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
 { e: "panzerfaustImpact", x: f32, y: f32 }
-{ e: "panzerfaustConversion", id: u32, toKind: string }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
@@ -1061,9 +1060,8 @@ team-current fog can see the shooter or launch point; the endpoint must be withh
 visible to that recipient or otherwise already safe through the recipient's projection. Panzerfaust
 impact events carry only the impact point and are sent to the firing team and to enemy recipients
 whose team-current fog can see that point; they do not imply damage, target identity, terrain
-reveal, or exploration. Panzerfaust conversion events report the same-id transition to Rifleman
-after the spent launcher's recovery presentation; `panzerfaustLoaded` plus launch/impact events
-show the one-shot lifecycle before that conversion.
+reveal, or exploration. The firing entity remains a Rifleman throughout; `panzerfaustLoaded` flips
+to false at launch while the detached projectile resolves through the launch/impact events.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 #### 2.5.1 Projection contract summary

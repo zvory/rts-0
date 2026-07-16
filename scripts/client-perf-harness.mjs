@@ -9,10 +9,7 @@ import {
   formatBakeoffMarkdown,
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
-import {
-  initializeWorkloadSetup,
-  validateActiveSupplyStressSample,
-} from "./client-perf/workload_setup.mjs";
+import { initializeWorkloadSetup } from "./client-perf/workload_setup.mjs";
 import {
   cleanupBrowserProfile,
   configurePageEmulation,
@@ -70,7 +67,7 @@ async function main() {
   fs.mkdirSync(outputRoot, { recursive: true });
   const puppeteer = await loadPuppeteer();
   const chrome = findChrome(args.chrome);
-  const server = await startOrReuseServer(args, selected);
+  const server = await startOrReuseServer(args);
   const browser = await launchBrowser(puppeteer, chrome, args);
 
   try {
@@ -1468,10 +1465,6 @@ function workloadSetupErrors(workload, setupResult) {
   if (minSelected && (setupResult.selectedCount || 0) < minSelected) {
     errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
   }
-  errors.push(...validateActiveSupplyStressSample(
-    setupResult.activeSupplyStress,
-    workload.setup?.activeSupplyStress,
-  ));
   return errors;
 }
 
@@ -1482,7 +1475,7 @@ async function prepareWorkload(workload) {
   fs.copyFileSync(workload.source, path.join(targetDir, "replay.json"));
 }
 
-async function startOrReuseServer(args, selectedWorkloads = []) {
+async function startOrReuseServer(args) {
   const fromEnv = args.baseUrl || process.env.RTS_URL;
   if (fromEnv && await isHealthy(fromEnv)) {
     return {
@@ -1523,12 +1516,7 @@ async function startOrReuseServer(args, selectedWorkloads = []) {
     env: {
       ...process.env,
       RTS_ADDR: `127.0.0.1:${port}`,
-      // Active prediction must be measured against the production 30 Hz
-      // cadence. The accelerated 5 ms harness clock outruns the browser WASM
-      // predictor and turns the active-player workload into disabled-prediction
-      // evidence before sampling begins.
-      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS
-        || (selectedWorkloads.some((workload) => workload.kind === "activeDevScenario") ? "33" : "5"),
+      RTS_TEST_TICK_MS: process.env.RTS_TEST_TICK_MS || "5",
       RTS_MATCH_SEED: process.env.RTS_MATCH_SEED || "1",
     },
     stdio: ["ignore", log, log],
@@ -1644,9 +1632,7 @@ async function loadPuppeteer() {
 }
 
 function selectedWorkloads(args) {
-  const ids = args.activeSupplyPair
-    ? ["supply-200-active", "supply-300-active"]
-    : args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
+  const ids = args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
   if (ids.length === 0) return DEFAULT_WORKLOADS;
   const byId = new Map(WORKLOADS.map((workload) => [workload.id, workload]));
   return ids.map((id) => {
@@ -1660,7 +1646,6 @@ function parseArgs(argv) {
   const args = {
     list: false,
     renderLagSuite: false,
-    activeSupplyPair: false,
     workloads: [],
     durationMs: DEFAULT_DURATION_MS,
     outputRoot: DEFAULT_OUTPUT_ROOT,
@@ -1692,7 +1677,6 @@ function parseArgs(argv) {
     };
     if (arg === "--list") args.list = true;
     else if (arg === "--render-lag-suite") args.renderLagSuite = true;
-    else if (arg === "--active-supply-pair") args.activeSupplyPair = true;
     else if (arg === "--stress-matrix") args.stressMatrix = true;
     else if (arg === "--trace") args.trace = true;
     else if (arg === "--snapshot-codec-bakeoff") args.snapshotCodecBakeoff = true;
@@ -1739,9 +1723,6 @@ function parseArgs(argv) {
   if (args.renderLagSuite && args.workloads.length > 0) {
     throw new Error("--render-lag-suite cannot be combined with --workload");
   }
-  if (args.activeSupplyPair && (args.renderLagSuite || args.workloads.length > 0)) {
-    throw new Error("--active-supply-pair cannot be combined with --render-lag-suite or --workload");
-  }
   return args;
 }
 
@@ -1751,7 +1732,6 @@ function printHelp() {
 Options:
   --list                         List available workloads.
   --render-lag-suite             Run the full render-lag comparison workload set.
-  --active-supply-pair           Run exact active-player 200/300 workloads with identical settings.
   --stress-matrix                Run workloads across CPU, viewport, DPR, and repeat matrix cells.
   --workload <id>                Run one workload; repeatable. Defaults to all non-opt-in workloads.
   --seconds <n>                  Browser collection time per workload. Default: ${DEFAULT_DURATION_MS / 1000}.

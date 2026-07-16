@@ -57,26 +57,15 @@ impl DevScenarioDriver {
     }
 }
 
-const SUPPLY_STRESS_ACTIVE_SEED: u32 = 0x5a00_0300;
-
 impl RoomTask {
     pub(super) fn on_join_dev_watch(
         &mut self,
         player_id: u32,
         name: String,
-        requested_spectator: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
         if self.players.contains_key(&player_id) {
-            let _ = ack.send(false);
-            return;
-        }
-        let active_supply_player = matches!(
-            &self.mode,
-            RoomMode::DevScenario(config) if matches!(config.id, DevScenarioId::SupplyStressActive)
-        ) && !requested_spectator;
-        if active_supply_player && self.players.values().any(|player| !player.spectator) {
             let _ = ack.send(false);
             return;
         }
@@ -87,7 +76,7 @@ impl RoomTask {
                 name,
                 color: "#6f8fa8".to_string(),
                 ready: true,
-                spectator: !active_supply_player,
+                spectator: true,
                 msg_tx,
                 head_of_line_count: 0,
                 last_received_client_seq: 0,
@@ -136,11 +125,7 @@ impl RoomTask {
             | RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevScenario(config) => {
                 let _ = default_faction_id_for(FactionRequestContext::DevScenario);
-                let seed = if matches!(config.id, DevScenarioId::SupplyStressActive) {
-                    SUPPLY_STRESS_ACTIVE_SEED
-                } else {
-                    match_seed()
-                };
+                let seed = match_seed();
                 macro_rules! session_from_setup {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
@@ -237,18 +222,6 @@ impl RoomTask {
                             seed,
                         )?)
                     }
-                    DevScenarioId::PanzerfaustDuel
-                    | DevScenarioId::PanzerfaustWindupCancel
-                    | DevScenarioId::PanzerfaustTargetDeath
-                    | DevScenarioId::PanzerfaustEntrenchedRange
-                    | DevScenarioId::PanzerfaustMethamphetamines => {
-                        session_from_setup!(Game::new_panzerfaust_inspection_scenario(
-                            config.id.room_id(),
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
                     DevScenarioId::TankCoaxInspection => {
                         session_from_setup!(Game::new_tank_coax_inspection_scenario(
                             config.unit,
@@ -256,9 +229,6 @@ impl RoomTask {
                             seed,
                         )?)
                     }
-                    DevScenarioId::SupplyStressActive => session_from_setup!(
-                        Game::new_supply_stress_scenario(config.count as u32, seed)?,
-                    ),
                 }
             }
         }
@@ -271,11 +241,7 @@ impl RoomTask {
             return;
         };
         let payload = game.start_payload();
-        let role = if player.spectator {
-            RecipientRole::Spectator
-        } else {
-            RecipientRole::ActivePlayer
-        };
+        let role = RecipientRole::Spectator;
         let diagnostics = self.projection_policy().diagnostic_capabilities_for(role);
         let start_policy = self.session_policy();
         let builder = StartPayloadBuilder::simulation(start_policy, &payload);
@@ -285,11 +251,7 @@ impl RoomTask {
             [LaunchRecipient {
                 connection_id: watcher_id,
                 payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
-                prediction: if player.spectator {
-                    LaunchPrediction::Disabled
-                } else {
-                    LaunchPrediction::Enabled
-                },
+                prediction: LaunchPrediction::Disabled,
                 role,
                 diagnostics,
                 clear_pending_snapshot: false,

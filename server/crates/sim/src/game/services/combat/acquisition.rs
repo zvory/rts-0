@@ -1,5 +1,5 @@
 use crate::game::entity::{
-    movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order,
+    movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order, WeaponSetup,
 };
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
@@ -124,7 +124,7 @@ pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bo
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::HoldPosition => CombatMode::Opportunistic,
-        Order::Idle if entrenchment_combat::is_actively_entrenched(e) => CombatMode::Opportunistic,
+        Order::Idle if idle_unit_holds_position(e) => CombatMode::Opportunistic,
         Order::AttackMove(_) => CombatMode::Aggressive,
         Order::Move(_) if moving_fire_move_order_holds_path(e, can_fire_while_moving) => {
             CombatMode::Opportunistic
@@ -133,6 +133,15 @@ pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bo
         Order::Idle if e.is_unit() && !is_passive_idle_unit(e.kind) => CombatMode::Aggressive,
         _ => CombatMode::Passive,
     }
+}
+
+fn idle_unit_holds_position(e: &Entity) -> bool {
+    entrenchment_combat::is_actively_entrenched(e)
+        || (e.kind == EntityKind::MachineGunner
+            && matches!(
+                e.weapon_setup(),
+                WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+            ))
 }
 
 #[cfg(test)]

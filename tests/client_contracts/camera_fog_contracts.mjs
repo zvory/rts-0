@@ -220,6 +220,66 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
     barracksFog.isVisible(6, 4) === false,
     "barracks sight should stop beyond east perimeter",
   );
+
+  const cachedFog = new Fog(8, 8, terrain);
+  let cachedRayCalls = 0;
+  const cachedRayClear = cachedFog._rayClear.bind(cachedFog);
+  cachedFog._rayClear = (...args) => {
+    cachedRayCalls += 1;
+    return cachedRayClear(...args);
+  };
+  const stationarySource = [{ id: 7, kind: "worker", x: 48, y: 80 }];
+  cachedFog.update(stationarySource, 32);
+  const firstRayCalls = cachedRayCalls;
+  cachedFog.update(stationarySource, 32);
+  const secondRayCalls = cachedRayCalls;
+  cachedFog.update(stationarySource, 32);
+  assert(firstRayCalls > 0, "local fog computes the first stationary visibility stamp");
+  assert(secondRayCalls > firstRayCalls, "local fog verifies an unchanged source before caching");
+  assert(cachedRayCalls === secondRayCalls, "an exact stationary visibility stamp reuses no stale rays");
+
+  const referenceFog = new Fog(24, 24, new Array(24 * 24).fill(TERRAIN.GRASS));
+  const memoizedFog = new Fog(24, 24, new Array(24 * 24).fill(TERRAIN.GRASS));
+  for (let frame = 0; frame < 60; frame++) {
+    if (frame === 25) {
+      const nextTerrain = new Array(24 * 24).fill(TERRAIN.GRASS);
+      for (let y = 3; y < 22; y += 4) nextTerrain[y * 24 + (y * 7) % 23] = TERRAIN.ROCK;
+      referenceFog.updateTerrain(nextTerrain);
+      memoizedFog.updateTerrain(nextTerrain.slice());
+    }
+    const tileSize = frame < 40 ? 32 : 16;
+    const sources = [
+      { id: 1, kind: "worker", x: 176, y: 208 },
+      {
+        id: 2,
+        kind: "rifleman",
+        x: 80 + (frame % 9) * 5.25,
+        y: 144 + (frame % 7) * 3.75,
+      },
+      {
+        id: 3,
+        kind: frame < 35 ? KIND.BARRACKS : "worker",
+        x: 336,
+        y: 304,
+      },
+    ];
+    memoizedFog.update(sources, tileSize);
+    referenceFog.update(sources.map(({ id: _id, ...source }) => source), tileSize);
+    assert(
+      memoizedFog.visibleGrid.every((value, index) => value === referenceFog.visibleGrid[index]),
+      `memoized fog preserves current visibility on frame ${frame}`,
+    );
+    assert(
+      memoizedFog.exploredGrid.every((value, index) => value === referenceFog.exploredGrid[index]),
+      `memoized fog preserves explored visibility on frame ${frame}`,
+    );
+    assert(
+      memoizedFog.revision === referenceFog.revision
+        && memoizedFog.visibleRevision === referenceFog.visibleRevision
+        && memoizedFog.exploredRevision === referenceFog.exploredRevision,
+      `memoized fog preserves revision semantics on frame ${frame}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

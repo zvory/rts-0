@@ -1,6 +1,6 @@
 import { SNAPSHOT_MS, STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
-import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
+import { liveRigDefinitionFor, liveRigKeyForEntity, liveRigRoutesFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext, sampleRigAnimation } from "./rigs/animation.js";
@@ -149,19 +149,20 @@ function unitVehicleBody(kind, stat) {
 
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const visualOverride = pools.visualOverride || null;
-  const definition = visualOverride?.definition || liveRigDefinitionFor(this._liveRigDefinitionsByKind, e.kind);
+  const rigKey = liveRigKeyForEntity(e);
+  const definition = visualOverride?.definition || liveRigDefinitionFor(this._liveRigDefinitionsByKind, rigKey);
   if (!definition) {
     throw new Error(`missing live SVG rig definition for unit kind ${e.kind}`);
   }
 
-  const routes = liveRigRoutesFor(e.kind, pools);
+  const routes = liveRigRoutesFor(rigKey, pools);
   if (routes.length === 0) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
   }
 
   const visualFrameStrip = !visualOverride ? pools.visualFrameStrip || null : null;
-  const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, e.kind));
-  const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(e.kind) || null;
+  const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, rigKey));
+  const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(rigKey) || null;
   if (frameStrip && frameStripTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     applyRigAlpha(renderContext, pools.alpha);
@@ -198,8 +199,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     return rendered;
   }
 
-  const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, e.kind);
-  const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(e.kind) ?? null;
+  const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, rigKey);
+  const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(rigKey) ?? null;
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     applyRigAlpha(renderContext, pools.alpha);

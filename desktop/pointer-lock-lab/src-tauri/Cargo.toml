@@ -1,0 +1,18 @@
+[package]
+name = "pointer-lock-lab"
+version = "0.1.0"
+edition = "2021"
+description = "An isolated Tauri Pointer Lock test harness"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.3", features = [] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

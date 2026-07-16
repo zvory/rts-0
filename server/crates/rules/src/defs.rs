@@ -63,11 +63,7 @@ impl TechRequirement {
 
 const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
-const BARRACKS_UNITS: &[EntityKind] = &[
-    EntityKind::Rifleman,
-    EntityKind::MachineGunner,
-    EntityKind::Panzerfaust,
-];
+const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -78,7 +74,6 @@ const FACTORY_UNITS: &[EntityKind] = &[
     EntityKind::Tank,
     EntityKind::CommandCar,
 ];
-const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
@@ -170,26 +165,6 @@ pub const UNITS: &[UnitDef] = &[
         train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
     },
     UnitDef {
-        kind: EntityKind::Panzerfaust,
-        stats: balance::UnitStats {
-            hp: 45,
-            dmg: 5,
-            range_tiles: 4,
-            cooldown: 16,
-            speed: 1.6,
-            sight_tiles: 11,
-            cost_steel: 60,
-            cost_oil: 15,
-            supply: 1,
-            build_ticks: 400,
-            radius: 9.0,
-        },
-        armor_class: ArmorClass::Small,
-        weapon: WeaponClass::SmallArms,
-        trained_at: Some(EntityKind::Barracks),
-        train_requirement: TechRequirement::All(TRAINING_CENTRE_REQUIRED),
-    },
-    UnitDef {
         kind: EntityKind::AntiTankGun,
         stats: balance::UnitStats {
             hp: 45,
@@ -274,7 +249,7 @@ pub const UNITS: &[UnitDef] = &[
         stats: balance::UnitStats {
             hp: 100,
             dmg: 6,
-            range_tiles: 7,
+            range_tiles: 6,
             cooldown: 6,
             speed: 2.35,
             sight_tiles: 15,
@@ -317,7 +292,7 @@ pub const UNITS: &[UnitDef] = &[
             range_tiles: 0,
             cooldown: 0,
             speed: 2.35,
-            sight_tiles: 13,
+            sight_tiles: 8,
             cost_steel: 150,
             cost_oil: 75,
             supply: 4,
@@ -362,7 +337,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 750,
-            provides_supply: balance::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -382,7 +356,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 0,
-            provides_supply: balance::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -402,7 +375,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 2,
             foot_h: 2,
             build_ticks: 300,
-            provides_supply: balance::DEPOT_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -422,7 +394,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 2,
             build_ticks: 200,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -430,7 +401,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: BARRACKS_UNITS,
-        build_requires: CITY_CENTRE_REQUIRED,
+        build_requires: &[],
     },
     BuildingDef {
         kind: EntityKind::TrainingCentre,
@@ -442,7 +413,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 2,
             build_ticks: 560,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -462,7 +432,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 749,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -482,7 +451,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: balance::TICK_HZ * 15,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -502,7 +470,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 599,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -522,7 +489,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 1,
             foot_h: 1,
             build_ticks: balance::TICK_HZ * 10,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -542,7 +508,6 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 1,
             foot_h: 1,
             build_ticks: balance::TICK_HZ * 20,
-            provides_supply: 0,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -634,7 +599,6 @@ mod tests {
                 EntityKind::Golem,
                 EntityKind::Rifleman,
                 EntityKind::MachineGunner,
-                EntityKind::Panzerfaust,
                 EntityKind::AntiTankGun,
                 EntityKind::MortarTeam,
                 EntityKind::Artillery,
@@ -738,55 +702,12 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_stats_use_rifle_defaults_and_barracks_training() {
-        let def = unit_def(EntityKind::Panzerfaust).expect("panzerfaust def");
-        let rifleman_speed = unit_def(EntityKind::Rifleman)
-            .expect("rifleman def")
-            .stats
-            .speed;
-
-        assert_eq!(def.stats.hp, 45);
-        assert_eq!(def.stats.dmg, 5);
-        assert_eq!(def.stats.range_tiles, 4);
-        assert_eq!(def.stats.cooldown, 16);
-        assert_eq!(def.stats.speed, rifleman_speed);
-        assert_eq!(def.stats.sight_tiles, 11);
-        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (60, 15));
-        assert_eq!(def.stats.supply, 1);
-        assert_eq!(def.stats.build_ticks, 400);
-        assert_eq!(def.stats.radius, 9.0);
-        assert_eq!(def.armor_class, ArmorClass::Small);
-        assert_eq!(def.weapon, WeaponClass::SmallArms);
-        assert_eq!(def.trained_at, Some(EntityKind::Barracks));
-        assert_eq!(
-            def.train_requirement,
-            TechRequirement::All(TRAINING_CENTRE_REQUIRED)
-        );
-        assert!(
-            building_def(EntityKind::Barracks)
-                .expect("barracks def")
-                .trains
-                .contains(&EntityKind::Panzerfaust),
-            "Panzerfaust should be exposed through Barracks production"
-        );
-    }
-
-    #[test]
     fn gun_works_uses_square_vehicle_tech_footprint() {
         let stats = building_def(EntityKind::Steelworks)
             .expect("gun works def")
             .stats;
 
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
-    }
-
-    #[test]
-    fn city_centre_provides_start_supply() {
-        let city_centre = building_def(EntityKind::CityCentre)
-            .expect("city centre def")
-            .stats;
-
-        assert_eq!(city_centre.provides_supply, balance::CITY_CENTRE_SUPPLY);
     }
 
     #[test]
@@ -812,7 +733,6 @@ mod tests {
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (30, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
         assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
-        assert_eq!(def.stats.provides_supply, 0);
         assert_eq!(def.armor_class, ArmorClass::Armored);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());
@@ -828,7 +748,6 @@ mod tests {
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (50, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
         assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 20);
-        assert_eq!(def.stats.provides_supply, 0);
         assert_eq!(def.armor_class, ArmorClass::Small);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());

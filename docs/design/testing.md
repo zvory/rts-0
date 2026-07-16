@@ -161,16 +161,11 @@ Current scenario ids:
   `explicit_infantry_attack`.
 - `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
-- `panzerfaust_duel` — one loaded Panzerfaust versus one Tank for launch, impact, damage, reload,
-  and repeated-fire inspection.
-- `panzerfaust_windup_cancel` — starts a Panzerfaust attack, then issues movement during windup to
-  inspect cancellation without shot consumption.
-- `panzerfaust_target_death` — pairs normal and boosted Panzerfausts against one low-health Tank so
-  a projectile reaches a target that died during travel.
-- `panzerfaust_entrenched_range` — compares occupied-trench and exposed Panzerfausts holding
-  position against Tanks at four-tile range.
-- `panzerfaust_methamphetamines` — compares normal and Methamphetamines Panzerfaust firing and
-  reload timing side by side.
+- Rifleman Panzerfaust inspection is composed in Lab: enable `panzerfausts` research for the owner,
+  spawn Riflemen plus Scout Car/Tank/Command Car targets, and compare loaded versus spent art,
+  cancellable windup, detached impact, exact target filtering, and explicit-Attack chase behavior.
+  The bundled `render-preview` and `supply-300-hellhole` scenarios include loaded Riflemen for
+  renderer and high-density coverage.
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
   and buildings around the coax arc for secondary-machine-gun inspection.
@@ -180,7 +175,7 @@ dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances ex
 authoritative tick while paused. Normal seek/reset controls are replay-only.
 
 Scenario setup is server-side only under `server/crates/sim/src/game/setup/dev_scenarios.rs`; do
-not expose arbitrary spawning or map editing through client commands. The Interact `scenario`
+not expose arbitrary spawning or map editing through client commands. The Interact `dev-scenario`
 namespace may observe, frame, screenshot, record, and time-lapse these watcher rooms; its artifacts
 remain confined under `target/interact/scenario/<session-id>/`.
 
@@ -288,7 +283,8 @@ canary runs own a private server; the browser shard passes its existing loopback
   performance workloads, stress-matrix dimensions, CPU/flame-graph capture, harness script, or
   documented performance workflow. Workload execution uses local headless Chrome by default and
   writes bounded JSON summaries under `target/client-perf`; it is measurement-only and does not add
-  FPS gates. The offline Hellhole stream remains in the default workload set, while the live
+  FPS gates. The offline Hellhole stream remains in the default workload set as active Player 1's
+  fog-filtered 2v2 projection, while the live
   server/client Hellhole is opt-in and requires an explicit workload id. The integrated launcher
   exposes its controlled Chrome window for visual inspection without changing workload identity.
   Stress-matrix runs vary CPU throttle, viewport, DPR, and repeat count, then write JSON and
@@ -305,13 +301,18 @@ canary runs own a private server; the browser shard passes its existing loopback
   without added latency and deterministic pixel parity is preserved.
 - Hellhole server performance: run `scripts/hellhole-perf-harness.sh --ticks 900` in release mode.
   This direct API-in/API-out lane includes simulation, full-world projection, compaction, and
-  MessagePack encoding but no room task, network transport, browser, or wall-clock pacing. Use
+  MessagePack encoding plus pre-tick scripted commands and respawn placement, but no room task,
+  network transport, browser, or wall-clock pacing. Its JSON reports shuttle commands/selected
+  units, deaths, respawn batches/units, and the minimum outgoing snapshot entity count. The entity
+  invariant is checked after pre-tick actions; a death tick's outgoing snapshot may intentionally
+  be lower until the following pre-tick restores the roster. Use
   `scripts/hellhole-perf-harness.sh --integrated` only when the live Lab server and visible Pixi
   client need to be inspected together; do not use its timings as isolated server evidence. The
-  canonical reference-MacBook goal is `realtime_factor >= 8.0` on one serial execution lane with no
-  subsystem parallelization. For the default workload, that is at most 3.75 seconds elapsed and at
-  most 4.167 ms average API round-trip work. Passing the normal 33.3 ms live tick budget is not a
-  substitute for meeting this headroom target.
+  old static fixture's `realtime_factor >= 8.0` target is not a gate for the new command/death churn
+  workload. Compare the full counter shape and timings like-for-like on the reference machine until
+  a repeated churn baseline establishes a new headroom target. The canonical scenario is 2v2
+  (`1+3` versus `2+4`); the server lane keeps its full-world serialization pressure while the
+  checked-in client stream uses Player 1's normal team-fog projection.
 - Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
   when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
   change. The harness compares Worker and Tank part and composition samples.

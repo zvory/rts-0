@@ -153,7 +153,6 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_sim::game::entity::EntityKind;
     use rts_sim::game::{Game, PlayerInit};
 
     fn artifact_dir(name: &str) -> std::path::PathBuf {
@@ -233,20 +232,6 @@ mod tests {
             room_mode_for("__lab__:sandbox:scenario=unknown"),
             RoomMode::Normal
         ));
-    }
-
-    #[test]
-    fn room_mode_for_accepts_panzerfaust_dev_scenario_room() {
-        match room_mode_for("__dev_scenario__:panzerfaust_target_death:unit=panzerfaust:count=1") {
-            RoomMode::DevScenario(config) => {
-                assert!(matches!(config.id, DevScenarioId::PanzerfaustTargetDeath));
-                assert_eq!(config.unit, EntityKind::Panzerfaust);
-                assert_eq!(config.count, 1);
-                assert_eq!(config.blocker, None);
-                assert_eq!(config.case, None);
-            }
-            _ => panic!("safe Panzerfaust dev scenario room should parse as dev mode"),
-        }
     }
 
     #[test]

@@ -274,7 +274,7 @@ fn lab_spawn_unit_repairs_supply_and_snapshot_fog() {
 }
 
 #[test]
-fn lab_spawn_building_repairs_supply_cap() {
+fn lab_spawn_building_keeps_intrinsic_supply_cap() {
     let mut game = new_game();
     let before_cap = game.snapshot_for(1).supply_cap;
     let (x, y) = footprint_center(&game.state.map, EntityKind::Depot, 28, 28);
@@ -288,10 +288,7 @@ fn lab_spawn_building_repairs_supply_cap() {
     }))
     .expect("depot should spawn");
 
-    assert_eq!(
-        game.snapshot_for(1).supply_cap,
-        before_cap + rules::economy::supply_provided(EntityKind::Depot)
-    );
+    assert_eq!(game.snapshot_for(1).supply_cap, before_cap);
 }
 
 #[test]
@@ -446,6 +443,36 @@ fn lab_bulk_spawn_accepts_400_rejects_401_and_is_atomic() {
         })
     ));
     assert_eq!(game.state.entities.ids(), before_ids);
+}
+
+#[test]
+fn lab_unit_spawn_planner_is_bounded_non_mutating_and_reserves_earlier_spawns() {
+    let mut game = new_game();
+    let before = game.state.entities.ids();
+    let candidates = [tile_center(&game, 30, 30), tile_center(&game, 34, 30)];
+    let planned = game
+        .lab_plan_unit_spawns(
+            &[(1, EntityKind::Rifleman), (1, EntityKind::Rifleman)],
+            &candidates,
+        )
+        .expect("bounded planning should succeed");
+    assert_eq!(planned.len(), 2);
+    assert_ne!((planned[0].x, planned[0].y), (planned[1].x, planned[1].y));
+    assert_eq!(
+        game.state.entities.ids(),
+        before,
+        "planning must not mutate"
+    );
+    game.apply_lab_op(LabOp::SpawnEntities(planned))
+        .expect("the planned atomic batch should remain valid");
+
+    let too_many = vec![(0.0, 0.0); LAB_PLACEMENT_PLAN_CANDIDATE_LIMIT + 1];
+    assert!(matches!(
+        game.lab_plan_unit_spawns(&[(1, EntityKind::Rifleman)], &too_many),
+        Err(LabError::BatchSize { .. })
+    ));
+    let owned = game.lab_owned_units(1).expect("authoritative roster");
+    assert!(owned.iter().any(|(_, kind)| *kind == EntityKind::Rifleman));
 }
 
 #[test]

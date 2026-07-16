@@ -192,6 +192,7 @@ export function buildCommandCardContextCatalog() {
     { id: "barracks-train", card: buildCommandCardDescriptors(ctx([baseEntities[1]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
     { id: "gun-works-train", card: buildCommandCardDescriptors(ctx([baseEntities[5]])) },
+    { id: "training-centre", card: buildCommandCardDescriptors(ctx([baseEntities[2]], { upgrades: [] })) },
     { id: "research-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
     {
       id: "research-complex-medium-guns",
