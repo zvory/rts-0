@@ -415,3 +415,73 @@ fn unit_blocked_build_clears_after_three_second_timeout() {
         Some(Event::Notice { msg, .. }) if msg == "Cannot build there"
     ));
 }
+
+#[test]
+fn eject_helper_uses_standable_center_of_workers_current_tile() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let building = entities
+        .spawn_building(1, EntityKind::Depot, bx, by, true)
+        .expect("depot should spawn");
+    let rect = crate::game::services::geometry::building_rect_for_entity(
+        &map,
+        entities.get(building).expect("depot should exist"),
+    )
+    .expect("depot rect");
+    let start = (rect.max_x + 0.5, by + 3.0);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, start.0, start.1)
+        .expect("worker should spawn");
+    let tile = map.tile_of(start.0, start.1);
+    let expected = map.tile_center(tile.0, tile.1);
+    let occupancy = Occupancy::build(&map, &entities);
+    assert!(
+        !standability::unit_static_standable(
+            &map,
+            &occupancy,
+            EntityKind::Worker,
+            start.0,
+            start.1,
+        ),
+        "worker should begin with its body clipping the depot"
+    );
+    assert!(
+        standability::unit_static_standable(
+            &map,
+            &occupancy,
+            EntityKind::Worker,
+            expected.0,
+            expected.1,
+        ),
+        "the center of the worker's current tile should be a valid destination"
+    );
+
+    eject_worker_from_static_overlap(&map, &mut entities, worker);
+
+    let worker = entities.get(worker).expect("worker should survive");
+    assert_eq!((worker.pos_x, worker.pos_y), expected);
+}
+
+#[test]
+fn eject_helper_searches_beyond_eight_tiles() {
+    let mut map = flat_map(24);
+    map.terrain.fill(crate::protocol::terrain::ROCK);
+    let destination_tile = (20, 12);
+    map.terrain[(destination_tile.1 * map.size + destination_tile.0) as usize] =
+        crate::protocol::terrain::GRASS;
+    let mut entities = EntityStore::new();
+    let start = map.tile_center(10, 12);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, start.0, start.1)
+        .expect("worker should spawn");
+
+    eject_worker_from_static_overlap(&map, &mut entities, worker);
+
+    let worker = entities.get(worker).expect("worker should survive");
+    assert_eq!(
+        (worker.pos_x, worker.pos_y),
+        map.tile_center(destination_tile.0, destination_tile.1),
+        "ejection must not strand a worker behind an arbitrary eight-tile search limit"
+    );
+}
