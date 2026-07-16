@@ -1056,11 +1056,12 @@ occupants.
 Entrenched combat benefits consume only active occupation through
 `entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen and Machine Gunners gain
 one tile of weapon range through `entrenchment_combat::attack_range_tiles`, including the loaded
-Rifleman's Panzerfaust shot, and idle
-target acquisition treats them like Hold Position: they can acquire and fire at legal targets inside
-current weapon range but do not request idle chase paths. Explicit Attack and other player orders
-remain authoritative and may move or chase the unit out of the trench; command application and lab
-moves clear active occupation before later combat decisions use it.
+Rifleman's Panzerfaust shot. Idle target acquisition treats actively entrenched units and Machine
+Gunners that are setting up or deployed like Hold Position: they can acquire and fire at legal
+targets inside current weapon range but do not request idle chase paths or tear down the weapon to
+pursue. Explicit Attack and other player orders remain authoritative and may move or chase the unit
+out of the trench or emplacement; command application and lab moves clear active occupation before
+later combat decisions use it.
 
 Incoming direct-fire accuracy is weapon-specific: Anti-Tank Gun and Tank cannon shots give each
 infantry body they intersect an independent 50% chance to dodge, while entrenchment adds no miss
