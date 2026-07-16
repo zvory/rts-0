@@ -137,6 +137,7 @@ export class App {
     this.lobby = new Lobby(dom.lobbyScreen, this.net, this.audio, {
       ensureConnected: () => this.ensureConnected(),
       disconnectWhenIdle: () => this.disconnectIdleConnection(),
+      autoRefreshLobbies: !this.requiresConnectionOnStart(),
     });
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
