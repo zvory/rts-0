@@ -13,6 +13,7 @@ export class MatchInputRouter {
     this.captureZone = null;
     this.captureSource = null;
     this.hoverZone = null;
+    this.hoverSource = null;
   }
 
   registerZone(zone) {
@@ -79,15 +80,35 @@ export class MatchInputRouter {
     return false;
   }
 
+  /** Cancel interaction state owned by an event source that has stopped producing events. */
+  releaseSource(source) {
+    let released = false;
+    if (this.captureZone && this.captureSource === source) {
+      const zone = this.captureZone;
+      this._clearCapture();
+      zone.pointerCancel?.({ source });
+      released = true;
+    }
+    if (this.hoverZone && (!this.hoverSource || this.hoverSource === source)) {
+      this._setHoverZone(null, { source });
+      released = true;
+    }
+    return released;
+  }
+
   _clearCapture() {
     this.captureZone = null;
     this.captureSource = null;
   }
 
   _setHoverZone(zone, event) {
-    if (zone === this.hoverZone) return;
+    if (zone === this.hoverZone) {
+      if (zone) this.hoverSource = event?.source || null;
+      return;
+    }
     const previous = this.hoverZone;
     this.hoverZone = zone;
+    this.hoverSource = zone ? event?.source || null : null;
     previous?.pointerLeave?.(event);
   }
 
@@ -227,6 +248,15 @@ export class DomClickInputZone {
       this._showPicker(clickTarget);
     }
     return true;
+  }
+
+  pointerCancel() {
+    const active = !!this.activeRoot;
+    this.activeRoot = null;
+    this.activeTarget = null;
+    this.activeClickTarget = null;
+    this.activeRange = null;
+    return active;
   }
 
   wheel(ev) {

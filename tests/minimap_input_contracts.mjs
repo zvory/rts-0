@@ -706,6 +706,20 @@ function pointerEvent(canvas, clientX, clientY, {
     preview.guns.some((e) => e.id === 31) && preview.guns.some((e) => e.id === 32),
     "setup minimap preview includes anti-tank guns and artillery",
   );
+  assert(h.router.releaseSource("locked"), "pointer-lock exit releases minimap preview ownership");
+  h.clientIntent.updateAntiTankGunSetupPreview({
+    source: "viewport",
+    mouseX: 650,
+    mouseY: 450,
+    guns: selected.slice(1),
+  });
+  h.minimap.updateCommandTargetPreview();
+  assert(
+    h.clientIntent.antiTankGunSetupPreview?.source === "viewport" &&
+      h.clientIntent.antiTankGunSetupPreview?.mouseX === 650,
+    "pointer-lock exit cannot leave a stale minimap point that overwrites native battlefield hover",
+  );
+  assert(h.router.pointerMove(lockedEvent(190, 290, 0)), "re-entering the minimap restores routed hover ownership");
   assert(!h.router.pointerMove(lockedEvent(500, 500, 0)), "leaving the minimap releases locked-cursor preview ownership");
   h.clientIntent.updateAntiTankGunSetupPreview({
     source: "viewport",
