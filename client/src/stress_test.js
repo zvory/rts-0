@@ -37,6 +37,9 @@ export class StressTestRunner {
     this.launch = launch;
     this.fetchFn = fetchFn;
     this.started = false;
+    this.match = null;
+    this.net = null;
+    this.matchGeneration = 0;
     this.root = null;
     this.publicState = { state: "loading", result: null, error: "" };
   }
@@ -52,6 +55,9 @@ export class StressTestRunner {
   }
 
   async run({ match, net }) {
+    this.match = match;
+    this.net = net;
+    this.matchGeneration += 1;
     if (this.started) return;
     this.started = true;
 
@@ -65,23 +71,24 @@ export class StressTestRunner {
           await waitForForeground();
         }
 
+        const attempt = this.restartWorkloadAttempt();
         this.setState("warmup");
         this.renderStatus(`Warming up for ${this.launch.warmupSeconds} seconds…`);
         const refreshPromise = estimateRefreshRate();
         const warmupComplete = await uninterruptedForegroundDelay(this.launch.warmupSeconds * 1000);
         const refreshRateHz = await refreshPromise;
-        if (!warmupComplete) {
+        if (!warmupComplete || !this.isCurrentAttempt(attempt)) {
           this.setState("waiting");
-          this.renderStatus("Tab left the foreground. Return here and the test will restart.");
+          this.renderStatus("The workload was interrupted. Return here and the test will restart.");
           continue;
         }
 
-        match?.frameProfiler?.reset();
+        attempt.match.frameProfiler?.reset();
+        this.setState("measuring");
+        this.renderStatus(`Measuring ${this.launch.durationSeconds} seconds… Keep this tab visible.`);
         const observer = new BrowserTimingObserver();
         observer.start();
         const profilerState = startBrowserProfiler();
-        this.setState("measuring");
-        this.renderStatus(`Measuring ${this.launch.durationSeconds} seconds… Keep this tab visible.`);
         const measuredAt = new Date().toISOString();
         const measuredStarted = performance.now();
         const measurementComplete = await uninterruptedForegroundDelay(
@@ -90,15 +97,16 @@ export class StressTestRunner {
         const measuredDurationMs = Math.round(performance.now() - measuredStarted);
         const browserTiming = observer.stop();
 
-        if (!measurementComplete) {
+        if (!measurementComplete || !this.isCurrentAttempt(attempt)) {
           await discardBrowserProfiler(profilerState.profiler);
           this.setState("waiting");
-          this.renderStatus("Tab left the foreground. This attempt was discarded; return to restart.");
+          this.renderStatus("This attempt was interrupted and discarded; return to restart.");
           continue;
         }
 
         const profile = await finishBrowserProfiler(profilerState, this.launch.label);
-        const frameSummary = match?.frameProfiler?.reportSummary?.() || {};
+        if (!this.isCurrentAttempt(attempt)) continue;
+        const frameSummary = attempt.match.frameProfiler?.reportSummary?.() || {};
         if (!stressTestHasEnoughFrames(frameSummary.frameCount)) {
           this.setState("warmup");
           this.renderStatus("Too few rendered frames. Restarting with a fresh warmup…");
@@ -134,7 +142,7 @@ export class StressTestRunner {
         status: "completed",
         invalidReasons: [],
         environment: { ...environment, refreshRateHz },
-        stream: sanitizeStreamState(net?.publicState),
+        stream: sanitizeStreamState(this.net?.publicState),
         frameSummary,
         browserTiming,
         profile,
@@ -162,6 +170,19 @@ export class StressTestRunner {
       this.renderFailure(this.publicState.error);
       console.error("[stress-test] failed", error);
     }
+  }
+
+  restartWorkloadAttempt() {
+    if (typeof this.net?.restartFromBeginning !== "function") {
+      throw new Error("The stress-test workload cannot be restarted.");
+    }
+    this.net.restartFromBeginning();
+    if (!this.match) throw new Error("The stress-test match could not be initialized.");
+    return { match: this.match, generation: this.matchGeneration };
+  }
+
+  isCurrentAttempt(attempt) {
+    return attempt.match === this.match && attempt.generation === this.matchGeneration;
   }
 
   async save(payload) {
@@ -292,14 +313,17 @@ class BrowserTimingObserver {
         for (const entry of list.getEntries()) collect(entry);
       });
       observer.observe({ type, buffered: false });
-      this.observers.push(observer);
+      this.observers.push({ observer, collect });
     } catch {
       // Browser advertised an entry type it would not observe; omit it from the report.
     }
   }
 
   stop() {
-    for (const observer of this.observers) observer.disconnect();
+    for (const { observer, collect } of this.observers) {
+      for (const entry of observer.takeRecords()) collect(entry);
+      observer.disconnect();
+    }
     const longTasks = this.longTasks.sort((a, b) => b.durationMs - a.durationMs);
     const animationFrames = this.animationFrames.sort((a, b) => b.durationMs - a.durationMs);
     return {

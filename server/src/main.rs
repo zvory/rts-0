@@ -151,7 +151,6 @@ async fn main() {
     // HTTP workflow without writing to a shared database. Reports always reach structured logs
     // and a bounded process-local cache; beta/mainline opt into durable Postgres storage.
     let record_stress_tests = env_truthy("RTS_RECORD_STRESS_TESTS");
-    let stress_test_db = record_stress_tests.then(|| db.clone()).flatten();
     if db.is_some() && !record_stress_tests {
         rts_server::log_info!(
             "RTS_RECORD_STRESS_TESTS unset; client stress-test database writes disabled"
@@ -162,6 +161,7 @@ async fn main() {
     let client_dir = configured_client_dir();
     let index_html = build_versioned_index(&client_dir, &version);
     let maps_dir = configured_maps_dir();
+    let stress_tests = stress_tests::StressTestStore::new(db.clone(), record_stress_tests);
     let lab_scenario_submission = LabScenarioSubmissionService::from_env();
     let submission_capability = lab_scenario_submission.capability();
     if submission_capability.available {
@@ -189,7 +189,7 @@ async fn main() {
         lab_scenario_submission,
         interact_lab_artifacts: interact_lab_artifacts::InteractLabArtifactBridge::from_env(),
         map_handoffs: map_handoffs::MapHandoffStore::default(),
-        stress_tests: stress_tests::StressTestStore::new(stress_test_db),
+        stress_tests,
     };
     let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the

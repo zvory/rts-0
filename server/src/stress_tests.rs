@@ -18,10 +18,14 @@ use crate::AppState;
 pub const MAX_SUBMISSION_BYTES: usize = 2 * 1024 * 1024;
 const MAX_CACHE_ENTRIES: usize = 64;
 const MAX_FLAMEGRAPH_BYTES: usize = 750 * 1024;
+const MAX_ENVIRONMENT_BYTES: usize = 32 * 1024;
+const MAX_FRAME_SUMMARY_BYTES: usize = 256 * 1024;
+const MAX_BROWSER_TIMING_BYTES: usize = 128 * 1024;
 
 #[derive(Clone)]
 pub struct StressTestStore {
     db: Option<Arc<Db>>,
+    record_to_db: bool,
     recent: Arc<Mutex<VecDeque<CachedArtifact>>>,
 }
 
@@ -82,9 +86,10 @@ struct ErrorResponse {
 }
 
 impl StressTestStore {
-    pub fn new(db: Option<Arc<Db>>) -> Self {
+    pub fn new(db: Option<Arc<Db>>, record_to_db: bool) -> Self {
         Self {
             db,
+            record_to_db,
             recent: Arc::new(Mutex::new(VecDeque::with_capacity(MAX_CACHE_ENTRIES))),
         }
     }
@@ -125,7 +130,7 @@ impl StressTestStore {
             "artifactLabel": artifact_label,
             "receivedAt": received_at,
             "buildId": build_id,
-            "persisted": self.db.is_some(),
+            "persisted": self.db.is_some() && self.record_to_db,
         });
 
         let record = ClientStressTestRecord {
@@ -145,7 +150,7 @@ impl StressTestStore {
             profile_sample_count,
             artifact_json: artifact.clone(),
         };
-        let persisted = if let Some(db) = &self.db {
+        let persisted = if let Some(db) = self.db.as_ref().filter(|_| self.record_to_db) {
             match db.record_client_stress_test(&record).await {
                 Ok(()) => true,
                 Err(err) => {
@@ -311,6 +316,14 @@ pub async fn flamegraph_handler(
                 header::CACHE_CONTROL,
                 HeaderValue::from_static("private, no-store"),
             ),
+            (
+                header::CONTENT_SECURITY_POLICY,
+                HeaderValue::from_static("sandbox; default-src 'none'; style-src 'unsafe-inline'"),
+            ),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ),
         ],
         svg.to_string(),
     )
@@ -349,6 +362,7 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
         return Err("The stress-test status is invalid.".to_string());
     }
     if submission.measured_at.len() > 64
+        || chrono::DateTime::parse_from_rfc3339(&submission.measured_at).is_err()
         || submission.invalid_reasons.len() > 8
         || submission
             .invalid_reasons
@@ -356,6 +370,38 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
             .any(|reason| reason.len() > 120)
     {
         return Err("The measurement metadata is too large.".to_string());
+    }
+    if !submission.environment.is_object()
+        || json_size(&submission.environment) > MAX_ENVIRONMENT_BYTES
+        || !submission.frame_summary.is_object()
+        || json_size(&submission.frame_summary) > MAX_FRAME_SUMMARY_BYTES
+        || !submission.browser_timing.is_object()
+        || json_size(&submission.browser_timing) > MAX_BROWSER_TIMING_BYTES
+    {
+        return Err("The diagnostics sections are invalid or too large.".to_string());
+    }
+    if submission.stream.get("id").and_then(Value::as_str) != Some("supply-300-hellhole")
+        || submission.stream.get("offline").and_then(Value::as_bool) != Some(true)
+        || submission.stream.get("websocket").and_then(Value::as_bool) != Some(false)
+        || submission
+            .stream
+            .get("serverSimulation")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || submission.stream.get("frameCount").and_then(Value::as_u64) != Some(900)
+        || submission.stream.get("tickRateHz").and_then(Value::as_f64) != Some(30.0)
+    {
+        return Err("The snapshot-stream identity is invalid.".to_string());
+    }
+    if submission
+        .frame_summary
+        .get("frameCount")
+        .and_then(Value::as_u64)
+        .is_none_or(|count| count == 0 || count > 100_000)
+        || !bounded_number(&submission.frame_summary, "frameWorkP95Ms", 10_000.0)
+        || !bounded_number(&submission.frame_summary, "rendererP95Ms", 10_000.0)
+    {
+        return Err("The frame summary is invalid.".to_string());
     }
     if !matches!(
         submission.profile.kind.as_str(),
@@ -367,6 +413,16 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
         return Err("The browser profile is invalid or too large.".to_string());
     }
     if submission.profile.kind == "js-self-profile" {
+        if !submission.profile.supported
+            || submission
+                .profile
+                .summary
+                .as_ref()
+                .is_none_or(|summary| !summary.is_object())
+            || submission.profile.flamegraph_svg.is_empty()
+        {
+            return Err("The JS profile metadata is inconsistent.".to_string());
+        }
         let Some(trace) = submission.profile.trace.as_ref() else {
             return Err("The JS profile trace is missing.".to_string());
         };
@@ -386,8 +442,36 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
                 ));
             }
         }
+        let sample_count = trace["samples"].as_array().map_or(0, Vec::len) as u64;
+        if submission
+            .profile
+            .summary
+            .as_ref()
+            .and_then(|summary| summary.get("sampleCount"))
+            .and_then(Value::as_u64)
+            != Some(sample_count)
+        {
+            return Err("The JS profile sample count is inconsistent.".to_string());
+        }
+    } else if submission.profile.supported
+        || submission.profile.trace.is_some()
+        || submission.profile.summary.is_some()
+        || !submission.profile.flamegraph_svg.is_empty()
+    {
+        return Err("The phase-timing fallback metadata is inconsistent.".to_string());
     }
     Ok(())
+}
+
+fn json_size(value: &Value) -> usize {
+    serde_json::to_vec(value).map_or(usize::MAX, |encoded| encoded.len())
+}
+
+fn bounded_number(value: &Value, key: &str, max: f64) -> bool {
+    value
+        .get(key)
+        .and_then(Value::as_f64)
+        .is_some_and(|number| number.is_finite() && number >= 0.0 && number <= max)
 }
 
 fn create_run_id(timestamp_ms: i64) -> String {
@@ -518,8 +602,19 @@ mod tests {
             status: "completed".to_string(),
             invalid_reasons: vec![],
             environment: json!({"platform": "Windows"}),
-            stream: json!({"offline": true}),
-            frame_summary: json!({"frameWorkP95Ms": 16}),
+            stream: json!({
+                "id": "supply-300-hellhole",
+                "offline": true,
+                "websocket": false,
+                "serverSimulation": false,
+                "frameCount": 900,
+                "tickRateHz": 30,
+            }),
+            frame_summary: json!({
+                "frameCount": 120,
+                "frameWorkP95Ms": 16,
+                "rendererP95Ms": 12,
+            }),
             browser_timing: json!({}),
             profile: ProfileSubmission {
                 kind: "phase-timings".to_string(),
@@ -551,6 +646,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_spoofed_stream_and_inconsistent_profile_metadata() {
+        let mut submission = fixture();
+        submission.stream["offline"] = Value::Bool(false);
+        assert!(validate_submission(&submission).is_err());
+
+        submission = fixture();
+        submission.profile.supported = true;
+        assert!(validate_submission(&submission).is_err());
+    }
+
+    #[test]
     fn artifact_names_are_filename_safe_and_labeled() {
         let submission = fixture();
         let label = artifact_label(
@@ -566,7 +672,7 @@ mod tests {
 
     #[tokio::test]
     async fn local_store_saves_and_retrieves_without_a_database() {
-        let store = StressTestStore::new(None);
+        let store = StressTestStore::new(None, false);
         let saved = store.save(fixture(), "build-123").await.unwrap();
         assert!(!saved.persisted);
         assert!(valid_run_id(&saved.run_id));

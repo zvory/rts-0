@@ -1,5 +1,6 @@
 import { assert } from "./assertions.mjs";
 import {
+  StressTestRunner,
   stressTestForegroundReady,
   stressTestHasEnoughFrames,
   stressTestHeadroom,
@@ -36,6 +37,27 @@ import {
     "self-profile analysis retains inclusive parent time");
   assert(svg.includes("Fixture profile") && svg.includes("render"),
     "self-profile analysis renders a labeled SVG flame graph");
+}
+
+{
+  const oldMatch = { frameProfiler: {} };
+  const freshMatch = { frameProfiler: {} };
+  const runner = new StressTestRunner({ launch: {} });
+  runner.started = true;
+  runner.match = oldMatch;
+  runner.matchGeneration = 1;
+  const net = {
+    restartFromBeginning: () => {
+      void runner.run({ match: freshMatch, net });
+    },
+  };
+  runner.net = net;
+  const attempt = runner.restartWorkloadAttempt();
+  assert(attempt.match === freshMatch && runner.isCurrentAttempt(attempt),
+    "each stress attempt rewinds the stream and follows the rebuilt match shell");
+  void runner.run({ match: { frameProfiler: {} }, net });
+  assert(!runner.isCurrentAttempt(attempt),
+    "a later match generation invalidates in-flight stress measurements");
 }
 
 {

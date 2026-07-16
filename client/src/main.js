@@ -22,7 +22,11 @@ async function start() {
       : new App({
         rendererBackendBundle: await createSelectedBackendBundle(),
         net: snapshotStreamLaunch
-          ? new SnapshotStreamNet({ id: snapshotStreamLaunch.id, diagnostics })
+          ? new SnapshotStreamNet({
+            id: snapshotStreamLaunch.id,
+            diagnostics,
+            autoStart: !stressTestLaunch,
+          })
           : null,
         snapshotStreamLaunch,
         stressTestLaunch,
