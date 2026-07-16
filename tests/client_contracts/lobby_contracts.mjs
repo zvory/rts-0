@@ -22,7 +22,6 @@ import {
   teamSlotsForLobby,
 } from "../../client/src/lobby.js";
 import {
-  LOBBY_BROWSER_POLL_MS,
   LobbyBrowserView,
   LobbyCreateModal,
   formatLobbyAge,
@@ -245,8 +244,7 @@ import { textWithin } from "./dom_text.mjs";
 }
 
 {
-  let stoppedPolling = 0;
-  let startedPolling = 0;
+  let cancelledRefreshes = 0;
   let clearedCountdown = 0;
   let hidReplayPrompt = 0;
   let renderedBrowser = null;
@@ -290,11 +288,8 @@ import { textWithin } from "./dom_text.mjs";
     _pendingBrowserJoinRoom: "Old room",
     _pendingReplayRoom: "Old room",
     _promptReturnFocus: {},
-    _stopLobbyBrowserPolling() {
-      stoppedPolling += 1;
-    },
-    _startLobbyBrowserPolling() {
-      startedPolling += 1;
+    _cancelLobbyBrowserRefresh() {
+      cancelledRefreshes += 1;
     },
     _clearCountdown() {
       clearedCountdown += 1;
@@ -329,14 +324,14 @@ import { textWithin } from "./dom_text.mjs";
   assert(lobby.btnStart.disabled, "lobby reset disables stale start control");
   assert(lobby.elSeatsSummary.textContent === "0 / 4" && lobby.elObserversSummary.textContent === "0",
     "lobby reset clears stale room summary counts");
-  assert(stoppedPolling === 1 && startedPolling === 1 && clearedCountdown === 1 && hidReplayPrompt === 1,
-    "lobby reset restarts browser polling and clears transient room UI");
+  assert(cancelledRefreshes === 1 && clearedCountdown === 1 && hidReplayPrompt === 1,
+    "lobby reset cancels in-flight refreshes and clears transient room UI");
   assert(renderedBrowser?.error === "" && statusText === "", "lobby reset redraws browser without stale errors");
 }
 
 {
   let rosterArgs = null;
-  let stoppedPolling = 0;
+  let cancelledRefreshes = 0;
   let statusText = "old";
   const root = { hidden: false, classList: fakeClassList() };
   const seatsCell = { hidden: false };
@@ -375,8 +370,8 @@ import { textWithin } from "./dom_text.mjs";
     _countdownActive: false,
     _browserActionPending: true,
     _pendingBrowserJoinRoom: "old",
-    _stopLobbyBrowserPolling() {
-      stoppedPolling += 1;
+    _cancelLobbyBrowserRefresh() {
+      cancelledRefreshes += 1;
     },
     _reflectTeamPreset() {},
     _reflectCreateButton() {},
@@ -414,12 +409,12 @@ import { textWithin } from "./dom_text.mjs";
     "joined replay lobbies hide active-seat counts");
   assert(lobby.elObserversSummary.textContent === "1", "joined replay lobbies count spectator occupants only");
   assert(rosterArgs?.spectatorOnly === true, "joined replay lobbies render the roster in spectator-only mode");
-  assert(stoppedPolling === 1 && statusText === "", "joined replay lobby render clears pending browser state");
+  assert(cancelledRefreshes === 1 && statusText === "", "joined replay lobby render clears pending browser state");
 }
 
 {
   let rosterArgs = null;
-  let stoppedPolling = 0;
+  let cancelledRefreshes = 0;
   const root = { hidden: false, classList: fakeClassList() };
   const lobby = Object.assign(Object.create(Lobby.prototype), {
     root,
@@ -456,8 +451,8 @@ import { textWithin } from "./dom_text.mjs";
     _countdownActive: false,
     _browserActionPending: false,
     _pendingBrowserJoinRoom: "",
-    _stopLobbyBrowserPolling() {
-      stoppedPolling += 1;
+    _cancelLobbyBrowserRefresh() {
+      cancelledRefreshes += 1;
     },
     _reflectTeamPreset() {},
     _reflectCreateButton() {},
@@ -491,7 +486,7 @@ import { textWithin } from "./dom_text.mjs";
   assert(lobby.elSeatsSummary.textContent === "2 / 2",
     "joined lobby summary uses selected map capacity");
   assert(rosterArgs?.maxPlayers === 2, "lobby roster receives selected map capacity");
-  assert(stoppedPolling === 1, "normal lobby render clears pending browser polling");
+  assert(cancelledRefreshes === 1, "normal lobby render cancels any pending browser refresh");
 }
 
 // ---------------------------------------------------------------------------
@@ -499,7 +494,8 @@ import { textWithin } from "./dom_text.mjs";
 // ---------------------------------------------------------------------------
 {
   const now = 200_000_000;
-  assert(LOBBY_BROWSER_POLL_MS === 1500, "lobby browser polls inside the 1-2 second contract");
+  const lobbySource = fs.readFileSync(new URL("../../client/src/lobby.js", import.meta.url), "utf8");
+  assert(!lobbySource.includes("setInterval"), "lobby browser has no background polling timer");
   assert(formatLobbyAge(now - 5_000, now) === "just now", "lobby browser formats fresh ages");
   assert(formatLobbyAge(now - 3 * 60_000, now) === "3m ago", "lobby browser formats minute ages");
   assert(formatLobbyAge(now - 2 * 60 * 60_000, now) === "2h ago", "lobby browser formats hour ages");
@@ -533,6 +529,68 @@ import { textWithin } from "./dom_text.mjs";
     "lobby create suggestion stays within the public lobby name limit");
   assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
     "lobby create suggestion avoids reserved internal prefixes");
+
+  {
+    const requests = [];
+    const renders = [];
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _joined: false,
+      root: { hidden: false },
+      browserView: {},
+      _browserLoading: false,
+      _browserLoaded: false,
+      _browserAbort: null,
+      _fetchImpl(_url, { signal }) {
+        return new Promise((resolve, reject) => requests.push({ resolve, reject, signal }));
+      },
+      _renderLobbyBrowser(state = {}) {
+        renders.push(state);
+      },
+      _reflectRefreshButton() {},
+    });
+    const staleRefresh = lobby._refreshLobbyBrowser({ force: true });
+    const currentRefresh = lobby._refreshLobbyBrowser({ force: true });
+    assert(requests[0].signal.aborted, "a forced lobby refresh aborts the older request");
+
+    requests[1].resolve({
+      ok: true,
+      async json() { return [{ room: "Current lobby" }]; },
+    });
+    await currentRefresh;
+    requests[0].reject(new Error("stale request failed after abort"));
+    await staleRefresh;
+
+    assert(renders.at(-1).rows?.[0]?.room === "Current lobby",
+      "a stale lobby refresh error cannot overwrite the latest rows");
+    assert(!lobby._browserLoading && lobby._browserAbort === null,
+      "the latest lobby refresh owns the loading state");
+  }
+
+  {
+    let connectionChecks = 0;
+    let joinedRoom = "";
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _browserActionPending: false,
+      _fetchImpl: async () => ({
+        ok: true,
+        async json() { return { room: "Created lobby" }; },
+      }),
+      async _connectForAction() {
+        connectionChecks += 1;
+        return true;
+      },
+      _beginBrowserJoin(row) {
+        joinedRoom = row.room;
+      },
+      _renderLobbyBrowser() {},
+      _reflectCreateButton() {},
+    });
+    const created = await lobby._submitCreateLobby("Created lobby");
+    assert(created && joinedRoom === "Created lobby", "create flow joins the reserved lobby");
+    assert(connectionChecks === 2,
+      "create flow rechecks its socket after the HTTP reservation completes");
+  }
+
   const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
   assert(indexHtml.includes('class="lobby-manual-room" hidden'),
     "manual room-name join controls stay outside the normal pre-join product path");
@@ -584,6 +642,14 @@ import { textWithin } from "./dom_text.mjs";
       },
     };
     const view = new LobbyBrowserView(root);
+    view.render({
+      rows: [],
+      loaded: false,
+      onCreateLobby: () => { createClicks += 1; },
+    });
+    assert(textWithin(rowsRoot).includes("Refresh to load lobbies"),
+      "lobby browser waits for an explicit first refresh");
+    assert(statusEl.textContent === "Not refreshed", "unrefreshed lobby browser labels its state");
     view.render({
       rows: [],
       nowMs: now,

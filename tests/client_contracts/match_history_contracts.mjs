@@ -32,6 +32,59 @@ assert(
   "match history winner label falls back for empty rows",
 );
 
+withFakeHudDocument(() => {
+  let refreshes = 0;
+  const host = document.createElement("div");
+  const history = Object.assign(Object.create(MatchHistory.prototype), {
+    host,
+    refresh() {
+      refreshes += 1;
+    },
+  });
+  history._render();
+  const button = host.querySelectorAll("button")[0];
+  assert(button?.textContent === "Refresh", "match history exposes a manual refresh button");
+  button.listeners.click();
+  assert(refreshes === 1, "match history refresh button performs one request");
+});
+
+{
+  const requests = [];
+  const history = Object.assign(Object.create(MatchHistory.prototype), {
+    limit: 20,
+    _ac: null,
+    _loading: false,
+    _rows: [],
+    fetchImpl(_url, { signal }) {
+      return new Promise((resolve, reject) => requests.push({ resolve, reject, signal }));
+    },
+    _setLoading() {},
+    _renderRows() {},
+    _setError() {},
+    _reflectRefreshButton() {},
+  });
+  const staleRefresh = history.refresh();
+  const staleRequest = requests[0];
+  const currentRefresh = history.refresh();
+  const currentRequest = requests[1];
+  assert(staleRequest.signal.aborted, "a newer match-history refresh aborts the older request");
+
+  currentRequest.resolve({
+    ok: true,
+    async json() { return [{ id: 2 }]; },
+  });
+  await currentRefresh;
+  staleRequest.resolve({
+    ok: true,
+    async json() { return [{ id: 1 }]; },
+  });
+  await staleRefresh;
+
+  assert(history._rows[0]?.id === 2,
+    "a stale match-history response cannot overwrite the latest refresh");
+  assert(!history._loading, "the latest match-history refresh owns the loading state");
+}
+
 {
   let joinedRoom = "";
   let renderedRows = 0;

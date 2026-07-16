@@ -1,5 +1,5 @@
 // Lobby browser view helpers for the pre-join lobby screen.
-// The Lobby controller owns networking and polling; this module owns row state and DOM rendering.
+// The Lobby controller owns networking and refreshes; this module owns row state and DOM rendering.
 
 import { LOBBY_KIND } from "./protocol.js";
 
@@ -37,8 +37,6 @@ const RESERVED_LOBBY_PREFIXES = Object.freeze([
 ]);
 const DEFAULT_LOBBY_OWNER_NAME = "Commander";
 const SUGGESTED_LOBBY_SUFFIX = "'s lobby";
-
-export const LOBBY_BROWSER_POLL_MS = 1500;
 
 export function normalizeLobbySummary(row = {}) {
   const joinState = normalizedJoinState(row.joinState);
@@ -151,7 +149,7 @@ export class LobbyBrowserView {
   render({
     rows,
     loading = false,
-    connected = true,
+    loaded = true,
     error = "",
     nowMs = Date.now(),
     actionsDisabled = false,
@@ -163,21 +161,24 @@ export class LobbyBrowserView {
     if (onCreateLobby !== undefined) this.onCreateLobby = onCreateLobby;
     if (onJoinLobby !== undefined) this.onJoinLobby = onJoinLobby;
     this.actionsDisabled = !!actionsDisabled || !!error;
-    this.root.classList.toggle("is-disconnected", !connected);
     this.root.classList.toggle("has-error", !!error);
     if (this.statusEl) {
-      this.statusEl.textContent = statusText({ loading, connected, error });
+      this.statusEl.textContent = statusText({ loading, loaded, error });
     }
     if (loading && this.rows.length === 0) {
       this.rowsRoot.replaceChildren(this._buildStateRow("Loading lobbies..."));
       return;
     }
+    if (!loaded && this.rows.length === 0) {
+      this.rowsRoot.replaceChildren(this._buildStateRow("Refresh to load lobbies."));
+      return;
+    }
     if (this.rows.length === 0) {
-      this.rowsRoot.replaceChildren(this._buildEmptyState(error, { connected }));
+      this.rowsRoot.replaceChildren(this._buildEmptyState(error));
       return;
     }
     this.rowsRoot.replaceChildren(
-      ...this.rows.map((row) => this._buildRow(row, { connected, nowMs })),
+      ...this.rows.map((row) => this._buildRow(row, { nowMs })),
     );
   }
 
@@ -199,7 +200,7 @@ export class LobbyBrowserView {
     return el;
   }
 
-  _buildEmptyState(error, { connected }) {
+  _buildEmptyState(error) {
     const el = document.createElement("div");
     el.className = "lobby-browser-empty";
     const title = document.createElement("strong");
@@ -207,7 +208,7 @@ export class LobbyBrowserView {
     const action = document.createElement("button");
     action.type = "button";
     action.className = "btn primary";
-    action.disabled = !connected || this.actionsDisabled || !this.onCreateLobby;
+    action.disabled = this.actionsDisabled || !this.onCreateLobby;
     action.textContent = "Create lobby";
     if (!action.disabled) {
       action.addEventListener("click", () => this.onCreateLobby?.(action));
@@ -216,17 +217,17 @@ export class LobbyBrowserView {
     return el;
   }
 
-  _buildRow(row, { connected, nowMs }) {
+  _buildRow(row, { nowMs }) {
     const intent = lobbyJoinIntent(row);
     const state = intent.state;
-    const canJoin = connected && !this.actionsDisabled && intent.joinable;
+    const canJoin = !this.actionsDisabled && intent.joinable;
     const disabled = !canJoin || !this.onJoinLobby;
     const el = document.createElement("article");
     el.className = `lobby-browser-row is-${state}`;
     if (row.kind === LOBBY_KIND.REPLAY) el.classList.add("is-replay");
     el.dataset.joinState = state;
     el.dataset.kind = row.kind;
-    if (!connected || state === "starting" || state === "stale") {
+    if (state === "starting" || state === "stale") {
       el.classList.add("is-muted");
     }
 
@@ -471,10 +472,10 @@ export class LobbyCreateModal {
   }
 }
 
-function statusText({ loading, connected, error }) {
-  if (!connected) return "Disconnected";
+function statusText({ loading, loaded, error }) {
   if (error) return "Refresh failed";
   if (loading) return "Refreshing";
+  if (!loaded) return "Not refreshed";
   return "Live";
 }
 

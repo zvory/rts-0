@@ -28,6 +28,12 @@ Both channels use one `performance-1x` Machine with 2 GB of memory,
 activity keeps a Machine running while browsers are connected. A headless AI room without a browser
 may not prevent autostop; durable unattended AI games are not a goal of this setup.
 
+The ordinary lobby page does not hold a WebSocket or poll `/api/lobbies`. Recent Matches performs
+one request when mounted, while lobby discovery is manual; Create, Join, Watch, Replay, and explicit
+launch URLs open the WebSocket on demand. The client closes an open pre-join connection when its tab
+is hidden. This keeps passive lobby tabs and scrapers from sustaining heartbeat traffic through the
+Machine's idle tail, although any individual HTTP request can still autostart the Machine.
+
 Deploy shutdown uses Fly's top-level `kill_signal = "SIGINT"` and `kill_timeout = 300`. The server
 drains active matches inside a 295-second application budget after the deploy signal, then closes
 connections and exits before Fly's final stop signal. That budget is split into 260 seconds for

@@ -211,6 +211,9 @@ export class ClientLane {
       }
     }, this.scenario.setup.prediction, this.networkProfile);
     await this.page.goto(url.href, { waitUntil: "networkidle2", timeout: 15000 });
+    // Live-room scenarios intentionally bypass the product lobby controls, so
+    // request the now-demand-driven transport before issuing harness commands.
+    await this.page.evaluate(() => window.__rts.ensureConnected());
     await this.page.waitForFunction(() => window.__rts?.net?.playerId != null, { timeout: 5000 });
     await this.page.evaluate((room) => {
       const app = window.__rts;

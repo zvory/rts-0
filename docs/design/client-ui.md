@@ -1478,9 +1478,9 @@ their start payload remains spectator-shaped.
 `lobby.js`
 ```js
 export class Lobby {
-  constructor(rootEl, net)
+  constructor(rootEl, net, audio?, { ensureConnected?, disconnectWhenIdle? }?)
   show(), hide()
-  // owns lobby state, pre-join browser polling, latest-row join preflight,
+  // owns lobby state, manual pre-join browser refresh, latest-row join preflight,
   // ready/start/spectator role, and delegates browser DOM to lobby_browser_view.js and
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
@@ -1490,14 +1490,14 @@ export class Lobby {
   // spectator occupants plus the host start control while the server reports canStart.
   // The normal product lobby exposes an Open Lab route affordance instead of a debug setup toggle.
   // Teams are layout groups only; player colors come from each player record.
-  joinReplayLobby(room)                  // join a persisted replay staging lobby as spectator
+  refreshLobbyBrowser()                  // one GET /api/lobbies request; never starts a timer
+  joinReplayLobby(room)                  // lazily connect, then join a persisted replay lobby
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
 ```
 
 `lobby_browser_view.js`
 ```js
-export const LOBBY_BROWSER_POLL_MS
 export function sortLobbySummaries(rows)
 export function formatLobbyAge(createdAtUnixMs, nowMs?)
 export function lobbyStatusLabel(joinState)
@@ -1507,7 +1507,7 @@ export function validateLobbyName(rawName)
 export function suggestLobbyName(playerName)
 export class LobbyBrowserView {
   constructor(rootEl)
-  render({ rows?, loading?, connected?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
+  render({ rows?, loading?, loaded?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
   destroy()
 }
 export class LobbyCreateModal {
@@ -1519,14 +1519,21 @@ export class LobbyCreateModal {
   destroy()
 }
 ```
-The pre-join lobby browser keeps in-progress rows labeled `In match` and exposes a spectator
+The pre-join lobby browser does not poll. It starts in a not-refreshed state and issues one
+`GET /api/lobbies` only when the player presses **Refresh** or when a join action performs its
+freshness preflight. The app also leaves the WebSocket closed on an ordinary lobby page until
+Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unjoined connection
+is closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail.
+
+The browser keeps in-progress rows labeled `In match` and exposes a spectator
 action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending
 `join` with `spectator: true`. Replay rows are detected from explicit `kind: "replay"` metadata,
 labelled `Replay`, and joined as spectators without setting `replayOk`, so rooms that race into
 playback still use the normal replay join confirmation. Countdown, stale, and unknown rows remain
 disabled.
 
-`match_history.js` renders the API-provided **Replay #** for each visible Recent Matches row. The
+`match_history.js` performs one initial Recent Matches fetch and exposes a manual **Refresh**
+button; it never polls. It renders the API-provided **Replay #** for each visible row. The
 server calculates that one-based sequence across the full filtered history, oldest first, while
 the table remains newest first; therefore the latest visible replay has the highest number. Saved
 debug or solo replays do not consume a number. It launches persisted match replays by POSTing
@@ -1537,8 +1544,8 @@ replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact
 The replay lobby UI is group-watch only: future playable resume work needs separate seat-claim
 controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
-`main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
-`window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. A bounded
+`main.js` starts `App`; `app.js` owns the on-demand `Net` and persistent `Audio`, derives the ws url
+from `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. A bounded
 `?snapshotStream=<id>` developer launch injects `SnapshotStreamNet` instead: it fetches a same-origin
 `.rtsstream` artifact, emits its static start payload, and clocks the contained exact MessagePack
 snapshot frames through `Net._onMessage` without constructing a WebSocket. This local benchmark lane

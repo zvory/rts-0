@@ -79,7 +79,10 @@
                   <span class="lobby-kicker">Public rooms</span>
                   <h2>Lobby Browser</h2>
                 </div>
-                <span id="lobby-browser-status" class="lobby-browser-refresh" aria-live="polite">Loading</span>
+                <div class="lobby-browser-header-actions">
+                  <span id="lobby-browser-status" class="lobby-browser-refresh-status" aria-live="polite">Not refreshed</span>
+                  <button id="lobby-browser-refresh" class="btn" type="button">Refresh</button>
+                </div>
               </header>
               <div class="lobby-browser-table" role="table" aria-label="Available lobbies">
                 <div class="lobby-browser-grid lobby-browser-head" role="row">
