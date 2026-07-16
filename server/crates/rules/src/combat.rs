@@ -167,7 +167,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::ScoutCarMg,
-        range_tiles: 7,
+        range_tiles: 6,
         dmg: 6,
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
