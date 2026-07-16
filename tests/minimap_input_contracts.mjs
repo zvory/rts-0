@@ -1336,7 +1336,7 @@ function pointerEvent(canvas, clientX, clientY, {
     {},
     { issueCommand() {} },
   );
-  minimap.ping(40, 60, "alert", "under_attack");
+  minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
   minimap._drawPings(650);
 
@@ -1356,7 +1356,7 @@ function pointerEvent(canvas, clientX, clientY, {
 
   canvas.context.calls.length = 0;
   minimap._pings.length = 0;
-  minimap.ping(40, 60, "alert", "out_of_oil");
+  minimap.ping(40, 60, "alert");
   minimap._pings[0].startedAt = 100;
   minimap._drawPings(550);
   assert(

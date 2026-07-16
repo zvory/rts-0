@@ -32,7 +32,6 @@ import {
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
-import { UNDER_ATTACK_ID } from "./alerts.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
@@ -363,14 +362,14 @@ export class Minimap {
    * @param {number} x world px
    * @param {number} y world px
    * @param {"info"|"warn"|"alert"} [severity]
-   * @param {string} [alertId] semantic alert identity, when present
+   * @param {boolean} [isUnderAttack] whether to use the emphasized under-attack treatment
    */
-  ping(x, y, severity = "alert", alertId = "") {
+  ping(x, y, severity = "alert", isUnderAttack = false) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       this.pulseBorder();
       return;
     }
-    this._pings.push({ x, y, severity, alertId, startedAt: performance.now() });
+    this._pings.push({ x, y, severity, isUnderAttack, startedAt: performance.now() });
   }
 
   /** Add a globally visible short-lived artillery firing marker. */
@@ -863,7 +862,6 @@ export class Minimap {
       (ping) => now - ping.startedAt < this._pingDurationMs(ping),
     );
     for (const ping of this._pings) {
-      const isUnderAttack = ping.alertId === UNDER_ATTACK_ID;
       const t = (now - ping.startedAt) / this._pingDurationMs(ping);
       const p = this._worldToCanvas(ping.x, ping.y);
       const radius = 4 + 15 * t;
@@ -874,7 +872,7 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.stroke();
-      if (isUnderAttack) {
+      if (ping.isUnderAttack) {
         ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -895,7 +893,7 @@ export class Minimap {
   }
 
   _pingDurationMs(ping) {
-    return ping.alertId === UNDER_ATTACK_ID ? UNDER_ATTACK_PING_MS : DEFAULT_PING_MS;
+    return ping.isUnderAttack ? UNDER_ATTACK_PING_MS : DEFAULT_PING_MS;
   }
 
   _drawArtilleryFiringMarkers(now) {

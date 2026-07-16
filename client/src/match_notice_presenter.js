@@ -46,7 +46,7 @@ export class MatchNoticePresenter {
 
     this.toast?.(noticeDisplayText(ev.msg));
     if (isAlert) {
-      if (hasPos) this.minimap?.ping(ev.x, ev.y, severity, alertId);
+      if (hasPos) this.minimap?.ping(ev.x, ev.y, severity, alertId === UNDER_ATTACK_ID);
       else this.minimap?.pulseBorder();
     }
 
