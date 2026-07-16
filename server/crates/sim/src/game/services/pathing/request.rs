@@ -25,7 +25,6 @@ impl PathingService {
     ) -> PathingRequestOutcome<Vec<(f32, f32)>> {
         let start = req.start;
         let kind = req.kind;
-        let relation = req.relation();
         if let Some((from, to)) = direct_segment {
             if req.start != req.goal
                 && standability::unit_static_segment_standable(map, occupancy, req.kind, from, to)
@@ -54,7 +53,6 @@ impl PathingService {
             let pass = TerrainPassability {
                 map,
                 occupancy,
-                relation,
                 kind,
                 radius_tiles: 0,
                 route_shape: RouteShape::VehicleClearance,
@@ -101,7 +99,6 @@ impl PathingService {
         let pass = TerrainPassability {
             map,
             occupancy,
-            relation: req.relation(),
             kind: req.kind,
             radius_tiles: req.radius_tiles,
             route_shape: req.route_shape,
@@ -109,8 +106,7 @@ impl PathingService {
         };
 
         let search_budget = req.budget.unwrap_or(self.default_budget);
-        let static_fingerprint =
-            occupancy.static_fingerprint_for_kind_and_relation(req.kind, &req.relation);
+        let static_fingerprint = occupancy.static_fingerprint_for_kind(req.kind);
         if let Some((tile_path, search_expanded_nodes)) =
             self.cache_lookup(&req, &pass, static_fingerprint, search_budget)
         {

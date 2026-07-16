@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, VecDeque};
 
-use super::super::{Occupancy, StaticPathingRelation};
+use super::super::Occupancy;
 use super::FormationUnit;
 use crate::config;
 use crate::game::entity::{uses_oriented_vehicle_body, EntityKind};
@@ -21,7 +21,6 @@ const NEIGHBORS: [(i32, i32); 8] = [
 pub(in crate::game::services::move_coordinator) struct FormationReachability<'a> {
     map: &'a Map,
     occ: &'a Occupancy<'a>,
-    relation: StaticPathingRelation,
     by_kind: BTreeMap<EntityKind, ReachabilityGrid>,
 }
 
@@ -29,12 +28,10 @@ impl<'a> FormationReachability<'a> {
     pub(in crate::game::services::move_coordinator) fn new(
         map: &'a Map,
         occ: &'a Occupancy<'a>,
-        relation: StaticPathingRelation,
     ) -> Self {
         Self {
             map,
             occ,
-            relation,
             by_kind: BTreeMap::new(),
         }
     }
@@ -50,11 +47,10 @@ impl<'a> FormationReachability<'a> {
         }
         let map = self.map;
         let occ = self.occ;
-        let relation = &self.relation;
         let grid = self
             .by_kind
             .entry(unit.kind)
-            .or_insert_with(|| ReachabilityGrid::build(map, occ, relation, unit.kind));
+            .or_insert_with(|| ReachabilityGrid::build(map, occ, unit.kind));
         let Some(can_reach) = grid.can_reach(start, tile) else {
             // If the unit cannot make useful progress at all, keep the legacy goal so the
             // ordinary path phase can surface PathFailed instead of turning the order into a no-op.
@@ -71,19 +67,13 @@ struct ReachabilityGrid {
 }
 
 impl ReachabilityGrid {
-    fn build(
-        map: &Map,
-        occ: &Occupancy<'_>,
-        relation: &StaticPathingRelation,
-        kind: EntityKind,
-    ) -> Self {
+    fn build(map: &Map, occ: &Occupancy<'_>, kind: EntityKind) -> Self {
         let len = (map.size * map.size) as usize;
         let mut passable = vec![false; len];
         for ty in 0..map.size {
             for tx in 0..map.size {
                 let idx = map.index(tx, ty);
-                passable[idx] =
-                    reachability_tile_passable(map, occ, relation, kind, tx as i32, ty as i32);
+                passable[idx] = reachability_tile_passable(map, occ, kind, tx as i32, ty as i32);
             }
         }
 
@@ -169,7 +159,6 @@ impl ReachabilityGrid {
 fn reachability_tile_passable(
     map: &Map,
     occ: &Occupancy<'_>,
-    relation: &StaticPathingRelation,
     kind: EntityKind,
     tx: i32,
     ty: i32,
@@ -177,17 +166,17 @@ fn reachability_tile_passable(
     let radius = config::unit_radius_tiles(kind) as i32;
     for dy in -radius..=radius {
         for dx in -radius..=radius {
-            if !single_tile_passable(map, occ, relation, kind, tx + dx, ty + dy) {
+            if !single_tile_passable(map, occ, kind, tx + dx, ty + dy) {
                 return false;
             }
         }
     }
 
     if uses_oriented_vehicle_body(kind) {
-        let nw = !single_tile_passable(map, occ, relation, kind, tx - 1, ty - 1);
-        let ne = !single_tile_passable(map, occ, relation, kind, tx + 1, ty - 1);
-        let sw = !single_tile_passable(map, occ, relation, kind, tx - 1, ty + 1);
-        let se = !single_tile_passable(map, occ, relation, kind, tx + 1, ty + 1);
+        let nw = !single_tile_passable(map, occ, kind, tx - 1, ty - 1);
+        let ne = !single_tile_passable(map, occ, kind, tx + 1, ty - 1);
+        let sw = !single_tile_passable(map, occ, kind, tx - 1, ty + 1);
+        let se = !single_tile_passable(map, occ, kind, tx + 1, ty + 1);
         if (nw && se) || (ne && sw) {
             return false;
         }
@@ -199,7 +188,6 @@ fn reachability_tile_passable(
 fn single_tile_passable(
     map: &Map,
     occ: &Occupancy<'_>,
-    relation: &StaticPathingRelation,
     kind: EntityKind,
     tx: i32,
     ty: i32,
@@ -211,8 +199,7 @@ fn single_tile_passable(
     else {
         return false;
     };
-    terrain::movement_allowed(kind, terrain_kind)
-        && occ.passable_for_kind_and_relation(tx, ty, kind, relation)
+    terrain::movement_allowed(kind, terrain_kind) && occ.passable_for_kind(tx, ty, kind)
 }
 
 fn step_allowed(map: &Map, passable: &[bool], tx: i32, ty: i32, dx: i32, dy: i32) -> bool {
