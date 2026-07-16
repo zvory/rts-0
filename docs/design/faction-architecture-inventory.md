@@ -110,7 +110,7 @@ APIs.
 ## Current Tech Tree
 
 Workers can place City Centre and Supply Depot immediately, and can place Pump Jacks contextually on
-live oil patches with no tech requirement. Barracks requires a completed City Centre; Training
+live oil patches with no tech requirement. Barracks also has no building prerequisite; Training
 Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and Gun Works require a
 completed City Centre and Training Centre; Tank Trap requires a completed Training Centre. City
 Centre trains Workers. Barracks trains Riflemen immediately and Machine
