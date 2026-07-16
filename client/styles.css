@@ -4593,9 +4593,11 @@ input[type="text"]:focus {
 }
 .room-time-timeline-hover {
   position: absolute;
-  left: clamp(58px, var(--room-time-hover, 50%), calc(100% - 58px));
+  left: var(--room-time-hover, 50%);
   bottom: calc(100% + 5px);
   z-index: 2;
+  box-sizing: border-box;
+  max-width: calc(100% - 8px);
   padding: 3px 6px;
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-sm);
@@ -4606,7 +4608,9 @@ input[type="text"]:focus {
   font-size: 10px;
   font-weight: 800;
   line-height: 1.2;
+  overflow: hidden;
   pointer-events: none;
+  text-overflow: ellipsis;
   transform: translateX(-50%);
   white-space: nowrap;
 }

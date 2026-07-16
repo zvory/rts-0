@@ -252,7 +252,10 @@ export class RoomTimeControls {
       btn.disabled = pending || this.roomTimeAccessDenied || awaitingAuthority;
     }
     const timeline = root.querySelector(".room-time-timeline-track");
-    if (timeline) timeline.disabled = pending || this.roomTimeAccessDenied || awaitingAuthority;
+    if (timeline) {
+      timeline.disabled = pending || this.roomTimeAccessDenied || awaitingAuthority;
+      if (timeline.disabled) this.hideRoomTimeTimelineHover();
+    }
     root.dataset.roomTimeAccessDenied = this.roomTimeAccessDenied ? "true" : "false";
     root.dataset.roomTimeAwaitingAuthority = awaitingAuthority ? "true" : "false";
   }
@@ -443,11 +446,12 @@ export class RoomTimeControls {
     const rect = track.getBoundingClientRect();
     if (!rect.width) return null;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return { ratio, tick: Math.round(ratio * duration) };
+    return { ratio, tick: Math.round(ratio * duration), trackWidth: rect.width };
   }
 
   formatRoomTimeTimelineTarget(tick) {
-    const totalSeconds = Math.floor(Math.max(0, tick) / TICK_HZ);
+    const safeTick = Number.isFinite(tick) ? Math.max(0, Math.round(tick)) : 0;
+    const totalSeconds = Math.floor(safeTick / TICK_HZ);
     const seconds = totalSeconds % 60;
     const totalMinutes = Math.floor(totalSeconds / 60);
     const minutes = totalMinutes % 60;
@@ -456,7 +460,7 @@ export class RoomTimeControls {
     const time = hours > 0
       ? `${hours}:${two(minutes)}:${two(seconds)}`
       : `${two(minutes)}:${two(seconds)}`;
-    return `${time} · tick ${tick}`;
+    return `${time} · tick ${safeTick}`;
   }
 
   updateRoomTimeTimelineHover(ev) {
@@ -473,8 +477,15 @@ export class RoomTimeControls {
     }
     const text = this.formatRoomTimeTimelineTarget(target.tick);
     hover.textContent = text;
-    hover.style.setProperty("--room-time-hover", `${target.ratio * 100}%`);
     hover.hidden = false;
+    const hoverWidth = Number.isFinite(hover.offsetWidth) ? hover.offsetWidth : 0;
+    const halfHoverWidth = Math.min(target.trackWidth / 2, hoverWidth / 2);
+    const targetX = target.ratio * target.trackWidth;
+    const clampedX = Math.max(
+      halfHoverWidth,
+      Math.min(target.trackWidth - halfHoverWidth, targetX),
+    );
+    hover.style.setProperty("--room-time-hover", `${clampedX}px`);
   }
 
   hideRoomTimeTimelineHover() {

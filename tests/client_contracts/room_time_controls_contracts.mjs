@@ -467,8 +467,9 @@ assert(
 );
 const timelineTrack = replayControls.querySelector(".room-time-timeline-track");
 assert(timelineTrack._listeners.has("pointerdown"), "timeline seek installs the scoped pointer activation path");
-timelineTrack._listeners.get("pointermove")({ clientX: 100, pointerType: "mouse" });
 const timelineHover = replayControls.querySelector(".room-time-timeline-hover");
+timelineHover.offsetWidth = 120;
+timelineTrack._listeners.get("pointermove")({ clientX: 100, pointerType: "mouse" });
 assert(
   timelineHover.textContent === "00:16 · tick 500" && timelineHover.hidden === false,
   "replay timeline hover previews the click destination in minutes, seconds, and ticks",
@@ -478,14 +479,46 @@ assert(
   "timeline target formatting carries elapsed time into minutes",
 );
 assert(
-  timelineHover.style["--room-time-hover"] === "50%" &&
+  replayUi.formatRoomTimeTimelineTarget(Number.NaN) === "00:00 · tick 0" &&
+    replayUi.formatRoomTimeTimelineTarget(-1) === "00:00 · tick 0",
+  "timeline target formatting normalizes invalid and negative ticks",
+);
+assert(
+  timelineHover.style["--room-time-hover"] === "100px" &&
     timelineTrack["aria-describedby"] === timelineHover.id,
   "replay timeline hover follows the cursor and is associated with the timeline control",
 );
+timelineTrack._listeners.get("pointermove")({ clientX: 0, pointerType: "mouse" });
+assert(
+  timelineHover.style["--room-time-hover"] === "60px",
+  "replay timeline hover stays within the left edge using its rendered width",
+);
+timelineTrack._listeners.get("pointermove")({ clientX: 200, pointerType: "mouse" });
+assert(
+  timelineHover.style["--room-time-hover"] === "140px",
+  "replay timeline hover stays within the right edge using its rendered width",
+);
+replayUi.roomTimeAccessDenied = true;
+replayUi.syncRoomTimePendingPresentation();
+assert(
+  timelineTrack.disabled && timelineHover.hidden,
+  "disabling the replay timeline also dismisses its hover preview",
+);
+replayUi.roomTimeAccessDenied = false;
+replayUi.syncRoomTimePendingPresentation();
 timelineTrack._listeners.get("pointerleave")({});
 assert(timelineHover.hidden === true, "replay timeline hover hides when the pointer leaves the scrubber");
 timelineTrack._listeners.get("pointermove")({ clientX: 100, pointerType: "touch" });
 assert(timelineHover.hidden === true, "touch movement does not leave behind a hover-only timeline preview");
+timelineTrack._listeners.get("pointermove")({ clientX: 100, pointerType: "mouse" });
+replayUi.roomTimePending = { kind: "speed", expectedSpeed: 2 };
+replayUi.syncRoomTimePendingPresentation();
+assert(
+  timelineTrack.disabled === true && timelineHover.hidden === true,
+  "disabling the timeline dismisses a stale hover preview",
+);
+replayUi.roomTimePending = null;
+replayUi.syncRoomTimePendingPresentation();
 timelineTrack._listeners.get("pointerdown")({ button: 0, isPrimary: true, pointerId: 25, pointerType: "touch" });
 timelineTrack._listeners.get("pointerup")({
   pointerId: 25,
