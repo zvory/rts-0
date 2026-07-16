@@ -467,7 +467,7 @@ assert(
 );
 const timelineTrack = replayControls.querySelector(".room-time-timeline-track");
 assert(timelineTrack._listeners.has("pointerdown"), "timeline seek installs the scoped pointer activation path");
-timelineTrack._listeners.get("mousemove")({ clientX: 100 });
+timelineTrack._listeners.get("pointermove")({ clientX: 100, pointerType: "mouse" });
 const timelineHover = replayControls.querySelector(".room-time-timeline-hover");
 assert(
   timelineHover.textContent === "00:16 · tick 500" && timelineHover.hidden === false,
@@ -478,11 +478,14 @@ assert(
   "timeline target formatting carries elapsed time into minutes",
 );
 assert(
-  timelineHover.style["--room-time-hover"] === "50%" && timelineTrack.title.includes("00:16 · tick 500"),
-  "replay timeline hover follows the cursor and mirrors the destination in the native title",
+  timelineHover.style["--room-time-hover"] === "50%" &&
+    timelineTrack["aria-describedby"] === timelineHover.id,
+  "replay timeline hover follows the cursor and is associated with the timeline control",
 );
-timelineTrack._listeners.get("mouseleave")({});
+timelineTrack._listeners.get("pointerleave")({});
 assert(timelineHover.hidden === true, "replay timeline hover hides when the pointer leaves the scrubber");
+timelineTrack._listeners.get("pointermove")({ clientX: 100, pointerType: "touch" });
+assert(timelineHover.hidden === true, "touch movement does not leave behind a hover-only timeline preview");
 timelineTrack._listeners.get("pointerdown")({ button: 0, isPrimary: true, pointerId: 25, pointerType: "touch" });
 timelineTrack._listeners.get("pointerup")({
   pointerId: 25,
@@ -507,6 +510,10 @@ assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes gen
 assert(!replayControls.querySelector(".vision-selection-controls"), "destroy removes generated vision controls");
 assert(!replayControls.querySelector(".room-time-tick-status"), "destroy removes generated status");
 assert(!replayControls.querySelector(".room-time-timeline"), "destroy removes generated timeline");
+assert(
+  !timelineTrack._listeners.has("pointermove") && !timelineTrack._listeners.has("pointerleave"),
+  "destroy removes timeline hover listeners",
+);
 assert(!replayControls.querySelector(".room-time-panel-drag-handle"), "destroy removes floating room-time panel chrome");
 assert(replayControls.children.includes(seekBack), "destroy unwraps static room-time controls back onto the root");
 assert(replayControls._listeners.size === 0, "destroy removes room-time click listener");

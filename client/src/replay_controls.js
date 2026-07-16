@@ -394,27 +394,33 @@ export class RoomTimeControls {
     track.type = "button";
     track.className = "room-time-timeline-track";
     track.setAttribute("aria-label", `Seek ${this.label.toLowerCase()} timeline`);
-    track.title = `Click to seek ${this.label.toLowerCase()}`;
+    track.setAttribute("aria-describedby", "room-time-timeline-hover");
     this.bindRoomTimeActivation(track, (event) => this.onRoomTimeTimelineClick({
       currentTarget: track,
       clientX: event?.clientX,
     }));
 
     const hover = document.createElement("span");
+    hover.id = "room-time-timeline-hover";
     hover.className = "room-time-timeline-hover";
     hover.setAttribute("role", "tooltip");
-    hover.setAttribute("aria-hidden", "true");
     hover.hidden = true;
-    const onMouseMove = (event) => this.updateRoomTimeTimelineHover({
-      currentTarget: track,
-      clientX: event?.clientX,
-    });
-    const onMouseLeave = () => this.hideRoomTimeTimelineHover();
-    track.addEventListener("mousemove", onMouseMove);
-    track.addEventListener("mouseleave", onMouseLeave);
+    const onPointerMove = (event) => {
+      if (event?.pointerType === "touch") {
+        this.hideRoomTimeTimelineHover();
+        return;
+      }
+      this.updateRoomTimeTimelineHover({
+        currentTarget: track,
+        clientX: event?.clientX,
+      });
+    };
+    const onPointerLeave = () => this.hideRoomTimeTimelineHover();
+    track.addEventListener("pointermove", onPointerMove);
+    track.addEventListener("pointerleave", onPointerLeave);
     this.timelineHoverBindings.push(
-      [track, "mousemove", onMouseMove],
-      [track, "mouseleave", onMouseLeave],
+      [track, "pointermove", onPointerMove],
+      [track, "pointerleave", onPointerLeave],
     );
 
     const progress = document.createElement("span");
@@ -469,17 +475,12 @@ export class RoomTimeControls {
     hover.textContent = text;
     hover.style.setProperty("--room-time-hover", `${target.ratio * 100}%`);
     hover.hidden = false;
-    hover.setAttribute("aria-hidden", "false");
-    track.title = `Seek to ${text}`;
   }
 
   hideRoomTimeTimelineHover() {
-    const track = dom.roomTimeControls?.querySelector(".room-time-timeline-track");
     const hover = dom.roomTimeControls?.querySelector(".room-time-timeline-hover");
-    if (track) track.title = `Click to seek ${this.label.toLowerCase()}`;
     if (!hover) return;
     hover.hidden = true;
-    hover.setAttribute("aria-hidden", "true");
   }
 
   onRoomTimeTimelineClick(ev) {
