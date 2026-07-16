@@ -251,7 +251,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(STATS[KIND.SCOUT_CAR].rangeTiles === 7, "Scout Car weapon range mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 15, "Scout Car sight radius mirrors server");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
-  assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Gun Works");
+  assert(
+    ABILITIES[ABILITY.SMOKE].techRequirement === KIND.RESEARCH_COMPLEX,
+    "Scout Car smoke should require a completed R&D Complex",
+  );
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
