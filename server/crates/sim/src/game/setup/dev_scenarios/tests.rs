@@ -364,6 +364,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
     let scenarios = [
         Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_direct_reverse_order_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_030d),
         Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
         Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
         Game::new_vehicle_small_block_baseline_scenario(
@@ -388,6 +389,89 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
+}
+
+#[test]
+fn replay_142_vehicle_lock_scenario_recreates_slow_overlap() {
+    let setup = Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_0142)
+        .expect("replay-142 scenario setup should succeed");
+    assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
+    assert_eq!(setup.units.len(), 5);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::CommandCar), 1);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::ScoutCar), 2);
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 1);
+    assert_eq!(
+        owned_kind_count(&setup.game, 1, EntityKind::MachineGunner),
+        1
+    );
+    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::CityCentre), 1);
+
+    let mut game = setup.game;
+    while game.tick_count() < setup.issue_after_ticks {
+        game.tick();
+    }
+    let command_car_id = setup.units[0];
+    let colliding_scout_id = setup.units[2];
+    game.enqueue(
+        setup.player_id,
+        SimCommand::Move {
+            units: setup.units,
+            x: setup.goal.0,
+            y: setup.goal.1,
+            queued: false,
+        },
+    );
+
+    let mut previous = {
+        let scout = game
+            .state
+            .entities
+            .get(colliding_scout_id)
+            .expect("colliding Scout Car should exist");
+        let command_car = game
+            .state
+            .entities
+            .get(command_car_id)
+            .expect("Command Car should exist");
+        (
+            (scout.pos_x, scout.pos_y),
+            (command_car.pos_x, command_car.pos_y),
+        )
+    };
+    let mut slow_run = 0u32;
+    let mut longest_slow_run = 0u32;
+    for _ in 0..180 {
+        game.tick();
+        let scout = game
+            .state
+            .entities
+            .get(colliding_scout_id)
+            .expect("colliding Scout Car should survive");
+        let command_car = game
+            .state
+            .entities
+            .get(command_car_id)
+            .expect("Command Car should survive");
+        let separation = (scout.pos_x - command_car.pos_x).hypot(scout.pos_y - command_car.pos_y);
+        let scout_step = (scout.pos_x - previous.0 .0).hypot(scout.pos_y - previous.0 .1);
+        let command_step =
+            (command_car.pos_x - previous.1 .0).hypot(command_car.pos_y - previous.1 .1);
+        if separation < 30.0 && scout_step < 1.0 && command_step < 1.0 {
+            slow_run += 1;
+            longest_slow_run = longest_slow_run.max(slow_run);
+        } else {
+            slow_run = 0;
+        }
+        previous = (
+            (scout.pos_x, scout.pos_y),
+            (command_car.pos_x, command_car.pos_y),
+        );
+    }
+
+    assert!(
+        longest_slow_run >= 100,
+        "replay-142 pair should overlap and translate below 1 px/tick for at least 100 ticks; longest run was {longest_slow_run}"
+    );
 }
 
 #[test]

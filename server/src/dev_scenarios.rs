@@ -133,6 +133,14 @@ const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
     },
 ];
 
+const REPLAY_142_VEHICLE_LOCK_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "replay_142_vehicle_lock",
+    unit: EntityKind::ScoutCar,
+    count: 2,
+    blocker: None,
+    case: None,
+}];
+
 const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
@@ -720,7 +728,7 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 15] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 16] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -733,6 +741,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 15] = [
         description:
             "Single vehicle faces east, then receives a move order 15 tiles directly behind it.",
         launches: &DIRECT_REVERSE_ORDER_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "replay_142_vehicle_lock",
+        title: "Replay 112 Vehicle Lock",
+        description: "Soupman's two touching Scout/Command Cars, three formation companions, and second-base landmark from match 142. After one second the translated tick-14,176 group order recreates their slow overlapping translation.",
+        launches: &REPLAY_142_VEHICLE_LOCK_LAUNCHES,
     },
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
@@ -1059,6 +1073,16 @@ mod tests {
                 case: None,
             })
         );
+        assert_eq!(
+            parse_dev_scenario_room("replay_142_vehicle_lock:unit=scout_car:count=2"),
+            Some(DevScenarioLaunch {
+                id: "replay_142_vehicle_lock",
+                unit: EntityKind::ScoutCar,
+                count: 2,
+                blocker: None,
+                case: None,
+            })
+        );
         for id in [
             "command_car_building_corner",
             "command_car_building_corner_west_southwest",
@@ -1251,6 +1275,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("factory_zero_gap_perpendicular", "tank", "3", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("replay_142_vehicle_lock", "command_car", "2", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("replay_142_vehicle_lock", "scout_car", "1", None),
             None
         );
         for id in [

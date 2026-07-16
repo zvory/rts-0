@@ -152,6 +152,13 @@ impl RoomTask {
                     DevScenarioId::DirectReverseOrder => session_from_setup!(
                         Game::new_direct_reverse_order_scenario(config.unit, config.count, seed)?,
                     ),
+                    DevScenarioId::Replay142VehicleLock => {
+                        session_from_setup!(Game::new_replay_142_vehicle_lock_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?,)
+                    }
                     DevScenarioId::ScoutCarWallChokepoint => {
                         session_from_setup!(Game::new_scout_car_wall_chokepoint_scenario(
                             config.unit,

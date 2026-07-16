@@ -2,6 +2,7 @@
 pub(in crate::lobby) enum DevScenarioId {
     ScoutCarSnakingCorridor,
     DirectReverseOrder,
+    Replay142VehicleLock,
     ScoutCarWallChokepoint,
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
@@ -22,6 +23,7 @@ impl DevScenarioId {
         match id {
             "scout_car_snaking_corridor" => Some(Self::ScoutCarSnakingCorridor),
             "direct_reverse_order" => Some(Self::DirectReverseOrder),
+            "replay_142_vehicle_lock" => Some(Self::Replay142VehicleLock),
             "scout_car_wall_chokepoint" => Some(Self::ScoutCarWallChokepoint),
             "vehicle_corner_wall" => Some(Self::VehicleCornerWall),
             "vehicle_small_block_baseline" => Some(Self::VehicleSmallBlockBaseline),
@@ -45,6 +47,7 @@ impl DevScenarioId {
         match self {
             Self::ScoutCarSnakingCorridor => "scout_car_snaking_corridor",
             Self::DirectReverseOrder => "direct_reverse_order",
+            Self::Replay142VehicleLock => "replay_142_vehicle_lock",
             Self::ScoutCarWallChokepoint => "scout_car_wall_chokepoint",
             Self::VehicleCornerWall => "vehicle_corner_wall",
             Self::VehicleSmallBlockBaseline => "vehicle_small_block_baseline",
