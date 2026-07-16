@@ -386,7 +386,18 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 {
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HORIZONTAL), [{ x: 1, y: 2 }, { x: 1, y: 5 }]);
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [{ x: 1, y: 2 }, { x: 6, y: 5 }]);
+  assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.THREE_WAY), [{ x: 1, y: 2 }, { x: 6, y: 2 }, { x: 3, y: 6 }]);
+  assert.deepEqual(
+    symmetricMapTiles(8, [{ x: 0, y: 0 }], MAP_EDITOR_SYMMETRY.THREE_WAY),
+    [{ x: 0, y: 0 }],
+    "three-way copies beyond the square map are omitted",
+  );
   assert.deepEqual(symmetricMapTiles(8, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL), [{ x: 1, y: 2 }, { x: 5, y: 1 }, { x: 6, y: 5 }, { x: 2, y: 6 }]);
+  const threeWayGuides = mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.THREE_WAY);
+  assert.equal(threeWayGuides.length, 3);
+  assert.deepEqual(threeWayGuides[0], { x0: 128, y0: 128, x1: 128, y1: 0 });
+  assert(Math.abs(threeWayGuides[1].x1 - 256) < 1e-9 && Math.abs(threeWayGuides[1].y1 - 201.9008344562721) < 1e-9);
+  assert(Math.abs(threeWayGuides[2].x1) < 1e-9 && Math.abs(threeWayGuides[2].y1 - 201.9008344562721) < 1e-9);
   assert.deepEqual(mapEditorSymmetryGuideLines(8, MAP_EDITOR_SYMMETRY.RADIAL), [
     { x0: 0, y0: 128, x1: 256, y1: 128 }, { x0: 128, y0: 0, x1: 128, y1: 256 },
   ]);
@@ -397,6 +408,15 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  assert.deepEqual(
+    symmetricTerrainTiles(8, [{ x: 1, y: 2 }], TERRAIN.ROAD_HORIZONTAL, MAP_EDITOR_SYMMETRY.THREE_WAY),
+    [
+      { x: 1, y: 2, paintTerrainCode: TERRAIN.ROAD_HORIZONTAL },
+      { x: 6, y: 2, paintTerrainCode: TERRAIN.ROAD_DIAGONAL_NE_SW },
+      { x: 3, y: 6, paintTerrainCode: TERRAIN.ROAD_DIAGONAL_NW_SE },
+    ],
+    "three-way symmetry snaps marked roads to the nearest square-grid direction",
+  );
   assert.deepEqual(
     symmetricTerrainTiles(8, [{ x: 1, y: 2 }], TERRAIN.ROAD_DIAGONAL_NW_SE, MAP_EDITOR_SYMMETRY.HORIZONTAL),
     [
@@ -452,6 +472,20 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
     result = removeDraftLocation(draft, { kind: "base", locationIndex: 0 });
   }), false);
   assert.match(result.error, /Remove the matching start/);
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Three-player map", description: "", size: 126,
+    terrain: Array(126 * 126).fill(TERRAIN.GRASS), starts: [], baseSites: [],
+  });
+  const result = addSymmetricDraftLocations(draft, {
+    kind: "start", tile: { x: 63, y: 30 }, symmetry: MAP_EDITOR_SYMMETRY.THREE_WAY,
+  });
+  assert.deepEqual(result, { ok: true, count: 3 });
+  assert.deepEqual(draft.startLocations, [{ x: 63, y: 30 }, { x: 90, y: 79 }, { x: 34, y: 78 }]);
+  assert.deepEqual(draft.baseSites, draft.startLocations,
+    "three-way placement creates a matching base for each 1v1v1 start");
 }
 
 {

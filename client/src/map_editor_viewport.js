@@ -23,6 +23,10 @@ export function mapEditorSymmetryGuideLines(size, symmetry) {
   const vertical = { x0: centre, y0: 0, x1: centre, y1: worldSize };
   if (symmetry === MAP_EDITOR_SYMMETRY.HORIZONTAL) return [horizontal];
   if (symmetry === MAP_EDITOR_SYMMETRY.VERTICAL) return [vertical];
+  if (symmetry === MAP_EDITOR_SYMMETRY.THREE_WAY) {
+    return [-Math.PI / 2, Math.PI / 6, 5 * Math.PI / 6]
+      .map((angle) => symmetryGuideRay(centre, worldSize, angle));
+  }
   if (symmetry === MAP_EDITOR_SYMMETRY.RADIAL) return [horizontal, vertical];
   if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN) {
     return [{ x0: 0, y0: 0, x1: worldSize, y1: worldSize }];
@@ -31,6 +35,23 @@ export function mapEditorSymmetryGuideLines(size, symmetry) {
     return [{ x0: 0, y0: worldSize, x1: worldSize, y1: 0 }];
   }
   return [];
+}
+
+function symmetryGuideRay(centre, worldSize, angle) {
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const distances = [];
+  if (dx > 0) distances.push((worldSize - centre) / dx);
+  if (dx < 0) distances.push(-centre / dx);
+  if (dy > 0) distances.push((worldSize - centre) / dy);
+  if (dy < 0) distances.push(-centre / dy);
+  const distance = Math.min(...distances.filter((candidate) => candidate >= 0));
+  return {
+    x0: centre,
+    y0: centre,
+    x1: centre + dx * distance,
+    y1: centre + dy * distance,
+  };
 }
 
 export function mapEditorSymmetryGuideCentre(size, symmetry) {

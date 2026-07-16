@@ -11,6 +11,7 @@ export const MAP_EDITOR_SYMMETRY = Object.freeze({
   HORIZONTAL: "horizontal",
   VERTICAL: "vertical",
   HALF_TURN: "halfTurn",
+  THREE_WAY: "threeWay",
   RADIAL: "radial",
   DIAGONAL_MAIN: "diagonalMain",
   DIAGONAL_ANTI: "diagonalAnti",
@@ -37,11 +38,19 @@ const CHAR_TO_TERRAIN = Object.freeze({
   "/": TERRAIN.ROAD_DIAGONAL_NE_SW,
 });
 const ROAD_TERRAIN_CHARS = new Set(ROAD_TERRAIN_CODES.map((code) => TERRAIN_TO_CHAR[code]));
+const ROAD_TERRAIN_ANGLES = new Map([
+  [TERRAIN.ROAD_HORIZONTAL, 0],
+  [TERRAIN.ROAD_DIAGONAL_NW_SE, 45],
+  [TERRAIN.ROAD_VERTICAL, 90],
+  [TERRAIN.ROAD_DIAGONAL_NE_SW, 135],
+]);
+const SIN_120 = Math.sqrt(3) / 2;
 const SYMMETRY_TRANSFORMS = Object.freeze({
   [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
   [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
   [MAP_EDITOR_SYMMETRY.VERTICAL]: ["identity", "vertical"],
   [MAP_EDITOR_SYMMETRY.HALF_TURN]: ["identity", "rotate180"],
+  [MAP_EDITOR_SYMMETRY.THREE_WAY]: ["identity", "rotate120", "rotate240"],
   [MAP_EDITOR_SYMMETRY.RADIAL]: ["identity", "rotate90", "rotate180", "rotate270"],
   [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN]: ["identity", "diagonalMain"],
   [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI]: ["identity", "diagonalAnti"],
@@ -652,13 +661,30 @@ function transformMapTile(tile, size, transform) {
   if (transform === "horizontal") return { x: tile.x, y: max - tile.y };
   if (transform === "vertical") return { x: max - tile.x, y: tile.y };
   if (transform === "rotate90") return { x: max - tile.y, y: tile.x };
+  if (transform === "rotate120") return rotateAndSnapMapTile(tile, size, -0.5, SIN_120);
   if (transform === "rotate180") return { x: max - tile.x, y: max - tile.y };
+  if (transform === "rotate240") return rotateAndSnapMapTile(tile, size, -0.5, -SIN_120);
   if (transform === "rotate270") return { x: tile.y, y: max - tile.x };
   if (transform === "diagonalMain") return { x: tile.y, y: tile.x };
   if (transform === "diagonalAnti") return { x: max - tile.y, y: max - tile.x };
   return copyLocation(tile);
 }
+function rotateAndSnapMapTile(tile, size, cosine, sine) {
+  const centre = (size - 1) / 2;
+  const dx = tile.x - centre;
+  const dy = tile.y - centre;
+  const rotated = {
+    x: Math.round(centre + dx * cosine - dy * sine),
+    y: Math.round(centre + dx * sine + dy * cosine),
+  };
+  // A square has no exact three-fold rotational symmetry. Keep the closest tile-centre
+  // projection when it remains on the map and omit copies that rotate beyond its corners.
+  return validMapTile(rotated, size);
+}
 function transformTerrainCode(code, transform) {
+  if (transform === "rotate120" || transform === "rotate240") {
+    return closestRotatedRoadTerrain(code, transform === "rotate120" ? 120 : 240);
+  }
   if (code === TERRAIN.ROAD_HORIZONTAL) {
     return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
       ? TERRAIN.ROAD_VERTICAL
@@ -680,6 +706,22 @@ function transformTerrainCode(code, transform) {
       : code;
   }
   return code;
+}
+function closestRotatedRoadTerrain(code, degrees) {
+  const sourceAngle = ROAD_TERRAIN_ANGLES.get(code);
+  if (sourceAngle === undefined) return code;
+  const targetAngle = (sourceAngle + degrees) % 180;
+  let closestCode = code;
+  let closestDistance = Infinity;
+  for (const [candidateCode, candidateAngle] of ROAD_TERRAIN_ANGLES) {
+    const difference = Math.abs(targetAngle - candidateAngle);
+    const distance = Math.min(difference, 180 - difference);
+    if (distance < closestDistance) {
+      closestCode = candidateCode;
+      closestDistance = distance;
+    }
+  }
+  return closestCode;
 }
 function normalizeMapEditorSymmetry(value) { return SYMMETRY_TRANSFORMS[value] ? value : MAP_EDITOR_SYMMETRY.NONE; }
 function locationKey(location) { return `${location?.x},${location?.y}`; }
