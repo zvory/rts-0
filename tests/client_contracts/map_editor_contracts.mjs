@@ -48,8 +48,11 @@ import {
   addSymmetricDraftLocations,
   authoredMapFromMaterialized,
   MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
+  MAP_EDITOR_DEFAULT_SIZE,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_SIZE,
+  MAP_EDITOR_MIN_SIZE,
   MAP_EDITOR_SYMMETRY,
   MapEditorSession,
   mapEditorRectTiles,
@@ -355,6 +358,33 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  const viewport = { armed: "unchanged", armTool(tool) { this.armed = tool; } };
+  const statuses = [];
+  const panel = {
+    session, viewport, blankMapSize: "48", selectedStartIndex: 3, selectedBaseIndex: 4,
+    setStatus(message, error = false) { statuses.push({ message, error }); },
+  };
+  assert.equal(MapEditorPanel.prototype.newBlankMap.call(panel), true);
+  assert.equal(session.draft.terrain.length, 48);
+  assert.equal(viewport.armed, null);
+  assert.deepEqual(statuses.pop(), { message: "Created a blank 48 × 48 two-player map.", error: false });
+
+  const before = session.materialized();
+  panel.blankMapSize = String(MAP_EDITOR_MAX_SIZE + 1);
+  assert.equal(MapEditorPanel.prototype.newBlankMap.call(panel), false);
+  assert.deepEqual(session.materialized(), before, "invalid custom sizes preserve the current draft");
+  assert.deepEqual(statuses.pop(), {
+    message: `Blank map size must be a whole number from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`,
+    error: true,
+  });
+
+  const defaults = new MapEditorSession({ storage: null });
+  defaults.initializeBlank();
+  assert.equal(defaults.draft.terrain.length, MAP_EDITOR_DEFAULT_SIZE);
+}
+
+{
   const starts = [{ x: 8, y: 8 }, { x: 117, y: 117 }, { x: 117, y: 8 }, { x: 8, y: 117 }];
   const baseSites = Array.from({ length: 32 }, (_, index) => ({ x: 20 + index, y: 20 }));
   const draft = authoredMapFromMaterialized({
@@ -486,6 +516,26 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   assert.deepEqual(draft.startLocations, [{ x: 63, y: 30 }, { x: 90, y: 79 }, { x: 34, y: 78 }]);
   assert.deepEqual(draft.baseSites, draft.startLocations,
     "three-way placement creates a matching base for each 1v1v1 start");
+
+  const edgeDraft = authoredMapFromMaterialized({
+    name: "Edge placement", description: "", size: 126,
+    terrain: Array(126 * 126).fill(TERRAIN.GRASS), starts: [], baseSites: [],
+  });
+  const edgeBefore = structuredClone(edgeDraft);
+  const invalidAdd = addSymmetricDraftLocations(edgeDraft, {
+    kind: "start", tile: { x: 22, y: 7 }, symmetry: MAP_EDITOR_SYMMETRY.THREE_WAY,
+  });
+  assert.equal(invalidAdd.ok, false);
+  assert.match(invalidAdd.error, /edge clearance/);
+  assert.deepEqual(edgeDraft, edgeBefore, "three-way placement rejects clipped or edge-unsafe copies atomically");
+
+  const before = structuredClone(draft);
+  const invalidMove = moveSymmetricDraftLocation(draft, {
+    kind: "start", locationIndex: 0, tile: { x: 22, y: 7 }, symmetry: MAP_EDITOR_SYMMETRY.THREE_WAY,
+  });
+  assert.equal(invalidMove.ok, false);
+  assert.match(invalidMove.error, /edge clearance/);
+  assert.deepEqual(draft, before, "three-way relocation rejects clipped or edge-unsafe copies atomically");
 }
 
 {

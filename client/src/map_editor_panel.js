@@ -1,9 +1,12 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
+  MAP_EDITOR_DEFAULT_SIZE,
   MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_SIZE,
   MAP_EDITOR_MAX_START_LOCATIONS,
+  MAP_EDITOR_MIN_SIZE,
   MAP_EDITOR_SYMMETRY,
   removeDraftLocation,
 } from "./map_editor_session.js";
@@ -34,6 +37,7 @@ export class MapEditorPanel {
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
+    this.blankMapSize = String(MAP_EDITOR_DEFAULT_SIZE);
     this.pending = false;
     this.status = "Ready to edit the map.";
     this.statusError = false;
@@ -100,10 +104,19 @@ export class MapEditorPanel {
     }
     select.value = this.selectedMapFile;
     select.addEventListener("change", () => { this.selectedMapFile = select.value; });
+    const blankSize = document.createElement("input");
+    blankSize.type = "number";
+    blankSize.min = String(MAP_EDITOR_MIN_SIZE);
+    blankSize.max = String(MAP_EDITOR_MAX_SIZE);
+    blankSize.step = "1";
+    blankSize.value = this.blankMapSize;
+    blankSize.setAttribute("aria-label", "Blank map size");
+    blankSize.addEventListener("input", () => { this.blankMapSize = blankSize.value; });
     section.append(
       field("Bundled map", select),
       button("Load bundled map", () => void this.loadBundledMap(), { disabled: !this.selectedMapFile || this.pending }),
-      button("New blank 126 × 126", () => this.newBlankMap(), { disabled: this.pending }),
+      field("Blank map size", blankSize),
+      button("New blank map", () => this.newBlankMap(), { disabled: this.pending }),
     );
     if (this.catalogError) section.appendChild(readout(this.catalogError, true));
     return section;
@@ -312,11 +325,17 @@ export class MapEditorPanel {
   }
 
   newBlankMap() {
-    this.session.initializeBlank({ size: 126, playerCount: 2 });
+    const size = Number(this.blankMapSize);
+    if (!Number.isInteger(size) || size < MAP_EDITOR_MIN_SIZE || size > MAP_EDITOR_MAX_SIZE) {
+      this.setStatus(`Blank map size must be a whole number from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`, true);
+      return false;
+    }
+    this.session.initializeBlank({ size, playerCount: 2 });
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.viewport.armTool(null);
-    this.setStatus("Created a blank two-player map.");
+    this.setStatus(`Created a blank ${size} × ${size} two-player map.`);
+    return true;
   }
 
   async loadCatalog() {

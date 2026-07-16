@@ -3,6 +3,9 @@ import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
 export const MAP_EDITOR_MAX_BASE_SITES = 32;
+export const MAP_EDITOR_DEFAULT_SIZE = 126;
+export const MAP_EDITOR_MIN_SIZE = 16;
+export const MAP_EDITOR_MAX_SIZE = 166;
 // Mirror the authored-map clearance contract enforced by the simulation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
@@ -109,8 +112,11 @@ export class MapEditorSession {
     return true;
   }
 
-  initializeBlank({ size = 126, playerCount = 2, name = "Untitled map" } = {}) {
-    const mapSize = Math.max(16, Math.min(126, Math.trunc(Number(size)) || 126));
+  initializeBlank({ size = MAP_EDITOR_DEFAULT_SIZE, playerCount = 2, name = "Untitled map" } = {}) {
+    const mapSize = Math.max(
+      MAP_EDITOR_MIN_SIZE,
+      Math.min(MAP_EDITOR_MAX_SIZE, Math.trunc(Number(size)) || MAP_EDITOR_DEFAULT_SIZE),
+    );
     const count = Math.max(1, Math.min(MAP_EDITOR_MAX_START_LOCATIONS, Math.trunc(Number(playerCount)) || 2));
     const startTile = (fraction) => Math.max(
       MAP_EDITOR_MAIN_CLEARANCE_TILES,
@@ -406,9 +412,12 @@ export function moveSymmetricDraftLocation(draft, {
   const plans = [];
   for (const transform of transforms) {
     const from = transformMapTile(source, draft.terrain.length, transform);
-    const to = transformMapTile(target, draft.terrain.length, transform);
     const index = collection.findIndex((candidate) => sameLocation(candidate, from));
-    if (index < 0 || !to || plannedSources.has(index)) continue;
+    if (index < 0 || plannedSources.has(index)) continue;
+    const to = transformMapTile(target, draft.terrain.length, transform);
+    if (!draftLocationTileWithinClearance(draft, to, radius)) {
+      return draftEditError("That location's symmetric copies do not fit within the map edge clearance.");
+    }
     plannedSources.add(index);
     plans.push({
       index,
@@ -467,7 +476,10 @@ export function addSymmetricDraftLocations(draft, {
   const radius = locationRadius(kind);
   const target = normalizedDraftTile(draft, tile, radius);
   if (!target) return draftEditError("Choose a valid map tile.");
-  const locations = symmetricMapTiles(draft.terrain.length, [target], symmetry);
+  const locations = symmetricDraftLocationTiles(draft, target, symmetry, radius);
+  if (!locations) {
+    return draftEditError("That location's symmetric copies do not fit within the map edge clearance.");
+  }
   if (kind === "start") {
     const additions = locations.filter((location) => (
       !draft.startLocations.some((start) => sameLocation(start, location))
@@ -650,6 +662,29 @@ function normalizedDraftTile(draft, tile, radius) {
   const valid = validMapTile(tile, size);
   if (!valid || size <= radius * 2) return null;
   return { x: Math.max(radius, Math.min(size - radius - 1, valid.x)), y: Math.max(radius, Math.min(size - radius - 1, valid.y)) };
+}
+function symmetricDraftLocationTiles(draft, tile, symmetry, radius) {
+  const locations = [];
+  const seen = new Set();
+  for (const transform of SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)]) {
+    const transformed = transformMapTile(tile, draft.terrain.length, transform);
+    if (!draftLocationTileWithinClearance(draft, transformed, radius)) return null;
+    const key = locationKey(transformed);
+    if (!seen.has(key)) {
+      seen.add(key);
+      locations.push(transformed);
+    }
+  }
+  return locations;
+}
+function draftLocationTileWithinClearance(draft, tile, radius) {
+  const size = draft?.terrain?.length || 0;
+  const valid = validMapTile(tile, size);
+  return !!valid
+    && valid.x >= radius
+    && valid.y >= radius
+    && valid.x < size - radius
+    && valid.y < size - radius;
 }
 function validMapTile(tile, size) {
   const x = Math.trunc(Number(tile?.x)); const y = Math.trunc(Number(tile?.y));

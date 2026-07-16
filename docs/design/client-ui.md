@@ -758,7 +758,7 @@ authoritative map-only payload, creates a server-validated editor handoff, and n
 entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
-`/maps/<file>`, creates the fixed-size blank map, edits name/description plus flat start and base
+`/maps/<file>`, creates configurable 16–166-tile square blank maps with a 126-tile default, edits name/description plus flat start and base
 locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
 capacity; every base location is permanent and its resources spawn even when no player starts there.
 Editor drafts may temporarily contain zero start locations so authors can clear and rebuild the player

@@ -425,6 +425,10 @@ try {
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
+      blankMapSize: (() => {
+        const input = document.querySelector("input[aria-label='Blank map size']");
+        return input && { type: input.type, value: input.value, min: input.min, max: input.max };
+      })(),
       clearanceSection: [...document.querySelectorAll(".map-editor-readout")]
         .find((node) => node.textContent === "Bases and starts reserve a passable grass area.")
         ?.closest("fieldset")?.querySelector("legend")?.textContent || "",
@@ -450,8 +454,12 @@ try {
       editorUi.symmetryOptions.includes("Radial (4-way)") &&
       editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
       editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
+      editorUi.blankMapSize?.type === "number" &&
+      editorUi.blankMapSize.value === "126" &&
+      editorUi.blankMapSize.min === "16" &&
+      editorUi.blankMapSize.max === "166" &&
       editorUi.clearanceSection === "Start and base locations",
-    "MAP EDITOR: symmetry help, modes, and grass-clearance guidance are presented in the right controls",
+    "MAP EDITOR: symmetry, custom blank-map size, and grass-clearance controls are presented correctly",
   );
   await editorPage.close();
 
