@@ -88,7 +88,7 @@ export class UnitRigInstance {
     const routeParts = normalizedPartSet(options.includeParts);
     this._routeParts = routeParts ? new Set(routeParts) : null;
     this._routePartKey = partSelectionKey(this._routeParts);
-    this._animationStage = createRigAnimationStage(definition, { includeParts: this._routeParts });
+    this._animationStage = null;
     this._diagnosticCounts = new Uint32Array(SVG_RIG_DIAGNOSTIC_LABELS.length);
     this._destroyed = false;
 
@@ -124,7 +124,13 @@ export class UnitRigInstance {
     this.container.rotation = 0;
 
     const includeParts = this._routeParts ?? normalizedPartSet(options.includeParts);
-    const sampled = options.sampledAnimation ?? sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    let sampled = options.sampledAnimation;
+    if (!sampled) {
+      if (!this._animationStage) {
+        this._animationStage = createRigAnimationStage(this.definition, { includeParts });
+      }
+      sampled = sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    }
     const diagnosticCounts = this._diagnosticCounts;
     diagnosticCounts.fill(0);
     for (const [partId, rec] of this.parts) {

@@ -156,8 +156,7 @@ class PngAtlasRigInstance {
       });
       this.container.addChild(display);
     }
-    this._animationPartIds = new Set([...this.parts.values()].map((rec) => rec.sprite.animationPart));
-    this._animationStage = createRigAnimationStage(definition, { includeParts: this._animationPartIds });
+    this._animationStage = null;
     this._diagnosticCounts = new Uint32Array(PNG_RIG_DIAGNOSTIC_LABELS.length);
   }
 
@@ -180,7 +179,14 @@ class PngAtlasRigInstance {
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 
-    const sampled = options.sampledAnimation ?? sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    let sampled = options.sampledAnimation;
+    if (!sampled) {
+      if (!this._animationStage) {
+        const animationPartIds = new Set([...this.parts.values()].map((rec) => rec.sprite.animationPart));
+        this._animationStage = createRigAnimationStage(this.definition, { includeParts: animationPartIds });
+      }
+      sampled = sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    }
     const diagnosticCounts = this._diagnosticCounts;
     diagnosticCounts.fill(0);
     for (const [spriteId, rec] of this.parts) {
