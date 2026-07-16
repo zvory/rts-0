@@ -631,6 +631,13 @@ mod tests {
     fn extra_unit_does_not_mask_a_different_kind_deficit_or_enlarge_canonical_roster() {
         let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
         let mut game = scenario.build_game().unwrap();
+        for player_id in [1, 2] {
+            game.apply_lab_op(LabOp::SetPlayerGodMode {
+                player_id,
+                enabled: true,
+            })
+            .unwrap();
+        }
         let mut driver = LabScenarioDriver::supply_300_hellhole().unwrap();
         driver.actions_for_tick(&game);
         let canonical_slot_count = driver.central_unit_provenance.len();
