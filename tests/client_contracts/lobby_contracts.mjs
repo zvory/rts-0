@@ -774,6 +774,8 @@ import { textWithin } from "./dom_text.mjs";
       onCreateLobby: () => { createClicks += 1; },
       onJoinLobby: (row, options) => joins.push({ room: row.room, spectator: !!options?.spectator }),
     });
+    assert(statusEl.textContent === "" && statusEl.hidden,
+      "a settled lobby browser hides the redundant refresh status");
     assert(textWithin(rowsRoot).includes("No lobbies"), "lobby browser renders compact empty state");
     findFakes(rowsRoot, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0]?.click();
     assert(createClicks === 1, "empty lobby browser create action opens the create flow");
