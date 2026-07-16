@@ -501,23 +501,18 @@ mod tests {
             .expect("four-player map should be listed");
         assert_eq!(four_player.min_players, 1);
         assert_eq!(four_player.max_players, 4);
+        let expected_starts = vec![(29, 29), (29, 136), (136, 29), (136, 136)];
         for player_count in 1..=4 {
-            let map = Map::load("4 Player Map", player_count, 0x1234_5678)
+            let mut map = Map::load("4 Player Map", player_count, 0x1234_5678)
                 .expect("four-player map should load for every supported player count");
             assert_eq!(map.size, 166);
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.base_sites.len(), 16);
+            if player_count == 4 {
+                map.starts.sort_unstable();
+                assert_eq!(map.starts, expected_starts);
+            }
         }
-
-        let mut four_player_starts = Map::load("4 Player Map", 4, 0x1234_5678)
-            .expect("four-player map should load all four starts")
-            .starts;
-        four_player_starts.sort_unstable();
-        assert_eq!(
-            four_player_starts,
-            vec![(29, 29), (29, 136), (136, 29), (136, 136)],
-            "four-player layout must remain centered after adding a 20-tile border"
-        );
     }
 
     #[test]
