@@ -66,6 +66,8 @@ export class Net {
     this.diagnostics = diagnostics;
     /** @type {WebSocket|null} */
     this.ws = null;
+    /** Whether the current socket has emitted its open lifecycle event. */
+    this._connected = false;
     /** @type {Map<string, Set<Function>>} type -> handlers */
     this._handlers = new Map();
     /** @type {number|null} our assigned player id, set on `welcome`. */
@@ -118,11 +120,17 @@ export class Net {
     if (!ws) return;
     this.ws = null;
     this._playerId = null;
+    const wasConnected = this._connected;
+    this._connected = false;
     try {
       ws.close();
     } catch {
       // The socket is already unusable; clearing our reference is sufficient.
     }
+    // Surface the intentional transition immediately. The socket's eventual
+    // close event is stale once `this.ws` is cleared and must not be allowed to
+    // tear down a replacement connection opened in the meantime.
+    if (wasConnected) this._emit("close");
   }
 
   _connectOnce(timeoutMs) {
@@ -150,6 +158,7 @@ export class Net {
         clearTimeout(timeoutId);
         opened = true;
         settled = true;
+        this._connected = true;
         this.diagnostics?.mark("ws.open");
         this._emit("open");
         resolve();
@@ -173,16 +182,23 @@ export class Net {
 
       ws.addEventListener("close", () => {
         clearTimeout(timeoutId);
-        if (this.ws === ws) this.ws = null;
+        const wasCurrent = this.ws === ws;
+        if (wasCurrent) {
+          this.ws = null;
+          this._connected = false;
+          this._playerId = null;
+        }
         this.diagnostics?.mark("ws.close");
-        if (opened) this._emit("close");
+        if (opened && wasCurrent) this._emit("close");
         if (!settled) {
           settled = true;
           reject(new Error("WebSocket connection failed"));
         }
       });
 
-      ws.addEventListener("message", (ev) => this._onMessage(ev));
+      ws.addEventListener("message", (ev) => {
+        if (this.ws === ws) this._onMessage(ev);
+      });
     });
   }
 

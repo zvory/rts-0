@@ -529,6 +529,32 @@ import { textWithin } from "./dom_text.mjs";
     "lobby create suggestion stays within the public lobby name limit");
   assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
     "lobby create suggestion avoids reserved internal prefixes");
+
+  {
+    let connectionChecks = 0;
+    let joinedRoom = "";
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _browserActionPending: false,
+      _fetchImpl: async () => ({
+        ok: true,
+        async json() { return { room: "Created lobby" }; },
+      }),
+      async _connectForAction() {
+        connectionChecks += 1;
+        return true;
+      },
+      _beginBrowserJoin(row) {
+        joinedRoom = row.room;
+      },
+      _renderLobbyBrowser() {},
+      _reflectCreateButton() {},
+    });
+    const created = await lobby._submitCreateLobby("Created lobby");
+    assert(created && joinedRoom === "Created lobby", "create flow joins the reserved lobby");
+    assert(connectionChecks === 2,
+      "create flow rechecks its socket after the HTTP reservation completes");
+  }
+
   const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
   assert(indexHtml.includes('class="lobby-manual-room" hidden'),
     "manual room-name join controls stay outside the normal pre-join product path");

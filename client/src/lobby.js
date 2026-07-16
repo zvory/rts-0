@@ -440,6 +440,16 @@ export class Lobby {
       }
       const payload = await response.json().catch(() => ({}));
       const createdRoom = String(payload?.room || room).trim() || room;
+      // The socket can close while the HTTP reservation is in flight. Recheck
+      // it before sending the join so a successful create cannot leave the UI
+      // waiting forever on a message that was never sent.
+      if (!await this._connectForAction({ reportError: false })) {
+        this._browserActionPending = false;
+        this.createModal?.setError("Lobby was created, but the server connection was lost. Try joining it again.");
+        this._renderLobbyBrowser();
+        this._reflectCreateButton();
+        return false;
+      }
       this._beginBrowserJoin({ room: createdRoom }, { spectator: false });
       return true;
     } catch (_) {

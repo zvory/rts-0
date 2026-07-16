@@ -312,11 +312,73 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
 {
   const net = new Net("ws://example.test/ws");
   let closes = 0;
+  net._connected = true;
+  net.on("close", () => { closes += 1; });
   net._playerId = 7;
-  net.ws = { close() { closes += 1; } };
+  let socketCloses = 0;
+  net.ws = { close() { socketCloses += 1; } };
   net.disconnect();
-  assert(closes === 1, "Net.disconnect closes the current socket");
+  assert(socketCloses === 1, "Net.disconnect closes the current socket");
+  assert(closes === 1, "Net.disconnect emits one immediate close lifecycle event");
   assert(net.ws === null && net.playerId === null, "Net.disconnect clears pre-join connection state");
+}
+
+{
+  const NativeWebSocket = globalThis.WebSocket;
+  const sockets = [];
+  class LifecycleWebSocket {
+    static OPEN = 1;
+
+    constructor() {
+      this.listeners = new Map();
+      this.readyState = 0;
+      sockets.push(this);
+    }
+
+    addEventListener(type, handler) {
+      this.listeners.set(type, handler);
+    }
+
+    emit(type, event = {}) {
+      this.listeners.get(type)?.(event);
+    }
+
+    close() {
+      this.readyState = 3;
+    }
+  }
+
+  globalThis.WebSocket = LifecycleWebSocket;
+  try {
+    const net = new Net("ws://example.test/ws");
+    let closes = 0;
+    let messages = 0;
+    net.on("close", () => { closes += 1; });
+    net._onMessage = () => { messages += 1; };
+
+    const firstConnect = net.connect({ attempts: 1 });
+    sockets[0].readyState = LifecycleWebSocket.OPEN;
+    sockets[0].emit("open");
+    await firstConnect;
+    const staleSocket = sockets[0];
+
+    net.disconnect();
+    assert(closes === 1, "intentional disconnect transitions listeners immediately");
+
+    const secondConnect = net.connect({ attempts: 1 });
+    sockets[1].readyState = LifecycleWebSocket.OPEN;
+    sockets[1].emit("open");
+    await secondConnect;
+    staleSocket.emit("close");
+    staleSocket.emit("message", { data: "stale" });
+    sockets[1].emit("message", { data: "current" });
+
+    assert(closes === 1, "a stale socket close does not close the replacement lifecycle");
+    assert(net.ws === sockets[1], "a stale socket close preserves the replacement socket");
+    assert(messages === 1, "messages from a stale socket are ignored after reconnect");
+  } finally {
+    globalThis.WebSocket = NativeWebSocket;
+  }
 }
 
 // ---------------------------------------------------------------------------
