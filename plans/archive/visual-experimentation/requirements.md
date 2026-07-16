@@ -123,7 +123,7 @@ presentation assets.
 - A developer should be able to launch an experiment with one local visual profile identifier.
 - No profile id means normal lab behavior.
 - A visual profile must be separate from authoritative checkpoint-backed lab setup JSON.
-- Visual profile data must not be submitted through the lab setup PR workflow.
+- Visual profile data must not be included in local lab setup exports.
 - A profile may be tied to a specific scenario or map when that keeps the local comparison simple.
 - Profiles may use brittle local selectors when acceptable for developer-only work, but they must
   fail visibly if they no longer match the current lab scene.
@@ -153,8 +153,8 @@ presentation assets.
 - No general-purpose custom asset loading system.
 - No changes to unit balance, collision, commands, combat, fog, or protocol for local visual
   experiments.
-- No visual experiment metadata inside checkpoint-backed lab setup payloads or lab setup PR
-  submissions.
+- No visual experiment metadata inside checkpoint-backed lab setup payloads or local lab setup
+  exports.
 - No requirement to make renderer-only samples behave like real game objects.
 
 ## Developer Stories
@@ -180,7 +180,7 @@ presentation assets.
 - As a developer, I can iterate by editing local profile or SVG files, refreshing or restarting, and
   reopening the lab.
 - As a developer, I can keep visual experiment work separate from authoritative lab scenarios and
-  avoid accidentally submitting experiment-only metadata as a scenario PR.
+  avoid accidentally including experiment-only metadata in a local scenario export.
 
 ## Acceptance Criteria
 

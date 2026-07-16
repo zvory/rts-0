@@ -21,7 +21,7 @@ bars, pan, and zoom still available.
 - Add lightweight world-space labels for candidates, using pooled Pixi objects or another
   renderer-owned teardown-safe mechanism.
 - Keep samples out of selection, hit testing, command targeting, minimap blips, fog sources,
-  snapshots, scenario authoring data, and lab scenario submissions.
+  snapshots, scenario authoring data, and local lab scenario exports.
 - Ensure broken candidate entries fail soft: skip the broken candidate where possible, record a
   local render/profile error, and continue rendering the rest of the scene.
 - Include at least one profile that compares several entrenchment candidates side by side near real

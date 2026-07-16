@@ -25,7 +25,7 @@ labs into a visual asset iteration tool.
 - Do not implement full authentication, user accounts, ownership, voting, comments, or publishing
   workflows.
 - Do not migrate `/dev/scenario` or scripted dev-watch scenarios in this plan.
-- Do not add map authoring or map PR submission. Scenarios may reference only bundled maps whose
+- Do not add server-side map authoring or persistence. Scenarios may reference only bundled maps whose
   metadata matches the then-current legacy setup validation path.
 - Do not serialize exact runtime snapshots. Projectiles, command logs, transient events, fog
   projections, interpolation, and setup/teardown timers remain outside legacy setup JSON.
@@ -46,8 +46,7 @@ start without depending on hand-coded Rust enum entries for every new scenario.
 Turn the existing import/export panel into an authoring surface for repo-ready scenarios. The phase
 adds metadata fields, slug rules, validation feedback, and a dry-run path that proves the current
 lab state can round-trip through legacy setup JSON and fit the catalog constraints. The user-facing
-outcome is that authors can tell whether a scenario is ready to submit before any GitHub side
-effects happen.
+outcome is that authors can tell whether a scenario is catalog-ready before exporting it locally.
 
 ### [Phase 5 - Hardening, Docs, and Review Flow](phase-5.md)
 
@@ -66,16 +65,13 @@ process with clear operational constraints.
   mutate sim internals or read a browser-supplied snapshot as authority.
 - Reject duplicate slugs, oversized payloads, unknown maps, unsupported schema versions, and
   non-catalog fields during validation.
-- Generated scenario PRs should be draft or clearly labeled for human review. They must not request
-  product auto-merge automatically.
 - Keep normal matches, replays, replay branches, dev scenarios, lobby behavior, and lab import/export
   stable unless a phase explicitly scopes a lab-only change.
 - Keep protocol mirrors and docs together if a phase adds a new wire message, HTTP DTO, start
   capability, or lab result shape.
-- Keep lab UI app-owned. `App` may own new catalog/submission clients and pass small collaborators
-  into `LabPanel`; `Match`, HUD, input, minimap, and renderer must not import GitHub or submission
-  modules.
-- Prefer deterministic JSON formatting and small manifests so PR diffs are readable.
+- Keep lab UI app-owned. `App` may own new catalog/authoring clients and pass small collaborators
+  into `LabPanel`; `Match`, HUD, input, minimap, and renderer must not import authoring modules.
+- Prefer deterministic JSON formatting and small manifests so exported files are readable.
 - Use focused verification for each phase and rely on the PR `./tests/run-all.sh` gate for full
   coverage.
 - A filtered test command only counts as verification when it actually runs matching tests.
@@ -96,8 +92,5 @@ reachable from `origin/main`.
 For unattended executor passes after manual approval of this plan:
 
 ```bash
-scripts/phase-runner.sh --plan labscenarios phase-1 phase-2 phase-3 phase-4 phase-5 --pr --wait
+scripts/phase-runner.sh --plan labscenarios phase-1 phase-2 phase-5 --pr --wait
 ```
-
-Manual review is recommended before Phase 3 because the GitHub submission service sets the security
-and operational model for repository writes initiated from the product UI.

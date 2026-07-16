@@ -68,7 +68,7 @@ not rewrite the catalog assets yet.
 
 ### [Phase 6 - Lab Asset Cutover](phase-6.md)
 
-Migrate the bundled lab catalog and lab submission/export path to checkpoint-backed setup
+Migrate the bundled lab catalog and lab export path to checkpoint-backed setup
 containers. Keep compatibility readers for old lab setup files during the transition, or explicitly
 remove them only after every bundled and persisted caller has a tested replacement. This phase is
 the first one that may intentionally change the lab setup JSON shape.

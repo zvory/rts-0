@@ -59,7 +59,7 @@ Explicit non-goals:
   embeddable payload, not a product-specific file format, and that maps remain normal map data
   supplied or referenced by outer artifacts.
 - Replay and lab compatibility policies cover file/dev artifacts, crash artifacts, match-history DB
-  rows, bundled scenarios, submitted scenarios, and old-format fixtures.
+  rows, bundled scenarios, locally exported scenarios, and old-format fixtures.
 - Projection privacy tests still cover checkpoint import/export boundaries for player, spectator,
   selected-player, and full-world diagnostic views.
 - Suggested focused commands:

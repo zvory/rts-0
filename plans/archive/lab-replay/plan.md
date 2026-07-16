@@ -36,7 +36,7 @@ long as failures are clear and the final stage restores newly captured replay la
   enough state to rebuild a `Game`, continue ticking, and produce the same future authoritative
   results as the original game.
 - `Scenario` is a product/UI word, not a separate serialization contract. Code, catalog assets,
-  import/export, validation, and submission should move to checkpoint-backed lab setup payloads;
+  import/export and validation should move to checkpoint-backed lab setup payloads;
   visible UI copy may still say "Lab Scenario" where that is the player-facing concept.
 - `ReplayArtifact` is `start: GameCheckpoint` plus `actions: ReplayAction[]`.
 - `ReplayAction` is a typed authoritative action applied at a recorded tick through public game or
