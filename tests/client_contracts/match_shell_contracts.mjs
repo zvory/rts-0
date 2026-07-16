@@ -10,6 +10,7 @@ import {
   predictionReportFields,
 } from "../../client/src/match_net_reporter.js";
 import { buildMatchSettingsContext } from "../../client/src/match_settings_context.js";
+import { pointerLockDiagnosticToast } from "../../client/src/match_pointer_lock_diagnostics.js";
 import {
   EVENT,
   KIND,
@@ -38,6 +39,16 @@ import {
   assert(!fields.nativeCursorActive, "Windows net reports do not claim native cursor capture is active");
   assert(fields.tauriInternalsPresent, "Windows net reports retain Tauri internals diagnostics");
   assert(fields.tauriGlobalPresent, "Windows net reports retain the Tauri global diagnostic");
+  assert(
+    pointerLockDiagnosticToast({
+      error: { name: "Error", message: "Pointer Lock request timeout without locking the target." },
+      support: {
+        desktopRuntime: root.__RTS_DESKTOP_RUNTIME,
+        nativeCursor: { supported: false, backend: null },
+      },
+    }).includes("request timeout"),
+    "Windows browser-lock diagnostics report the browser failure instead of claiming the native bridge is missing",
+  );
 }
 
 // Match net-report/ping collaborator
