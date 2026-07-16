@@ -4,7 +4,7 @@
 //! networking layer calls ONLY the methods in §3.1; everything else here is private detail.
 //!
 //! The simulation is fixed-rate: each [`Game::tick`] drains queued commands, advances every
-//! system in a deterministic order, and recomputes per-player fog. Snapshots are pulled
+//! system in a deterministic order, and recomputes per-player fog at 15 Hz. Snapshots are pulled
 //! separately via [`Game::snapshot_for`], fog-filtered so a player only ever sees neutral /
 //! enemy entities on tiles they currently see.
 
@@ -76,6 +76,7 @@ pub use crate::game::command::SimCommand;
 pub use teams::TeamId;
 
 const AI_WORKER_RETREAT_TILES: f32 = 5.0;
+const FOG_UPDATE_INTERVAL_TICKS: u32 = 2;
 
 fn primary_base_kind(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::CityCentre | EntityKind::Zamok)
@@ -204,8 +205,8 @@ impl Game {
     ///
     /// Ordered per `docs/design/server-sim.md`: drain+apply commands → movement → queued-order
     /// promotion → combat/economy/production → construction/deconstruction → projectile/death
-    /// cleanup → collision/supply → recompute fog. The whole method is panic-free: every entity
-    /// lookup is fallible and stale ids are ignored.
+    /// cleanup → collision/supply → sample fog on 15 Hz boundaries. The whole method is
+    /// panic-free: every entity lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
         self.tick_inner(None)
     }
@@ -225,9 +226,7 @@ impl Game {
         self.derived.advance_pathing_tick(self.state.tick);
         self.state.smokes.retain_active(self.state.tick);
         let player_ids = self.state.player_ids();
-        if self.retain_active_visibility_sources() {
-            self.recompute_live_fog(&player_ids);
-        }
+        self.retain_active_visibility_sources();
 
         // Per-player event buckets, accumulated by the systems below.
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
@@ -281,12 +280,13 @@ impl Game {
             &mut self.state.world_combat_position,
         );
 
-        // Live fog last, from the post-systems world state. Lingering death vision is stamped as
-        // ordinary temporary sight so snapshots, commands, and combat all consume one visibility
-        // model.
-        crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
-            self.recompute_live_fog(&player_ids);
-        });
+        // Live fog refreshes at 15 Hz from the post-systems world state. Between refreshes,
+        // snapshots, commands, and combat all consume the same last authoritative visibility.
+        if self.state.tick.is_multiple_of(FOG_UPDATE_INTERVAL_TICKS) {
+            crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
+                self.recompute_live_fog(&player_ids);
+            });
+        }
         self.refresh_building_memory(&player_ids);
         self.refresh_trench_memory(&player_ids);
 
@@ -623,9 +623,7 @@ impl Game {
         }
     }
 
-    fn retain_active_visibility_sources(&mut self) -> bool {
-        let lingering_before = self.state.lingering_sight.len();
-        let firing_before = self.state.firing_reveals.len();
+    fn retain_active_visibility_sources(&mut self) {
         self.state
             .lingering_sight
             .retain(|source| source.is_active_at(self.state.tick));
@@ -637,8 +635,6 @@ impl Game {
                     .get(source.entity_id())
                     .is_some_and(|entity| entity.hp > 0)
         });
-        lingering_before != self.state.lingering_sight.len()
-            || firing_before != self.state.firing_reveals.len()
     }
 
     pub(crate) fn team_relations(&self) -> teams::TeamRelations {

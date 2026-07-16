@@ -167,7 +167,7 @@ The public API used by the server layer is intentionally small:
 | `eliminate(player)` | Remove a leaving player's army so matches can resolve. |
 
 `Game::tick()` increments the tick counter, drains pending commands, and calls
-`systems::run_tick`. After the services finish, it recomputes live fog and
+`systems::run_tick`. After the services finish, it samples live fog at 15 Hz and
 refreshes remembered enemy buildings.
 
 ```mermaid
@@ -189,7 +189,7 @@ flowchart TD
     Death --> Collision["movement::resolve_collisions"]
     Collision --> Supply["supply::recompute_supply"]
     Supply --> Final["final spatial index"]
-    Final --> Fog["Game recomputes fog"]
+    Final --> Fog["Game samples fog at 15 Hz"]
 ```
 
 The services are not independent actors. They are ordinary Rust functions called
