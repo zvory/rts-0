@@ -955,7 +955,7 @@ mod tests {
             .iter()
             .find(|entry| entry.id == "supply-300-hellhole")
             .expect("supply-300-hellhole catalog row");
-        assert_eq!(hellhole.map, "No Terrain");
+        assert_eq!(hellhole.map, "Chokes");
         assert_eq!(hellhole.player_count, 4);
         assert_eq!(hellhole.filename, "supply-300-hellhole.json");
 
