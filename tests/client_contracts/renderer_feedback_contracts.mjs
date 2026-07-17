@@ -651,9 +651,9 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   assertApprox(
     mortarArcs[0][5] - mortarArcs[0][4],
-    (Math.PI * 2) / 3,
+    Math.PI * 2,
     0.0001,
-    "selected deployed mortar draws a 120 degree field of fire",
+    "selected deployed mortar draws a 360 degree field of fire",
   );
 
   const workerRangeGfx = new RecordingGraphics();

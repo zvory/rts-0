@@ -1,7 +1,7 @@
 use super::fixtures::*;
 use super::*;
 use crate::game::entity::MovePhase;
-use crate::game::mortar_scatter::predicted_mortar_impact;
+use crate::game::mortar_scatter::scattered_mortar_impact;
 use crate::game::teams::TeamRelations;
 
 fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
@@ -123,7 +123,7 @@ fn expected_mortar_impact(
         .owner;
     let teams =
         TeamRelations::from_player_teams(game.state.players.iter().map(|p| (p.id, p.team_id)));
-    predicted_mortar_impact(
+    scattered_mortar_impact(
         &game.state.fog,
         &teams,
         owner,

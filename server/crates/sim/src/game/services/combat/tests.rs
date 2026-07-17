@@ -235,7 +235,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     events
 }
 
-fn predicted_test_mortar_impact(
+fn test_mortar_scattered_impact(
     entities: &EntityStore,
     teams: &TeamRelations,
     player_ids: &[u32],
@@ -247,8 +247,16 @@ fn predicted_test_mortar_impact(
     let map = Map::generate(2, 0x00C0_FFEE);
     let mut fog = Fog::new(map.size);
     fog.recompute(player_ids, entities, &map);
-    let (x, y) = mortar_aim_point(entities, target, tick);
-    crate::game::mortar_scatter::predicted_mortar_impact(&fog, teams, owner, attacker, x, y, tick)
+    let target = entities.get(target).expect("target should exist");
+    crate::game::mortar_scatter::scattered_mortar_impact(
+        &fog,
+        teams,
+        owner,
+        attacker,
+        target.pos_x,
+        target.pos_y,
+        tick,
+    )
 }
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
@@ -1946,155 +1954,7 @@ fn mortar_turns_fast_before_auto_firing() {
 }
 
 #[test]
-fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
-    let target_kinds = [
-        EntityKind::Worker,
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-        EntityKind::AntiTankGun,
-        EntityKind::MortarTeam,
-        EntityKind::Tank,
-        EntityKind::ScoutCar,
-        EntityKind::CommandCar,
-        EntityKind::Artillery,
-    ];
-
-    for target_kind in target_kinds {
-        let mut entities = EntityStore::new();
-        let target_id = entities
-            .spawn_unit(2, target_kind, 220.0, 100.0)
-            .expect("target should spawn");
-        if let Some(target) = entities.get_mut(target_id) {
-            target.set_order(Order::attack_move_to(500.0, 100.0));
-            target.set_path(Vec::new());
-            target.set_path_goal(Some((500.0, 100.0)));
-            target.mark_move_phase(MovePhase::Moving);
-        }
-
-        let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-        let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
-        assert!(
-            offset <= 0.001,
-            "{target_kind:?} stationary attack-move target should not receive movement lead, got offset {offset:.2}"
-        );
-    }
-}
-
-#[test]
-fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
-    let target_kinds = [
-        EntityKind::Worker,
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-        EntityKind::AntiTankGun,
-        EntityKind::MortarTeam,
-        EntityKind::Tank,
-        EntityKind::ScoutCar,
-        EntityKind::CommandCar,
-        EntityKind::Artillery,
-    ];
-
-    for target_kind in target_kinds {
-        let mut entities = EntityStore::new();
-        let target_id = entities
-            .spawn_unit(2, target_kind, 220.0, 100.0)
-            .expect("target should spawn");
-        let speed = config::unit_stats(target_kind)
-            .map(|stats| stats.speed)
-            .expect("target should have unit stats");
-        if let Some(target) = entities.get_mut(target_id) {
-            target.set_order(Order::attack_move_to(500.0, 100.0));
-            target.set_path(vec![(500.0, 100.0)]);
-            target.set_path_goal(Some((500.0, 100.0)));
-            target.mark_move_phase(MovePhase::Moving);
-            target.set_movement_delta(speed, 0.0);
-        }
-
-        let (aim_x, _aim_y) = mortar_aim_point(&entities, target_id, 10);
-        let expected_lead = speed * config::MORTAR_SHELL_DELAY_TICKS as f32;
-        assert!(
-            aim_x >= 220.0 + expected_lead - 0.001,
-            "{target_kind:?} moving target should be led by its current movement delta, got x={aim_x:.2}"
-        );
-    }
-}
-
-#[test]
-fn mortar_autocast_leads_current_direction_not_corner_destination() {
-    let mut entities = EntityStore::new();
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Worker, 220.0, 100.0)
-        .expect("target should spawn");
-    if let Some(target) = entities.get_mut(target_id) {
-        target.set_order(Order::attack_move_to(500.0, 50.0));
-        target.set_path(vec![(500.0, 50.0), (220.0, 50.0)]);
-        target.set_path_goal(Some((500.0, 50.0)));
-        target.mark_move_phase(MovePhase::Moving);
-    }
-
-    let map = open_map(24);
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-    assert!(
-        aim_x <= 220.0 + 0.001,
-        "target moving north around a corner should not be led east toward its final destination, got x={aim_x:.2}"
-    );
-    assert!(
-        aim_y < 0.0,
-        "target moving north around a corner should be led along actual last movement, got y={aim_y:.2}"
-    );
-}
-
-#[test]
-fn mortar_autocast_velocity_clears_when_path_clears() {
-    let mut entities = EntityStore::new();
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("target should spawn");
-    if let Some(target) = entities.get_mut(target_id) {
-        target.set_movement_delta(2.0, 0.0);
-        target.clear_path();
-    }
-
-    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-    let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
-    assert!(
-        offset <= 0.001,
-        "target with cleared path should not keep stale mortar lead, got offset {offset:.2}"
-    );
-}
-
-#[test]
-fn mortar_autocast_velocity_resets_for_stationary_units_each_movement_tick() {
-    let mut entities = EntityStore::new();
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("target should spawn");
-    if let Some(target) = entities.get_mut(target_id) {
-        target.set_order(Order::attack_move_to(500.0, 100.0));
-        target.set_path(Vec::new());
-        target.mark_move_phase(MovePhase::Moving);
-        target.set_movement_delta(2.0, 0.0);
-    }
-
-    let map = open_map(24);
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-    let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
-    assert!(
-        offset <= 0.001,
-        "stationary target should not retain stale movement-tick mortar lead, got offset {offset:.2}"
-    );
-}
-
-#[test]
-fn mortar_autocast_velocity_clears_when_target_stops_to_fire() {
+fn movement_delta_clears_when_target_stops_to_fire() {
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
@@ -2140,7 +2000,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
         .expect("enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     let (impact_x, impact_y) =
-        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
+        test_mortar_scattered_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");
@@ -2158,7 +2018,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "autocast mortar should hold fire when the predicted impact would hit an owned unit"
+        "autocast mortar should hold fire when the scattered impact would hit an owned unit"
     );
 }
 
@@ -2173,7 +2033,7 @@ fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
         .expect("enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
     let (impact_x, impact_y) =
-        predicted_test_mortar_impact(&entities, &teams, &[1, 2, 3], 1, mortar_id, enemy_id, 10);
+        test_mortar_scattered_impact(&entities, &teams, &[1, 2, 3], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_unit(2, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("allied unit should spawn");
@@ -2196,7 +2056,7 @@ fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "autocast mortar should hold fire when the predicted impact would hit an allied unit"
+        "autocast mortar should hold fire when the scattered impact would hit an allied unit"
     );
 }
 
@@ -2211,7 +2071,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
         .expect("enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     let (impact_x, impact_y) =
-        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
+        test_mortar_scattered_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_building(1, EntityKind::Depot, impact_x, impact_y + 40.0, true)
         .expect("depot should spawn");
@@ -2228,12 +2088,12 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "autocast mortar should hold fire when the predicted impact would hit an owned building"
+        "autocast mortar should hold fire when the scattered impact would hit an owned building"
     );
 }
 
 #[test]
-fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
+fn mortar_autocast_fires_when_scattered_impact_is_clear_of_owned_entities() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
@@ -2254,7 +2114,7 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
         mortar.attack_cd() > 0,
-        "autocast mortar should fire when no owned entity is inside the predicted impact"
+        "autocast mortar should fire when no owned entity is inside the scattered impact"
     );
 }
 

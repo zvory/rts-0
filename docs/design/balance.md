@@ -297,7 +297,7 @@ folded into default targeting.
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
   `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
-  `MORTAR_RANGE_TILES = 15`, and `MORTAR_FIELD_OF_FIRE_RAD = 120 degrees total`,
+  `MORTAR_RANGE_TILES = 15`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
@@ -310,13 +310,13 @@ folded into default targeting.
   `X` and remains a player-directed override that does not require setup, but it must land in the
   5-to-15-tile range band. Autocast uses normal idle/attack-move acquisition after Mortar Autocast
   research completes and fires only while fully deployed, at targets inside the same range band and
-  the setup-facing 120-degree field of fire. Manual and
-  autocast shots scatter from the intended impact point: if the point is visible to the firing team,
+  its full 360-degree field of fire. Autocast aims at a target's current position and does not lead
+  movement. Manual and autocast shots scatter from the intended impact point: if the point is visible to the firing team,
   the deterministic radial scatter has a one-tile median miss radius; otherwise it has a four-tile
-  median miss radius. Autocast prefers targets whose scattered predicted impact avoids same-team
+  median miss radius. Autocast prefers targets whose deterministic scattered impact avoids same-team
   units/buildings when alternatives are available.
   Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
-  scattered predicted impact points that would hit any same-team unit or building at its current position,
+  deterministic scattered impact points that would hit any same-team unit or building at its current position,
   while manual fire remains unrestricted.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and

@@ -1115,9 +1115,10 @@ nodes are ignored. Same-team mortar damage is intentionally real friendly fire, 
 unattributed: it does not update `last_damage_owner`/position/tick, does not trigger AI worker
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
 Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research plus a
-fully deployed Mortar Team. Acquisition and firing are restricted to the setup-facing 120-degree
-field of fire and the five-to-15-tile range band. Before
-scheduling a shell, combat checks the scattered predicted impact point against owned and allied
+fully deployed Mortar Team. Acquisition and firing are restricted to the full 360-degree field of
+fire and the five-to-15-tile range band. Autocast targets each unit's current position without
+movement lead, then applies normal deterministic scatter. Before
+scheduling a shell, combat checks the deterministic scattered impact point against owned and allied
 units/buildings at their current positions and holds fire if any would be inside the damaging radius. Autocast
 target acquisition uses the same safety check, so Mortar Teams face the nearest target that can be
 autocast safely instead of tracking an unsafe closer enemy. Manual mortar fire is intentionally
