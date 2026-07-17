@@ -25,11 +25,13 @@ export class LabCatalogScreen {
     root,
     fetchImpl = globalThis.fetch?.bind(globalThis),
     initialRoom = "default",
+    onBack = null,
     onStart,
   }) {
     this.root = root;
     this.fetchImpl = fetchImpl;
     this.initialRoom = initialRoom;
+    this.onBack = onBack;
     this.onStart = onStart;
     this.entries = [];
     this.status = "";
@@ -98,11 +100,24 @@ export class LabCatalogScreen {
     const title = document.createElement("h1");
     title.textContent = "Setup Catalog";
     titleGroup.append(kicker, title);
+    const headerActions = document.createElement("div");
+    headerActions.className = "lab-entry-header-actions";
+    if (this.onBack) {
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "btn";
+      back.textContent = "Back";
+      back.setAttribute("aria-label", "Back to desktop main screen");
+      back.disabled = this.starting;
+      back.addEventListener("click", () => this.back());
+      headerActions.appendChild(back);
+    }
     const status = document.createElement("p");
     status.className = "lab-entry-status";
     status.dataset.state = this.error ? "error" : this.connected ? "ready" : "pending";
     status.textContent = this.loading ? "Loading" : this.status || (this.connected ? "Ready" : "Connecting");
-    header.append(titleGroup, status);
+    headerActions.appendChild(status);
+    header.append(titleGroup, headerActions);
 
     const controls = document.createElement("section");
     controls.className = "lab-entry-controls";
@@ -208,6 +223,15 @@ export class LabCatalogScreen {
     this.error = "";
     this.render();
     this.onStart?.(selection);
+  }
+
+  back() {
+    if (!this.onBack || this.starting) return;
+    this.starting = true;
+    this.status = "Returning to main screen";
+    this.error = "";
+    this.render();
+    this.onBack();
   }
 
   currentRoom() {

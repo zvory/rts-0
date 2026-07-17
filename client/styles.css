@@ -444,6 +444,19 @@ body {
   border-bottom: 1px solid rgba(91, 83, 65, 0.58);
 }
 
+.lobby-masthead-actions,
+.lab-entry-header-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.lobby-masthead-actions > .btn,
+.lab-entry-header-actions > .btn {
+  min-height: 40px;
+}
+
 #lobby-screen:not(.is-joined) .lobby-room-chip {
   display: none;
 }
@@ -611,6 +624,10 @@ input[type="text"]:focus {
   font-weight: 400;
   line-height: 0.95;
   letter-spacing: 0;
+}
+
+.lab-entry-header-actions {
+  align-items: center;
 }
 
 .lab-entry-status {
@@ -1471,6 +1488,11 @@ input[type="text"]:focus {
   .lab-entry-header,
   .lobby-status-grid {
     grid-template-columns: 1fr;
+  }
+
+  .lobby-masthead-actions,
+  .lab-entry-header-actions {
+    justify-content: space-between;
   }
 
   .lab-entry-header h1 {

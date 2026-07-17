@@ -10,6 +10,10 @@ const windowsArtifactBuilder = await readFile(
   new URL("build-unsigned-windows.mjs", shellRoot),
   "utf8",
 );
+const capability = JSON.parse(
+  await readFile(new URL("src-tauri/capabilities/default.json", shellRoot), "utf8"),
+);
+const shellSource = await readFile(new URL("src-tauri/src/main.rs", shellRoot), "utf8");
 
 assert.equal(tauriConfig.productName, "Bewegungskrieg");
 assert.equal(tauriConfig.identifier, "dev.bewegungskrieg.Bewegungskrieg");
@@ -24,6 +28,9 @@ assert.match(windowsArtifactBuilder, /"--bundles",\s*"nsis"/);
 assert.match(windowsArtifactBuilder, /unsigned-windows-nsis/);
 assert.match(windowsArtifactBuilder, /rts-server\.exe/);
 assert.doesNotMatch(windowsArtifactBuilder, /targets:\s*"msi"/);
+assert(capability.permissions.includes("allow-desktop-return-to-startup"));
+assert.match(shellSource, /fn desktop_return_to_startup\(/);
+assert.match(shellSource, /window\s*\.navigate\(startup_url\)/);
 
 import {
   LAST_PROFILE_KEY,

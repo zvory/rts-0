@@ -224,14 +224,16 @@ fn run() -> ShellResult<()> {
         desktop_log_info,
         desktop_reveal_logs,
         desktop_log_client_event,
-        desktop_open_profile
+        desktop_open_profile,
+        desktop_return_to_startup
     ]);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         desktop_log_info,
         desktop_reveal_logs,
         desktop_log_client_event,
-        desktop_open_profile
+        desktop_open_profile,
+        desktop_return_to_startup
     ]);
 
     builder
@@ -429,6 +431,24 @@ fn desktop_open_profile(
         .map_err(|err| format!("failed to open release channel {}: {err}", profile.label))
 }
 
+#[tauri::command]
+fn desktop_return_to_startup(
+    window: WebviewWindow,
+    diagnostics: tauri::State<'_, ShellDiagnostics>,
+) -> Result<(), String> {
+    ensure_game_context(&window)?;
+    let current_url = window
+        .url()
+        .ok()
+        .map(|url| redact_url_for_log(url.as_str()));
+    let startup_url =
+        tauri::Url::parse(STARTUP_ERROR_URL).map_err(|err| format!("bad startup URL: {err}"))?;
+    diagnostics.log_event("return_to_startup", json!({ "fromUrl": current_url }));
+    window
+        .navigate(startup_url)
+        .map_err(|err| format!("failed to return to the desktop main screen: {err}"))
+}
+
 fn ensure_startup_context(window: &WebviewWindow) -> Result<(), String> {
     let url = window
         .url()
@@ -438,6 +458,21 @@ fn ensure_startup_context(window: &WebviewWindow) -> Result<(), String> {
     } else {
         Err("log-path commands are available only on the startup or shell error screen".to_string())
     }
+}
+
+fn ensure_game_context(window: &WebviewWindow) -> Result<(), String> {
+    let url = window
+        .url()
+        .map_err(|err| format!("failed to read current WebView URL: {err}"))?;
+    if release_profile_for_url(&url).is_some() || developer_game_url(&url) {
+        Ok(())
+    } else {
+        Err("returning to the main screen is available only from a loaded game channel".to_string())
+    }
+}
+
+fn developer_game_url(url: &tauri::Url) -> bool {
+    url.scheme() == "http" && matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"))
 }
 
 fn server_profile_for_id(profile_id: &str) -> Option<&'static ServerProfile> {
@@ -1311,6 +1346,20 @@ mod tests {
         assert!(navigation_allowed(&developer_path, Some(&developer_url)));
         assert!(!navigation_allowed(&other_port, Some(&developer_url)));
         assert!(!navigation_allowed(&unrelated, None));
+    }
+
+    #[test]
+    fn return_to_startup_context_accepts_release_and_loopback_game_urls_only() {
+        let beta_url: tauri::Url = "https://rts-0-zvorygin-beta.fly.dev/lab".parse().unwrap();
+        let developer_url: tauri::Url = "http://localhost:41231/".parse().unwrap();
+        let startup_url: tauri::Url = "tauri://localhost/index.html".parse().unwrap();
+        let unrelated_url: tauri::Url = "https://example.com/".parse().unwrap();
+
+        assert!(release_profile_for_url(&beta_url).is_some());
+        assert!(developer_game_url(&developer_url));
+        assert!(!developer_game_url(&startup_url));
+        assert!(release_profile_for_url(&unrelated_url).is_none());
+        assert!(!developer_game_url(&unrelated_url));
     }
 
     #[test]

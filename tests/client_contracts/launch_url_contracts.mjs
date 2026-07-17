@@ -219,6 +219,35 @@ async function testLabLaunchConfig() {
   }
 }
 
+async function testDesktopMainScreenBridge() {
+  const {
+    desktopMainScreenAvailable,
+    returnToDesktopMainScreen,
+  } = await import("../../client/src/bootstrap.js");
+  const calls = [];
+  const desktopRoot = {
+    __RTS_DESKTOP_RUNTIME: {
+      shell: "tauri",
+      serverMode: "release",
+    },
+    __TAURI_INTERNALS__: {
+      invoke(command, payload) {
+        calls.push({ command, payload });
+        return Promise.resolve();
+      },
+    },
+  };
+
+  assert(desktopMainScreenAvailable(desktopRoot),
+    "loaded desktop release channels expose the shell main-screen affordance");
+  assert(!desktopMainScreenAvailable({}),
+    "ordinary browsers do not expose a desktop main-screen affordance");
+  assert(await returnToDesktopMainScreen(desktopRoot),
+    "desktop main-screen navigation reports a handled shell transition");
+  assert(calls.length === 1 && calls[0].command === "desktop_return_to_startup",
+    "desktop main-screen navigation uses the bounded shell command");
+}
+
 async function testMatchLaunchConfig() {
   const {
     matchLaunchConfig,
@@ -463,6 +492,7 @@ async function testVisualProfileRegistry() {
 await testDevWatchScenarioConfig();
 await testReplayArtifactLaunchConfig();
 await testLabLaunchConfig();
+await testDesktopMainScreenBridge();
 await testMatchLaunchConfig();
 await testMatchLaunchActions();
 await testVisualProfileRegistry();

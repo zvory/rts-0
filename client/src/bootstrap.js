@@ -3,6 +3,26 @@ export function wsUrl() {
   return `${scheme}://${window.location.host}/ws`;
 }
 
+export function desktopMainScreenAvailable(root = globalThis) {
+  const runtime = root?.__RTS_DESKTOP_RUNTIME;
+  return runtime?.shell === "tauri" &&
+    (runtime.serverMode === "release" || runtime.serverMode === "developer");
+}
+
+export async function returnToDesktopMainScreen(root = globalThis) {
+  if (!desktopMainScreenAvailable(root)) return false;
+  const candidates = [
+    root?.__TAURI_INTERNALS__?.invoke,
+    root?.__TAURI__?.core?.invoke,
+    root?.__TAURI__?.tauri?.invoke,
+    root?.__TAURI__?.invoke,
+  ];
+  const invoke = candidates.find((candidate) => typeof candidate === "function");
+  if (!invoke) throw new Error("Desktop bridge is unavailable.");
+  await invoke("desktop_return_to_startup");
+  return true;
+}
+
 export function snapshotStreamLaunchConfig() {
   const params = new URLSearchParams(window.location.search);
   if (!params.has("snapshotStream")) return null;
@@ -261,6 +281,7 @@ export const dom = {
   app: document.getElementById("app"),
   version: document.getElementById("version"),
   lobbyScreen: document.getElementById("lobby-screen"),
+  lobbyMainScreen: document.getElementById("lobby-main-screen"),
   labEntryScreen: document.getElementById("lab-entry-screen"),
   branchScreen: document.getElementById("branch-screen"),
   gameScreen: document.getElementById("game-screen"),

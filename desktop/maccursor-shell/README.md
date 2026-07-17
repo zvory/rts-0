@@ -57,6 +57,10 @@ spike:
 }
 ```
 
+The loaded lobby and Lab scenario catalog show a **Back** button in desktop sessions. It invokes the
+shell-owned `desktop_return_to_startup` command and returns the same WebView to the Beta/Mainline
+selector. The command is unavailable to ordinary browsers and rejects startup or unrelated origins.
+
 Pointer Lock is deliberately disabled inside the macOS shell. Cursor-lock requests
 use `window.__RTS_NATIVE_CURSOR`, a Tauri-injected native bridge that hides and
 disconnects the macOS cursor, forwards native mouse movement/down/up/wheel
@@ -188,12 +192,13 @@ Manual check:
    `https://rts-0-zvorygin-beta.fly.dev/`.
 4. Restart, choose Mainline, and confirm the loaded page uses
    `https://rts-0-zvorygin.fly.dev/`.
-5. From the lobby, use **Open Lab** and confirm the lab opens in the same
-   shell window and starts the lab room.
-6. Start a one-player sandbox or AI match from either release channel.
-7. Confirm the shell locks the cursor automatically in-match, then Alt-Tab away
+5. From the lobby, use **Back** and confirm the release-channel selector returns; reopen a channel.
+6. Use **Open Lab**, confirm the scenario catalog opens in the same shell window, then use **Back**
+   and confirm the release-channel selector returns.
+7. Reopen a channel and start a one-player sandbox or AI match.
+8. Confirm the shell locks the cursor automatically in-match, then Alt-Tab away
    and back to confirm it re-locks. Move over terrain/HUD/minimap, right-click
    move units, box-select, and wheel zoom. Inspect
    `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
-8. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
+9. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
    `shell.log` contains startup and selected-profile events.

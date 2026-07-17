@@ -716,6 +716,9 @@ import { textWithin } from "./dom_text.mjs";
     "DOM contract documents room-name controls as hidden compatibility only");
   assert(indexHtml.includes('id="lobby-lab-open"'),
     "normal lobby exposes a direct lab entry affordance");
+  assert(indexHtml.includes('id="lobby-main-screen"') &&
+      /id="lobby-main-screen"[^>]*hidden/.test(indexHtml),
+    "lobby includes a desktop-only Back button that stays hidden in ordinary browsers");
   assert(indexHtml.includes('href="/lab"'),
     "normal lobby lab entry opens the default lab scenario without URL overrides");
   assert(!indexHtml.includes('id="lobby-quickstart"'),
