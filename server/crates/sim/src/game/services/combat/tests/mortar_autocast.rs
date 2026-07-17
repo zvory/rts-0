@@ -218,6 +218,37 @@ fn deployed_mortar_autocast_ignores_targets_inside_minimum_range() {
 }
 
 #[test]
+fn deployed_mortar_autocast_ignores_targets_outside_maximum_range() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            100.0 + config::MORTAR_RANGE_TILES as f32 * config::TILE_SIZE as f32 + 1.0,
+            100.0,
+        )
+        .expect("enemy should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(mortar.target_id(), None);
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "mortar must not fire beyond fifteen tiles"
+    );
+}
+
+#[test]
 fn deployed_mortar_autocast_ignores_targets_outside_field_of_fire() {
     let mut entities = EntityStore::new();
     let mortar_id = entities

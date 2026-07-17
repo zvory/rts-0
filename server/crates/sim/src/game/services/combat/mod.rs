@@ -218,7 +218,12 @@ pub(in crate::game) fn combat_system(
             } else {
                 cd
             };
-            let range_px = range_tiles * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
+            let range_px = range_tiles * config::TILE_SIZE as f32
+                + if e.kind == EntityKind::MortarTeam {
+                    0.0
+                } else {
+                    e.radius() + RANGE_SLACK
+                };
             let min_range_px = profile.min_range_tiles * config::TILE_SIZE as f32;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
             // attack-move / auto-defend actually close the gap. Idle deployed weapons are the
