@@ -449,12 +449,12 @@ async fn lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.lobby.summaries().await)
 }
 
-/// POST /api/lobbies — reserve a new normal lobby name without joining an existing room.
+/// POST /api/lobbies — reserve an available normal lobby name without joining an existing room.
 async fn create_lobby_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateLobbyRequest>,
 ) -> impl IntoResponse {
-    match state.lobby.create_lobby(&request.room).await {
+    match state.lobby.create_available_lobby(&request.room).await {
         Ok(room) => (StatusCode::CREATED, Json(CreateLobbyResponse { room })).into_response(),
         Err(err) => create_lobby_error_response(err),
     }

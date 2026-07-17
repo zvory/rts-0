@@ -481,7 +481,7 @@ export class Lobby {
   _openCreateLobby(trigger) {
     if (this._joined || this._browserActionPending) return;
     this.createModal?.open(trigger, {
-      initialValue: suggestLobbyName(this.elName?.value),
+      initialValue: suggestLobbyName(this.elName?.value, this.browserView?.rows),
     });
   }
 

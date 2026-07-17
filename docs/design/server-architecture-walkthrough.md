@@ -62,8 +62,9 @@ upgrades `/ws` to a WebSocket. It also builds one shared `Lobby`.
 `GET /api/lobbies` returns browser-safe summaries for public normal rooms and persisted replay
 staging lobbies: room name, kind, current host name, map, creation time, occupied active slots, max
 slots, spectator count, phase, and server-authored join state. `POST /api/lobbies` reserves a new
-normal lobby name with create-only semantics; duplicate, invalid, reserved/internal, and
-deploy-drain attempts fail instead of routing through the normal join-or-create WebSocket path.
+normal lobby name with create-only semantics. If the requested name exists, the registry atomically
+reserves the first free numbered variant and returns it; invalid, reserved/internal, and deploy-drain
+attempts fail instead of routing through the normal join-or-create WebSocket path.
 
 `main.rs` does not own a `Game`. It is the edge of the server, not the
 simulation.

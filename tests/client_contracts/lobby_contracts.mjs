@@ -571,8 +571,14 @@ import { textWithin } from "./dom_text.mjs";
   assert(!validateLobbyName("x".repeat(65)).ok, "lobby create mirrors the server byte-length cap");
   assert(suggestLobbyName("Alex") === "Alex's lobby", "lobby create suggests a lobby from player name");
   assert(suggestLobbyName("") === "Commander's lobby", "lobby create suggestion falls back when player name is blank");
+  assert(suggestLobbyName("Alex", ["Alex's lobby"]) === "Alex's lobby 2",
+    "lobby create suggestion numbers a taken default name");
+  assert(suggestLobbyName("Alex", [{ room: "Alex's lobby" }, { room: "Alex's lobby 2" }]) === "Alex's lobby 3",
+    "lobby create suggestion skips taken numbered names from browser rows");
   assert(validateLobbyName(suggestLobbyName("x".repeat(120))).ok,
     "lobby create suggestion stays within the public lobby name limit");
+  assert(validateLobbyName(suggestLobbyName("x".repeat(120), [{ room: suggestLobbyName("x".repeat(120)) }])).ok,
+    "numbered lobby create suggestions stay within the public lobby name limit");
   assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
     "lobby create suggestion avoids reserved internal prefixes");
 
@@ -746,7 +752,7 @@ import { textWithin } from "./dom_text.mjs";
       _browserActionPending: false,
       _fetchImpl: async () => ({
         ok: true,
-        async json() { return { room: "Created lobby" }; },
+        async json() { return { room: "Created lobby 2" }; },
       }),
       async _connectForAction() {
         connectionChecks += 1;
@@ -759,9 +765,28 @@ import { textWithin } from "./dom_text.mjs";
       _reflectCreateButton() {},
     });
     const created = await lobby._submitCreateLobby("Created lobby");
-    assert(created && joinedRoom === "Created lobby", "create flow joins the reserved lobby");
+    assert(created && joinedRoom === "Created lobby 2",
+      "create flow joins the server-selected available lobby name");
     assert(connectionChecks === 2,
       "create flow rechecks its socket after the HTTP reservation completes");
+  }
+
+  {
+    let initialValue = "";
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _joined: false,
+      _browserActionPending: false,
+      elName: { value: "Alex" },
+      browserView: { rows: [{ room: "Alex's lobby" }, { room: "Alex's lobby 2" }] },
+      createModal: {
+        open(_trigger, options) { initialValue = options.initialValue; },
+      },
+    });
+
+    lobby._openCreateLobby(null);
+
+    assert(initialValue === "Alex's lobby 3",
+      "opening create lobby preselects the first available default name");
   }
 
   const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");

@@ -131,11 +131,13 @@ export function validateLobbyName(rawName) {
   return { ok: true, room, error: "" };
 }
 
-export function suggestLobbyName(playerName) {
+export function suggestLobbyName(playerName, existingRooms = []) {
   const ownerName = normalizeLobbyOwnerName(playerName) || DEFAULT_LOBBY_OWNER_NAME;
   const suggested = fittedSuggestedLobbyName(ownerName);
-  if (validateLobbyName(suggested).ok) return suggested;
-  return fittedSuggestedLobbyName(`${DEFAULT_LOBBY_OWNER_NAME} ${ownerName}`);
+  const validSuggestion = validateLobbyName(suggested).ok
+    ? suggested
+    : fittedSuggestedLobbyName(`${DEFAULT_LOBBY_OWNER_NAME} ${ownerName}`);
+  return firstAvailableLobbyName(validSuggestion, existingRooms);
 }
 
 export class LobbyBrowserView {
@@ -548,6 +550,34 @@ function fittedSuggestedLobbyName(ownerName) {
   const candidate = `${(fittedOwner.trim() || DEFAULT_LOBBY_OWNER_NAME)}${SUGGESTED_LOBBY_SUFFIX}`;
   if (!RESERVED_LOBBY_PREFIXES.some((prefix) => candidate.startsWith(prefix))) return candidate;
   return fittedSuggestedLobbyName(`Player ${ownerName}`);
+}
+
+function firstAvailableLobbyName(suggested, existingRooms) {
+  const takenRooms = new Set(
+    (Array.isArray(existingRooms) ? existingRooms : [])
+      .map((entry) => typeof entry === "string" ? entry : entry?.room)
+      .map((room) => String(room ?? "").trim())
+      .filter(Boolean),
+  );
+  if (!takenRooms.has(suggested)) return suggested;
+
+  for (let sequence = 2; sequence <= takenRooms.size + 2; sequence += 1) {
+    const candidate = numberedLobbyName(suggested, sequence);
+    if (!takenRooms.has(candidate)) return candidate;
+  }
+  return suggested;
+}
+
+function numberedLobbyName(suggested, sequence) {
+  const suffix = ` ${sequence}`;
+  const maxPrefixBytes = Math.max(0, PUBLIC_LOBBY_NAME_MAX_BYTES - utf8ByteLength(suffix));
+  let prefix = "";
+  for (const char of suggested) {
+    const next = `${prefix}${char}`;
+    if (utf8ByteLength(next) > maxPrefixBytes) break;
+    prefix = next;
+  }
+  return `${prefix.trimEnd()}${suffix}`;
 }
 
 function utf8ByteLength(value) {

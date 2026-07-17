@@ -884,6 +884,26 @@ impl Lobby {
         Ok(room)
     }
 
+    /// Create a public normal lobby, adding the first available numeric suffix when the requested
+    /// name is already reserved. Name selection and reservation happen under the same registry
+    /// lock so concurrent browser creates cannot race into a duplicate-name failure.
+    pub async fn create_available_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
+        let requested_room = normalize_public_lobby_name(room)?;
+        let mut rooms = self.rooms.lock().await;
+        if self.drain.is_draining() {
+            return Err(CreateLobbyError::Draining(self.drain.notice().unwrap_or(
+                DrainNotice {
+                    deadline_unix_ms: 0,
+                    seconds_remaining: 0,
+                },
+            )));
+        }
+        let room = first_available_public_lobby_name(&requested_room, &rooms);
+        let handle = self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
+        schedule_pending_create_disposal_probe(handle.event_tx.clone());
+        Ok(room)
+    }
+
     /// Collect browser rows from room tasks without inspecting room internals or waiting forever
     /// on a stuck room. Dead, busy, timed-out, and internal rooms are omitted.
     pub async fn summaries(&self) -> Vec<LobbySummary> {
@@ -1373,6 +1393,35 @@ fn normalize_public_lobby_name(raw: &str) -> Result<String, CreateLobbyError> {
         return Err(CreateLobbyError::ReservedName);
     }
     Ok(room.to_string())
+}
+
+fn first_available_public_lobby_name(
+    requested_room: &str,
+    rooms: &HashMap<String, RoomHandle>,
+) -> String {
+    if !rooms.contains_key(requested_room) {
+        return requested_room.to_string();
+    }
+
+    let mut sequence = 2usize;
+    loop {
+        let candidate = numbered_public_lobby_name(requested_room, sequence);
+        if !rooms.contains_key(&candidate) {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
+fn numbered_public_lobby_name(requested_room: &str, sequence: usize) -> String {
+    let suffix = format!(" {sequence}");
+    let max_prefix_bytes = PUBLIC_LOBBY_NAME_MAX_BYTES.saturating_sub(suffix.len());
+    let mut prefix_end = requested_room.len().min(max_prefix_bytes);
+    while !requested_room.is_char_boundary(prefix_end) {
+        prefix_end = prefix_end.saturating_sub(1);
+    }
+    let prefix = requested_room[..prefix_end].trim_end();
+    format!("{prefix}{suffix}")
 }
 
 fn is_reserved_lobby_name(room: &str) -> bool {

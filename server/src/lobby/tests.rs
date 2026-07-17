@@ -737,6 +737,55 @@ async fn create_lobby_rejects_duplicate_names() {
 }
 
 #[tokio::test]
+async fn create_available_lobby_numbers_duplicate_names() {
+    let lobby = Lobby::new();
+
+    assert_eq!(
+        lobby
+            .create_available_lobby("  alex's lobby  ")
+            .await
+            .expect("first create should reserve the requested name"),
+        "alex's lobby"
+    );
+    assert_eq!(
+        lobby
+            .create_available_lobby("alex's lobby")
+            .await
+            .expect("second create should reserve a numbered name"),
+        "alex's lobby 2"
+    );
+    assert_eq!(
+        lobby
+            .create_available_lobby("alex's lobby")
+            .await
+            .expect("third create should skip the occupied numbered name"),
+        "alex's lobby 3"
+    );
+}
+
+#[tokio::test]
+async fn create_available_lobby_keeps_numbered_unicode_names_within_the_byte_limit() {
+    let lobby = Lobby::new();
+    let max_length_name = "é".repeat(PUBLIC_LOBBY_NAME_MAX_BYTES / 2);
+
+    assert_eq!(
+        lobby
+            .create_available_lobby(&max_length_name)
+            .await
+            .expect("first create should accept the maximum-length Unicode name"),
+        max_length_name
+    );
+    let numbered = lobby
+        .create_available_lobby(&max_length_name)
+        .await
+        .expect("duplicate Unicode create should receive a numbered name");
+
+    assert!(numbered.ends_with(" 2"));
+    assert!(numbered.len() <= PUBLIC_LOBBY_NAME_MAX_BYTES);
+    assert_eq!(normalize_public_lobby_name(&numbered).unwrap(), numbered);
+}
+
+#[tokio::test]
 async fn create_lobby_abandoned_reservation_expires_and_name_can_be_recreated() {
     let lobby = Lobby::new();
 
