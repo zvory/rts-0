@@ -116,6 +116,11 @@ const COMMAND_RECORDS = Object.freeze({
     defaults: ["refs/kinds/owners=unfiltered", "cameraViewport=false", "limit=25"], bounds: ["0-400 refs", "0-32 kinds", "0-16 owners", "limit 1-400"],
     example: { sessionId: "<lab-session-id>", refs: ["subject"], limit: 1 },
   }),
+  select: descriptor("Replace the browser-local selection used by the HUD and renderer.", "{sessionId:string,refs:(alias|u32)[]}", {
+    variants: ["refs=[] clears selection", "selection is local presentation state and sends no gameplay command"],
+    bounds: ["0-400 unique resolved references", "entities must exist in the current authoritative snapshot"],
+    example: { sessionId: "<lab-session-id>", refs: ["subject"] },
+  }),
   camera: descriptor("Set the camera or focus a bounded referenced subject set; returns semantic camera/viewport/bounds facts.", "{sessionId:string,camera:camera-command}", {
     variants: ["focus {action,refs,padding?}", "set {action,snapshot:CameraSnapshotV1}"], defaults: ["focus.padding=32 for one unit, otherwise 48"],
     bounds: ["focus 1-400 refs", "padding 0-1024", "snapshot framingScale >0 and <=16"],
@@ -185,6 +190,11 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["0-400 unique ids", "0-32 kinds", "limit 1-400", "only the normal recipient's fog-filtered snapshot is inspectable"],
     example: { sessionId: "<game-session-id>", ownership: "owned", limit: 25 },
   }),
+  "game-select": descriptor("Replace the browser-local selection used by the match HUD and renderer.", "{sessionId:string,ids:u32[]}", {
+    variants: ["ids=[] clears selection", "players and spectators may select entities visible in their normal fog-filtered snapshot"],
+    bounds: ["0-400 unique visible entity ids", "selection sends no gameplay command"],
+    example: { sessionId: "<game-session-id>", ids: [42] },
+  }),
   "game-move": descriptor("Issue one normal move order for bounded locally owned units.", "{sessionId:string,units:u32[],x:number,y:number,queued?:boolean}", {
     sceneMutation: true,
     defaults: ["queued=false"],
@@ -234,6 +244,11 @@ const COMMAND_RECORDS = Object.freeze({
     defaults: ["ids/kinds=unfiltered", "cameraViewport=false", "limit=25"],
     bounds: ["0-400 unique ids", "0-32 kinds", "limit 1-400", "only the no-fog watcher snapshot is inspectable"],
     example: { sessionId: "<scenario-session-id>", limit: 100 },
+  }),
+  "scenario-select": descriptor("Replace the browser-local selection used by the scenario renderer.", "{sessionId:string,ids:u32[]}", {
+    variants: ["ids=[] clears selection", "selection remains observation-only and sends no gameplay command"],
+    bounds: ["0-400 unique visible entity ids"],
+    example: { sessionId: "<scenario-session-id>", ids: [42] },
   }),
   "scenario-camera": descriptor("Set the camera, focus bounded visible entity ids, or frame the whole scenario map.", "{sessionId:string,camera:game-camera-command}", {
     variants: ["focus {action,entities,padding?}", "overview {action,padding?} fits the whole map", "set {action,snapshot:CameraSnapshotV1}"],
@@ -293,6 +308,7 @@ const NAMESPACE_RECORDS = Object.freeze({
       close: "close",
       status: "status",
       inspect: "game-inspect",
+      select: "game-select",
       move: "game-move",
       camera: "game-camera",
       screenshot: "game-screenshot",
@@ -312,6 +328,7 @@ const NAMESPACE_RECORDS = Object.freeze({
       close: "close",
       status: "status",
       inspect: "scenario-inspect",
+      select: "scenario-select",
       camera: "scenario-camera",
       screenshot: "scenario-screenshot",
       "record-start": "scenario-record-start",

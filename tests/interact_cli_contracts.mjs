@@ -80,7 +80,7 @@ try {
     assert.equal(result.namespace, "game", `${args.join(" ")} identifies the game namespace`);
     assert.deepEqual(
       result.commands,
-      ["open", "close", "status", "inspect", "move", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "give-up", "shutdown"],
+      ["open", "close", "status", "inspect", "select", "move", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "give-up", "shutdown"],
       "game help exposes bounded match observation, player controls, and region-aware media commands",
     );
   }
@@ -93,7 +93,7 @@ try {
     assert.equal(result.namespace, "dev-scenario", `${args.join(" ")} identifies the dev-scenario namespace`);
     assert.deepEqual(
       result.commands,
-      ["open", "close", "status", "inspect", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "shutdown"],
+      ["open", "close", "status", "inspect", "select", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "shutdown"],
       "dev-scenario help exposes observation, framing, and media without gameplay mutations",
     );
   }
@@ -180,10 +180,16 @@ try {
   assert.match(gameSessionId, /^game_[a-f0-9]{32}$/, "game open returns a distinct bounded session id");
   assert.equal(gameOpened.kind, "game", "game open identifies the isolated match kind");
   assert.deepEqual(gameOpened.capabilities.orders, ["move"], "game capabilities expose move as the only gameplay order");
+  assert.equal(gameOpened.capabilities.selection, true, "game capabilities advertise browser-local selection");
   assert.deepEqual(gameOpened.capabilities.media, ["screenshot", "recording"], "player capabilities omit spectator-only time-lapse capture");
   const gameInspection = callNamespace("game", "inspect", { sessionId: gameSessionId }).result;
   assert.deepEqual(gameInspection.entities.map(({ id }) => id), [100], "game inspect defaults to locally owned fog-filtered entities");
   assert.equal(gameInspection.ui.hudVisible, true, "game inspect returns semantic UI state");
+  assert.deepEqual(
+    callNamespace("game", "select", { sessionId: gameSessionId, ids: [100] }).result.selection,
+    [100],
+    "game select targets a visible unit without issuing a gameplay order",
+  );
   const moved = callNamespace("game", "move", { sessionId: gameSessionId, units: [100], x: 700, y: 700 }).result;
   assert.equal(moved.result.accepted, true, "game move uses the bounded normal command surface");
   assert.equal(
@@ -207,6 +213,11 @@ try {
   assert.deepEqual(spectatorOpened.capabilities.media, ["screenshot", "recording", "timelapse"], "spectator capabilities advertise time-lapse capture");
   const spectatorInspection = callNamespace("game", "inspect", { sessionId: spectatorOpened.sessionId }).result;
   assert.deepEqual(spectatorInspection.entities.map(({ id }) => id), [100, 101], "spectator inspection defaults to all visible entities");
+  assert.deepEqual(
+    callNamespace("game", "select", { sessionId: spectatorOpened.sessionId, ids: [101] }).result.selection,
+    [101],
+    "AI-vs-AI spectators can select a visible AI unit",
+  );
   const overview = callNamespace("game", "camera", { sessionId: spectatorOpened.sessionId, camera: { action: "overview" } }).result;
   assert.deepEqual(overview.camera.focus, { x: 1024, y: 1024 }, "overview camera frames the complete map");
   const minimap = callNamespace("game", "screenshot", { sessionId: spectatorOpened.sessionId, name: "minimap", region: "minimap" }).result;
@@ -230,12 +241,18 @@ try {
   assert.equal(scenarioOpened.capabilities.role, "observer", "scenario capabilities describe the observation namespace rather than the underlying server seat");
   assert.deepEqual(scenarioOpened.capabilities.orders, [], "scenario sessions expose no gameplay orders");
   assert.equal(scenarioOpened.capabilities.giveUp, false, "scenario sessions expose no surrender mutation");
+  assert.equal(scenarioOpened.capabilities.selection, true, "scenario capabilities advertise observation-only selection");
   assert.deepEqual(scenarioOpened.capabilities.media, ["screenshot", "recording", "timelapse"], "scenario sessions advertise every observation capture mode");
   const scenarioScreenshot = callNamespace("dev-scenario", "screenshot", {
     sessionId: scenarioOpened.sessionId, name: "before",
   }).result;
   assert.equal(scenarioScreenshot.presentation, "clean", "scenario screenshots use clean presentation by default");
   assert.equal(scenarioScreenshot.preview.available, true, "scenario screenshots publish a Tailnet preview");
+  assert.deepEqual(
+    callNamespace("dev-scenario", "select", { sessionId: scenarioOpened.sessionId, ids: [100] }).result.selection,
+    [100],
+    "dev-scenario select shares the observation selection path",
+  );
   const scenarioRecording = callNamespace("dev-scenario", "record-start", {
     sessionId: scenarioOpened.sessionId, name: "full-run", maxDurationMs: 1000,
   }).result;
@@ -403,6 +420,10 @@ try {
   ] });
   const inspected = call("inspect", { sessionId, refs: ["shooter", "target"], limit: 2 });
   assert.deepEqual(inspected.result.entities.map((entity) => entity.alias).sort(), ["shooter", "target"], "aliases persist across CLI invocations");
+  const labSelection = call("select", { sessionId, refs: ["shooter", "target"] });
+  assert.deepEqual(labSelection.result.selection, [100, 101], "Lab select resolves aliases and replaces browser-local selection");
+  assert.deepEqual(labSelection.result.entities.map((entity) => entity.alias), ["shooter", "target"], "Lab select returns decorated selected entities");
+  assert.deepEqual(call("inspect", { sessionId, limit: 4 }).result.selection, [100, 101], "Lab inspect reports browser-local selection ids");
   assert.equal(
     callFailure("order", {
       sessionId,

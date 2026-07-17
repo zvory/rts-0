@@ -31,15 +31,16 @@ export async function openInteractDriver(options) {
   }
   const openDelayMs = Number(process.env.RTS_INTERACT_FAKE_OPEN_DELAY_MS || 0);
   if (openDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, openDelayMs));
-  let nextId = options.mode === "game" ? 102 : 100;
+  let nextId = options.mode === "lab" ? 100 : 102;
   let tick = 0;
   let closed = false;
-  let entities = options.mode === "game"
+  let entities = options.mode !== "lab"
     ? [
         { id: 100, kind: "rifleman", owner: 1, x: 512, y: 512, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
         { id: 101, kind: "rifleman", owner: 2, x: 1536, y: 1536, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
       ]
     : [];
+  let selection = [];
   let gamePhase = "active";
   let recording = null;
   let lastRecording = null;
@@ -72,6 +73,7 @@ export async function openInteractDriver(options) {
       cameraWorldBounds: { ...cameraWorldBounds },
       player: { ...CATALOG.players[0], resources: { steel: 100, oil: 100, supplyUsed: 1, supplyCap: 10 } },
       ui: { gameVisible: true, hudVisible: true, timer: "00:01", scoreScreenVisible: gamePhase === "concluded" },
+      selection: selection.slice(),
     };
   };
   const finishRecording = (reason, { aliases = [] } = {}) => {
@@ -114,6 +116,7 @@ export async function openInteractDriver(options) {
         phase: options.mode === "game" ? gamePhase : undefined,
         role: options.spectate ? "spectator" : "player",
         roomTime: options.spectate ? { currentTick: tick, speed: 1, paused: false } : null,
+        selection: selection.slice(),
       };
     },
     async catalog() {
@@ -185,6 +188,17 @@ export async function openInteractDriver(options) {
     },
     async inspect(query) {
       return inspect(query);
+    },
+    async select(entityIds) {
+      if (entityIds.some((id) => !entities.some((entity) => entity.id === id))) {
+        throw Object.assign(new Error("entity is not selectable"), { code: "unknownEntity" });
+      }
+      selection = entityIds.slice();
+      return {
+        selection: selection.slice(),
+        entities: selection.map((id) => project(entities.find((entity) => entity.id === id))),
+        ui: { selection: selection.length ? `${selection.length} selected` : "" },
+      };
     },
     async camera(command) {
       if (command.action === "set") {
@@ -286,7 +300,7 @@ export async function openInteractDriver(options) {
         manifestPath: path.join(directory, `${name}.json`),
         frameSummary: { count: frameCount, uniqueHashes: frameCount, representativeFramePaths, detailsInManifest: true },
         authoritative: { startTick, endTick: tick },
-        mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases },
+        mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases, selection: selection.slice() },
       };
     },
     async captureTimelapse({ sessionId, name = "timelapse", fps = 30, speed = 8, region = "viewport" }) {

@@ -43,17 +43,10 @@ interface ServiceInput extends JsonObject {
   categories?: string[];
   details?: boolean;
   spawns?: SpawnInput[];
-  update?: JsonObject;
-  updates?: JsonObject[];
-  refs?: EntityRef[];
-  playerId?: number;
-  command?: JsonObject;
-  ignoreCommandLimits?: boolean;
+  update?: JsonObject; updates?: JsonObject[]; refs?: EntityRef[]; ids?: number[];
+  playerId?: number; command?: JsonObject; ignoreCommandLimits?: boolean;
   control?: JsonObject;
-  kinds?: string[];
-  owners?: number[];
-  cameraViewport?: boolean;
-  limit?: number;
+  kinds?: string[]; owners?: number[]; cameraViewport?: boolean; limit?: number;
   camera?: JsonObject;
   name?: string;
   presentation?: "clean" | "normal";
@@ -71,7 +64,6 @@ interface ServiceInput extends JsonObject {
   reproduction?: boolean;
   opponent?: string;
   spectate?: string[]; sampleEveryMs?: number; speed?: number;
-  ids?: number[];
   ownership?: string;
   units?: number[];
   x?: number;
@@ -267,7 +259,7 @@ export class InteractService {
       players: Array.isArray(catalog?.players) ? catalog.players : [],
       status,
       capabilities: session.kind === "lab"
-        ? { aliases: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
+        ? { aliases: true, selection: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
         : session.kind === "scenario"
           ? scenarioSessionCapabilities(this.maxSessions)
           : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
@@ -396,6 +388,7 @@ export class InteractService {
     if (command === "order") return order(session, input);
     if (command === "time") return { sessionId, result: await session.driver.time(input.control || {}) };
     if (command === "inspect") return inspect(session, input);
+    if (command === "select") return select(session, input);
     if (command === "camera") return camera(session, input.camera || {});
     if (command === "screenshot") return screenshot(session, input, this.artifactPreview);
     if (command === "export") return exportArtifact(this.workspaceRoot, session, input);
@@ -518,9 +511,16 @@ async function inspect(session: InteractSession, { refs, kinds, owners, cameraVi
     entities: objectArray(response.entities).map((entity) => decorateEntity(entity, session.aliases)),
     players: response.players || [], room: response.room || null, camera: response.camera || null,
     cameraViewport: response.cameraViewport || null,
-    cameraWorldBounds: response.cameraWorldBounds || null,
+    cameraWorldBounds: response.cameraWorldBounds || null, selection: Array.isArray(response.selection) ? response.selection : [],
     truncated: response.truncated === true,
     totalMatching: Number.isInteger(response.totalMatching) ? response.totalMatching : 0,
+  };
+}
+
+async function select(session: InteractSession, { refs = [] }: ServiceInput) {
+  const resolved = await resolveEntityReferences(session, refs); const response = await session.driver.select(resolved.map((entry) => entry.id));
+  return { sessionId: session.sessionId, selection: Array.isArray(response.selection) ? response.selection : [],
+    entities: objectArray(response.entities).map((entity) => decorateEntity(entity, session.aliases)),
   };
 }
 

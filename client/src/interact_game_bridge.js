@@ -3,14 +3,19 @@
 
 import { cmd, isUnit } from "./protocol.js";
 import { INTERACT_BRIDGE_KEY } from "./interact_bridge.js";
+import {
+  applyInteractSelection,
+  selectedInteractEntityIds,
+} from "./interact_selection.js";
 
-export const INTERACT_GAME_BRIDGE_VERSION = 2;
+export const INTERACT_GAME_BRIDGE_VERSION = 3;
 export const INTERACT_GAME_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectKinds: 32,
   moveUnits: 100,
   focusEntities: 400,
   captureSubjects: 400,
+  selectionEntities: 400,
   waitMs: 8_000,
 });
 
@@ -112,6 +117,7 @@ export class InteractGameBridge {
       cameraViewport: projectCameraViewport(match?.camera),
       cameraWorldBounds: projectCameraWorldBounds(match?.camera),
       ui: projectUi(),
+      selection: selectedInteractEntityIds(match?.state, INTERACT_GAME_LIMITS.selectionEntities),
     };
   }
 
@@ -135,6 +141,7 @@ export class InteractGameBridge {
     switch (method) {
       case "status": return this.status();
       case "inspect": return this.inspect(input);
+      case "select": return this.select(input);
       case "move": return this.gameMutation(method, () => this.move(input));
       case "giveUp": return this.gameMutation(method, () => this.giveUp());
       case "time": return this.time(input);
@@ -186,6 +193,31 @@ export class InteractGameBridge {
       camera: projectCamera(match.camera),
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
+      ui: projectUi(),
+      selection: selectedInteractEntityIds(match.state, INTERACT_GAME_LIMITS.selectionEntities),
+    };
+  }
+
+  async select(input = {}) {
+    const { match } = this.session();
+    const entityIds = optionalBoundedIds(
+      input.entityIds,
+      "select.entityIds",
+      INTERACT_GAME_LIMITS.selectionEntities,
+    );
+    const entities = entityIds.map((id) => match.state.entityById(id));
+    if (entities.some((entity) => !isInspectableEntity(entity))) {
+      throw bridgeError("unknownEntity", "select contains an entity outside the current fog-filtered snapshot.");
+    }
+    applyInteractSelection(match, entityIds);
+    await animationFrames(2);
+    const selection = selectedInteractEntityIds(match.state, INTERACT_GAME_LIMITS.selectionEntities);
+    return {
+      selection,
+      entities: selection
+        .map((id) => match.state.entityById(id))
+        .filter(isInspectableEntity)
+        .map((entity) => projectEntity(entity, match.state.playerId)),
       ui: projectUi(),
     };
   }
@@ -318,6 +350,7 @@ export class InteractGameBridge {
       camera: projectCamera(match.camera),
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
+      selection: selectedInteractEntityIds(match.state, INTERACT_GAME_LIMITS.selectionEntities),
       visualProfileId: match.visualProfile?.id || null,
       subjects: subjects.map((entity) => projectEntity(entity, match.state.playerId)),
       fonts,
