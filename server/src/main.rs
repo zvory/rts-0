@@ -449,7 +449,7 @@ async fn lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.lobby.summaries().await)
 }
 
-/// POST /api/lobbies — reserve a new normal lobby name without joining an existing room.
+/// POST /api/lobbies — reserve an available normal lobby name without joining an existing room.
 async fn create_lobby_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateLobbyRequest>,
@@ -462,7 +462,6 @@ async fn create_lobby_handler(
 
 fn create_lobby_error_response(err: lobby::CreateLobbyError) -> axum::response::Response {
     let status = match &err {
-        lobby::CreateLobbyError::Duplicate => StatusCode::CONFLICT,
         lobby::CreateLobbyError::Draining(_) => StatusCode::SERVICE_UNAVAILABLE,
         lobby::CreateLobbyError::EmptyName
         | lobby::CreateLobbyError::NameTooLong { .. }

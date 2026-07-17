@@ -146,32 +146,26 @@ async function expectNoLobbyRow(room, label) {
   ok(!rows.some((entry) => entry.room === room), label);
 }
 
-async function waitForCreateAvailable(room, label) {
-  for (let i = 0; i < 70; i++) {
-    const response = await createLobby(room);
-    if (response.status === 201) return response;
-    if (response.status !== 409) {
-      throw new Error(`unexpected create status ${response.status} while waiting for ${label}`);
-    }
-    await sleep(100);
-  }
-  throw new Error(`timeout waiting for lobby create availability: ${label}`);
-}
-
 async function main() {
   const abandonedRoom = uniqueRoom("browser-abandoned");
   const abandonedName = `alex's ${abandonedRoom}`;
   const abandoned = await createLobby(abandonedName);
   ok(abandoned.status === 201, `POST /api/lobbies accepts apostrophe names (${abandoned.status})`);
   const abandonedDuplicate = await createLobby(abandonedName);
-  ok(abandonedDuplicate.status === 409,
-    `pending create lease keeps duplicate protection (${abandonedDuplicate.status})`);
-  const recreatedAbandoned = await waitForCreateAvailable(
-    abandonedName,
-    "abandoned pending create lease",
-  );
+  ok(abandonedDuplicate.status === 201,
+    `pending create lease gets an available numbered name (${abandonedDuplicate.status})`);
+  const abandonedDuplicatePayload = await abandonedDuplicate.json();
+  ok(abandonedDuplicatePayload.room === `${abandonedName} 2`,
+    `duplicate pending create returns its numbered room (${abandonedDuplicatePayload.room})`);
+  // Empty pending reservations are intentionally hidden from GET /api/lobbies, so wait beyond
+  // the server's five-second lease before checking that the original name can be reclaimed.
+  await sleep(5500);
+  const recreatedAbandoned = await createLobby(abandonedName);
   ok(recreatedAbandoned.status === 201,
     `abandoned pending create lease releases the name (${recreatedAbandoned.status})`);
+  const recreatedAbandonedPayload = await recreatedAbandoned.json();
+  ok(recreatedAbandonedPayload.room === abandonedName,
+    `released pending create can reclaim its original name (${recreatedAbandonedPayload.room})`);
 
   const labRoom = `__lab__:${uniqueRoom("browser-lab")}:map=Chokes:seed=321`;
   const LabViewer = await connectClient("browser-lab");
@@ -355,11 +349,11 @@ async function main() {
   ok(payload.room === room, `create trims and returns the room name (${payload.room})`);
 
   const duplicate = await createLobby(room);
-  ok(duplicate.status === 409, `duplicate create rejects instead of joining (${duplicate.status})`);
+  ok(duplicate.status === 201, `duplicate create reserves another lobby (${duplicate.status})`);
   const duplicatePayload = await duplicate.json();
   ok(
-    duplicatePayload.error === "Lobby name is already in use.",
-    `duplicate create returns an inline-safe error (${duplicatePayload.error})`,
+    duplicatePayload.room === `${room} 2`,
+    `duplicate create returns the numbered lobby name (${duplicatePayload.room})`,
   );
 
   const A = await connectClient("browser-A");
@@ -502,10 +496,7 @@ async function main() {
 
   closeClients(Host, StaleJoiner, SpectatorJoiner);
   await waitForLobbyGone(lifecycleRoom, "empty room cleanup hides browser row");
-  const recreatedLifecycle = await waitForCreateAvailable(
-    lifecycleRoom,
-    "empty public room cleanup",
-  );
+  const recreatedLifecycle = await createLobby(lifecycleRoom);
   ok(recreatedLifecycle.status === 201,
     `empty public room has no reconnect grace and releases the name (${recreatedLifecycle.status})`);
 

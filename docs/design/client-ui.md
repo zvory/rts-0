@@ -1521,7 +1521,7 @@ export function lobbyStatusLabel(joinState)
 export function lobbyActionLabel(joinState)
 export function lobbyJoinIntent(row)
 export function validateLobbyName(rawName)
-export function suggestLobbyName(playerName)
+export function suggestLobbyName(playerName, existingRooms?)
 export class LobbyBrowserView {
   constructor(rootEl)
   render({ rows?, loading?, loaded?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
@@ -1546,6 +1546,10 @@ Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unj
 closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail. If an
 established ordinary-lobby socket closes, the app silently resets the joined room UI to the main
 lobby browser; dedicated launch URLs and active matches retain their existing disconnect handling.
+The create modal derives its default from the player name and the latest browser rows, adding the
+first free numeric suffix when that suggestion is already listed. The create endpoint repeats that
+selection atomically and returns the authoritative room name, covering stale lists and concurrent
+creates before the client joins the reserved room.
 While connected, pointer, keyboard, wheel, and foregrounding input emits a transport-only activity
 notice at most once every 30 seconds so local-only camera interaction also prevents a false AFK
 disconnect.
