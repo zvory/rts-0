@@ -1,16 +1,54 @@
-.git
-.docdrift
-desktop
-.gitignore
-target
-server/target
-node_modules
-tests/node_modules
-.DS_Store
-docs
+# Keep the deploy context aligned with the Dockerfile COPY inputs. New build
+# inputs must be explicitly added here instead of uploading the whole checkout.
+**
+
+!Dockerfile
+
+!server/
+!server/Cargo.toml
+!server/Cargo.lock
+!server/crates/
+!server/crates/**
+!server/src/
+!server/src/**
+!server/assets/
+!server/assets/**
+!server/migrations/
+!server/migrations/**
+
+!client/
+!client/**
+
+!scripts/
+!scripts/build-sim-wasm.sh
+
+# The deployed wiki reads only these allowlisted documentation trees.
 !docs/
 !docs/context/
 !docs/context/**
 !docs/design/
 !docs/design/**
-TODO.md
+
+# Ship only runtime rig textures. Source art, prompts, previews, and old passes
+# remain excluded unless a runtime reference and Docker build guard are added.
+client/assets/rigs/**
+!client/assets/rigs/anti-tank-gun-noshield-lowdetail/
+!client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png
+!client/assets/rigs/machine-gunner-pass-01/
+!client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png
+!client/assets/rigs/mortar-png-pass-01/
+!client/assets/rigs/mortar-png-pass-01/generated/
+!client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png
+!client/assets/rigs/rifleman-pass-02/
+!client/assets/rigs/rifleman-pass-02/generated/
+!client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png
+!client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/
+!client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png
+!client/assets/rigs/scout-car-pass-02-team/
+!client/assets/rigs/scout-car-pass-02-team/generated/
+!client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png
+!client/assets/rigs/scout-plane-fw189-pass-01/
+!client/assets/rigs/scout-plane-fw189-pass-01/generated/
+!client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png
+!client/assets/rigs/tank-ps1/
+!client/assets/rigs/tank-ps1/tank-atlas.png
