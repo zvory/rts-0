@@ -693,7 +693,6 @@ pub enum CreateLobbyError {
     NameTooLong { max_bytes: usize },
     InvalidCharacters,
     ReservedName,
-    Duplicate,
     Draining(DrainNotice),
 }
 
@@ -710,7 +709,6 @@ impl CreateLobbyError {
             CreateLobbyError::NameTooLong { .. } => "Lobby name is too long.",
             CreateLobbyError::InvalidCharacters => "Lobby name contains unsupported characters.",
             CreateLobbyError::ReservedName => "Lobby name is reserved.",
-            CreateLobbyError::Duplicate => "Lobby name is already in use.",
             CreateLobbyError::Draining(_) => {
                 "Server is draining for deploy; new lobbies are disabled."
             }
@@ -863,14 +861,12 @@ impl Lobby {
         Ok(self.create_room_locked(room, &mut rooms))
     }
 
-    /// Create a public normal lobby only when the normalized name is absent. This is intentionally
-    /// separate from join-by-room-name so duplicate create can fail instead of silently joining.
+    /// Create a public normal lobby, adding the first available numeric suffix when the requested
+    /// name is already reserved. Name selection and reservation happen under the same registry
+    /// lock so concurrent browser creates cannot race into the same room.
     pub async fn create_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
-        let room = normalize_public_lobby_name(room)?;
+        let requested_room = normalize_public_lobby_name(room)?;
         let mut rooms = self.rooms.lock().await;
-        if rooms.contains_key(&room) {
-            return Err(CreateLobbyError::Duplicate);
-        }
         if self.drain.is_draining() {
             return Err(CreateLobbyError::Draining(self.drain.notice().unwrap_or(
                 DrainNotice {
@@ -879,6 +875,7 @@ impl Lobby {
                 },
             )));
         }
+        let room = first_available_public_lobby_name(&requested_room, &rooms);
         let handle = self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
         schedule_pending_create_disposal_probe(handle.event_tx.clone());
         Ok(room)
@@ -1373,6 +1370,35 @@ fn normalize_public_lobby_name(raw: &str) -> Result<String, CreateLobbyError> {
         return Err(CreateLobbyError::ReservedName);
     }
     Ok(room.to_string())
+}
+
+fn first_available_public_lobby_name(
+    requested_room: &str,
+    rooms: &HashMap<String, RoomHandle>,
+) -> String {
+    if !rooms.contains_key(requested_room) {
+        return requested_room.to_string();
+    }
+
+    let mut sequence = 2usize;
+    loop {
+        let candidate = numbered_public_lobby_name(requested_room, sequence);
+        if !rooms.contains_key(&candidate) {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
+fn numbered_public_lobby_name(requested_room: &str, sequence: usize) -> String {
+    let suffix = format!(" {sequence}");
+    let max_prefix_bytes = PUBLIC_LOBBY_NAME_MAX_BYTES.saturating_sub(suffix.len());
+    let mut prefix_end = requested_room.len().min(max_prefix_bytes);
+    while !requested_room.is_char_boundary(prefix_end) {
+        prefix_end = prefix_end.saturating_sub(1);
+    }
+    let prefix = requested_room[..prefix_end].trim_end();
+    format!("{prefix}{suffix}")
 }
 
 fn is_reserved_lobby_name(room: &str) -> bool {

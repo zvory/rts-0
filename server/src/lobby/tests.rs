@@ -721,19 +721,68 @@ async fn deploy_drain_write_wait_is_bounded_when_tracked_write_hangs() {
 }
 
 #[tokio::test]
-async fn create_lobby_rejects_duplicate_names() {
+async fn create_lobby_numbers_duplicate_names() {
     let lobby = Lobby::new();
 
-    let room = lobby
-        .create_lobby("  alex's lobby  ")
-        .await
-        .expect("first create should reserve normalized lobby name");
-    assert_eq!(room, "alex's lobby");
+    assert_eq!(
+        lobby
+            .create_lobby("  alex's lobby  ")
+            .await
+            .expect("first create should reserve the requested name"),
+        "alex's lobby"
+    );
+    assert_eq!(
+        lobby
+            .create_lobby("alex's lobby")
+            .await
+            .expect("second create should reserve a numbered name"),
+        "alex's lobby 2"
+    );
+    assert_eq!(
+        lobby
+            .create_lobby("alex's lobby")
+            .await
+            .expect("third create should skip the occupied numbered name"),
+        "alex's lobby 3"
+    );
+}
 
-    assert!(matches!(
-        lobby.create_lobby("alex's lobby").await,
-        Err(CreateLobbyError::Duplicate)
-    ));
+#[tokio::test]
+async fn concurrent_lobby_creates_reserve_distinct_names() {
+    let lobby = Lobby::new();
+    let (first, second) = tokio::join!(
+        lobby.create_lobby("contested lobby"),
+        lobby.create_lobby("contested lobby"),
+    );
+    let mut rooms = vec![
+        first.expect("first concurrent create should succeed"),
+        second.expect("second concurrent create should succeed"),
+    ];
+    rooms.sort();
+
+    assert_eq!(rooms, ["contested lobby", "contested lobby 2"]);
+}
+
+#[tokio::test]
+async fn create_lobby_keeps_numbered_unicode_names_within_the_byte_limit() {
+    let lobby = Lobby::new();
+    let max_length_name = "é".repeat(PUBLIC_LOBBY_NAME_MAX_BYTES / 2);
+
+    assert_eq!(
+        lobby
+            .create_lobby(&max_length_name)
+            .await
+            .expect("first create should accept the maximum-length Unicode name"),
+        max_length_name
+    );
+    let numbered = lobby
+        .create_lobby(&max_length_name)
+        .await
+        .expect("duplicate Unicode create should receive a numbered name");
+
+    assert!(numbered.ends_with(" 2"));
+    assert!(numbered.len() <= PUBLIC_LOBBY_NAME_MAX_BYTES);
+    assert_eq!(normalize_public_lobby_name(&numbered).unwrap(), numbered);
 }
 
 #[tokio::test]
@@ -745,10 +794,13 @@ async fn create_lobby_abandoned_reservation_expires_and_name_can_be_recreated() 
         .await
         .expect("first create should reserve the lobby name");
 
-    assert!(matches!(
-        lobby.create_lobby(&room).await,
-        Err(CreateLobbyError::Duplicate)
-    ));
+    assert_eq!(
+        lobby
+            .create_lobby(&room)
+            .await
+            .expect("duplicate create should reserve a numbered name"),
+        format!("{room} 2")
+    );
 
     wait_for_lobby_room_count(&lobby, 0).await;
 
@@ -901,11 +953,6 @@ async fn lobby_summaries_collect_browser_safe_rows_from_room_tasks() {
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::Open);
     assert_eq!(summary.occupied_slots, 1);
-    assert!(matches!(
-        lobby.create_lobby(&room).await,
-        Err(CreateLobbyError::Duplicate)
-    ));
-
     handle
         .event_tx
         .send(RoomEvent::Leave { player_id: 9001 })
