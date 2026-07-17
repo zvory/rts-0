@@ -927,7 +927,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
 }
 
 #[test]
-fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer_damage() {
+fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     let players = [
         PlayerInit {
             id: 1,
@@ -963,27 +963,22 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
         .entities
         .spawn_building(2, EntityKind::TankTrap, target_pos.0, target_pos.1, true)
         .expect("armored target should spawn");
-    let outer_target = game
+    let armored_outer = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::MachineGunner, outer_pos.0, outer_pos.1)
-        .expect("outer target should spawn");
-    game.state
-        .entities
-        .get_mut(outer_target)
-        .expect("outer target should exist")
-        .hold_position();
-    let armored_hp_before = game
+        .spawn_building(2, EntityKind::TankTrap, outer_pos.0, outer_pos.1, true)
+        .expect("outer armored target should spawn");
+    let armored_inner_hp_before = game
         .state
         .entities
         .get(armored_inner)
         .expect("armored target exists")
         .hp;
-    let outer_hp_before = game
+    let armored_outer_hp_before = game
         .state
         .entities
-        .get(outer_target)
-        .expect("outer target exists")
+        .get(armored_outer)
+        .expect("outer armored target exists")
         .hp;
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
@@ -1012,34 +1007,34 @@ fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer
         .set_position(impact_pos.0, impact_pos.1);
     game.state
         .entities
-        .get_mut(outer_target)
-        .expect("outer target should exist")
+        .get_mut(armored_outer)
+        .expect("outer armored target should exist")
         .set_position(impact_pos.0, impact_pos.1 + config::TILE_SIZE as f32 * 1.25);
     for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
         game.tick();
     }
 
-    let armored_hp_after = game
+    let armored_inner_hp_after = game
         .state
         .entities
         .get(armored_inner)
         .expect("armored target should survive")
         .hp;
-    let outer_hp_after = game
+    let armored_outer_hp_after = game
         .state
         .entities
-        .get(outer_target)
-        .expect("outer target should survive")
+        .get(armored_outer)
+        .expect("outer armored target should survive")
         .hp;
     assert_eq!(
-        armored_hp_before - armored_hp_after,
-        config::MORTAR_INNER_DAMAGE,
-        "inner mortar splash should deal full damage to armored targets"
+        armored_inner_hp_before - armored_inner_hp_after,
+        config::MORTAR_INNER_DAMAGE / 4,
+        "inner mortar splash should receive the standard non-piercing armor reduction"
     );
     assert_eq!(
-        outer_hp_before - outer_hp_after,
-        config::MORTAR_OUTER_DAMAGE,
-        "outer mortar splash should use the outer damage value"
+        armored_outer_hp_before - armored_outer_hp_after,
+        config::MORTAR_OUTER_DAMAGE / 4,
+        "outer mortar splash should receive the standard non-piercing armor reduction"
     );
 }
 
