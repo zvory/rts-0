@@ -612,7 +612,7 @@ and auto-join for compatibility.
 export const INTERACT_BRIDGE_KEY = "__rtsInteract"
 export class InteractBridge {
   status()                            // readiness or launch error; no internal references
-  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset/presentation/captureReadiness
+  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/select/camera/reset/presentation/captureReadiness
   destroy()
 }
 export function interactLaunchEnabled(locationLike?)
@@ -628,7 +628,9 @@ padding, defaults to a close 32-world-pixel frame for readable single-unit captu
 48 world pixels for multi-subject and non-unit framing), and returns `CameraSnapshotV1` plus
 semantic CSS viewport and ground bounds. Camera set accepts only `CameraSnapshotV1`; status,
 readiness, screenshot manifest v2, recording manifest v2, and fixed-capture manifest v2 carry the
-same versioned shape. The Lab bridge surface version is 5. Setup mutations
+same versioned shape. The Lab bridge surface version is 6. `select` resolves up to 400 visible
+entities into browser-local `GameState` selection, accepts an empty list to clear it, and waits for
+two render frames without sending a gameplay or Lab mutation. Setup mutations
 wait for the server's immediate authoritative snapshot without advancing paused simulation. Order
 calls also wait for a new snapshot and request one bounded tick when paused so the queued command is
 consumed before success.
@@ -650,7 +652,7 @@ Tailnet URL, the daemon validates the artifact and copies it into the machine-le
 copied artifact has at least 24 hours of retention, so Lab close/shutdown, idle expiry, and worktree
 removal do not invalidate issued links. A later publisher can restart the service and continue
 serving unexpired copies from its OS-temporary root.
-Operational aliases, inspection, camera focus, screenshot subjects, and corresponding bridge
+Operational aliases, inspection, selection, camera focus, screenshot subjects, and corresponding bridge
 entity-id inputs accept at most 400 references. Screenshot readiness validates the complete
 requested subject set, but returned and persisted subject detail is capped at 24 rows with total and
 `truncated` metadata; recording and fixed-capture alias detail is similarly capped at 40 rows.
@@ -672,7 +674,7 @@ representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of
 ```js
 export class InteractGameBridge {
   status()                            // isolated-match readiness and bounded semantic UI state
-  call(method, input)                 // status/inspect/move/giveUp/time/camera/presentation/captureReadiness
+  call(method, input)                 // status/inspect/select/move/giveUp/time/camera/presentation/captureReadiness
   destroy()
 }
 export function interactGameLaunchEnabled(locationLike?)
@@ -691,6 +693,10 @@ speed control is exposed for sampled time-lapse capture. Camera `overview` disab
 spectator director and fits authoritative map bounds. Game screenshots and recordings default to
 normal presentation and accept full-viewport, live-minimap, or bounded custom regions; clean
 presentation is an explicit opt-in.
+The bridge surface version is 3. Its shared game/dev-scenario `select` method replaces browser-local
+selection with up to 400 entities from the recipient's normal fog-filtered snapshot and waits for
+two render frames. It is available to players, AI-vs-AI spectators, and dev-scenario observers,
+including an empty selection for clearing, and never changes authoritative simulation state.
 
 `lab_scenario_authoring.js`
 ```js

@@ -12,7 +12,7 @@ import {
 } from "./lab_spawn_catalog.js";
 
 export const INTERACT_BRIDGE_KEY = "__rtsInteract";
-export const INTERACT_BRIDGE_VERSION = 5;
+export const INTERACT_BRIDGE_VERSION = 6;
 export const INTERACT_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectPlayers: 16,
@@ -24,6 +24,7 @@ export const INTERACT_LIMITS = Object.freeze({
   seekTick: 1_000_000,
   waitMs: 8_000,
   captureSubjects: 400,
+  selectionEntities: 400,
 });
 
 const INTERACT_DEFAULT_FOCUS_PADDING = 48;
@@ -130,6 +131,7 @@ export class InteractBridge {
       case "order": return this.order(input);
       case "time": return this.time(input);
       case "inspect": return this.inspect(input);
+      case "select": return this.select(input);
       case "camera": return this.camera(input);
       case "reset": return this.reset();
       case "exportSetup": return this.exportSetup(input);
@@ -308,6 +310,27 @@ export class InteractBridge {
       camera: projectCamera(match.camera),
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
+      selection: selectedEntityIds(match.state),
+    };
+  }
+
+  async select(input = {}) {
+    const { match } = this.session();
+    const entityIds = optionalBoundedIds(
+      input?.entityIds,
+      "select.entityIds",
+      INTERACT_LIMITS.selectionEntities,
+    );
+    const entities = entityIds.map((id) => match.state.entityById(id));
+    if (entities.some((entity) => !isSelectableEntity(entity))) {
+      throw bridgeError("unknownEntity", "select contains an entity that is not selectable in the current snapshot.");
+    }
+    applyInteractSelection(match, entityIds);
+    await animationFrames(2);
+    const selection = selectedEntityIds(match.state);
+    return {
+      selection,
+      entities: selection.map((id) => projectEntity(match.state.entityById(id))).filter(Boolean),
     };
   }
 
@@ -520,6 +543,22 @@ function inspectionIncludesEntity(entity, query, camera) {
   if (query.kinds.size > 0 && !query.kinds.has(entity.kind)) return false;
   if (query.cameraViewport && !entityInCameraViewport(entity, camera)) return false;
   return true;
+}
+
+function isSelectableEntity(entity) {
+  return !!entity && entity.shotReveal !== true && entity.visionOnly !== true;
+}
+
+function applyInteractSelection(match, entityIds) {
+  match.clientIntent?.closeCommandCardMenu?.();
+  match.state.setSelection(entityIds);
+  match.clientIntent?.clearPlannedOrdersOutsideSelection?.(match.state.selection || []);
+}
+
+function selectedEntityIds(state) {
+  return state?.selection instanceof Set
+    ? [...state.selection].slice(0, INTERACT_LIMITS.selectionEntities)
+    : (state?.selectedEntities?.() || []).map((entity) => entity.id).slice(0, INTERACT_LIMITS.selectionEntities);
 }
 
 function entityInCameraViewport(entity, camera) {

@@ -14,7 +14,7 @@ uncertain; command help never starts or inspects the daemon.
 For normal match/UI review, use `node scripts/interact/cli.mjs game <command> '<JSON-object>'`.
 `game open` creates one isolated player-vs-AI match, or accepts `spectate:["ai_2_1","ai_turtle"]`
 for an AI-vs-AI spectator match. Retain its `game_...` session id. Player sessions may use bounded
-`move` and `give-up`; spectator sessions are observation/media-only. Both may use `inspect`, `camera`,
+`move` and `give-up`; spectator sessions are observation/media-only. Both may use `inspect`, `select`, `camera`,
 `screenshot`, recording, and capture commands. Game media defaults to `presentation:"normal"` so
 the HUD and score screen remain visible. This namespace cannot join arbitrary rooms or issue
 attack, build, production, economy, ability, or arbitrary protocol commands.
@@ -22,7 +22,7 @@ attack, build, production, economy, ability, or arbitrary protocol commands.
 For an existing server-authored dev scenario, use
 `node scripts/interact/cli.mjs dev-scenario <command> '<JSON-object>'`. `dev-scenario open` takes the same
 `id`, `unit`, `count`, optional `blocker`, and optional `case` fields listed at `/dev/scenarios` and
-returns a `scenario_...` session id. The namespace is observation/media-only: `inspect`, `camera`,
+returns a `scenario_...` session id. The namespace is observation/media-only: `inspect`, `select`, `camera`,
 `screenshot`, recording, time-lapse, capture cancellation, and lifecycle commands. It cannot spawn,
 move, order, build, or send arbitrary input. Scenario media defaults to `presentation:"clean"`.
 
@@ -40,7 +40,9 @@ move, order, build, or send arbitrary input. Scenario media defaults to `present
    as `{c:"adjustProductionRepeat",buildings:[...],unit:"<kind>",delta:1|-1}`; each command adds
    or removes one allocation across the resolved producer set.
 3. Use `time` to pause or step authoritative state. Position the view with `camera`. Single-unit
-   focus without padding uses the intentionally close 32-world-pixel default.
+   focus without padding uses the intentionally close 32-world-pixel default. Use `select` before a
+   capture when selection rings, range overlays, support-weapon cones, or the selected-unit HUD are
+   part of the review; pass an empty reference/id list to clear browser-local selection.
 4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700 at DPR 1, and any subject
    aliases. Use `presentation: "clean"` to hide UI chrome or `presentation: "normal"` to retain
    visible Lab panels and game UI.

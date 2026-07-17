@@ -39,6 +39,12 @@ export async function executeObservationCommand(
       limit: input.limit || 25,
     }) });
   }
+  if (["game-select", "scenario-select"].includes(command)) {
+    return handled("direct", {
+      sessionId,
+      ...await session.driver.select(input.ids || []),
+    });
+  }
   if (["game-camera", "scenario-camera"].includes(command)) {
     const value = input.camera || {};
     const driverCommand = value.action === "focus"

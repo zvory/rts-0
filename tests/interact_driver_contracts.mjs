@@ -194,7 +194,7 @@ assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and 
 assert.equal(inspection.limit, 400, "inspection result limits support the large-scene operational bound");
 assert.equal(INTERACT_LIMITS.focusEntities, 400, "bridge camera focus shares the 400-reference bound");
 assert.equal(INTERACT_LIMITS.captureSubjects, 400, "bridge readiness checks share the 400-subject bound");
-assert.equal(INTERACT_BRIDGE_VERSION, 5, "launch-failure status projection increments the bridge version");
+assert.equal(INTERACT_BRIDGE_VERSION, 6, "browser-local selection increments the Lab bridge version");
 assert.equal(inspection.cameraViewport, false, "inspection viewport filtering is opt-in");
 assert.equal(normalizeInspectionQuery({ cameraViewport: true }).cameraViewport, true, "inspection accepts the bounded camera viewport filter");
 
@@ -342,10 +342,13 @@ const viewportBridge = new InteractBridge({
       state: {
         currRecvTime: 1,
         tick: 7,
+        selection: new Set(),
         players: [],
         map: { name: "Chokes", width: 64, height: 64, tileSize: 32 },
         entitiesInterpolated: () => viewportEntities,
         entityById: (id) => viewportEntities.find((entity) => entity.id === id),
+        setSelection(ids) { this.selection = new Set(ids); },
+        selectedEntities() { return viewportEntities.filter((entity) => this.selection.has(entity.id)); },
       },
       capabilities: { roomTime: { available: true } },
       roomTimeControls: { roomTimeState: { currentTick: 7, speed: 0, paused: true } },
@@ -367,6 +370,11 @@ assert.deepEqual(
 );
 assert.equal(viewportInspection.camera.version, 1, "bridge inspection reports CameraSnapshotV1");
 assert.deepEqual(viewportInspection.cameraWorldBounds, { minX: 0, minY: 0, maxX: 100, maxY: 100 }, "bridge inspection reports semantic camera world bounds");
+const selected = await viewportBridge.select({ entityIds: [1, 2] });
+assert.deepEqual(selected.selection, [1, 2], "Lab bridge selection replaces browser-local selection with bounded entity ids");
+assert.deepEqual(selected.entities.map((entity) => entity.id), [1, 2], "Lab bridge selection returns its exact projected entities");
+assert.deepEqual(viewportBridge.inspect({ limit: 10 }).selection, [1, 2], "Lab inspection reports the current browser-local selection");
+assert.deepEqual((await viewportBridge.select({ entityIds: [] })).selection, [], "Lab bridge accepts an empty selection as clear");
 const focused = viewportBridge.camera({ action: "focus", entityIds: [1, 2], padding: 10 });
 assert.ok(focused.camera.framingScale > 0 && focused.cameraWorldBounds.maxX > focused.cameraWorldBounds.minX, "bridge focus applies bounded padding and returns semantic camera data");
 const groupFocused = viewportBridge.camera({ action: "focus", entityIds: [1, 2] });

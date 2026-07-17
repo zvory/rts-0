@@ -10,6 +10,7 @@ export const INTERACT_LIMITS = Object.freeze({
   maxCommandUnits: 100,
   maxInspectRefs: 400,
   maxInspectResults: 400,
+  maxSelectionRefs: 400,
   maxFocusRefs: 400,
   maxScreenshotSubjects: 400,
   maxArtifactBytes: 8 * 1024 * 1024,
@@ -121,6 +122,9 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
     if (value.owners != null) array(value.owners, "inspect.owners", 0, 16, (entry: unknown) => u32(entry, "inspect.owner"));
     optionalBoolean(value.cameraViewport, "inspect.cameraViewport");
     if (value.limit != null) integer(value.limit, "inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
+  } else if (command === "select") {
+    exact(value, ["sessionId", "refs"], command);
+    refs(value.refs, "select.refs", 0, INTERACT_LIMITS.maxSelectionRefs);
   } else if (command === "camera") {
     exact(value, ["sessionId", "camera"], command);
     validateCamera(value.camera);
@@ -189,6 +193,9 @@ function validateScenarioNamespaceInput(command: string, value: CommandInput, se
     if (value.kinds != null) array(value.kinds, "dev-scenario inspect.kinds", 0, 32, (entry: unknown) => token(entry, "dev-scenario inspect.kind"));
     optionalBoolean(value.cameraViewport, "dev-scenario inspect.cameraViewport");
     if (value.limit != null) integer(value.limit, "dev-scenario inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
+  } else if (command === "scenario-select") {
+    exact(value, ["sessionId", "ids"], "dev-scenario select");
+    idArray(value.ids, "dev-scenario select.ids", 0, INTERACT_LIMITS.maxSelectionRefs);
   } else if (command === "scenario-camera") {
     exact(value, ["sessionId", "camera"], "dev-scenario camera");
     validateGameCamera(value.camera);
@@ -250,6 +257,9 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     if (value.ownership != null && !["owned", "visible"].includes(String(value.ownership))) invalid("game inspect.ownership", "must be owned or visible");
     optionalBoolean(value.cameraViewport, "game inspect.cameraViewport");
     if (value.limit != null) integer(value.limit, "game inspect.limit", 1, INTERACT_LIMITS.maxInspectResults);
+  } else if (command === "game-select") {
+    exact(value, ["sessionId", "ids"], "game select");
+    idArray(value.ids, "game select.ids", 0, INTERACT_LIMITS.maxSelectionRefs);
   } else if (command === "game-move") {
     exact(value, ["sessionId", "units", "x", "y", "queued"], "game move");
     idArray(value.units, "game move.units", 1, INTERACT_LIMITS.maxCommandUnits);

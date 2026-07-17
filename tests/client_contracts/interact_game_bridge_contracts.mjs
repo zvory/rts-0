@@ -102,6 +102,7 @@ try {
     state: {
       get currRecvTime() { return snapshotSequence; },
       tick: 3,
+      selection: new Set(),
       spectator: false,
       playerId: 1,
       localPlayer: { id: 1, teamId: 1, factionId: "kriegsia", name: "Interact", color: "#fff", isAi: false },
@@ -113,6 +114,8 @@ try {
       map: { name: "Chokes", width: 64, height: 64, tileSize: 32 },
       entitiesInterpolated: () => entities,
       entityById: (id) => entities.find((entity) => entity.id === id) || null,
+      setSelection(ids) { this.selection = new Set(ids); },
+      selectedEntities() { return entities.filter((entity) => this.selection.has(entity.id)); },
       worldInBounds: (x, y) => x >= 0 && y >= 0 && x < 2048 && y < 2048,
     },
     commandIssuer: {
@@ -172,6 +175,14 @@ try {
     [10, 20],
     "inspection excludes shot-reveal and lingering vision-only render records",
   );
+  const selected = await bridge.select({ entityIds: [10] });
+  assert.deepEqual(selected.selection, [10], "game bridge selects a visible entity through browser-local state");
+  assert.deepEqual(bridge.inspect().selection, [10], "game inspection reports the current selection ids");
+  await assert.rejects(
+    () => bridge.select({ entityIds: [30] }),
+    (error) => error?.code === "unknownEntity",
+    "game selection rejects non-selectable lingering vision records",
+  );
 
   const moved = await bridge.move({ units: [10], x: 500, y: 500 });
   assert.equal(moved.accepted, true, "move reports normal client admission");
@@ -197,6 +208,7 @@ try {
   match.state.spectator = true;
   assert.equal(bridge.status().role, "spectator", "status identifies the AI-vs-AI spectator launch");
   assert.equal(bridge.status().ready, true, "an active spectator remains fully inspectable");
+  assert.deepEqual((await bridge.select({ entityIds: [20] })).selection, [20], "AI-vs-AI spectators can select visible AI units");
   await assert.rejects(() => bridge.move({ units: [10], x: 600, y: 600 }), (error) => error?.code === "playerSeatRequired");
   const time = await bridge.time({ action: "speed", speed: 8 });
   assert.equal(time.roomTime.speed, 8, "AI-only spectator time control confirms the authoritative speed");
@@ -210,6 +222,7 @@ try {
   });
   const scenarioTime = await scenarioBridge.time({ action: "speed", speed: 4 });
   assert.equal(scenarioTime.roomTime.speed, 4, "active-player dev scenarios retain room-time control for time-lapse capture");
+  assert.deepEqual((await scenarioBridge.select({ entityIds: [20] })).selection, [20], "dev-scenario observers share browser-local selection support");
   const rejectedScenarioMove = await scenarioBridge.call("move", { units: [10], x: 600, y: 600 });
   assert.equal(rejectedScenarioMove.ok, false, "active-player dev scenarios expose no gameplay mutation bridge");
   assert.equal(rejectedScenarioMove.error.code, "methodUnavailable", "scenario gameplay mutations fail at the page-bridge boundary");
