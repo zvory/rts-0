@@ -322,7 +322,12 @@ Prototype raster rig workflow:
   4.2-inch-inspired wheeled mortar sheet: assembled reference, team-tinted carriage/frame and
   tube/barrel assembly, plus fixed-color tire overlays. The carriage sprite follows the SVG
   carriage recoil binding while the separate tube sprite follows the stronger weapon recoil
-  binding. See
+  binding. The deployed Mortar Team also uses an image-generated square base-plate PNG in the unit
+  atlas. Its white-painted source receives the owning player's runtime team tint. The keyed and
+  tightly cropped 128px source is postprocessed to exactly 16x16 world pixels (half a tile), draws
+  below the carriage with its center offset 20 world pixels rearward, scales from zero to full size
+  with setup progress, and shrinks during teardown; the SVG part supplies animation bindings only
+  and has no visible paint. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt
@@ -1072,8 +1077,8 @@ rather than relying on the full mutable `GameState`. Queued support-weapon setup
 accepted move or attack-move order-plan endpoints as their field-of-fire origin, plus local pending
 move/setup stages when the command has been sent but no owner-only `orderPlan` echo has arrived;
 unqueued setup previews use the current support-weapon position. Minimap hover and click targeting
-feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns
-and Artillery. The input router owns the active preview surface: while the minimap is hovered it
+feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns,
+Mortar Teams, and Artillery. The input router owns the active preview surface: while the minimap is hovered it
 suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
 hiding minimap-authored setup cones or issued-command feedback. HUD command-target arming preserves
 Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
@@ -1447,8 +1452,9 @@ ring remain valid and produce sorties that expire before arrival.
 Unit abilities remain on their declared grid slots in mixed selections rather than spilling into an
 unrelated empty hotkey. When abilities collide, Point Fire and Blanket Fire have the lowest command-
 card priority: Mortar Fire replaces Point Fire on `X`, and Scout Plane replaces Blanket Fire on `C`.
-The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns or Artillery are
-present and that slot is available. Artillery-only selections still expose Point Fire, Blanket Fire,
+The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns, Mortar Teams,
+or Artillery are present and that slot is available. A deployed selected Mortar Team draws its
+5-to-15-tile, 120-degree field-of-fire wedge. Artillery-only selections still expose Point Fire, Blanket Fire,
 and Set Up together because those commands do not collide in that context.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a

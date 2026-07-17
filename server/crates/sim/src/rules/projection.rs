@@ -314,7 +314,11 @@ pub fn project_entity(
     ) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
-    if matches!(entity.kind, EntityKind::AntiTankGun | EntityKind::Artillery) && owner_or_ally {
+    if matches!(
+        entity.kind,
+        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
+    ) && owner_or_ally
+    {
         view.setup_facing = entity.emplacement_facing();
     }
 

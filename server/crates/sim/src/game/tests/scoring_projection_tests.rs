@@ -566,6 +566,10 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+        mortar_entity.set_emplacement_facing(Some(0.0));
+    }
     let spotter_pos = game.state.map.tile_center(15, 2);
     let spotter = game
         .state

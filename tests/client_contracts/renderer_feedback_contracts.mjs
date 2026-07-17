@@ -627,6 +627,35 @@ function nearPoint(call, point, epsilon = 0.001) {
     "selected unit minimum-range rings draw at doubled opacity",
   );
 
+  const mortarRangeGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: mortarRangeGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 2,
+      showUnitRangesEnabled: true,
+      selectedEntities: () => [{
+        id: 78,
+        owner: 2,
+        kind: KIND.MORTAR_TEAM,
+        x: 224,
+        y: 96,
+        setupState: SETUP.DEPLOYED,
+        setupFacing: 0,
+      }],
+    },
+  );
+  const mortarArcs = mortarRangeGfx.calls.filter((call) => call[0] === "arc");
+  assert(
+    mortarArcs.some((call) => call[3] === 480) && mortarArcs.some((call) => call[3] === 160),
+    "selected deployed mortar draws its 15-tile outer arc and five-tile dead zone",
+  );
+  assertApprox(
+    mortarArcs[0][5] - mortarArcs[0][4],
+    (Math.PI * 2) / 3,
+    0.0001,
+    "selected deployed mortar draws a 120 degree field of fire",
+  );
+
   const workerRangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
     { _feedbackGfx: workerRangeGfx, _map: { tileSize: 32 } },

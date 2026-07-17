@@ -25,7 +25,7 @@ fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities
@@ -35,6 +35,7 @@ fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
         mortar_entity.set_facing(0.0);
         mortar_entity.set_weapon_facing(0.0);
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+        mortar_entity.set_emplacement_facing(Some(0.0));
     }
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
@@ -220,7 +221,7 @@ fn manual_mortar_fire_waits_for_weapon_cooldown() {
 #[test]
 fn manual_mortar_fire_turns_while_waiting_for_weapon_cooldown() {
     let (mut game, mortar, _) = manual_fire_fixture();
-    let target_pos = game.state.map.tile_center(8, 12);
+    let target_pos = game.state.map.tile_center(8, 14);
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_attack_cd(4);
         mortar_entity.set_facing(0.0);
@@ -315,14 +316,20 @@ fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
 #[test]
 fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
-    let enemy_pos = game.state.map.tile_center(8, 12);
+    let enemy_pos = game.state.map.tile_center(8, 14);
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
     }
-    game.state
+    let enemy = game
+        .state
         .entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
+    game.state
+        .entities
+        .get_mut(enemy)
+        .expect("enemy should exist")
+        .hold_position();
     game.state.players[0]
         .upgrades
         .insert(upgrade::UpgradeKind::MortarAutocast);

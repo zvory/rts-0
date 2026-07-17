@@ -801,14 +801,17 @@ pub(crate) fn caster_in_range(
     let Some(e) = entities.get(caster) else {
         return false;
     };
-    let Some(range_tiles) = ability::definition(ability).range_tiles else {
+    let definition = ability::definition(ability);
+    let Some(range_tiles) = definition.range_tiles else {
         return true;
     };
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
         return false;
     }
     let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
-    dist2(e.pos_x, e.pos_y, x, y) <= range_px * range_px
+    let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
+    let distance_sq = dist2(e.pos_x, e.pos_y, x, y);
+    distance_sq >= min_range_px * min_range_px && distance_sq <= range_px * range_px
 }
 
 fn staging_point(
@@ -820,8 +823,10 @@ fn staging_point(
     y: f32,
 ) -> Option<(f32, f32)> {
     let caster = entities.get(caster)?;
-    let range_tiles = ability::definition(ability).range_tiles?;
+    let definition = ability::definition(ability);
+    let range_tiles = definition.range_tiles?;
     let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let dx = caster.pos_x - x;
     let dy = caster.pos_y - y;
     let len = (dx * dx + dy * dy).sqrt();
@@ -829,7 +834,11 @@ fn staging_point(
         return None;
     }
     let margin = (caster.radius() * 0.25).max(1.0);
-    let staging_distance = (range_px - margin).max(0.0);
+    let staging_distance = if len < min_range_px {
+        (min_range_px + margin).min(range_px)
+    } else {
+        (range_px - margin).max(min_range_px)
+    };
     let (sx, sy) = if len <= f32::EPSILON {
         (caster.pos_x, caster.pos_y)
     } else {

@@ -60,7 +60,10 @@ fn worker_has_pass_through_work_order(e: &Entity) -> bool {
 pub(super) fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::MachineGunner | EntityKind::AntiTankGun | EntityKind::Artillery
+        EntityKind::MachineGunner
+            | EntityKind::AntiTankGun
+            | EntityKind::MortarTeam
+            | EntityKind::Artillery
     )
 }
 

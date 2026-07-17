@@ -563,6 +563,7 @@ test("live rig routes expose kind-specific production part groups", () => {
 
   const mortarTeamRoutes = liveRigRoutesFor(KIND.MORTAR_TEAM);
   assert.deepEqual(mortarTeamRoutes[0].parts, ["part.shadow"]);
+  assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.basePlate.deployed"), true);
   assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.tube.packed"), true);
   assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.leg.left.deployed"), true);
 
@@ -976,7 +977,7 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(rightTrail.alpha, 0);
 });
 
-test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and fixed tires", () => {
+test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   const result = compileSvgRig(MORTAR_TEAM_RIG_SVG, { expectedKind: KIND.MORTAR_TEAM });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   const definition = result.definition;
@@ -989,7 +990,8 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
   const packedTubeSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
   const packedLeftTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.left.packed");
   const packedRightTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
-  for (const sprite of [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite]) assert.ok(sprite);
+  const basePlateSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.basePlate.deployed");
+  for (const sprite of [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite, basePlateSprite]) assert.ok(sprite);
   assert.deepEqual(
     [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite].map((sprite) => sprite.tintSlot),
     ["team-light", "team-light", "fixed", "fixed"],
@@ -1002,6 +1004,12 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
   assert.equal(packedRightTireSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"), false);
   assert.ok(packedTubeSprite.sourceParts.includes("part.mortar.tube.packed"));
   assert.equal(packedTubeSprite.sourceParts.includes("part.mortar.body.packed"), false);
+  assert.deepEqual(basePlateSprite.sourceParts, ["part.mortar.basePlate.deployed"]);
+  assert.equal(basePlateSprite.tintSlot, "team");
+  assert.equal(basePlateSprite.frame.w / basePlateSprite.frame.pixelsPerUnitX, 16);
+  assert.equal(basePlateSprite.frame.h / basePlateSprite.frame.pixelsPerUnitY, 16);
+  assert.equal(basePlateSprite.positionOffsetX, -20);
+  assert.ok(basePlateSprite.drawOrder < packedCarriageSprite.drawOrder);
 
   const entity = {
     id: 46,
@@ -1023,20 +1031,34 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 1 });
 
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const underlay = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  assert.ok(underlay);
   const carriage = unit.parts.get("sprite.mortar.carriage.deployed").display;
   const tube = unit.parts.get("sprite.mortar.tube.deployed").display;
   const leftTire = unit.parts.get("sprite.mortar.tire.left.deployed").display;
   const rightTire = unit.parts.get("sprite.mortar.tire.right.deployed").display;
+  const basePlate = unit.parts.get("sprite.mortar.basePlate.deployed").display;
   for (const display of [carriage, tube, leftTire, rightTire]) {
     assert.equal(display.visible, true);
     assert.equal(display.alpha, 1);
   }
+  assert.equal(basePlate.alpha, 1);
+  assert.equal(basePlate.tint, 0x336699);
+  assert.ok(Math.abs(Math.hypot(basePlate.x, basePlate.y) - 20) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleX - 1 / 8) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleY - 1 / 8) < 0.001);
   assert.notEqual(carriage.tint, 0xffffff);
   assert.notEqual(tube.tint, 0xffffff);
   assert.equal(leftTire.tint, 0xffffff);
   assert.equal(rightTire.tint, 0xffffff);
   assert.ok(Math.abs(tube.x) > Math.abs(carriage.x) * 2);
+
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0.5, frameProgress: 0.5, barrel: true });
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 0 });
+  assert.equal(basePlate.alpha, 0.5);
+  assert.ok(Math.abs(basePlate.scaleX - 1 / 16) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleY - 1 / 16) < 0.001);
 
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
   renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
@@ -1052,6 +1074,9 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
     assert.equal(display.alpha, 1);
   }
   for (const display of [carriage, tube, leftTire, rightTire]) assert.equal(display.alpha, 0);
+  assert.equal(basePlate.alpha, 0);
+  assert.equal(basePlate.scaleX, 0);
+  assert.equal(basePlate.scaleY, 0);
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {

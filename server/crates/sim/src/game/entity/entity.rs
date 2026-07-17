@@ -1028,6 +1028,7 @@ impl Entity {
         let teardown_ticks = match self.kind {
             EntityKind::MachineGunner => config::MACHINE_GUNNER_SETUP_TICKS,
             EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
+            EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
             EntityKind::Artillery => {
                 self.reset_artillery_accuracy();
                 self.reset_artillery_blanket_sequence();
@@ -1035,7 +1036,10 @@ impl Entity {
             }
             _ => return true,
         };
-        if matches!(self.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
+        if matches!(
+            self.kind,
+            EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
+        ) {
             self.set_emplacement_facing(None);
             self.set_pending_redeploy_facing(None);
         }

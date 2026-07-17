@@ -239,7 +239,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         carriers: &[EntityKind::MortarTeam],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::MORTAR_RANGE_TILES),
-        min_range_tiles: None,
+        min_range_tiles: Some(balance::MORTAR_MIN_RANGE_TILES),
         cooldown_ticks: (balance::TICK_HZ as u16) * 2,
         charges: None,
         cost: ResourceCost::new(0, 0),

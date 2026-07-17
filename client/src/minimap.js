@@ -1322,7 +1322,9 @@ export class Minimap {
     const sel = this.state.selectedEntities() || [];
     return sel.filter((e) =>
       ownOwner(this.state, e.owner) &&
-      (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY));
+      (e.kind === KIND.ANTI_TANK_GUN ||
+        e.kind === KIND.MORTAR_TEAM ||
+        e.kind === KIND.ARTILLERY));
   }
 
   /** Issue the minimap's current command to the world point for any selected own units. */

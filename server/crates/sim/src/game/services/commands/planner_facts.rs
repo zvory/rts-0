@@ -91,8 +91,10 @@ pub(super) fn planner_facts(
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)
                 .is_some_and(|catalog| catalog.builders.contains(&e.kind));
-            facts.can_setup_anti_tank_gun =
-                matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
+            facts.can_setup_anti_tank_gun = matches!(
+                e.kind,
+                EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
+            );
             if let Some(ability) = ability {
                 let ready_at_issue =
                     ability_orders::caster_can_accept_order(entities, player, id, ability.kind);

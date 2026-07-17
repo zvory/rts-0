@@ -306,7 +306,10 @@ export function buildUnitCard(ctx, selection) {
   const ownUnits = selectedOwnUnits(ctx, selection);
   const unitIds = ownUnits.map((e) => e.id);
   const setupGunIds = ownUnits
-    .filter((e) => e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY)
+    .filter((e) =>
+      e.kind === KIND.ANTI_TANK_GUN ||
+      e.kind === KIND.MORTAR_TEAM ||
+      e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
   const abilityAffordances = selectedAbilityAffordances(ctx, ownUnits);
   const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
