@@ -1227,7 +1227,6 @@ async function readLobbyApiError(response) {
   } catch (_) {
     // Fall through to status-based copy below.
   }
-  if (response?.status === 409) return "Lobby name is already in use.";
   if (response?.status === 503) return "Server is draining for deploy; new lobbies are disabled.";
   if (response?.status === 400) return "Lobby name is invalid.";
   return `Create lobby failed (${response?.status || "network"}).`;

@@ -1023,7 +1023,7 @@ import { textWithin } from "./dom_text.mjs";
     const modal = new LobbyCreateModal(host, {
       onSubmit: async (room) => {
         submitted = room;
-        modal.setError("Lobby name is already in use.");
+        modal.setError("Server is draining for deploy; new lobbies are disabled.");
         return false;
       },
     });
@@ -1040,8 +1040,8 @@ import { textWithin } from "./dom_text.mjs";
     submit.click();
     await Promise.resolve();
     assert(submitted === "taken", "create lobby modal submits the trimmed lobby name");
-    assert(textWithin(host).includes("Lobby name is already in use."),
-      "duplicate create failures are displayed inline");
+    assert(textWithin(host).includes("Server is draining for deploy; new lobbies are disabled."),
+      "server-rejected create failures are displayed inline");
     modal.close();
     assert(document.activeElement === trigger, "create lobby modal returns focus to the trigger");
     modal.destroy();

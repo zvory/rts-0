@@ -693,7 +693,6 @@ pub enum CreateLobbyError {
     NameTooLong { max_bytes: usize },
     InvalidCharacters,
     ReservedName,
-    Duplicate,
     Draining(DrainNotice),
 }
 
@@ -710,7 +709,6 @@ impl CreateLobbyError {
             CreateLobbyError::NameTooLong { .. } => "Lobby name is too long.",
             CreateLobbyError::InvalidCharacters => "Lobby name contains unsupported characters.",
             CreateLobbyError::ReservedName => "Lobby name is reserved.",
-            CreateLobbyError::Duplicate => "Lobby name is already in use.",
             CreateLobbyError::Draining(_) => {
                 "Server is draining for deploy; new lobbies are disabled."
             }
@@ -863,31 +861,10 @@ impl Lobby {
         Ok(self.create_room_locked(room, &mut rooms))
     }
 
-    /// Create a public normal lobby only when the normalized name is absent. This is intentionally
-    /// separate from join-by-room-name so duplicate create can fail instead of silently joining.
-    pub async fn create_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
-        let room = normalize_public_lobby_name(room)?;
-        let mut rooms = self.rooms.lock().await;
-        if rooms.contains_key(&room) {
-            return Err(CreateLobbyError::Duplicate);
-        }
-        if self.drain.is_draining() {
-            return Err(CreateLobbyError::Draining(self.drain.notice().unwrap_or(
-                DrainNotice {
-                    deadline_unix_ms: 0,
-                    seconds_remaining: 0,
-                },
-            )));
-        }
-        let handle = self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
-        schedule_pending_create_disposal_probe(handle.event_tx.clone());
-        Ok(room)
-    }
-
     /// Create a public normal lobby, adding the first available numeric suffix when the requested
     /// name is already reserved. Name selection and reservation happen under the same registry
-    /// lock so concurrent browser creates cannot race into a duplicate-name failure.
-    pub async fn create_available_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
+    /// lock so concurrent browser creates cannot race into the same room.
+    pub async fn create_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
         let requested_room = normalize_public_lobby_name(room)?;
         let mut rooms = self.rooms.lock().await;
         if self.drain.is_draining() {

@@ -454,7 +454,7 @@ async fn create_lobby_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateLobbyRequest>,
 ) -> impl IntoResponse {
-    match state.lobby.create_available_lobby(&request.room).await {
+    match state.lobby.create_lobby(&request.room).await {
         Ok(room) => (StatusCode::CREATED, Json(CreateLobbyResponse { room })).into_response(),
         Err(err) => create_lobby_error_response(err),
     }
@@ -462,7 +462,6 @@ async fn create_lobby_handler(
 
 fn create_lobby_error_response(err: lobby::CreateLobbyError) -> axum::response::Response {
     let status = match &err {
-        lobby::CreateLobbyError::Duplicate => StatusCode::CONFLICT,
         lobby::CreateLobbyError::Draining(_) => StatusCode::SERVICE_UNAVAILABLE,
         lobby::CreateLobbyError::EmptyName
         | lobby::CreateLobbyError::NameTooLong { .. }
