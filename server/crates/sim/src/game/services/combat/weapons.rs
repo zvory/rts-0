@@ -313,6 +313,9 @@ pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) 
     {
         return false;
     }
+    if config::MORTAR_FIELD_OF_FIRE_RAD >= std::f32::consts::TAU {
+        return true;
+    }
     let Some(center) = e.emplacement_facing().filter(|facing| facing.is_finite()) else {
         return false;
     };

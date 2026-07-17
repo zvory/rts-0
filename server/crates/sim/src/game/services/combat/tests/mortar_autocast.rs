@@ -278,6 +278,22 @@ fn deployed_mortar_autocast_covers_all_directions() {
 }
 
 #[test]
+fn full_circle_mortar_coverage_does_not_require_setup_facing_metadata() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    let mortar = entities.get_mut(mortar_id).expect("mortar should exist");
+    mortar.set_weapon_setup(WeaponSetup::Deployed);
+
+    assert_eq!(mortar.emplacement_facing(), None);
+    assert!(mortar_target_inside_field_of_fire(
+        mortar,
+        std::f32::consts::PI
+    ));
+}
+
+#[test]
 fn mortar_autocast_aims_at_a_moving_target_current_position_before_scatter() {
     let mut entities = EntityStore::new();
     let mortar_id = entities

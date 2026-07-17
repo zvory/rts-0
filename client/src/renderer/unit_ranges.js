@@ -130,18 +130,17 @@ function staticUnitRangeProfile(e, tileSize) {
     (e.kind === KIND.MORTAR_TEAM && e.setupState === SETUP.DEPLOYED)
   ) {
     if (e.setupState !== SETUP.DEPLOYED) return null;
-    const facing = firstFinite(e.setupFacing, e.weaponFacing, e.facing);
-    if (!finiteNumber(facing)) return null;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
-    return weapon
-      ? {
-        kind: "fieldOfFire",
-        minRadius: weapon.minRadius,
-        maxRadius: weapon.maxRadius,
-        arc: weapon.arc,
-        facing,
-      }
-      : null;
+    if (!weapon) return null;
+    const facing = firstFinite(e.setupFacing, e.weaponFacing, e.facing);
+    if (!finiteNumber(facing) && weapon.arc < Math.PI * 2) return null;
+    return {
+      kind: "fieldOfFire",
+      minRadius: weapon.minRadius,
+      maxRadius: weapon.maxRadius,
+      arc: weapon.arc,
+      facing: finiteNumber(facing) ? facing : 0,
+    };
   }
 
   const stat = STATS[e.kind] || {};
