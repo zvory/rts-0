@@ -626,8 +626,12 @@ impl SessionPolicy {
 
     pub(super) fn is_public_lobby_browser_room(self) -> bool {
         (self.mode == SessionMode::Normal
-            && matches!(self.phase, SessionPhase::Lobby | SessionPhase::LiveMatch))
-            || (self.mode == SessionMode::Replay && self.phase == SessionPhase::Lobby)
+            && matches!(
+                self.phase,
+                SessionPhase::Lobby | SessionPhase::LiveMatch | SessionPhase::ReplayViewer
+            ))
+            || (self.mode == SessionMode::Replay
+                && matches!(self.phase, SessionPhase::Lobby | SessionPhase::ReplayViewer))
     }
 
     pub(super) fn allows_match_history(self) -> bool {
@@ -1138,6 +1142,7 @@ mod tests {
         assert_eq!(lobby.persistence, PersistencePolicy::NONE);
         assert_eq!(lobby.start_payload, StartPayloadPolicy::None);
         assert!(lobby.countdown_eligible);
+        assert!(lobby.is_public_lobby_browser_room());
 
         let live = SessionPolicy::new(SessionMode::Normal, SessionPhase::LiveMatch);
         assert_eq!(live.state_source, StateSource::LiveGame);
@@ -1154,6 +1159,7 @@ mod tests {
         assert_eq!(live.start_payload, StartPayloadPolicy::LiveMatch);
         assert!(!live.countdown_eligible);
         assert!(live.allows_match_history());
+        assert!(live.is_public_lobby_browser_room());
 
         let replay = SessionPolicy::new(SessionMode::Normal, SessionPhase::ReplayViewer);
         assert_eq!(replay.state_source, StateSource::PostMatchReplaySession);
@@ -1167,6 +1173,7 @@ mod tests {
         assert!(!replay.countdown_eligible);
         assert!(!replay.allows_match_history());
         assert!(replay.has_authoritative_mutation());
+        assert!(replay.is_public_lobby_browser_room());
     }
 
     #[test]
@@ -1198,6 +1205,8 @@ mod tests {
         let playing = SessionPolicy::new(SessionMode::Replay, SessionPhase::ReplayViewer);
         assert_eq!(playing.state_source, StateSource::PostMatchReplaySession);
         assert_eq!(playing.clock, ClockCapability::REPLAY_PLAYBACK);
+        assert!(playing.is_public_lobby_browser_room());
+        assert!(!saved.is_public_lobby_browser_room());
     }
 
     #[test]

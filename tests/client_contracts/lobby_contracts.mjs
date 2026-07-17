@@ -562,6 +562,9 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly", kind: "replay" }),
     { state: "fullSpectatorOnly", joinable: true, spectator: true },
     "replay lobby rows always join as spectators");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "inGame", kind: "replay" }),
+    { state: "inGame", joinable: true, spectator: true, replayOk: true },
+    "active replay rows join the current shared playback without another confirmation");
   assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
@@ -572,6 +575,21 @@ import { textWithin } from "./dom_text.mjs";
     "lobby create suggestion stays within the public lobby name limit");
   assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
     "lobby create suggestion avoids reserved internal prefixes");
+
+  {
+    let joinOptions = null;
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _browserActionPending: false,
+      async _connectForAction() { return true; },
+      _beginBrowserJoin(_row, options) { joinOptions = options; },
+    });
+    await lobby._joinBrowserLobby(
+      { room: "Active Replay", kind: "replay", joinState: "inGame" },
+      { preflight: false, spectator: true },
+    );
+    assertDeepEqual(joinOptions, { spectator: true, replayOk: true },
+      "active replay browser clicks confirm the intentional replay join");
+  }
 
   {
     const priorDocument = globalThis.document;

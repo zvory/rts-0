@@ -113,6 +113,26 @@ fn lobby_summary_includes_live_normal_rooms_as_non_joinable() {
 }
 
 #[test]
+fn lobby_summary_marks_post_match_replay_as_joinable_replay() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 3);
+    let mut task = summary_task("post-match-replay-summary");
+    task.phase = Phase::ReplayViewer(Box::new(ReplaySession::new(artifact).unwrap()));
+
+    let summary = task
+        .lobby_summary()
+        .expect("post-match replay should remain visible");
+
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.map, "Chokes");
+    assert_eq!(summary.occupied_slots, 0);
+    assert_eq!(summary.max_slots, 0);
+    assert_eq!(summary.spectator_count, 1);
+    assert_eq!(summary.phase, LobbySummaryPhase::InGame);
+    assert_eq!(summary.join_state, LobbyJoinState::InGame);
+}
+
+#[test]
 fn lobby_summary_marks_persisted_replay_lobbies() {
     let replay_players = replay_test_players(2);
     let (_live, replay_artifact) = replay_test_artifact(&replay_players, 0);
@@ -142,6 +162,36 @@ fn lobby_summary_marks_persisted_replay_lobbies() {
     assert_eq!(summary.spectator_count, 1);
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
+}
+
+#[test]
+fn lobby_summary_keeps_persisted_replay_visible_during_playback() {
+    let replay_players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&replay_players, 3);
+    let replay = ReplaySession::new(artifact.clone()).unwrap();
+    let mut task = RoomTask::new(
+        "__match_replay__:00000002".to_string(),
+        RoomMode::Replay { artifact },
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.created_at_unix_ms = 123_456;
+    task.host_id = Some(99);
+    add_test_room_spectator(&mut task, 99);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    let summary = task
+        .lobby_summary()
+        .expect("persisted replay playback should remain visible");
+
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.map, "Chokes");
+    assert_eq!(summary.occupied_slots, 0);
+    assert_eq!(summary.max_slots, 0);
+    assert_eq!(summary.spectator_count, 1);
+    assert_eq!(summary.phase, LobbySummaryPhase::InGame);
+    assert_eq!(summary.join_state, LobbyJoinState::InGame);
 }
 
 #[test]

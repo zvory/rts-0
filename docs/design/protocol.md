@@ -61,7 +61,7 @@ lobby/config dump replaces the source scrape.
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as an observer. `room` defaults to `"main"`. Normal live matches accept `spectator: true` after match start and attach the connection as a gameplay-read-only live spectator with shared live pause controls; active late joins and countdown joins are rejected. Lobby role switches are observer-only and must happen before match start. Persisted match-history replay rooms start as `kind: "replay"` staging lobbies; joins there are accepted as spectators only and do not require `replayOk`. If the target room is already replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as an observer. `room` defaults to `"main"`. Normal live matches accept `spectator: true` after match start and attach the connection as a gameplay-read-only live spectator with shared live pause controls; active late joins and countdown joins are rejected. Lobby role switches are observer-only and must happen before match start. Persisted match-history replay rooms start as `kind: "replay"` staging lobbies; joins there are accepted as spectators only and do not require `replayOk`. Active replay playback remains listed in the lobby browser with `kind: "replay"`; its explicit **Join replay** action sends `replayOk: true` and attaches the viewer at the room's current shared tick. Other attempts to enter replay playback without `replayOk` receive `joinReplayPrompt` and may retry after confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `setName`  | `name: string` | Update the sender's display name while still in the lobby. The server trims and bounds the value with the same rules as `join`, broadcasts the updated roster, and ignores the request during countdown or after match start. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). In a persisted replay staging lobby, host `start` begins replay playback immediately when at least one spectator is present and deploy drain is not blocking new sessions; ready/team/map/AI checks do not apply. |
@@ -376,12 +376,15 @@ selector; `minPlayers` is one and `maxPlayers` is derived from the authored `sta
 for that map. Lobby `map` is the current selected map name and is distinct from replay start
 metadata `mapName`.
 
-`LobbyKind`: `"normal"` for ordinary public lobbies/live rooms, `"replay"` for persisted
-match-history replay staging lobbies. Replay lobbies carry only spectator `LobbyPlayer` rows,
-report `canStart` when the host may begin playback, send the replay artifact map name as `map`,
-and send an empty `maps[]` because map selection is disabled. The HTTP `GET /api/lobbies` row
-uses the same `kind` values and includes only safe room metadata: room, kind, host name, map,
-creation time, active-slot counts, spectator count, phase, and join state.
+`LobbyKind`: `"normal"` for ordinary public lobbies/live rooms and `"replay"` for replay staging
+or active replay playback, including the automatic replay entered after a normal match ends.
+Replay staging lobbies carry only spectator `LobbyPlayer` rows, report `canStart` when the host may
+begin playback, send the replay artifact map name as `map`, and send an empty `maps[]` because map
+selection is disabled. The HTTP `GET /api/lobbies` row uses the same `kind` values and includes
+only safe room metadata: room, kind, host name, map, creation time, active-slot counts, spectator
+count, phase, and join state. Active replay rows use `phase: "inGame"` and
+`joinState: "inGame"`, report zero active slots, and count every connected replay viewer as a
+spectator.
 
 `GET /api/lab-scenarios` returns a bounded catalog of bundled lab checkpoint setup metadata:
 `[{ id, title, description, tags, map, playerCount, filename }]`. `id` is the stable safe token used
@@ -583,7 +586,10 @@ Persisted match-history replay launch creates a replay staging lobby rather than
 on the first join. The first spectator becomes host, additional viewers may gather from the lobby
 browser, and the host's `start` transitions the shared room into the same replay playback runtime
 used after post-match replay. Replay staging ignores ready toggles, active-seat role changes, team
-or faction edits, AI changes, and map selection.
+or faction edits, AI changes, and map selection. After playback starts, the room remains in the
+lobby browser as an active replay. New viewers join the existing shared cursor and receive its
+current start metadata, room-time state, snapshot, and observer analysis immediately, including
+when playback is already at its final tick.
 
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
@@ -594,6 +600,8 @@ the replay simulation after the last viewer leaves; for normal public rooms, tha
 asks the lobby registry to dispose the public name rather than holding it for reconnect. Dedicated
 replay rooms created for match-history or dev replay viewing follow the same per-viewer detach rule
 after playback has started; they keep the shared replay session alive until the room empties.
+Automatic post-match replay rooms remain listed and joinable as replay rooms for that entire
+shared-viewing lifetime.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 `Snapshot` remains the semantic shape used by server game code and by client modules after

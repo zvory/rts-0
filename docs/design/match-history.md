@@ -93,7 +93,9 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   replay staging lobby and returning `{ "room": "..." }`. Once the first
   viewer joins, that room appears in `/api/lobbies` with `kind: "replay"` and safe room metadata
   only; the stored artifact JSON is never exposed through the lobby browser. The host starts
-  playback with the normal WebSocket `start` message, without ready/team/map/AI setup checks.
+  playback with the normal WebSocket `start` message, without ready/team/map/AI setup checks. The
+  room remains listed as an active replay during playback, and later viewers join its current
+  shared tick rather than starting a separate replay session.
   Build-SHA mismatches log a warning and remain launchable. Schema, map, faction/loadout, or
   missing replay failures return a clear JSON `{ "error": "..." }` instead of trying partial
   playback.
@@ -134,7 +136,8 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   normal-room `onBackToLobby` so the freshly-written row appears without a page reload.
   `?replayRoom=...` auto-joins a server-created replay staging lobby through the normal WebSocket
   join flow, and after playback starts its back-to-lobby action navigates to `/` so only that
-  viewer leaves the replay room.
+  viewer leaves the replay room. Active replay rows in the ordinary lobby browser join the current
+  playback directly with `replayOk: true`.
 
 ## What gets recorded
 

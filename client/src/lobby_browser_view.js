@@ -89,7 +89,10 @@ export function lobbyJoinIntent(row = {}) {
   const state = normalizedJoinState(row?.joinState);
   const kind = normalizedLobbyKind(row?.kind);
   if (kind === LOBBY_KIND.REPLAY) {
-    if (state === "open" || state === "fullSpectatorOnly" || state === "inGame") {
+    if (state === "inGame") {
+      return { state, joinable: true, spectator: true, replayOk: true };
+    }
+    if (state === "open" || state === "fullSpectatorOnly") {
       return { state, joinable: true, spectator: true };
     }
     return { state, joinable: false, spectator: true };
