@@ -91,11 +91,13 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   shows `Aborted` and can launch the captured replay.
 - **Deploy asset hermeticity**: release Docker builds generate browser-loadable prediction WASM
   assets with `scripts/build-sim-wasm.sh` inside the builder image, then fail if
-  `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. These
-  generated files stay ignored in git, so deploys must not depend on untracked files in a local
-  checkout. Missing static asset requests under paths such as `/vendor`, `/src`, `/assets`, or
-  root files with extensions return 404 instead of the SPA `index.html`, making packaging mistakes
-  visible to the client and probes.
+  `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. The
+  deploy context allowlists the Dockerfile inputs and runtime rig textures while omitting source
+  art and authoring artifacts; the build also fails if the checked-in snapshot stream or any
+  allowlisted runtime rig texture is missing. Generated WASM files stay ignored in git, so deploys
+  must not depend on untracked files in a local checkout. Missing static asset requests under paths
+  such as `/vendor`, `/src`, `/assets`, or root files with extensions return 404 instead of the SPA
+  `index.html`, making packaging mistakes visible to the client and probes.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility. Normal active-player snapshots use the union of current fog from living teammates,
