@@ -35,6 +35,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "ai_diagnostics_panel.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
   "observer_analysis_preferences.js": "app-shell",
+  "observer_analysis_research.js": "app-shell",
   "observer_analysis_resources.js": "app-shell",
   "observer_analysis_rows.js": "app-shell",
   "observer_analysis_signatures.js": "app-shell",

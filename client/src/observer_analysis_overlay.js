@@ -11,11 +11,13 @@ import {
 } from "./floating_panel_positioner.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
 import { normalizeResourceWindows, renderResourcesMetric } from "./observer_analysis_resources.js";
+import { renderResearchMetric } from "./observer_analysis_research.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
 import { resourceValueElement } from "./resource_icons.js";
 
 const ARMY_VALUE_TAB_ID = "army-value";
 const PRODUCTION_TAB_ID = "production";
+const RESEARCH_TAB_ID = "research";
 const UNITS_TAB_ID = "units";
 const RESOURCES_TAB_ID = "resources";
 const UNITS_LOST_TAB_ID = "units-lost";
@@ -248,6 +250,7 @@ export class ObserverAnalysisOverlay {
       : OBSERVER_ANALYSIS_TABS[0].id;
     if (
       selected === PRODUCTION_TAB_ID
+      || selected === RESEARCH_TAB_ID
       || selected === UNITS_TAB_ID
       || selected === RESOURCES_TAB_ID
       || selected === UNITS_LOST_TAB_ID
@@ -262,6 +265,7 @@ export class ObserverAnalysisOverlay {
     renderObserverAnalysisBody(this, tab, frameViews, {
       armyValue: ARMY_VALUE_TAB_ID,
       production: PRODUCTION_TAB_ID,
+      research: RESEARCH_TAB_ID,
       units: UNITS_TAB_ID,
       resources: RESOURCES_TAB_ID,
       unitsLost: UNITS_LOST_TAB_ID,
@@ -404,6 +408,15 @@ export class ObserverAnalysisOverlay {
       }
     }
     return wrap;
+  }
+
+  renderResearch(analysis) {
+    return renderResearchMetric({
+      analysis,
+      players: this.getPlayers(),
+      upgrades: UPGRADES,
+      renderPlayerHeading: (player) => this.renderPlayerHeading(player),
+    });
   }
 
   renderResources(analysis) {
@@ -570,6 +583,9 @@ function normalizeAnalysisPlayer(player) {
     id,
     units: normalizeKindRows(player.units),
     production: normalizeProductionRows(player.production),
+    upgrades: Array.isArray(player.upgrades)
+      ? player.upgrades.map((upgrade) => String(upgrade || "")).filter(Boolean)
+      : [],
     unitsLost: normalizeKindRows(player.unitsLost),
     resourcesLost: {
       steel: Math.max(0, Math.trunc(Number(player.resourcesLost?.steel) || 0)),

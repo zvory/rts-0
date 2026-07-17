@@ -120,6 +120,7 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
             .expect("player one should exist");
         player.add_gathered_resources(EntityKind::Steel, 80, current_tick);
         player.add_gathered_resources(EntityKind::Oil, 30, current_tick - config::TICK_HZ * 10);
+        player.upgrades.insert(upgrade::UpgradeKind::TankUnlock);
     }
 
     let victim_unit = game
@@ -175,6 +176,7 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
             && row.queue_depth == 1
             && row.progress > 0.0
     }));
+    assert_eq!(player_one.upgrades, vec!["tank_unlock"]);
     assert_eq!(player_one.resources.lifetime.steel, 80);
     assert_eq!(player_one.resources.lifetime.oil, 30);
     assert_eq!(player_one.resources.last_5s.steel, 80);

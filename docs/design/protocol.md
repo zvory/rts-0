@@ -1462,6 +1462,7 @@ must not receive this message.
           queueDepth: u32
         }
       ],
+      upgrades?: string[], // completed permanent research; omitted when empty
       unitsLost: [{ kind: string, count: u32, steelValue: u32, oilValue: u32 }],
       resourcesLost: { steel: u32, oil: u32 },
       resources: {
@@ -1530,6 +1531,7 @@ must not receive this message.
 `players` lists every active observed player. `units` is the current living unit inventory by kind.
 `production` has one row for each owned building with a non-empty unit or research queue; `progress`
 is the front item's completion fraction and `queueDepth` is that queue's total item count.
+`upgrades` lists that player's completed permanent research using protocol upgrade ids.
 `steelValue` and `oilValue` are aggregate row values (`count * configured cost`), not per-unit
 costs. `unitsLost` is the authoritative unit-death count by kind. `resourcesLost` is intentionally
 narrow: the spent steel/oil value of units that died, matching `unitsLost`; it does not include
