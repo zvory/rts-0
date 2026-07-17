@@ -138,12 +138,23 @@ The application dependency direction is intentionally small:
 ```text
 cli.mjs -> cli.ts / daemon.ts
         |
-command registry + command service + session coordinator
+command registry + command service lifecycle/dispatch + session coordinator
+        |
+namespace handlers normalize policy and public input
+        |
+shared inspect / select / camera / media capabilities
         |
 driver + private server + recording / fixed capture / Tailnet / runtime helpers
         |
 process runner / filesystem / Puppeteer / FFmpeg / Rust server / Tailscale
 ```
+
+`command_service.ts` owns session lifecycle and generic registry dispatch. Namespace handlers own
+their public policy and normalize differences such as Lab aliases versus Game entity ids,
+inspection ownership, and presentation defaults. After normalization, shared capabilities own the
+common inspect, select, camera, screenshot, recording, and capture workflows. A capability does not
+expand a namespace's authority: the namespace handler must admit the command before calling it.
+Driver and infrastructure ownership remains unchanged.
 
 `session_coordinator.ts` owns the only generic semantic FIFO. Commands use four explicit lanes:
 

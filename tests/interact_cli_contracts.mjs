@@ -248,11 +248,19 @@ try {
   }).result;
   assert.equal(scenarioScreenshot.presentation, "clean", "scenario screenshots use clean presentation by default");
   assert.equal(scenarioScreenshot.preview.available, true, "scenario screenshots publish a Tailnet preview");
+  const scenarioInspection = callNamespace("dev-scenario", "inspect", {
+    sessionId: scenarioOpened.sessionId, ids: [100], cameraViewport: true,
+  }).result;
+  assert.deepEqual(scenarioInspection.entities.map(({ id }) => id), [100], "dev-scenario inspect uses the shared visible-entity path");
   assert.deepEqual(
     callNamespace("dev-scenario", "select", { sessionId: scenarioOpened.sessionId, ids: [100] }).result.selection,
     [100],
     "dev-scenario select shares the observation selection path",
   );
+  const scenarioCamera = callNamespace("dev-scenario", "camera", {
+    sessionId: scenarioOpened.sessionId, camera: { action: "focus", entities: [100] },
+  }).result;
+  assert.deepEqual(scenarioCamera.camera.focus, { x: 512, y: 512 }, "dev-scenario camera shares normalized entity focus");
   const scenarioRecording = callNamespace("dev-scenario", "record-start", {
     sessionId: scenarioOpened.sessionId, name: "full-run", maxDurationMs: 1000,
   }).result;
