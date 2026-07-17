@@ -839,14 +839,25 @@ fn staging_point(
     } else {
         (range_px - margin).max(min_range_px)
     };
-    let (sx, sy) = if len <= f32::EPSILON {
-        (caster.pos_x, caster.pos_y)
+    let (dir_x, dir_y) = if len > f32::EPSILON {
+        (dx / len, dy / len)
     } else {
-        (
-            x + dx / len * staging_distance,
-            y + dy / len * staging_distance,
-        )
+        let map_center = map.world_size_px() * 0.5;
+        let center_dx = map_center - x;
+        let center_dy = map_center - y;
+        let center_len = center_dx.hypot(center_dy);
+        if center_len > f32::EPSILON {
+            (center_dx / center_len, center_dy / center_len)
+        } else {
+            let facing = caster.facing();
+            if facing.is_finite() {
+                (facing.cos(), facing.sin())
+            } else {
+                (1.0, 0.0)
+            }
+        }
     };
+    let (sx, sy) = (x + dir_x * staging_distance, y + dir_y * staging_distance);
     SmokeCloudStore::clamp_point_to_map(map, sx, sy)
 }
 

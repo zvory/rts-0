@@ -9,8 +9,9 @@ use crate::config;
 use crate::game::ability;
 use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
 use crate::game::entity::{
-    active_trench_occupation, fires_while_moving, tank_trap_deconstruction_ticks, Entity,
-    EntityKind, EntityStore, GatherPhase, Order, OrderIntent, PanzerfaustState,
+    active_trench_occupation, fires_while_moving, supports_manual_emplacement,
+    tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore, GatherPhase, Order,
+    OrderIntent, PanzerfaustState,
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
@@ -305,20 +306,10 @@ pub fn project_entity(
             }
         }
     }
-    if matches!(
-        entity.kind,
-        EntityKind::MachineGunner
-            | EntityKind::AntiTankGun
-            | EntityKind::MortarTeam
-            | EntityKind::Artillery
-    ) {
+    if entity.kind == EntityKind::MachineGunner || supports_manual_emplacement(entity.kind) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
-    if matches!(
-        entity.kind,
-        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-    ) && owner_or_ally
-    {
+    if supports_manual_emplacement(entity.kind) && owner_or_ally {
         view.setup_facing = entity.emplacement_facing();
     }
 

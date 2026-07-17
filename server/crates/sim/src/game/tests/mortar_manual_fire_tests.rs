@@ -264,6 +264,75 @@ fn manual_mortar_fire_turns_while_waiting_for_weapon_cooldown() {
 }
 
 #[test]
+fn deployed_manual_mortar_fire_inside_minimum_range_tears_down_and_repositions() {
+    let (mut game, mortar, _) = manual_fire_fixture();
+    let target_pos = game.state.map.tile_center(8, 8);
+
+    enqueue_manual_mortar_fire(&mut game, mortar, target_pos);
+    let events = game.tick();
+
+    assert_eq!(mortar_launch_count(&events, 1, mortar), 0);
+    let mortar_entity = game
+        .state
+        .entities
+        .get(mortar)
+        .expect("mortar should exist");
+    assert!(matches!(mortar_entity.order(), Order::Ability(_)));
+    assert!(matches!(
+        mortar_entity.weapon_setup(),
+        WeaponSetup::TearingDown { .. }
+    ));
+
+    let mut launched = false;
+    for _ in 0..240 {
+        let events = game.tick();
+        if mortar_launch_count(&events, 1, mortar) == 1 {
+            launched = true;
+            break;
+        }
+    }
+
+    assert!(
+        launched,
+        "manual fire should launch after the deployed mortar tears down and exits its dead zone"
+    );
+}
+
+#[test]
+fn queued_mortar_setup_promotes_instead_of_being_discarded() {
+    let (mut game, mortar, _) = manual_fire_fixture();
+    let target_pos = game.state.map.tile_center(8, 14);
+
+    game.enqueue(
+        1,
+        Command::SetupAntiTankGuns {
+            units: vec![mortar],
+            x: target_pos.0,
+            y: target_pos.1,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let mortar_entity = game
+        .state
+        .entities
+        .get(mortar)
+        .expect("mortar should exist");
+    assert!(mortar_entity.queued_orders().is_empty());
+    assert!(matches!(
+        mortar_entity.weapon_setup(),
+        WeaponSetup::TearingDownToRedeploy { .. }
+    ));
+    assert!(
+        (mortar_entity.pending_redeploy_facing().unwrap_or_default() - std::f32::consts::FRAC_PI_2)
+            .abs()
+            < 0.001,
+        "queued mortar setup should promote toward the submitted point"
+    );
+}
+
+#[test]
 fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {

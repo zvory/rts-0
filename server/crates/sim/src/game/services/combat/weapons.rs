@@ -1,5 +1,7 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
+use crate::game::entity::{
+    supports_manual_emplacement, Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+};
 use crate::game::entrenchment_combat;
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
@@ -189,20 +191,12 @@ pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
 }
 
 fn requires_weapon_setup(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::MachineGunner
-            | EntityKind::AntiTankGun
-            | EntityKind::MortarTeam
-            | EntityKind::Artillery
-    )
+    kind == EntityKind::MachineGunner || supports_manual_emplacement(kind)
 }
 
 pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
     e.kind == EntityKind::MachineGunner
-        || (e.kind == EntityKind::AntiTankGun && !matches!(e.weapon_setup(), WeaponSetup::Packed))
-        || (e.kind == EntityKind::MortarTeam && !matches!(e.weapon_setup(), WeaponSetup::Packed))
-        || (e.kind == EntityKind::Artillery && !matches!(e.weapon_setup(), WeaponSetup::Packed))
+        || (supports_manual_emplacement(e.kind) && !matches!(e.weapon_setup(), WeaponSetup::Packed))
 }
 
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
@@ -235,10 +229,7 @@ fn support_weapon_attack_move_waiting_without_target(e: &Entity) -> bool {
 }
 
 pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
-    !matches!(
-        e.kind,
-        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-    ) || matches!(e.weapon_setup(), WeaponSetup::Packed)
+    !supports_manual_emplacement(e.kind) || matches!(e.weapon_setup(), WeaponSetup::Packed)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -364,10 +355,7 @@ fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {
 }
 
 fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
-    if !matches!(
-        e.kind,
-        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-    ) {
+    if !supports_manual_emplacement(e.kind) {
         return;
     }
     let target = match e.weapon_setup() {
@@ -393,11 +381,7 @@ fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
 }
 
 fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
-    if !matches!(
-        e.kind,
-        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-    ) || !matches!(e.weapon_setup(), WeaponSetup::Packed)
-    {
+    if !supports_manual_emplacement(e.kind) || !matches!(e.weapon_setup(), WeaponSetup::Packed) {
         return;
     }
     if !e.path_is_empty()

@@ -10,10 +10,10 @@ use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 #[cfg(test)]
 use super::EntityStateGroups;
 use super::{
-    AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
-    GatherPhase, MovePhase, MovementState, Order, OrderIntent, PanzerfaustState, ProductionState,
-    ResourceExtractorState, ResourceNodeState, ScoutPlaneState, WeaponSetup, WorkerState,
-    MAX_QUEUED_ORDERS, NEUTRAL,
+    supports_manual_emplacement, AttackPhase, BuildPhase, CombatState, ConstructionState,
+    DeconstructPhase, EntityKind, GatherPhase, MovePhase, MovementState, Order, OrderIntent,
+    PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, ScoutPlaneState,
+    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 mod production;
@@ -1036,10 +1036,7 @@ impl Entity {
             }
             _ => return true,
         };
-        if matches!(
-            self.kind,
-            EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-        ) {
+        if supports_manual_emplacement(self.kind) {
             self.set_emplacement_facing(None);
             self.set_pending_redeploy_facing(None);
         }

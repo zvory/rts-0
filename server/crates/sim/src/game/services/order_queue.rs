@@ -2,7 +2,8 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
-    BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
+    supports_manual_emplacement, BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
+    OrderIntent, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -541,7 +542,7 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
+    if !supports_manual_emplacement(e.kind)
         || e.under_construction()
         || !x.is_finite()
         || !y.is_finite()

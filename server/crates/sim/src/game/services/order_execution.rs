@@ -1,5 +1,7 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{
+    supports_manual_emplacement, Entity, EntityKind, EntityStore, Order, WeaponSetup,
+};
 
 pub(crate) mod targeting;
 
@@ -27,10 +29,8 @@ pub(crate) fn execute_anti_tank_gun_setup(
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if !matches!(
-        e.kind,
-        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-    ) || e.under_construction()
+    if !supports_manual_emplacement(e.kind)
+        || e.under_construction()
         || !x.is_finite()
         || !y.is_finite()
     {

@@ -6,7 +6,8 @@ use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::entity::{
-    EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
+    supports_manual_emplacement, EntityKind, EntityStore, Order, OrderIntent, ProdItem,
+    RallyIntent, ResearchItem, WeaponSetup,
 };
 use crate::game::firing_reveal::{
     record_global_firing_reveals_for_enemy_players, FiringRevealSource,
@@ -306,10 +307,7 @@ pub(in crate::game) fn apply_commands(
                     let Some(e) = entities.get_mut(id) else {
                         continue;
                     };
-                    if !matches!(
-                        e.kind,
-                        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-                    ) {
+                    if !supports_manual_emplacement(e.kind) {
                         continue;
                     }
                     if matches!(
