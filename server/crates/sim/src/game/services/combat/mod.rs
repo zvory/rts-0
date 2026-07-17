@@ -12,7 +12,7 @@ use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRe
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
-use crate::game::mortar_scatter::predicted_mortar_impact;
+use crate::game::mortar_scatter::scattered_mortar_impact;
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -470,16 +470,15 @@ pub(in crate::game) fn combat_system(
                     {
                         continue;
                     }
-                    let (mx, my) = mortar_aim_point(entities, tid, tick);
                     let (impact_x, impact_y) =
-                        predicted_mortar_impact(fog, teams, owner, id, mx, my, tick);
+                        scattered_mortar_impact(fog, teams, owner, id, tx, ty, tick);
                     if mortar_autocast_would_hit_same_team_entity(
                         entities, teams, spatial, owner, impact_x, impact_y,
                     ) {
                         continue;
                     }
                     mortar_shells
-                        .schedule(events, fog, teams, owner, id, px, py, mx, my, tick, true);
+                        .schedule(events, fog, teams, owner, id, px, py, tx, ty, tick, true);
                     if let Some(e) = entities.get_mut(id) {
                         e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                     }
@@ -593,8 +592,18 @@ fn mortar_autocast_target_safe(
     target: u32,
     tick: u32,
 ) -> bool {
-    let (x, y) = mortar_aim_point(entities, target, tick);
-    let (impact_x, impact_y) = predicted_mortar_impact(fog, teams, owner, attacker, x, y, tick);
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    let (impact_x, impact_y) = scattered_mortar_impact(
+        fog,
+        teams,
+        owner,
+        attacker,
+        target.pos_x,
+        target.pos_y,
+        tick,
+    );
     !mortar_autocast_would_hit_same_team_entity(entities, teams, spatial, owner, impact_x, impact_y)
 }
 
@@ -618,45 +627,6 @@ fn mortar_autocast_target_eligible(
         && distance >= min_range_px
         && distance <= max_range_px
         && mortar_target_inside_field_of_fire(attacker, dy.atan2(dx))
-}
-
-fn mortar_aim_point(entities: &EntityStore, target: u32, _tick: u32) -> (f32, f32) {
-    let Some(t) = entities.get(target) else {
-        return (0.0, 0.0);
-    };
-    let mut x = t.pos_x;
-    let mut y = t.pos_y;
-    if let Some((dx, dy)) = mortar_lead_delta(t) {
-        x += dx;
-        y += dy;
-    }
-    (x, y)
-}
-
-fn mortar_lead_delta(target: &Entity) -> Option<(f32, f32)> {
-    let (vx, vy) = target.movement_delta();
-    if !vx.is_finite() || !vy.is_finite() {
-        return None;
-    }
-    let lead_ticks = config::MORTAR_SHELL_DELAY_TICKS as f32;
-    let mut dx = vx * lead_ticks;
-    let mut dy = vy * lead_ticks;
-    let lead_dist = (dx * dx + dy * dy).sqrt();
-    if lead_dist <= f32::EPSILON || !lead_dist.is_finite() {
-        return None;
-    }
-    let max_lead = config::unit_stats(target.kind)
-        .map(|stats| stats.speed * lead_ticks)
-        .unwrap_or(0.0);
-    if max_lead <= f32::EPSILON || !max_lead.is_finite() {
-        return None;
-    }
-    if lead_dist > max_lead {
-        let scale = max_lead / lead_dist;
-        dx *= scale;
-        dy *= scale;
-    }
-    Some((dx, dy))
 }
 
 fn mortar_autocast_would_hit_same_team_entity(

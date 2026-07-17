@@ -5,7 +5,7 @@ use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::entrenchment_combat;
 use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringRevealSource};
 use crate::game::fog::Fog;
-use crate::game::mortar_scatter::predicted_mortar_impact;
+use crate::game::mortar_scatter::scattered_mortar_impact;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
@@ -98,7 +98,7 @@ impl MortarShellStore {
         tick: u32,
         reveal_launch_to_enemies: bool,
     ) {
-        let (impact_x, impact_y) = predicted_mortar_impact(fog, teams, owner, attacker, x, y, tick);
+        let (impact_x, impact_y) = scattered_mortar_impact(fog, teams, owner, attacker, x, y, tick);
         self.shells.push(MortarShell {
             owner,
             attacker,

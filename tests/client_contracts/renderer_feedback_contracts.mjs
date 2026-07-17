@@ -640,20 +640,18 @@ function nearPoint(call, point, epsilon = 0.001) {
         x: 224,
         y: 96,
         setupState: SETUP.DEPLOYED,
-        setupFacing: 0,
       }],
     },
   );
-  const mortarArcs = mortarRangeGfx.calls.filter((call) => call[0] === "arc");
+  const mortarCircles = mortarRangeGfx.calls.filter((call) => call[0] === "drawCircle");
   assert(
-    mortarArcs.some((call) => call[3] === 480) && mortarArcs.some((call) => call[3] === 160),
-    "selected deployed mortar draws its 15-tile outer arc and five-tile dead zone",
+    mortarCircles.some((call) => call[3] === 480) && mortarCircles.some((call) => call[3] === 160),
+    "selected deployed mortar draws its 15-tile outer circle and five-tile dead zone",
   );
-  assertApprox(
-    mortarArcs[0][5] - mortarArcs[0][4],
-    (Math.PI * 2) / 3,
-    0.0001,
-    "selected deployed mortar draws a 120 degree field of fire",
+  assert(
+    mortarRangeGfx.calls.some((call) => call[0] === "beginHole") &&
+      !mortarRangeGfx.calls.some((call) => call[0] === "lineTo"),
+    "selected deployed mortar draws a seamless full-circle range band without requiring facing metadata",
   );
 
   const workerRangeGfx = new RecordingGraphics();
