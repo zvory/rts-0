@@ -177,6 +177,8 @@ try {
   );
   const selected = await bridge.select({ entityIds: [10] });
   assert.deepEqual(selected.selection, [10], "game bridge selects a visible entity through browser-local state");
+  assert.deepEqual(bridge.status().selection, [10], "game status carries selection into capture provenance");
+  assert.deepEqual(bridge.captureReadiness().selection, [10], "game capture readiness records the rendered selection");
   assert.deepEqual(bridge.inspect().selection, [10], "game inspection reports the current selection ids");
   await assert.rejects(
     () => bridge.select({ entityIds: [30] }),

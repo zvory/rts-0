@@ -225,6 +225,7 @@ assert.deepEqual(
     camera: null,
     cameraViewport: null,
     cameraWorldBounds: null,
+    selection: [],
   },
   "the launch-gated bridge exposes a bounded server startup failure",
 );
@@ -373,6 +374,8 @@ assert.deepEqual(viewportInspection.cameraWorldBounds, { minX: 0, minY: 0, maxX:
 const selected = await viewportBridge.select({ entityIds: [1, 2] });
 assert.deepEqual(selected.selection, [1, 2], "Lab bridge selection replaces browser-local selection with bounded entity ids");
 assert.deepEqual(selected.entities.map((entity) => entity.id), [1, 2], "Lab bridge selection returns its exact projected entities");
+assert.deepEqual(viewportBridge.status().selection, [1, 2], "Lab status carries selection into capture provenance");
+assert.deepEqual(viewportBridge.captureReadiness().selection, [1, 2], "Lab capture readiness records the rendered selection");
 assert.deepEqual(viewportBridge.inspect({ limit: 10 }).selection, [1, 2], "Lab inspection reports the current browser-local selection");
 assert.deepEqual((await viewportBridge.select({ entityIds: [] })).selection, [], "Lab bridge accepts an empty selection as clear");
 const focused = viewportBridge.camera({ action: "focus", entityIds: [1, 2], padding: 10 });

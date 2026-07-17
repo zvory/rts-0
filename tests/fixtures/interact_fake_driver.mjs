@@ -116,6 +116,7 @@ export async function openInteractDriver(options) {
         phase: options.mode === "game" ? gamePhase : undefined,
         role: options.spectate ? "spectator" : "player",
         roomTime: options.spectate ? { currentTick: tick, speed: 1, paused: false } : null,
+        selection: selection.slice(),
       };
     },
     async catalog() {
@@ -299,7 +300,7 @@ export async function openInteractDriver(options) {
         manifestPath: path.join(directory, `${name}.json`),
         frameSummary: { count: frameCount, uniqueHashes: frameCount, representativeFramePaths, detailsInManifest: true },
         authoritative: { startTick, endTick: tick },
-        mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases },
+        mapping: { simulationHz: 30, outputFps: fps }, fixtureMetadata: { sceneIdentity, sceneRevision, aliases, selection: selection.slice() },
       };
     },
     async captureTimelapse({ sessionId, name = "timelapse", fps = 30, speed = 8, region = "viewport" }) {

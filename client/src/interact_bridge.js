@@ -10,6 +10,10 @@ import {
   labSpawnFactionOptions,
   labSpawnUnitKindsForFaction,
 } from "./lab_spawn_catalog.js";
+import {
+  applyInteractSelection,
+  selectedInteractEntityIds,
+} from "./interact_selection.js";
 
 export const INTERACT_BRIDGE_KEY = "__rtsInteract";
 export const INTERACT_BRIDGE_VERSION = 6;
@@ -97,6 +101,7 @@ export class InteractBridge {
       camera: projectCamera(match?.camera),
       cameraViewport: projectCameraViewport(match?.camera),
       cameraWorldBounds: projectCameraWorldBounds(match?.camera),
+      selection: selectedInteractEntityIds(match?.state, INTERACT_LIMITS.selectionEntities),
     };
   }
 
@@ -310,7 +315,7 @@ export class InteractBridge {
       camera: projectCamera(match.camera),
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
-      selection: selectedEntityIds(match.state),
+      selection: selectedInteractEntityIds(match.state, INTERACT_LIMITS.selectionEntities),
     };
   }
 
@@ -327,7 +332,7 @@ export class InteractBridge {
     }
     applyInteractSelection(match, entityIds);
     await animationFrames(2);
-    const selection = selectedEntityIds(match.state);
+    const selection = selectedInteractEntityIds(match.state, INTERACT_LIMITS.selectionEntities);
     return {
       selection,
       entities: selection.map((id) => projectEntity(match.state.entityById(id))).filter(Boolean),
@@ -453,6 +458,7 @@ export class InteractBridge {
       camera: projectCamera(match.camera),
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
+      selection: selectedInteractEntityIds(match.state, INTERACT_LIMITS.selectionEntities),
       visualProfileId: match.visualProfile?.id || null,
       subjects: subjectEntities.map(projectEntity),
       fonts,
@@ -547,18 +553,6 @@ function inspectionIncludesEntity(entity, query, camera) {
 
 function isSelectableEntity(entity) {
   return !!entity && entity.shotReveal !== true && entity.visionOnly !== true;
-}
-
-function applyInteractSelection(match, entityIds) {
-  match.clientIntent?.closeCommandCardMenu?.();
-  match.state.setSelection(entityIds);
-  match.clientIntent?.clearPlannedOrdersOutsideSelection?.(match.state.selection || []);
-}
-
-function selectedEntityIds(state) {
-  return state?.selection instanceof Set
-    ? [...state.selection].slice(0, INTERACT_LIMITS.selectionEntities)
-    : (state?.selectedEntities?.() || []).map((entity) => entity.id).slice(0, INTERACT_LIMITS.selectionEntities);
 }
 
 function entityInCameraViewport(entity, camera) {

@@ -3,6 +3,10 @@
 
 import { cmd, isUnit } from "./protocol.js";
 import { INTERACT_BRIDGE_KEY } from "./interact_bridge.js";
+import {
+  applyInteractSelection,
+  selectedInteractEntityIds,
+} from "./interact_selection.js";
 
 export const INTERACT_GAME_BRIDGE_VERSION = 3;
 export const INTERACT_GAME_LIMITS = Object.freeze({
@@ -113,6 +117,7 @@ export class InteractGameBridge {
       cameraViewport: projectCameraViewport(match?.camera),
       cameraWorldBounds: projectCameraWorldBounds(match?.camera),
       ui: projectUi(),
+      selection: selectedInteractEntityIds(match?.state, INTERACT_GAME_LIMITS.selectionEntities),
     };
   }
 
@@ -189,7 +194,7 @@ export class InteractGameBridge {
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
       ui: projectUi(),
-      selection: selectedEntityIds(match.state),
+      selection: selectedInteractEntityIds(match.state, INTERACT_GAME_LIMITS.selectionEntities),
     };
   }
 
@@ -206,7 +211,7 @@ export class InteractGameBridge {
     }
     applyInteractSelection(match, entityIds);
     await animationFrames(2);
-    const selection = selectedEntityIds(match.state);
+    const selection = selectedInteractEntityIds(match.state, INTERACT_GAME_LIMITS.selectionEntities);
     return {
       selection,
       entities: selection
@@ -345,6 +350,7 @@ export class InteractGameBridge {
       camera: projectCamera(match.camera),
       cameraViewport: projectCameraViewport(match.camera),
       cameraWorldBounds: projectCameraWorldBounds(match.camera),
+      selection: selectedInteractEntityIds(match.state, INTERACT_GAME_LIMITS.selectionEntities),
       visualProfileId: match.visualProfile?.id || null,
       subjects: subjects.map((entity) => projectEntity(entity, match.state.playerId)),
       fonts,
@@ -427,18 +433,6 @@ function isInspectableEntity(entity) {
 
 function isControllableUnit(entity, playerId) {
   return isInspectableEntity(entity) && entity.owner === playerId && isUnit(entity.kind);
-}
-
-function applyInteractSelection(match, entityIds) {
-  match.clientIntent?.closeCommandCardMenu?.();
-  match.state.setSelection(entityIds);
-  match.clientIntent?.clearPlannedOrdersOutsideSelection?.(match.state.selection || []);
-}
-
-function selectedEntityIds(state) {
-  return state?.selection instanceof Set
-    ? [...state.selection].slice(0, INTERACT_GAME_LIMITS.selectionEntities)
-    : (state?.selectedEntities?.() || []).map((entity) => entity.id).slice(0, INTERACT_GAME_LIMITS.selectionEntities);
 }
 
 function projectLocalPlayer(state) {
