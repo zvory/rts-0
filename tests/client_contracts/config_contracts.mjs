@@ -114,11 +114,15 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "METHAMPHETAMINES_RESEARCH_TICKS",
   "MINING_CC_RANGE_TILES",
   "MORTAR_AUTOCAST_RESEARCH_TICKS",
+  "MORTAR_FIELD_OF_FIRE_RAD",
   "MORTAR_FIRE_COOLDOWN_TICKS",
   "MORTAR_INNER_RADIUS_TILES",
+  "MORTAR_MIN_RANGE_TILES",
   "MORTAR_OUTER_RADIUS_TILES",
   "MORTAR_RANGE_TILES",
+  "MORTAR_SETUP_TICKS",
   "MORTAR_SHELL_DELAY_TICKS",
+  "MORTAR_TEARDOWN_TICKS",
   "PANZERFAUSTS_RESEARCH_TICKS",
   "PANZERFAUST_ARMOR_PENETRATION",
   "PANZERFAUST_DAMAGE",
@@ -1298,13 +1302,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     sent.length = 0;
     const selectedAntiTankGun = { id: 88, owner: playerId, kind: KIND.ANTI_TANK_GUN, setupState: SETUP.DEPLOYED };
     const selectedArtillery = { id: 89, owner: playerId, kind: KIND.ARTILLERY, setupState: SETUP.PACKED };
+    const setupSelectedMortar = { id: 90, owner: playerId, kind: KIND.MORTAR_TEAM, setupState: SETUP.PACKED };
     const antiTankGunHud = Object.create(HUD.prototype);
     antiTankGunHud.state = {
       playerId,
       resources: { steel: 0, oil: 0 },
       commandTarget: null,
-      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
-      entitiesInterpolated: () => [selectedAntiTankGun, selectedArtillery],
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery, setupSelectedMortar],
+      entitiesInterpolated: () => [selectedAntiTankGun, selectedArtillery, setupSelectedMortar],
       beginCommandTarget(kind) {
         this.commandTarget = kind;
       },
@@ -1325,7 +1330,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const setupInput = Object.create(Input.prototype);
     setupInput.state = {
       playerId,
-      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery, setupSelectedMortar],
     };
     setupInput.clientIntent = new ClientIntent();
     setupInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
@@ -1333,14 +1338,15 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
     setupInput._groundAtScreen = (x, y) => ({ x, y });
     setupInput._entityAtScreen = () => null;
-    setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id];
+    setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id, setupSelectedMortar.id];
     setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
     assert(
       setupCommands[0]?.c === "setupAntiTankGuns" &&
         setupCommands[0].units.includes(selectedAntiTankGun.id) &&
         setupCommands[0].units.includes(selectedArtillery.id) &&
+        setupCommands[0].units.includes(setupSelectedMortar.id) &&
         setupCommands[0].queued === true,
-      "setupAntiTankGuns targeting includes selected artillery as setup-capable support weapons",
+      "setupAntiTankGuns targeting includes selected artillery and mortars as setup-capable support weapons",
     );
 
     const movingAntiTankGun = {

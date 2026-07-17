@@ -295,7 +295,9 @@ folded into default targeting.
   including passability, construction, cover, concealment, and line of sight.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
-- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 15`,
+- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
+  `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
+  `MORTAR_RANGE_TILES = 15`, and `MORTAR_FIELD_OF_FIRE_RAD = 120 degrees total`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
@@ -305,8 +307,10 @@ folded into default targeting.
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
   Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
   resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
-  `X`; autocast
-  uses normal idle/attack-move acquisition after Mortar Autocast research completes. Manual and
+  `X` and remains a player-directed override that does not require setup, but it must land in the
+  5-to-15-tile range band. Autocast uses normal idle/attack-move acquisition after Mortar Autocast
+  research completes and fires only while fully deployed, at targets inside the same range band and
+  the setup-facing 120-degree field of fire. Manual and
   autocast shots scatter from the intended impact point: if the point is visible to the firing team,
   the deterministic radial scatter has a one-tile median miss radius; otherwise it has a four-tile
   median miss radius. Autocast prefers targets whose scattered predicted impact avoids same-team
@@ -539,7 +543,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 15 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-15 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |

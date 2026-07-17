@@ -1114,7 +1114,9 @@ They damage owned, allied, and enemy units/buildings with the same falloff and a
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is
 unattributed: it does not update `last_damage_owner`/position/tick, does not trigger AI worker
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
-Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research: before
+Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research plus a
+fully deployed Mortar Team. Acquisition and firing are restricted to the setup-facing 120-degree
+field of fire and the five-to-15-tile range band. Before
 scheduling a shell, combat checks the scattered predicted impact point against owned and allied
 units/buildings at their current positions and holds fire if any would be inside the damaging radius. Autocast
 target acquisition uses the same safety check, so Mortar Teams face the nearest target that can be
@@ -1492,8 +1494,9 @@ Allocation rules:
   chosen idle caster's active order with an ability movement order. Abilities may also explicitly
   allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
   stops the mortar's current movement and clears future queued intents.
-- Anti-Tank Gun setup is a queueable facing intent for selected Anti-Tank Guns only. The stored point means
-  "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
+- Support-weapon setup is a queueable facing intent for selected Anti-Tank Guns, Mortar Teams, and
+  Artillery. The stored point means "face toward this world point from wherever the weapon is when
+  the setup stage promotes"; mixed
   selections ignore non-setup-capable units for setup but keep them for later compatible orders.
 - Artillery Point Fire and Blanket Fire are queueable, terminal per-gun fire orders. Issue-time
   admission stores a locked effective fire point for Point Fire or locked blanket center for

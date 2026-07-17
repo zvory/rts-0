@@ -6,7 +6,8 @@ use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::entity::{
-    EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
+    supports_manual_emplacement, EntityKind, EntityStore, Order, OrderIntent, ProdItem,
+    RallyIntent, ResearchItem, WeaponSetup,
 };
 use crate::game::firing_reveal::{
     record_global_firing_reveals_for_enemy_players, FiringRevealSource,
@@ -306,7 +307,7 @@ pub(in crate::game) fn apply_commands(
                     let Some(e) = entities.get_mut(id) else {
                         continue;
                     };
-                    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
+                    if !supports_manual_emplacement(e.kind) {
                         continue;
                     }
                     if matches!(
@@ -316,7 +317,7 @@ pub(in crate::game) fn apply_commands(
                         e.clear_orders();
                         e.set_path_goal(None);
                         e.set_weapon_setup(WeaponSetup::TearingDown {
-                            ticks: setup_ticks_for(e.kind),
+                            ticks: teardown_ticks_for(e.kind),
                         });
                     } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
                         e.set_emplacement_facing(None);
@@ -1560,6 +1561,13 @@ fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
         _ => config::ANTI_TANK_GUN_SETUP_TICKS,
+    }
+}
+
+fn teardown_ticks_for(kind: EntityKind) -> u16 {
+    match kind {
+        EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
+        _ => setup_ticks_for(kind),
     }
 }
 

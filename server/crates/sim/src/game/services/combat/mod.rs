@@ -52,9 +52,9 @@ use shot_blocker_index::ShotBlockerIndex;
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
-    mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_move_order_holds_path,
-    relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
-    rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
+    mirror_weapon_to_body, mortar_target_inside_field_of_fire, moving_fire_miss_chance,
+    moving_fire_move_order_holds_path, relax_vehicle_weapon_toward_body,
+    rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
     update_attack_move_no_target_teardown, uses_stationary_weapon_aggro,
     uses_vehicle_weapon_policy,
 };
@@ -178,6 +178,7 @@ pub(in crate::game) fn combat_system(
             owner,
             px,
             py,
+            min_range_px,
             range_px,
             acquire_px,
             weapon_profile,
@@ -217,7 +218,13 @@ pub(in crate::game) fn combat_system(
             } else {
                 cd
             };
-            let range_px = range_tiles * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
+            let range_px = range_tiles * config::TILE_SIZE as f32
+                + if e.kind == EntityKind::MortarTeam {
+                    0.0
+                } else {
+                    e.radius() + RANGE_SLACK
+                };
+            let min_range_px = profile.min_range_tiles * config::TILE_SIZE as f32;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
             // attack-move / auto-defend actually close the gap. Idle deployed weapons are the
             // exception: they hold position and only auto-acquire enemies already in weapon
@@ -243,6 +250,7 @@ pub(in crate::game) fn combat_system(
                 e.owner,
                 e.pos_x,
                 e.pos_y,
+                min_range_px,
                 range_px,
                 acquire_px,
                 weapon_profile,
@@ -288,10 +296,18 @@ pub(in crate::game) fn combat_system(
             mode,
             can_move_fire,
             &|target_id| {
-                !require_safe_mortar_autocast_target
-                    || mortar_autocast_target_safe(
-                        entities, teams, fog, spatial, owner, id, target_id, tick,
-                    )
+                (!is_mortar_team
+                    || mortar_autocast_target_eligible(
+                        entities,
+                        id,
+                        target_id,
+                        min_range_px,
+                        range_px,
+                    ))
+                    && (!require_safe_mortar_autocast_target
+                        || mortar_autocast_target_safe(
+                            entities, teams, fog, spatial, owner, id, target_id, tick,
+                        ))
             },
         );
         let Some(tid) = target else {
@@ -349,6 +365,11 @@ pub(in crate::game) fn combat_system(
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);
+        if is_mortar_team
+            && !mortar_autocast_target_eligible(entities, id, tid, min_range_px, range_px)
+        {
+            continue;
+        }
         let holds_commanded_movement_path = entities
             .get(id)
             .map(|e| moving_fire_move_order_holds_path(e, can_move_fire))
@@ -387,7 +408,7 @@ pub(in crate::game) fn combat_system(
             )
         };
 
-        if dist <= range_px && clear_shot {
+        if dist >= min_range_px && dist <= range_px && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
             let mut weapon_aligned = true;
             if let Some(e) = entities.get_mut(id) {
@@ -575,6 +596,28 @@ fn mortar_autocast_target_safe(
     let (x, y) = mortar_aim_point(entities, target, tick);
     let (impact_x, impact_y) = predicted_mortar_impact(fog, teams, owner, attacker, x, y, tick);
     !mortar_autocast_would_hit_same_team_entity(entities, teams, spatial, owner, impact_x, impact_y)
+}
+
+fn mortar_autocast_target_eligible(
+    entities: &EntityStore,
+    attacker: u32,
+    target: u32,
+    min_range_px: f32,
+    max_range_px: f32,
+) -> bool {
+    let Some(attacker) = entities.get(attacker) else {
+        return false;
+    };
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    let dx = target.pos_x - attacker.pos_x;
+    let dy = target.pos_y - attacker.pos_y;
+    let distance = dx.hypot(dy);
+    distance.is_finite()
+        && distance >= min_range_px
+        && distance <= max_range_px
+        && mortar_target_inside_field_of_fire(attacker, dy.atan2(dx))
 }
 
 fn mortar_aim_point(entities: &EntityStore, target: u32, _tick: u32) -> (f32, f32) {

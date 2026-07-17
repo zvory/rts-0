@@ -445,6 +445,7 @@ impl<'a> MoveCoordinator<'a> {
             ));
             e.set_path_goal(Some(staging));
             e.reset_gather_state();
+            e.begin_weapon_teardown_for_movement();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }

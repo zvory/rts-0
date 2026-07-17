@@ -349,7 +349,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities
@@ -423,6 +423,11 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .get_mut(target)
         .expect("target should still exist")
         .set_position(impact_pos.0, impact_pos.1);
+    game.state
+        .entities
+        .get_mut(target)
+        .expect("target should still exist")
+        .hold_position();
     let hp_before_impact = game
         .state
         .entities
@@ -542,7 +547,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities
@@ -555,6 +560,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
             .get_mut(mortar)
             .expect("mortar should exist");
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+        mortar_entity.set_emplacement_facing(Some(0.0));
         mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
     }
     game.state
@@ -617,7 +623,7 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities
@@ -739,7 +745,7 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(8, 4);
+    let target_pos = game.state.map.tile_center(8, 2);
     let mortar = game
         .state
         .entities
@@ -863,7 +869,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities
@@ -948,8 +954,8 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
-    let outer_pos = game.state.map.tile_center(13, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
+    let outer_pos = game.state.map.tile_center(15, 8);
     let mortar = game
         .state
         .entities
@@ -1068,7 +1074,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities
@@ -1157,7 +1163,7 @@ fn manual_mortar_fire_damages_friendly_buildings() {
     ];
     let mut game = empty_flat_game(&players);
     let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(12, 8);
+    let target_pos = game.state.map.tile_center(14, 8);
     let mortar = game
         .state
         .entities

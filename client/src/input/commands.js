@@ -395,7 +395,10 @@ export function _selectedGathererIds() {
 
 export function _selectedOwnAntiTankGunIds() {
   return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY))
+    .filter((e) => ownOwner(this.state, e.owner) && (
+      e.kind === KIND.ANTI_TANK_GUN ||
+      e.kind === KIND.MORTAR_TEAM ||
+      e.kind === KIND.ARTILLERY))
     .map((e) => e.id);
 }
 
@@ -589,7 +592,10 @@ export function _refreshAntiTankGunSetupPreview() {
   }
   const guns = this.state
     .selectedEntities()
-    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY))
+    .filter((e) => ownOwner(this.state, e.owner) && (
+      e.kind === KIND.ANTI_TANK_GUN ||
+      e.kind === KIND.MORTAR_TEAM ||
+      e.kind === KIND.ARTILLERY))
     .map((e) => supportWeaponSetupPreviewEntity(plannedEntityForIntent(intent, e), setupPreviewQueued(this, intent)));
   if (guns.length === 0) {
     intent?.updateAntiTankGunSetupPreview?.(null);

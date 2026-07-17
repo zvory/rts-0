@@ -45,6 +45,7 @@ export const MORTAR_TEAM_PARTS = Object.freeze({
       "trail", "leg.left.dark", "leg.right.dark", "leg.left", "leg.right", "base", "body", "tube", "tubeHighlight", "muzzle",
     ], "packed"),
     ...supportPartIds("part.mortar", [
+      "basePlate",
       "axle",
       "wheel.left.body", "wheel.left.tread.0", "wheel.left.tread.1", "wheel.left.cross.0", "wheel.left.cross.1", "wheel.left.cross.2", "wheel.left.hub",
       "wheel.right.body", "wheel.right.tread.0", "wheel.right.tread.1", "wheel.right.cross.0", "wheel.right.cross.1", "wheel.right.cross.2", "wheel.right.hub",
@@ -180,6 +181,7 @@ function mortarTeamParts(suffix, deploy, setupAlpha) {
   const muzzleDist = lerp(r * 1.02, r * 0.74, deploy);
   const bipodRootX = r * 0.22;
   return [
+    ...(deploy > 0 ? mortarBasePlateParts(suffix) : []),
     line(`part.mortar.axle.${suffix}`, wheelX, -wheelY, wheelX, wheelY, { stroke: OUTLINE, strokeWidth: 2, strokeOpacity: 0.9, animation: baseAnim }),
     ...gunTireParts(`part.mortar.wheel.left`, suffix, wheelX, -wheelY, r * 0.54, r * 0.18, baseAnim),
     ...gunTireParts(`part.mortar.wheel.right`, suffix, wheelX, wheelY, r * 0.54, r * 0.18, baseAnim),
@@ -215,6 +217,17 @@ function mortarTeamParts(suffix, deploy, setupAlpha) {
       strokeWidth: r * 0.08,
       strokeOpacity: 0.66,
       animation: tubeAnim,
+    }),
+  ];
+}
+
+function mortarBasePlateParts(suffix) {
+  const plateSize = 16;
+  const growAnim = `${WEAPON_FACE};setupVisual:geometry.scaleX:1:-1;setupVisual:geometry.scaleY:1:-1;${DEPLOYED_ALPHA}`;
+  return [
+    rect(`part.mortar.basePlate.${suffix}`, -plateSize / 2, -plateSize / 2, plateSize, plateSize, {
+      fill: "none",
+      animation: growAnim,
     }),
   ];
 }

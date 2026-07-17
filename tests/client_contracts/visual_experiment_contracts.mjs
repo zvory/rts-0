@@ -210,14 +210,14 @@ const NOOP_RENDERER_OVERLAYS = [
   const atlas = createLivePngRigAtlases().get(KIND.MORTAR_TEAM);
   assert(atlas?.enabled, "mortar PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png"),
+    atlas.image.includes("/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png"),
     "mortar PNG atlas uses the checked-in generated alpha asset",
   );
   const imageSize = readPngDimensions(atlas.image);
   assert(
     imageSize.width >= atlas.grid?.components?.tube?.x + atlas.grid?.components?.tube?.w &&
       imageSize.height >= atlas.grid?.components?.carriage?.y + atlas.grid?.components?.carriage?.h,
-    "mortar PNG atlas frame coordinates fit inside the generated three-cell sheet",
+    "mortar PNG atlas frame coordinates fit inside the generated component sheet",
   );
   for (const sprite of atlas.sprites) {
     assert(
@@ -230,6 +230,7 @@ const NOOP_RENDERER_OVERLAYS = [
   const tubeSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
   const leftTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.left.packed");
   const rightTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
+  const basePlateSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.basePlate.deployed");
   assert(
     carriageSprite?.tintSlot === "team-light" &&
       carriageSprite.tintAdjustment?.brightness === 78 &&
@@ -251,6 +252,14 @@ const NOOP_RENDERER_OVERLAYS = [
       rightTireSprite.drawOrder < tubeSprite?.drawOrder,
     "mortar PNG tire overlays remain fixed-color above the team-tinted carriage",
   );
+  assert(
+    basePlateSprite?.tintSlot === "team" &&
+      basePlateSprite.drawOrder < carriageSprite?.drawOrder &&
+      basePlateSprite.positionOffsetX === -20 &&
+      basePlateSprite.frame?.w / basePlateSprite.frame?.pixelsPerUnitX === 16 &&
+      basePlateSprite.frame?.h / basePlateSprite.frame?.pixelsPerUnitY === 16,
+    "mortar PNG base plate is team-tinted, half a tile wide, rearward, and draws below the carriage",
+  );
   const definitions = createLiveRigDefinitions();
   const definition = liveRigDefinitionFor(definitions, KIND.MORTAR_TEAM);
   const routes = liveRigRoutesFor(KIND.MORTAR_TEAM);
@@ -260,14 +269,16 @@ const NOOP_RENDERER_OVERLAYS = [
   const shadowCoverage = pngAtlasRouteCoverage(definition, atlas, shadowRoute);
   assert(unitCoverage.missingParts.length === 0, "mortar PNG atlas covers every unit-route part");
   assert(
-    unitCoverage.coveredParts.includes("part.mortar.body.packed") &&
+    unitCoverage.coveredParts.includes("part.mortar.basePlate.deployed") &&
+      unitCoverage.coveredParts.includes("part.mortar.body.packed") &&
       unitCoverage.coveredParts.includes("part.mortar.tube.packed"),
-    "mortar PNG atlas replaces both carriage/body and tube SVG parts",
+    "mortar PNG atlas replaces the base plate, carriage/body, and tube SVG parts",
   );
   assert(
     shadowCoverage.coveredParts.length === 0 &&
+      shadowCoverage.missingParts.length === 1 &&
       shadowCoverage.missingParts.includes("part.shadow"),
-    "mortar PNG atlas leaves the existing SVG shadow route in place",
+    "mortar PNG atlas leaves only the ordinary unit shadow on the SVG under-unit route",
   );
 }
 

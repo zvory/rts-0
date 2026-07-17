@@ -283,6 +283,22 @@ fn print_client_constants(indent: &str) {
         json_f32(balance::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD)
     );
     println!(
+        "{indent}    \"mortarMinRangeTiles\": {},",
+        balance::MORTAR_MIN_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"mortarFieldOfFireRad\": {},",
+        json_f32(balance::MORTAR_FIELD_OF_FIRE_RAD)
+    );
+    println!(
+        "{indent}    \"mortarSetupTicks\": {},",
+        balance::MORTAR_TEAM_SETUP_TICKS
+    );
+    println!(
+        "{indent}    \"mortarTeardownTicks\": {},",
+        balance::MORTAR_TEAM_TEARDOWN_TICKS
+    );
+    println!(
         "{indent}    \"artilleryMinRangeTiles\": {},",
         balance::ARTILLERY_MIN_RANGE_TILES
     );

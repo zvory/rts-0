@@ -16,6 +16,8 @@ import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
+  MORTAR_DEPLOYED_WEAPON_ANIM_MS,
+  MORTAR_TEARDOWN_WEAPON_ANIM_MS,
 } from "./palette.js";
 import {
   angleDelta,
@@ -39,7 +41,11 @@ export function _deployedWeaponSetupVisual(e) {
   const elapsed = now - rec.changedAt;
   const durationMs = e.kind === KIND.ARTILLERY
     ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
-    : DEPLOYED_WEAPON_ANIM_MS;
+    : e.kind === KIND.MORTAR_TEAM
+      ? setupState === SETUP.TEARING_DOWN
+        ? MORTAR_TEARDOWN_WEAPON_ANIM_MS
+        : MORTAR_DEPLOYED_WEAPON_ANIM_MS
+      : DEPLOYED_WEAPON_ANIM_MS;
   const progress = clamp01(elapsed / durationMs);
   const t = smoothstep01(progress);
 

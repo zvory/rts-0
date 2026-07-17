@@ -5,6 +5,9 @@ import {
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
+  MORTAR_FIELD_OF_FIRE_RAD,
+  MORTAR_MIN_RANGE_TILES,
+  MORTAR_RANGE_TILES,
   STATS,
 } from "../config.js";
 import { ABILITY, KIND, SETUP, isUnit } from "../protocol.js";
@@ -121,7 +124,11 @@ function dynamicUnitRangeProfile(e, tileSize) {
 }
 
 function staticUnitRangeProfile(e, tileSize) {
-  if (e.kind === KIND.ARTILLERY || e.kind === KIND.ANTI_TANK_GUN) {
+  if (
+    e.kind === KIND.ARTILLERY ||
+    e.kind === KIND.ANTI_TANK_GUN ||
+    (e.kind === KIND.MORTAR_TEAM && e.setupState === SETUP.DEPLOYED)
+  ) {
     if (e.setupState !== SETUP.DEPLOYED) return null;
     const facing = firstFinite(e.setupFacing, e.weaponFacing, e.facing);
     if (!finiteNumber(facing)) return null;
@@ -160,6 +167,13 @@ function fieldOfFireProfile(kind, tileSize) {
       minRadius: 0,
       maxRadius: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES * tileSize,
       arc: ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
+    };
+  }
+  if (kind === KIND.MORTAR_TEAM) {
+    return {
+      minRadius: MORTAR_MIN_RANGE_TILES * tileSize,
+      maxRadius: MORTAR_RANGE_TILES * tileSize,
+      arc: MORTAR_FIELD_OF_FIRE_RAD,
     };
   }
   return null;

@@ -560,7 +560,7 @@ fn mortar_fire_replaces_active_move_order() {
             SimCommand::UseAbility {
                 ability: AbilityKind::MortarFire,
                 units: vec![mortar],
-                x: Some(180.0),
+                x: Some(292.0),
                 y: Some(100.0),
                 queued: false,
             },
@@ -613,7 +613,7 @@ fn queued_mortar_fire_appends_while_reload_is_waitable() {
             SimCommand::UseAbility {
                 ability: AbilityKind::MortarFire,
                 units: vec![mortar],
-                x: Some(180.0),
+                x: Some(292.0),
                 y: Some(100.0),
                 queued: true,
             },
@@ -627,7 +627,7 @@ fn queued_mortar_fire_appends_while_reload_is_waitable() {
             mortar_entity.queued_orders().first(),
             Some(OrderIntent::WorldAbility(intent))
                 if intent.ability == AbilityKind::MortarFire
-                    && intent.x == 180.0
+                    && intent.x == 292.0
                     && intent.y == 100.0
         ),
         "queued Mortar Fire should append even while its cooldown/weapon cycle is waiting"

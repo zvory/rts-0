@@ -1918,15 +1918,16 @@ fn anti_tank_gun_turns_slowly_before_firing() {
 fn mortar_turns_fast_before_auto_firing() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .spawn_unit(1, EntityKind::MortarTeam, 300.0, 300.0)
         .expect("mortar should spawn");
     entities
-        .spawn_unit(2, EntityKind::Rifleman, 100.0, 20.0)
+        .spawn_unit(2, EntityKind::Rifleman, 428.6, 146.8)
         .expect("enemy should spawn");
     if let Some(mortar) = entities.get_mut(mortar_id) {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
     run_combat_tick(&mut entities);
@@ -1938,7 +1939,7 @@ fn mortar_turns_fast_before_auto_firing() {
     }
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
-        angle_delta(mortar.facing(), -std::f32::consts::FRAC_PI_2).abs()
+        angle_delta(mortar.facing(), -50_f32.to_radians()).abs()
             <= mortar::FIRE_TOLERANCE_RAD + 0.001
     );
     assert!(mortar.attack_cd() > 0);
@@ -2147,6 +2148,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -2237,12 +2239,13 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
         .expect("mortar should spawn");
     entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
         .expect("enemy should spawn");
     if let Some(mortar) = entities.get_mut(mortar_id) {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -2259,8 +2262,8 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
 fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
     let map = map_with_rock_at((4, 3));
     let mortar_pos = map.tile_center(2, 3);
-    let target_pos = map.tile_center(6, 3);
-    let spotter_pos = map.tile_center(6, 6);
+    let target_pos = map.tile_center(8, 3);
+    let spotter_pos = map.tile_center(8, 6);
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
@@ -2275,6 +2278,7 @@ fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -2293,7 +2297,7 @@ fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
 fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
     let map = map_with_rock_at((4, 3));
     let mortar_pos = map.tile_center(2, 3);
-    let target_pos = map.tile_center(6, 3);
+    let target_pos = map.tile_center(8, 3);
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
@@ -2305,6 +2309,7 @@ fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
