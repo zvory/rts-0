@@ -43,35 +43,33 @@ const dockerignoreEntries = new Set(
     .filter((line) => line && !line.startsWith("#")),
 );
 
-if (!dockerignoreEntries.has("**")) {
-  throw new Error(".dockerignore must exclude the checkout by default");
-}
-
-for (const buildInput of [
-  "!Dockerfile",
-  "!server/",
-  "!server/Cargo.toml",
-  "!server/Cargo.lock",
-  "!server/crates/",
-  "!server/crates/**",
-  "!server/src/",
-  "!server/src/**",
-  "!server/assets/",
-  "!server/assets/**",
-  "!server/migrations/",
-  "!server/migrations/**",
-  "!client/",
-  "!client/**",
-  "!scripts/",
-  "!scripts/build-sim-wasm.sh",
-  "!docs/",
-  "!docs/context/",
-  "!docs/context/**",
-  "!docs/design/",
-  "!docs/design/**",
+for (const excludedPath of [
+  ".git",
+  ".docdrift",
+  "desktop",
+  "node_modules",
+  "plans",
+  "target",
+  "tests",
+  "server/target",
+  "docs/*",
+  "scripts/*",
+  "client/vendor/sim-wasm/rts_sim_wasm.js",
+  "client/vendor/sim-wasm/rts_sim_wasm_bg.wasm",
+  "client/assets/rigs/anti-tank-gun-noshield-lowdetail/generated",
+  "client/assets/rigs/machine-gunner-pass-01/generated",
+  "client/assets/rigs/panzerfaust-pass-01",
+  "client/assets/rigs/rifleman-backpack-hidden-legs",
+  "client/assets/rigs/tank-ps1/generated",
+  "client/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png",
 ]) {
+  if (!dockerignoreEntries.has(excludedPath)) {
+    throw new Error(`.dockerignore must exclude deploy-irrelevant path ${excludedPath}`);
+  }
+}
+for (const buildInput of ["!docs/context", "!docs/design", "!scripts/build-sim-wasm.sh"]) {
   if (!dockerignoreEntries.has(buildInput)) {
-    throw new Error(`.dockerignore must allowlist Docker build input ${buildInput}`);
+    throw new Error(`.dockerignore must retain Docker build input ${buildInput}`);
   }
 }
 
@@ -132,9 +130,6 @@ const checkedInRuntimeAssets = [
   "./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png",
   "./client/assets/rigs/tank-ps1/tank-atlas.png",
 ];
-if (!dockerignoreEntries.has("client/assets/rigs/**")) {
-  throw new Error(".dockerignore must exclude rig authoring trees by default");
-}
 for (const asset of checkedInRuntimeAssets) {
   const localAsset = path.join(repoRoot, asset);
   const assetStat = fs.statSync(localAsset);
@@ -146,23 +141,6 @@ for (const asset of checkedInRuntimeAssets) {
     `test -s ${asset}`,
     `Dockerfile must fail the image build when ${asset} is absent from the filtered context`,
   );
-  if (asset.includes("/assets/rigs/")) {
-    const relativeAsset = asset.slice(2);
-    const allowlistEntry = `!${relativeAsset}`;
-    if (!dockerignoreEntries.has(allowlistEntry)) {
-      throw new Error(`.dockerignore must allowlist runtime rig texture ${allowlistEntry}`);
-    }
-    for (
-      let parent = path.posix.dirname(relativeAsset);
-      parent !== "client/assets/rigs";
-      parent = path.posix.dirname(parent)
-    ) {
-      const parentEntry = `!${parent}/`;
-      if (!dockerignoreEntries.has(parentEntry)) {
-        throw new Error(`.dockerignore must make runtime rig parent traversable ${parentEntry}`);
-      }
-    }
-  }
 }
 assertMatches(
   wasmBuildScript,
