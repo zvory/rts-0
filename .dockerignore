@@ -1,54 +1,68 @@
-# Keep the deploy context aligned with the Dockerfile COPY inputs. New build
-# inputs must be explicitly added here instead of uploading the whole checkout.
-**
+# Use explicit exclusions: Fly's context-size scanner treats negated parent
+# directories as re-including their local build artifacts in its warning.
+# Repository metadata and local development state.
+.git
+.docdrift
+.agents
+.cargo
+.claude
+.config
+.github
+desktop
+hooks
+node_modules
+plans
+target
+tests
+tools
+server/target
+tests/node_modules
+.DS_Store
 
-!Dockerfile
+# Root files not consumed by the Dockerfile.
+.env.example
+.gitignore
+AGENTS.md
+CLAUDE.md
+DESIGN.md
+DONE.md
+PLAN.md
+README.md
+TODO.md
+cover-art.png
+deploy.sh
+fly.beta.toml
+fly.mainline.toml
+lessons learned.md
+package-lock.json
+package.json
+playtest_notes.md
+runaireplay.sh
+runserver
+runserver.sh
+rust-toolchain.toml
 
-!server/
-!server/Cargo.toml
-!server/Cargo.lock
-!server/crates/
-!server/crates/**
-!server/src/
-!server/src/**
-!server/assets/
-!server/assets/**
-!server/migrations/
-!server/migrations/**
+# The deployed wiki reads only these documentation trees.
+docs/*
+!docs/context
+!docs/design
 
-!client/
-!client/**
-
-!scripts/
+# The Docker build consumes only the prediction-WASM builder script.
+scripts/*
 !scripts/build-sim-wasm.sh
 
-# The deployed wiki reads only these allowlisted documentation trees.
-!docs/
-!docs/context/
-!docs/context/**
-!docs/design/
-!docs/design/**
+# Prediction WASM is generated inside the builder image.
+client/vendor/sim-wasm/rts_sim_wasm.js
+client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
 
-# Ship only runtime rig textures. Source art, prompts, previews, and old passes
-# remain excluded unless a runtime reference and Docker build guard are added.
-client/assets/rigs/**
-!client/assets/rigs/anti-tank-gun-noshield-lowdetail/
+# Ship only runtime rig textures. This file-only rule leaves parent directories
+# traversable without making Fly's context scanner count their ignored contents.
+client/assets/rigs/**/*.*
 !client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png
-!client/assets/rigs/machine-gunner-pass-01/
 !client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png
-!client/assets/rigs/mortar-png-pass-01/
-!client/assets/rigs/mortar-png-pass-01/generated/
 !client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png
-!client/assets/rigs/rifleman-pass-02/
-!client/assets/rigs/rifleman-pass-02/generated/
 !client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png
-!client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/
 !client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png
-!client/assets/rigs/scout-car-pass-02-team/
-!client/assets/rigs/scout-car-pass-02-team/generated/
 !client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png
-!client/assets/rigs/scout-plane-fw189-pass-01/
-!client/assets/rigs/scout-plane-fw189-pass-01/generated/
 !client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png
-!client/assets/rigs/tank-ps1/
 !client/assets/rigs/tank-ps1/tank-atlas.png
