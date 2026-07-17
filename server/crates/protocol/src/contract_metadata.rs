@@ -446,6 +446,7 @@ pub fn protocol_contract() -> ProtocolContract {
         message_tags: ProtocolMessageTags {
             client: string_map(&[
                 ("JOIN", "join"),
+                ("SET_NAME", "setName"),
                 ("READY", "ready"),
                 ("START", "start"),
                 ("SET_TEAM_PRESET", "setTeamPreset"),

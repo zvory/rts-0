@@ -32,6 +32,7 @@ export const LOBBY_KIND = Object.freeze({
 // --- Client -> Server message tags ---
 export const C = Object.freeze({
   JOIN: "join",
+  SET_NAME: "setName",
   READY: "ready",
   START: "start",
   SET_TEAM_PRESET: "setTeamPreset",

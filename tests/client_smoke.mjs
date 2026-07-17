@@ -65,6 +65,14 @@ try {
   });
   await page.waitForFunction(() => document.querySelector("#lobby-players")?.children.length >= 1, { timeout: 5000 });
   ok(true, "joined room; lobby player list populated");
+  await page.click("#lobby-name", { clickCount: 3 });
+  await page.type("#lobby-name", "Renamed Solo");
+  await page.waitForFunction(
+    () => Array.from(document.querySelectorAll("#lobby-players .player-name"))
+      .some((el) => el.textContent === "Renamed Solo"),
+    { timeout: 5000 },
+  );
+  ok(true, "editing the joined lobby name updates the authoritative roster");
   const teamUi = await page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll("#lobby-players .team-row"));
     const seat = document.querySelector("#lobby-players .lobby-seat");

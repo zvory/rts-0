@@ -353,6 +353,7 @@ impl RoomTask {
                 msg_tx,
                 ack,
             } => self.on_join(player_id, name, spectator, replay_ok, msg_tx, ack),
+            RoomEvent::SetName { player_id, name } => self.on_set_name(player_id, name),
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),

@@ -65,6 +65,8 @@ pub enum ClientMessage {
         #[serde(default)]
         replay_ok: bool,
     },
+    /// Update this connection's display name while it is still in a lobby.
+    SetName { name: String },
     /// Toggle ready state in the lobby.
     Ready { ready: bool },
     /// Host requests the match to begin.
@@ -718,6 +720,13 @@ mod contract_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn set_name_deserializes() {
+        let msg: ClientMessage =
+            serde_json::from_str(r#"{"t":"setName","name":"Renamed"}"#).unwrap();
+        assert!(matches!(msg, ClientMessage::SetName { name } if name == "Renamed"));
+    }
 
     #[test]
     fn client_net_report_deserializes() {

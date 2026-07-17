@@ -26,6 +26,7 @@ import {
 } from "./lobby_view.js";
 
 const NAME_STORAGE_KEY = "rts.playerName";
+const NAME_UPDATE_DEBOUNCE_MS = 250;
 export const LOBBY_BROWSER_REFRESH_INTERVAL_MS = 5000;
 export const LOBBY_BROWSER_ACTIVITY_WINDOW_MS = 30000;
 const LOBBY_BROWSER_ACTIVITY_EVENTS = Object.freeze([
@@ -188,6 +189,8 @@ export class Lobby {
     this._browserAutoRefreshEnabled = options.autoRefreshLobbies !== false;
     this._browserActivityTracking = false;
     this._browserAutoRefreshTimer = undefined;
+    this._nameUpdateTimer = undefined;
+    this._lastSentName = "";
     this._lastBrowserActivityAt = 0;
     this._lastBrowserRefreshAt = 0;
     this._ensureConnection = typeof options.ensureConnected === "function"
@@ -225,6 +228,8 @@ export class Lobby {
       this._reflectCreateButton();
     };
     this._onReplayPromptKeydown = (ev) => this._handleReplayPromptKeydown(ev);
+    this._onNameInput = () => this._scheduleNameUpdate();
+    this._onNameChange = () => this._flushNameUpdate();
     this._onBrowserActivity = () => this._noteLobbyBrowserActivity();
     this._onBrowserVisibilityChange = () => {
       if (document.hidden) {
@@ -289,6 +294,8 @@ export class Lobby {
     this._promptReturnFocus = null;
 
     this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
+    this._cancelNameUpdate();
+    this._lastSentName = "";
     this._clearCountdown();
     this._hideReplayPrompt(false);
     if (this.elPlayers) this.elPlayers.innerHTML = "";
@@ -334,6 +341,8 @@ export class Lobby {
     this.btnRefreshLobbies?.addEventListener("click", () => {
       void this.refreshLobbyBrowser();
     });
+    this.elName?.addEventListener("input", this._onNameInput);
+    this.elName?.addEventListener("change", this._onNameChange);
     // The hidden room field keeps legacy/dev joins available without exposing manual room entry.
     for (const el of [this.elRoom]) {
       if (!el) continue;
@@ -356,6 +365,7 @@ export class Lobby {
     // Start: host-only; the server ignores it from non-hosts but we also gate the UI.
     this.btnStart.addEventListener("click", () => {
       if (this.btnStart.disabled) return;
+      this._flushNameUpdate();
       this.net.start();
     });
 
@@ -455,9 +465,11 @@ export class Lobby {
     this._reflectCreateButton();
   }
 
-  _sendJoin({ name, room, spectator }) {
+  _sendJoin({ name, room, spectator, replayOk = false }) {
+    this._cancelNameUpdate();
+    this._lastSentName = name;
     this._persistName(name);
-    this.net.join(name, room, spectator);
+    this.net.join(name, room, spectator, replayOk);
   }
 
   _openCreateLobby(trigger) {
@@ -547,6 +559,8 @@ export class Lobby {
     this.net.off(S.ERROR, this._onError);
     this.net.off("open", this._onOpen);
     this.net.off("close", this._onClose);
+    this.elName?.removeEventListener("input", this._onNameInput);
+    this.elName?.removeEventListener("change", this._onNameChange);
     if (this._browserAutoRefreshEnabled && typeof document !== "undefined") {
       for (const eventName of LOBBY_BROWSER_ACTIVITY_EVENTS) {
         document.removeEventListener(eventName, this._onBrowserActivity);
@@ -554,6 +568,7 @@ export class Lobby {
       document.removeEventListener("visibilitychange", this._onBrowserVisibilityChange);
     }
     this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
+    this._cancelNameUpdate();
     this.browserView?.destroy();
     this.createModal?.destroy();
     this._clearCountdown();
@@ -904,6 +919,7 @@ export class Lobby {
 
   /** The server signaled match start: fire subscribers (main.js switches screens). */
   _handleStart() {
+    this._cancelNameUpdate();
     this._clearCountdown();
     this._hideReplayPrompt(false);
     for (const cb of this._startCbs) {
@@ -1000,9 +1016,8 @@ export class Lobby {
 
   _joinReplayRoom(room) {
     const name = (this.elName && this.elName.value.trim()) || "Commander";
-    this._persistName(name);
     if (this.elRoom) this.elRoom.value = room;
-    this.net.join(name, room, true, true);
+    this._sendJoin({ name, room, spectator: true, replayOk: true });
     this._joined = true;
     this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     this._spectator = true;
@@ -1125,6 +1140,32 @@ export class Lobby {
     } catch (_) {
       // Ignore storage failures.
     }
+  }
+
+  _scheduleNameUpdate() {
+    if (!this._joined || typeof window === "undefined") return;
+    this._cancelNameUpdate();
+    this._nameUpdateTimer = window.setTimeout(
+      () => this._flushNameUpdate(),
+      NAME_UPDATE_DEBOUNCE_MS,
+    );
+  }
+
+  _flushNameUpdate() {
+    this._cancelNameUpdate();
+    if (!this._joined) return;
+    const name = (this.elName?.value.trim()) || "Commander";
+    this._persistName(name);
+    if (name === this._lastSentName) return;
+    this._lastSentName = name;
+    this.net.setName(name);
+  }
+
+  _cancelNameUpdate() {
+    if (this._nameUpdateTimer !== undefined && typeof window !== "undefined") {
+      window.clearTimeout(this._nameUpdateTimer);
+    }
+    this._nameUpdateTimer = undefined;
   }
 
   _reflectJoinedState(hasLobby = this._joined && this._hostId != null) {

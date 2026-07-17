@@ -287,6 +287,23 @@ impl RoomTask {
         }
     }
 
+    pub(in crate::lobby) fn on_set_name(&mut self, player_id: u32, name: String) {
+        if self.is_dev_watch()
+            || self.match_countdown_deadline.is_some()
+            || !matches!(self.phase, Phase::Lobby)
+        {
+            return;
+        }
+        let Some(player) = self.players.get_mut(&player_id) else {
+            return;
+        };
+        if player.name == name {
+            return;
+        }
+        player.name = name;
+        self.broadcast_lobby();
+    }
+
     pub(in crate::lobby) fn on_ready(&mut self, player_id: u32, ready: bool) {
         if self.is_dev_watch() {
             return;

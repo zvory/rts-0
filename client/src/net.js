@@ -241,6 +241,11 @@ export class Net {
     this._send(msg.join(name, room, spectator, replayOk));
   }
 
+  /** Update our display name while waiting in the lobby. */
+  setName(name) {
+    this._send(msg.setName(name));
+  }
+
   /**
    * Toggle our ready state in the lobby.
    * @param {boolean} isReady

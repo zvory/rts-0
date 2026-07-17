@@ -105,6 +105,7 @@ fn is_player_activity(message: &ClientMessage) -> bool {
     match message {
         ClientMessage::Ping { .. } | ClientMessage::NetReport { .. } => false,
         ClientMessage::Join { .. }
+        | ClientMessage::SetName { .. }
         | ClientMessage::Ready { .. }
         | ClientMessage::Start
         | ClientMessage::SetTeamPreset { .. }
@@ -1400,6 +1401,17 @@ async fn handle_client_message(
                 player_id,
                 current_room,
                 RoomEvent::Ready { player_id, ready },
+            )
+            .await;
+        }
+        ClientMessage::SetName { name } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetName {
+                    player_id,
+                    name: sanitize_name(name),
+                },
             )
             .await;
         }
