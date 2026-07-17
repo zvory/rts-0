@@ -8,6 +8,13 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
+function filesUnder(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? filesUnder(entryPath) : [entryPath];
+  });
+}
+
 function assertIncludes(text, needle, message) {
   if (!text.includes(needle)) {
     throw new Error(message);
@@ -43,6 +50,24 @@ const dockerignoreEntries = new Set(
     .filter((line) => line && !line.startsWith("#")),
 );
 
+const dockerBuildRoots = new Set([
+  ".dockerignore",
+  "Dockerfile",
+  "client",
+  "docs",
+  "scripts",
+  "server",
+]);
+for (const entry of fs.readdirSync(repoRoot, { withFileTypes: true })) {
+  if (
+    entry.isDirectory() &&
+    !dockerBuildRoots.has(entry.name) &&
+    !dockerignoreEntries.has(entry.name)
+  ) {
+    throw new Error(`.dockerignore must exclude top-level non-build directory ${entry.name}`);
+  }
+}
+
 for (const excludedPath of [
   ".git",
   ".docdrift",
@@ -56,12 +81,7 @@ for (const excludedPath of [
   "scripts/*",
   "client/vendor/sim-wasm/rts_sim_wasm.js",
   "client/vendor/sim-wasm/rts_sim_wasm_bg.wasm",
-  "client/assets/rigs/anti-tank-gun-noshield-lowdetail/generated",
-  "client/assets/rigs/machine-gunner-pass-01/generated",
-  "client/assets/rigs/panzerfaust-pass-01",
-  "client/assets/rigs/rifleman-backpack-hidden-legs",
-  "client/assets/rigs/tank-ps1/generated",
-  "client/assets/rigs/rifleman-pass-02/rifleman-pass-02-strip.png",
+  "client/assets/rigs/**/*.*",
 ]) {
   if (!dockerignoreEntries.has(excludedPath)) {
     throw new Error(`.dockerignore must exclude deploy-irrelevant path ${excludedPath}`);
@@ -119,16 +139,22 @@ for (const asset of generatedWasmAssets) {
   );
 }
 
+const clientRuntimeSourceFiles = [
+  path.join(repoRoot, "client/index.html"),
+  path.join(repoRoot, "client/manifest.webmanifest"),
+  path.join(repoRoot, "client/styles.css"),
+  ...filesUnder(path.join(repoRoot, "client/src")),
+];
+const runtimeRigAssets = new Set();
+for (const sourceFile of clientRuntimeSourceFiles) {
+  const source = fs.readFileSync(sourceFile, "utf8");
+  for (const match of source.matchAll(/["'`(](\/assets\/rigs\/[^"'`)\s?#]+)/g)) {
+    runtimeRigAssets.add(`./client${match[1]}`);
+  }
+}
 const checkedInRuntimeAssets = [
   "./client/assets/snapshot-streams/supply-300-hellhole.rtsstream",
-  "./client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png",
-  "./client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
-  "./client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png",
-  "./client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png",
-  "./client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png",
-  "./client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png",
-  "./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png",
-  "./client/assets/rigs/tank-ps1/tank-atlas.png",
+  ...Array.from(runtimeRigAssets).sort(),
 ];
 for (const asset of checkedInRuntimeAssets) {
   const localAsset = path.join(repoRoot, asset);
@@ -141,6 +167,12 @@ for (const asset of checkedInRuntimeAssets) {
     `test -s ${asset}`,
     `Dockerfile must fail the image build when ${asset} is absent from the filtered context`,
   );
+  if (asset.includes("/assets/rigs/")) {
+    const allowlistEntry = `!${asset.slice(2)}`;
+    if (!dockerignoreEntries.has(allowlistEntry)) {
+      throw new Error(`.dockerignore must retain runtime rig texture ${allowlistEntry}`);
+    }
+  }
 }
 assertMatches(
   wasmBuildScript,
