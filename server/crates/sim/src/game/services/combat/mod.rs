@@ -42,8 +42,9 @@ mod tests;
 #[cfg(test)]
 use acquisition::combat_mode;
 use acquisition::{
-    combat_mode_with_moving_fire, direct_fire_target_legal, resolve_target_for_weapon, CombatMode,
-    DirectFireLegality, DirectFireVisibility,
+    combat_mode_with_moving_fire, direct_fire_target_legal,
+    resolve_target as resolve_target_with_obstruction, CombatMode, DirectFireLegality,
+    DirectFireVisibility,
 };
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
@@ -80,122 +81,28 @@ fn resolve_target(
     let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
         occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
     };
-    resolve_target_with_filters(
+    let attacker_can_fire_while_moving = entities
+        .get(self_id)
+        .map(|e| can_fire_while_moving(e, false))
+        .unwrap_or(false);
+    resolve_target_with_obstruction(
         map,
         entities,
         &blockers,
         teams,
+        spatial,
+        los,
+        fog,
+        smokes,
         &tank_trap_obstructs_vehicle_route,
-        spatial,
-        los,
-        fog,
-        smokes,
         self_id,
         owner,
         px,
         py,
         acquire_px,
         mode,
-        false,
+        attacker_can_fire_while_moving,
         &|_| true,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn resolve_target_with_filters(
-    map: &Map,
-    entities: &EntityStore,
-    blockers: &ShotBlockerIndex,
-    teams: &TeamRelations,
-    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
-    spatial: &SpatialIndex,
-    los: &LineOfSight<'_>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    self_id: u32,
-    owner: u32,
-    px: f32,
-    py: f32,
-    acquire_px: f32,
-    mode: CombatMode,
-    attacker_can_fire_while_moving: bool,
-    target_filter: &dyn Fn(u32) -> bool,
-) -> Option<u32> {
-    let Some(attacker) = entities.get(self_id) else {
-        return None;
-    };
-    let profile = effective_attack_profile(attacker);
-    let attacker_weapon_class = profile
-        .weapon
-        .map(|weapon| weapon.weapon_class)
-        .unwrap_or(crate::rules::defs::WeaponClass::None);
-    let weapon_range_px = if attacker.kind == EntityKind::MortarTeam {
-        profile.range_tiles * config::TILE_SIZE as f32
-    } else {
-        profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + RANGE_SLACK
-    };
-    resolve_target_for_weapon(
-        map,
-        entities,
-        blockers,
-        teams,
-        spatial,
-        los,
-        fog,
-        smokes,
-        tank_trap_obstructs_vehicle_route,
-        self_id,
-        owner,
-        px,
-        py,
-        acquire_px,
-        mode,
-        attacker_can_fire_while_moving,
-        attacker_weapon_class,
-        weapon_range_px,
-        target_filter,
-    )
-}
-
-#[cfg(test)]
-#[allow(clippy::too_many_arguments)]
-fn resolve_target_with_obstruction(
-    map: &Map,
-    entities: &EntityStore,
-    blockers: &ShotBlockerIndex,
-    teams: &TeamRelations,
-    spatial: &SpatialIndex,
-    los: &LineOfSight<'_>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
-    self_id: u32,
-    owner: u32,
-    px: f32,
-    py: f32,
-    acquire_px: f32,
-    mode: CombatMode,
-    attacker_can_fire_while_moving: bool,
-    target_filter: &dyn Fn(u32) -> bool,
-) -> Option<u32> {
-    resolve_target_with_filters(
-        map,
-        entities,
-        blockers,
-        teams,
-        tank_trap_obstructs_vehicle_route,
-        spatial,
-        los,
-        fog,
-        smokes,
-        self_id,
-        owner,
-        px,
-        py,
-        acquire_px,
-        mode,
-        attacker_can_fire_while_moving,
-        target_filter,
     )
 }
 
@@ -371,16 +278,16 @@ pub(in crate::game) fn combat_system(
                 Some(true)
             )
             && mortar_autocast_researched(owner);
-        let target = resolve_target_with_filters(
+        let target = resolve_target_with_obstruction(
             map,
             entities,
             &blockers,
             teams,
-            &tank_trap_obstructs_vehicle_route,
             spatial,
             &los,
             fog,
             smokes,
+            &tank_trap_obstructs_vehicle_route,
             id,
             owner,
             px,

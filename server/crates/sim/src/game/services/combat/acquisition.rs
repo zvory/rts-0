@@ -184,8 +184,11 @@ pub(super) fn resolve_target(
     let attacker = entities.get(self_id)?;
     let profile = effective_attack_profile(attacker);
     let weapon_range_px = profile.range_tiles * crate::config::TILE_SIZE as f32
-        + attacker.radius()
-        + super::RANGE_SLACK;
+        + if attacker.kind == EntityKind::MortarTeam {
+            0.0
+        } else {
+            attacker.radius() + super::RANGE_SLACK
+        };
     resolve_target_for_weapon(
         map,
         entities,
