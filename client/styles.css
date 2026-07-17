@@ -4075,6 +4075,7 @@ input[type="text"]:focus {
   line-height: 1;
 }
 .replay-production-row,
+.replay-research-row,
 .replay-units-row,
 .replay-resources-row,
 .replay-resources-lost-row {
@@ -4086,7 +4087,11 @@ input[type="text"]:focus {
 .replay-production-row {
   grid-template-columns: 25px minmax(0, 1fr) minmax(36px, auto) minmax(32px, auto);
 }
+.replay-research-row {
+  grid-template-columns: 25px minmax(0, 1fr);
+}
 .replay-production-main,
+.replay-research-label,
 .replay-units-label,
 .replay-resources-window,
 .replay-resources-name,
@@ -4096,6 +4101,10 @@ input[type="text"]:focus {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.replay-research-empty {
+  padding-left: 17px;
+  color: var(--ink-faint);
 }
 .replay-production-progress,
 .replay-production-queue,

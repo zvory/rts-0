@@ -67,6 +67,7 @@ src/
   ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   observer_analysis_preferences.js # persisted observer analysis tab/visibility/window preferences
+  observer_analysis_research.js # completed-research tab renderer for observer analysis
   observer_analysis_resources.js # resources tab renderer and wire normalization for observer analysis
   observer_analysis_rows.js # observer analysis player row metadata joiner
   floating_panel_positioner.js # shared app-shell move-only panel interaction and placement
@@ -410,7 +411,7 @@ shouldMountObserverAnalysisOverlay({ capabilities })
 createObserverAnalysisOverlayPreferences(storage?)
 export class ObserverAnalysisOverlay {
   constructor({ root, preferences, getEntities, getCameraBounds, getPlayers, stats })
-  applyObserverAnalysis(payload)            // renders server-backed production, unit, and losses tabs
+  applyObserverAnalysis(payload)            // renders server-backed production, research, unit, and losses tabs
   update(frameViews?)                     // refreshes viewport army value from camera/snapshot state
   destroy()
 }
@@ -422,8 +423,10 @@ seek-triggered `start` messages and spectator rematches. Preferences are stored 
 compatibility. Its titlebar is draggable, keyboard-nudgeable, viewport-clamped, and retains its
 desktop placement through replay seeks and spectator rematches; `Home` restores the default
 placement. The overlay owns its generated DOM and is read-only. The Army Value tab is
-client-side and viewport-specific; Production, Units, Units Lost, and Resources Lost render the
-latest server-authored `observerAnalysis` payload. Resources Lost follows the protocol's narrow
+client-side and viewport-specific; Production, Research, Units, Resources, Units Lost, and
+Resources Lost render the latest server-authored `observerAnalysis` payload. Research groups
+completed permanent upgrades by player, retaining an explicit empty row when a player has
+completed none. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
 harvesting, refunds, and cancelled queues.
 
@@ -1929,7 +1932,8 @@ Current areas:
   `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
-  `observer_analysis_preferences.js`, `observer_analysis_rows.js`, `observer_analysis_signatures.js`,
+  `observer_analysis_preferences.js`, `observer_analysis_research.js`, `observer_analysis_rows.js`,
+  `observer_analysis_signatures.js`,
   `floating_panel_positioner.js`, `replay_controls.js`, `replay_seek_notice.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.

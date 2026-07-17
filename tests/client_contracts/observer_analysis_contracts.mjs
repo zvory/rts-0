@@ -431,6 +431,28 @@ import { textWithin } from "./dom_text.mjs";
       "production tab renders active research with mirrored upgrade labels",
     );
 
+    restored.selectedTab = "research";
+    overlay.render();
+    overlay.applyObserverAnalysis({
+      tick: 14,
+      players: [
+        { id: 1, units: [], production: [], upgrades: [UPGRADE.METHAMPHETAMINES, UPGRADE.TANK_UNLOCK] },
+        { id: 2, units: [], production: [], upgrades: [] },
+      ],
+    });
+    const researchText = textWithin(root);
+    assert(
+      researchText.includes("Completed research")
+        && researchText.includes("Red")
+        && researchText.includes("Methamphetamines")
+        && researchText.includes("Tank Production"),
+      "research tab lists each player's completed research with mirrored labels",
+    );
+    assert(
+      researchText.includes("Blue") && researchText.includes("No completed research"),
+      "research tab keeps players with no completed research visible",
+    );
+
     restored.selectedTab = "units";
     overlay.render();
     overlay.applyObserverAnalysis({

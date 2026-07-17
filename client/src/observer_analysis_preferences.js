@@ -4,6 +4,7 @@ const LEGACY_STORAGE_KEY = "rts.replayAnalysisOverlay";
 export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: "army-value", label: "Army value" },
   { id: "production", label: "Production" },
+  { id: "research", label: "Research" },
   { id: "units", label: "Units" },
   { id: "resources", label: "Resources" },
   { id: "units-lost", label: "Units lost" },

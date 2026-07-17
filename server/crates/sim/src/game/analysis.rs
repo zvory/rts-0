@@ -23,6 +23,11 @@ impl Game {
                     id: player.id,
                     units: self.current_unit_inventory(player.id),
                     production: self.current_production(player.id),
+                    upgrades: player
+                        .upgrades
+                        .iter()
+                        .map(|upgrade| upgrade.to_protocol_str().to_string())
+                        .collect(),
                     units_lost: unit_loss_rows(&player.score.units_lost_by_kind),
                     resources_lost: resources_lost(&player.score.units_lost_by_kind),
                     resources: player.observer_analysis_resources(self.tick_count()),

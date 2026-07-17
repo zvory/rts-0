@@ -15,6 +15,8 @@ pub struct ObserverAnalysisPlayer {
     pub id: u32,
     pub units: Vec<ObserverAnalysisKindCount>,
     pub production: Vec<ObserverAnalysisProduction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<String>,
     pub units_lost: Vec<ObserverAnalysisKindCount>,
     pub resources_lost: ObserverAnalysisResourcesLost,
     pub resources: ObserverAnalysisResources,
@@ -205,6 +207,7 @@ mod tests {
                     progress: 0.5,
                     queue_depth: 2,
                 }],
+                upgrades: vec!["tank_unlock".to_string()],
                 units_lost: vec![ObserverAnalysisKindCount {
                     kind: kinds::WORKER.to_string(),
                     count: 1,
@@ -263,6 +266,7 @@ mod tests {
         assert_eq!(json["players"][0]["production"][0]["buildingId"], 10);
         assert_eq!(json["players"][0]["production"][0]["itemType"], "unit");
         assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
+        assert_eq!(json["players"][0]["upgrades"][0], "tank_unlock");
         assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
         assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
         assert_eq!(json["players"][0]["resources"]["lifetime"]["steel"], 120);
