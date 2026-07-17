@@ -441,15 +441,6 @@ function boundedResponseSummary<T>(values: T[]) {
   };
 }
 
-function recordingOperation(command: string, input: JsonObject, result: unknown) {
-  return {
-    command,
-    acceptedAt: new Date().toISOString(),
-    input: JSON.parse(JSON.stringify(input, (key, value) => key === "sessionId" ? undefined : value)),
-    authoritativeTick: findSnapshotTick(result),
-  };
-}
-
 function findSnapshotTick(value: unknown, depth = 0): number | null {
   if (!isJsonObject(value) || depth > 5) return null;
   if (Number.isInteger(value.snapshotTick)) return Number(value.snapshotTick);
