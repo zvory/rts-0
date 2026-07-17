@@ -54,9 +54,7 @@ impl RoomTask {
         self.order.push(player_id);
         self.players.insert(player_id, replay_viewer(name, msg_tx));
         let _ = ack.send(true);
-        self.send_replay_start_to(player_id);
-        self.send_room_time_state_to(player_id);
-        self.send_observer_analysis_to(player_id);
+        self.send_active_replay_state_to(player_id);
     }
 
     pub(super) fn on_join_replay_lobby(
@@ -95,9 +93,7 @@ impl RoomTask {
 
         match &self.phase {
             Phase::ReplayViewer(_) => {
-                self.send_replay_start_to(player_id);
-                self.send_room_time_state_to(player_id);
-                self.send_observer_analysis_to(player_id);
+                self.send_active_replay_state_to(player_id);
             }
             Phase::Lobby => match self.replay_session_for_mode() {
                 Ok(session) => self.transition_to_replay_viewer(session),
@@ -215,6 +211,32 @@ impl RoomTask {
             &player.msg_tx,
             ServerMessage::Start(payload),
         );
+    }
+
+    fn send_active_replay_state_to(&mut self, watcher_id: u32) {
+        self.send_replay_start_to(watcher_id);
+        self.send_room_time_state_to(watcher_id);
+        self.send_current_replay_snapshot_to(watcher_id);
+        self.send_observer_analysis_to(watcher_id);
+    }
+
+    fn send_current_replay_snapshot_to(&mut self, watcher_id: u32) {
+        let context = ReplayTickContext {
+            scheduler_lag: Duration::ZERO,
+            tick_budget: self.current_tick_interval(),
+            tick_start: StdInstant::now(),
+            projection_policy: self.projection_policy_for_phase(SessionPhase::ReplayViewer),
+        };
+        let session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::ReplayViewer(session) => session,
+            other => {
+                self.phase = other;
+                return;
+            }
+        };
+        self.clear_pending_snapshots_for([watcher_id]);
+        self.fanout_replay_snapshots_to(&session, [watcher_id], HashMap::new(), context, None);
+        self.phase = Phase::ReplayViewer(session);
     }
 
     pub(super) fn send_room_time_state_to(&self, watcher_id: u32) {

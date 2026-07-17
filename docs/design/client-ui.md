@@ -1547,9 +1547,11 @@ disconnect.
 The browser keeps in-progress rows labeled `In match` and exposes a spectator
 action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending
 `join` with `spectator: true`. Replay rows are detected from explicit `kind: "replay"` metadata,
-labelled `Replay`, and joined as spectators without setting `replayOk`, so rooms that race into
-playback still use the normal replay join confirmation. Countdown, stale, and unknown rows remain
-disabled.
+labelled `Replay`, and joined as spectators. Replay staging rows join without `replayOk`; active
+replay rows use their explicit **Join replay** action as confirmation and send `replayOk: true`, so
+the viewer enters the room's current shared playback without a second prompt. This applies both to
+persisted replay rooms and automatic post-match replay playback. Countdown, stale, and unknown rows
+remain disabled.
 
 `match_history.js` performs one initial Recent Matches fetch and exposes a manual **Refresh**
 button; it never polls. It renders the API-provided **Replay #** for each visible row. The

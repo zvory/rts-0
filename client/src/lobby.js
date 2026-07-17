@@ -404,7 +404,10 @@ export class Lobby {
     }
     if (!preflight) {
       if (!await this._connectForAction()) return;
-      this._beginBrowserJoin({ room }, { spectator: !!spectator });
+      this._beginBrowserJoin(row, {
+        spectator: !!spectator,
+        replayOk: !!intent.replayOk,
+      });
       return;
     }
     this._browserActionPending = true;
@@ -434,10 +437,13 @@ export class Lobby {
       this._cancelPendingBrowserJoin("Server connection unavailable.", { rows: latestRows });
       return;
     }
-    this._beginBrowserJoin(latestRow, { spectator: latestIntent.spectator });
+    this._beginBrowserJoin(latestRow, {
+      spectator: latestIntent.spectator,
+      replayOk: !!latestIntent.replayOk,
+    });
   }
 
-  _beginBrowserJoin(row, { spectator = false, replayLobby = false } = {}) {
+  _beginBrowserJoin(row, { spectator = false, replayLobby = false, replayOk = false } = {}) {
     const room = String(row?.room || "").trim();
     if (!room) return;
     const name = (this.elName && this.elName.value.trim()) || "Commander";
@@ -445,7 +451,7 @@ export class Lobby {
     this._pendingBrowserJoinRoom = room;
     this._spectator = !!spectator;
     if (this.elRoom) this.elRoom.value = room;
-    this._sendJoin({ name, room, spectator: !!spectator });
+    this._sendJoin({ name, room, spectator: !!spectator, replayOk: !!replayOk });
     const isReplay = replayLobby || row?.kind === LOBBY_KIND.REPLAY;
     this.setStatus(isReplay
       ? `Joining replay lobby "${room}"...`
@@ -922,6 +928,13 @@ export class Lobby {
     this._cancelNameUpdate();
     this._clearCountdown();
     this._hideReplayPrompt(false);
+    // Active replay rows transition directly from the browser to `start`, without an
+    // intermediate lobby payload. Treat `start` as the authoritative join completion so the
+    // hidden lobby does not remain action-pending or keep its refresh timer alive during play.
+    this._joined = true;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     for (const cb of this._startCbs) {
       try {
         cb();

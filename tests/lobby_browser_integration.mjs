@@ -261,7 +261,47 @@ async function main() {
   ]);
   ok(hostRoomTime.speed === 2 && guestRoomTime.speed === 2,
     "shared replay playback keeps the replay default speed");
-  await waitForLobbyGone(replayRoom, "started replay playback leaves the staging browser");
+  await waitForLobbyRow(
+    replayRoom,
+    (row) => row.kind === "replay" &&
+      row.joinState === "inGame" &&
+      row.map === replaySetup.map.name &&
+      row.spectatorCount === 2,
+    "active replay playback browser row",
+  );
+
+  const ReplayLate = await connectClient("browser-replay-late");
+  ReplayLate.send({
+    t: "join",
+    name: "Late Viewer",
+    room: replayRoom,
+    spectator: true,
+    replayOk: true,
+  });
+  const lateReplayStart = await ReplayLate.waitFor(
+    (msg) => msg.t === "start" && msg.replay,
+    4000,
+    "late active replay join start",
+  );
+  const lateReplayState = await ReplayLate.waitFor(
+    (msg) => msg.t === "roomTimeState",
+    4000,
+    "late active replay join room-time state",
+  );
+  const lateReplaySnapshot = await ReplayLate.waitFor(
+    (msg) => msg.t === "snapshot",
+    4000,
+    "late active replay join current snapshot",
+  );
+  ok(lateReplayStart.spectator && lateReplayStart.replay.durationTicks > 0,
+    "late active replay join enters as a replay spectator");
+  ok(lateReplaySnapshot.tick === lateReplayState.currentTick,
+    "late active replay join starts at the room's current shared tick");
+  await waitForLobbyRow(
+    replayRoom,
+    (row) => row.kind === "replay" && row.joinState === "inGame" && row.spectatorCount === 3,
+    "active replay late-viewer count",
+  );
 
   const guestInitialSnapshot = await ReplayGuest.waitFor(
     (msg) => msg.t === "snapshot",
@@ -276,7 +316,7 @@ async function main() {
   );
   ok(guestContinuedSnapshot.tick > guestInitialSnapshot.tick,
     "leaving one replay viewer keeps playback alive for remaining viewers");
-  closeClients(ReplayHost, ReplayGuest);
+  closeClients(ReplayHost, ReplayGuest, ReplayLate);
   await sleep(200);
 
   const savedReplayRoom = `__replay_artifact__:${replayFixture.name}`;
