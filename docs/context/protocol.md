@@ -30,6 +30,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   guarded by `node tests/protocol_parity.mjs`
 
 ## Current lobby fields to remember
+- `setName { name }` updates the sender's sanitized name during the lobby
+  phase; countdown and in-game requests are ignored.
 - `selectMap { map }` is the host-only map selector command.
 - `lobby` carries `map` (selected stable map name) and `maps[]`
   (`{name, description, minPlayers, maxPlayers}` catalog rows). Replay start metadata separately

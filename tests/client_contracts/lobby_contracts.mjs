@@ -172,6 +172,25 @@ import { textWithin } from "./dom_text.mjs";
 }
 
 {
+  const sentNames = [];
+  const persistedNames = [];
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    _joined: true,
+    _nameUpdateTimer: undefined,
+    _lastSentName: "Original",
+    elName: { value: "  Renamed  " },
+    net: { setName: (name) => sentNames.push(name) },
+    _persistName: (name) => persistedNames.push(name),
+  });
+
+  lobby._flushNameUpdate();
+  lobby._flushNameUpdate();
+
+  assertDeepEqual(sentNames, ["Renamed"], "joined lobby name edits send one normalized update");
+  assertDeepEqual(persistedNames, ["Renamed", "Renamed"], "joined lobby name edits persist locally");
+}
+
+{
   withFakeDocument(() => {
     const root = document.createElement("div");
     const view = new LobbyRosterView(root);

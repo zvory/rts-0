@@ -141,6 +141,7 @@ export const msg = Object.freeze({
     if (replayOk) payload.replayOk = true;
     return payload;
   },
+  setName: (name) => ({ t: C.SET_NAME, name }),
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
   start: () => ({ t: C.START }),
   setTeamPreset: (preset) => ({ t: C.SET_TEAM_PRESET, preset }),

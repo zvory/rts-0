@@ -134,6 +134,7 @@ export class Net {
   on(type, handler)                      // type ∈ ServerMessage tags + "open"/"close"
   off(type, handler)
   join(name, room, spectator?, replayOk?)
+  setName(name)                          // update own display name while waiting in the lobby
   ready(isReady)
   start()
   setTeamPreset(preset)                  // deprecated compatibility command; server ignores it
@@ -1485,6 +1486,7 @@ export class Lobby {
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // Name-field edits are debounced, persisted locally, and sent through Net.setName while joined.
   // Replay lobbies are keyed by explicit `kind: "replay"` metadata: the joined view hides
   // Ready, team, faction, AI, map-selection, and active-seat controls, then shows only
   // spectator occupants plus the host start control while the server reports canStart.

@@ -1,6 +1,49 @@
 use super::support::*;
 
 #[test]
+fn lobby_name_update_changes_roster_and_host_summary() {
+    let mut task = summary_task("rename-lobby");
+    let mut observer = add_test_room_spectator(&mut task, 2);
+
+    task.on_set_name(1, "Renamed".to_string());
+
+    assert_eq!(
+        task.players.get(&1).map(|player| player.name.as_str()),
+        Some("Renamed")
+    );
+    assert_eq!(
+        task.lobby_summary().and_then(|summary| summary.host_name),
+        Some("Renamed".to_string())
+    );
+    let lobby = std::iter::from_fn(|| observer.reliable_rx.try_recv().ok())
+        .find_map(|message| match message {
+            ServerMessage::Lobby { players, .. } => Some(players),
+            _ => None,
+        })
+        .expect("rename should broadcast an updated lobby roster");
+    assert_eq!(
+        lobby
+            .iter()
+            .find(|player| player.id == 1)
+            .map(|player| player.name.as_str()),
+        Some("Renamed")
+    );
+}
+
+#[test]
+fn lobby_name_update_is_ignored_during_countdown() {
+    let mut task = summary_task("countdown-rename");
+    task.match_countdown_deadline = Some(TokioInstant::now() + Duration::from_secs(3));
+
+    task.on_set_name(1, "Too Late".to_string());
+
+    assert_eq!(
+        task.players.get(&1).map(|player| player.name.as_str()),
+        Some("Player 1")
+    );
+}
+
+#[test]
 fn lobby_summary_reports_open_waiting_room_state() {
     let task = summary_task("open-summary");
 

@@ -384,6 +384,8 @@ pub enum RoomEvent {
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     },
+    /// A connected human updated their display name while waiting in the lobby.
+    SetName { player_id: u32, name: String },
     /// A player left (socket closed). During a match this eliminates them so it can resolve.
     Leave { player_id: u32 },
     /// A player toggled their lobby ready flag.

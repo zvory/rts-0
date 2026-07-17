@@ -517,6 +517,10 @@ assert(
   "setTeamPreset builder must emit the exact wire shape",
 );
 assert(
+  JSON.stringify(msg.setName("Renamed")) === JSON.stringify({ t: "setName", name: "Renamed" }),
+  "setName builder must emit the exact wire shape",
+);
+assert(
   C.SET_TEAM === "setTeam",
   "setTeam client message tag must match Rust",
 );
