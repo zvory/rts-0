@@ -928,6 +928,13 @@ export class Lobby {
     this._cancelNameUpdate();
     this._clearCountdown();
     this._hideReplayPrompt(false);
+    // Active replay rows transition directly from the browser to `start`, without an
+    // intermediate lobby payload. Treat `start` as the authoritative join completion so the
+    // hidden lobby does not remain action-pending or keep its refresh timer alive during play.
+    this._joined = true;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
+    this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
     for (const cb of this._startCbs) {
       try {
         cb();

@@ -592,6 +592,29 @@ import { textWithin } from "./dom_text.mjs";
   }
 
   {
+    let stoppedRefresh = null;
+    let started = 0;
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _joined: false,
+      _browserActionPending: true,
+      _pendingBrowserJoinRoom: "Active Replay",
+      _startCbs: [() => { started += 1; }],
+      _cancelNameUpdate() {},
+      _clearCountdown() {},
+      _hideReplayPrompt() {},
+      _stopLobbyBrowserAutoRefresh(options) { stoppedRefresh = options; },
+    });
+
+    lobby._handleStart();
+
+    assert(lobby._joined && !lobby._browserActionPending && !lobby._pendingBrowserJoinRoom,
+      "direct replay start completes the pending browser join");
+    assertDeepEqual(stoppedRefresh, { cancelRequest: true },
+      "direct replay start stops hidden lobby refresh work");
+    assert(started === 1, "direct replay start still notifies the app");
+  }
+
+  {
     const priorDocument = globalThis.document;
     globalThis.document = { hidden: false };
     try {
