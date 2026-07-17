@@ -152,9 +152,7 @@ fn mortar_autocast_candidates_respect_exact_max_range() {
     let padded_range = exact_range + mortar.radius() + RANGE_SLACK;
     let target_x = 100.0 + (exact_range + (padded_range - exact_range) * 0.5);
     let _target_id = spawn_target(&mut entities, EntityKind::Rifleman, target_x, 100.0);
-    let attacker = entities
-        .get(mortar_id)
-        .expect("mortar should still exist");
+    let attacker = entities.get(mortar_id).expect("mortar should still exist");
     let target = resolve_target(
         &map,
         &entities,
@@ -170,7 +168,10 @@ fn mortar_autocast_candidates_respect_exact_max_range() {
         padded_range,
         combat_mode(attacker),
     );
-    assert_eq!(target, None, "mortar should not select targets outside its exact max range");
+    assert_eq!(
+        target, None,
+        "mortar should not select targets outside its exact max range"
+    );
 }
 
 fn spawn_target(entities: &mut EntityStore, kind: EntityKind, x: f32, y: f32) -> u32 {
