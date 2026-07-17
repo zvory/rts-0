@@ -214,10 +214,7 @@ fn resolve(
         let effective = entities
             .get(id)
             .map(|target| {
-                entrenchment_combat::reduce_area_damage(
-                    target,
-                    mortar_damage(target.kind, base),
-                )
+                entrenchment_combat::reduce_area_damage(target, mortar_damage(target.kind, base))
             })
             .unwrap_or(0);
         if effective == 0 {
