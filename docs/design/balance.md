@@ -303,8 +303,9 @@ folded into default targeting.
   `MORTAR_BLIND_MEDIAN_SCATTER_TILES = 4.0`.
   Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
-  The inner radius is fully armor-piercing against armored targets; the outer radius keeps
-  semi-armor-piercing damage against armored targets. Manual Fire uses hotkey `X`; autocast
+  Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
+  resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
+  `X`; autocast
   uses normal idle/attack-move acquisition after Mortar Autocast research completes. Manual and
   autocast shots scatter from the intended impact point: if the point is visible to the firing team,
   the deterministic radial scatter has a one-tile median miss radius; otherwise it has a four-tile
