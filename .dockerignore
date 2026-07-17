@@ -29,23 +29,26 @@
 !docs/design/
 !docs/design/**
 
-# Ship runtime rig textures, not source art, prompts, previews, or old passes.
-client/assets/rigs/**/metadata
-client/assets/rigs/anti-tank-gun-noshield-lowdetail/generated
-client/assets/rigs/machine-gunner-pass-01/generated
-client/assets/rigs/panzerfaust-pass-01
-client/assets/rigs/rifleman-backpack-hidden-legs
-client/assets/rigs/tank-ps1/generated
-client/assets/rigs/tank-ps1/tank-contact-sheet.png
-client/assets/rigs/tank-ps1/tank-contact-sheet.svg
-client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-preview.png
-client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-source.png
-client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-source.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-alpha.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-source.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-comparison-4x-preview.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip-4x-preview.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-strip-4x-preview.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-alpha.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-source-imagegen.png
-client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip-4x-preview.png
+# Ship only runtime rig textures. Source art, prompts, previews, and old passes
+# remain excluded unless a runtime reference and Docker build guard are added.
+client/assets/rigs/**
+!client/assets/rigs/anti-tank-gun-noshield-lowdetail/
+!client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png
+!client/assets/rigs/machine-gunner-pass-01/
+!client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png
+!client/assets/rigs/mortar-png-pass-01/
+!client/assets/rigs/mortar-png-pass-01/generated/
+!client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png
+!client/assets/rigs/rifleman-pass-02/
+!client/assets/rigs/rifleman-pass-02/generated/
+!client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png
+!client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/
+!client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png
+!client/assets/rigs/scout-car-pass-02-team/
+!client/assets/rigs/scout-car-pass-02-team/generated/
+!client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png
+!client/assets/rigs/scout-plane-fw189-pass-01/
+!client/assets/rigs/scout-plane-fw189-pass-01/generated/
+!client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png
+!client/assets/rigs/tank-ps1/
+!client/assets/rigs/tank-ps1/tank-atlas.png
