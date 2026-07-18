@@ -1,5 +1,4 @@
 import {
-  GRID_HOTKEYS,
   factionCommandId,
   gridHotkeyForSlot,
   parsedFactionCommandId,
@@ -16,13 +15,22 @@ export const HOTKEY_COMMAND_SELECT_IDLE_WORKERS = "hud.selectIdleWorkers";
 const VALID_KEY_RE = /^[A-Z]$/;
 const DEFAULT_EXPORT_BUILD = "unknown";
 
-const CORE_CLASSIC_BINDINGS = Object.freeze({
+// Direct-profile bindings must not depend on a command card slot. Keep the
+// familiar action keys here, including the mnemonic conflict resolutions for
+// commands that can share a card.
+const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   "unit.move": "M",
   "unit.attack": "A",
-  "unit.holdPosition": "W",
+  "unit.holdPosition": "H",
   "unit.stop": "S",
+  "unit.setupSupportWeapon": "U",
   "worker.buildMenu": "B",
   "worker.return": "W",
+  "kriegsia.build.tank_trap": "K",
+  "kriegsia.ability.smoke": "O",
+  "kriegsia.ability.scoutPlane": "P",
+  "kriegsia.train.artillery": "R",
+  "kriegsia.research.mortar_autocast": "O",
 });
 
 const GLOBAL_HOTKEY_CONTEXTS = Object.freeze([Object.freeze({
@@ -636,17 +644,14 @@ function buildClassicBindingMaps(catalog) {
   const bindingMaps = { bindings: {}, factionBindings: {} };
   for (const command of catalog?.commands || []) {
     setBindingForCommand(bindingMaps, command.commandId,
-      CORE_CLASSIC_BINDINGS[command.commandId] ||
+      CLASSIC_DIRECT_BINDINGS[command.commandId] ||
       command.classicHotkey ||
-      normalizeHotkey((command.label || "").trim().charAt(0)) ||
-      (Number.isInteger(command.slotIndex) ? GRID_HOTKEYS[command.slotIndex] : ""));
+      normalizeHotkey((command.label || "").trim().charAt(0)));
   }
   return resolveContextConflicts(bindingMaps, catalog);
 }
 
 function resolveContextConflicts(bindingMaps, catalog) {
-  const commandById = new Map((catalog?.commands || [])
-    .map((command) => [command.commandId, command]));
   for (const context of catalog?.contexts || []) {
     if (context.global) continue;
     const used = new Set();
@@ -654,15 +659,6 @@ function resolveContextConflicts(bindingMaps, catalog) {
       const current = bindingForCommand(bindingMaps, commandId);
       if (current && !used.has(current)) {
         used.add(current);
-        continue;
-      }
-      const command = commandById.get(commandId);
-      const gridKey = Number.isInteger(command?.slotIndex)
-        ? gridHotkeyForSlot(command.slotIndex)
-        : "";
-      if (gridKey && !used.has(gridKey)) {
-        setBindingForCommand(bindingMaps, commandId, gridKey);
-        used.add(gridKey);
         continue;
       }
       const next = firstFreeKey(used);

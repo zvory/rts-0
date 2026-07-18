@@ -160,8 +160,29 @@ function commandCarCard() {
   );
   assert.equal(
     hotkeys.resolveCard(commandCarCard()).slots[8].hotkey,
-    "C",
-    "Classic RTS preset binds Scout Plane ability to C",
+    "P",
+    "Classic RTS preset binds Scout Plane ability to P",
+  );
+  assert.equal(
+    classic.bindings["unit.holdPosition"],
+    "H",
+    "Classic RTS binds Hold Position to its mnemonic instead of its Grid slot",
+  );
+  assert.equal(
+    classic.bindings["unit.setupSupportWeapon"],
+    "U",
+    "Classic RTS binds support-weapon setup independently of the Grid slot",
+  );
+  assert.deepEqual(
+    {
+      tankTrap: classic.factionBindings.kriegsia[kriegsiaCommandId("build", KIND.TANK_TRAP)],
+      smoke: classic.factionBindings.kriegsia[kriegsiaCommandId("ability", ABILITY.SMOKE)],
+      scoutPlane: classic.factionBindings.kriegsia[kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE)],
+      artillery: classic.factionBindings.kriegsia[kriegsiaCommandId("train", KIND.ARTILLERY)],
+      mortarAutocast: classic.factionBindings.kriegsia[kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST)],
+    },
+    { tankTrap: "K", smoke: "O", scoutPlane: "P", artillery: "R", mortarAutocast: "O" },
+    "Classic RTS conflict resolutions are mnemonic rather than Grid-slot fallbacks",
   );
 }
 
