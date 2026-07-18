@@ -236,6 +236,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     wc: [1024, 2048],
     u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK], UPGRADE_CODE[UPGRADE.PANZERFAUSTS]],
     fg: [1, 2, 3, 1],
+    eg: [1, 3, 2, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
       [EVENT_CODE[EVENT.OVERPENETRATION], 22],
@@ -370,6 +371,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(
     decoded.visibleTiles.join(",") === "1,1,0,0,0,1",
     "compact snapshot decodes server visibility grid",
+  );
+  assert(
+    decoded.exploredTiles.join(",") === "1,1,1,0,0,1",
+    "compact snapshot decodes server exploration grid",
   );
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
   const weaponEventDecoded = decodeServerMessage({

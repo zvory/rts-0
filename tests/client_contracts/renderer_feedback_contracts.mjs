@@ -13,7 +13,10 @@ import {
   STATE,
   WEAPON_KIND,
 } from "../../client/src/protocol.js";
-import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import {
+  createDefaultControlPolicy,
+  createLabControlPolicy,
+} from "../../client/src/lab_control_policy.js";
 import { createControlPolicyProjection } from "../../client/src/control_policy_projection.js";
 import { buildRendererFeedbackView } from "../../client/src/renderer/feedback_view_model.js";
 import { createLiveRigDefinitions } from "../../client/src/renderer/rigs/live_routing.js";
@@ -44,6 +47,51 @@ import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.j
 import { muzzleFeedbackStyle } from "../../client/src/renderer/weapon_feedback_style.js";
 
 import { RecordingGraphics, installFakePixi } from "./pixi_fakes.mjs";
+
+{
+  const selected = [
+    {
+      id: 900,
+      owner: 2,
+      kind: KIND.RIFLEMAN,
+      x: 64,
+      y: 64,
+      orderPlan: [{ kind: "move", x: 120, y: 120 }],
+    },
+    {
+      id: 901,
+      owner: 2,
+      kind: KIND.CITY_CENTRE,
+      x: 96,
+      y: 96,
+      rallyPlan: [{ kind: "move", x: 180, y: 160 }],
+    },
+  ];
+  const spectatorState = {
+    playerId: 99,
+    spectator: true,
+    selectedEntities() { return selected; },
+    isOwnOwner() { return false; },
+  };
+  const feedbackView = buildRendererFeedbackView(spectatorState, {
+    controlPolicy: createControlPolicyProjection(createDefaultControlPolicy()),
+    selectedEntities: selected,
+  });
+  const rallyGfx = new RecordingGraphics();
+
+  _drawRallyPoints.call({ _feedbackGfx: rallyGfx }, feedbackView);
+
+  assert(
+    rallyGfx.calls.some((call) => call[0] === "drawPolygon"),
+    "passive omniscient spectators draw server-projected rally plans",
+  );
+  const orderGfx = new RecordingGraphics();
+  _drawOrderPlan.call({ _feedbackGfx: orderGfx }, feedbackView);
+  assert(
+    orderGfx.calls.some((call) => call[0] === "lineTo"),
+    "passive omniscient spectators draw server-projected unit order plans",
+  );
+}
 
 function polygonCenter(points) {
   let x = 0;

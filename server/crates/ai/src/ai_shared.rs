@@ -443,6 +443,7 @@ mod tests {
             ability_objects: Vec::new(),
             trenches: Vec::new(),
             visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),
             upgrades: Vec::new(),

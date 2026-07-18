@@ -6,7 +6,7 @@
 // row-major tile grids are maintained:
 //   - `visibleGrid`  : 1 where an own entity can currently see the tile (recomputed
 //                      from scratch each `update`).
-//   - `exploredGrid` : 1 where a tile has *ever* been visible (cumulative, never cleared).
+//   - `exploredGrid` : server-authoritative cumulative exploration for the current perspective.
 //
 // A tile is rendered clear when visible, dimmed when explored-but-not-visible, and
 // solid dark when never explored (the renderer reads the grids directly). `revision`
@@ -77,8 +77,29 @@ export class Fog {
    * @param {Array<{id?:number,kind:string,x:number,y:number}>} ownEntities entities owned by this player (world px centers)
    * @param {number} tileSize world px per tile
    * @param {ArrayLike<number>|null} serverVisibleTiles server-authoritative current visibility
+   * @param {ArrayLike<number>|null} serverExploredTiles server-authoritative exploration history
    */
-  update(ownEntities, tileSize, serverVisibleTiles = null) {
+  update(ownEntities, tileSize, serverVisibleTiles = null, serverExploredTiles = null) {
+    const hasAuthoritativeGrids = serverVisibleTiles?.length === this.visibleGrid.length
+      && serverExploredTiles?.length === this.exploredGrid.length;
+    if (hasAuthoritativeGrids) {
+      let visibleChanged = false;
+      let exploredChanged = false;
+      for (let i = 0; i < this.visibleGrid.length; i++) {
+        const visible = serverVisibleTiles[i] ? 1 : 0;
+        const explored = serverExploredTiles[i] ? 1 : 0;
+        if (this.visibleGrid[i] !== visible) {
+          this.visibleGrid[i] = visible;
+          visibleChanged = true;
+        }
+        if (this.exploredGrid[i] !== explored) {
+          this.exploredGrid[i] = explored;
+          exploredChanged = true;
+        }
+      }
+      this._recordGridChanges(visibleChanged, exploredChanged);
+      return;
+    }
     if (this.revealAll) {
       this._recordGridChanges(
         this._fillGridIfChanged(this.visibleGrid, 1),

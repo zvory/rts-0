@@ -236,7 +236,7 @@ export function _drawOrderPlan(state) {
   const attackColor = COLORS.selectEnemy;
 
   for (const e of state.selectedEntities()) {
-    if (!feedbackOwner(state, e.owner) || !isUnit(e.kind)) continue;
+    if (!isUnit(e.kind)) continue;
     const markers = Array.isArray(e.orderPlan)
       ? e.orderPlan.filter((m) => Number.isFinite(m?.x) && Number.isFinite(m?.y))
       : [];
@@ -1081,7 +1081,6 @@ export function _drawRallyPoints(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   for (const e of state.selectedEntities()) {
-    if (!feedbackOwner(state, e.owner)) continue;
     if (!isBuilding(e.kind) || !isProducerBuilding(e.kind)) continue;
     const color = e.optimisticRally ? 0x7ee7ff : COLORS.selectOwn;
     const plan = Array.isArray(e.rallyPlan) && e.rallyPlan.length > 0

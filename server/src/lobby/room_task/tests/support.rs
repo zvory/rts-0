@@ -311,6 +311,7 @@ pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
         trenches: Vec::new(),
         ability_objects: Vec::new(),
         visible_tiles: Vec::new(),
+        explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
         events: Vec::new(),
         upgrades: Vec::new(),

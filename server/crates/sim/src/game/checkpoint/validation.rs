@@ -263,6 +263,19 @@ pub(super) fn validate_fog(
             return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
         }
     }
+    for (&player, grid) in &fog.explored_grids {
+        if !player_ids.contains(&player) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "fog.exploredGrids",
+                id: player,
+            });
+        }
+        if grid.len() != cells {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "fog.exploredGrids",
+            });
+        }
+    }
     validate_firing_reveal_visibility(fog, player_ids, entity_next_id, tick)?;
     Ok(())
 }

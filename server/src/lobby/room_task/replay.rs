@@ -465,11 +465,15 @@ impl RoomTask {
         player_id: u32,
         selection: VisionSelectionRequest,
     ) {
-        if !self
-            .players
-            .get(&player_id)
-            .is_some_and(|player| player.spectator)
-        {
+        let may_select_vision = match &self.phase {
+            Phase::ReplayViewer(_) => self.players.contains_key(&player_id),
+            Phase::InGame(_) => self
+                .players
+                .get(&player_id)
+                .is_some_and(|player| player.spectator),
+            _ => false,
+        };
+        if !may_select_vision {
             return;
         }
         if let Phase::InGame(game) = &self.phase {

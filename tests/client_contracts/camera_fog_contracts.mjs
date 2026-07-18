@@ -201,6 +201,24 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   serverFog.update([], 32, new Uint8Array([0, 1]));
   assert(serverFog.revision > serverRevision, "server fog revisions change for new grids");
 
+  const perspectiveFog = new Fog(2, 1);
+  perspectiveFog.update(
+    [],
+    32,
+    new Uint8Array([1, 1]),
+    new Uint8Array([1, 1]),
+  );
+  perspectiveFog.update(
+    [],
+    32,
+    new Uint8Array([1, 0]),
+    new Uint8Array([1, 0]),
+  );
+  assert(
+    perspectiveFog.isExplored(1, 0) === false,
+    "authoritative exploration replaces omniscient history when perspective narrows",
+  );
+
   const terrain = new Array(8 * 8).fill(TERRAIN.GRASS);
   terrain[2 * 8 + 3] = TERRAIN.ROCK;
   const blockedFog = new Fog(8, 8, terrain);

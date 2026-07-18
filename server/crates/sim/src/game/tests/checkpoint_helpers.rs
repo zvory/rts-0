@@ -16,6 +16,7 @@ struct SemanticGameView {
     entities: Vec<(u32, String)>,
     command_log: Vec<super::replay::CommandLogEntry>,
     fog_visible_tiles: Vec<(u32, Vec<u8>)>,
+    fog_explored_tiles: Vec<(u32, Vec<u8>)>,
     scores: Vec<PlayerScore>,
     active_construction_sites: Vec<u32>,
     lab_god_mode_players: Vec<u32>,
@@ -242,6 +243,10 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
         fog_visible_tiles: player_ids(game)
             .into_iter()
             .map(|player| (player, game.state.fog.visible_tiles_for(player)))
+            .collect(),
+        fog_explored_tiles: player_ids(game)
+            .into_iter()
+            .map(|player| (player, game.state.fog.explored_tiles_for(player)))
             .collect(),
         scores: game.scores(),
         active_construction_sites: game

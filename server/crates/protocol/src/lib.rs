@@ -1350,6 +1350,7 @@ mod tests {
                 radius_tiles: 0.375,
             }],
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
+            explored_tiles: vec![1, 1, 1, 0, 0, 1],
             remembered_buildings: vec![RememberedBuildingView {
                 id: 99,
                 owner: 2,
@@ -1513,6 +1514,7 @@ mod tests {
         );
         assert_eq!(value["tr"], serde_json::json!([[80, 448.0, 480.0, 0.375]]));
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
+        assert_eq!(value["eg"], serde_json::json!([1, 3, 2, 1]));
         assert_eq!(
             value["mb"],
             serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
@@ -1612,7 +1614,7 @@ mod tests {
         };
         assert_eq!(section("entities").count, 3);
         assert!(section("entities").bytes > 0);
-        assert_eq!(section("visibility").count, 4);
+        assert_eq!(section("visibility").count, 8);
         assert!(section("visibility").bytes > 0);
         assert_eq!(section("resourceDeltas").count, 1);
         assert_eq!(section("events").count, 11);
@@ -1670,6 +1672,7 @@ mod tests {
             ability_objects: Vec::new(),
             trenches: Vec::new(),
             visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),
             upgrades: Vec::new(),

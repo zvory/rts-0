@@ -386,6 +386,14 @@ fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
         .expect("full-world enemy setup facing should project");
     assert!((projected_facing - gun_facing).abs() < 0.0001);
     assert!(full_world.visible_tiles.iter().all(|visible| *visible == 1));
+    assert!(full_world
+        .explored_tiles
+        .iter()
+        .all(|explored| *explored == 1));
+    assert!(selected_owner
+        .explored_tiles
+        .iter()
+        .any(|explored| *explored == 0));
     assert_eq!(full_world.player_resources.len(), phase7_players().len());
 }
 

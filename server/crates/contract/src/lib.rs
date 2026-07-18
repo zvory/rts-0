@@ -343,9 +343,11 @@ pub struct Snapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub trenches: Vec<TrenchView>,
     /// Row-major current visibility grid for this recipient, one byte per map tile.
-    /// Populated only for fog-filtered snapshots; clients keep explored history locally.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visible_tiles: Vec<u8>,
+    /// Row-major authoritative cumulative exploration grid for this recipient.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub explored_tiles: Vec<u8>,
     /// Recipient-only stale enemy building intel. These records are last-seen memory, not live
     /// entities: clients may render them as non-interactive fog silhouettes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

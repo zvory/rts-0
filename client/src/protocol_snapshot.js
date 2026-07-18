@@ -55,6 +55,7 @@ export function decodeCompactSnapshot(raw) {
     ).map(decodeCompactAbilityObject),
     trenches: decodeCompactTrenches(raw.tr),
     visibleTiles: decodeVisibilityRuns(raw.fg),
+    exploredTiles: decodeVisibilityRuns(raw.eg, "exploredTiles"),
     rememberedBuildings: readOptionalArray(
       raw.mb,
       "rememberedBuildings",
@@ -71,18 +72,18 @@ export function decodeCompactSnapshot(raw) {
   };
 }
 
-function decodeVisibilityRuns(record) {
+function decodeVisibilityRuns(record, field = "visibleTiles") {
   if (record == null) return [];
-  const runs = readArray(record, "visibleTiles", MAX_COMPACT_VISIBLE_TILES + 1);
-  if (runs.length < 2) throw new Error("visibleTiles run data must include a value and length");
-  let value = readU32(runs[0], "visibleTiles.first");
-  if (value !== 0 && value !== 1) throw new Error("visibleTiles.first must be 0 or 1");
+  const runs = readArray(record, field, MAX_COMPACT_VISIBLE_TILES + 1);
+  if (runs.length < 2) throw new Error(`${field} run data must include a value and length`);
+  let value = readU32(runs[0], `${field}.first`);
+  if (value !== 0 && value !== 1) throw new Error(`${field}.first must be 0 or 1`);
   const out = [];
   for (let i = 1; i < runs.length; i++) {
-    const len = readU32(runs[i], `visibleTiles.run.${i}`);
-    if (len === 0) throw new Error("visibleTiles run length must be positive");
+    const len = readU32(runs[i], `${field}.run.${i}`);
+    if (len === 0) throw new Error(`${field} run length must be positive`);
     if (out.length + len > MAX_COMPACT_VISIBLE_TILES) {
-      throw new Error("visibleTiles exceeds compact bounds");
+      throw new Error(`${field} exceeds compact bounds`);
     }
     for (let j = 0; j < len; j++) out.push(value);
     value = value === 1 ? 0 : 1;

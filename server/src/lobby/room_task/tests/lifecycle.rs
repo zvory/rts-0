@@ -285,6 +285,32 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     assert!(writer_a.snapshots.take().is_none());
     assert!(writer_b.snapshots.take().is_none());
 
+    task.on_set_vision_selection(
+        players[0].id,
+        VisionSelectionRequest::Player {
+            player_id: players[1].id,
+        },
+    );
+    assert_eq!(
+        task.observer_view_for(players[0].id),
+        rts_sim::game::ObserverView::Players(vec![players[1].id]),
+        "former active players should gain replay-view selection without changing command authority"
+    );
+    let selected_snapshot = writer_a
+        .snapshots
+        .take()
+        .expect("vision selection should send an immediate replay snapshot");
+    let Phase::ReplayViewer(session) = &task.phase else {
+        panic!("match should remain in replay viewer");
+    };
+    let expected = session.game.snapshot_for_spectator(&[players[1].id]);
+    assert_eq!(selected_snapshot.visible_tiles, expected.visible_tiles);
+    assert_eq!(selected_snapshot.explored_tiles, expected.explored_tiles);
+    assert_eq!(
+        selected_snapshot.player_resources,
+        expected.player_resources
+    );
+
     let a_messages: Vec<_> = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
     let b_messages: Vec<_> = std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()).collect();
     assert!(a_messages
