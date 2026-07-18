@@ -3,7 +3,7 @@ import {
   gridHotkeyForSlot,
   parsedFactionCommandId,
 } from "./hud_command_card.js";
-import { DEFAULT_FACTION_ID } from "./protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "./protocol.js";
 
 export const HOTKEY_PROFILE_SCHEMA_VERSION = 1;
 export const HOTKEY_STORAGE_PROFILES_KEY = "rts.hotkeyProfiles.v1";
@@ -26,11 +26,11 @@ const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   "unit.setupSupportWeapon": "U",
   "worker.buildMenu": "B",
   "worker.return": "W",
-  "kriegsia.build.tank_trap": "K",
-  "kriegsia.ability.smoke": "O",
-  "kriegsia.ability.scoutPlane": "P",
-  "kriegsia.train.artillery": "R",
-  "kriegsia.research.mortar_autocast": "O",
+  [factionCommandId(DEFAULT_FACTION_ID, "build", KIND.TANK_TRAP)]: "K",
+  [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SMOKE)]: "O",
+  [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SCOUT_PLANE)]: "P",
+  [factionCommandId(DEFAULT_FACTION_ID, "train", KIND.ARTILLERY)]: "R",
+  [factionCommandId(DEFAULT_FACTION_ID, "research", UPGRADE.MORTAR_AUTOCAST)]: "O",
 });
 
 const GLOBAL_HOTKEY_CONTEXTS = Object.freeze([Object.freeze({
@@ -502,9 +502,9 @@ export class HotkeyProfileService {
   _fallbackKeyForCommand(command) {
     const classicKey = normalizeHotkey(command.classicHotkey);
     if (classicKey) return classicKey;
-    const slotKey = Number.isInteger(command.slotIndex) ? gridHotkeyForSlot(command.slotIndex) : "";
-    if (slotKey) return slotKey;
-    return normalizeHotkey((command.label || "").trim().charAt(0));
+    const labelKey = normalizeHotkey((command.label || "").trim().charAt(0));
+    if (labelKey) return labelKey;
+    return Number.isInteger(command.slotIndex) ? gridHotkeyForSlot(command.slotIndex) : "";
   }
 
   _fallbackKeyForMissingCommand(command, bindingMaps) {

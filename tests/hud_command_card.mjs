@@ -533,6 +533,8 @@ function buttonSlots(card) {
     "training-centre",
     "research-complex",
     "research-complex-medium-guns",
+    "ekat-unit",
+    "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
@@ -542,6 +544,15 @@ function buttonSlots(card) {
         )
     ),
     "command-card context catalog samples Heavy Guns after Medium Guns so direct hotkeys can discover it",
+  );
+  assert(
+    catalog.some((entry) =>
+      entry.id === "ekat-unit" &&
+        entry.card.slots.some((slot) =>
+          slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_LINE_SHOT)
+        )
+    ),
+    "command-card context catalog samples Ekat abilities so direct hotkeys can discover them",
   );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.CITY_CENTRE,

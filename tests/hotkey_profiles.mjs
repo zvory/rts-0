@@ -91,6 +91,30 @@ function commandCarCard() {
   });
 }
 
+function ekatCard() {
+  const ekat = {
+    id: 23,
+    owner: 1,
+    kind: KIND.EKAT,
+    abilities: [
+      ABILITY.EKAT_TELEPORT,
+      ABILITY.EKAT_LINE_SHOT,
+      ABILITY.EKAT_MAGIC_ANCHOR,
+      ABILITY.EKAT_CONSUME_GOLEM,
+    ].map((ability) => ({ ability, cooldownLeft: 0, remainingUses: null })),
+  };
+  return buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: "ekat",
+    selection: [ekat],
+    entities: [ekat],
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+}
+
 {
   const catalog = buildHotkeyCommandCatalog(buildCommandCardContextCatalog());
   assert(
@@ -124,6 +148,13 @@ function commandCarCard() {
         command.slotIndex === 0
     ),
     "hotkey command catalog includes Heavy Guns research after Medium Guns unlocks its replacement slot",
+  );
+  assert(
+    catalog.commands.some((command) =>
+      command.commandId === ekatCommandId("ability", ABILITY.EKAT_LINE_SHOT) &&
+        command.slotIndex === 7
+    ),
+    "hotkey command catalog includes Ekat Line Shot from its X-grid context",
   );
   assert(
     catalog.commands.some((command) =>
@@ -183,6 +214,27 @@ function commandCarCard() {
     },
     { tankTrap: "K", smoke: "O", scoutPlane: "P", artillery: "R", mortarAutocast: "O" },
     "Classic RTS conflict resolutions are mnemonic rather than Grid-slot fallbacks",
+  );
+  assert.deepEqual(
+    hotkeys.resolveCard(ekatCard()).slots
+      .filter(Boolean)
+      .map((slot) => [slot.commandId, slot.hotkey]),
+    [
+      ["unit.move", "M"],
+      ["unit.holdPosition", "H"],
+      ["unit.attack", "A"],
+      ["unit.stop", "S"],
+      [ekatCommandId("ability", ABILITY.EKAT_TELEPORT), "D"],
+      [ekatCommandId("ability", ABILITY.EKAT_CONSUME_GOLEM), "C"],
+      [ekatCommandId("ability", ABILITY.EKAT_LINE_SHOT), "L"],
+      [ekatCommandId("ability", ABILITY.EKAT_MAGIC_ANCHOR), "B"],
+    ],
+    "Classic RTS assigns Ekat stable direct hotkeys instead of reusing grid slots",
+  );
+  assert.equal(
+    hotkeys.resolveSlot({ commandId: "future.ability.command", label: "Future", slotIndex: 0 }, classic).hotkey,
+    "F",
+    "direct-mode fallback prefers a mnemonic key to a grid slot",
   );
 }
 
@@ -472,7 +524,7 @@ function commandCarCard() {
   assert.equal(imported.ok, true, "unavailable faction commands are preserved on import");
   assert(imported.warnings.some((warning) => warning.code === "unavailableFactionCommand"), "unavailable faction command preservation is diagnosed");
   assert.equal(imported.profile.factionBindings.ekat[futureCommandId], "E", "future Ekat command binding is stored");
-  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "Q", "future Ekat bindings are inactive for current Kriegsia cards");
+  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "C", "future Ekat bindings are inactive for current Kriegsia cards");
   assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekat[futureCommandId], "E", "future Ekat bindings round-trip through export");
 }
 
