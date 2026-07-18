@@ -150,6 +150,7 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
         .get(oil)
         .and_then(|node| node.remaining())
         .expect("oil node remaining");
+
     let mut payouts = Vec::new();
 
     for _ in 0..config::HARVEST_TICKS {
@@ -179,7 +180,7 @@ fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
     let oil = entities
         .spawn_node(EntityKind::Oil, pump_x, pump_y)
         .expect("oil node should spawn");
-    entities
+    let pump = entities
         .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
         .expect("pump jack should spawn");
     entities
@@ -201,6 +202,11 @@ fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
         .and_then(|node| node.remaining())
         .expect("oil node remaining");
 
+    assert!(
+        !pump_jack_is_active(&entities, &teams, pump),
+        "inactive extraction query should match the payout gate"
+    );
+
     for _ in 0..config::HARVEST_TICKS.saturating_mul(2) {
         assert!(pump_jack::tick(&mut entities, &teams).is_empty());
     }
@@ -212,6 +218,10 @@ fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
 
     let _ = entities.remove(incomplete_ally);
     spawn_completed_mining_anchor(&mut entities, 2, pump_x, pump_y);
+    assert!(
+        pump_jack_is_active(&entities, &teams, pump),
+        "completed allied anchor should activate the projected extractor state"
+    );
     let mut payouts = Vec::new();
     for _ in 0..config::HARVEST_TICKS {
         payouts.extend(pump_jack::tick(&mut entities, &teams));
