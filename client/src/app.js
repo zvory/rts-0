@@ -203,6 +203,7 @@ export class App {
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
+    this.onConnectionLostKeyDown = this.onConnectionLostKeyDown.bind(this);
     this.onPlayerActivity = () => this.reportPlayerActivity();
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
@@ -238,6 +239,7 @@ export class App {
     dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
     window.addEventListener("beforeunload", this.onBeforeUnload);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    dom.connectionLost?.addEventListener("keydown", this.onConnectionLostKeyDown);
     for (const eventName of PLAYER_ACTIVITY_EVENTS) {
       document.addEventListener(eventName, this.onPlayerActivity, { passive: true });
     }
@@ -1120,9 +1122,18 @@ export class App {
   showConnectionLost(text = "The game can no longer reach the server.") {
     if (dom.connectionLostDetail) dom.connectionLostDetail.textContent = text;
     if (dom.connectionLost) dom.connectionLost.hidden = false;
+    this.match?.input?.exitPointerLock?.();
     dom.connectionLostReload?.focus();
     if (this.lobby) this.lobby.setStatus(text, true);
     this.labCatalog?.setStatus(text, { error: true });
+  }
+
+  /** Keep keyboard input inside the terminal connection-loss dialog. */
+  onConnectionLostKeyDown(ev) {
+    ev.stopPropagation();
+    if (ev.key !== "Tab") return;
+    ev.preventDefault();
+    dom.connectionLostReload?.focus();
   }
 
   /** Fetch and display the build version in the shared top-left badge. */

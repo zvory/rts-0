@@ -508,12 +508,25 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     const app = Object.create(App.prototype);
     app.lobby = null;
     app.labCatalog = null;
+    app.match = { input: { exitPointerLock() { app.pointerLockExitCount += 1; } } };
+    app.pointerLockExitCount = 0;
     app.showConnectionLost("Server connection lost.");
     assert(!connectionLost.hidden, "connection loss opens the persistent blocking overlay");
     assert(connectionLostDetail.textContent === "Server connection lost.",
       "connection loss overlay shows the transport failure detail");
     assert(reloadFocusCount === 1,
       "connection loss focuses the reload recovery action for keyboard users");
+    assert(app.pointerLockExitCount === 1,
+      "connection loss releases pointer lock so the recovery action is usable");
+    let stopped = 0;
+    let prevented = 0;
+    app.onConnectionLostKeyDown({
+      key: "Tab",
+      stopPropagation() { stopped += 1; },
+      preventDefault() { prevented += 1; },
+    });
+    assert(stopped === 1 && prevented === 1 && reloadFocusCount === 2,
+      "connection loss traps keyboard focus and blocks gameplay hotkeys");
   }
   assert(
     shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),
