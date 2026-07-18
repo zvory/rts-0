@@ -291,6 +291,69 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 
 {
   const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) { view.parentNode = this; },
+      removeChild(view) { view.parentNode = null; },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
+    const inactivePumpJack = {
+      id: 503,
+      owner: 1,
+      kind: KIND.PUMP_JACK,
+      x: 160,
+      y: 160,
+      hp: 50,
+      maxHp: 50,
+      state: "idle",
+      extractorActive: false,
+    };
+
+    renderer._drawBuilding(inactivePumpJack, new Map([[1, 0x4878c8]]), {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+    });
+
+    const badgeCalls = renderer._pools.buildingOverlays.get(inactivePumpJack.id)?.calls || [];
+    assert(
+      badgeCalls.filter((call) => call[0] === "drawCircle").length === 2,
+      "inactive Pump Jack draws a backed prohibited-sign circle",
+    );
+    assert(
+      badgeCalls.some((call) => call[0] === "moveTo")
+        && badgeCalls.some((call) => call[0] === "lineTo"),
+      "inactive Pump Jack prohibited sign includes the diagonal slash",
+    );
+
+    const activePumpJack = { ...inactivePumpJack, id: 504, extractorActive: true };
+    renderer._drawBuilding(activePumpJack, new Map([[1, 0x4878c8]]), {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+    });
+    assert(
+      !renderer._pools.buildingOverlays.has(activePumpJack.id),
+      "active Pump Jack does not draw the prohibited-sign badge",
+    );
+
+    const scaffold = { ...inactivePumpJack, id: 505, buildProgress: 0.5 };
+    renderer._drawBuilding(scaffold, new Map([[1, 0x4878c8]]), {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+    });
+    assert(
+      !renderer._pools.buildingOverlays.has(scaffold.id),
+      "Pump Jack scaffold does not show an inactive-extractor warning",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
   const priorConsoleError = console.error;
   const consoleErrors = [];
   console.error = (...args) => consoleErrors.push(args);

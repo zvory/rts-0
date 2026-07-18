@@ -640,6 +640,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.breakthrough_aura_ticks.is_some() {
             len = 39;
         }
+        if entity.extractor_active.is_some() {
+            len = 40;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -766,6 +769,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 38 {
             seq.serialize_element(&entity.breakthrough_aura_ticks)?;
+        }
+        if len > 39 {
+            seq.serialize_element(&entity.extractor_active)?;
         }
         seq.end()
     }

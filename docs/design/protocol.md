@@ -706,7 +706,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 41. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 42. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -732,7 +732,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 41,
+  "v": 42,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -742,7 +742,7 @@ adds an explicit application compression envelope.
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
-      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?
+      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -941,6 +941,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   buildActive?: bool,            // owner-only; true when server advanced this scaffold this tick
+  extractorActive?: bool,        // visible completed Pump Jack is currently extracting
   // Tank Trap deconstruction:
   deconstructProgress?: f32,     // 1..0 remaining dismantle progress; render reverse progress bar
   // gatherers:

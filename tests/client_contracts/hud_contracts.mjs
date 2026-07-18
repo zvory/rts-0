@@ -508,6 +508,39 @@ function fakeHudRootWithoutResourceSpans() {
     assert(panel.children[0].innerHTML.includes("40 / 100"), "HUD selected detail renders changed health after dirty guard");
   });
 
+  for (const [kind, label] of [[KIND.STEEL, "Steel"], [KIND.OIL, "Oil"]]) {
+    withFakeHudDocument(({ FakeElement }) => {
+      const panel = new FakeElement("section");
+      const root = {
+        querySelector(selector) {
+          return selector === "#selected-panel" ? panel : null;
+        },
+      };
+      const selected = { id: kind === KIND.STEEL ? 2201 : 2202, owner: 0, kind, hp: 1, maxHp: 1, remaining: 625 };
+      const state = {
+        selectionBudgetOverflow: null,
+        selectedEntities() {
+          return [selected];
+        },
+      };
+      const hud = new HUD(root, state, {}, null);
+      hud._renderSelectedPanel();
+      const originalNode = panel.children[0];
+      assert(
+        originalNode.innerHTML.includes(`${label} Remaining:</span><strong>625</strong>`),
+        `HUD selected ${label.toLowerCase()} patch shows its remaining resources`,
+      );
+
+      selected.remaining = 417;
+      hud._renderSelectedPanel();
+      assert(panel.children[0] !== originalNode, `HUD selected ${label.toLowerCase()} patch refreshes after mining`);
+      assert(
+        panel.children[0].innerHTML.includes(`${label} Remaining:</span><strong>417</strong>`),
+        `HUD selected ${label.toLowerCase()} patch shows the updated remaining resources`,
+      );
+    });
+  }
+
   {
     const ownResearchState = {
       playerId: 1,
