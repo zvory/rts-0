@@ -47,6 +47,7 @@ with licensed recordings before any commercial distribution.
 | `combat/combat_panzerfaust_launch_01.mp3` | Panzerfaust launch — generated first-pass cue; replace with reviewed recording before final audio pass | local procedural ffmpeg generation, Phase 6 | project-generated |
 | `combat/combat_panzerfaust_impact_01.mp3` | Panzerfaust tank impact/miss-expire cue — generated first-pass cue; replace with reviewed recording before final audio pass | local procedural ffmpeg generation, Phase 6 | project-generated |
 | `combat/combat_mortar_launch_04.mp3` | Mortar launch — selected from CC0 examples; too long, trim before final polish | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
+| `combat/combat_mortar_impact_01.mp3` | Mortar impact — first 76 ms removed; normalized to the project −16 LUFS target with a ≤ −1 dBTP ceiling | user-provided local source | unknown |
 | `combat/combat_artillery_fire_05.mp3` | Artillery fire — selected from CC0 examples | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
 | `combat/combat_artillery_landing_01.mp3` | Artillery incoming whistle and landing blast — user-selected focused-whistle mix, trimmed to 7.20 s after the audible decay | user-provided local source | unknown |
 | `combat/combat_distant_bed_01.mp3` | First-pass fixed 12 s distant-combat bed; low/high-pass filtered, reverberant, and compositionally static so the global activity signal reveals no live battle details | Project derivative of `combat_artillery_fire_05`, `combat_mortar_launch_04`, and `combat_panzerfaust_launch_01` | project derivative (CC0 + project-generated sources) |
@@ -68,7 +69,7 @@ with licensed recordings before any commercial distribution.
 - License unknown for `units_tank_engine_idle_03.mp3` — verify freesound.org/people/C-V/sounds/565598/
 - Grass infantry footstep pack: need 6–10 clean variations on grass surface
 - Tank engine running (moving): https://freesound.org/people/C-V/sounds/565597/ (same session as idle_03)
-- No explosion sounds (all candidates rejected — see SOUND_NOTES)
+- No additional mortar explosion variations; this first impact cue is user-provided and its source/license needs verification
 - Replace generated Panzerfaust launch/impact cues with reviewed realistic recordings before final
   audio polish
 - `ambient/` directory is empty
