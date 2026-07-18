@@ -1835,7 +1835,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   recoil frames remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
   anchor source. Artillery likewise uses a modular A-19 PNG atlas for two independent trails, its
-  frame/wheels, and its visibly elevated bulky barrel/recoil assembly; the current pass-02 review
+  frame/wheels, and its visibly elevated bulky barrel/recoil assembly; the current pass-03 review
+  pitches the complete weapon assembly toward the elevated camera so its muzzle face and recoil
+  depth remain legible from the above-view camera. It
   temporarily colors the left trail purple and frames both full trail crops in black for
   pivot/origin inspection. It uses
   the existing SVG Artillery rig for setup/facing/recoil animation and the muzzle-flash overlay.
