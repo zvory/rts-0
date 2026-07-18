@@ -13,6 +13,7 @@ pub(crate) mod ability_projectile;
 mod ability_projection;
 pub(crate) mod ability_runtime;
 mod analysis;
+mod apm;
 mod artillery;
 mod building_memory;
 mod checkpoint;
