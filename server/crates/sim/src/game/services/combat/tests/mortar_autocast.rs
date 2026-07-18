@@ -41,7 +41,7 @@ fn mortar_autocast_prefers_safe_target_over_nearer_unsafe_target() {
 }
 
 #[test]
-fn mortar_autocast_tracks_safe_target_while_reload_blocks_firing() {
+fn mortar_autocast_waits_until_reload_finishes_before_acquiring() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
@@ -49,7 +49,7 @@ fn mortar_autocast_tracks_safe_target_while_reload_blocks_firing() {
     let unsafe_enemy = entities
         .spawn_unit(2, EntityKind::Rifleman, 280.0, 100.0)
         .expect("unsafe enemy should spawn");
-    let safe_enemy = entities
+    let _safe_enemy = entities
         .spawn_unit(2, EntityKind::Rifleman, 260.0, 260.0)
         .expect("safe enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
@@ -72,14 +72,13 @@ fn mortar_autocast_tracks_safe_target_while_reload_blocks_firing() {
     let mortar_entity = entities.get(mortar_id).expect("mortar should exist");
     assert_eq!(
         mortar_entity.target_id(),
-        Some(safe_enemy),
-        "reloading autocast mortar should keep tracking the safe target"
+        None,
+        "reloading autocast mortar should defer target acquisition until its weapon is ready"
     );
-    let expected_turn = mortar::TURN_RATE_RAD_PER_TICK;
     assert!(
-        angle_delta(mortar_entity.facing(), expected_turn).abs() <= 0.001,
-        "mortar should turn toward the safe target while reloading, got {:.4}",
-        mortar_entity.facing()
+        angle_delta(mortar_entity.facing(), 0.0).abs() <= 0.001,
+        "mortar should not turn toward a target it has not acquired, got {:.4}",
+        mortar_entity.facing(),
     );
     assert!(
         mortar_entity.attack_cd() > 0,

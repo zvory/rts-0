@@ -1378,8 +1378,8 @@ General rules:
   the current authoritative turret facing, accepts only targets within a 10-degree half arc and the
   6-tile coax range, uses intended-target direct-fire legality so enemy hard blockers can reject a
   behind-them infantry target, and never rotates the turret, changes the cannon target slot, clears
-  paths, or requests chase movement. Same-tick Tank cannon/coax events are emitted cannon first,
-  then coax.
+  paths, or requests chase movement. It skips candidate construction while the coax weapon is on
+  cooldown. Same-tick Tank cannon/coax events are emitted cannon first, then coax.
   The first successful enemy Tank cannon, Anti-Tank Gun, or Panzerfaust hit on a surviving Tank
   locks its source for three seconds. Later hits cannot redirect or extend that lock. At the next
   movement phase, a stationary Tank turns at the normal hull rate toward the locked source; once
@@ -1404,12 +1404,14 @@ General rules:
   closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose
   to real combat targets. The obstruction query is read-only, uses the current waypoint, `path_goal`,
   or movement intent, and does not run pathfinding during target ranking.
-  Retention is intentionally a stickiness term inside the ranker rather than a separate branch:
-  Tanks, Scout Cars, and Methamphetamines-upgraded Riflemen keep a still-legal current target when
-  competing targets have the same material rank, but they switch when a higher-rank default-weapon
-  threat appears.
-  Dead, friendly, hidden, smoke-covered, or non-fireable retained targets are filtered out before
-  ranking and cannot bypass legality.
+  Default-weapon acquisition is cycle-based. A full spatial candidate pass runs when a ready weapon
+  has no target, immediately after a shot to prepare the next target during reload, or on the ready
+  tick when that prepared target fails current hostile, visibility, smoke, range, line-of-sight,
+  blocker, or weapon-specific legality. Cooldown, setup, and aiming ticks validate only the
+  committed target and never rank alternatives. If the prepared target remains fireable when the
+  weapon becomes ready, it receives the shot without a full rerank; the post-shot pass can then
+  choose a newly higher-priority threat for the following cycle. Explicit Attack orders retain
+  their commanded-target semantics.
 - The auto-acquisition ranker chooses only for the current default attack profile. Future grenades,
   satchels, sticky bombs, melee demolition, or other special attacks must be represented as separate
   profiles with explicit activation policy; explicit-only special attacks can be added without

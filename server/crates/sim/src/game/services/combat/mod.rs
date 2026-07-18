@@ -7,7 +7,9 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
-use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order};
+#[cfg(test)]
+use crate::game::entity::Entity;
+use crate::game::entity::{AttackPhase, EntityKind, EntityStore, Order};
 use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -25,6 +27,7 @@ use crate::protocol::Event;
 use rand::Rng;
 
 mod acquisition;
+mod acquisition_pass;
 mod activation;
 mod coax;
 mod damage;
@@ -39,10 +42,9 @@ mod weapons;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-use acquisition::combat_mode;
+use acquisition::{combat_mode, resolve_target as resolve_target_with_obstruction};
 use acquisition::{
-    combat_mode_with_moving_fire, direct_fire_target_legal,
-    resolve_target as resolve_target_with_obstruction, CombatMode, DirectFireLegality,
+    combat_mode_with_moving_fire, direct_fire_target_legal, CombatMode, DirectFireLegality,
     DirectFireVisibility,
 };
 use damage::apply_damage;
@@ -244,9 +246,6 @@ pub(in crate::game) fn combat_system(
         }
 
         // Resolve / acquire a target id based on the current order semantics.
-        let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-            occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
-        };
         let require_safe_mortar_autocast_target = is_mortar_team
             && matches!(
                 entities
@@ -255,16 +254,16 @@ pub(in crate::game) fn combat_system(
                 Some(true)
             )
             && mortar_autocast_researched(owner);
-        let target = resolve_target_with_obstruction(
+        let target = acquisition_pass::select(
             map,
             entities,
             &blockers,
             teams,
+            occ,
             spatial,
             &los,
             fog,
             smokes,
-            &tank_trap_obstructs_vehicle_route,
             id,
             owner,
             px,
@@ -272,20 +271,12 @@ pub(in crate::game) fn combat_system(
             acquire_px,
             mode,
             can_move_fire,
-            &|target_id| {
-                (!is_mortar_team
-                    || mortar_autocast_target_eligible(
-                        entities,
-                        id,
-                        target_id,
-                        min_range_px,
-                        range_px,
-                    ))
-                    && (!require_safe_mortar_autocast_target
-                        || mortar_autocast_target_safe(
-                            entities, teams, fog, spatial, owner, id, target_id, tick,
-                        ))
-            },
+            weapon_profile.id,
+            is_mortar_team,
+            min_range_px,
+            range_px,
+            require_safe_mortar_autocast_target,
+            tick,
         );
         let Some(tid) = target else {
             if let Some(e) = entities.get_mut(id) {
@@ -385,6 +376,7 @@ pub(in crate::game) fn combat_system(
                 DirectFireLegality::auto_acquire(),
             )
         };
+        let mut fired = false;
 
         if dist >= min_range_px && dist <= range_px && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
@@ -460,56 +452,86 @@ pub(in crate::game) fn combat_system(
                     if let Some(e) = entities.get_mut(id) {
                         e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                     }
-                    continue;
-                }
-                let extra_miss_chance =
-                    entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
-                let shot_victim_owner = apply_damage(
-                    map,
-                    entities,
-                    &blockers,
-                    teams,
-                    events,
-                    fog,
-                    smokes,
-                    rng,
-                    id,
-                    tid,
-                    weapon_profile,
-                    dmg,
-                    owner,
-                    px,
-                    py,
-                    tx,
-                    ty,
-                    range_px,
-                    extra_miss_chance,
-                    tick,
-                );
-                if is_unit {
-                    if let Some(victim_owner) = shot_victim_owner {
-                        let player_ids = events.keys().copied().collect::<Vec<_>>();
-                        record_firing_reveals_for_victim_team(
-                            firing_reveals,
-                            player_ids,
-                            fog,
-                            teams,
-                            victim_owner,
-                            owner,
-                            id,
-                            (px, py),
-                            tick,
-                            cd_reset,
-                        );
+                    fired = true;
+                } else {
+                    let extra_miss_chance =
+                        entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
+                    let shot_victim_owner = apply_damage(
+                        map,
+                        entities,
+                        &blockers,
+                        teams,
+                        events,
+                        fog,
+                        smokes,
+                        rng,
+                        id,
+                        tid,
+                        weapon_profile,
+                        dmg,
+                        owner,
+                        px,
+                        py,
+                        tx,
+                        ty,
+                        range_px,
+                        extra_miss_chance,
+                        tick,
+                    );
+                    if is_unit {
+                        if let Some(victim_owner) = shot_victim_owner {
+                            let player_ids = events.keys().copied().collect::<Vec<_>>();
+                            record_firing_reveals_for_victim_team(
+                                firing_reveals,
+                                player_ids,
+                                fog,
+                                teams,
+                                victim_owner,
+                                owner,
+                                id,
+                                (px, py),
+                                tick,
+                                cd_reset,
+                            );
+                        }
                     }
-                }
-                if let Some(e) = entities.get_mut(id) {
-                    e.set_weapon_cooldown(weapon_profile.id, cd_reset);
+                    if let Some(e) = entities.get_mut(id) {
+                        e.set_weapon_cooldown(weapon_profile.id, cd_reset);
+                    }
+                    fired = true;
                 }
             }
         } else if mode == CombatMode::Ordered {
             if let Some(e) = entities.get_mut(id) {
                 e.mark_attack_phase(AttackPhase::Waiting);
+            }
+        }
+        if fired {
+            let next_target = acquisition_pass::acquire(
+                map,
+                entities,
+                &blockers,
+                teams,
+                occ,
+                spatial,
+                &los,
+                fog,
+                smokes,
+                id,
+                owner,
+                px,
+                py,
+                acquire_px,
+                mode,
+                can_move_fire,
+                is_mortar_team,
+                min_range_px,
+                range_px,
+                require_safe_mortar_autocast_target,
+                tick,
+            );
+            if let Some(e) = entities.get_mut(id) {
+                e.set_target_id(next_target);
             }
         }
     }

@@ -54,6 +54,11 @@ pub(super) fn fire_tank_coax_system(
         return;
     };
     for id in entities.ids() {
+        let ready =
+            matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
+        if !ready {
+            continue;
+        }
         let Some(snapshot) = tank_coax_snapshot(entities, id, weapon_profile) else {
             continue;
         };
@@ -89,11 +94,6 @@ pub(super) fn fire_tank_coax_system(
             if !reaction_ready {
                 continue;
             }
-        }
-        let ready =
-            matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
-        if !ready {
-            continue;
         }
         let shot_victim_owner = apply_damage(
             map,

@@ -326,7 +326,7 @@ fn aggressive_auto_acquisition_prefers_currently_fireable_targets(mode: CombatMo
     mode == CombatMode::Aggressive
 }
 
-fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {
+pub(super) fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {
     !(movement_body_class(attacker) == MovementBodyClass::InfantryLike
         && target.kind == EntityKind::TankTrap)
 }
@@ -415,7 +415,7 @@ fn legal_target_candidates(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn target_has_legal_shot(
+pub(super) fn target_has_legal_shot(
     map: &Map,
     entities: &EntityStore,
     blockers: &ShotBlockerIndex,
