@@ -106,3 +106,41 @@ fn queued_mortar_setup_is_terminal_and_retains_current_facing() {
         OrderIntent::SetupAntiTankGuns(_)
     ));
 }
+
+#[test]
+fn immediate_mortar_setup_allows_a_later_queued_order() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let mortar = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![
+            (
+                1,
+                SimCommand::SetupAntiTankGuns {
+                    units: vec![mortar],
+                    x: 100.0,
+                    y: 100.0,
+                    queued: false,
+                },
+            ),
+            (
+                1,
+                SimCommand::Move {
+                    units: vec![mortar],
+                    x: 180.0,
+                    y: 100.0,
+                    queued: true,
+                },
+            ),
+        ],
+    );
+
+    let mortar = entities.get(mortar).expect("mortar should exist");
+    assert_eq!(mortar.queued_orders().len(), 1);
+    assert!(matches!(mortar.queued_orders()[0], OrderIntent::Move(_)));
+}

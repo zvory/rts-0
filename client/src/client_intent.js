@@ -376,9 +376,7 @@ export class ClientIntent {
     if (planHasTerminal(authorityPlan, entity)) return;
     if (planHasTerminal(current, entity)) return;
     const next = replaceContradictoryLocalStages(current, stage);
-    next.push(cloneStage(stage, {
-      terminal: stage.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS && entity?.kind === KIND.MORTAR_TEAM,
-    }));
+    next.push(cloneStage(stage));
     this._plannedOrderStagesByUnit.set(unitId, next);
   }
 
@@ -517,8 +515,9 @@ function planHasTerminal(plan, entity = null) {
 
 function stageIsTerminalForEntity(stage, entity = null) {
   return QUEUE_TERMINAL_STAGES.has(stage?.kind) ||
-    !!stage?.terminal ||
-    (entity?.kind === KIND.MORTAR_TEAM && stage?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS);
+    (entity?.kind === KIND.MORTAR_TEAM &&
+      stage?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
+      !stage?.replacesAuthority);
 }
 
 function stageConfirmedByAuthority(stage, authorityPlan) {

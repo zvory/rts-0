@@ -68,3 +68,24 @@ assertDeepEqual(
   ],
   "queued mortar setup remains after preceding movement and stops later queued commands",
 );
+
+// Immediate mortar setup replaces the old plan but does not prevent a later queued command.
+const immediateMortarSetupIntent = new ClientIntent();
+immediateMortarSetupIntent.recordPlannedCommand(
+  cmd.setupAntiTankGuns([mortar.id], mortar.x, mortar.y),
+  [mortar],
+  { sent: true, clientSeq: 90 },
+);
+immediateMortarSetupIntent.recordPlannedCommand(
+  cmd.move([mortar.id], 512, 288, true),
+  [mortar],
+  { sent: true, clientSeq: 91 },
+);
+assertDeepEqual(
+  immediateMortarSetupIntent.plannedOrderPlanForEntity(mortar),
+  [
+    { kind: "setupAntiTankGuns", x: mortar.x, y: mortar.y },
+    { kind: "move", x: 512, y: 288 },
+  ],
+  "immediate mortar setup still allows a subsequent queued command",
+);
