@@ -54,8 +54,8 @@ assert.equal(deployedRightTrail.tintSlot, "team-light");
 assert.equal("diagnostics" in ARTILLERY_PNG_RIG_ATLAS.grid, false);
 assert.ok(Math.abs(deployedLeftTrail.positionOffsetX - (-3.024 - (541 / 15) * 0.5)) < 0.001);
 assert.ok(Math.abs(deployedRightTrail.positionOffsetX - (-3.024 - (541 / 15) * 0.5)) < 0.001);
-assert.ok(Math.abs(deployedLeftTrail.positionOffsetY - (-(217 / 15) * 0.1)) < 0.001);
-assert.ok(Math.abs(deployedRightTrail.positionOffsetY - ((216 / 15) * 0.1)) < 0.001);
+assert.ok(Math.abs(deployedLeftTrail.positionOffsetY - (-(217 / 15) * 0.1 - (541 / 15) * 0.1)) < 0.001);
+assert.ok(Math.abs(deployedRightTrail.positionOffsetY - ((216 / 15) * 0.1 + (541 / 15) * 0.1)) < 0.001);
 
 const entity = {
   id: 47,
