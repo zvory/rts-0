@@ -1237,7 +1237,7 @@ fn lab_vision_state_and_snapshots_are_per_operator() {
         panic!("lab should remain running");
     };
     let mut expected_operator = game.snapshot_for_spectator(&[LAB_PLAYER_TWO_ID]);
-    let mut expected_collab = game.snapshot_for_spectator(&[LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID]);
+    let mut expected_collab = game.snapshot_for_observer(&ObserverView::Omniscient);
     compact_snapshot_for_wire(&mut expected_operator);
     compact_snapshot_for_wire(&mut expected_collab);
     assert_eq!(

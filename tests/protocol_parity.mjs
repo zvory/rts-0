@@ -557,7 +557,7 @@ const decodedAck = decodeServerMessage({
   v: COMPACT_SNAPSHOT_VERSION,
   s: [12, 75, 0, 4, 10],
   e: [],
-  pr: [[1, 325, 80, 7, 14, 42]],
+  pr: [[1, 325, 80, 7, 14, 42, [1]]],
   ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null]]],
   n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
 });
@@ -567,6 +567,7 @@ assert(decodedAck.netStatus.lastSimConsumedClientTick === 12, "compact consumed 
 assert(decodedAck.abilityObjects[0].kind === "returnMarker", "compact ability object kind decodes");
 assert(decodedAck.abilityObjects[0].sourceCasterId === 7, "compact ability source caster decodes");
 assert(decodedAck.playerResources[0].apm === 42, "compact observer player APM decodes");
+assert(decodedAck.playerResources[0].upgrades.length === 1, "compact observer upgrades decode");
 assert(
   decodedAck.abilityObjects[0].ownerState.earliestReturnTick === 45,
   "compact ability owner state decodes",

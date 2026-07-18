@@ -445,7 +445,7 @@ fn normal_live_start_payloads_stamp_active_players_and_spectators() {
     assert!(!spectator_payload.capabilities.commands.gameplay);
     assert!(spectator_payload.capabilities.match_controls.pause);
     assert!(!spectator_payload.capabilities.room_time.available);
-    assert!(!spectator_payload.capabilities.visibility.vision_selection);
+    assert!(spectator_payload.capabilities.visibility.vision_selection);
     assert!(!spectator_payload.capabilities.actions.branch_from_tick);
     assert!(spectator_payload.replay.is_none());
     assert!(spectator_payload.lab.is_none());
@@ -750,7 +750,7 @@ fn late_spectator_join_gets_pause_control_and_read_only_snapshot() {
     let Phase::InGame(game) = &task.phase else {
         panic!("normal live match should remain active");
     };
-    let mut expected = game.snapshot_for_spectator(&[1]);
+    let mut expected = game.snapshot_for_observer(&ObserverView::Omniscient);
     compact_snapshot_for_wire(&mut expected);
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);

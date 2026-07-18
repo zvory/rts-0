@@ -30,7 +30,7 @@ export class RoomTimeControls {
     this.lastRoomTimeSpeed = 2;
     this.floatingPanel = null;
 
-    if (!dom.roomTimeControls || !this.roomTime.available) return;
+    if (!dom.roomTimeControls || (!this.roomTime.available && !this.visibility.visionSelection)) return;
 
     dom.roomTimeControls.hidden = false;
     dom.roomTimeControls.classList.toggle("replay-viewer-controls", this.replayViewer);
@@ -56,11 +56,13 @@ export class RoomTimeControls {
     if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
     if (this.replayViewer && this.actions.branchFromTick) this.buildBranchFromTickControl();
     if (this.visibility.visionSelection) this.buildVisionSelectionControls();
-    this.buildRoomTimeStatus();
-    if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
-    this.syncRoomTimePendingPresentation();
-    this.updateRoomTimePauseButton();
-    this.updateRoomTimeStatus();
+    if (this.roomTime.available) {
+      this.buildRoomTimeStatus();
+      if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
+      this.syncRoomTimePendingPresentation();
+      this.updateRoomTimePauseButton();
+      this.updateRoomTimeStatus();
+    }
   }
 
   roomTimeControlSurface() {
@@ -338,14 +340,14 @@ export class RoomTimeControls {
     const group = document.createElement("div");
     group.className = "vision-selection-controls";
     group.setAttribute("role", "group");
-    group.setAttribute("aria-label", "Replay fog perspective");
+    group.setAttribute("aria-label", "Observer perspective");
 
     const all = document.createElement("button");
     all.type = "button";
     all.className = "spd-btn vision-btn active";
     all.dataset.vision = "all";
-    all.textContent = "All vision";
-    all.title = "Show the union of all players' fog perspectives.";
+    all.textContent = "Omniscient";
+    all.title = "Show the complete world and every owner's private details.";
     this.bindRoomTimeActivation(all, (event) => this.onVisionSelectionClick({
       target: all,
       shiftKey: event?.shiftKey,

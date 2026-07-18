@@ -142,6 +142,12 @@ impl Game {
     /// owner-only movement paths. The default `snapshot_for` includes no movement diagnostics.
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
 
+    /// Build a read-only privileged observer projection. `Omniscient` exposes the complete
+    /// world/all-owner private detail; `Players` combines selected real-player perspectives.
+    /// This value never conveys command authority.
+    pub fn snapshot_for_observer(&self, view: &ObserverView) -> Snapshot;
+    pub fn snapshot_for_observer_with_options(&self, view: &ObserverView, options: SnapshotOptions) -> Snapshot;
+
     /// Build a spectator snapshot from the union of the selected players' current fog, stale
     /// building memory, and resource rows.
     pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot;
@@ -685,8 +691,8 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   accepted freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
-  `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, selected
-  perspective projection, full-world projection, projected movement-path diagnostics, and
+  `SnapshotFanout`. `ProjectionPolicy` names live player fog and the shared observer views
+  (omniscient or an explicit player subset), plus projected movement-path diagnostics and
   observer-analysis recipient scopes; `SnapshotFanout`
   owns compacting, net status, and perf accounting. Lobby phase: broadcast `lobby` on changes.
 - Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
@@ -701,8 +707,9 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
   gameplay-read-only live spectator attach with shared pause controls. Spectators receive
   `StartPayload.spectator = true` and live
-  `game.snapshot_for_spectator(active_player_ids)` snapshots plus event unions for those active
-  player buckets, with per-player position-free non-alert notices filtered out, but are not
+  omniscient observer snapshots by default; they can select one or more real-player perspectives
+  through the same connection-scoped observer-view state used by replay, dev, and Lab. Normal live
+  observer event unions filter per-player position-free non-alert notices. Spectators are not
   included in `PlayerInit`, command routing, elimination, or match-player counts.
   `RoomTask` captures the existing connected recipient ids before inserting a late spectator and
   queues a room-owned
@@ -1021,8 +1028,8 @@ Complex ability runtime state lives in `game::ability_runtime`. Its `AbilityRunt
 deterministic active instances and lightweight ability world objects that are not normal entities:
 they do not participate in supply, pathing, production, selection, scoring, or combat target
 queries unless a later phase explicitly adds such behavior. `Game::snapshot_for`,
-`snapshot_for_spectator`, and `snapshot_full_for` project active world objects through
-`Snapshot.abilityObjects`, filtered by the same current-team fog / spectator union / full-world
+`snapshot_for_observer`, and `snapshot_full_for` project active world objects through
+`Snapshot.abilityObjects`, filtered by the same current-team fog / selected-player / omniscient
 mode used by other snapshot data. Enemy-visible objects expose only public render fields; owner-only
 payload state and safe caster ids are withheld from enemies.
 

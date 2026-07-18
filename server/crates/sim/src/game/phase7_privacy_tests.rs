@@ -346,6 +346,15 @@ fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
     assert!(normal_barracks.rally.is_none());
     assert!(normal_barracks.rally_plan.is_empty());
     let full_world = game.snapshot_full_for(1);
+    let selected_owner = game.snapshot_for_observer(&super::ObserverView::Players(vec![3]));
+    let selected_barracks = selected_owner
+        .entities
+        .iter()
+        .find(|entity| entity.id == barracks)
+        .expect("selected owner barracks should project");
+    assert_eq!(selected_barracks.rally, Some([rally.0, rally.1]));
+    assert_eq!(selected_owner.player_resources.len(), 1);
+    assert_eq!(selected_owner.player_resources[0].id, 3);
     let full_barracks = full_world
         .entities
         .iter()
@@ -376,6 +385,8 @@ fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
         .setup_facing
         .expect("full-world enemy setup facing should project");
     assert!((projected_facing - gun_facing).abs() < 0.0001);
+    assert!(full_world.visible_tiles.iter().all(|visible| *visible == 1));
+    assert_eq!(full_world.player_resources.len(), phase7_players().len());
 }
 
 #[test]

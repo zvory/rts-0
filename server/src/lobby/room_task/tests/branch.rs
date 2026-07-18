@@ -577,7 +577,7 @@ fn branch_live_commands_and_snapshots_use_mapped_original_seats() {
     );
     assert_eq!(
         snapshot_spectator.visible_tiles,
-        game.snapshot_for_spectator(&[players[0].id, players[1].id])
+        game.snapshot_for_observer(&ObserverView::Omniscient)
             .visible_tiles
     );
 }
@@ -638,10 +638,10 @@ fn branch_live_late_join_start_payload_attaches_as_observer_without_resetting_st
     assert!(start.spectator);
     assert_eq!(start.prediction_build_id, None);
     assert_eq!(start.prediction_version, 0);
-    assert_eq!(
-        start.capabilities,
-        SessionPolicy::for_room(&task.mode, SessionPhase::LiveMatch).start_capabilities(false)
-    );
+    let mut expected_capabilities =
+        SessionPolicy::for_room(&task.mode, SessionPhase::LiveMatch).start_capabilities(false);
+    expected_capabilities.visibility.vision_selection = true;
+    assert_eq!(start.capabilities, expected_capabilities);
     assert!(start.diagnostics.observer_analysis);
     assert!(!start.capabilities.commands.gameplay);
     assert!(start.capabilities.match_controls.pause);

@@ -446,6 +446,9 @@ pub struct PlayerResourceSnapshot {
     pub supply_cap: u32,
     /// Rolling command-envelope rate over the last ten simulated seconds.
     pub apm: u32,
+    /// Completed research for this projected player.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<String>,
 }
 
 /// Dynamic resource state the client is currently allowed to know.

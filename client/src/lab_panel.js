@@ -123,7 +123,6 @@ export class LabPanel {
     status.className = "lab-status-grid";
     this.addStatus(status, "Role", roleLabel(this.state?.role));
     this.addStatus(status, "Map", this.mapName());
-    this.addStatus(status, "Vision", labVisionLabel(this.state?.vision));
     this.addStatus(status, "Dirty", this.state?.dirty ? "Yes" : "No");
     this.addStatus(status, "Ops", String(this.state?.operationCount ?? 0));
     body.appendChild(status);
@@ -187,7 +186,6 @@ export class LabPanel {
 
   renderOptionsPanel() {
     const root = this.panelSection("Options", "lab-options");
-    root.appendChild(this.renderVisionOptions());
 
     if (!this.canOperate()) return root;
 

@@ -66,20 +66,6 @@ impl<'a> Participants<'a> {
         ids
     }
 
-    pub(super) fn spectator_visible_player_ids(
-        &self,
-        ai_ids: impl IntoIterator<Item = u32>,
-    ) -> Vec<u32> {
-        if !self.branch_live_seat_by_connection.is_empty() {
-            return self
-                .branch_live_seat_by_connection
-                .values()
-                .copied()
-                .collect();
-        }
-        self.active_seat_ids(ai_ids)
-    }
-
     pub(super) fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {
         self.branch_live_seat_by_connection
             .get(&connection_id)

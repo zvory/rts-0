@@ -31,7 +31,7 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     let starts = start_payloads(&mut writer);
     assert_eq!(starts.len(), 1);
     let payload = &starts[0];
-    assert_eq!(payload.player_id, LAB_PLAYER_ONE_ID);
+    assert_eq!(payload.player_id, 99);
     assert!(payload.spectator);
     assert!(payload.prediction_build_id.is_none());
     assert_eq!(payload.prediction_version, 0);
@@ -44,7 +44,7 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     assert!(payload.capabilities.room_time.seek_relative);
     assert!(payload.capabilities.room_time.seek_absolute);
     assert!(payload.capabilities.room_time.timeline);
-    assert!(!payload.capabilities.visibility.vision_selection);
+    assert!(payload.capabilities.visibility.vision_selection);
     assert!(!payload.capabilities.actions.branch_from_tick);
     assert!(payload.diagnostics.is_empty());
     assert!(payload.replay.is_none());
@@ -369,7 +369,7 @@ fn lab_start_payload_additional_joiner_uses_policy_metadata() {
     let starts = start_payloads(&mut viewer_writer);
     assert_eq!(starts.len(), 1);
     let payload = &starts[0];
-    assert_eq!(payload.player_id, LAB_PLAYER_ONE_ID);
+    assert_eq!(payload.player_id, 100);
     assert!(payload.spectator);
     assert!(payload.prediction_build_id.is_none());
     assert_eq!(payload.prediction_version, 0);
@@ -449,7 +449,7 @@ fn running_lab_room_collaborator_can_join_during_drain() {
 }
 
 #[test]
-fn lab_room_full_vision_uses_all_player_fog_union() {
+fn lab_room_defaults_to_omniscient_observer_view() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
@@ -468,7 +468,7 @@ fn lab_room_full_vision_uses_all_player_fog_union() {
     let Phase::InGame(game) = &task.phase else {
         panic!("lab should remain live");
     };
-    let mut expected = game.snapshot_for_spectator(&[LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID]);
+    let mut expected = game.snapshot_for_observer(&rts_sim::game::ObserverView::Omniscient);
     compact_snapshot_for_wire(&mut expected);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert!(!snapshot.visible_tiles.is_empty());

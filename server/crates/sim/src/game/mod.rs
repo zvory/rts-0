@@ -43,6 +43,7 @@ pub(crate) mod services;
 mod setup;
 pub(crate) mod smoke;
 mod snapshot;
+pub use snapshot::ObserverView;
 mod state;
 mod systems;
 pub mod teams;

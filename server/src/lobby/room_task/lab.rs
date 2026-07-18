@@ -19,7 +19,7 @@ use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
-use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID};
+use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{LabRoomConfig, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::lab_scenarios::{
@@ -33,7 +33,7 @@ use crate::protocol::{
     DEFAULT_FACTION_ID,
 };
 use crate::structured_log::{self, MatchStartedLog};
-use rts_sim::game::{Game, PlayerInit};
+use rts_sim::game::{Game, ObserverView, PlayerInit};
 
 use replay::LabReplayRebaseSource;
 
@@ -49,7 +49,6 @@ pub(super) struct LabSession {
     pub(super) initial_camera: Option<InitialCamera>,
     pub(super) dirty: bool,
     pub(super) operation_log: Vec<LabOperationLogEntry>,
-    pub(super) view_player_id: u32,
 }
 
 #[allow(dead_code)]
@@ -89,7 +88,6 @@ impl LabSession {
             initial_camera: None,
             dirty: false,
             operation_log: Vec::new(),
-            view_player_id: LAB_PLAYER_ONE_ID,
         }
     }
 
@@ -624,11 +622,7 @@ impl RoomTask {
                 .filter_map(|&id| {
                     self.players.get(&id).map(|player| LaunchRecipient {
                         connection_id: id,
-                        payload_player_id: self
-                            .lab_session
-                            .as_ref()
-                            .map(|session| session.view_player_id)
-                            .unwrap_or(LAB_PLAYER_ONE_ID),
+                        payload_player_id: id,
                         role: RecipientRole::Spectator,
                         prediction: LaunchPrediction::Disabled,
                         diagnostics: projection_policy
@@ -781,11 +775,7 @@ impl RoomTask {
             &builder,
             [LaunchRecipient {
                 connection_id: watcher_id,
-                payload_player_id: self
-                    .lab_session
-                    .as_ref()
-                    .map(|session| session.view_player_id)
-                    .unwrap_or(LAB_PLAYER_ONE_ID),
+                payload_player_id: watcher_id,
                 prediction: LaunchPrediction::Disabled,
                 role: RecipientRole::Spectator,
                 diagnostics,
@@ -820,11 +810,7 @@ impl RoomTask {
             .filter_map(|&id| {
                 self.players.get(&id).map(|player| LaunchRecipient {
                     connection_id: id,
-                    payload_player_id: self
-                        .lab_session
-                        .as_ref()
-                        .map(|session| session.view_player_id)
-                        .unwrap_or(LAB_PLAYER_ONE_ID),
+                    payload_player_id: id,
                     prediction: LaunchPrediction::Disabled,
                     role: RecipientRole::Spectator,
                     diagnostics,
@@ -847,25 +833,7 @@ impl RoomTask {
             .map(|session| session.metadata_for(player_id, god_mode_players))
     }
 
-    pub(super) fn lab_visible_player_ids_by_recipient(
-        &self,
-        game: &Game,
-    ) -> HashMap<u32, Vec<u32>> {
-        let Some(session) = &self.lab_session else {
-            return HashMap::new();
-        };
-        let players = game.player_inits();
-        let mut projections = HashMap::new();
-        for &id in &self.order {
-            if !self.players.contains_key(&id) {
-                continue;
-            }
-            projections.insert(id, player_ids_for_vision(&players, &session.vision_for(id)));
-        }
-        projections
-    }
-
-    fn fanout_current_lab_snapshots(&mut self) {
+    pub(super) fn fanout_current_lab_snapshots(&mut self) {
         if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::Lab) {
             return;
         }
@@ -880,8 +848,7 @@ impl RoomTask {
             }
         };
         let mut per_player_events: HashMap<u32, Vec<Event>> = HashMap::new();
-        let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient(&game);
-        let fallback_player_ids = player_ids_for_vision(&game.player_inits(), &LabVisionMode::All);
+        let observer_views = self.observer_views.clone();
         let recipients = self.order.clone();
         SnapshotFanout::new(
             &self.room,
@@ -892,11 +859,11 @@ impl RoomTask {
             None,
         )
         .send_to_recipients(&mut self.players, recipients, |id, player| {
-            let player_ids = lab_visible_player_ids_by_recipient
+            let view = observer_views
                 .get(&id)
                 .cloned()
-                .unwrap_or_else(|| fallback_player_ids.clone());
-            let projection = projection_policy.selected_perspective_snapshot_for(player_ids);
+                .unwrap_or(ObserverView::Omniscient);
+            let projection = projection_policy.selected_perspective_snapshot_for(view);
             let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
@@ -1032,6 +999,12 @@ impl RoomTask {
             return lab_result_error(request_id, op, &err);
         }
         let tick = game.tick_count();
+        let observer_view = match &vision {
+            LabVisionMode::All => ObserverView::Omniscient,
+            LabVisionMode::Team { .. } => {
+                ObserverView::Players(player_ids_for_vision(&game.player_inits(), &vision))
+            }
+        };
         let log_operations = self.session_policy().logs_lab_operations();
         if let Some(session) = &mut self.lab_session {
             session.set_vision_for(operator_id, vision);
@@ -1045,6 +1018,7 @@ impl RoomTask {
                 });
             }
         }
+        self.observer_views.insert(operator_id, observer_view);
         self.broadcast_lab_state();
         lab_result_ok(request_id, op, None)
     }

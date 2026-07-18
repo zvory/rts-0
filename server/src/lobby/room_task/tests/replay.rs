@@ -385,8 +385,8 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
         false,
         DrainHandle::default(),
     );
-    let writer_a = add_test_room_player(&mut task, 100, true);
-    let writer_b = add_test_room_player(&mut task, 101, true);
+    let writer_a = add_test_room_spectator(&mut task, 100);
+    let writer_b = add_test_room_spectator(&mut task, 101);
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
     for _ in 0..8 {
@@ -515,13 +515,6 @@ fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
         replay.tick(None);
     }
     replay.set_speed(100, 0.0);
-    replay.set_vision(
-        100,
-        VisionSelectionRequest::Player {
-            player_id: players[0].id,
-        },
-    );
-
     let mut task = RoomTask::new(
         "paused-replay-seek-snapshot-test".to_string(),
         RoomMode::Normal,
@@ -530,6 +523,10 @@ fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
         DrainHandle::default(),
     );
     let mut writer = add_test_room_spectator(&mut task, 100);
+    task.observer_views.insert(
+        100,
+        rts_sim::game::ObserverView::Players(vec![players[0].id]),
+    );
     let all_player_ids = players.iter().map(|player| player.id).collect::<Vec<_>>();
     let stale_pending = replay.game().snapshot_for_spectator(&all_player_ids);
     task.players
@@ -744,8 +741,9 @@ fn persisted_replay_room_host_start_begins_replay_viewer() {
     let Phase::ReplayViewer(session) = &task.phase else {
         panic!("confirmed replay join should keep replay viewer active");
     };
-    let visible_players = players.iter().map(|player| player.id).collect::<Vec<_>>();
-    let expected = session.game.snapshot_for_spectator(&visible_players);
+    let expected = session
+        .game
+        .snapshot_for_observer(&ObserverView::Omniscient);
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     let tick_analysis = take_observer_analysis(&writer, "confirmed replay tick");
@@ -857,7 +855,10 @@ fn saved_artifact_replay_join_uses_replay_viewer_runtime() {
         panic!("saved artifact replay should start the shared replay viewer runtime");
     };
     assert_eq!(session.artifact.command_log, artifact.command_log);
-    assert_eq!(session.vision_player_ids_for(99), vec![1, 2]);
+    assert_eq!(
+        task.observer_view_for(99),
+        rts_sim::game::ObserverView::Omniscient
+    );
     assert!(task.players.get(&99).is_some_and(|p| p.spectator));
     assert!(matches!(
         writer.reliable_rx.try_recv().unwrap(),

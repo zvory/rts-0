@@ -698,13 +698,13 @@ await withFakeDocument(async () => {
     "LabPanel renders command limit controls in an Options panel",
   );
   assert(
-    textWithin(sectionByClass("lab-options")).includes("Vision") &&
+    !textWithin(sectionByClass("lab-options")).includes("Vision") &&
       textWithin(sectionByClass("lab-options")).includes("Unlimited commands") &&
       textWithin(sectionByClass("lab-options")).includes("Checkpoint Setup") &&
       textWithin(sectionByClass("lab-options")).includes("Lab Replay") &&
       !textWithin(sectionByClass("lab-options")).includes("Unit Spawn") &&
       !textWithin(sectionByClass("lab-options")).includes("Player State"),
-    "LabPanel groups global controls in the Options section",
+    "LabPanel leaves observer vision to the shared room controls and groups Lab-only controls in Options",
   );
   assert(
     textWithin(sectionByClass("lab-tools")).includes("Unit Spawn") &&
@@ -796,16 +796,9 @@ await withFakeDocument(async () => {
   );
   assert(!buttonByText("Apply teams"), "LabPanel omits the arbitrary team-union controls");
   assert(
-    buttonByText("Full")?.dataset.active === "true" &&
-      buttonByText("Full")?.["aria-pressed"] === "true" &&
-      buttonByText("Team 2")?.dataset.active === "false",
-    "LabPanel marks the current vision button as active",
+    !buttonByText("Full") && !buttonByText("Team 2"),
+    "LabPanel does not duplicate the shared observer-view selector",
   );
-  buttonByText("Full").listeners.click();
-  assert(sent.at(-1).op.vision.mode === "all", "LabPanel Full vision requests all-team fog");
-  const teamButton = buttonByText("Team 2");
-  teamButton.listeners.click();
-  assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
   playerButtonById(2).listeners.click();
   assert(panel.fields.get("lab-player").value === "2", "LabPanel target player buttons update shared target state");
   assert(

@@ -15,6 +15,7 @@ use rts_sim::game::entity::EntityKind;
 #[cfg(test)]
 use rts_sim::game::lab::{LabOp, LabSetPlayerResources};
 use rts_sim::game::replay::ReplayStartComposition;
+use rts_sim::game::ObserverView;
 use tokio::time::Instant as TokioInstant;
 
 mod branch;
@@ -102,6 +103,9 @@ pub(super) struct RoomTask {
     /// Recipient-specific room-owned notices appended to the next live snapshot for each
     /// connection id. Used when the notice is about room membership rather than sim events.
     pending_recipient_notices: HashMap<u32, Vec<Event>>,
+    /// Per-connection observer perspective. This is read-only projection state and never an
+    /// issuer/command capability.
+    observer_views: HashMap<u32, ObserverView>,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
     match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
     /// When true, rows written by this room are hidden from non-localhost match-history reads.
@@ -165,6 +169,7 @@ impl RoomTask {
             slow_tick_count: 0,
             pending_client_command_acks: Vec::new(),
             pending_recipient_notices: HashMap::new(),
+            observer_views: HashMap::new(),
             match_history_writer,
             match_history_local_only,
             match_started_at: None,
@@ -329,6 +334,13 @@ impl RoomTask {
     fn projection_policy_for_phase(&self, phase: SessionPhase) -> ProjectionPolicy {
         let policy = self.session_policy_for_phase(phase);
         ProjectionPolicy::new(policy.visibility, policy.diagnostics)
+    }
+
+    fn observer_view_for(&self, connection_id: u32) -> ObserverView {
+        self.observer_views
+            .get(&connection_id)
+            .cloned()
+            .unwrap_or(ObserverView::Omniscient)
     }
 
     fn is_dev_watch(&self) -> bool {

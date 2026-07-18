@@ -159,6 +159,7 @@ impl RoomTask {
         self.human_team_assignments.remove(&player_id);
         self.human_faction_assignments.remove(&player_id);
         self.pending_recipient_notices.remove(&player_id);
+        self.observer_views.remove(&player_id);
         if let Some(session) = &mut self.lab_session {
             session.remove_viewer(player_id);
         }
@@ -193,9 +194,7 @@ impl RoomTask {
                 }
                 self.branch_live_seat_by_connection.remove(&player_id);
             }
-            Phase::ReplayViewer(session) => {
-                session.remove_viewer(player_id);
-            }
+            Phase::ReplayViewer(_) => {}
             Phase::BranchStaging(staging) => {
                 staging.release_occupant(player_id);
                 broadcast_branch_staging = true;
@@ -742,11 +741,6 @@ impl RoomTask {
             }
         }
         true
-    }
-
-    pub(super) fn spectator_visible_player_ids(&self) -> Vec<u32> {
-        self.participants()
-            .spectator_visible_player_ids(self.ai_players.iter().map(|ai| ai.id))
     }
 
     pub(super) fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {

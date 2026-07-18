@@ -14,7 +14,7 @@ use super::super::snapshots::union_events;
 use super::types::{Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
-use rts_sim::game::{command::SimCommand, Game};
+use rts_sim::game::{command::SimCommand, Game, ObserverView};
 
 pub(super) enum DevDriver {
     Scenario(DevScenarioDriver),
@@ -257,7 +257,7 @@ impl RoomTask {
             &builder,
             [LaunchRecipient {
                 connection_id: watcher_id,
-                payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
+                payload_player_id: watcher_id,
                 prediction: LaunchPrediction::Disabled,
                 role,
                 diagnostics,
@@ -338,6 +338,7 @@ impl RoomTask {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
+        let observer_views = self.observer_views.clone();
         let full_vision_events = rts_sim::perf::timed(perf.as_mut(), "event_union", || {
             union_events(per_player_events.values())
         });
@@ -350,15 +351,24 @@ impl RoomTask {
             &mut self.slow_tick_count,
             perf.as_mut(),
         )
-        .send_to_recipients(&mut self.players, recipients, |_id, player| {
+        .send_to_recipients(&mut self.players, recipients, |id, player| {
             let role = if player.spectator {
                 RecipientRole::Spectator
             } else {
                 RecipientRole::ActivePlayer
             };
-            let snapshot = projection_policy
-                .dev_watch_snapshot_for(role, view_player_id)
-                .snapshot_with_events(&game, &mut per_player_events, &full_vision_events);
+            let projection = if role == RecipientRole::Spectator {
+                projection_policy.selected_perspective_snapshot_for(
+                    observer_views
+                        .get(&id)
+                        .cloned()
+                        .unwrap_or(ObserverView::Omniscient),
+                )
+            } else {
+                projection_policy.dev_watch_snapshot_for(role, view_player_id)
+            };
+            let snapshot =
+                projection.snapshot_with_events(&game, &mut per_player_events, &full_vision_events);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 
