@@ -64,9 +64,9 @@ assertDeepEqual(
   mortarSetupIntent.plannedOrderPlanForEntity(mortar),
   [
     { kind: "move", x: 320, y: 288 },
-    { kind: "setupAntiTankGuns", x: mortar.x, y: mortar.y },
+    { kind: "setupAntiTankGuns", x: 320, y: 288 },
   ],
-  "queued mortar setup remains after preceding movement and stops later queued commands",
+  "queued mortar setup stays at the preceding movement destination and stops later queued commands",
 );
 
 // Immediate mortar setup replaces the old plan but does not prevent a later queued command.

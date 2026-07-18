@@ -376,7 +376,7 @@ export class ClientIntent {
     if (planHasTerminal(authorityPlan, entity)) return;
     if (planHasTerminal(current, entity)) return;
     const next = replaceContradictoryLocalStages(current, stage);
-    next.push(cloneStage(stage));
+    next.push(queuedStageForEntity(stage, authorityPlan.concat(next), entity));
     this._plannedOrderStagesByUnit.set(unitId, next);
   }
 
@@ -518,6 +518,23 @@ function stageIsTerminalForEntity(stage, entity = null) {
     (entity?.kind === KIND.MORTAR_TEAM &&
       stage?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
       !stage?.replacesAuthority);
+}
+
+function queuedStageForEntity(stage, precedingStages, entity = null) {
+  if (
+    entity?.kind !== KIND.MORTAR_TEAM ||
+    stage?.kind !== ORDER_STAGE.SETUP_ANTI_TANK_GUNS
+  ) {
+    return cloneStage(stage);
+  }
+  const precedingPoint = [...precedingStages]
+    .reverse()
+    .find((candidate) => Number.isFinite(candidate?.x) && Number.isFinite(candidate?.y));
+  const x = Number.isFinite(precedingPoint?.x) ? precedingPoint.x : entity?.x;
+  const y = Number.isFinite(precedingPoint?.y) ? precedingPoint.y : entity?.y;
+  return Number.isFinite(x) && Number.isFinite(y)
+    ? cloneStage(stage, { x, y })
+    : cloneStage(stage);
 }
 
 function stageConfirmedByAuthority(stage, authorityPlan) {

@@ -331,6 +331,37 @@ fn queued_mortar_setup_promotes_instead_of_being_discarded() {
 }
 
 #[test]
+fn queued_mortar_setup_projects_at_the_preceding_stage_destination() {
+    let (mut game, mortar, _) = manual_fire_fixture();
+    let move_target = game.state.map.tile_center(12, 8);
+    let old_position = game.state.map.tile_center(8, 8);
+    {
+        let mortar = game
+            .state
+            .entities
+            .get_mut(mortar)
+            .expect("mortar should exist");
+        mortar.append_queued_order(OrderIntent::move_to(move_target.0, move_target.1));
+        mortar.append_queued_order(OrderIntent::setup_anti_tank_guns(
+            old_position.0,
+            old_position.1,
+        ));
+    }
+
+    let view = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == mortar)
+        .expect("owner snapshot should include mortar");
+    assert_eq!(view.order_plan.len(), 2);
+    assert_eq!(view.order_plan[0].kind, "move");
+    assert_eq!((view.order_plan[0].x, view.order_plan[0].y), move_target);
+    assert_eq!(view.order_plan[1].kind, "setupAntiTankGuns");
+    assert_eq!((view.order_plan[1].x, view.order_plan[1].y), move_target);
+}
+
+#[test]
 fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
