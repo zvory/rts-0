@@ -10,21 +10,17 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - [client-stress-tests.md](../design/client-stress-tests.md) — benchmark contract
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, stress-test modules, `interact_bridge.js`, `interact_game_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
-  AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`,
-  `control_policy_projection.js`, and `room_capabilities.js`.
-- `model`: `state.js`, `state_ground_decals.js` (client-only received death/impact decal queue), `client_intent.js`, `command_interaction.js`, `command_budget.js`,
-  `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
+- `app-shell`: `main.js`, `app.js`, `match*.js`, launch/Interact bridges, diagnostics,
+  replay/spectator/Lab wiring, policies, room-time controls, and capabilities.
+- `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`,
+  `command_interaction.js`, command composition/budget, prediction, and display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js` facade + `config/`.
-- `ui`: HUD, command cards, hotkeys, lobby views, match history, minimap, branch staging, Lab
-  catalog/panel, dedicated Map Editor panel/session, scoreboard/status/resource icons, and settings.
+- `ui`: HUD/cards/hotkeys, lobby/history, minimap, Lab/Map Editor panels, scoreboard, and settings.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
 - `renderer`: `renderer/` facade, layers, terrain/decals, entities, fog, feedback, rigs, palettes.
-- `platform`: `bootstrap.js`, `audio.js`, `audio_spatial.js`, `sound_manifest.js`,
-  `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`, `prediction_settings.js`,
-  `report_window_aggregate.js`.
+- `platform`: bootstrap, audio, alerts, fog, camera, prediction settings, and reports.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI`; do not
@@ -39,8 +35,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - **Interact bridges.** Explicit Lab, isolated-game, and bounded dev-scenario launches install
   narrow bridges called only by `scripts/interact/`; none exposes app, match, transport, renderer,
   or state references.
-- **Setup authoring flow.** `/lab` opens catalog or blank setups; the app-owned panel validates
-  authoritative state and supports browser-side setup JSON export/import.
+- **Setup authoring.** `/lab` opens catalog or blank setups; its app-owned panel validates state
+  and supports setup JSON export/import.
 - **Map Editor boundary.** `/map-editor` owns Pixi/camera/session state without `Net`, `Match`,
   `GameState`, or a simulation room. One-use two-minute Lab handoffs carry only map data.
 - **Room affordances are metadata-driven.** `room_capabilities.js` parses `startPayload.capabilities`
@@ -50,11 +46,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   mode, active lab tools, previews, or command feedback through `GameState` shims. Lab setup tools
   are armed through `Match` and consumed by input world clicks, not by panel-owned viewport
   listeners.
-- **Command and ownership interactions are explicit.** `Match` injects one `CommandInteraction`
-  into Input, HUD, and Minimap for issue-and-planned-order recording. It also injects one frozen
-  read-only control-policy projection into ownership consumers; `GameState` does not carry the
-  policy, and LabPanel receives mutable command-limit settings through a separate narrow app-owned
-  collaborator.
+- **Commands and ownership are explicit.** `Match` injects one `CommandInteraction` into Input,
+  HUD, and Minimap for issue-and-record, plus a frozen read-only policy projection into ownership
+  consumers. `GameState` carries no policy; LabPanel gets mutable command-limit settings separately.
 - **Teardown.** Any module that holds DOM/window listeners or GPU resources must implement
   `destroy()`. `Match.destroy()` calls it on every module between matches.
 - **Coordinates.** World pixels on the wire and in client code, except fields ending in `Tile`.
