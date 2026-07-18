@@ -513,7 +513,7 @@ impl RoomTask {
         );
         let mut payload = game.start_payload();
         payload.match_run_id = self.match_run_id.clone();
-        self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
+        self.ai_controllers = live_ai_controllers(&inits, &self.ai_players);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let start_policy = self.live_session_policy();

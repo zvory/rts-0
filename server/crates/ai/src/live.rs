@@ -51,8 +51,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
-    let _ = rng;
-    DEFAULT_LIVE_PROFILE_ID
+    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
 }
 
 pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {
@@ -523,11 +522,13 @@ mod tests {
     }
 
     #[test]
-    fn random_live_profile_selection_never_selects_an_internal_profile() {
+    fn random_live_profile_selection_uses_the_full_internal_pool() {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
+        let mut selected = BTreeSet::new();
         for _ in 0..32 {
-            assert_eq!(random_live_profile_id(&mut rng), DEFAULT_LIVE_PROFILE_ID);
+            selected.insert(random_live_profile_id(&mut rng));
         }
+        assert_eq!(selected, BTreeSet::from([AI_2_1_ID, AI_TURTLE_ID]));
     }
 
     #[test]
