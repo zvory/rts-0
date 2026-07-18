@@ -14,6 +14,7 @@ pub fn kind_from_wire(kind: &str) -> Option<EntityKind> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_rules::faction::{AbilityKind, UpgradeKind};
 
     const PROTOCOL_KIND_IDS: [&str; 24] = [
         kinds::WORKER,
@@ -70,6 +71,38 @@ mod tests {
                 !PROTOCOL_KIND_IDS[..index].contains(wire),
                 "duplicate protocol kind constant {wire}"
             );
+        }
+    }
+
+    #[test]
+    fn rules_ability_ids_match_protocol_vocabulary_and_compact_codes() {
+        let rule_ids = AbilityKind::ALL
+            .iter()
+            .map(|kind| kind.stable_id())
+            .collect::<Vec<_>>();
+        assert_eq!(rule_ids.len(), abilities::ALL.len());
+        for id in rule_ids {
+            assert!(
+                abilities::ALL.contains(&id),
+                "protocol is missing ability {id}"
+            );
+            assert_ne!(ability_code(id), COMPACT_UNKNOWN_CODE);
+        }
+    }
+
+    #[test]
+    fn rules_upgrade_ids_match_protocol_vocabulary_and_compact_codes() {
+        let rule_ids = UpgradeKind::ALL
+            .iter()
+            .map(|kind| kind.stable_id())
+            .collect::<Vec<_>>();
+        assert_eq!(rule_ids.len(), upgrades::ALL.len());
+        for id in rule_ids {
+            assert!(
+                upgrades::ALL.contains(&id),
+                "protocol is missing upgrade {id}"
+            );
+            assert_ne!(upgrade_code(id), COMPACT_UNKNOWN_CODE);
         }
     }
 }

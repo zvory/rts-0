@@ -1469,7 +1469,7 @@ fn validate_upgrade_for_player(
 ) -> Result<(), LabError> {
     let upgrade_id = upgrade.to_protocol_str();
     let allowed = rules::faction::catalog_for(&player.faction_id)
-        .is_some_and(|catalog| catalog.upgrades.iter().any(|entry| entry.id == upgrade_id));
+        .is_some_and(|catalog| catalog.upgrades.iter().any(|entry| entry.kind == upgrade));
     if allowed {
         Ok(())
     } else {

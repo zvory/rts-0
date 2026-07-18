@@ -202,8 +202,9 @@ pub struct SnapshotOptions {
 `SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
 envelopes and replay artifacts are translated into it at the boundary. Live transport metadata
 such as `clientSeq` stays in the room/connection layer and is not part of the sim command or replay
-command-log contract. `game::upgrade::UpgradeKind` is public because `SimCommand::Research` carries
-it and external AI controllers construct ordinary `SimCommand`s. `CommandLogEntry.command` remains
+command-log contract. `rts-rules::faction::UpgradeKind` is re-exported through `game::upgrade`
+because `SimCommand::Research` carries it and external AI controllers construct ordinary
+`SimCommand`s. `CommandLogEntry.command` remains
 the serde `Command` from `rts-protocol` so replay JSON stays wire-compatible. `StartPayload`,
 `Snapshot`, `Event`, and `PlayerScore` are also serde types from `rts-protocol`.
 
@@ -926,14 +927,17 @@ ordinary queue is empty and inserts a normal paid item only after cost and suppl
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
-`rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the
-stable id, label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
+`rules::faction` owns `AbilityKind`, `UpgradeKind`, `AbilityTargetMode`, their stable ids, and the
+faction-aware ability/upgrade catalog rows. Each `AbilityCatalogEntry` records its typed kind,
+label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
 finite charges, Steel/Oil cost, tech requirement, queue policy, autocast support, command-card
-visibility, and compact protocol/order-stage codes. `game/ability.rs` keeps the typed
-`AbilityKind` and converts those registry rows into the sim-facing `AbilityDefinition`; it is not a
-second source of metadata. Adding a registry-backed ability means adding a global `AbilityKind` and
-protocol id, adding the faction catalog entry, updating the client mirror/parity check, and then
-adding only the effect-specific code that the registry cannot express.
+visibility, and compact protocol/order-stage codes. `game/ability.rs` thinly re-exports the
+rules-owned types and converts total typed catalog lookups into the sim-facing `AbilityDefinition`;
+it is not a second identity or metadata source. Its planner codes and effect hooks remain
+simulation-only details. Raw command, replay/Lab, and checkpoint strings still parse fallibly at
+their trust boundaries. Adding a registry-backed ability means adding the rules-owned typed
+kind/catalog row and dependency-required protocol wire mirror, extending their parity coverage,
+updating the client mirror, and then adding only effect-specific code the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
 effect shapes that actually exist today: legacy no-op (`charge` compatibility), reserved no-op

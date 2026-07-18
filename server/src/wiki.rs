@@ -350,7 +350,7 @@ fn upgrade_table() -> StatsTable {
                 catalog.upgrades.iter().map(move |upgrade| {
                     vec![
                         catalog.id.to_string(),
-                        upgrade.id.to_string(),
+                        upgrade.kind.stable_id().to_string(),
                         kind_label(upgrade.researched_at),
                     ]
                 })
@@ -386,7 +386,7 @@ fn ability_table() -> StatsTable {
                 catalog.abilities.iter().map(move |ability| {
                     vec![
                         catalog.id.to_string(),
-                        ability.id.to_string(),
+                        ability.kind.stable_id().to_string(),
                         ability.label.to_string(),
                         ability.title.to_string(),
                         kind_list(ability.carriers),
@@ -986,14 +986,14 @@ mod tests {
             for upgrade in catalog.upgrades {
                 assert!(upgrades.rows.contains(&vec![
                     catalog.id.to_string(),
-                    upgrade.id.to_string(),
+                    upgrade.kind.stable_id().to_string(),
                     kind_label(upgrade.researched_at),
                 ]));
             }
             for ability in catalog.abilities {
                 assert!(abilities.rows.contains(&vec![
                     catalog.id.to_string(),
-                    ability.id.to_string(),
+                    ability.kind.stable_id().to_string(),
                     ability.label.to_string(),
                     ability.title.to_string(),
                     kind_list(ability.carriers),

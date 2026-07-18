@@ -13,21 +13,24 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   attachment endpoint can serve a submitted flame graph. Database writes require the separate
   `RTS_RECORD_STRESS_TESTS` gate. See
   [`client-stress-tests.md`](client-stress-tests.md).
-- **Command unit cap and budget** (`services/commands.rs`, with mirrored budget scalars in
-  `command_budget.rs`): ordinary unit-list commands inspect at most
-  `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject
-  over-budget human commands before planning. Lab `issueCommandAs` requests that explicitly set
-  `ignoreCommandLimits` bypass the command-supply budget and inspect at most
-  `LAB_MAX_UNITS_PER_COMMAND = 4096` submitted ids, still bounded by the WebSocket frame cap. The
+- **Command unit cap and budget** (`rts-contract`, consumed by `services/commands.rs`, Lab artifact
+  validation, and checkpoint validation; budget scalars remain in `command_budget.rs`): ordinary
+  unit-list commands accept at most `MAX_UNITS_PER_COMMAND = 256` raw submitted ids and reject the
+  whole command at cap plus one before deduplication. Accepted lists preserve first-seen dedupe and
+  reject over-budget human commands before planning. Lab `issueCommandAs` requests that explicitly set
+  `ignoreCommandLimits` bypass the command-supply budget and accept at most
+  `LAB_MAX_UNITS_PER_COMMAND = 4096` raw submitted ids, with the same whole-command rejection at
+  cap plus one and still bounded by the WebSocket frame cap. Lab artifact validation uses the same
+  selected raw boundary, and checkpoint restore uses the shared 4,096 persisted-command bound. The
   human command budget is 24 supply plus
   `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each submitted
   owned Command Car, with mirrored unit supply as command weight and a fallback weight of 1.
   AI-owned players are exempt from the command-budget gameplay limit because live AI still enqueues
-  ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Rejection drops the whole
-  malformed human command and emits a private "Command supply exceeded" notice; the server does not
-  silently trim the unit list.
+  ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Raw-cap rejection drops
+  the whole malformed command without trimming; command-budget rejection also emits a private
+  "Command supply exceeded" notice.
 - **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 8`): each mobile unit stores at most
-  eight future intents. Queued command application still runs the unit-list dedupe/cap first, and
+  eight future intents. Queued command application still validates the raw cap and dedupes first, and
   queued promotion drains invalid stale intents instead of retrying them forever.
   Phase 6 kept this cap at eight because no playtest evidence in the repo justified a larger
   command buffer; mixed ability/setup replay coverage now guards the current cap and command-log

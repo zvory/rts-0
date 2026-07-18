@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 
 pub type TeamId = u32;
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
+/// Maximum raw submitted ids in an ordinary multi-unit command.
+pub const MAX_UNITS_PER_COMMAND: usize = 256;
+/// Maximum raw submitted ids in a Lab command that bypasses ordinary command limits.
+pub const LAB_MAX_UNITS_PER_COMMAND: usize = 4_096;
 
 fn is_false(value: &bool) -> bool {
     !*value

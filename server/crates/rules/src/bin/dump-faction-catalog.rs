@@ -87,7 +87,7 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         };
         println!(
             "{indent}    {{\"id\":\"{}\",\"researchedAt\":\"{}\"}}{comma}",
-            upgrade.id,
+            upgrade.kind.stable_id(),
             upgrade.researched_at.stable_id()
         );
     }
@@ -101,7 +101,7 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         };
         print!(
             "{indent}    {{\"id\":\"{}\",\"label\":\"{}\",\"icon\":\"{}\",\"hotkey\":{},\"title\":\"{}\",\"carriers\":",
-            ability.id,
+            ability.kind.stable_id(),
             ability.label,
             ability.icon,
             json_string_or_null(ability.hotkey),

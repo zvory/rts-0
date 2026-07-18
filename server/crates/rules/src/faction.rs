@@ -5,34 +5,161 @@
 //! id across factions only when its gameplay semantics are identical for every faction that can
 //! use it; divergent behavior needs a distinct global id gated by catalog availability.
 
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{balance, defs, economy::ResourceCost, EntityKind};
 
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
 pub const EKAT_FACTION_ID: &str = "ekat";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
-pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";
-pub const PANZERFAUSTS_UPGRADE: &str = "panzerfausts";
-pub const ENTRENCHMENT_UPGRADE: &str = "entrenchment";
-pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = "anti_tank_gun_unlock";
-pub const ARTILLERY_UNLOCK_UPGRADE: &str = "artillery_unlock";
-pub const BALLISTIC_TABLES_UPGRADE: &str = "ballistic_tables";
-pub const TANK_UNLOCK_UPGRADE: &str = "tank_unlock";
-pub const MORTAR_AUTOCAST_UPGRADE: &str = "mortar_autocast";
-pub const SMOKE_PLUS_UPGRADE: &str = "smoke_plus";
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum UpgradeKind {
+    Methamphetamines,
+    Panzerfausts,
+    Entrenchment,
+    AntiTankGunUnlock,
+    ArtilleryUnlock,
+    BallisticTables,
+    TankUnlock,
+    MortarAutocast,
+    SmokePlus,
+}
 
-pub const SMOKE_ABILITY: &str = "smoke";
-pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
-pub const POINT_FIRE_ABILITY: &str = "pointFire";
-pub const BLANKET_FIRE_ABILITY: &str = "blanketFire";
-pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
-pub const SCOUT_PLANE_ABILITY: &str = "scoutPlane";
-pub const DISMISS_SCOUT_PLANE_ABILITY: &str = "dismissScoutPlane";
-pub const CHARGE_ABILITY: &str = "charge";
-pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
-pub const EKAT_LINE_SHOT_ABILITY: &str = "ekatLineShot";
-pub const EKAT_MAGIC_ANCHOR_ABILITY: &str = "ekatMagicAnchor";
-pub const EKAT_CONSUME_GOLEM_ABILITY: &str = "ekatConsumeGolem";
+impl UpgradeKind {
+    pub const ALL: &'static [Self] = &[
+        Self::Methamphetamines,
+        Self::Panzerfausts,
+        Self::Entrenchment,
+        Self::AntiTankGunUnlock,
+        Self::ArtilleryUnlock,
+        Self::BallisticTables,
+        Self::TankUnlock,
+        Self::MortarAutocast,
+        Self::SmokePlus,
+    ];
+
+    pub const fn stable_id(self) -> &'static str {
+        match self {
+            Self::Methamphetamines => "methamphetamines",
+            Self::Panzerfausts => "panzerfausts",
+            Self::Entrenchment => "entrenchment",
+            Self::AntiTankGunUnlock => "anti_tank_gun_unlock",
+            Self::ArtilleryUnlock => "artillery_unlock",
+            Self::BallisticTables => "ballistic_tables",
+            Self::TankUnlock => "tank_unlock",
+            Self::MortarAutocast => "mortar_autocast",
+            Self::SmokePlus => "smoke_plus",
+        }
+    }
+
+    pub const fn to_protocol_str(self) -> &'static str {
+        self.stable_id()
+    }
+}
+
+impl FromStr for UpgradeKind {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|kind| kind.stable_id() == value)
+            .ok_or(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum AbilityKind {
+    Charge,
+    Smoke,
+    MortarFire,
+    PointFire,
+    BlanketFire,
+    Breakthrough,
+    ScoutPlane,
+    DismissScoutPlane,
+    EkatTeleport,
+    EkatLineShot,
+    EkatMagicAnchor,
+    EkatConsumeGolem,
+}
+
+impl AbilityKind {
+    pub const ALL: &'static [Self] = &[
+        Self::Charge,
+        Self::Smoke,
+        Self::MortarFire,
+        Self::PointFire,
+        Self::BlanketFire,
+        Self::Breakthrough,
+        Self::ScoutPlane,
+        Self::DismissScoutPlane,
+        Self::EkatTeleport,
+        Self::EkatLineShot,
+        Self::EkatMagicAnchor,
+        Self::EkatConsumeGolem,
+    ];
+
+    pub const fn stable_id(self) -> &'static str {
+        match self {
+            Self::Charge => "charge",
+            Self::Smoke => "smoke",
+            Self::MortarFire => "mortarFire",
+            Self::PointFire => "pointFire",
+            Self::BlanketFire => "blanketFire",
+            Self::Breakthrough => "breakthrough",
+            Self::ScoutPlane => "scoutPlane",
+            Self::DismissScoutPlane => "dismissScoutPlane",
+            Self::EkatTeleport => "ekatTeleport",
+            Self::EkatLineShot => "ekatLineShot",
+            Self::EkatMagicAnchor => "ekatMagicAnchor",
+            Self::EkatConsumeGolem => "ekatConsumeGolem",
+        }
+    }
+
+    pub const fn to_protocol_str(self) -> &'static str {
+        self.stable_id()
+    }
+}
+
+impl FromStr for AbilityKind {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|kind| kind.stable_id() == value)
+            .ok_or(())
+    }
+}
+
+pub const METHAMPHETAMINES_UPGRADE: &str = UpgradeKind::Methamphetamines.stable_id();
+pub const PANZERFAUSTS_UPGRADE: &str = UpgradeKind::Panzerfausts.stable_id();
+pub const ENTRENCHMENT_UPGRADE: &str = UpgradeKind::Entrenchment.stable_id();
+pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = UpgradeKind::AntiTankGunUnlock.stable_id();
+pub const ARTILLERY_UNLOCK_UPGRADE: &str = UpgradeKind::ArtilleryUnlock.stable_id();
+pub const BALLISTIC_TABLES_UPGRADE: &str = UpgradeKind::BallisticTables.stable_id();
+pub const TANK_UNLOCK_UPGRADE: &str = UpgradeKind::TankUnlock.stable_id();
+pub const MORTAR_AUTOCAST_UPGRADE: &str = UpgradeKind::MortarAutocast.stable_id();
+pub const SMOKE_PLUS_UPGRADE: &str = UpgradeKind::SmokePlus.stable_id();
+
+pub const SMOKE_ABILITY: &str = AbilityKind::Smoke.stable_id();
+pub const MORTAR_FIRE_ABILITY: &str = AbilityKind::MortarFire.stable_id();
+pub const POINT_FIRE_ABILITY: &str = AbilityKind::PointFire.stable_id();
+pub const BLANKET_FIRE_ABILITY: &str = AbilityKind::BlanketFire.stable_id();
+pub const BREAKTHROUGH_ABILITY: &str = AbilityKind::Breakthrough.stable_id();
+pub const SCOUT_PLANE_ABILITY: &str = AbilityKind::ScoutPlane.stable_id();
+pub const DISMISS_SCOUT_PLANE_ABILITY: &str = AbilityKind::DismissScoutPlane.stable_id();
+pub const CHARGE_ABILITY: &str = AbilityKind::Charge.stable_id();
+pub const EKAT_TELEPORT_ABILITY: &str = AbilityKind::EkatTeleport.stable_id();
+pub const EKAT_LINE_SHOT_ABILITY: &str = AbilityKind::EkatLineShot.stable_id();
+pub const EKAT_MAGIC_ANCHOR_ABILITY: &str = AbilityKind::EkatMagicAnchor.stable_id();
+pub const EKAT_CONSUME_GOLEM_ABILITY: &str = AbilityKind::EkatConsumeGolem.stable_id();
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -147,48 +274,48 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 
-const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
     UpgradeCatalogEntry {
-        id: METHAMPHETAMINES_UPGRADE,
+        kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
     },
     UpgradeCatalogEntry {
-        id: PANZERFAUSTS_UPGRADE,
+        kind: UpgradeKind::Panzerfausts,
         researched_at: EntityKind::TrainingCentre,
     },
     UpgradeCatalogEntry {
-        id: ENTRENCHMENT_UPGRADE,
+        kind: UpgradeKind::Entrenchment,
         researched_at: EntityKind::TrainingCentre,
     },
     UpgradeCatalogEntry {
-        id: ANTI_TANK_GUN_UNLOCK_UPGRADE,
+        kind: UpgradeKind::AntiTankGunUnlock,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
-        id: BALLISTIC_TABLES_UPGRADE,
+        kind: UpgradeKind::BallisticTables,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
-        id: TANK_UNLOCK_UPGRADE,
+        kind: UpgradeKind::TankUnlock,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
-        id: MORTAR_AUTOCAST_UPGRADE,
+        kind: UpgradeKind::MortarAutocast,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
-        id: SMOKE_PLUS_UPGRADE,
+        kind: UpgradeKind::SmokePlus,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
-        id: ARTILLERY_UNLOCK_UPGRADE,
+        kind: UpgradeKind::ArtilleryUnlock,
         researched_at: EntityKind::ResearchComplex,
     },
 ];
 
-const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
+const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
     AbilityCatalogEntry {
-        id: CHARGE_ABILITY,
+        kind: AbilityKind::Charge,
         label: "Charge",
         icon: "CHG",
         hotkey: None,
@@ -208,7 +335,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 8,
     },
     AbilityCatalogEntry {
-        id: SMOKE_ABILITY,
+        kind: AbilityKind::Smoke,
         label: "Smoke",
         icon: "SMK",
         hotkey: Some("D"),
@@ -231,7 +358,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 6,
     },
     AbilityCatalogEntry {
-        id: MORTAR_FIRE_ABILITY,
+        kind: AbilityKind::MortarFire,
         label: "Fire",
         icon: "FIR",
         hotkey: Some("X"),
@@ -251,7 +378,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 9,
     },
     AbilityCatalogEntry {
-        id: POINT_FIRE_ABILITY,
+        kind: AbilityKind::PointFire,
         label: "Point Fire",
         icon: "PF",
         hotkey: Some("X"),
@@ -271,7 +398,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 10,
     },
     AbilityCatalogEntry {
-        id: BLANKET_FIRE_ABILITY,
+        kind: AbilityKind::BlanketFire,
         label: "Blanket Fire",
         icon: "BF",
         hotkey: Some("C"),
@@ -291,7 +418,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 17,
     },
     AbilityCatalogEntry {
-        id: BREAKTHROUGH_ABILITY,
+        kind: AbilityKind::Breakthrough,
         label: "Breakthrough!",
         icon: "BRK",
         hotkey: Some("E"),
@@ -311,7 +438,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 11,
     },
     AbilityCatalogEntry {
-        id: SCOUT_PLANE_ABILITY,
+        kind: AbilityKind::ScoutPlane,
         label: "Scout Plane",
         icon: "SP",
         hotkey: Some("C"),
@@ -334,7 +461,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 19,
     },
     AbilityCatalogEntry {
-        id: DISMISS_SCOUT_PLANE_ABILITY,
+        kind: AbilityKind::DismissScoutPlane,
         label: "Dismiss",
         icon: "X",
         hotkey: Some("X"),
@@ -358,9 +485,9 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
 const EKAT_UNITS: &[EntityKind] = &[EntityKind::Ekat, EntityKind::Golem];
 const EKAT_BUILDINGS: &[EntityKind] = &[EntityKind::Zamok];
 
-const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
+const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
     AbilityCatalogEntry {
-        id: EKAT_TELEPORT_ABILITY,
+        kind: AbilityKind::EkatTeleport,
         label: "Dash",
         icon: "DSH",
         hotkey: Some("D"),
@@ -380,7 +507,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 12,
     },
     AbilityCatalogEntry {
-        id: EKAT_LINE_SHOT_ABILITY,
+        kind: AbilityKind::EkatLineShot,
         label: "Line Shot",
         icon: "LS",
         hotkey: Some("X"),
@@ -400,7 +527,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 13,
     },
     AbilityCatalogEntry {
-        id: EKAT_MAGIC_ANCHOR_ABILITY,
+        kind: AbilityKind::EkatMagicAnchor,
         label: "Magic Anchor",
         icon: "ANC",
         hotkey: Some("C"),
@@ -420,7 +547,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 14,
     },
     AbilityCatalogEntry {
-        id: EKAT_CONSUME_GOLEM_ABILITY,
+        kind: AbilityKind::EkatConsumeGolem,
         label: "Consume",
         icon: "CON",
         hotkey: Some("Z"),
@@ -447,8 +574,8 @@ pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
     units: DEFAULT_UNITS,
     buildings: DEFAULT_BUILDINGS,
     buildables: DEFAULT_WORKER_BUILDABLES,
-    upgrades: DEFAULT_UPGRADES,
-    abilities: DEFAULT_ABILITIES,
+    upgrades: &DEFAULT_UPGRADES,
+    abilities: &DEFAULT_ABILITIES,
     builders: &[EntityKind::Worker],
     gatherers: &[EntityKind::Worker],
     production_anchors: &[
@@ -479,7 +606,7 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     buildings: EKAT_BUILDINGS,
     buildables: &[],
     upgrades: &[],
-    abilities: EKAT_ABILITIES,
+    abilities: &EKAT_ABILITIES,
     builders: &[],
     gatherers: &[EntityKind::Golem],
     production_anchors: &[EntityKind::Zamok],
@@ -489,7 +616,7 @@ pub const CATALOGS: &[FactionCatalog] = &[CURRENT_CATALOG, EKAT_CATALOG, EMPTY_F
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeCatalogEntry {
-    pub id: &'static str,
+    pub kind: UpgradeKind,
     pub researched_at: EntityKind,
 }
 
@@ -531,7 +658,7 @@ impl AbilityQueuePolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbilityCatalogEntry {
-    pub id: &'static str,
+    pub kind: AbilityKind,
     pub label: &'static str,
     pub icon: &'static str,
     pub hotkey: Option<&'static str>,
@@ -628,31 +755,39 @@ impl FactionCatalog {
             .collect::<Vec<_>>()
     }
 
-    pub fn researchable_upgrades(self, building_kind: EntityKind) -> Vec<&'static str> {
+    pub fn researchable_upgrade_kinds(
+        self,
+        building_kind: EntityKind,
+    ) -> impl Iterator<Item = UpgradeKind> {
         self.upgrades
             .iter()
-            .filter(|entry| entry.researched_at == building_kind)
-            .map(|entry| entry.id)
+            .filter(move |entry| entry.researched_at == building_kind)
+            .map(|entry| entry.kind)
+    }
+
+    pub fn researchable_upgrades(self, building_kind: EntityKind) -> Vec<&'static str> {
+        self.researchable_upgrade_kinds(building_kind)
+            .map(UpgradeKind::stable_id)
             .collect()
     }
 
-    pub fn allows_research(self, upgrade_id: &str, building_kind: EntityKind) -> bool {
+    pub fn allows_research(self, upgrade: UpgradeKind, building_kind: EntityKind) -> bool {
         self.upgrades
             .iter()
-            .any(|entry| entry.id == upgrade_id && entry.researched_at == building_kind)
+            .any(|entry| entry.kind == upgrade && entry.researched_at == building_kind)
     }
 
-    pub fn allows_ability(self, ability_id: &str, carrier: EntityKind) -> bool {
+    pub fn allows_ability(self, ability: AbilityKind, carrier: EntityKind) -> bool {
         self.abilities
             .iter()
-            .any(|entry| entry.id == ability_id && entry.carriers.contains(&carrier))
+            .any(|entry| entry.kind == ability && entry.carriers.contains(&carrier))
     }
 
-    pub fn ability(self, ability_id: &str) -> Option<AbilityCatalogEntry> {
+    pub fn ability(self, ability: AbilityKind) -> Option<AbilityCatalogEntry> {
         self.abilities
             .iter()
             .copied()
-            .find(|entry| entry.id == ability_id)
+            .find(|entry| entry.kind == ability)
     }
 
     pub fn abilities_for_carrier(
@@ -686,11 +821,40 @@ pub fn catalog_loadout_for(faction_id: &str, loadout_id: &str) -> Option<Faction
     (catalog.loadout.id == loadout_id).then_some(catalog.loadout)
 }
 
-pub fn ability_definition(ability_id: &str) -> Option<AbilityCatalogEntry> {
-    CATALOGS
-        .iter()
-        .flat_map(|catalog| catalog.abilities.iter().copied())
-        .find(|entry| entry.id == ability_id)
+pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
+    let [charge, smoke, mortar_fire, point_fire, blanket_fire, breakthrough, scout_plane, dismiss_scout_plane] =
+        DEFAULT_ABILITIES;
+    let [ekat_teleport, ekat_line_shot, ekat_magic_anchor, ekat_consume_golem] = EKAT_ABILITIES;
+    match kind {
+        AbilityKind::Charge => charge,
+        AbilityKind::Smoke => smoke,
+        AbilityKind::MortarFire => mortar_fire,
+        AbilityKind::PointFire => point_fire,
+        AbilityKind::BlanketFire => blanket_fire,
+        AbilityKind::Breakthrough => breakthrough,
+        AbilityKind::ScoutPlane => scout_plane,
+        AbilityKind::DismissScoutPlane => dismiss_scout_plane,
+        AbilityKind::EkatTeleport => ekat_teleport,
+        AbilityKind::EkatLineShot => ekat_line_shot,
+        AbilityKind::EkatMagicAnchor => ekat_magic_anchor,
+        AbilityKind::EkatConsumeGolem => ekat_consume_golem,
+    }
+}
+
+pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
+    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus, artillery_unlock] =
+        DEFAULT_UPGRADES;
+    match kind {
+        UpgradeKind::Methamphetamines => methamphetamines,
+        UpgradeKind::Panzerfausts => panzerfausts,
+        UpgradeKind::Entrenchment => entrenchment,
+        UpgradeKind::AntiTankGunUnlock => anti_tank_gun_unlock,
+        UpgradeKind::BallisticTables => ballistic_tables,
+        UpgradeKind::TankUnlock => tank_unlock,
+        UpgradeKind::MortarAutocast => mortar_autocast,
+        UpgradeKind::SmokePlus => smoke_plus,
+        UpgradeKind::ArtilleryUnlock => artillery_unlock,
+    }
 }
 
 #[cfg(test)]
@@ -737,15 +901,15 @@ mod tests {
                 EntityKind::Artillery
             ]
         );
-        assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(ANTI_TANK_GUN_UNLOCK_UPGRADE, research_complex));
-        assert!(catalog.allows_research(BALLISTIC_TABLES_UPGRADE, research_complex));
-        assert!(catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
-        assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, research_complex));
-        assert!(catalog.allows_research(MORTAR_AUTOCAST_UPGRADE, research_complex));
-        assert!(catalog.allows_research(SMOKE_PLUS_UPGRADE, research_complex));
-        assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(UpgradeKind::AntiTankGunUnlock, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::BallisticTables, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::TankUnlock, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::MortarAutocast, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::SmokePlus, research_complex));
+        assert!(!catalog.allows_research(UpgradeKind::TankUnlock, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(catalog.allows_building(EntityKind::PumpJack));
@@ -755,13 +919,13 @@ mod tests {
         );
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));
-        assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
-        assert!(catalog.allows_ability(POINT_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
-        assert!(catalog.allows_ability(BLANKET_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
-        assert!(catalog.allows_ability(SCOUT_PLANE_ABILITY, EntityKind::CommandCar));
-        assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));
-        assert!(!catalog.allows_ability(DISMISS_SCOUT_PLANE_ABILITY, EntityKind::ScoutPlane));
-        assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));
+        assert!(catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));
+        assert!(catalog.allows_ability(AbilityKind::PointFire, ARTILLERY_ABILITY_CARRIERS[0]));
+        assert!(catalog.allows_ability(AbilityKind::BlanketFire, ARTILLERY_ABILITY_CARRIERS[0]));
+        assert!(catalog.allows_ability(AbilityKind::ScoutPlane, EntityKind::CommandCar));
+        assert!(!catalog.allows_ability(AbilityKind::Charge, EntityKind::Rifleman));
+        assert!(!catalog.allows_ability(AbilityKind::DismissScoutPlane, EntityKind::ScoutPlane));
+        assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::Worker));
     }
 
     #[test]
@@ -778,17 +942,17 @@ mod tests {
         assert_eq!(catalog.loadout.starting_entities, EKAT_START_ENTITIES);
         assert!(catalog.can_gather(EntityKind::Golem));
         assert!(catalog.can_act_as_production_anchor(EntityKind::Zamok));
-        assert!(catalog.allows_ability(EKAT_TELEPORT_ABILITY, EntityKind::Ekat));
-        assert!(catalog.allows_ability(EKAT_LINE_SHOT_ABILITY, EntityKind::Ekat));
-        assert!(catalog.allows_ability(EKAT_MAGIC_ANCHOR_ABILITY, EntityKind::Ekat));
-        assert!(catalog.allows_ability(EKAT_CONSUME_GOLEM_ABILITY, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatTeleport, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatLineShot, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatConsumeGolem, EntityKind::Ekat));
         assert!(!catalog.allows_unit(EntityKind::Rifleman));
         assert!(!catalog.allows_building(EntityKind::CityCentre));
     }
 
     #[test]
     fn default_ability_registry_preserves_current_metadata() {
-        let smoke = CURRENT_CATALOG.ability(SMOKE_ABILITY).unwrap();
+        let smoke = CURRENT_CATALOG.ability(AbilityKind::Smoke).unwrap();
         assert_eq!(smoke.label, "Smoke");
         assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
@@ -808,7 +972,7 @@ mod tests {
         );
         assert!(smoke.command_card);
 
-        let point_fire = CURRENT_CATALOG.ability(POINT_FIRE_ABILITY).unwrap();
+        let point_fire = CURRENT_CATALOG.ability(AbilityKind::PointFire).unwrap();
         assert_eq!(point_fire.carriers, ARTILLERY_ABILITY_CARRIERS);
         assert_eq!(
             point_fire.min_range_tiles,
@@ -827,7 +991,7 @@ mod tests {
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
 
-        let blanket_fire = CURRENT_CATALOG.ability(BLANKET_FIRE_ABILITY).unwrap();
+        let blanket_fire = CURRENT_CATALOG.ability(AbilityKind::BlanketFire).unwrap();
         assert_eq!(blanket_fire.carriers, ARTILLERY_ABILITY_CARRIERS);
         assert_eq!(blanket_fire.target_mode, AbilityTargetMode::WorldPoint);
         assert_eq!(
@@ -850,47 +1014,47 @@ mod tests {
         assert_eq!(blanket_fire.protocol_code, 10);
         assert_eq!(blanket_fire.order_stage_code, 17);
 
-        let breakthrough = CURRENT_CATALOG.ability(BREAKTHROUGH_ABILITY).unwrap();
+        let breakthrough = CURRENT_CATALOG.ability(AbilityKind::Breakthrough).unwrap();
         assert_eq!(breakthrough.target_mode, AbilityTargetMode::SelfTarget);
         assert_eq!(
             breakthrough.cooldown_ticks,
             balance::BREAKTHROUGH_COOLDOWN_TICKS
         );
 
-        let dismiss = ability_definition(DISMISS_SCOUT_PLANE_ABILITY).unwrap();
+        let dismiss = ability_definition(AbilityKind::DismissScoutPlane);
         assert!(dismiss.carriers.is_empty());
         assert_eq!(dismiss.target_mode, AbilityTargetMode::SelfTarget);
         assert!(!dismiss.command_card);
         assert_eq!(dismiss.protocol_code, 11);
         assert_eq!(dismiss.order_stage_code, 18);
 
-        let charge = ability_definition(CHARGE_ABILITY).unwrap();
+        let charge = ability_definition(AbilityKind::Charge);
         assert!(!charge.command_card);
         assert!(charge.carriers.is_empty());
         assert_eq!(charge.cooldown_ticks, 0);
 
-        let teleport = EKAT_CATALOG.ability(EKAT_TELEPORT_ABILITY).unwrap();
+        let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
         assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES)
         );
 
-        let line_shot = EKAT_CATALOG.ability(EKAT_LINE_SHOT_ABILITY).unwrap();
+        let line_shot = EKAT_CATALOG.ability(AbilityKind::EkatLineShot).unwrap();
         assert_eq!(line_shot.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             line_shot.range_tiles,
             Some(balance::EKAT_LINE_SHOT_RANGE_TILES)
         );
 
-        let anchor = EKAT_CATALOG.ability(EKAT_MAGIC_ANCHOR_ABILITY).unwrap();
+        let anchor = EKAT_CATALOG.ability(AbilityKind::EkatMagicAnchor).unwrap();
         assert_eq!(anchor.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             anchor.range_tiles,
             Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
         );
 
-        let consume = EKAT_CATALOG.ability(EKAT_CONSUME_GOLEM_ABILITY).unwrap();
+        let consume = EKAT_CATALOG.ability(AbilityKind::EkatConsumeGolem).unwrap();
         assert_eq!(consume.carriers, &[EntityKind::Ekat]);
         assert_eq!(consume.target_mode, AbilityTargetMode::SelfTarget);
         assert_eq!(
@@ -911,9 +1075,9 @@ mod tests {
         assert!(catalog.allows_unit(EntityKind::ScoutCar));
         assert!(catalog.allows_building(EntityKind::Depot));
         assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
-        assert!(!catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
-        assert!(!catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
-        assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
+        assert!(!catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
+        assert!(!catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
+        assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));
     }
 
     #[test]
@@ -928,6 +1092,29 @@ mod tests {
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "missing.loadout").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "kriegsia.standard").is_some());
         assert!(catalog_loadout_for(EKAT_FACTION_ID, "ekat.standard").is_some());
+    }
+
+    #[test]
+    fn typed_ability_and_upgrade_ids_are_unique_and_round_trip() {
+        for (index, kind) in AbilityKind::ALL.iter().copied().enumerate() {
+            let id = kind.stable_id();
+            assert_eq!(id.parse::<AbilityKind>(), Ok(kind));
+            assert!(!AbilityKind::ALL[..index]
+                .iter()
+                .any(|prior| prior.stable_id() == id));
+            assert_eq!(ability_definition(kind).kind, kind);
+        }
+        assert!("unknownAbility".parse::<AbilityKind>().is_err());
+
+        for (index, kind) in UpgradeKind::ALL.iter().copied().enumerate() {
+            let id = kind.stable_id();
+            assert_eq!(id.parse::<UpgradeKind>(), Ok(kind));
+            assert!(!UpgradeKind::ALL[..index]
+                .iter()
+                .any(|prior| prior.stable_id() == id));
+            assert_eq!(upgrade_definition(kind).kind, kind);
+        }
+        assert!("unknown_upgrade".parse::<UpgradeKind>().is_err());
     }
 
     #[test]
