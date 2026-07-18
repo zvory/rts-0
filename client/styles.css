@@ -1614,7 +1614,7 @@ input[type="text"]:focus {
 #game-screen.branch-background #hud,
 #game-screen.branch-background #minimap-wrap,
 #game-screen.branch-background #selection-area,
-#game-screen.branch-background #command-card-stack,
+#game-screen.branch-background #command-card,
 #game-screen.branch-background .replay-analysis-overlay,
 #game-screen.branch-background .ai-diagnostics-panel-host,
 #game-screen.branch-background .ai-diagnostics-show,
@@ -1921,7 +1921,7 @@ input[type="text"]:focus {
 #minimap-wrap,
 #selection-area,
 #game-menu,
-#command-card-stack,
+#command-card,
 .lab-panel,
 #toast {
   position: absolute;
@@ -2946,12 +2946,6 @@ input[type="text"]:focus {
 .replay-res-val.supply-capped {
   color: var(--bad);
 }
-.replay-apm-val {
-  min-width: 32px;
-  padding-left: 8px;
-  border-left: 1px solid rgba(202, 193, 163, 0.34);
-  text-align: right;
-}
 
 /* --- Bottom-left minimap frame --- */
 #minimap-wrap {
@@ -2987,25 +2981,6 @@ input[type="text"]:focus {
   line-height: 1;
   text-align: center;
   text-shadow: 1px 1px 0 #191710;
-}
-.apm-counter {
-  box-sizing: border-box;
-  width: 42px;
-  min-height: 24px;
-  padding: 4px 3px;
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--radius-sm);
-  background: rgba(39, 37, 31, 0.94);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  text-align: center;
-  text-shadow: 1px 1px 0 #191710;
-  pointer-events: none;
 }
 .idle-workers-button {
   appearance: none;
@@ -3394,16 +3369,9 @@ input[type="text"]:focus {
 }
 
 /* --- Bottom-right command card (3x3 fixed grid of buttons) --- */
-#command-card-stack {
+#command-card {
   right: 12px;
   bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  pointer-events: none;
-}
-#command-card {
   padding: 13px;
   border-radius: var(--radius);
   pointer-events: auto;
@@ -5226,12 +5194,6 @@ input[type="text"]:focus {
     font-size: 14px;
   }
 
-  .apm-counter {
-    width: 34px;
-    min-height: 26px;
-    font-size: 12px;
-  }
-
   .minimap-status-row {
     gap: 4px;
   }
@@ -5268,12 +5230,9 @@ input[type="text"]:focus {
     min-height: 36px;
   }
 
-  #command-card-stack {
+  #command-card {
     right: var(--mobile-debug-right);
     bottom: var(--mobile-debug-bottom);
-  }
-
-  #command-card {
     grid-template-columns: repeat(3, 40px);
     grid-auto-rows: 40px;
     gap: 4px;
