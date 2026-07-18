@@ -56,9 +56,14 @@ export class ObserverSelectionInput {
     return true;
   }
 
-  destroy() {
+  cancelGesture() {
     this.drag = null;
     this.dragging = false;
+    this.screenOverlay.clearMarquee();
+  }
+
+  destroy() {
+    this.cancelGesture();
     this.screenOverlay.destroy();
   }
 

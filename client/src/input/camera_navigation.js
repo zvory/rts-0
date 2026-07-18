@@ -29,6 +29,7 @@ export class CameraNavigationInput {
     onUnconsumedMouseDown = null,
     onUnconsumedMouseMove = null,
     onUnconsumedMouseUp = null,
+    onRelease = null,
   } = {}) {
     this.domElement = domElement;
     this.camera = camera;
@@ -38,6 +39,7 @@ export class CameraNavigationInput {
     this.onUnconsumedMouseDown = onUnconsumedMouseDown;
     this.onUnconsumedMouseMove = onUnconsumedMouseMove;
     this.onUnconsumedMouseUp = onUnconsumedMouseUp;
+    this.onRelease = onRelease;
     this.keys = { up: false, down: false, left: false, right: false };
     this.mouse = null;
     this.spacePan = false;
@@ -234,6 +236,7 @@ export class CameraNavigationInput {
     this.panDrag = null;
     this.touchGesture = null;
     this.touchIds.clear();
+    this.onRelease?.();
   }
 
   screenPos(ev) {

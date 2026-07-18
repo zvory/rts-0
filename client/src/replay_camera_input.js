@@ -11,6 +11,7 @@ export class ReplayCameraInput {
       onUnconsumedMouseDown: (ev, point) => this.observerSelection?.handleMouseDown(ev, point),
       onUnconsumedMouseMove: (ev, point) => this.observerSelection?.handleMouseMove(ev, point),
       onUnconsumedMouseUp: (ev, point) => this.observerSelection?.handleMouseUp(ev, point),
+      onRelease: () => this.observerSelection?.cancelGesture(),
     });
     this.keys = this.cameraNavigation.keys;
     Object.defineProperty(this, "mouse", {
