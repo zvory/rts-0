@@ -41,7 +41,7 @@
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-observation, #game-over-scores,
                 #game-over-button
-        App:    #toast, #connection-lost, #connection-lost-detail, #connection-lost-reload
+        App:    #toast, #connection-lost, #connection-lost-drag, #connection-lost-close
     -->
     <div id="app">
       <div id="version" aria-label="game version"></div>
@@ -250,27 +250,25 @@
       </div>
       <div id="toast" hidden></div>
 
-      <!-- Persistent, blocking transport failure notice -->
+      <!-- Persistent, non-blocking transport failure notice -->
       <div
         id="connection-lost"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="connection-lost-title"
-        aria-describedby="connection-lost-detail"
+        role="status"
         hidden
       >
-        <div class="connection-lost-box">
-          <div class="connection-lost-signal" aria-hidden="true">
-            <span></span>
-          </div>
-          <p class="connection-lost-kicker">Network status</p>
-          <h1 id="connection-lost-title">Server connection lost</h1>
-          <p id="connection-lost-detail">The game can no longer reach the server.</p>
-          <p class="connection-lost-persistence">
-            Reload the game when the server is available.
-          </p>
-          <a id="connection-lost-reload" href="">Reload game</a>
-        </div>
+        <button
+          id="connection-lost-drag"
+          type="button"
+          aria-label="Move connection status notice"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home"
+          title="Drag to move. Arrow keys nudge. Home resets."
+        >⋮⋮</button>
+        <span>Server connection lost</span>
+        <button
+          id="connection-lost-close"
+          type="button"
+          aria-label="Dismiss connection status notice"
+        >×</button>
       </div>
     </div>
 
