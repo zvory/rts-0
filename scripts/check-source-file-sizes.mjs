@@ -9,6 +9,7 @@ const baselinePath = path.join(repoRoot, "scripts", "source-file-size-baseline.j
 const MAX_LINES = 1_500;
 const INCLUDED_ROOTS = ["server", "client/src", "tests", "scripts"];
 const INCLUDED_EXTENSIONS = new Set([".rs", ".js", ".mjs", ".ts"]);
+const INCLUDED_FILES = ["client/styles.css"];
 const EXCLUDED_PATH_PREFIXES = [
   "server/target/",
   "client/vendor/",
@@ -16,61 +17,9 @@ const EXCLUDED_PATH_PREFIXES = [
   "node_modules/",
 ];
 
-const failures = [];
-const ratchetNotes = [];
-
 const baseline = readBaseline();
-const exceptions = new Map();
-
-for (const entry of baseline.exceptions) {
-  if (exceptions.has(entry.path)) {
-    failures.push(`baseline repeats exception for ${entry.path}`);
-    continue;
-  }
-  exceptions.set(entry.path, entry);
-}
-
 const sourceFiles = listSourceFiles();
-const sourceByPath = new Map(sourceFiles.map((file) => [file.path, file]));
-
-for (const file of sourceFiles) {
-  const exception = exceptions.get(file.path);
-  if (file.lines <= MAX_LINES) {
-    if (exception) {
-      ratchetNotes.push(
-        `${file.path} is now ${file.lines} lines, at or below the ${MAX_LINES}-line cap; remove its baseline exception`,
-      );
-    }
-    continue;
-  }
-
-  if (!exception) {
-    failures.push(`${file.path}: ${file.lines} lines exceeds the ${MAX_LINES}-line cap`);
-    continue;
-  }
-
-  if (!Number.isInteger(exception.lines) || exception.lines <= MAX_LINES) {
-    failures.push(`${file.path}: baseline exception must record an integer line count above ${MAX_LINES}`);
-  } else if (file.lines > exception.lines) {
-    failures.push(
-      `${file.path}: grew to ${file.lines} lines; frozen exception is ${exception.lines}. Split the file or update the baseline with a reviewable reason.`,
-    );
-  } else if (file.lines < exception.lines) {
-    ratchetNotes.push(
-      `${file.path} shrank from frozen exception ${exception.lines} to ${file.lines} lines; lower or remove the exception`,
-    );
-  }
-
-  if (typeof exception.reason !== "string" || exception.reason.trim() === "") {
-    failures.push(`${file.path}: baseline exception reason must not be blank`);
-  }
-}
-
-for (const entry of baseline.exceptions) {
-  if (!sourceByPath.has(entry.path)) {
-    ratchetNotes.push(`${entry.path} is no longer a tracked source file; remove its baseline exception`);
-  }
-}
+const { failures, ratchetNotes } = evaluateSizeRatchet(sourceFiles, baseline.exceptions);
 
 if (ratchetNotes.length > 0) {
   console.log("source file size ratchet notes:");
@@ -92,7 +41,78 @@ console.log(
   `source file size check passed (${sourceFiles.length} files, ${overCap} frozen exceptions over ${MAX_LINES} lines)`,
 );
 
+if (process.argv.includes("--verify")) {
+  verifyCssRatchetFixtures();
+}
+
+function evaluateSizeRatchet(files, baselineExceptions) {
+  const fixtureFailures = [];
+  const fixtureNotes = [];
+  const exceptions = new Map();
+
+  for (const entry of baselineExceptions) {
+    if (exceptions.has(entry.path)) {
+      fixtureFailures.push(`baseline repeats exception for ${entry.path}`);
+      continue;
+    }
+    exceptions.set(entry.path, entry);
+  }
+
+  const sourceByPath = new Map(files.map((file) => [file.path, file]));
+  for (const file of files) {
+    const exception = exceptions.get(file.path);
+    if (file.lines <= MAX_LINES) {
+      if (exception) {
+        fixtureNotes.push(
+          `${file.path} is now ${file.lines} lines, at or below the ${MAX_LINES}-line cap; remove its baseline exception`,
+        );
+      }
+      continue;
+    }
+    if (!exception) {
+      fixtureFailures.push(`${file.path}: ${file.lines} lines exceeds the ${MAX_LINES}-line cap`);
+      continue;
+    }
+    if (!Number.isInteger(exception.lines) || exception.lines <= MAX_LINES) {
+      fixtureFailures.push(`${file.path}: baseline exception must record an integer line count above ${MAX_LINES}`);
+    } else if (file.lines > exception.lines) {
+      fixtureFailures.push(
+        `${file.path}: grew to ${file.lines} lines; frozen exception is ${exception.lines}. Split the file or update the baseline with a reviewable reason.`,
+      );
+    } else if (file.lines < exception.lines) {
+      fixtureNotes.push(
+        `${file.path} shrank from frozen exception ${exception.lines} to ${file.lines} lines; lower or remove the exception`,
+      );
+    }
+    if (typeof exception.reason !== "string" || exception.reason.trim() === "") {
+      fixtureFailures.push(`${file.path}: baseline exception reason must not be blank`);
+    }
+  }
+  for (const entry of baselineExceptions) {
+    if (!sourceByPath.has(entry.path)) {
+      fixtureNotes.push(`${entry.path} is no longer a tracked source file; remove its baseline exception`);
+    }
+  }
+  return { failures: fixtureFailures, ratchetNotes: fixtureNotes };
+}
+
+function verifyCssRatchetFixtures() {
+  const cssPath = "client/fixture.css";
+  const exception = { path: cssPath, lines: 1_600, reason: "fixture" };
+  const unbaselined = evaluateSizeRatchet([{ path: cssPath, lines: 1_501 }], []);
+  const growth = evaluateSizeRatchet([{ path: cssPath, lines: 1_601 }], [exception]);
+  const shrinkage = evaluateSizeRatchet([{ path: cssPath, lines: 1_550 }], [exception]);
+  if (unbaselined.failures.length !== 1 || growth.failures.length !== 1) {
+    throw new Error("CSS size fixtures must reject unbaselined oversize files and frozen-count growth");
+  }
+  if (shrinkage.failures.length !== 0 || shrinkage.ratchetNotes.length !== 1) {
+    throw new Error("CSS size fixture shrinkage must pass with one advisory ratchet note");
+  }
+  console.log("source file size CSS fixture verification passed");
+}
+
 function readBaseline() {
+  const failures = [];
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(baselinePath, "utf8"));
@@ -114,6 +134,13 @@ function readBaseline() {
     failures.push("baseline exceptions must be an array");
     parsed.exceptions = [];
   }
+  if (failures.length > 0) {
+    console.error("source file size baseline is invalid:");
+    for (const failure of failures) {
+      console.error(`  - ${failure}`);
+    }
+    process.exit(1);
+  }
   return parsed;
 }
 
@@ -123,6 +150,12 @@ function listSourceFiles() {
     const absRoot = path.join(repoRoot, root);
     if (existsSync(absRoot)) {
       walk(absRoot);
+    }
+  }
+  for (const relPath of INCLUDED_FILES) {
+    const absPath = path.join(repoRoot, relPath);
+    if (existsSync(absPath) && !isExcluded(relPath)) {
+      files.push({ path: relPath, lines: countLines(readFileSync(absPath, "utf8")) });
     }
   }
   return files.sort((a, b) => a.path.localeCompare(b.path));
