@@ -270,6 +270,11 @@ export function labHandoffLaunchConfig() {
 }
 
 export function replayLaunchConfig() {
+  const permalink = /^\/replay\/([1-9][0-9]*)\/?$/.exec(window.location.pathname || "");
+  if (permalink) {
+    const matchId = Number(permalink[1]);
+    return Number.isSafeInteger(matchId) ? { matchId, permalink: true } : null;
+  }
   const params = new URLSearchParams(window.location.search);
   const artifact = (params.get("replayArtifact") || "").trim();
   if (artifact) {
@@ -280,6 +285,17 @@ export function replayLaunchConfig() {
   if (!room) return null;
   if (!/^__match_replay__:[A-Za-z0-9_-]+$/.test(room)) return null;
   return { room, staging: true };
+}
+
+export function replaceReplayPermalink(matchId, {
+  locationLike = window.location,
+  historyLike = window.history,
+} = {}) {
+  const id = Number(matchId);
+  if (!Number.isSafeInteger(id) || id <= 0) return "";
+  const url = new URL(`/replay/${id}`, locationLike.href);
+  historyLike?.replaceState?.(historyLike.state ?? null, "", url.pathname);
+  return url.toString();
 }
 
 

@@ -685,6 +685,7 @@ impl RoomLifecycle {
 pub struct RoomHandle {
     pub event_tx: mpsc::Sender<RoomEvent>,
     identity: RoomIdentity,
+    persisted_replay_match_id: Option<i64>,
     shutdown_tx: watch::Sender<bool>,
 }
 
@@ -932,12 +933,23 @@ impl Lobby {
         rooms: &mut HashMap<String, RoomHandle>,
         mode: RoomMode,
     ) -> RoomHandle {
+        self.create_room_locked_with_mode_and_match_id(room, rooms, mode, None)
+    }
+
+    fn create_room_locked_with_mode_and_match_id(
+        &self,
+        room: &str,
+        rooms: &mut HashMap<String, RoomHandle>,
+        mode: RoomMode,
+        persisted_replay_match_id: Option<i64>,
+    ) -> RoomHandle {
         let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let identity = RoomIdentity(self.next_room_identity.fetch_add(1, Ordering::Relaxed));
         let handle = RoomHandle {
             event_tx,
             identity,
+            persisted_replay_match_id,
             shutdown_tx,
         };
         rooms.insert(room.to_string(), handle.clone());
@@ -981,6 +993,34 @@ impl Lobby {
             );
             return room;
         }
+    }
+
+    /// Return the shared replay room for one persisted match, creating it when no viewer has an
+    /// active room for that match. The match id stays in this private registry rather than the
+    /// client-visible room name, so joining a persisted replay still requires an authorized HTTP
+    /// launch. Repeated permalink launches on one server process converge on the same room and
+    /// late viewers join its current tick.
+    pub async fn persisted_replay_room(&self, match_id: i64, artifact: ReplayArtifactV1) -> String {
+        let mut rooms = self.rooms.lock().await;
+        if let Some((room, _)) = rooms
+            .iter()
+            .find(|(_, handle)| handle.persisted_replay_match_id == Some(match_id))
+        {
+            return room.clone();
+        }
+        let room = loop {
+            let candidate = format!("{MATCH_REPLAY_ROOM_PREFIX}:{:032x}", rand::random::<u128>());
+            if !rooms.contains_key(&candidate) {
+                break candidate;
+            }
+        };
+        self.create_room_locked_with_mode_and_match_id(
+            &room,
+            &mut rooms,
+            RoomMode::Replay { artifact },
+            Some(match_id),
+        );
+        room
     }
 
     /// Create an unguessable room holding frozen state for a future replay practice branch.

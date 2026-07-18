@@ -92,13 +92,35 @@ async function testReplayArtifactLaunchConfig() {
     localStorage: { getItem: () => null },
   };
   try {
-    const { replayLaunchConfig } = await import("../../client/src/bootstrap.js");
+    const { replayLaunchConfig, replaceReplayPermalink } = await import("../../client/src/bootstrap.js");
     let config = replayLaunchConfig();
     assert(config, "replay artifact launch config should be recognized");
     assert(
       config.room === "__replay_artifact__:manual_worker_rush_latest",
       "replay artifact launch should auto-join the neutral replay artifact room",
     );
+
+    globalThis.window.location = new URL("http://localhost/replay/171");
+    config = replayLaunchConfig();
+    assert(config?.matchId === 171 && config.permalink === true,
+      "persisted replay permalinks resolve their immutable match id");
+
+    globalThis.window.location = new URL("http://localhost/replay/9007199254740992");
+    config = replayLaunchConfig();
+    assert(config === null, "persisted replay permalinks reject unsafe integer ids");
+
+    let replacedPath = "";
+    const permalinkUrl = replaceReplayPermalink(171, {
+      locationLike: new URL("https://bewegungskrieg.net/?from=history"),
+      historyLike: {
+        state: { lobby: true },
+        replaceState(_state, _title, path) { replacedPath = path; },
+      },
+    });
+    assert(replacedPath === "/replay/171",
+      "watch replay replaces transient lobby query state with the clean permalink path");
+    assert(permalinkUrl === "https://bewegungskrieg.net/replay/171",
+      "the replay permalink is absolute and copyable");
 
     globalThis.window.location = new URL("http://localhost/?replayArtifact=bad/artifact");
     config = replayLaunchConfig();

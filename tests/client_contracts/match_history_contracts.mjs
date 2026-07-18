@@ -87,6 +87,7 @@ withFakeHudDocument(() => {
 
 {
   let joinedRoom = "";
+  let joinedMatchId = null;
   let renderedRows = 0;
   const history = Object.assign(Object.create(MatchHistory.prototype), {
     fetchImpl: async (url, init) => {
@@ -99,8 +100,9 @@ withFakeHudDocument(() => {
         json: async () => ({ room: "__match_replay__:abc123" }),
       };
     },
-    onReplayRoom(room) {
+    onReplayRoom(room, matchId) {
       joinedRoom = room;
+      joinedMatchId = matchId;
       return true;
     },
     _launchingId: null,
@@ -113,6 +115,8 @@ withFakeHudDocument(() => {
   await history._launchReplay(42);
   assert(joinedRoom === "__match_replay__:abc123",
     "watch replay hands the created replay room back to the lobby flow");
+  assert(joinedMatchId === 42,
+    "watch replay hands off the immutable match id used by the permalink");
   assert(history._launchingId === null && renderedRows >= 2,
     "watch replay clears launching state after lobby handoff");
 }

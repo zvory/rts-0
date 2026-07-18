@@ -26,11 +26,12 @@ import {
   formatScore,
   labLaunchConfig,
   replaceLabCatalogRoute,
+  replaceReplayPermalink,
   replayLaunchConfig,
   wsUrl,
 } from "./bootstrap.js";
 import { Match } from "./match.js";
-import { MatchHistory } from "./match_history.js";
+import { MatchHistory, requestReplayRoom } from "./match_history.js";
 import { applyMatchUnitRanges } from "./match_settings_toggles.js";
 import { readAutoSpectatorEnabled, writeAutoSpectatorEnabled } from "./auto_spectator_settings.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
@@ -259,7 +260,7 @@ export class App {
     try {
       await this.ensureConnected();
       if (this.labHandoffLaunch) await this.prepareLabHandoff();
-      if (this.replayLaunch) this.maybeAutoJoinReplay();
+      if (this.replayLaunch) await this.maybeAutoJoinReplay();
       else if (this.labLaunch) this.maybeAutoJoinLab();
       else if (this.labCatalogLaunch) this.labCatalog?.setConnected(true);
       else if (this.matchLaunch) this.maybeAutoJoinMatchLaunch();
@@ -371,7 +372,18 @@ export class App {
     this.lobby.setStatus("Starting local scenario...");
   }
 
-  maybeAutoJoinReplay() {
+  async maybeAutoJoinReplay() {
+    if (this.replayLaunch?.matchId) {
+      try {
+        const room = await requestReplayRoom(this.replayLaunch.matchId);
+        return await this.joinReplayLobby(room, this.replayLaunch.matchId);
+      } catch (error) {
+        const message = error?.message || String(error);
+        this.lobby?.setStatus(message, true);
+        this.showConnectionWarning(message);
+        return false;
+      }
+    }
     const name = "Spectator";
     if (this.lobby?.elName) this.lobby.elName.value = name;
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.replayLaunch.room;
@@ -382,6 +394,7 @@ export class App {
     this.net.join(name, this.replayLaunch.room, true, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     this.lobby.setStatus("Starting replay...");
+    return true;
   }
 
   maybeAutoJoinLab() {
@@ -1045,12 +1058,16 @@ export class App {
     if (!host) return;
     if (this.matchHistory) return;
     this.matchHistory = new MatchHistory(host, {
-      onReplayRoom: (room) => this.joinReplayLobby(room),
+      onReplayRoom: (room, matchId) => this.joinReplayLobby(room, matchId),
     });
   }
 
-  async joinReplayLobby(room) {
+  async joinReplayLobby(room, matchId = null) {
     if (!this.lobby) return false;
+    if (Number.isSafeInteger(matchId) && matchId > 0) {
+      this.replayLaunch = { matchId, room, staging: true, permalink: true };
+      replaceReplayPermalink(matchId);
+    }
     dom.lobbyScreen.hidden = false;
     this.lobby.show();
     return await this.lobby.joinReplayLobby(room);

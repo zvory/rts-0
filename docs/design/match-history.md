@@ -89,8 +89,12 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
   the persisted artifact only if the match is visible to the request scope, validates it against
   the running map metadata and the shared replay faction/loadout validator used by replay rooms,
-  and runs embedded checkpoint restore and timeline validation before creating a spectator-only
-  replay staging lobby and returning `{ "room": "..." }`. Once the first
+  and runs embedded checkpoint restore and timeline validation before resolving a spectator-only
+  replay staging lobby and returning `{ "room": "..." }`. A process-local private registry maps
+  the immutable match id to an opaque room name: repeated launches reuse the active shared room,
+  while a launch after the empty room was disposed creates a fresh playback room for the same
+  stored replay. Keeping the match id out of the room name prevents direct WebSocket joins from
+  bypassing the HTTP launch endpoint's history-visibility check. Once the first
   viewer joins, that room appears in `/api/lobbies` with `kind: "replay"` and safe room metadata
   only; the stored artifact JSON is never exposed through the lobby browser. The host starts
   playback with the normal WebSocket `start` message, without ready/team/map/AI setup checks. The
@@ -98,7 +102,9 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   shared tick rather than starting a separate replay session.
   Build-SHA mismatches log a warning and remain launchable. Schema, map, faction/loadout, or
   missing replay failures return a clear JSON `{ "error": "..." }` instead of trying partial
-  playback.
+  playback. The public SPA route `/replay/{id}` stores the immutable match id, calls this launch
+  endpoint, and joins the returned room. **Watch replay** replaces the browser URL with that route,
+  so copying or reloading the address rejoins the current room when it exists or recreates it.
 - **AI observation lookup**: `GET /api/observations/{matchRunId}` — read-only recovery for an
   AI-only watched match that is intentionally hidden from Recent Matches. The run id is shown on
   the completed-match score screen and is the exact `match_run_id` in the structured server logs.

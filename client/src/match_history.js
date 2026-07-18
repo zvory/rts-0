@@ -232,15 +232,9 @@ export class MatchHistory {
     this._launchErrors.delete(id);
     this._renderRows();
     try {
-      const res = await this.fetchImpl(`/api/matches/${encodeURIComponent(id)}/replay`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error(await replayLaunchError(res));
-      const payload = await res.json();
-      const room = typeof payload?.room === "string" ? payload.room : "";
-      if (!room) throw new Error("Replay launch did not return a room.");
+      const room = await requestReplayRoom(id, this.fetchImpl);
       if (this.onReplayRoom) {
-        const handled = await this.onReplayRoom(room);
+        const handled = await this.onReplayRoom(room, id);
         if (handled === false) throw new Error("Replay lobby could not be joined.");
         this._launchingId = null;
         this._renderRows();
@@ -258,6 +252,21 @@ export class MatchHistory {
       this._renderRows();
     }
   }
+}
+
+export async function requestReplayRoom(id, fetchImpl = window.fetch.bind(window)) {
+  const matchId = Number(id);
+  if (!Number.isSafeInteger(matchId) || matchId <= 0) {
+    throw new Error("Replay link has an invalid match id.");
+  }
+  const res = await fetchImpl(`/api/matches/${encodeURIComponent(matchId)}/replay`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await replayLaunchError(res));
+  const payload = await res.json();
+  const room = typeof payload?.room === "string" ? payload.room : "";
+  if (!room) throw new Error("Replay launch did not return a room.");
+  return room;
 }
 
 export function matchHistoryWinnerLabel(row) {
