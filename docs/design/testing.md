@@ -340,7 +340,8 @@ canary runs own a private server; the browser shard passes its existing loopback
   client smoke. Include Node integration when protocol decode or network behavior changed.
 
 `scripts/check-source-file-sizes.mjs` runs as a cheap policy gate and enforces a 1500-line cap for
-Rust, JS, and MJS source/test files under `server/`, `client/src/`, `tests/`, and `scripts/`.
+Rust, JS, and MJS source/test files under `server/`, `client/src/`, `tests/`, and `scripts/`, plus
+the checked-in production stylesheet at `client/styles.css`.
 Files that were already above the cap are frozen in `scripts/source-file-size-baseline.json`; new
 over-cap files fail, and frozen exceptions fail on growth. Shrinkage prints a ratchet note so the
 baseline can be lowered or removed.
@@ -383,9 +384,12 @@ Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative
 `client/` paths and skips Rust nextest, lint, and Rust architecture work while still building the
-server and running live Node plus browser coverage. Contract-adjacent client paths
-such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
-`client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
+server and running live Node plus browser coverage. Contract-adjacent client paths such as the
+`client/src/config.js` facade and the explicitly classified rules, faction, timing, and
+player-palette mirror modules, along with `client/src/protocol.js`, `client/src/net.js`,
+`client/src/lobby_view.js`, and generated sim-WASM assets, fall back to `full`. Client-owned
+`client/src/config/presentation.js` remains client-only, and selector verification requires each
+production config module to declare one classification. Branch protection
 should require this single aggregate full-gate check unless a plan phase explicitly changes the
 contract.
 

@@ -1,6 +1,6 @@
 # Phase 1 - Make Client Guardrails Truthful
 
-Status: Incomplete.
+Status: Done.
 
 ## Objective
 

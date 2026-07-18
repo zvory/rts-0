@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,6 +60,10 @@ function addAll(set, suites) {
 
 const ciClientFullFallbackPaths = new Set([
   "client/src/config.js",
+  "client/src/config/factions.js",
+  "client/src/config/player_palette_mirror.js",
+  "client/src/config/rules_mirror.js",
+  "client/src/config/timing.js",
   "client/src/lobby_view.js",
   "client/src/net.js",
   "client/src/protocol.js",
@@ -89,6 +93,7 @@ function isClientOnlyCiPath(pathname) {
 
 function isSourceFileSizePath(pathname) {
   return (
+    pathname === "client/styles.css" ||
     pathname === "scripts/source-file-size-baseline.json" ||
     pathname === "tests/run-all.sh" ||
     (
@@ -195,6 +200,7 @@ function isRulesVisibleBalance(pathname) {
     pathname === "server/src/config.rs" ||
     pathname === "server/crates/sim/src/config.rs" ||
     pathname === "client/src/config.js" ||
+    pathname === "client/src/config/rules_mirror.js" ||
     pathname === "docs/design/balance.md" ||
     pathname.startsWith("docs/context/balance")
   );
@@ -213,9 +219,19 @@ function isFactionCatalogSurface(pathname) {
     pathname === "server/crates/rules/src/faction.rs" ||
     pathname === "server/crates/rules/src/bin/dump-faction-catalog.rs" ||
     pathname === "client/src/config.js" ||
+    pathname === "client/src/config/factions.js" ||
     pathname === "client/src/lobby_view.js"
   );
 }
+
+const configModuleSuites = new Map([
+  ["client/src/config.js", ["nextest-rules", "nextest-sim", "nextest-server", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
+  ["client/src/config/rules_mirror.js", ["nextest-rules", "nextest-sim", "js-protocol-contracts"]],
+  ["client/src/config/factions.js", ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
+  ["client/src/config/timing.js", ["nextest-rules", "nextest-sim", "js-protocol-contracts"]],
+  ["client/src/config/player_palette_mirror.js", ["nextest-server", "js-protocol-contracts"]],
+  ["client/src/config/presentation.js", []],
+]);
 
 function isFactionRuntimeSurface(pathname) {
   return (
@@ -341,6 +357,8 @@ export function selectSuites(files) {
     if (clientArchitecturePolicy) {
       suites.add("client-architecture");
     }
+
+    addAll(suites, configModuleSuites.get(normalized) || []);
 
     addFactionSuites(suites, normalized);
 
@@ -479,6 +497,12 @@ function verify() {
     [["server/crates/ai/src/ai_core/profiles.rs"], ["nextest-ai", "node-ai-integration", "node-team-integration", "full-ai"]],
     [["server/src/lobby/room_task.rs"], ["nextest-server", "node-server-integration", "node-regression", "node-ai-integration", "node-team-integration", "client-smoke"]],
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    [["client/src/config.js"], ["nextest-rules", "nextest-sim", "nextest-server", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts", "client-architecture", "client-smoke"]],
+    [["client/src/config/rules_mirror.js"], ["nextest-rules", "nextest-sim", "js-protocol-contracts", "client-architecture", "client-smoke"]],
+    [["client/src/config/factions.js"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts", "client-architecture", "client-smoke"]],
+    [["client/src/config/timing.js"], ["nextest-rules", "nextest-sim", "js-protocol-contracts", "client-architecture", "client-smoke"]],
+    [["client/src/config/player_palette_mirror.js"], ["nextest-server", "js-protocol-contracts", "client-architecture", "client-smoke"]],
+    [["client/styles.css"], ["source-file-sizes", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
     [["scripts/interact/driver.ts"], ["source-file-sizes", "interact-contracts", "client-smoke"]],
@@ -524,6 +548,21 @@ function verify() {
     }
   }
 
+  const exactConfigCases = [
+    ["client/src/config.js", ["source-file-sizes", "nextest-rules", "nextest-sim", "nextest-server", "client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    ["client/src/config/rules_mirror.js", ["source-file-sizes", "nextest-rules", "nextest-sim", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    ["client/src/config/factions.js", ["source-file-sizes", "nextest-rules", "nextest-sim", "client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    ["client/src/config/timing.js", ["source-file-sizes", "nextest-rules", "nextest-sim", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    ["client/src/config/player_palette_mirror.js", ["source-file-sizes", "nextest-server", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    ["client/src/config/presentation.js", ["source-file-sizes", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+  ];
+  for (const [file, expected] of exactConfigCases) {
+    const actual = selectSuites([file]);
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      failures.push(`${file} selected ${actual.join(", ")}; expected exactly ${expected.join(", ")}`);
+    }
+  }
+
   for (const files of [
     ["scripts/check-faction-assumptions.mjs"],
     ["scripts/check-faction-catalog-parity.mjs"],
@@ -551,6 +590,12 @@ function verify() {
     [["client/src/protocol.js"], { ci_class: "full", run_rust: true }],
     [["client/src/net.js"], { ci_class: "full", run_rust: true }],
     [["client/src/lobby_view.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/config/rules_mirror.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/config/factions.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/config/timing.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/config/player_palette_mirror.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/config/presentation.js"], { ci_class: "client_only", run_rust: false }],
+    [["client/styles.css"], { ci_class: "client_only", run_rust: false }],
     [["client/vendor/sim-wasm/rts_sim_wasm.js"], { ci_class: "full", run_rust: true }],
     [["client/src/match.js", "server/src/main.rs"], { ci_class: "full", run_rust: true }],
   ];
@@ -561,6 +606,16 @@ function verify() {
       if (actual[key] !== value) {
         failures.push(`${files.join(", ") || "(no files)"} ci policy ${key}=${actual[key]}; expected ${value}`);
       }
+    }
+  }
+
+  const classifiedConfigModules = new Set(configModuleSuites.keys());
+  const productionConfigModules = readdirSync(path.join(repoRoot, "client/src/config"), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .map((entry) => `client/src/config/${entry.name}`);
+  for (const modulePath of productionConfigModules) {
+    if (!classifiedConfigModules.has(modulePath)) {
+      failures.push(`${modulePath} has no explicit mirror-or-client-owned config classification`);
     }
   }
 
