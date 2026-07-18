@@ -87,11 +87,11 @@ fn scout_car_smoke_recharges_two_spent_charges_sequentially() {
         .find(|status| status.ability == ability::AbilityKind::Smoke.to_protocol_str())
         .expect("owner snapshot should include Smoke charge status");
     assert_eq!(
-        (smoke_status.remaining_uses, smoke_status.charge_recharge_left),
         (
-            Some(0),
-            Some(config::SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS)
+            smoke_status.remaining_uses,
+            smoke_status.charge_recharge_left
         ),
+        (Some(0), Some(config::SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS)),
         "owner snapshot should drive the HUD recharge clock from the authoritative timer"
     );
 
