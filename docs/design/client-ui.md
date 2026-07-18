@@ -1834,7 +1834,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   30 Hz snapshots; paused, blocked, or otherwise stationary units then return to idle art while firing
   recoil frames remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
-  anchor source. It uses toned-down team tinting, with most firing recoil on the barrel assembly
+  anchor source. Artillery likewise uses a modular A-19 PNG atlas for two independent trails, its
+  frame/wheels, and its bulky barrel/recoil assembly; the current review pass temporarily colors the
+  left trail purple and frames both full trail crops in black for pivot/origin inspection. It uses
+  the existing SVG Artillery rig for setup/facing/recoil animation and the muzzle-flash overlay.
+  The Anti-Tank Gun uses toned-down team tinting, with most firing recoil on the barrel assembly
   and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi
   asset path when image, canvas, pixel-read, or texture creation fails. When browser image
   dimensions are unavailable, full strip dimensions come from frame metadata. Deployed Machine Gunners use `firingFrames` during active recoil, with the visual-effect buffer's linear recoil phase advancing the clip through rest, recoil, and reset frames. Setup and deployed frame-strip poses take priority over movement frames
@@ -1865,8 +1869,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
-  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
-  support-weapon rig routed through the live renderer).
+  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
+  A-19 PNG components animated from the SVG-authored support-weapon rig).
   Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
   with a team-colored band and switch immediately to normal rifle art after launch. Both white-base
   Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine

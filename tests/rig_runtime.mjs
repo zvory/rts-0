@@ -43,6 +43,7 @@ import {
   pngAtlasRouteCoverage,
 } from "../client/src/renderer/rigs/png_runtime.js";
 import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_tank_gun_png_atlas.js";
+import { ARTILLERY_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/artillery_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_team_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
 import {
@@ -975,6 +976,87 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(packedCarriage.alpha, 1);
   assert.equal(leftTrail.alpha, 0);
   assert.equal(rightTrail.alpha, 0);
+});
+
+test("artillery PNG atlas assembles modular A-19 parts with review diagnostics", () => {
+  const result = compileSvgRig(ARTILLERY_RIG_SVG, { expectedKind: KIND.ARTILLERY });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const definition = result.definition;
+  const [, unitRoute] = liveRigRoutesFor(KIND.ARTILLERY);
+  const coverage = pngAtlasRouteCoverage(definition, ARTILLERY_PNG_RIG_ATLAS, unitRoute);
+  assert.deepEqual(coverage.missingParts, [
+    "part.art.flashCone",
+    "part.art.flashCore",
+    "part.art.flashGlow",
+  ]);
+
+  const deployedLeftTrail = ARTILLERY_PNG_RIG_ATLAS.sprites.find(
+    (sprite) => sprite.id === "sprite.art.leftTrail.deployed",
+  );
+  const deployedRightTrail = ARTILLERY_PNG_RIG_ATLAS.sprites.find(
+    (sprite) => sprite.id === "sprite.art.rightTrail.deployed",
+  );
+  const deployedCarriage = ARTILLERY_PNG_RIG_ATLAS.sprites.find(
+    (sprite) => sprite.id === "sprite.art.carriage.deployed",
+  );
+  const deployedBarrel = ARTILLERY_PNG_RIG_ATLAS.sprites.find(
+    (sprite) => sprite.id === "sprite.art.barrelAssembly.deployed",
+  );
+  for (const sprite of [deployedLeftTrail, deployedRightTrail, deployedCarriage, deployedBarrel]) {
+    assert.ok(sprite);
+  }
+  assert.equal(deployedLeftTrail.tintSlot, "#a05cff");
+  assert.equal(deployedRightTrail.tintSlot, "fixed");
+  assert.ok(deployedLeftTrail.sourceParts.includes("part.art.foot.left.deployed"));
+  assert.ok(deployedRightTrail.sourceParts.includes("part.art.foot.right.deployed"));
+  assert.ok(deployedBarrel.sourceParts.includes("part.art.cradle.deployed"));
+  assert.equal(deployedCarriage.sourceParts.includes("part.art.cradle.deployed"), false);
+  assert.equal(ARTILLERY_PNG_RIG_ATLAS.grid.diagnostics.trailFrameStroke, "#000000");
+
+  const entity = {
+    id: 47,
+    kind: KIND.ARTILLERY,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: 0,
+    setupState: SETUP.DEPLOYED,
+    state: STATE.IDLE,
+  };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.ARTILLERY, definition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[
+    KIND.ARTILLERY,
+    { ...ARTILLERY_PNG_RIG_ATLAS, enabled: true },
+  ]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.ARTILLERY, fakeAtlasTexture()]]);
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 1, frameProgress: 1, barrel: true });
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), {
+    playerId: 1,
+    selection: new Set(),
+    weaponRecoil: () => 0,
+  });
+
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  const leftTrail = unit.parts.get("sprite.art.leftTrail.deployed").display;
+  const rightTrail = unit.parts.get("sprite.art.rightTrail.deployed").display;
+  const carriage = unit.parts.get("sprite.art.carriage.deployed").display;
+  const barrel = unit.parts.get("sprite.art.barrelAssembly.deployed").display;
+  for (const display of [leftTrail, rightTrail, carriage, barrel]) {
+    assert.equal(display.visible, true);
+    assert.equal(display.alpha, 1);
+  }
+  assert.equal(leftTrail.tint, 0xa05cff);
+  assert.equal(rightTrail.tint, 0xffffff);
+  assert.ok(leftTrail.rotation > 0);
+  assert.ok(rightTrail.rotation < 0);
+  assert.ok(Math.abs(leftTrail.scaleX - 1 / 15) < 0.001);
+  assert.ok(Math.abs(barrel.scaleX - 1 / 11.28) < 0.001);
+  assert.notEqual(carriage.tint, 0xffffff);
+  assert.notEqual(barrel.tint, 0xffffff);
 });
 
 test("mortar PNG atlas supplies the animated half-tile base plate", () => {

@@ -1,12 +1,14 @@
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
 import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "./anti_tank_gun_png_atlas.js";
+import { ARTILLERY_PNG_RIG_ATLAS } from "./artillery_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "./mortar_team_png_atlas.js";
 import { SCOUT_CAR_PNG_RIG_ATLAS } from "./scout_car_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "./tank_png_atlas.js";
 
 const LIVE_PNG_RIG_ATLASES = Object.freeze([
   [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_PNG_RIG_ATLAS],
+  [KIND.ARTILLERY, ARTILLERY_PNG_RIG_ATLAS],
   [KIND.MORTAR_TEAM, MORTAR_TEAM_PNG_RIG_ATLAS],
   [KIND.SCOUT_CAR, SCOUT_CAR_PNG_RIG_ATLAS],
   [KIND.TANK, TANK_PNG_RIG_ATLAS],
