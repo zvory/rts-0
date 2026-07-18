@@ -328,12 +328,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Barracks no longer exposes a standalone Panzerfaust unit",
   );
   assert(
+    STATS[KIND.RIFLEMAN].cost.steel === 60 &&
+      STATS[KIND.RIFLEMAN].cost.oil === 10,
+    "Rifleman cost mirrors server",
+  );
+  assert(
     UPGRADES[UPGRADE.PANZERFAUSTS].researchedAt === KIND.TRAINING_CENTRE &&
       UPGRADES[UPGRADE.PANZERFAUSTS].cost.steel === 100 &&
       UPGRADES[UPGRADE.PANZERFAUSTS].cost.oil === 100 &&
       UPGRADES[UPGRADE.PANZERFAUSTS].researchTicks === PANZERFAUSTS_RESEARCH_TICKS &&
       PANZERFAUSTS_RESEARCH_TICKS === TICK_HZ * 20 &&
-      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("every current and future Rifleman") &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("newly produced Riflemen") &&
       UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("one disposable 5-tile anti-vehicle shot"),
     "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and Rifleman effect",
   );

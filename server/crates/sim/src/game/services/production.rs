@@ -274,7 +274,6 @@ fn sync_entity_upgrade_effects(
             upgrades.contains(&UpgradeKind::MortarAutocast),
         );
     }
-    entity.set_panzerfaust_upgrade(upgrades.contains(&UpgradeKind::Panzerfausts));
 }
 
 pub(crate) fn sync_owned_upgrade_effects(
@@ -310,6 +309,7 @@ pub(crate) fn sync_spawned_upgrade_effects(
     };
     if let Some(entity) = entities.get_mut(entity_id) {
         sync_entity_upgrade_effects(entity, upgrades);
+        entity.set_panzerfaust_upgrade(upgrades.contains(&UpgradeKind::Panzerfausts));
     }
 }
 
