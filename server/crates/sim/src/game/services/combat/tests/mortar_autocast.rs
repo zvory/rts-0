@@ -243,7 +243,7 @@ fn deployed_mortar_autocast_ignores_targets_outside_maximum_range() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "mortar must not fire beyond fifteen tiles"
+        "mortar must not fire beyond its maximum range"
     );
 }
 

@@ -9,6 +9,8 @@ import {
   ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
   MINING_CC_RANGE_TILES,
+  MORTAR_MIN_RANGE_TILES,
+  MORTAR_RANGE_TILES,
   SMOKE_ABILITY_COST,
   SMOKE_CLOUD_DURATION_TICKS,
   SMOKE_CLOUD_RADIUS_TILES,
@@ -177,6 +179,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "client config public export names remain stable across internal splits",
   );
   assert(MINING_CC_RANGE_TILES === 11, "client mirrors the server mining City Centre range");
+  assert(
+    MORTAR_MIN_RANGE_TILES === 5 && MORTAR_RANGE_TILES === 17,
+    "client mirrors the server mortar five-to-seventeen-tile range band",
+  );
   assert(
     STATS[KIND.CITY_CENTRE].cost.steel === 450 &&
       STATS[KIND.CITY_CENTRE].cost.oil === 150 &&

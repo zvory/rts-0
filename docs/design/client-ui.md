@@ -1505,7 +1505,7 @@ or Artillery are present and that slot is available. Mortar-only setup issues in
 from the button or hotkey; holding Shift appends a terminal setup after existing queued movement.
 Selections containing Anti-Tank Guns or Artillery retain the directional world-point target step.
 A deployed selected Mortar Team draws its
-5-to-15-tile full-circle range band. Artillery-only selections still expose Point Fire, Blanket Fire,
+5-to-17-tile full-circle range band. Artillery-only selections still expose Point Fire, Blanket Fire,
 and Set Up together because those commands do not collide in that context.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
