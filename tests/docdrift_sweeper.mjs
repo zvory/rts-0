@@ -923,6 +923,32 @@ try {
     return { branch, worktree };
   };
 
+  const initializedRunId = "initialized-before-branch";
+  const initializedBranch = `zvorygin/docdrift-sweep-${initializedRunId}`;
+  const initializedWorktree = `.docdrift/worktrees/docdrift-sweep-${initializedRunId}`;
+  writeRunState(initializedRunId, {
+    status: "initialized",
+    baseSha: simCommit,
+    headSha: docsOnlyHead,
+    branch: initializedBranch,
+    worktree: initializedWorktree,
+    generatedHeadSha: null,
+    pr: null,
+    checkpointTarget: null,
+    recoveryAction: "created_fresh_run",
+  });
+  const initializedGh = writeFakeGh("fake-gh-initialized", []);
+  const initializedReport = JSON.parse(
+    fullSweep(
+      ["--run-id", initializedRunId, "--no-codex", "--fixture", "classifier-basic", "--format", "json"],
+      { env: recoveryEnv(initializedGh) },
+    ),
+  );
+  assert.equal(initializedReport.sweep.recoveryAction, "resumed_recorded_pre_pr_run");
+  assert.equal(initializedReport.sweep.action, "noop_no_doc_changes");
+  assert.equal(git(["rev-parse", initializedBranch]), docsOnlyHead);
+  assert.ok(fs.existsSync(path.join(repo, initializedWorktree)));
+
   const openRun = createRecordedBranch("open-run", docsOnlyHead);
   const openGh = writeFakeGh("fake-gh-open", [
     { number: 700, url: "https://example.invalid/pr/700", state: "OPEN", mergeStateStatus: "CLEAN", headRefOid: docsOnlyHead, headRefName: openRun.branch, mergedAt: null },
@@ -973,6 +999,9 @@ try {
   ]);
   assert.match(fullSweepFailure(["--run-id", "dirty"], { env: recoveryEnv(dirtyGh) }), /unsafe sweep worktree.*dirty.txt/);
   assert.equal(fs.readFileSync(path.join(repo, dirtyRun.worktree, "dirty.txt"), "utf8"), "do not touch\n");
+  const dirtyState = JSON.parse(fs.readFileSync(path.join(repo, ".docdrift/runs/dirty/run-state.json"), "utf8"));
+  assert.equal(dirtyState.lifecycle["fetch origin/main"], "completed");
+  assert.equal(dirtyState.recoveryAction, "stopped_for_operator_review");
 
   const closedUpdateRepo = path.join(fixtureRoot, "closed-update");
   run("git", ["clone", "--branch", "main", bareOrigin, closedUpdateRepo], { cwd: fixtureRoot });

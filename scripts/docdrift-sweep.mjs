@@ -1626,9 +1626,9 @@ function writeJsonAtomic(filePath, value) {
   renameSync(tempPath, filePath);
 }
 
-function persistRunState(options, state, lifecycle = []) {
+function persistRunState(options, state, lifecycle = null) {
   state.updatedAt = new Date().toISOString();
-  state.lifecycle = Object.fromEntries(lifecycle.map((step) => [step.name, step.status]));
+  if (lifecycle) state.lifecycle = Object.fromEntries(lifecycle.map((step) => [step.name, step.status]));
   writeJsonAtomic(runStatePath(options.repoRoot, options.runRoot, state.runId), state);
 }
 
@@ -2069,7 +2069,7 @@ export function runFullSweep(options) {
   if (state) {
     const pr = lookupOwnedPr(options, state.branch);
     const refs = validateRecordedRefs(options, state, pr);
-    if (!refs.local && !refs.remote) {
+    if (!refs.local && !refs.remote && (state.status !== "initialized" || state.generatedHeadSha || state.pr)) {
       throw new Error(`recorded branch is missing locally and remotely: run=${state.runId} branch=${state.branch} expected=${refs.expected}`);
     }
     if (pr) {
