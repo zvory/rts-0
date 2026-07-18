@@ -506,7 +506,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     app.labCatalog = null;
     app.showConnectionLost();
     assert(!connectionLost.hidden, "connection loss opens the persistent non-blocking notice");
-    app.hasConnected = false;
     app.socketOpen = false;
     app.stopHeartbeat = () => {};
     app.net = { offline: true };

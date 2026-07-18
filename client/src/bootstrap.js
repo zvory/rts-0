@@ -312,6 +312,7 @@ export const dom = {
   minimap: document.getElementById("minimap"),
   toast: document.getElementById("toast"),
   connectionLost: document.getElementById("connection-lost"),
+  connectionLostDrag: document.getElementById("connection-lost-drag"),
   connectionLostClose: document.getElementById("connection-lost-close"),
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),

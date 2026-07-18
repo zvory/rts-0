@@ -41,7 +41,7 @@
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-observation, #game-over-scores,
                 #game-over-button
-        App:    #toast, #connection-lost, #connection-lost-close
+        App:    #toast, #connection-lost, #connection-lost-drag, #connection-lost-close
     -->
     <div id="app">
       <div id="version" aria-label="game version"></div>
@@ -254,11 +254,21 @@
       <div
         id="connection-lost"
         role="status"
-        draggable="true"
         hidden
       >
+        <button
+          id="connection-lost-drag"
+          type="button"
+          aria-label="Move connection status notice"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home"
+          title="Drag to move. Arrow keys nudge. Home resets."
+        >⋮⋮</button>
         <span>Server connection lost</span>
-        <button id="connection-lost-close" type="button" draggable="false" aria-label="Dismiss">×</button>
+        <button
+          id="connection-lost-close"
+          type="button"
+          aria-label="Dismiss connection status notice"
+        >×</button>
       </div>
     </div>
 

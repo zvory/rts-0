@@ -67,6 +67,7 @@ import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
+import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -127,22 +128,13 @@ export class App {
     dom.connectionLostClose?.addEventListener("click", () => {
       dom.connectionLost.hidden = true;
     });
-    dom.connectionLost?.addEventListener("dragend", (ev) => {
-      if (!ev.clientX && !ev.clientY) return;
-      const left = Math.max(0, Math.min(
-        window.innerWidth - dom.connectionLost.offsetWidth,
-        ev.clientX - dom.connectionLost.offsetWidth / 2,
-      ));
-      const top = Math.max(0, Math.min(
-        window.innerHeight - dom.connectionLost.offsetHeight,
-        ev.clientY - dom.connectionLost.offsetHeight / 2,
-      ));
-      Object.assign(dom.connectionLost.style, {
-        left: `${left}px`,
-        top: `${top}px`,
-        right: "auto",
-      });
+    this.connectionLostPositioner = new FloatingPanelPositioner({
+      root: dom.connectionLost,
+      defaultPosition: { left: 16, top: 16 },
+      defaultSize: { width: 240, height: 44 },
+      canConstrain: () => !dom.connectionLost?.hidden,
     });
+    this.connectionLostPositioner.mount(dom.connectionLostDrag, { restore: false });
     this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.stressTestLaunch = stressTestLaunch;
     this.stressTestRunner = stressTestLaunch
@@ -200,8 +192,6 @@ export class App {
     this.replaySeekNotice = "";
     /** @type {number|undefined} heartbeat interval id while connected. */
     this.heartbeatTimer = undefined;
-    /** Whether the WebSocket has ever reached open in this page session. */
-    this.hasConnected = false;
     this.socketOpen = false;
     this.connectionPromise = null;
     this.intentionalIdleDisconnect = false;
@@ -282,9 +272,7 @@ export class App {
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.stressTestRunner?.fail("The Hellhole workload could not be loaded.");
-      this.showConnectionLost(
-        "Unable to connect after several attempts. Refresh to try again.",
-      );
+      this.showConnectionLost();
     }
   }
 
@@ -578,7 +566,6 @@ export class App {
    * so we never spam pings before then.
    */
   onOpen() {
-    this.hasConnected = true;
     this.socketOpen = true;
     if (dom.connectionLost) dom.connectionLost.hidden = true;
     this.stopHeartbeat();
