@@ -1,6 +1,6 @@
 # Phase 6 - Report Net Subscriber Failures Safely
 
-Status: Incomplete.
+Status: Done.
 
 ## Objective
 

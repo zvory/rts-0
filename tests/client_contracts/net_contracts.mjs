@@ -83,6 +83,156 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
 }
 
 {
+  const nativeConsoleError = console.error;
+  const consoleReports = [];
+  const diagnosticReports = [];
+  console.error = (...args) => { consoleReports.push(args); };
+  try {
+    const diagnostics = {
+      mark(label, detail) {
+        diagnosticReports.push([label, detail]);
+      },
+    };
+    const net = new Net("ws://example.test/ws", diagnostics);
+    const payloadSentinel = "SECRET_NET_PAYLOAD_SENTINEL";
+    const payloadError = new Error(payloadSentinel);
+    payloadError.name = payloadSentinel;
+    payloadError.stack = payloadSentinel;
+    let healthyDeliveries = 0;
+    const broken = () => { throw payloadError; };
+    net.on("snapshot", broken);
+    net.on("snapshot", () => { healthyDeliveries += 1; });
+    net._emit("snapshot", { secret: payloadSentinel });
+    net._emit("snapshot", { secret: payloadSentinel });
+
+    assert(consoleReports.length === 1, "identical Net subscriber failures log once");
+    assert(diagnosticReports.length === 1, "identical Net subscriber failures mark diagnostics once");
+    assert(healthyDeliveries === 2, "later Net subscribers run after repeated handler failures");
+    assert(
+      JSON.stringify([consoleReports, diagnosticReports]).includes(payloadSentinel) === false,
+      "Net subscriber reports exclude thrown error and payload details",
+    );
+    assert(consoleReports[0][0] === "[rts-net] subscriber failure", "Net uses the fixed console failure prefix");
+    assert(consoleReports[0][1].eventType === "snapshot", "Net reports normalized event type");
+    assert(consoleReports[0][1].thrownValueClass === "Error", "Net reports the fixed Error class");
+    assert(Number.isInteger(consoleReports[0][1].handlerId), "Net reports a local numeric handler id");
+    assert(diagnosticReports[0][0] === "net.subscriberFailure", "Net mirrors failures through diagnostics mark");
+
+    const throwingGetter = new Error(payloadSentinel);
+    Object.defineProperty(throwingGetter, "name", {
+      get() { throw new Error("caught value name was inspected"); },
+    });
+    const longEventType = "event-name-that-is-deliberately-longer-than-sixty-four-characters-to-normalize-safely";
+    net.on(longEventType, () => { throw throwingGetter; });
+    net._emit(longEventType);
+    assert(consoleReports[1][1].eventType.length === 64, "Net caps reported event types at 64 characters");
+    assert(consoleReports[1][1].thrownValueClass === "Error", "Net classifies Error without reading its name");
+
+    net.on(7, () => { throw null; });
+    net._emit(7);
+    assert(consoleReports[2][1].eventType === "unknown", "Net normalizes non-string event types");
+
+    const reportsBeforeDisconnect = consoleReports.length;
+    net._connected = true;
+    net.ws = { close() {} };
+    net.disconnect();
+    net._connected = true;
+    net.ws = {};
+    net._emit("snapshot", { secret: payloadSentinel });
+    assert(
+      consoleReports.length === reportsBeforeDisconnect,
+      "Net disconnect and reconnect lifecycle does not reset subscriber failure deduplication",
+    );
+
+    const secondNet = new Net("ws://example.test/ws");
+    secondNet.on("snapshot", broken);
+    secondNet._emit("snapshot");
+    assert(consoleReports.length === reportsBeforeDisconnect + 1, "a second Net has a fresh failure registry");
+  } finally {
+    console.error = nativeConsoleError;
+  }
+}
+
+{
+  const nativeConsoleError = console.error;
+  const consoleReports = [];
+  const diagnosticReports = [];
+  console.error = (...args) => { consoleReports.push(args); };
+  try {
+    const net = new Net("ws://example.test/ws", {
+      mark(...args) { diagnosticReports.push(args); },
+    });
+    for (let i = 0; i < 33; i += 1) {
+      const handler = () => { throw new Error("ignored"); };
+      net.on(`event-${i}`, handler);
+      net._emit(`event-${i}`);
+      net.off(`event-${i}`, handler);
+    }
+    assert(net._reportedSubscriberFailureSignatures.size === 32, "Net caps recorded failure signatures at 32");
+    assert(consoleReports.length === 33, "the 33rd distinct Net failure emits one saturation report");
+    assert(
+      consoleReports.slice(0, 32).every((report) => report[0] === "[rts-net] subscriber failure"),
+      "Net reports each of the first 32 distinct signatures independently",
+    );
+    assert(
+      consoleReports[32].length === 1 &&
+        consoleReports[32][0] === "[rts-net] subscriber failure reporting saturated",
+      "Net saturation reporting contains no failure metadata",
+    );
+    assert(
+      diagnosticReports.length === 33 &&
+        diagnosticReports[32].length === 1 &&
+        diagnosticReports[32][0] === "net.subscriberFailure.reportingSaturated",
+      "Net diagnostics mirror uses one fixed saturation marker",
+    );
+    for (let i = 33; i < 1000; i += 1) {
+      const handler = () => { throw new Error("ignored"); };
+      net.on(`event-${i}`, handler);
+      net._emit(`event-${i}`);
+      net.off(`event-${i}`, handler);
+    }
+    assert(consoleReports.length === 33, "Net suppresses new signatures after saturation");
+    assert(net._subscriberHandlerIds instanceof WeakMap, "Net keeps handler diagnostic identity only in a WeakMap");
+    assert(
+      [...net._handlers.values()].every((handlers) => handlers.size === 0),
+      "Net subscribe/off churn introduces no strong handler identity registry",
+    );
+    const enumerableDiagnosticCollections = Object.entries(net).filter(([key, value]) =>
+      key.includes("SubscriberFailure") && (value instanceof Map || value instanceof Set));
+    assert(
+      enumerableDiagnosticCollections.length === 1 &&
+        enumerableDiagnosticCollections[0][1].size === 32,
+      "Net exposes only the capped signature Set as an enumerable diagnostic registry",
+    );
+  } finally {
+    console.error = nativeConsoleError;
+  }
+}
+
+{
+  const nativeConsoleError = console.error;
+  let laterDeliveries = 0;
+  let diagnosticAttempts = 0;
+  console.error = () => { throw new Error("console reporter failed"); };
+  try {
+    const net = new Net("ws://example.test/ws", {
+      mark() {
+        diagnosticAttempts += 1;
+        throw new Error("diagnostics reporter failed");
+      },
+    });
+    net.on("snapshot", () => { throw new Error("subscriber failed"); });
+    net.on("snapshot", () => { laterDeliveries += 1; });
+    net._emit("snapshot");
+    assert(laterDeliveries === 1, "Net continues delivery when handler and both reporters throw");
+    assert(diagnosticAttempts === 1, "Net diagnostics reporting remains independent when console throws");
+    assert(net._reportedSubscriberFailureSignatures.size === 1, "failed reporters still record the signature once");
+  } finally {
+    console.error = nativeConsoleError;
+  }
+}
+
+{
   const net = new Net("ws://example.test/ws");
   assert(net instanceof Net, "Net constructor should return an instance");
   assertHasMethod(net, "connect", "Net");
