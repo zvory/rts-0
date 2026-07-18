@@ -64,6 +64,8 @@ import {
   PANZERFAUST_WINDUP_TICKS,
   RESOURCE_AMOUNTS,
   SCOUT_CAR_BODY,
+  SCOUT_CAR_SMOKE_CHARGES,
+  SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS,
   SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
   SCOUT_PLANE_BODY,
   SCOUT_PLANE_LIFETIME_TICKS,
@@ -208,6 +210,8 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "panzerfaustRangeTiles",
   "panzerfaustTravelTicks",
   "panzerfaustWindupTicks",
+  "scoutCarSmokeChargeRechargeTicks",
+  "scoutCarSmokeCharges",
   "scoutPlaneAbilityCooldownTicks",
   "scoutPlaneLifetimeTicks",
   "scoutPlaneOrbitRadiusTiles",
@@ -350,6 +354,7 @@ function assertAbilityDescriptor(entry, factionId) {
   assert.equal(descriptor.minRangeTiles ?? null, entry.minRangeTiles, `${factionId} ${entry.id} min range mirrors Rust registry`);
   assert.equal(descriptor.cooldownTicks, entry.cooldownTicks, `${factionId} ${entry.id} cooldown mirrors Rust registry`);
   assert.equal(descriptor.charges ?? null, entry.charges, `${factionId} ${entry.id} charges mirror Rust registry`);
+  assert.equal(descriptor.chargeRechargeTicks ?? null, entry.chargeRechargeTicks, `${factionId} ${entry.id} charge recharge mirrors Rust registry`);
   assert.deepEqual(descriptor.cost, entry.cost, `${factionId} ${entry.id} cost mirrors Rust registry`);
   assert.equal(descriptor.techRequirement ?? null, entry.techRequirement, `${factionId} ${entry.id} tech requirement mirrors Rust registry`);
   assert.equal(descriptor.queued, entry.mayQueue, `${factionId} ${entry.id} queue behavior mirrors Rust registry`);
@@ -553,6 +558,8 @@ const clientConstants = {
   smokeCloudRadiusTiles: SMOKE_CLOUD_RADIUS_TILES,
   smokeCloudDurationTicks: SMOKE_CLOUD_DURATION_TICKS,
   smokeAbilityCooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
+  scoutCarSmokeCharges: SCOUT_CAR_SMOKE_CHARGES,
+  scoutCarSmokeChargeRechargeTicks: SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS,
   scoutPlaneOrbitRadiusTiles: SCOUT_PLANE_ORBIT_RADIUS_TILES,
   scoutPlaneSpeedPxPerTick: SCOUT_PLANE_SPEED_PX_PER_TICK,
   scoutPlaneLifetimeTicks: SCOUT_PLANE_LIFETIME_TICKS,

@@ -251,7 +251,7 @@ function buttonSlots(card) {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
   };
   const abilityCard = buildCommandCardDescriptors({
     playerId: 1,
@@ -265,6 +265,7 @@ function buttonSlots(card) {
   const smoke = abilityCard.slots.find((slot) => slot?.commandId === smokeCommandId);
   assert.equal(smoke.slotIndex, 5);
   assert.equal(smoke.hotkey, "D");
+  assert.equal(smoke.countBadge, "2", "Smoke displays its remaining charge count");
   assert.deepEqual(commandCardActivationCandidates(abilityCard, smokeCommandId), [{
     commandId: smokeCommandId,
     slotIndex: 5,
@@ -272,6 +273,22 @@ function buttonSlots(card) {
     label: "Smoke",
     enabled: true,
   }]);
+
+  const rechargingCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [{
+      ...scoutCar,
+      abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 0 }],
+    }],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const rechargingSmoke = rechargingCard.slots.find((slot) => slot?.commandId === smokeCommandId);
+  assert.equal(rechargingSmoke.enabled, false);
+  assert.equal(rechargingSmoke.title, "Recharging");
+  assert.equal(rechargingSmoke.countBadge, "0");
 }
 
 {
@@ -383,7 +400,7 @@ function buttonSlots(card) {
     abilities: (abilitiesByKind[kind] || []).map((ability) => ({
       ability,
       cooldownLeft: 0,
-      remainingUses: null,
+      remainingUses: ability === ABILITY.SMOKE ? 2 : null,
     })),
   }));
   const combinedCard = buildCommandCardDescriptors({
@@ -447,7 +464,7 @@ function buttonSlots(card) {
     id: 42,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
   };
   const fixtureScoutCard = buildCommandCardDescriptors({
     playerId: 1,

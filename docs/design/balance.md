@@ -459,11 +459,13 @@ folded into default targeting.
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability once their
-  player completes an R&D Complex; no completed Gun Works is required. Each scout car has unlimited
-  Smoke uses. Smoke has no steel or oil cost. Target range: 14 tiles from the caster. Launch delay:
-  up to 100 ms at max range, scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration:
-  5 seconds. Smoke retains its zero-tick cooldown. After Smoke Plus research, future casts by that
-  player use a 3-tile
+  player completes an R&D Complex; no completed Gun Works is required. Each scout car holds up to
+  2 Smoke charges and has unlimited lifetime uses. Smoke has no steel or oil cost and no activation
+  cooldown, so both stored charges can be cast back-to-back. Spending the first charge starts a
+  sequential recharge queue: one missing charge returns after 15 seconds, and a second missing
+  charge returns after another 15 seconds. Target range: 14 tiles from the caster. Launch delay: up
+  to 100 ms at max range, scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration:
+  5 seconds. After Smoke Plus research, future casts by that player use a 3-tile
   radius and 10-second duration.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
@@ -472,7 +474,8 @@ folded into default targeting.
   does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
   inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
   visible to the player occupying it.
-  Finite uses are the per-car limit, so each Scout Car can create exactly two smoke clouds total.
+  The command card shows the selected Scout Car's remaining charges and reports `Recharging` at
+  zero charges.
 - **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
   owned units within 9 tiles a 1.4x speed multiplier. This passive aura has no smoke interaction,
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active

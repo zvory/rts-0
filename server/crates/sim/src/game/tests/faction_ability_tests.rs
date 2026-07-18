@@ -46,7 +46,7 @@ fn scout_car_smoke_requires_completed_research_complex() {
             .get(scout)
             .expect("scout should exist")
             .ability_uses_remaining(ability::AbilityKind::Smoke),
-        None,
+        Some(config::SCOUT_CAR_SMOKE_CHARGES),
         "Scout Car smoke should remain locked without a completed R&D Complex"
     );
     assert_eq!(
@@ -84,8 +84,8 @@ fn scout_car_smoke_requires_completed_research_complex() {
             .get(scout)
             .expect("scout should exist")
             .ability_uses_remaining(ability::AbilityKind::Smoke),
-        None,
-        "Scout Car smoke should remain unlimited after use"
+        Some(config::SCOUT_CAR_SMOKE_CHARGES - 1),
+        "Scout Car smoke should spend one stored charge after use"
     );
     assert_eq!(
         game.state

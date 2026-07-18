@@ -65,6 +65,8 @@ pub struct Entity {
     pub ability_cooldowns: BTreeMap<AbilityKind, u16>,
     pub ability_lockouts_until_tick: BTreeMap<AbilityKind, u32>,
     pub ability_uses_remaining: BTreeMap<AbilityKind, u16>,
+    #[serde(default)]
+    pub ability_charge_recharge_ticks: BTreeMap<AbilityKind, u16>,
 }
 
 impl Entity {
@@ -99,6 +101,7 @@ impl Entity {
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: initial_ability_uses(kind),
+            ability_charge_recharge_ticks: BTreeMap::new(),
         })
     }
 
@@ -152,6 +155,7 @@ impl Entity {
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
+            ability_charge_recharge_ticks: BTreeMap::new(),
         })
     }
 
@@ -186,6 +190,7 @@ impl Entity {
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
+            ability_charge_recharge_ticks: BTreeMap::new(),
         })
     }
 
@@ -615,25 +620,31 @@ impl Entity {
     }
 
     pub fn ability_uses_remaining(&self, ability: AbilityKind) -> Option<u16> {
-        crate::game::ability::definition(ability).charges?;
+        let max_charges = crate::game::ability::definition(ability).charges?;
         Some(
             self.ability_uses_remaining
                 .get(&ability)
                 .copied()
-                .unwrap_or(0),
+                .unwrap_or(max_charges),
         )
     }
 
     pub fn consume_ability_use(&mut self, ability: AbilityKind) -> bool {
+        let definition = crate::game::ability::definition(ability);
         match self.ability_uses_remaining(ability) {
             Some(0) => false,
             Some(_) => {
-                if let Some(uses) = self.ability_uses_remaining.get_mut(&ability) {
-                    *uses = uses.saturating_sub(1);
-                    true
-                } else {
-                    false
+                let uses = self
+                    .ability_uses_remaining
+                    .entry(ability)
+                    .or_insert(definition.charges.unwrap_or(0));
+                *uses = uses.saturating_sub(1);
+                if let Some(recharge_ticks) = definition.charge_recharge_ticks {
+                    self.ability_charge_recharge_ticks
+                        .entry(ability)
+                        .or_insert_with(|| recharge_ticks.saturating_add(1));
                 }
+                true
             }
             None => true,
         }
@@ -655,6 +666,44 @@ impl Entity {
         self.ability_cooldowns.retain(|_, ticks| {
             *ticks = ticks.saturating_sub(1);
             *ticks > 0
+        });
+    }
+
+    pub(crate) fn tick_ability_charge_recharges(&mut self) {
+        for (&ability, &remaining) in &self.ability_uses_remaining {
+            let definition = crate::game::ability::definition(ability);
+            let (Some(max_charges), Some(recharge_ticks)) =
+                (definition.charges, definition.charge_recharge_ticks)
+            else {
+                continue;
+            };
+            if remaining < max_charges {
+                self.ability_charge_recharge_ticks
+                    .entry(ability)
+                    .or_insert_with(|| recharge_ticks.saturating_add(1));
+            }
+        }
+        let uses = &mut self.ability_uses_remaining;
+        self.ability_charge_recharge_ticks.retain(|ability, ticks| {
+            *ticks = ticks.saturating_sub(1);
+            if *ticks > 0 {
+                return true;
+            }
+            let definition = crate::game::ability::definition(*ability);
+            let (Some(max_charges), Some(recharge_ticks), Some(remaining)) = (
+                definition.charges,
+                definition.charge_recharge_ticks,
+                uses.get_mut(ability),
+            ) else {
+                return false;
+            };
+            *remaining = remaining.saturating_add(1).min(max_charges);
+            if *remaining < max_charges {
+                *ticks = recharge_ticks;
+                true
+            } else {
+                false
+            }
         });
     }
 
