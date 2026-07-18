@@ -10,19 +10,24 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-There are exactly two supported AI profile IDs:
+The player-facing lobby supports exactly one AI profile ID:
 
 - ai_2_1 — AI 2.1, the default pressure profile.
-- ai_turtle — AI Turtle, the defensive choke-holding profile.
+
+`ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
+diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
+replaces it with `ai_2_1` whenever a room has an active human player. The replacement is enforced
+again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
+human match.
 
 Those IDs are concrete match profile IDs used by controllers and diagnostics. Live AI selection
 also accepts suite request IDs, such as ai_2_0, which resolve to concrete profiles for a match.
-The convenience inputs ai and default resolve to ai_2_1. The lobby exposes both canonical
-profiles; unsupported profile IDs are ignored when changing a seat and fall back to AI 2.1 when
-adding a seat.
+The convenience inputs ai and default resolve to ai_2_1. The lobby exposes only AI 2.1;
+unsupported or internal profile IDs fall back to AI 2.1 when adding a seat and are ignored when
+changing a seat in a player lobby.
 
-Launch URLs use the same IDs. For example, a spectator can launch an AI 2.1 versus Turtle match
-with:
+Internal observer launch URLs may still use both IDs. For example, a spectator can launch an AI
+2.1 versus Turtle diagnostic match with:
 
     /?rtsLaunch=match&rtsRoom=agent-ai-selfplay&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1
 

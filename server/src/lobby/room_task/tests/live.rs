@@ -61,7 +61,7 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 }
 
 #[test]
-fn lobby_ai_slots_keep_selected_canonical_profile() {
+fn player_lobby_replaces_internal_ai_profile_with_supported_opponent() {
     let mut task = RoomTask::new(
         "live-ai-profile-selection-test".to_string(),
         RoomMode::Normal,
@@ -76,18 +76,40 @@ fn lobby_ai_slots_keep_selected_canonical_profile() {
     task.on_add_ai(host_id, Some(2), Some("ai_turtle".to_string()));
     assert_eq!(
         task.ai_players.first().map(|ai| ai.profile_id),
-        Some("ai_turtle")
+        Some("ai_2_1")
     );
-    assert_eq!(ai_slot_names(&task), vec!["AI Turtle"]);
+    assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
 
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_turtle");
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_1");
 }
 
 #[test]
-fn lobby_ai_names_follow_profile_labels_and_duplicate_counts() {
+fn match_start_cannot_launch_internal_ai_profile_against_human() {
+    let mut task = RoomTask::new(
+        "live-ai-profile-launch-guard-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let host_id = next_player_id();
+    task.host_id = Some(host_id);
+    add_test_room_player(&mut task, host_id, true);
+    task.on_add_ai(host_id, Some(2), None);
+
+    // Simulate stale persisted state or a future caller bypassing the ordinary lobby handler.
+    task.ai_players[0].profile_id = "ai_turtle";
+    task.start_match();
+
+    assert_eq!(task.ai_players[0].profile_id, "ai_2_1");
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_1");
+}
+
+#[test]
+fn internal_ai_profiles_remain_available_to_observer_only_sessions() {
     let mut task = RoomTask::new(
         "live-ai-name-selection-test".to_string(),
         RoomMode::Normal,
@@ -97,27 +119,21 @@ fn lobby_ai_names_follow_profile_labels_and_duplicate_counts() {
     );
     let host_id = next_player_id();
     task.host_id = Some(host_id);
-    add_test_room_player(&mut task, host_id, true);
+    add_test_room_spectator(&mut task, host_id);
     task.on_select_map(host_id, "Chokes".to_string());
 
-    task.on_add_ai(host_id, Some(2), None);
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
-
-    let first_ai_id = task.ai_players[0].id;
-    task.on_add_ai(host_id, Some(3), None);
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.1 1", "AI 2.1 2"]);
-
-    task.on_set_ai_profile(host_id, first_ai_id, "ai_turtle".to_string());
-    assert_eq!(ai_slot_names(&task), vec!["AI Turtle", "AI 2.1"]);
-
-    task.on_add_ai(host_id, Some(4), Some("ai_turtle".to_string()));
-    assert_eq!(
-        ai_slot_names(&task),
-        vec!["AI Turtle 1", "AI 2.1", "AI Turtle 2"]
-    );
-
-    task.on_remove_ai(host_id, first_ai_id);
+    task.on_add_ai(host_id, Some(1), None);
+    task.on_add_ai(host_id, Some(2), Some("ai_turtle".to_string()));
     assert_eq!(ai_slot_names(&task), vec!["AI 2.1", "AI Turtle"]);
+
+    task.start_match();
+    assert_eq!(
+        task.ai_controllers
+            .iter()
+            .map(|controller| controller.profile_id())
+            .collect::<Vec<_>>(),
+        vec!["ai_2_1", "ai_turtle"]
+    );
 }
 
 #[test]

@@ -9,6 +9,7 @@ const RESERVED_ROOM_PREFIXES = Object.freeze([
   "__replay_branch__",
   "__lab__:",
 ]);
+const INTERNAL_OBSERVER_AI_PROFILE_IDS = Object.freeze(["ai_2_1", "ai_turtle"]);
 
 function launchParams(locationLike) {
   return new URLSearchParams(locationLike?.search || "");
@@ -84,7 +85,7 @@ function aiSpecsFromParams(params) {
     .filter(Boolean);
 }
 
-function parseAiSpec(raw, index, errors) {
+function parseAiSpec(raw, index, role, errors) {
   const [left, right, extra] = raw.split(":");
   if (extra != null) {
     errors.push(`rtsAi entry "${raw}" has too many fields.`);
@@ -107,9 +108,12 @@ function parseAiSpec(raw, index, errors) {
     errors.push(`rtsAi entry "${raw}" has an invalid profile id.`);
     return null;
   }
+  const aiProfileId = role === "spectator" && INTERNAL_OBSERVER_AI_PROFILE_IDS.includes(safeProfile)
+    ? safeProfile
+    : playableAiProfileId(safeProfile);
   return {
     teamId,
-    aiProfileId: playableAiProfileId(safeProfile),
+    aiProfileId,
   };
 }
 
@@ -122,7 +126,7 @@ function parseAiSlots(params, role, errors) {
     return [];
   }
   return rawSlots
-    .map((raw, index) => parseAiSpec(raw, index, errors))
+    .map((raw, index) => parseAiSpec(raw, index, role, errors))
     .filter(Boolean);
 }
 

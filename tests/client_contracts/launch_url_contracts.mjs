@@ -311,7 +311,15 @@ async function testMatchLaunchConfig() {
   ));
   assert(
     JSON.stringify(config.ai) === JSON.stringify([{ teamId: 1, aiProfileId: "ai_turtle" }]),
-    "profile-only AI entries preserve AI Turtle",
+    "observer-only internal launch entries preserve AI Turtle",
+  );
+
+  config = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRoom=player-match&rtsRole=player&rtsAi=2:ai_turtle",
+  ));
+  assert(
+    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 2, aiProfileId: "ai_2_1" }]),
+    "player launch URLs cannot select the internal Turtle profile",
   );
 
   config = matchLaunchConfig(new URL("http://localhost/?rtsLaunch=match&rtsRoom=bad%0Aroom"));

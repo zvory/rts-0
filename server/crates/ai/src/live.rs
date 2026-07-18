@@ -30,7 +30,8 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 /// The default live-lobby profile id.
 pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ID;
 
-/// Canonical profile ids accepted for ordinary lobby AI opponents.
+/// Canonical profile ids understood by the live adapter. Experimental profiles are available to
+/// internal observer-only sessions; the room actor prevents them from entering human matches.
 pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_2_1_ID, AI_TURTLE_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
@@ -50,7 +51,8 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
-    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
+    let _ = rng;
+    DEFAULT_LIVE_PROFILE_ID
 }
 
 pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {
@@ -511,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_pool_exposes_supported_lobby_choices() {
+    fn live_adapter_knows_public_and_internal_profiles() {
         assert_eq!(LIVE_PROFILE_IDS, [AI_2_1_ID, AI_TURTLE_ID]);
     }
 
@@ -521,11 +523,10 @@ mod tests {
     }
 
     #[test]
-    fn random_live_profile_selection_uses_live_pool() {
+    fn random_live_profile_selection_never_selects_an_internal_profile() {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
         for _ in 0..32 {
-            let selected = random_live_profile_id(&mut rng);
-            assert!(LIVE_PROFILE_IDS.contains(&selected));
+            assert_eq!(random_live_profile_id(&mut rng), DEFAULT_LIVE_PROFILE_ID);
         }
     }
 

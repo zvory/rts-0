@@ -139,6 +139,7 @@ impl RoomTask {
         if !spectator {
             self.assign_missing_team_for(player_id);
             self.assign_missing_faction_for(player_id);
+            self.replace_internal_ai_profiles_for_player_match();
         }
         crate::log_debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
@@ -408,6 +409,9 @@ impl RoomTask {
         let profile_id = requested_profile_id
             .as_deref()
             .and_then(rts_ai::canonical_live_profile_id)
+            .filter(|profile_id| {
+                self.active_human_count() == 0 || *profile_id == DEFAULT_LIVE_PROFILE_ID
+            })
             .unwrap_or(DEFAULT_LIVE_PROFILE_ID);
         let team_id = if let Some(team_id) = requested_team_id {
             if !self.team_move_allowed(id, team_id) {
@@ -456,6 +460,15 @@ impl RoomTask {
             );
             return;
         };
+        if self.active_human_count() > 0 && profile_id != DEFAULT_LIVE_PROFILE_ID {
+            crate::log_debug!(
+                room = %self.room,
+                target,
+                ai_profile_id = %requested_profile_id,
+                "ignoring internal-only AI profile selection in a player lobby"
+            );
+            return;
+        }
         let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == target) else {
             return;
         };
@@ -576,6 +589,7 @@ impl RoomTask {
             }
             self.assign_missing_team_for(target);
             self.assign_missing_faction_for(target);
+            self.replace_internal_ai_profiles_for_player_match();
         }
         self.broadcast_lobby();
     }
@@ -607,6 +621,24 @@ impl RoomTask {
 
     pub(super) fn active_human_count(&self) -> usize {
         self.participants().active_human_count()
+    }
+
+    pub(super) fn replace_internal_ai_profiles_for_player_match(&mut self) {
+        if self.active_human_count() == 0 {
+            return;
+        }
+        for ai in &mut self.ai_players {
+            if ai.profile_id != DEFAULT_LIVE_PROFILE_ID {
+                crate::log_warn!(
+                    room = %self.room,
+                    ai_id = ai.id,
+                    rejected_profile_id = %ai.profile_id,
+                    replacement_profile_id = DEFAULT_LIVE_PROFILE_ID,
+                    "replacing internal-only AI profile before player match"
+                );
+                ai.profile_id = DEFAULT_LIVE_PROFILE_ID;
+            }
+        }
     }
 
     pub(super) fn active_human_ids(&self) -> impl Iterator<Item = u32> + '_ {
