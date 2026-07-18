@@ -91,7 +91,14 @@ snapInput.clientIntent = {
 snapInput._refreshPlacement();
 assert(
   placementPreview?.tileX === 5 && placementPreview?.tileY === 5 && placementPreview?.valid,
-  "armed Pump Jack placement snaps to the closest visible live oil patch",
+  "armed Pump Jack placement snaps to the closest nearby visible live oil patch",
+);
+
+snapInput._groundAtScreen = () => ({ x: 32, y: 32 });
+snapInput._refreshPlacement();
+assert(
+  placementPreview?.tileX === 1 && placementPreview?.tileY === 1 && !placementPreview?.valid,
+  "armed Pump Jack placement does not target an oil patch far outside the cursor area",
 );
 
 console.log("pump_jack_input_contracts: ok");

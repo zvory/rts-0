@@ -87,17 +87,26 @@ export function pumpJackBuildIntentForResource(resource, map) {
 }
 
 export function nearestLiveOilPumpJackSite(entities, world, map) {
-  if (!world) return null;
-  const candidates = [];
+  if (!world || !map) return null;
+  const tileSize = map.tileSize || DEFAULT_TILE_SIZE;
+  if (!(tileSize > 0)) return null;
+  const maxDistanceSq = tileSize * tileSize;
+  let nearest = null;
   for (const resource of entities || []) {
     const intent = pumpJackBuildIntentForResource(resource, map);
     if (!intent) continue;
     const dx = resource.x - world.x;
     const dy = resource.y - world.y;
-    candidates.push({ ...intent, resourceId: resource.id, distanceSq: dx * dx + dy * dy });
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq > maxDistanceSq) continue;
+    if (
+      nearest &&
+      (distanceSq > nearest.distanceSq ||
+        (distanceSq === nearest.distanceSq && resource.id >= nearest.resourceId))
+    ) continue;
+    nearest = { ...intent, resourceId: resource.id, distanceSq };
   }
-  candidates.sort((a, b) => a.distanceSq - b.distanceSq || a.resourceId - b.resourceId);
-  return candidates[0] || null;
+  return nearest;
 }
 
 export function movementBodyClass(kind) {
@@ -176,7 +185,8 @@ export function _refreshPlacement() {
   const footH = stat && stat.footH ? stat.footH : 1;
 
   // Pump Jacks target resource entities rather than arbitrary ground. Snap to
-  // the closest visible live oil patch so the player need not pixel-hunt it.
+  // a nearby visible live oil patch so the player need not pixel-hunt it without
+  // letting an empty-ground click target a distant or off-screen patch.
   const pumpJackSite = place.building === KIND.PUMP_JACK
     ? nearestLiveOilPumpJackSite(this._selectionEntities(), world, map)
     : null;
