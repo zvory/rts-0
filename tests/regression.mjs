@@ -79,7 +79,7 @@ async function soloStart(room) {
        `SOLO START: snapshot carries host supply (${snap.supplyUsed}/${snap.supplyCap})`);
     ok(visibleTiles > 0,
        `SOLO START: snapshot carries authoritative visible tiles (${visibleTiles})`);
-    ok(ownCityCentres.length === 1 && ownWorkers.length === 4,
+    ok(ownCityCentres.length === 1 && ownWorkers.length === 6,
        `SOLO START: host sees normal selectable base units (cc=${ownCityCentres.length}, workers=${ownWorkers.length}, own=${own.length})`);
     c.ws.close();
   }
