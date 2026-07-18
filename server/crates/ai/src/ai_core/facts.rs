@@ -423,6 +423,7 @@ mod tests {
             diagnostics: Default::default(),
             replay: None,
             lab: None,
+            observer_view: None,
             tick: 0,
             map: MapInfo {
                 width: 64,

@@ -19,6 +19,7 @@ fn pending_tracker_start_payload() -> StartPayload {
         diagnostics: Default::default(),
         replay: None,
         lab: None,
+        observer_view: None,
         tick: 0,
         map: MapInfo {
             width: 96,

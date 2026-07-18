@@ -482,6 +482,8 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     dirty: bool,
     operationCount: u32
   },
+  observerView?: { mode: "all" } | { mode: "player", playerId: u32 } | { mode: "players", playerIds: u32[] },
+  // authoritative per-connection privileged observer selection; omitted for active players
   tick: u32,                     // starting tick (0 for normal starts; restored checkpoint tick for checkpoint replays)
   map: {
     width: u32, height: u32,     // in tiles

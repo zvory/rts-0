@@ -42,6 +42,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   them from replay/dev/Lab mode names. Privileged viewers share one per-connection selector for
   omniscient or selected-player views, independent of command authority. Lab timeline controls use
   neutral room-time messages rather than `LabClientOp`.
+- Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
+  to render the shared controls; do not reconstruct it from legacy Lab metadata.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
   movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
 - Resolved AI matches send `observationReady` (replay/log lookup).

@@ -369,7 +369,7 @@ impl RoomTask {
                 self.send_lab_start_payloads_to_all(true);
                 self.broadcast_lab_room_time_state();
                 self.broadcast_lab_state();
-                self.fanout_current_lab_snapshots();
+                self.fanout_current_observer_snapshots_to(self.order.clone());
             }
             Err(err) => {
                 crate::log_warn!(room = %self.room, error = %err, "lab seek failed");

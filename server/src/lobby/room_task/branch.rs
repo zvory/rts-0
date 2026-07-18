@@ -121,13 +121,16 @@ impl RoomTask {
         let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
         let mut recipients = Vec::new();
         for &connection_id in &self.order {
-            let Some(player) = self.players.get_mut(&connection_id) else {
-                continue;
-            };
             let mapped_seat = self
                 .branch_live_seat_by_connection
                 .get(&connection_id)
                 .copied();
+            let observer_view = mapped_seat
+                .is_none()
+                .then(|| self.observer_view_selection_for(connection_id));
+            let Some(player) = self.players.get_mut(&connection_id) else {
+                continue;
+            };
             let role = if mapped_seat.is_some() {
                 RecipientRole::ActivePlayer
             } else {
@@ -147,6 +150,7 @@ impl RoomTask {
                 diagnostics: projection_policy.diagnostic_capabilities_for(role),
                 clear_pending_snapshot: true,
                 lab: None,
+                observer_view,
                 msg_tx: player.msg_tx.clone(),
             });
         }

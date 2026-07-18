@@ -4,6 +4,7 @@ use super::session_policy::{
 use super::snapshots::{union_events, union_events_without_private_notices};
 use crate::protocol::{
     DiagnosticCapabilities, Event, MovementPathDiagnosticScope, ObserverAnalysisPayload, Snapshot,
+    VisionSelectionRequest,
 };
 use rts_sim::game::{Game, ObserverView, SnapshotOptions};
 use std::collections::HashMap;
@@ -267,6 +268,29 @@ pub(super) fn scope_observer_analysis(
         analysis.map_analysis = None;
     }
     analysis
+}
+
+pub(super) fn observer_view_from_selection(selection: VisionSelectionRequest) -> ObserverView {
+    match selection {
+        VisionSelectionRequest::All => ObserverView::Omniscient,
+        VisionSelectionRequest::Player { player_id } => ObserverView::Players(vec![player_id]),
+        VisionSelectionRequest::Players { player_ids } => ObserverView::Players(player_ids),
+    }
+}
+
+pub(super) fn selection_from_observer_view(view: &ObserverView) -> VisionSelectionRequest {
+    match view {
+        ObserverView::Omniscient => VisionSelectionRequest::All,
+        ObserverView::Players(player_ids) if player_ids.is_empty() => VisionSelectionRequest::All,
+        ObserverView::Players(player_ids) if player_ids.len() == 1 => {
+            VisionSelectionRequest::Player {
+                player_id: player_ids[0],
+            }
+        }
+        ObserverView::Players(player_ids) => VisionSelectionRequest::Players {
+            player_ids: player_ids.clone(),
+        },
+    }
 }
 
 #[cfg(test)]

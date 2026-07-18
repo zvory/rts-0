@@ -34,11 +34,11 @@ pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
     EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
-    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
-    TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
+    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
+    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 
@@ -289,17 +289,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(
-    tag = "mode",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-pub enum VisionSelectionRequest {
-    All,
-    Player { player_id: u32 },
-    Players { player_ids: Vec<u32> },
-}
+pub type VisionSelectionRequest = ObserverViewSelection;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]

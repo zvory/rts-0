@@ -1,6 +1,6 @@
 use super::connection::send_or_log;
 use super::lab_timeline::LabTimeline;
-use super::projection::ProjectionPolicy;
+use super::projection::{selection_from_observer_view, ProjectionPolicy};
 use super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy, SessionPolicyContext};
 use super::tick_control::{RoomTimeClock, TickControl};
 use super::*;
@@ -26,6 +26,7 @@ mod lifecycle;
 mod live;
 mod lobby;
 mod match_history;
+mod observer;
 mod replay;
 mod summary;
 mod types;
@@ -341,6 +342,13 @@ impl RoomTask {
             .get(&connection_id)
             .cloned()
             .unwrap_or(ObserverView::Omniscient)
+    }
+
+    fn observer_view_selection_for(
+        &self,
+        connection_id: u32,
+    ) -> crate::protocol::VisionSelectionRequest {
+        selection_from_observer_view(&self.observer_view_for(connection_id))
     }
 
     fn is_dev_watch(&self) -> bool {

@@ -52,6 +52,38 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) replay_start: Option<&'a ReplayStartComposition>,
 }
 
+pub(super) fn fanout_current_observer_snapshots(
+    room: &str,
+    players: &mut HashMap<u32, RoomPlayer>,
+    observer_views: &HashMap<u32, ObserverView>,
+    projection_policy: ProjectionPolicy,
+    recipients: impl IntoIterator<Item = u32>,
+    slow_tick_count: &mut u32,
+    tick_budget: Duration,
+    tick_start: StdInstant,
+    game: &Game,
+) {
+    let mut per_player_events = HashMap::new();
+    SnapshotFanout::new(
+        room,
+        Duration::ZERO,
+        tick_budget,
+        tick_start,
+        slow_tick_count,
+        None,
+    )
+    .send_to_recipients(players, recipients, |id, player| {
+        let projection = projection_policy.selected_perspective_snapshot_for(
+            observer_views
+                .get(&id)
+                .cloned()
+                .unwrap_or(ObserverView::Omniscient),
+        );
+        let snapshot = projection.snapshot_with_events(game, &mut per_player_events, &[]);
+        Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+    });
+}
+
 impl LiveTickDriver<'_> {
     pub(super) fn run(mut self, mut game: Box<Game>) -> LiveTickResult {
         let scheduler_lag = self.scheduled.elapsed();

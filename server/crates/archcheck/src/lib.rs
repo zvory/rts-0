@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+mod player_state_usages;
+
 const LINE_GROWTH_BUFFER: usize = 80;
 const TEST_LINE_GROWTH_BUFFER: usize = 250;
 const NEW_FILE_LINE_BUDGET: usize = 500;
@@ -444,7 +446,7 @@ fn analyze_source_files_with_registry(
         check_pure_policy_imports(file, &use_statements, &service_roles, &mut report);
         check_role_state_boundaries(file, &stripped, &service_roles, &mut report);
         collect_broad_signatures(file, &stripped, &mut report);
-        collect_player_state_usages(file, &stripped, &mut report);
+        player_state_usages::collect(file, &stripped, &mut report);
         collect_player_state_field_writes(file, &stripped, &mut report);
         collect_public_exports(file, &stripped, &mut report);
         collect_entity_field_writes(file, &stripped, &mut report);
@@ -1447,22 +1449,6 @@ fn collect_broad_signatures(file: &SourceFile, text: &str, report: &mut Architec
     }
 }
 
-fn collect_player_state_usages(file: &SourceFile, text: &str, report: &mut ArchitectureReport) {
-    for (index, line) in text.lines().enumerate() {
-        let code = code_before_comment(line);
-        if code
-            .split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
-            .any(|part| part == "PlayerState")
-        {
-            report.metrics.player_state_usages.push(PlayerStateUsage {
-                path: file.rel_path.clone(),
-                line: index + 1,
-                code: normalized_code(code),
-            });
-        }
-    }
-}
-
 fn collect_player_state_field_writes(
     file: &SourceFile,
     text: &str,
@@ -2300,16 +2286,16 @@ mod tests {
     fn direct_player_state_usages_are_recorded() {
         let report = analyze_source_files(&[source(
             "services/example.rs",
-            "use crate::game::PlayerState;\nfn update(player: &mut PlayerState) {}\n",
+            "use crate::game::{\n    PlayerState,\n};\nfn update(player: &mut PlayerState) {}\n",
         )]);
 
-        assert_eq!(report.metrics.player_state_usages.len(), 2);
+        assert_eq!(report.metrics.player_state_usages.len(), 1);
         assert!(report
             .metrics
             .player_state_usages
             .contains(&PlayerStateUsage {
                 path: "services/example.rs".to_string(),
-                line: 2,
+                line: 4,
                 code: "fn update(player: &mut PlayerState) {}".to_string(),
             }));
     }

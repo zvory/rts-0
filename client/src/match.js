@@ -412,6 +412,7 @@ export class Match {
         controlPolicy: this.controlPolicy,
         replayViewer: this.replayViewer,
         capabilities: this.capabilities,
+        initialVisionSelection: options.initialVisionSelection,
       });
     }
     this.observerDiagnostics = new MatchObserverDiagnostics({

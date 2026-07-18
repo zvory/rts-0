@@ -1,37 +1,26 @@
 use super::*;
 
 #[derive(Clone, Copy)]
-enum PlayerResourceProjection<'a> {
+pub(in crate::game) enum PlayerResourceProjection<'a> {
     None,
     All,
     Selected(&'a [u32]),
 }
 
 #[derive(Clone, Copy)]
-struct SnapshotMode<'a> {
-    player: u32,
-    memory_players: &'a [u32],
-    fog: &'a Fog,
-    actionable_fog: Option<&'a Fog>,
-    fogged: bool,
-    player_resource_projection: PlayerResourceProjection<'a>,
-    private_detail_projection: projection::PrivateDetailProjection<'a>,
-    owner_visible_players: &'a [u32],
-    omniscient: bool,
-}
-
-/// A read-only observer's authoritative perspective. This value never conveys command authority.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ObserverView {
-    /// Full world state, including private details for every real owner.
-    Omniscient,
-    /// The combined perspective of the explicitly selected real players.
-    Players(Vec<u32>),
+pub(in crate::game) struct SnapshotMode<'a> {
+    pub(in crate::game) player: u32,
+    pub(in crate::game) memory_players: &'a [u32],
+    pub(in crate::game) fog: &'a Fog,
+    pub(in crate::game) actionable_fog: Option<&'a Fog>,
+    pub(in crate::game) fogged: bool,
+    pub(in crate::game) player_resource_projection: PlayerResourceProjection<'a>,
+    pub(in crate::game) private_detail_projection: projection::PrivateDetailProjection<'a>,
+    pub(in crate::game) owner_visible_players: &'a [u32],
+    pub(in crate::game) omniscient: bool,
 }
 
 impl Game {
-    const OBSERVER_FOG_VIEWER_ID: u32 = 0;
-
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
@@ -83,82 +72,11 @@ impl Game {
         )
     }
 
-    /// Build a spectator snapshot from the union of all active players' current fog.
-    pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot {
-        self.snapshot_for_spectator_with_options(visible_players, SnapshotOptions::default())
-    }
-
-    pub fn snapshot_for_spectator_with_options(
+    pub(in crate::game) fn snapshot_for_mode(
         &self,
-        visible_players: &[u32],
+        mode: SnapshotMode<'_>,
         options: SnapshotOptions,
     ) -> Snapshot {
-        self.snapshot_for_observer_with_options(
-            &ObserverView::Players(visible_players.to_vec()),
-            options,
-        )
-    }
-
-    pub fn snapshot_for_observer(&self, view: &ObserverView) -> Snapshot {
-        self.snapshot_for_observer_with_options(view, SnapshotOptions::default())
-    }
-
-    pub fn snapshot_for_observer_with_options(
-        &self,
-        view: &ObserverView,
-        options: SnapshotOptions,
-    ) -> Snapshot {
-        let ObserverView::Players(selected_players) = view else {
-            return self.snapshot_for_mode(
-                SnapshotMode {
-                    player: Self::OBSERVER_FOG_VIEWER_ID,
-                    memory_players: &[],
-                    fog: &self.state.fog,
-                    actionable_fog: None,
-                    fogged: false,
-                    player_resource_projection: PlayerResourceProjection::All,
-                    private_detail_projection: projection::PrivateDetailProjection::AllProjected,
-                    owner_visible_players: &[],
-                    omniscient: true,
-                },
-                options,
-            );
-        };
-        let mut fog_players = Vec::new();
-        for &selected in selected_players {
-            let mut team_players = self.living_team_player_ids_for_vision(selected);
-            if team_players.is_empty() {
-                team_players.push(selected);
-            }
-            for player_id in team_players {
-                if !fog_players.contains(&player_id) {
-                    fog_players.push(player_id);
-                }
-            }
-        }
-        let actionable_fog = self
-            .state
-            .fog
-            .union_for(Self::OBSERVER_FOG_VIEWER_ID, &fog_players);
-        self.snapshot_for_mode(
-            SnapshotMode {
-                player: Self::OBSERVER_FOG_VIEWER_ID,
-                memory_players: selected_players,
-                fog: &actionable_fog,
-                actionable_fog: Some(&actionable_fog),
-                fogged: true,
-                player_resource_projection: PlayerResourceProjection::Selected(selected_players),
-                private_detail_projection: projection::PrivateDetailProjection::SelectedOwners(
-                    selected_players,
-                ),
-                owner_visible_players: selected_players,
-                omniscient: false,
-            },
-            options,
-        )
-    }
-
-    fn snapshot_for_mode(&self, mode: SnapshotMode<'_>, options: SnapshotOptions) -> Snapshot {
         let SnapshotMode {
             player,
             memory_players,

@@ -2,8 +2,8 @@ use super::connection::{send_or_log, ConnectionSink};
 use super::projection::RecipientRole;
 use super::session_policy::{SessionPolicy, StartPayloadPolicy};
 use crate::protocol::{
-    DiagnosticCapabilities, LabStartMetadata, ReplayStartMetadata, ServerMessage, StartPayload,
-    PREDICTION_PROTOCOL_VERSION,
+    DiagnosticCapabilities, LabStartMetadata, ObserverViewSelection, ReplayStartMetadata,
+    ServerMessage, StartPayload, PREDICTION_PROTOCOL_VERSION,
 };
 
 #[derive(Clone, Copy)]
@@ -20,6 +20,7 @@ pub(super) struct LaunchRecipient {
     pub(super) diagnostics: DiagnosticCapabilities,
     pub(super) clear_pending_snapshot: bool,
     pub(super) lab: Option<LabStartMetadata>,
+    pub(super) observer_view: Option<ObserverViewSelection>,
     pub(super) msg_tx: ConnectionSink,
 }
 
@@ -29,9 +30,31 @@ pub(super) struct StartPayloadRecipient {
     pub(super) prediction: LaunchPrediction,
     pub(super) diagnostics: DiagnosticCapabilities,
     pub(super) lab: Option<LabStartMetadata>,
+    pub(super) observer_view: Option<ObserverViewSelection>,
 }
 
 impl LaunchRecipient {
+    pub(super) fn observer(
+        connection_id: u32,
+        diagnostics: DiagnosticCapabilities,
+        clear_pending_snapshot: bool,
+        lab: Option<LabStartMetadata>,
+        observer_view: ObserverViewSelection,
+        msg_tx: ConnectionSink,
+    ) -> Self {
+        Self {
+            connection_id,
+            payload_player_id: connection_id,
+            role: RecipientRole::Spectator,
+            prediction: LaunchPrediction::Disabled,
+            diagnostics,
+            clear_pending_snapshot,
+            lab,
+            observer_view: Some(observer_view),
+            msg_tx,
+        }
+    }
+
     fn start_payload_recipient(&self) -> StartPayloadRecipient {
         StartPayloadRecipient {
             payload_player_id: self.payload_player_id,
@@ -39,6 +62,7 @@ impl LaunchRecipient {
             prediction: self.prediction,
             diagnostics: self.diagnostics,
             lab: self.lab.clone(),
+            observer_view: self.observer_view.clone(),
         }
     }
 }
@@ -129,6 +153,7 @@ impl<'a> StartPayloadBuilder<'a> {
             diagnostics: recipient.diagnostics,
             replay,
             lab,
+            observer_view: recipient.observer_view.clone(),
             ..self.base_payload.clone()
         }
     }

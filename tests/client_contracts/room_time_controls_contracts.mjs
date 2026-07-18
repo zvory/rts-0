@@ -242,6 +242,7 @@ const replayUi = new ReplayControls({
   net: replayNet,
   state: roomTimeState,
   replayViewer: true,
+  initialVisionSelection: { mode: "players", playerIds: [2, 1, 99, 2] },
   capabilities: createRoomCapabilities({
     startPayload: {
       replay: { durationTicks: 1_000 },
@@ -271,6 +272,17 @@ assert(replayControls.querySelector(".room-time-panel-body")?.querySelector(".se
   "floating panel wraps the existing room-time buttons in its body");
 assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
 assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+const initialVisionButtons = replayControls.querySelectorAll(".vision-btn");
+assert(
+  !initialVisionButtons[0].classList.contains("active") &&
+    initialVisionButtons[1].classList.contains("active") &&
+    initialVisionButtons[2].classList.contains("active"),
+  "vision controls restore the current observer selection instead of assuming omniscient view",
+);
+assert(
+  JSON.stringify(replayUi.visionSelectionRequest()) === JSON.stringify({ mode: "players", playerIds: [1, 2] }),
+  "vision controls expose a canonical selection for a replacement match",
+);
 dragHandle._listeners.get("pointerdown")({
   button: 0,
   isPrimary: true,

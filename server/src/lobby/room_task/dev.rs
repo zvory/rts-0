@@ -7,7 +7,7 @@ use super::super::crash_replay::{dump_crash_replay, panic_reason};
 use super::super::dev_replay::match_seed;
 use super::super::dev_scenario_id::DevScenarioId;
 use super::super::faction_validation::{default_faction_id_for, FactionRequestContext};
-use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
+use super::super::launch::{LaunchRecipient, StartPayloadBuilder};
 use super::super::projection::RecipientRole;
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::snapshots::union_events;
@@ -255,16 +255,14 @@ impl RoomTask {
         super::super::launch::send_start_payloads(
             &self.room,
             &builder,
-            [LaunchRecipient {
-                connection_id: watcher_id,
-                payload_player_id: watcher_id,
-                prediction: LaunchPrediction::Disabled,
-                role,
+            [LaunchRecipient::observer(
+                watcher_id,
                 diagnostics,
-                clear_pending_snapshot: false,
-                lab: None,
-                msg_tx: player.msg_tx.clone(),
-            }],
+                false,
+                None,
+                self.observer_view_selection_for(watcher_id),
+                player.msg_tx.clone(),
+            )],
         );
     }
 

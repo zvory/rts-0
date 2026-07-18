@@ -255,6 +255,10 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     task.match_human_count = 2;
     task.replay_start = Some(replay_start);
     task.outcome_sent.insert(players[1].id);
+    task.observer_views.insert(
+        players[0].id,
+        rts_sim::game::ObserverView::Players(vec![players[0].id]),
+    );
 
     task.players
         .get(&players[0].id)

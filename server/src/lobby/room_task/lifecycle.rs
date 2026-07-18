@@ -399,6 +399,7 @@ impl RoomTask {
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
+        self.observer_views.clear();
         self.reset_live_pause_state();
         self.reset_room_time_state();
         self.replay_start = None;

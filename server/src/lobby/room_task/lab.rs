@@ -13,7 +13,7 @@ use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::dev_replay::match_seed;
 use super::super::lab_replay_operations::lab_op_to_replay_operation;
 use super::super::lab_timeline::LabTimeline;
-use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
+use super::super::launch::{LaunchRecipient, StartPayloadBuilder};
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
@@ -166,6 +166,13 @@ fn player_ids_for_vision(players: &[PlayerInit], vision: &LabVisionMode) -> Vec<
         })
         .map(|player| player.id)
         .collect()
+}
+
+fn observer_view_for_lab_vision(players: &[PlayerInit], vision: &LabVisionMode) -> ObserverView {
+    match vision {
+        LabVisionMode::All => ObserverView::Omniscient,
+        LabVisionMode::Team { .. } => ObserverView::Players(player_ids_for_vision(players, vision)),
+    }
 }
 
 fn lab_op_kind(op: &LabClientOp) -> &'static str {
@@ -550,6 +557,12 @@ impl RoomTask {
                 last_sim_consumed_client_tick: None,
             },
         );
+        if let (Some(game), Some(session)) = (self.live_game(), self.lab_session.as_ref()) {
+            self.observer_views.insert(
+                player_id,
+                observer_view_for_lab_vision(&game.player_inits(), &session.vision_for(player_id)),
+            );
+        }
         self.reassign_host_if_needed();
         let _ = ack.send(true);
         self.send_current_shutdown_warning_to(player_id);
@@ -613,26 +626,26 @@ impl RoomTask {
         self.lab_driver = launch_driver;
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
+        self.sync_lab_legacy_observer_views(&game);
         let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
-        let recipients: Vec<_> =
-            self.order
-                .iter()
-                .filter_map(|&id| {
-                    self.players.get(&id).map(|player| LaunchRecipient {
-                        connection_id: id,
-                        payload_player_id: id,
-                        role: RecipientRole::Spectator,
-                        prediction: LaunchPrediction::Disabled,
-                        diagnostics: projection_policy
-                            .diagnostic_capabilities_for(RecipientRole::Spectator),
-                        clear_pending_snapshot: false,
-                        lab: self.lab_session.as_ref().map(|session| {
+        let recipients: Vec<_> = self
+            .order
+            .iter()
+            .filter_map(|&id| {
+                self.players.get(&id).map(|player| {
+                    LaunchRecipient::observer(
+                        id,
+                        projection_policy.diagnostic_capabilities_for(RecipientRole::Spectator),
+                        false,
+                        self.lab_session.as_ref().map(|session| {
                             session.metadata_for(id, launch_god_mode_players.clone())
                         }),
-                        msg_tx: player.msg_tx.clone(),
-                    })
+                        self.observer_view_selection_for(id),
+                        player.msg_tx.clone(),
+                    )
                 })
-                .collect();
+            })
+            .collect();
         let builder = StartPayloadBuilder::simulation(start_policy, &payload);
         super::super::launch::send_start_payloads(&self.room, &builder, recipients);
 
@@ -755,33 +768,30 @@ impl RoomTask {
         self.broadcast(&error);
     }
 
-    pub(super) fn send_lab_start_to(&self, watcher_id: u32) {
-        let Some(Phase::InGame(game)) = Some(&self.phase) else {
-            return;
-        };
-        let Some(player) = self.players.get(&watcher_id) else {
+    fn send_lab_start_payloads(&self, recipients: impl IntoIterator<Item = LaunchRecipient>) {
+        let Phase::InGame(game) = &self.phase else {
             return;
         };
         let payload = game.start_payload();
+        let builder = StartPayloadBuilder::simulation(self.session_policy(), &payload);
+        super::super::launch::send_start_payloads(&self.room, &builder, recipients);
+    }
+
+    pub(super) fn send_lab_start_to(&self, watcher_id: u32) {
+        let Some(player) = self.players.get(&watcher_id) else {
+            return;
+        };
         let diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
-        let start_policy = self.session_policy();
-        let builder = StartPayloadBuilder::simulation(start_policy, &payload);
-        super::super::launch::send_start_payloads(
-            &self.room,
-            &builder,
-            [LaunchRecipient {
-                connection_id: watcher_id,
-                payload_player_id: watcher_id,
-                prediction: LaunchPrediction::Disabled,
-                role: RecipientRole::Spectator,
-                diagnostics,
-                clear_pending_snapshot: false,
-                lab: self.lab_start_metadata_for(watcher_id),
-                msg_tx: player.msg_tx.clone(),
-            }],
-        );
+        self.send_lab_start_payloads([LaunchRecipient::observer(
+            watcher_id,
+            diagnostics,
+            false,
+            self.lab_start_metadata_for(watcher_id),
+            self.observer_view_selection_for(watcher_id),
+            player.msg_tx.clone(),
+        )]);
     }
 
     fn send_lab_start_payloads_to_all(&self, clear_pending_snapshot: bool) {
@@ -793,32 +803,26 @@ impl RoomTask {
         clear_pending_snapshot: bool,
         excluded_player_id: Option<u32>,
     ) {
-        let Phase::InGame(game) = &self.phase else {
-            return;
-        };
-        let payload = game.start_payload();
         let diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
-        let start_policy = self.session_policy();
         let recipients = self
             .order
             .iter()
             .filter(|&&id| Some(id) != excluded_player_id)
             .filter_map(|&id| {
-                self.players.get(&id).map(|player| LaunchRecipient {
-                    connection_id: id,
-                    payload_player_id: id,
-                    prediction: LaunchPrediction::Disabled,
-                    role: RecipientRole::Spectator,
-                    diagnostics,
-                    clear_pending_snapshot,
-                    lab: self.lab_start_metadata_for(id),
-                    msg_tx: player.msg_tx.clone(),
+                self.players.get(&id).map(|player| {
+                    LaunchRecipient::observer(
+                        id,
+                        diagnostics,
+                        clear_pending_snapshot,
+                        self.lab_start_metadata_for(id),
+                        self.observer_view_selection_for(id),
+                        player.msg_tx.clone(),
+                    )
                 })
             });
-        let builder = StartPayloadBuilder::simulation(start_policy, &payload);
-        super::super::launch::send_start_payloads(&self.room, &builder, recipients);
+        self.send_lab_start_payloads(recipients);
     }
 
     fn lab_start_metadata_for(&self, player_id: u32) -> Option<LabStartMetadata> {
@@ -829,13 +833,6 @@ impl RoomTask {
         self.lab_session
             .as_ref()
             .map(|session| session.metadata_for(player_id, god_mode_players))
-    }
-
-    pub(super) fn fanout_current_lab_snapshots(&mut self) {
-        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::Lab) {
-            return;
-        }
-        self.fanout_current_observer_snapshots_to(self.order.clone());
     }
 
     pub(super) fn on_lab_request(&mut self, player_id: u32, request_id: u32, op: LabClientOp) {
@@ -947,8 +944,10 @@ impl RoomTask {
         if let Some(result) = result {
             let refresh_snapshot = refresh_snapshot_after_result && result.ok;
             self.send_lab_result_to(player_id, result);
-            if refresh_snapshot {
-                self.fanout_current_lab_snapshots();
+            if refresh_snapshot
+                && self.session_policy().clock.room_time_source() == Some(RoomTimeSource::Lab)
+            {
+                self.fanout_current_observer_snapshots_to(self.order.clone());
             }
         }
     }
@@ -967,12 +966,7 @@ impl RoomTask {
             return lab_result_error(request_id, op, &err);
         }
         let tick = game.tick_count();
-        let observer_view = match &vision {
-            LabVisionMode::All => ObserverView::Omniscient,
-            LabVisionMode::Team { .. } => {
-                ObserverView::Players(player_ids_for_vision(&game.player_inits(), &vision))
-            }
-        };
+        let observer_view = observer_view_for_lab_vision(&game.player_inits(), &vision);
         let log_operations = self.session_policy().logs_lab_operations();
         if let Some(session) = &mut self.lab_session {
             session.set_vision_for(operator_id, vision);
@@ -1168,6 +1162,9 @@ impl RoomTask {
         let Some(game) = self.live_game().map(Game::clone_for_replay_keyframe) else {
             return lab_result_error(request_id, op_kind, "lab game is not running");
         };
+        let imported_observer_view = imported_vision
+            .as_ref()
+            .map(|vision| observer_view_for_lab_vision(&game.player_inits(), vision));
         let Some(source) = rebase_source else {
             return lab_result_error(
                 request_id,
@@ -1198,6 +1195,9 @@ impl RoomTask {
                     result: outcome_json.to_string(),
                 });
             }
+        }
+        if let Some(observer_view) = imported_observer_view {
+            self.observer_views.insert(operator_id, observer_view);
         }
         self.broadcast_lab_state();
         self.broadcast_lab_room_time_state();
@@ -1282,6 +1282,20 @@ impl RoomTask {
             Phase::InGame(game) => Some(game),
             _ => None,
         }
+    }
+
+    fn sync_lab_legacy_observer_views(&mut self, game: &Game) {
+        let Some(session) = self.lab_session.as_ref() else {
+            return;
+        };
+        let players = game.player_inits();
+        self.observer_views
+            .extend(self.order.iter().copied().map(|viewer_id| {
+                (
+                    viewer_id,
+                    observer_view_for_lab_vision(&players, &session.vision_for(viewer_id)),
+                )
+            }));
     }
 
     fn send_lab_result_to(&self, player_id: u32, result: LabResult) {

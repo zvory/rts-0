@@ -48,6 +48,10 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     assert!(!payload.capabilities.actions.branch_from_tick);
     assert!(payload.diagnostics.is_empty());
     assert!(payload.replay.is_none());
+    assert_eq!(
+        payload.observer_view,
+        Some(crate::protocol::VisionSelectionRequest::All)
+    );
     assert_eq!(payload.players.len(), 2);
     assert_eq!(payload.players[0].team_id, 1);
     assert_eq!(payload.players[1].team_id, 2);

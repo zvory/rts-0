@@ -861,6 +861,16 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
 
     task.on_lab_request(
         99,
+        27,
+        LabClientOp::SetVision {
+            vision: LabVisionMode::Team { team_id: 1 },
+        },
+    );
+    assert!(lab_results(&mut writer)[0].ok);
+    while collab_writer.reliable_rx.try_recv().is_ok() {}
+
+    task.on_lab_request(
+        99,
         23,
         LabClientOp::SetPlayerResources {
             player_id: LAB_PLAYER_ONE_ID,
@@ -891,6 +901,17 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     let session = task.lab_session.as_ref().unwrap();
     assert_eq!(session.vision_for(99), LabVisionMode::Team { team_id: 2 });
     assert_eq!(session.vision_for(100), LabVisionMode::Team { team_id: 1 });
+    let expected_operator =
+        game.snapshot_for_observer(&ObserverView::Players(vec![LAB_PLAYER_TWO_ID]));
+    let operator_snapshot = writer.snapshots.take().expect("imported lab snapshot");
+    assert_eq!(
+        operator_snapshot.visible_tiles,
+        expected_operator.visible_tiles
+    );
+    assert_eq!(
+        operator_snapshot.player_resources,
+        expected_operator.player_resources
+    );
 
     let (late_tx, mut late_writer) = ConnectionSink::new();
     let (late_ack, _late_ack_rx) = tokio::sync::oneshot::channel();
@@ -908,6 +929,23 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
     assert_eq!(
         late_start.lab.as_ref().expect("lab metadata").vision,
         LabVisionMode::Team { team_id: 2 }
+    );
+    assert_eq!(
+        late_start.observer_view,
+        Some(crate::protocol::VisionSelectionRequest::Player {
+            player_id: LAB_PLAYER_TWO_ID,
+        })
+    );
+    task.on_tick(TokioInstant::now());
+    let late_snapshot = late_writer.snapshots.take().expect("late lab snapshot");
+    let Phase::InGame(game) = &task.phase else {
+        panic!("lab should remain live after a collaborator joins");
+    };
+    let expected_late = game.snapshot_for_observer(&ObserverView::Players(vec![LAB_PLAYER_TWO_ID]));
+    assert_eq!(late_snapshot.visible_tiles, expected_late.visible_tiles);
+    assert_eq!(
+        late_snapshot.player_resources,
+        expected_late.player_resources
     );
 }
 
