@@ -60,7 +60,10 @@ pub(super) fn late_spectator_notice_name(name: &str) -> String {
     }
 }
 
-pub(super) fn live_ai_controllers(players: &[PlayerInit], ai_slots: &[AiSlot]) -> Vec<AiController> {
+pub(super) fn live_ai_controllers(
+    players: &[PlayerInit],
+    ai_slots: &[AiSlot],
+) -> Vec<AiController> {
     players
         .iter()
         .filter(|player| player.is_ai)
