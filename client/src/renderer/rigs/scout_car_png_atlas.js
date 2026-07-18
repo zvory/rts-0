@@ -16,25 +16,25 @@ const TEAM_FRAME_COLORS = Object.freeze([
   "#7e57c2",
 ]);
 
-const ATLAS_PADDING = 2;
+const ATLAS_PADDING = 1;
 const ATLAS_COLUMNS = 2;
 const GUN_RENDER_SCALE_X = 1.1;
 const GUN_RENDER_SCALE_Y = 1.32;
 const BODY_FRAME_BASE = Object.freeze({
-  w: 1312,
-  h: 678,
-  originX: 656,
-  originY: 339,
-  pixelsPerUnitX: 30.140540540540538,
-  pixelsPerUnitY: 30.599999999999994,
+  w: 656,
+  h: 339,
+  originX: 328,
+  originY: 169.5,
+  pixelsPerUnitX: 15.070270270270269,
+  pixelsPerUnitY: 15.299999999999997,
 });
 const GUN_FRAME_BASE = Object.freeze({
-  w: 1076,
-  h: 329,
-  originX: 380.6258503401361,
-  originY: 155.47679324894514,
-  pixelsPerUnitX: 46.84625850340136 / GUN_RENDER_SCALE_X,
-  pixelsPerUnitY: 44.42194092827004 / GUN_RENDER_SCALE_Y,
+  w: 538,
+  h: 165,
+  originX: 190.31292517006804,
+  originY: 77.9746835443038,
+  pixelsPerUnitX: 23.42312925170068 / GUN_RENDER_SCALE_X,
+  pixelsPerUnitY: 22.278481012658226 / GUN_RENDER_SCALE_Y,
 });
 const TEAM_CELL_WIDTH = BODY_FRAME_BASE.w;
 const TEAM_CELL_HEIGHT = BODY_FRAME_BASE.h + GUN_FRAME_BASE.h;
@@ -72,7 +72,7 @@ const GUN_NEUTRAL_FRAME = paletteFrame("#0072b2", "rearMachineGun");
 export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "scout_car",
-  image: "/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png?v=pass02-team-mg-neutral-110x132-alpha-repair",
+  image: "/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png?v=pass02-team-halfres-rgba8",
   runtimeColorAdjustment: {
     brightness: 90,
     saturation: 90,
@@ -86,15 +86,15 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   },
   grid: {
     layout: "semantic",
-    width: 2630,
-    height: 4038,
+    width: 1315,
+    height: 2021,
     sourceSheet: "client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png",
     cells: [
       "sprite.body",
       "sprite.rearMachineGun",
     ],
     palette: TEAM_FRAME_COLORS,
-    imageVersion: "pass02-team-mg-neutral-110x132-alpha-repair",
+    imageVersion: "pass02-team-halfres-rgba8",
   },
   frames: {},
   sprites: [
