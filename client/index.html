@@ -39,7 +39,7 @@
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-observation, #game-over-scores,
                 #game-over-button
-        App:    #toast, #connection-lost, #connection-lost-detail
+        App:    #toast, #connection-lost, #connection-lost-detail, #connection-lost-reload
     -->
     <div id="app">
       <div id="version" aria-label="game version"></div>
@@ -262,8 +262,9 @@
           <h1 id="connection-lost-title">Server connection lost</h1>
           <p id="connection-lost-detail">The game can no longer reach the server.</p>
           <p class="connection-lost-persistence">
-            This warning will stay on screen until a server connection is restored.
+            Reload the game when the server is available.
           </p>
+          <a id="connection-lost-reload" href="">Reload game</a>
         </div>
       </div>
     </div>

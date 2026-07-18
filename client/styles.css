@@ -4889,6 +4889,29 @@ input[type="text"]:focus {
   line-height: 1.45;
 }
 
+#connection-lost-reload {
+  display: inline-block;
+  margin-top: 24px;
+  padding: 11px 18px;
+  border: 2px solid var(--bad);
+  border-radius: var(--radius);
+  background: var(--bad);
+  color: #fff5ea;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+#connection-lost-reload:hover,
+#connection-lost-reload:focus-visible {
+  border-color: #fff5ea;
+  outline: 3px solid rgba(255, 245, 234, 0.28);
+  outline-offset: 3px;
+}
+
 /* --- Pre-match countdown --- */
 .match-countdown {
   position: absolute;

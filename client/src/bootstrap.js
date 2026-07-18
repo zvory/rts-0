@@ -297,6 +297,7 @@ export const dom = {
   toast: document.getElementById("toast"),
   connectionLost: document.getElementById("connection-lost"),
   connectionLostDetail: document.getElementById("connection-lost-detail"),
+  connectionLostReload: document.getElementById("connection-lost-reload"),
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),
   gameOverObservation: document.getElementById("game-over-observation"),

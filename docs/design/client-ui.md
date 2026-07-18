@@ -1574,7 +1574,8 @@ established ordinary-lobby socket closes, the app silently resets the joined roo
 lobby browser; dedicated launch URLs and active matches retain their existing disconnect handling.
 An unexpected disconnect in a dedicated launch or active match raises a global, input-blocking
 connection-loss overlay instead of relying on the transient toast. The overlay remains visible
-until the next successful WebSocket open event; intentional idle lobby disconnects do not show it.
+for the rest of the application session and offers a reload action; intentional idle lobby
+disconnects do not show it. A fresh socket does not resume an existing match seat.
 The create modal derives its default from the player name and the latest browser rows, adding the
 first free numeric suffix when that suggestion is already listed. The create endpoint repeats that
 selection atomically and returns the authoritative room name, covering stale lists and concurrent

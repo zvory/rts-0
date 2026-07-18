@@ -501,8 +501,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   {
     const connectionLost = { hidden: true };
     const connectionLostDetail = { textContent: "" };
+    let reloadFocusCount = 0;
     dom.connectionLost = connectionLost;
     dom.connectionLostDetail = connectionLostDetail;
+    dom.connectionLostReload = { focus() { reloadFocusCount += 1; } };
     const app = Object.create(App.prototype);
     app.lobby = null;
     app.labCatalog = null;
@@ -510,10 +512,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(!connectionLost.hidden, "connection loss opens the persistent blocking overlay");
     assert(connectionLostDetail.textContent === "Server connection lost.",
       "connection loss overlay shows the transport failure detail");
-    app.net = { offline: true };
-    app.stopHeartbeat = () => {};
-    app.onOpen();
-    assert(connectionLost.hidden, "connection overlay is hidden after connectivity returns");
+    assert(reloadFocusCount === 1,
+      "connection loss focuses the reload recovery action for keyboard users");
   }
   assert(
     shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),

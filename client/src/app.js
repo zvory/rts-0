@@ -548,7 +548,6 @@ export class App {
   onOpen() {
     this.hasConnected = true;
     this.socketOpen = true;
-    this.hideConnectionLost();
     this.stopHeartbeat();
     if (!this.net.offline) {
       this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
@@ -1113,21 +1112,17 @@ export class App {
 
   /**
    * Block the application with a persistent transport warning. Unlike a toast,
-   * this remains visible until the next successful WebSocket open event.
+   * this remains visible for the rest of this application session. A new
+   * socket cannot resume the current server-side player or spectator seat, so
+   * recovery requires reloading the page.
    * @param {string} text
    */
   showConnectionLost(text = "The game can no longer reach the server.") {
     if (dom.connectionLostDetail) dom.connectionLostDetail.textContent = text;
     if (dom.connectionLost) dom.connectionLost.hidden = false;
+    dom.connectionLostReload?.focus();
     if (this.lobby) this.lobby.setStatus(text, true);
     this.labCatalog?.setStatus(text, { error: true });
-  }
-
-  /** Clear the blocking transport warning after connectivity returns. */
-  hideConnectionLost() {
-    if (!dom.connectionLost) return false;
-    dom.connectionLost.hidden = true;
-    return true;
   }
 
   /** Fetch and display the build version in the shared top-left badge. */
