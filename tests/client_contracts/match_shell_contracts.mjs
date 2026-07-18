@@ -310,6 +310,10 @@ import {
   combatAudio.playPointFireSound({ e: EVENT.MORTAR_LAUNCH, fromX: 12, fromY: 24 });
   assert(plays.at(-1).id === "combat_mortar_launch_04", "match combat audio routes mortar launches");
   assert(plays.at(-1).opts.x === 12 && plays.at(-1).opts.y === 24, "match combat audio preserves point-fire source position");
+  combatAudio.playPointFireSound({ e: EVENT.MORTAR_IMPACT, from: 1, x: 48, y: 96 });
+  assert(plays.at(-1).id === "combat_mortar_impact_01", "match combat audio routes mortar impacts");
+  assert(plays.at(-1).opts.x === 48 && plays.at(-1).opts.y === 96, "mortar impact sound is spatialized at the landing point");
+  assert(plays.at(-1).opts.category === "combat_self", "own mortar impact uses the self combat bus");
   const playCountBeforeSelfReveal = plays.length;
   combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 3, to: 3, weaponKind: WEAPON_KIND.ARTILLERY_GUN });
   assert(

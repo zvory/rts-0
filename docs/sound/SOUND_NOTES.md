@@ -22,6 +22,7 @@ Files that failed any of these were deleted immediately.
 | combat/examples/combat_mortar_launch_04.mp3 | Keeper from the reviewed mortar launch batch. Almost good and preferred over 01/02/03/05, but too long; trim before integration. | https://opengameart.org/content/25-cc0-bang-firework-sfx |
 | combat/examples/combat_artillery_fire_05.mp3 | Keeper from the reviewed artillery fire batch. Good; use this over 01/02/03/04. | https://opengameart.org/content/25-cc0-bang-firework-sfx |
 | combat_artillery_landing_01.mp3 | User-selected focused-whistle artillery landing cue. The whizz is brighter than the source, the explosion begins 2.808 s into playback, and the inaudible tail is conservatively trimmed at 7.20 s. | user-provided local source |
+| combat_mortar_impact_01.mp3 | User-provided mortar impact. Removed the first 76 ms, then rendered as 44.1 kHz mono MP3 with the project −16 LUFS / ≤ −1 dBTP normalization target. The decoded cue measures −16.86 dB RMS, below the comparable 0.53 s artillery landing blast window at −12.44 dB RMS. | user-provided local source |
 | combat_tank_cannon_01.mp3 | Fine. A bit loud. | unknown |
 | combat_kar98k_02.mp3 | Good. Keep as variation. | unknown |
 | combat_kar98k_03.mp3 | Primary. Trimmed to 1.35s — bolt action removed. Original retained as combat_kar98k_03_with_bolt_action.mp3. | unknown |
@@ -171,7 +172,6 @@ Samples reviewed:
 
 - Grass infantry footstep pack: need clean, light steps on grass, 6–10 variations
 - Tank engine running (moving): download https://freesound.org/people/C-V/sounds/565597/ to match idle_03
-- Realistic mortar explosion recordings: avoid retro/game-style, synthetic, 8-bit, or MIDI-like explosion packs
 - Realistic artillery explosion recordings: this batch produced no keepers; fetch a new round later
 - Armored vehicle hit impacts: avoid ambiguous "tank" searches that return water-tank/generic metal hits; search for armor impact, vehicle shell hit, anti-tank hit, or ricochet/penetration source material
 - anti-tank round hit variants: defer until mortar and tank hit sounds have acceptable matching coverage
@@ -181,7 +181,7 @@ Samples reviewed:
 
 ## Out of scope — first pass
 
-- **Explosions**: explicitly deferred. No explosion SFX for v1. Death events for vehicles will play nothing or a generic hit sound; revisit after first pass ships.
+- **Explosion coverage**: mortar ability impacts use `combat_mortar_impact_01.mp3`. Vehicle-death and broader explosion coverage remain deferred; revisit after first pass ships.
 - **Panzerfaust travel audio**: deliberately silent in Phase 6. The visual tracer, impact cue, and
   Rifleman's immediate switch back to the standard rifle rig are the intended first-pass feedback;
   add a travel sound only after playtests show it improves clarity without adding spam.

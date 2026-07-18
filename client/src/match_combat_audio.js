@@ -12,6 +12,7 @@ import { EVENT, KIND } from "./protocol.js";
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
 const MORTAR_LAUNCH_GAIN = 0.85;
+const MORTAR_IMPACT_GAIN = 1;
 const ARTILLERY_FIRE_GAIN = 1.2;
 const ARTILLERY_LANDING_GAIN = 1;
 const PANZERFAUST_LAUNCH_GAIN = 0.52;
@@ -70,6 +71,11 @@ const POSITIONAL_EVENT_SOUNDS = Object.freeze({
     id: "combat_mortar_launch_04",
     priority: 3.5,
     gain: MORTAR_LAUNCH_GAIN,
+  },
+  [EVENT.MORTAR_IMPACT]: {
+    id: "combat_mortar_impact_01",
+    priority: 4,
+    gain: MORTAR_IMPACT_GAIN,
   },
   [EVENT.ARTILLERY_TARGET]: {
     id: "combat_artillery_fire_05",
@@ -271,6 +277,9 @@ function positionalEventSoundPosition(ev, state) {
   if (!ev) return null;
   if (ev.e === EVENT.MORTAR_LAUNCH && Number.isFinite(ev.fromX) && Number.isFinite(ev.fromY)) {
     return { x: ev.fromX, y: ev.fromY };
+  }
+  if (ev.e === EVENT.MORTAR_IMPACT && Number.isFinite(ev.x) && Number.isFinite(ev.y)) {
+    return { x: ev.x, y: ev.y };
   }
   if (ev.e === EVENT.ARTILLERY_TARGET && typeof ev.from === "number") {
     const from = state.entityById(ev.from);
