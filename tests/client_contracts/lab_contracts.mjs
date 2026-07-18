@@ -392,8 +392,8 @@ await withFakeDocument(() => {
     "LabPanel spawn palette excludes buildings from primary unit options",
   );
   assert(
-    labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.SCOUT_PLANE),
-    "LabPanel spawn palette includes Kriegsia Scout Plane for direct lab spawning",
+    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.SCOUT_PLANE),
+    "LabPanel spawn palette excludes the ability-only Kriegsia Scout Plane",
   );
   assert(
     STATS[KIND.BARRACKS].trains.length === 2,
