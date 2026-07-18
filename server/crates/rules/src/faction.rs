@@ -915,8 +915,8 @@ mod tests {
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(catalog.allows_building(EntityKind::PumpJack));
         assert!(
-            !catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),
-            "Pump Jacks are contextual oil-node builds, not generic worker build-card entries"
+            catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),
+            "Pump Jacks are worker-buildable while placement remains restricted to oil nodes"
         );
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));
