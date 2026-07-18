@@ -1,0 +1,34 @@
+{
+  "pipelineVersion": 1,
+  "status": "live while the Rifleman's authoritative Panzerfaust remains loaded",
+  "method": "deterministic layer compositing",
+  "frameGeometry": {
+    "width": 160,
+    "height": 112,
+    "count": 4,
+    "order": ["idle", "movement 1", "movement 2", "movement 3"]
+  },
+  "bodyFrames": [
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/idle-runtime.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/movement-01-runtime.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/movement-02-runtime.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/movement-03-runtime.png"
+  ],
+  "launcherSource": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/idle-runtime.png",
+  "launcherMask": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-mask.png",
+  "launcherLayer": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-layer.png",
+  "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png",
+  "runtimeColorAdjustment": {"brightness": 70, "saturation": 100, "hue": 100},
+  "motion": [
+    {"frame": 0, "rotationDegrees": 0, "offset": {"x": 0, "y": 0}},
+    {"frame": 1, "rotationDegrees": -3, "offset": {"x": -1, "y": -1}},
+    {"frame": 2, "rotationDegrees": 3, "offset": {"x": 1, "y": 1}},
+    {"frame": 3, "rotationDegrees": 0, "offset": {"x": 0, "y": 0}}
+  ],
+  "invariants": [
+    "The accepted white no-pack Rifleman frames are composited without alteration.",
+    "The rifle remains on the same shoulder and in the same hands throughout the cycle.",
+    "Only the extracted Panzerfaust layer and its deterministic retaining straps sway between frames.",
+    "The strip contains no firing or launcher-ready animation frames."
+  ]
+}

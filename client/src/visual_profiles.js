@@ -1,4 +1,6 @@
 import { KIND } from "./protocol.js";
+import { LOADED_RIFLEMAN_RIG_KEY } from "./renderer/rigs/live_routing.js";
+import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "./renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./renderer/rigs/scout_plane_png_strip.js";
 
 const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
@@ -147,6 +149,16 @@ const RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   }),
 ]);
 
+const RIFLEMAN_PANZERFAUST_COMPOSITED_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
+  Object.freeze({
+    id: "rifleman-panzerfaust-composited-strip",
+    label: "Rifleman Panzerfaust composited strip",
+    kind: KIND.RIFLEMAN,
+    rigKey: LOADED_RIFLEMAN_RIG_KEY,
+    strip: RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP,
+  }),
+]);
+
 const SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   Object.freeze({
     id: "scout-plane-fw189-pass-01",
@@ -177,6 +189,13 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     description: "Local checked-in profile for previewing Rifleman firing recoil frames in the render-preview lab scenario.",
     initialCamera: cameraSnapshot(2050, 1930, 2.1),
     frameStripOverrides: RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1,
+  }),
+  Object.freeze({
+    id: "rifleman-panzerfaust-composite-1",
+    label: "Rifleman Panzerfaust composite 1",
+    description: "Local profile for previewing the white no-pack Rifleman with a deterministically animated Panzerfaust in the render-preview lab scenario.",
+    initialCamera: cameraSnapshot(2050, 1930, 2.1),
+    frameStripOverrides: RIFLEMAN_PANZERFAUST_COMPOSITED_FRAME_STRIP_OVERRIDES_1,
   }),
   Object.freeze({
     id: "scout-car-png-1",

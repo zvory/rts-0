@@ -25,7 +25,7 @@ import {
 } from "./vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "./worker_svg.js";
 
-const LOADED_RIFLEMAN_RIG_KEY = "rifleman.panzerfaustLoaded";
+export const LOADED_RIFLEMAN_RIG_KEY = "rifleman.panzerfaustLoaded";
 
 const DEFAULT_POOL_PROFILE = Object.freeze({
   familyKey: "liveUnit",

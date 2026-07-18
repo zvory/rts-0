@@ -34,9 +34,9 @@ import {
   applyFrameStripColorAdjustmentToRgba,
   FRAME_STRIP_TARGET_COLOR_ADJUSTMENT,
   frameStripRuntimeColorAdjustment,
-  isNeutralFrameStripColorAdjustment,
 } from "../client/src/renderer/rigs/frame_strip_color_profile.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
+import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
   pngAtlasCanRenderRoute,
@@ -1124,7 +1124,7 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: {}, weaponRecoil: () => 0 });
 
   const expectedFrame = frameStripFrameIndex(strip, entity, renderNow);
-  assert.equal(expectedFrame, 2);
+  assert.equal(strip.movementFrames.includes(expectedFrame), true);
   assert.equal(stripInstance.sprite.texture.frame.x, strip.frameWidth * expectedFrame);
   assert.equal(frameStripVisualFacing(entity), entity.facing);
   assert.equal(stripInstance.container.rotation, entity.facing);
@@ -1185,7 +1185,13 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 });
 
 test("frame-strip color profile applies shared and per-strip targets only when not already baked", () => {
-  assert.equal(isNeutralFrameStripColorAdjustment(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP)), true);
+  const dimmedRiflemanAdjustment = {
+    brightness: 70,
+    saturation: 100,
+    hue: 100,
+  };
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
   assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), {
     brightness: 145,
     saturation: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.saturation,
@@ -1372,6 +1378,32 @@ test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loa
   assert.equal(riflemanRig.parts.has("part.pzf.tube"), false);
   assert.equal(renderer.layers.units.children.includes(riflemanRig.container), true);
   riflemanRig.destroy();
+});
+
+test("Rifleman PNG frame strips switch with the Panzerfaust loadout", () => {
+  const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
+  assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
+  const renderer = makeRigRenderer();
+  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true });
+  const [panzerfaustTexture, riflemanTexture] = [fakeFrameStripTexture(), fakeFrameStripTexture()];
+  renderer._liveRigDefinitionsByKind = new Map([[loadedRiflemanKey, panzerfaust.definition], [KIND.RIFLEMAN, rifleman.definition]]);
+  renderer._liveFrameStripsByKind = new Map([[loadedRiflemanKey, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP], [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP]]);
+  renderer._liveFrameStripTextures = new Map([[loadedRiflemanKey, panzerfaustTexture], [KIND.RIFLEMAN, riflemanTexture]]);
+  const colorByOwner = new Map([[1, 0x336699]]);
+  const state = { playerId: 1, selection: new Set(), weaponRecoil: () => 0 };
+  const entity = { id: 94, kind: KIND.RIFLEMAN, panzerfaustLoaded: true, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  renderer._drawUnit(entity, colorByOwner, state);
+  const panzerfaustUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(panzerfaustUnit.strip, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP);
+  assert.equal(panzerfaustUnit.texture, panzerfaustTexture);
+  renderer._drawUnit({ ...entity, panzerfaustLoaded: false }, colorByOwner, state);
+  const riflemanUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(panzerfaustUnit._destroyed, true);
+  assert.equal(riflemanUnit.strip, RIFLEMAN_PNG_FRAME_STRIP);
+  assert.equal(riflemanUnit.texture, riflemanTexture);
+  riflemanUnit.destroy();
 });
 
 test("live rig renderer rebuilds instances after a mutable route changes", () => {

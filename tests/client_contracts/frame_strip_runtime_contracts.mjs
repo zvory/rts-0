@@ -61,43 +61,28 @@ assert(
   "Machine Gunner setup frames take precedence over firing frames",
 );
 
-assert(
-  frameStripFrameIndex(
-    RIFLEMAN_PNG_FRAME_STRIP,
-    { id: 11, kind: KIND.RIFLEMAN, state: STATE.MOVE },
-    {
-      now: 0,
-      recoilProgress: 1,
-      recoilPhase: 0.05,
-    },
-  ) === 5,
-  "moving Rifleman uses its first firing frame during active weapon recoil",
-);
-
-assert(
-  frameStripFrameIndex(
-    RIFLEMAN_PNG_FRAME_STRIP,
-    { id: 11, kind: KIND.RIFLEMAN, state: STATE.MOVE },
-    {
-      now: 0,
-      recoilProgress: 1,
-      recoilPhase: 0.18,
-    },
-  ) === 6,
-  "moving Rifleman advances to its recovery firing frame during active weapon recoil",
-);
-
-const postRecoilFrame = frameStripFrameIndex(
+const riflemanFrameDuringRecoil = frameStripFrameIndex(
   RIFLEMAN_PNG_FRAME_STRIP,
   { id: 11, kind: KIND.RIFLEMAN, state: STATE.MOVE },
   {
     now: 0,
     recoilProgress: 1,
-    recoilPhase: 0.3,
+    recoilPhase: 0.05,
   },
 );
-assert(postRecoilFrame !== 5 && postRecoilFrame !== 6,
-  "moving Rifleman returns to movement frames after the brief firing hold");
+assert(
+  RIFLEMAN_PNG_FRAME_STRIP.movementFrames.includes(riflemanFrameDuringRecoil),
+  "new Rifleman art keeps its movement pose during recoil until firing frames are authored",
+);
+
+assert(
+  frameStripFrameIndex(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.ATTACK },
+    { now: 0, recoilProgress: 1, recoilPhase: 0.05 },
+  ) === RIFLEMAN_PNG_FRAME_STRIP.idleFrame,
+  "new stationary Rifleman art holds idle during recoil until firing frames are authored",
+);
 
 const stationaryMoveContext = { now: 1000, frameStripMoving: false };
 
