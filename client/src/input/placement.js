@@ -1,5 +1,6 @@
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
 import { STATS, TANK_BODY } from "../config.js";
+import { DEFAULT_TILE_SIZE } from "./constants.js";
 import { buildTankTrapLineSites, tankTrapBuildCommands } from "./tank_trap_line.js";
 
 const POINT_IN_RECT_EPS_PX = 0.001;
@@ -71,6 +72,32 @@ export function placementPolicyForBuilding(kind) {
     unitOverlap: kind === KIND.TANK_TRAP ? "infantryAllowed" : "none",
     resourceOverlap: kind === KIND.PUMP_JACK ? "oilCenterRequired" : "none",
   });
+}
+
+export function pumpJackBuildIntentForResource(resource, map) {
+  if (!resource || resource.kind !== KIND.OIL || resource.remaining === 0 || !map) return null;
+  const stat = STATS[KIND.PUMP_JACK];
+  if (!stat?.footW || !stat?.footH) return null;
+  const tileSize = map.tileSize || DEFAULT_TILE_SIZE;
+  if (!(tileSize > 0)) return null;
+  const tileX = Math.round(resource.x / tileSize - stat.footW * 0.5);
+  const tileY = Math.round(resource.y / tileSize - stat.footH * 0.5);
+  if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
+  return { building: KIND.PUMP_JACK, tileX, tileY };
+}
+
+export function nearestLiveOilPumpJackSite(entities, world, map) {
+  if (!world) return null;
+  const candidates = [];
+  for (const resource of entities || []) {
+    const intent = pumpJackBuildIntentForResource(resource, map);
+    if (!intent) continue;
+    const dx = resource.x - world.x;
+    const dy = resource.y - world.y;
+    candidates.push({ ...intent, resourceId: resource.id, distanceSq: dx * dx + dy * dy });
+  }
+  candidates.sort((a, b) => a.distanceSq - b.distanceSq || a.resourceId - b.resourceId);
+  return candidates[0] || null;
 }
 
 export function movementBodyClass(kind) {
@@ -148,9 +175,18 @@ export function _refreshPlacement() {
   const footW = stat && stat.footW ? stat.footW : 1;
   const footH = stat && stat.footH ? stat.footH : 1;
 
-  // Snap so the footprint is centered on the cursor (top-left tile of the footprint).
-  const tileX = Math.floor(world.x / map.tileSize - footW / 2 + 0.5);
-  const tileY = Math.floor(world.y / map.tileSize - footH / 2 + 0.5);
+  // Pump Jacks target resource entities rather than arbitrary ground. Snap to
+  // the closest visible live oil patch so the player need not pixel-hunt it.
+  const pumpJackSite = place.building === KIND.PUMP_JACK
+    ? nearestLiveOilPumpJackSite(this._selectionEntities(), world, map)
+    : null;
+  // Other buildings stay centered on the cursor (top-left footprint tile).
+  const tileX = pumpJackSite?.tileX ?? Math.floor(world.x / map.tileSize - footW / 2 + 0.5);
+  const tileY = pumpJackSite?.tileY ?? Math.floor(world.y / map.tileSize - footH / 2 + 0.5);
+  if (place.building === KIND.PUMP_JACK && !pumpJackSite) {
+    intent?.updatePlacement?.(tileX, tileY, false);
+    return;
+  }
   if (this._placementDrag && place.building === KIND.TANK_TRAP) {
     const lineSites = buildTankTrapLineSites({
       start: this._placementDrag,

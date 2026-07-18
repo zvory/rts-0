@@ -189,7 +189,8 @@ export const STATS = Object.freeze({
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [] },
+    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
+    description: "Build on an oil patch. Extracts 2 Oil every 1.3s while within 11 tiles of an allied completed City Centre or Zamok." },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -467,6 +468,7 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
   KIND.CITY_CENTRE,
+  KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.RESEARCH_COMPLEX,

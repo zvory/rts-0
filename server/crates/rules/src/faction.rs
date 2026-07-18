@@ -264,6 +264,7 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::CityCentre,
+    EntityKind::PumpJack,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::ResearchComplex,

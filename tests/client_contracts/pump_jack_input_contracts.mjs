@@ -72,4 +72,26 @@ assert(
   "steel resource-range preview should continue to require an owned mining anchor",
 );
 
+const snapInput = Object.create(Input.prototype);
+const nearOil = { id: 50, owner: 0, kind: KIND.OIL, x: 176, y: 176, remaining: 962 };
+const farOil = { id: 51, owner: 0, kind: KIND.OIL, x: 336, y: 336, remaining: 962 };
+const depletedOil = { id: 52, owner: 0, kind: KIND.OIL, x: 161, y: 161, remaining: 0 };
+let placementPreview = null;
+snapInput.state = { map };
+snapInput.mouse = { x: 160, y: 160 };
+snapInput._groundAtScreen = () => ({ x: 160, y: 160 });
+snapInput._selectionEntities = () => [nearOil, farOil, depletedOil];
+snapInput._footprintValid = (tileX, tileY) => tileX === 5 && tileY === 5;
+snapInput.clientIntent = {
+  placement: { building: KIND.PUMP_JACK, tileX: 0, tileY: 0, valid: false },
+  updatePlacement(tileX, tileY, valid) {
+    placementPreview = { tileX, tileY, valid };
+  },
+};
+snapInput._refreshPlacement();
+assert(
+  placementPreview?.tileX === 5 && placementPreview?.tileY === 5 && placementPreview?.valid,
+  "armed Pump Jack placement snaps to the closest visible live oil patch",
+);
+
 console.log("pump_jack_input_contracts: ok");

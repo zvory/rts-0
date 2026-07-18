@@ -136,7 +136,13 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.CITY_CENTRE));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
-  assert.equal(buildCard.slots[1], null, "former Supply Depot W slot stays empty");
+  assert.equal(buildCard.slots[1].commandId, kriegsiaCommandId("build", KIND.PUMP_JACK));
+  assert.equal(buildCard.slots[1].label, "Pump Jack");
+  assert.equal(buildCard.slots[1].hotkey, "W");
+  assert.deepEqual(buildCard.slots[1].intent, {
+    type: "beginPlacement",
+    building: KIND.PUMP_JACK,
+  }, "Pump Jack W slot starts normal placement");
   assert.equal(buildCard.slots[7].commandId, kriegsiaCommandId("build", KIND.TANK_TRAP));
   assert.equal(buildCard.slots[7].label, "Tank Trap");
   assert.equal(buildCard.slots[7].hotkey, "X");
@@ -556,6 +562,7 @@ function buttonSlots(card) {
   );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.CITY_CENTRE,
+    KIND.PUMP_JACK,
     KIND.BARRACKS,
     KIND.TRAINING_CENTRE,
     KIND.RESEARCH_COMPLEX,

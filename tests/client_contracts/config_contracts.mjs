@@ -544,9 +544,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     !WORKER_BUILDABLE.includes(KIND.DEPOT) &&
-      WORKER_BUILD_CARD_SLOTS[1] == null &&
+      WORKER_BUILDABLE.includes(KIND.PUMP_JACK) &&
+      WORKER_BUILD_CARD_SLOTS[1] === KIND.PUMP_JACK &&
       WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.join(","),
-    "Supply Depot is unavailable while its worker-card W slot remains empty",
+    "Supply Depot stays unavailable while Pump Jack occupies the worker-card W slot",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
