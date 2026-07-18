@@ -1,6 +1,6 @@
 import { ABILITY } from "../protocol.js";
 import { ZOOM_STEP } from "./constants.js";
-import { commandHotkeyFromEvent, isTextEntry } from "./placement.js";
+import { commandHotkeyCodeFromEvent, isTextEntry } from "./placement.js";
 
 export function _handleKeyDown(ev) {
   if (ev.code === "ShiftLeft" || ev.code === "ShiftRight") {
@@ -9,7 +9,7 @@ export function _handleKeyDown(ev) {
   }
   // Never hijack typing in inputs (lobby name field, etc.). Modifier state still
   // needs to stay current if focus changes while the key remains held.
-  if (isTextEntry(ev.target)) return;
+  if (ev.isComposing || isTextEntry(ev.target)) return;
 
   switch (ev.code) {
     case "ArrowUp":
@@ -60,11 +60,11 @@ export function _handleKeyDown(ev) {
 
 function activateGlobalHotkey(input, ev) {
   if (ev.repeat || ev.altKey || ev.ctrlKey || ev.metaKey) return false;
-  const key = commandHotkeyFromEvent(ev);
-  if (!key) return false;
+  const code = commandHotkeyCodeFromEvent(ev);
+  if (!code) return false;
   for (const action of input.globalHotkeyActions || []) {
-    const resolved = input.hotkeyProfiles?.hotkeyForCommand?.(action.commandId) || "";
-    if (resolved !== key) continue;
+    const resolved = input.hotkeyProfiles?.hotkeyCodeForCommand?.(action.commandId) || "";
+    if (resolved !== code) continue;
     action.activate?.();
     ev.preventDefault?.();
     return true;

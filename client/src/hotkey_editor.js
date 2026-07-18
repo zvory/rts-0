@@ -3,7 +3,8 @@ import {
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PRESET_GRID,
   HOTKEY_PROFILE_SCHEMA_VERSION,
-  normalizeHotkey,
+  hotkeyLabelForCode,
+  normalizeHotkeyCode,
   profileBindingForCommand,
   setProfileBindingForCommand,
 } from "./hotkey_profiles.js";
@@ -195,6 +196,7 @@ export class HotkeyEditor {
         icon: slot.icon,
         label: slot.label,
         hotkey: slot.hotkey === "?" ? "" : slot.hotkey,
+        hotkeyCode: slot.hotkeyCode || "",
         cost: slot.cost,
         enabled: true,
         unaffordable: false,
@@ -217,7 +219,7 @@ export class HotkeyEditor {
     wrap.setAttribute("role", "status");
     wrap.setAttribute("aria-live", "polite");
     if (this.pendingCommandId) {
-      wrap.appendChild(message("info", `Press a letter for ${this._commandLabel(this.pendingCommandId)}.`));
+      wrap.appendChild(message("info", `Press a physical A-Z key position for ${this._commandLabel(this.pendingCommandId)}.`));
     }
     if (this.invalidCapture) {
       wrap.appendChild(message("error", this.invalidCapture));
@@ -346,13 +348,13 @@ export class HotkeyEditor {
       this.render();
       return;
     }
-    const key = normalizeHotkey(ev.key || eventKeyFromCode(ev.code));
-    if (!key) {
-      this.invalidCapture = "Use a single A-Z letter.";
+    const code = normalizeHotkeyCode(ev.code);
+    if (!code) {
+      this.invalidCapture = "Use a physical A-Z key position.";
       this.render();
       return;
     }
-    setProfileBindingForCommand(this.draft, this.pendingCommandId, key);
+    setProfileBindingForCommand(this.draft, this.pendingCommandId, code);
     this.pendingCommandId = "";
     this.invalidCapture = "";
     this.render();
@@ -421,15 +423,19 @@ export class HotkeyEditor {
       ...card,
       slots: card.slots.map((slot) => {
         if (!slot) return null;
-        const key = normalizeHotkey(profileBindingForCommand(this.draft, slot.commandId));
-        return { ...slot, hotkey: key || "?" };
+        const hotkeyCode = normalizeHotkeyCode(profileBindingForCommand(this.draft, slot.commandId));
+        return {
+          ...slot,
+          hotkeyCode,
+          hotkey: hotkeyLabelForCode(hotkeyCode) || "?",
+        };
       }),
     };
   }
 
   _buttonTitle(slot) {
     const base = slot.title || slot.label || slot.commandId;
-    if (this.pendingCommandId === slot.commandId) return `${base} - press a letter`;
+    if (this.pendingCommandId === slot.commandId) return `${base} - press a physical A-Z key position`;
     if (slot.hotkey === "?") return `${base} - unbound`;
     return `${base} (${slot.hotkey})`;
   }
@@ -519,7 +525,7 @@ export class HotkeyEditor {
       }
       if (Number.isInteger(command.slotIndex)) {
         const slotKey = ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"][command.slotIndex] || "";
-        if (slotKey) setProfileBindingForCommand(profile, command.commandId, slotKey);
+        if (slotKey) setProfileBindingForCommand(profile, command.commandId, `Key${slotKey}`);
       }
     }
     return profile;
@@ -532,11 +538,6 @@ function hasCommands(ctx) {
 
 function contextLabel(ctx) {
   return CONTEXT_LABELS[ctx?.id] || ctx?.label || ctx?.id || "Command Card";
-}
-
-function eventKeyFromCode(code) {
-  const match = /^Key([A-Z])$/.exec(String(code || ""));
-  return match ? match[1] : "";
 }
 
 function replaceChildren(root, ...children) {

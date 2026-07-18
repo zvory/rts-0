@@ -365,11 +365,10 @@ export class MapEditorViewport {
 
   handleKey(event, pressed) {
     if (isTextEntry(event.target)) return;
-    const key = String(event.key || "").toLowerCase();
-    const direction = key === "arrowup" || key === "w" ? "up"
-      : key === "arrowdown" || key === "s" ? "down"
-        : key === "arrowleft" || key === "a" ? "left"
-          : key === "arrowright" || key === "d" ? "right" : "";
+    const direction = event.code === "ArrowUp" || event.code === "KeyW" ? "up"
+      : event.code === "ArrowDown" || event.code === "KeyS" ? "down"
+        : event.code === "ArrowLeft" || event.code === "KeyA" ? "left"
+          : event.code === "ArrowRight" || event.code === "KeyD" ? "right" : "";
     if (!direction) return;
     this.keys[direction] = pressed;
     event.preventDefault();

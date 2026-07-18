@@ -5,32 +5,32 @@ import {
 } from "./hud_command_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "./protocol.js";
 
-export const HOTKEY_PROFILE_SCHEMA_VERSION = 1;
-export const HOTKEY_STORAGE_PROFILES_KEY = "rts.hotkeyProfiles.v1";
-export const HOTKEY_STORAGE_ACTIVE_KEY = "rts.activeHotkeyProfile.v1";
+export const HOTKEY_PROFILE_SCHEMA_VERSION = 2;
+export const HOTKEY_STORAGE_PROFILES_KEY = "rts.hotkeyProfiles.v2";
+export const HOTKEY_STORAGE_ACTIVE_KEY = "rts.activeHotkeyProfile.v2";
 export const HOTKEY_PRESET_GRID = "preset.grid";
 export const HOTKEY_PRESET_CLASSIC = "preset.classicRts";
 export const HOTKEY_COMMAND_SELECT_IDLE_WORKERS = "hud.selectIdleWorkers";
 
-const VALID_KEY_RE = /^[A-Z]$/;
+const VALID_HOTKEY_CODE_RE = /^Key[A-Z]$/;
 const DEFAULT_EXPORT_BUILD = "unknown";
 
 // Direct-profile bindings must not depend on a command card slot. Keep the
 // familiar action keys here, including the mnemonic conflict resolutions for
 // commands that can share a card.
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
-  "unit.move": "M",
-  "unit.attack": "A",
-  "unit.holdPosition": "H",
-  "unit.stop": "S",
-  "unit.setupSupportWeapon": "U",
-  "worker.buildMenu": "B",
-  "worker.return": "W",
-  [factionCommandId(DEFAULT_FACTION_ID, "build", KIND.TANK_TRAP)]: "K",
-  [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SMOKE)]: "O",
-  [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SCOUT_PLANE)]: "P",
-  [factionCommandId(DEFAULT_FACTION_ID, "train", KIND.ARTILLERY)]: "R",
-  [factionCommandId(DEFAULT_FACTION_ID, "research", UPGRADE.MORTAR_AUTOCAST)]: "O",
+  "unit.move": "KeyM",
+  "unit.attack": "KeyA",
+  "unit.holdPosition": "KeyH",
+  "unit.stop": "KeyS",
+  "unit.setupSupportWeapon": "KeyU",
+  "worker.buildMenu": "KeyB",
+  "worker.return": "KeyW",
+  [factionCommandId(DEFAULT_FACTION_ID, "build", KIND.TANK_TRAP)]: "KeyK",
+  [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SMOKE)]: "KeyO",
+  [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SCOUT_PLANE)]: "KeyP",
+  [factionCommandId(DEFAULT_FACTION_ID, "train", KIND.ARTILLERY)]: "KeyR",
+  [factionCommandId(DEFAULT_FACTION_ID, "research", UPGRADE.MORTAR_AUTOCAST)]: "KeyO",
 });
 
 const GLOBAL_HOTKEY_CONTEXTS = Object.freeze([Object.freeze({
@@ -52,10 +52,21 @@ const GLOBAL_HOTKEY_CONTEXTS = Object.freeze([Object.freeze({
   }),
 })]);
 
-export function normalizeHotkey(value) {
+export function normalizeHotkeyCode(value) {
   if (typeof value !== "string") return "";
-  const key = value.trim().toUpperCase();
-  return VALID_KEY_RE.test(key) ? key : "";
+  const code = value.trim();
+  return VALID_HOTKEY_CODE_RE.test(code) ? code : "";
+}
+
+export function hotkeyLabelForCode(value) {
+  const code = normalizeHotkeyCode(value);
+  return code ? code.slice(3) : "";
+}
+
+function hotkeyCodeForLabel(value) {
+  if (typeof value !== "string") return "";
+  const label = value.trim().toUpperCase();
+  return /^[A-Z]$/.test(label) ? `Key${label}` : "";
 }
 
 export function buildHotkeyCommandCatalog(cards = []) {
@@ -74,8 +85,8 @@ export function buildHotkeyCommandCatalog(cards = []) {
           commandId: slot.commandId,
           label: slot.label || slot.commandId,
           slotIndex: Number.isInteger(slot.slotIndex) ? slot.slotIndex : null,
-          gridHotkey: normalizeHotkey(slot.gridHotkey),
-          classicHotkey: normalizeHotkey(slot.classicHotkey),
+          gridHotkey: hotkeyCodeForLabel(slot.gridHotkey),
+          classicHotkey: hotkeyCodeForLabel(slot.classicHotkey),
           global: !!entry?.global,
         });
       }
@@ -336,14 +347,14 @@ export class HotkeyProfileService {
     const bindingMaps = { bindings: {}, factionBindings: {} };
 
     for (const [commandId, value] of Object.entries(sourceBindings)) {
-      const key = normalizeHotkey(value);
-      if (!key) {
+      const code = normalizeHotkeyCode(value);
+      if (!code) {
         errors.push({ code: "invalidKey", commandId, key: value });
         continue;
       }
       const migrated = this._canonicalImportedCommandId(commandId, warnings);
       if (!migrated) continue;
-      setBindingForCommand(bindingMaps, migrated, key);
+      setBindingForCommand(bindingMaps, migrated, code);
     }
 
     for (const [factionId, entries] of Object.entries(sourceFactionBindings)) {
@@ -352,8 +363,8 @@ export class HotkeyProfileService {
         continue;
       }
       for (const [commandId, value] of Object.entries(entries)) {
-        const key = normalizeHotkey(value);
-        if (!key) {
+        const code = normalizeHotkeyCode(value);
+        if (!code) {
           errors.push({ code: "invalidKey", commandId, key: value });
           continue;
         }
@@ -365,7 +376,7 @@ export class HotkeyProfileService {
         if (!this._knownCommandIds().has(commandId)) {
           warnings.push({ code: "unavailableFactionCommand", commandId });
         }
-        setBindingForCommand(bindingMaps, commandId, key);
+        setBindingForCommand(bindingMaps, commandId, code);
       }
     }
 
@@ -419,22 +430,26 @@ export class HotkeyProfileService {
   }
 
   resolveSlot(slot, profile = this.getActiveProfile()) {
-    const gridHotkey = normalizeHotkey(slot.gridHotkey);
-    const hotkey = profile?.mode === "direct"
-      ? normalizeHotkey(profileBindingForCommand(profile, slot.commandId)) || this._fallbackKeyForCommand(slot)
+    const gridHotkey = hotkeyCodeForLabel(slot.gridHotkey);
+    const hotkeyCode = profile?.mode === "direct"
+      ? normalizeHotkeyCode(profileBindingForCommand(profile, slot.commandId)) || this._fallbackKeyForCommand(slot)
       : gridHotkey
-        ? normalizeHotkey(profileBindingForCommand(profile, slot.commandId)) || gridHotkey
-        : gridHotkeyForSlot(slot.slotIndex);
-    return { ...slot, hotkey };
+        ? normalizeHotkeyCode(profileBindingForCommand(profile, slot.commandId)) || gridHotkey
+        : hotkeyCodeForLabel(gridHotkeyForSlot(slot.slotIndex));
+    return { ...slot, hotkeyCode, hotkey: hotkeyLabelForCode(hotkeyCode) };
   }
 
   hotkeyForCommand(commandId, profile = this.getActiveProfile()) {
+    return hotkeyLabelForCode(this.hotkeyCodeForCommand(commandId, profile));
+  }
+
+  hotkeyCodeForCommand(commandId, profile = this.getActiveProfile()) {
     const command = (this.catalog.commands || []).find((entry) => entry.commandId === commandId);
     if (!command) return "";
-    const bound = normalizeHotkey(profileBindingForCommand(profile, commandId));
+    const bound = normalizeHotkeyCode(profileBindingForCommand(profile, commandId));
     if (bound) return bound;
     if (profile?.mode === "grid") {
-      return command.gridHotkey || gridHotkeyForSlot(command.slotIndex);
+      return command.gridHotkey || hotkeyCodeForLabel(gridHotkeyForSlot(command.slotIndex));
     }
     return this._fallbackKeyForCommand(command);
   }
@@ -500,11 +515,11 @@ export class HotkeyProfileService {
   }
 
   _fallbackKeyForCommand(command) {
-    const classicKey = normalizeHotkey(command.classicHotkey);
+    const classicKey = normalizeHotkeyCode(command.classicHotkey);
     if (classicKey) return classicKey;
-    const labelKey = normalizeHotkey((command.label || "").trim().charAt(0));
+    const labelKey = hotkeyCodeForLabel((command.label || "").trim().charAt(0));
     if (labelKey) return labelKey;
-    return Number.isInteger(command.slotIndex) ? gridHotkeyForSlot(command.slotIndex) : "";
+    return Number.isInteger(command.slotIndex) ? hotkeyCodeForLabel(gridHotkeyForSlot(command.slotIndex)) : "";
   }
 
   _fallbackKeyForMissingCommand(command, bindingMaps) {
@@ -578,7 +593,7 @@ export class HotkeyProfileService {
       if (context.global) continue;
       for (const commandId of context.commandIds) {
         const command = commandById.get(commandId);
-        const key = command?.gridHotkey || gridHotkeyForSlot(command?.slotIndex);
+        const key = command?.gridHotkey || hotkeyCodeForLabel(gridHotkeyForSlot(command?.slotIndex));
         for (const [globalCommandId, globalKey] of globalKeys) {
           if (!key || key !== globalKey) continue;
           errors.push({
@@ -646,7 +661,7 @@ function buildClassicBindingMaps(catalog) {
     setBindingForCommand(bindingMaps, command.commandId,
       CLASSIC_DIRECT_BINDINGS[command.commandId] ||
       command.classicHotkey ||
-      normalizeHotkey((command.label || "").trim().charAt(0)));
+      hotkeyCodeForLabel((command.label || "").trim().charAt(0)));
   }
   return resolveContextConflicts(bindingMaps, catalog);
 }
@@ -689,7 +704,8 @@ function resolveContextConflicts(bindingMaps, catalog) {
 
 function firstFreeKey(used) {
   for (const key of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-    if (!used.has(key)) return key;
+    const code = `Key${key}`;
+    if (!used.has(code)) return code;
   }
   return "";
 }
