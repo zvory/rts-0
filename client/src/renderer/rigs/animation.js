@@ -39,6 +39,9 @@ export function createRigRenderContext(entity, {
   const recoilPhase = typeof state.weaponRecoilPhase === "function"
     ? clamp01(state.weaponRecoilPhase(entity.id, entity.kind, now))
     : clamp01(entity.recoilPhase ?? (recoilProgress > 0 ? 1 - recoilProgress : 0));
+  const recoilWeaponKind = typeof state.weaponRecoilKind === "function"
+    ? state.weaponRecoilKind(entity.id)
+    : undefined;
   const recoilPx = weaponRecoilOffset(entity.kind, recoilProgress);
   const setup = setupVisual ?? defaultSetupVisual(entity);
   const deploy = clamp01(setup.prongFactor);
@@ -70,6 +73,7 @@ export function createRigRenderContext(entity, {
     teamColor: colorByOwner.get(entity.owner) ?? hexToInt(entity.teamColor),
     recoilProgress,
     recoilPhase,
+    recoilWeaponKind,
     recoilPx,
     recoilKickX: recoilKick.x,
     recoilKickY: recoilKick.y,

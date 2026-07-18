@@ -7,6 +7,7 @@ export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "state._prevById", reviewTrigger: "a pose DTO or effect needs normalized previous poses" }),
   Object.freeze({ id: "state.weaponRecoil", reviewTrigger: "an effect needs normalized recoil data" }),
   Object.freeze({ id: "state.weaponRecoilPhase", reviewTrigger: "an effect needs normalized recoil data" }),
+  Object.freeze({ id: "state.weaponRecoilKind", reviewTrigger: "authored recoil art is weapon-specific" }),
   Object.freeze({ id: "match.renderClock", reviewTrigger: "the existing Pixi capture path changes" }),
   Object.freeze({ id: "match.frameProfiler", reviewTrigger: "measurement needs backend-neutral metrics" }),
   Object.freeze({ id: "match.visualProfile.unitOverrides", reviewTrigger: "a playtest needs representative visuals" }),
@@ -338,6 +339,7 @@ function buildStateFacade(frame, entities, rememberedBuildings, trenches, feedba
     _prevById: legacy.previousById,
     weaponRecoil: (id) => legacy.recoilById.get(id) ?? 0,
     weaponRecoilPhase: (id) => legacy.recoilPhaseById.get(id) ?? 0,
+    weaponRecoilKind: (id) => legacy.recoilKindById.get(id),
     isFeedbackOwner: feedback.isFeedbackOwner,
     isOwnOwner: (owner) => relationship(owner) === "own" || feedback.isFeedbackOwner(owner),
     isAllyOwner: (owner) => relationship(owner) === "ally",
@@ -350,15 +352,22 @@ function snapshotLegacyState(state, entities, now, profiler) {
   const previousById = new Map();
   const recoilById = new Map();
   const recoilPhaseById = new Map();
+  const recoilKindById = new Map();
   for (const entity of entities) {
     copyPose(currentById, entity.id, state?._curById?.get?.(entity.id));
     copyPose(previousById, entity.id, state?._prevById?.get?.(entity.id));
     try {
+      let recoil = 0;
       if (typeof state?.weaponRecoil === "function") {
-        recoilById.set(entity.id, finiteNumber(state.weaponRecoil(entity.id, entity.kind, now), 0));
+        recoil = finiteNumber(state.weaponRecoil(entity.id, entity.kind, now), 0);
+        recoilById.set(entity.id, recoil);
       }
       if (typeof state?.weaponRecoilPhase === "function") {
         recoilPhaseById.set(entity.id, finiteNumber(state.weaponRecoilPhase(entity.id, entity.kind, now), 0));
+      }
+      if (recoil > 0 && typeof state?.weaponRecoilKind === "function") {
+        const weaponKind = state.weaponRecoilKind(entity.id);
+        if (weaponKind) recoilKindById.set(entity.id, weaponKind);
       }
     } catch {
       profiler?.recordDiagnosticCounter?.("pixiCompatibility.legacyRead.failed", 1);
@@ -370,6 +379,7 @@ function snapshotLegacyState(state, entities, now, profiler) {
     previousById,
     recoilById,
     recoilPhaseById,
+    recoilKindById,
   };
 }
 
