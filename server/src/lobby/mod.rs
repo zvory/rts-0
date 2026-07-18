@@ -685,6 +685,7 @@ impl RoomLifecycle {
 pub struct RoomHandle {
     pub event_tx: mpsc::Sender<RoomEvent>,
     identity: RoomIdentity,
+    persisted_replay_match_id: Option<i64>,
     shutdown_tx: watch::Sender<bool>,
 }
 
@@ -721,7 +722,6 @@ impl CreateLobbyError {
 #[derive(Clone)]
 pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
-    persisted_replay_rooms: Arc<Mutex<HashMap<i64, String>>>,
     disposal_tx: mpsc::UnboundedSender<RoomDisposalRequest>,
     next_room_identity: Arc<AtomicU64>,
     match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
@@ -732,12 +732,10 @@ pub struct Lobby {
 impl Lobby {
     pub fn new() -> Self {
         let rooms = Arc::new(Mutex::new(HashMap::new()));
-        let persisted_replay_rooms = Arc::new(Mutex::new(HashMap::new()));
         let (disposal_tx, disposal_rx) = mpsc::unbounded_channel();
-        spawn_room_disposal_task(rooms.clone(), persisted_replay_rooms.clone(), disposal_rx);
+        spawn_room_disposal_task(rooms.clone(), disposal_rx);
         Lobby {
             rooms,
-            persisted_replay_rooms,
             disposal_tx,
             next_room_identity: Arc::new(AtomicU64::new(1)),
             match_history_writer: None,
@@ -935,12 +933,23 @@ impl Lobby {
         rooms: &mut HashMap<String, RoomHandle>,
         mode: RoomMode,
     ) -> RoomHandle {
+        self.create_room_locked_with_mode_and_match_id(room, rooms, mode, None)
+    }
+
+    fn create_room_locked_with_mode_and_match_id(
+        &self,
+        room: &str,
+        rooms: &mut HashMap<String, RoomHandle>,
+        mode: RoomMode,
+        persisted_replay_match_id: Option<i64>,
+    ) -> RoomHandle {
         let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let identity = RoomIdentity(self.next_room_identity.fetch_add(1, Ordering::Relaxed));
         let handle = RoomHandle {
             event_tx,
             identity,
+            persisted_replay_match_id,
             shutdown_tx,
         };
         rooms.insert(room.to_string(), handle.clone());
@@ -992,12 +1001,12 @@ impl Lobby {
     /// launch. Repeated permalink launches on one server process converge on the same room and
     /// late viewers join its current tick.
     pub async fn persisted_replay_room(&self, match_id: i64, artifact: ReplayArtifactV1) -> String {
-        let mut persisted_replay_rooms = self.persisted_replay_rooms.lock().await;
         let mut rooms = self.rooms.lock().await;
-        if let Some(room) = persisted_replay_rooms.get(&match_id) {
-            if rooms.contains_key(room) {
-                return room.clone();
-            }
+        if let Some((room, _)) = rooms
+            .iter()
+            .find(|(_, handle)| handle.persisted_replay_match_id == Some(match_id))
+        {
+            return room.clone();
         }
         let room = loop {
             let candidate = format!("{MATCH_REPLAY_ROOM_PREFIX}:{:032x}", rand::random::<u128>());
@@ -1005,8 +1014,12 @@ impl Lobby {
                 break candidate;
             }
         };
-        self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Replay { artifact });
-        persisted_replay_rooms.insert(match_id, room.clone());
+        self.create_room_locked_with_mode_and_match_id(
+            &room,
+            &mut rooms,
+            RoomMode::Replay { artifact },
+            Some(match_id),
+        );
         room
     }
 
@@ -1341,18 +1354,11 @@ fn lobby_join_sort_rank(state: LobbyJoinState) -> u8 {
 
 fn spawn_room_disposal_task(
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
-    persisted_replay_rooms: Arc<Mutex<HashMap<i64, String>>>,
     mut disposal_rx: mpsc::UnboundedReceiver<RoomDisposalRequest>,
 ) {
     tokio::spawn(async move {
         while let Some(request) = disposal_rx.recv().await {
             let removed = remove_room_if_matching(&rooms, &request.room, request.identity).await;
-            if removed {
-                persisted_replay_rooms
-                    .lock()
-                    .await
-                    .retain(|_, room| room != &request.room);
-            }
             if let Some(ack) = request.ack {
                 let _ = ack.send(removed);
             }
