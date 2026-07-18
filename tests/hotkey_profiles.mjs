@@ -159,8 +159,8 @@ function ekatCard() {
   assert(
     catalog.commands.some((command) =>
       command.commandId === HOTKEY_COMMAND_SELECT_IDLE_WORKERS &&
-        command.gridHotkey === "T" &&
-        command.classicHotkey === "I" &&
+        command.gridHotkey === "KeyT" &&
+        command.classicHotkey === "KeyI" &&
         command.global
     ),
     "hotkey command catalog includes the global idle-worker action with per-preset defaults",
@@ -196,12 +196,12 @@ function ekatCard() {
   );
   assert.equal(
     classic.bindings["unit.holdPosition"],
-    "H",
+    "KeyH",
     "Classic RTS binds Hold Position to its mnemonic instead of its Grid slot",
   );
   assert.equal(
     classic.bindings["unit.setupSupportWeapon"],
-    "U",
+    "KeyU",
     "Classic RTS binds support-weapon setup independently of the Grid slot",
   );
   assert.deepEqual(
@@ -212,7 +212,7 @@ function ekatCard() {
       artillery: classic.factionBindings.kriegsia[kriegsiaCommandId("train", KIND.ARTILLERY)],
       mortarAutocast: classic.factionBindings.kriegsia[kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST)],
     },
-    { tankTrap: "K", smoke: "O", scoutPlane: "P", artillery: "R", mortarAutocast: "O" },
+    { tankTrap: "KeyK", smoke: "KeyO", scoutPlane: "KeyP", artillery: "KeyR", mortarAutocast: "KeyO" },
     "Classic RTS conflict resolutions are mnemonic rather than Grid-slot fallbacks",
   );
   assert.deepEqual(
@@ -245,7 +245,7 @@ function ekatCard() {
     ...grid,
     id: "custom.grid-global-conflict",
     type: "custom",
-    bindings: { ...grid.bindings, [HOTKEY_COMMAND_SELECT_IDLE_WORKERS]: "Q" },
+    bindings: { ...grid.bindings, [HOTKEY_COMMAND_SELECT_IDLE_WORKERS]: "KeyQ" },
   };
   assert.equal(
     hotkeys.validateDraftProfile(conflicting).ok,
@@ -262,13 +262,13 @@ function ekatCard() {
     type: "custom",
     mode: "direct",
     name: "Existing Custom",
-    bindings: { "unit.move": "I" },
+    bindings: { "unit.move": "KeyI" },
     factionBindings: {},
   });
   assert.equal(saved.ok, true, "existing custom profiles gain a conflict-free idle-worker binding");
   assert.notEqual(
     saved.profile.bindings[HOTKEY_COMMAND_SELECT_IDLE_WORKERS],
-    "I",
+    "KeyI",
     "idle-worker migration does not displace an existing I binding",
   );
 }
@@ -280,7 +280,7 @@ function ekatCard() {
     ...classic,
     id: "custom.global-conflict",
     type: "custom",
-    bindings: { ...classic.bindings, [HOTKEY_COMMAND_SELECT_IDLE_WORKERS]: "T" },
+    bindings: { ...classic.bindings, [HOTKEY_COMMAND_SELECT_IDLE_WORKERS]: "KeyT" },
     factionBindings: Object.fromEntries(Object.entries(classic.factionBindings)
       .map(([factionId, bindings]) => [factionId, { ...bindings }])),
   };
@@ -311,7 +311,7 @@ function ekatCard() {
   const hotkeys = service();
   const editedPreset = hotkeys.saveCustomProfile({
     ...hotkeys.exportProfile(HOTKEY_PRESET_GRID),
-    bindings: { "unit.move": "M" },
+    bindings: { "unit.move": "KeyM" },
   });
   assert.equal(editedPreset.ok, false, "presets cannot be edited directly");
   assert(editedPreset.errors.some((error) => error.code === "presetImmutable"), "preset edit rejection is reported");
@@ -327,10 +327,10 @@ function ekatCard() {
     mode: "direct",
     name: "Direct",
     bindings: {
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
     },
   });
   assert.equal(saved.ok, true, "custom direct profile saves");
@@ -361,8 +361,8 @@ function ekatCard() {
     name: "Bad",
     bindings: {
       "unit.move": "1",
-      "unit.attack": "A",
-      "unknown.command": "U",
+      "unit.attack": "KeyA",
+      "unknown.command": "KeyU",
     },
   });
   assert.equal(invalid.ok, false, "invalid keys block saving");
@@ -379,10 +379,10 @@ function ekatCard() {
     mode: "direct",
     name: "Conflict",
     bindings: {
-      "unit.move": "A",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
+      "unit.move": "KeyA",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
     },
   });
   assert.equal(conflict.ok, false, "same-context duplicate keys block saving");
@@ -396,7 +396,7 @@ function ekatCard() {
     ...classic,
     id: "custom.draft",
     type: "custom",
-    bindings: { ...classic.bindings, "unit.move": "A", "unit.attack": "A" },
+    bindings: { ...classic.bindings, "unit.move": "KeyA", "unit.attack": "KeyA" },
   });
   assert.equal(draft.ok, false, "draft validator reports same-context duplicate keys");
   assert(draft.errors.some((error) =>
@@ -414,7 +414,7 @@ function ekatCard() {
     ...classic,
     id: "custom.exclusive",
     type: "custom",
-    bindings: { ...classic.bindings, "worker.buildMenu": "Y", "worker.return": "Y" },
+    bindings: { ...classic.bindings, "worker.buildMenu": "KeyY", "worker.return": "KeyY" },
   });
   assert.equal(draft.ok, true, "same key is allowed across mutually exclusive command-card contexts");
 }
@@ -442,11 +442,11 @@ function ekatCard() {
     mode: "direct",
     name: "Partial",
     bindings: {
-      "unit.move": "M",
+      "unit.move": "KeyM",
     },
   });
   assert.equal(parsed.ok, true, "missing known commands are filled during import parsing");
-  assert.equal(parsed.profile.bindings["unit.attack"], "A", "missing command falls back to rendered grid slot");
+  assert.equal(parsed.profile.bindings["unit.attack"], "KeyA", "missing command falls back to rendered grid slot");
   assert(parsed.warnings.some((warning) => warning.code === "missingCommandFallback"), "fallback is diagnosed");
 }
 
@@ -459,17 +459,17 @@ function ekatCard() {
     mode: "direct",
     name: "Legacy Build",
     bindings: {
-      "build.city_centre": "B",
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "W",
+      "build.city_centre": "KeyB",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyW",
     },
   }, { activate: true });
   const cityCentreCommandId = kriegsiaCommandId("build", KIND.CITY_CENTRE);
   assert.equal(migrated.ok, true, "legacy faction command ids import successfully");
   assert(migrated.warnings.some((warning) => warning.code === "legacyCommandMigrated"), "legacy command migration is diagnosed");
-  assert.equal(migrated.profile.factionBindings.kriegsia[cityCentreCommandId], "B", "legacy build ids migrate into Kriegsia bindings");
+  assert.equal(migrated.profile.factionBindings.kriegsia[cityCentreCommandId], "KeyB", "legacy build ids migrate into Kriegsia bindings");
   assert.equal(migrated.profile.bindings["build.city_centre"], undefined, "legacy build ids are not kept in the global binding map");
   assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "B", "migrated Kriegsia build binding resolves in Kriegsia cards");
 }
@@ -485,14 +485,14 @@ function ekatCard() {
     name: "Kriegsia Only",
     factionBindings: {
       kriegsia: {
-        [cityCentreCommandId]: "B",
+        [cityCentreCommandId]: "KeyB",
       },
     },
     bindings: {
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "W",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyW",
     },
   }, { activate: true });
   assert.equal(imported.ok, true, "Kriegsia faction bindings import successfully");
@@ -511,21 +511,21 @@ function ekatCard() {
     name: "Future Ekat",
     factionBindings: {
       ekat: {
-        [futureCommandId]: "E",
+        [futureCommandId]: "KeyE",
       },
     },
     bindings: {
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "W",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyW",
     },
   }, { activate: true });
   assert.equal(imported.ok, true, "unavailable faction commands are preserved on import");
   assert(imported.warnings.some((warning) => warning.code === "unavailableFactionCommand"), "unavailable faction command preservation is diagnosed");
-  assert.equal(imported.profile.factionBindings.ekat[futureCommandId], "E", "future Ekat command binding is stored");
+  assert.equal(imported.profile.factionBindings.ekat[futureCommandId], "KeyE", "future Ekat command binding is stored");
   assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "C", "future Ekat bindings are inactive for current Kriegsia cards");
-  assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekat[futureCommandId], "E", "future Ekat bindings round-trip through export");
+  assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekat[futureCommandId], "KeyE", "future Ekat bindings round-trip through export");
 }
 
 {
@@ -552,7 +552,7 @@ function ekatCard() {
   assert.equal(exported.description.length > 0, true, "export includes profile description");
   assert.equal(exported.createdWithBuild, "test-build", "export includes build metadata");
   assert.equal(exported.basePreset, HOTKEY_PRESET_CLASSIC, "preset exports name their base preset");
-  assert.equal(exported.bindings["unit.move"], "M", "export includes hotkey bindings");
+  assert.equal(exported.bindings["unit.move"], "KeyM", "export includes physical hotkey-code bindings");
   delete globalThis.__RTS_BUILD__;
 }
 
@@ -582,11 +582,11 @@ function ekatCard() {
     mode: "direct",
     name: "Direct",
     bindings: {
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
-      "unknown.command": "U",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
+      "unknown.command": "KeyU",
     },
   });
   assert.equal(imported.ok, true, "unknown imported commands are non-fatal");
@@ -603,9 +603,9 @@ function ekatCard() {
     name: "Bad Import",
     bindings: {
       "unit.move": "1",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
     },
   });
   assert.equal(invalid.ok, false, "invalid imported keys are fatal");
@@ -620,10 +620,10 @@ function ekatCard() {
     mode: "direct",
     name: "Conflict Import",
     bindings: {
-      "unit.move": "A",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
+      "unit.move": "KeyA",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
     },
   });
   assert.equal(conflict.ok, false, "same-context imported duplicate keys are fatal");
@@ -646,10 +646,10 @@ function ekatCard() {
     mode: "direct",
     name: "Direct",
     bindings: {
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
     },
   }, { activate: true });
   assert.equal(imported.ok, true, "profile import succeeds");
@@ -671,10 +671,10 @@ function ekatCard() {
     mode: "direct",
     name: "Replace",
     bindings: {
-      "unit.move": "M",
-      "unit.attack": "A",
-      "unit.holdPosition": "S",
-      "worker.buildMenu": "B",
+      "unit.move": "KeyM",
+      "unit.attack": "KeyA",
+      "unit.holdPosition": "KeyS",
+      "worker.buildMenu": "KeyB",
     },
   });
   hotkeys.importProfile({

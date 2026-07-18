@@ -830,13 +830,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       assert(id === "command-card", "Mortar autocast hotkey should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "Mortar autocast hotkey should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "Mortar autocast hotkey should query physical-code buttons");
           return [coolingMortarButton];
         },
       };
     };
     const disableAutocastEv = {
-      code: `Key${coolingMortarButton.dataset.hotkey}`,
+      code: coolingMortarButton.dataset.hotkeyCode,
       altKey: true,
       ctrlKey: false,
       metaKey: false,
@@ -874,13 +874,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       assert(id === "command-card", "Mortar autocast enable hotkey should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "Mortar autocast enable hotkey should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "Mortar autocast enable hotkey should query physical-code buttons");
           return [readyMortarButton];
         },
       };
     };
     input._activateCommandHotkey({
-      code: `Key${readyMortarButton.dataset.hotkey}`,
+      code: readyMortarButton.dataset.hotkeyCode,
       altKey: true,
       ctrlKey: false,
       metaKey: false,
@@ -997,7 +997,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       assert(id === "command-card", "Methamphetamines hotkey should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "Methamphetamines hotkey should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "Methamphetamines hotkey should query physical-code buttons");
           return [researchButton];
         },
       };
@@ -1279,14 +1279,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       assert(id === "command-card", "unaffordable build hotkey should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "unaffordable build hotkey should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "unaffordable build hotkey should query physical-code buttons");
           return [barracksButton];
         },
       };
     };
     input.state = shortResourceHud.state;
     input._activateCommandHotkey({
-      code: `Key${barracksButton.dataset.hotkey}`,
+      code: barracksButton.dataset.hotkeyCode,
       shiftKey: false,
       repeat: false,
       preventDefault() {},

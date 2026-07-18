@@ -95,9 +95,9 @@ function smokeCommandCard(input) {
       assert(id === "command-card", "ability hotkeys should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "ability hotkeys should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "ability hotkeys should query physical-code buttons");
           return [{
-            dataset: { hotkey: "D" },
+            dataset: { hotkey: "D", hotkeyCode: "KeyD" },
             disabled: false,
             click() {
               input.clientIntent.beginCommandTarget(
