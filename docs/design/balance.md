@@ -459,12 +459,11 @@ folded into default targeting.
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability once their
-  player completes an R&D Complex; no completed Gun Works is required. Each scout car spawns with
-  2 smoke uses; once those uses are depleted, that car cannot use Smoke again. Smoke has no steel
-  or oil cost. Target range: 14 tiles from the caster. Launch delay: up to 100 ms at max range,
-  scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration: 5 seconds. No cooldown;
-  one Scout Car can spend both smoke uses back-to-back immediately. After Smoke Plus research,
-  future casts by that player use a 3-tile
+  player completes an R&D Complex; no completed Gun Works is required. Each scout car has unlimited
+  Smoke uses. Smoke has no steel or oil cost. Target range: 14 tiles from the caster. Launch delay:
+  up to 100 ms at max range, scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration:
+  5 seconds. Smoke retains its zero-tick cooldown. After Smoke Plus research, future casts by that
+  player use a 3-tile
   radius and 10-second duration.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through

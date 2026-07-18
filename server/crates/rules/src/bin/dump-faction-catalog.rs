@@ -351,10 +351,6 @@ fn print_client_constants(indent: &str) {
         balance::SMOKE_ABILITY_COOLDOWN_TICKS
     );
     println!(
-        "{indent}    \"scoutCarSmokeUses\": {},",
-        balance::SCOUT_CAR_SMOKE_USES
-    );
-    println!(
         "{indent}    \"scoutPlaneOrbitRadiusTiles\": {},",
         balance::SCOUT_PLANE_ORBIT_RADIUS_TILES
     );

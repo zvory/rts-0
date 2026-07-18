@@ -1342,7 +1342,7 @@ fn smoke_nonfinite_target_coordinates_are_rejected() {
 }
 
 #[test]
-fn scout_car_smoke_has_two_free_uses_then_depletes() {
+fn scout_car_smoke_has_unlimited_free_uses() {
     let (mut game, scout, _target, _) = smoke_command_fixture();
     let target = game.state.map.tile_center(12, 8);
     game.state.players[0].set_resources(0, 0);
@@ -1364,19 +1364,19 @@ fn scout_car_smoke_has_two_free_uses_then_depletes() {
     let scout_entity = game.state.entities.get(scout).expect("scout should exist");
     assert_eq!(
         scout_entity.ability_uses_remaining(ability::AbilityKind::Smoke),
-        Some(0),
-        "three same-tick smoke commands should only spend the two Scout Car uses"
+        None,
+        "Smoke should not expose or spend finite uses"
     );
     assert_eq!(
         scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),
         0,
-        "Smoke should not start a cooldown between uses"
+        "Smoke should retain its existing cooldown"
     );
 
     for _ in 0..config::SMOKE_LAUNCH_MAX_DELAY_TICKS {
         game.tick();
     }
-    assert_eq!(game.state.smokes.iter().count(), 2);
+    assert_eq!(game.state.smokes.iter().count(), 3);
     assert_eq!(game.state.players[0].steel, 0);
     assert_eq!(game.state.players[0].oil, 0);
 
@@ -1392,11 +1392,14 @@ fn scout_car_smoke_has_two_free_uses_then_depletes() {
     );
     game.tick();
 
+    for _ in 0..config::SMOKE_LAUNCH_MAX_DELAY_TICKS {
+        game.tick();
+    }
+    assert_eq!(game.state.smokes.iter().count(), 4);
     let scout_entity = game.state.entities.get(scout).expect("scout should exist");
-    assert_eq!(game.state.smokes.iter().count(), 2);
     assert_eq!(
         scout_entity.ability_uses_remaining(ability::AbilityKind::Smoke),
-        Some(0)
+        None
     );
     assert_eq!(
         scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),

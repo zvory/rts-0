@@ -1468,8 +1468,8 @@ General rules:
   skipped if stale at promotion. `QueueWaitUntilReady` abilities, such as Mortar Fire, may append
   while the carrier is otherwise valid but on ability cooldown or weapon reload; promotion turns the
   stored intent into an active ability order that waits for readiness before firing. Finite-use
-  abilities also reserve already-active and already-queued same-ability intents at issue time, so
-  queued Smoke clicks cannot exceed the scout car's remaining smoke uses.
+  abilities also reserve already-active and already-queued same-ability intents at issue time.
+  Scout Car Smoke is unlimited, so its queued intents are bounded only by the normal unit queue cap.
 - Later orders still apply to every compatible selected unit. Earlier specialized stages do not
   remove non-carriers from the plan; for example, a queued smoke applies to one scout car, while the
   following queued attack-move applies to all selected units that can receive attack-move.

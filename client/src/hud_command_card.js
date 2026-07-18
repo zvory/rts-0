@@ -128,7 +128,7 @@ export function buildCommandCardContextCatalog() {
     id: 12,
     owner: playerId,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 1 }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
   };
   const mortar = {
     id: 13,

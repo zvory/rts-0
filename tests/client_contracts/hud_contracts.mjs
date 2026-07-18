@@ -1148,7 +1148,7 @@ function fakeHudRootWithoutResourceSpans() {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
   };
   const smokeResearchComplex = {
     id: 29,

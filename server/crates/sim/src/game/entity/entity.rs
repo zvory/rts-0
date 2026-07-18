@@ -615,15 +615,13 @@ impl Entity {
     }
 
     pub fn ability_uses_remaining(&self, ability: AbilityKind) -> Option<u16> {
-        match (self.kind, ability) {
-            (EntityKind::ScoutCar, AbilityKind::Smoke) => Some(
-                self.ability_uses_remaining
-                    .get(&ability)
-                    .copied()
-                    .unwrap_or(0),
-            ),
-            _ => None,
-        }
+        crate::game::ability::definition(ability).charges?;
+        Some(
+            self.ability_uses_remaining
+                .get(&ability)
+                .copied()
+                .unwrap_or(0),
+        )
     }
 
     pub fn consume_ability_use(&mut self, ability: AbilityKind) -> bool {
