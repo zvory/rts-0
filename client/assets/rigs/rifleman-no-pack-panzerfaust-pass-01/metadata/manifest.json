@@ -46,6 +46,9 @@
     "firingFrames": [
       4
     ],
+    "firingWeaponKinds": [
+      "rifleman_rifle"
+    ],
     "firingFrameHoldPhase": 0.2,
     "fps": 8,
     "worldScale": 0.34,

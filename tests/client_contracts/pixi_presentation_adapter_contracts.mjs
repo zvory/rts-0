@@ -11,6 +11,7 @@ const EXPECTED_LEGACY_READS = [
   "state._prevById",
   "state.weaponRecoil",
   "state.weaponRecoilPhase",
+  "state.weaponRecoilKind",
   "match.renderClock",
   "match.frameProfiler",
   "match.visualProfile.unitOverrides",
@@ -88,6 +89,7 @@ const sourceState = {
   get _prevById() { stateReadCount += 1; return previous; },
   weaponRecoil() { stateReadCount += 1; return 0.25; },
   weaponRecoilPhase() { stateReadCount += 1; return 0.75; },
+  weaponRecoilKind() { stateReadCount += 1; return "rifleman_rifle"; },
   consumePendingGroundDecals() { destructiveReads += 1; return []; },
 };
 const engine = fakeEngine();
@@ -126,6 +128,7 @@ assert(engine.renders[0].state !== sourceState, "legacy Pixi helpers receive a f
 assert(engine.renders[0].state.resources.oil === 4, "allowlisted low-oil cue input is snapshotted into the facade");
 assert(engine.renders[0].state._curById.get(7).x === 22, "allowlisted current pose is detached for legacy motion sampling");
 assert(engine.renders[0].state.weaponRecoil(7) === 0.25, "allowlisted recoil is sampled once at assembly time");
+assert(engine.renders[0].state.weaponRecoilKind(7) === "rifleman_rifle", "weapon-specific recoil art receives the sampled weapon kind");
 assert(engine.renders[0].fog.isVisible(0, 0) && !engine.renders[0].fog.isVisible(1, 0), "Pixi fog facade reads backend-owned grid copies");
 assert(engine.marquees[0].w === 10 && engine.marquees[0].h === 12, "screen marquee is drawn from the assembled screenOverlay layer");
 

@@ -1,7 +1,8 @@
 import { assert } from "./assertions.mjs";
-import { KIND, SETUP, STATE } from "../../client/src/protocol.js";
+import { KIND, SETUP, STATE, WEAPON_KIND } from "../../client/src/protocol.js";
 import {
   frameStripFrameIndex,
+  frameStripSpriteOffset,
   frameStripVisualFacing,
   frameStripWorldScale,
 } from "../../client/src/renderer/rigs/frame_strip_runtime.js";
@@ -70,6 +71,8 @@ const riflemanFrameDuringRecoil = frameStripFrameIndex(
     recoilPhase: 0.05,
   },
 );
+assert(frameStripSpriteOffset(RIFLEMAN_PNG_FRAME_STRIP, RIFLEMAN_PNG_FRAME_STRIP.idleFrame).x === 10, "Rifleman art uses its corrected forward origin");
+assert(frameStripSpriteOffset(RIFLEMAN_PNG_FRAME_STRIP, riflemanFrameDuringRecoil).x === 6, "Rifleman firing art applies the authored recoil offset");
 assert(
   riflemanFrameDuringRecoil === RIFLEMAN_PNG_FRAME_STRIP.firingFrames[0],
   "moving Rifleman uses the authored firing frame during the brief recoil impulse",
@@ -82,6 +85,15 @@ assert(
     { now: 0, recoilProgress: 1, recoilPhase: 0.05 },
   ) === RIFLEMAN_PNG_FRAME_STRIP.firingFrames[0],
   "stationary Rifleman uses the authored firing frame during the brief recoil impulse",
+);
+
+assert(
+  frameStripFrameIndex(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.ATTACK },
+    { now: 0, recoilProgress: 1, recoilPhase: 0.05, recoilWeaponKind: WEAPON_KIND.PANZERFAUST_LOADED_SHOT },
+  ) === RIFLEMAN_PNG_FRAME_STRIP.idleFrame,
+  "Panzerfaust recoil does not show the rifle muzzle-flare frame",
 );
 
 assert(

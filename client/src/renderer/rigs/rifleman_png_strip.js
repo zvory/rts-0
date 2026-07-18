@@ -16,6 +16,7 @@ export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   idleFrame: 0,
   movementFrames: [1, 2, 3],
   firingFrames: [4],
+  firingWeaponKinds: ["rifleman_rifle"],
   firingFrameHoldPhase: 0.2,
   fps: 8,
   worldScale: 0.34,

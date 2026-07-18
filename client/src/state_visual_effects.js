@@ -371,6 +371,10 @@ export class VisualEffectBuffers {
     return clamp01(sample.age / sample.ttlMs);
   }
 
+  weaponRecoilKind(id) {
+    return normalizedWeaponKind(this.weaponRecoilById.get(id)?.weaponKind);
+  }
+
   _weaponRecoilSample(id, kind, now, weaponKind) {
     if (typeof now !== "number") {
       now = kind;
@@ -512,6 +516,9 @@ export class VisualEffectBackedState {
   }
   weaponRecoilPhase(id, kind, now, weaponKind) {
     return this.visualEffects.weaponRecoilPhase(id, kind, now, weaponKind);
+  }
+  weaponRecoilKind(id) {
+    return this.visualEffects.weaponRecoilKind(id);
   }
 }
 

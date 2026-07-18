@@ -88,6 +88,14 @@ function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame 
 function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback = 0) {
   const firingFrames = validFrameList(strip, strip?.firingFrames);
   if (firingFrames.length === 0) return null;
+  const firingWeaponKinds = Array.isArray(strip?.firingWeaponKinds) ? strip.firingWeaponKinds : [];
+  if (
+    firingWeaponKinds.length > 0 &&
+    renderContext.recoilWeaponKind &&
+    !firingWeaponKinds.includes(renderContext.recoilWeaponKind)
+  ) {
+    return null;
+  }
   if (clamp01(finite(renderContext.recoilProgress, 0)) <= 0) return null;
   const phase = clamp01(finite(renderContext.recoilPhase, 0));
   const holdPhase = finite(strip?.firingFrameHoldPhase, 0);

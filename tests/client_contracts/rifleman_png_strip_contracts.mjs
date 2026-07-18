@@ -31,6 +31,7 @@ for (const [label, strip, variant] of [
   assert(strip.idleFrame === runtime.idleFrame, `${label} idle frame matches the manifest`);
   assert(JSON.stringify(strip.movementFrames) === JSON.stringify(runtime.movementFrames), `${label} movement frames match the manifest`);
   assert(JSON.stringify(strip.firingFrames) === JSON.stringify(runtime.firingFrames), `${label} firing frames match the manifest`);
+  assert(JSON.stringify(strip.firingWeaponKinds) === JSON.stringify(runtime.firingWeaponKinds), `${label} firing weapon routing matches the manifest`);
   assert(strip.firingFrameHoldPhase === runtime.firingFrameHoldPhase, `${label} firing-frame timing matches the manifest`);
   assert(strip.fps === runtime.fps, `${label} FPS matches the manifest`);
   assert(strip.worldScale === runtime.worldScale, `${label} world scale matches the manifest`);

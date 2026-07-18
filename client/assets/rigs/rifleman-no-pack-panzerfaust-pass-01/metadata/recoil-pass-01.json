@@ -34,6 +34,7 @@
   "reviewStripOrder": ["standing", "movement 1", "movement 2", "movement 3", "recoil"],
   "runtimeAnimation": {
     "firingFrame": 4,
+    "firingWeaponKinds": ["rifleman_rifle"],
     "firingFrameHoldPhase": 0.2,
     "rifleRecoilDurationMs": 84,
     "originForwardPx": 10,
