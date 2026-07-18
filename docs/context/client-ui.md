@@ -8,6 +8,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   behavior in §4.2
 - [client-rendering.md](../design/client-rendering.md) — renderer-neutral contracts and parity ledger
 - [client-stress-tests.md](../design/client-stress-tests.md) — benchmark contract
+- [../client-performance-optimization-lessons.md](../client-performance-optimization-lessons.md) —
+  measured wins, rejected experiments, live rig counts, and recurring analytical mistakes
 
 ## Code map
 - `app-shell`: `main.js`, `app.js`, `match*.js`, launch/Interact bridges, diagnostics,
