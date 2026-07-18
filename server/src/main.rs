@@ -768,7 +768,7 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
 
     // Also version the top-level entry point, stylesheet, and web manifest.
     html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
-        .replace("./styles.css\"", &format!("./styles.css?v={version}\""))
+        .replace(".css\"", &format!(".css?v={version}\""))
         .replace(
             "/manifest.webmanifest\"",
             &format!("/manifest.webmanifest?v={version}\""),
@@ -1054,7 +1054,7 @@ mod tests {
             "nested ES modules must be versioned so browser clients do not run stale renderer code"
         );
         assert!(html.contains("./src/main.js?v=test-version\""));
-        assert!(html.contains("./styles.css?v=test-version\""));
+        assert_eq!(html.matches(".css?v=test-version\"").count(), 2);
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
     }
 
