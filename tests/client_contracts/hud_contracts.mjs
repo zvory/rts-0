@@ -1201,12 +1201,8 @@ withFakeHudDocument(({ FakeElement }) => {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{
-      ability: ABILITY.SMOKE,
-      cooldownLeft: 0,
-      remainingUses: 2,
-      chargeRechargeLeft: TICK_HZ * 7.5,
-    }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2,
+      chargeRechargeLeft: TICK_HZ * 7.5 }],
   };
   const smokeResearchComplex = {
     id: 29,
@@ -1252,14 +1248,10 @@ withFakeHudDocument(({ FakeElement }) => {
       countBadge: "0",
       cooldownClocks: smoke.cooldownClocks,
     });
-    assert(
-      button.innerHTML.includes('<span class="cmd-ready-count">0</span>'),
-      "the rendered Smoke button should contain the zero-charge badge",
-    );
-    assert(
-      button.innerHTML.includes("cmd-cd-clock") && button.innerHTML.includes("cmd-cd-arm"),
-      "the rendered Smoke button should contain the existing cooldown clock and arm",
-    );
+    assert(button.innerHTML.includes('<span class="cmd-ready-count">0</span>'),
+      "the rendered Smoke button should contain the zero-charge badge");
+    assert(button.innerHTML.includes("cmd-cd-clock") && button.innerHTML.includes("cmd-cd-arm"),
+      "the rendered Smoke button should contain the existing cooldown clock and arm");
     assert(button.title !== "Recharging", "the rendered Smoke button should not invent Recharging copy");
   });
 
