@@ -15,8 +15,8 @@
     },
     {
       "path": "scripts/docdrift-sweep.mjs",
-      "lines": 1988,
-      "reason": "Docs sweep core remains over the cap after renderer extraction; keep ratcheting as follow-up pieces split out."
+      "lines": 2424,
+      "reason": "The recoverable full-sweep lifecycle now keeps run-state, exact Git/PR reconciliation, legacy adoption, and fail-closed reporting beside the existing classifier/generator transaction; keep ratcheting by extracting that cohesive lifecycle without splitting its recovery authority."
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",

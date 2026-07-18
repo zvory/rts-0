@@ -472,13 +472,32 @@ can decide whether to follow up manually.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed
-seed in `docs/docdrift-checkpoint.txt`, creates or reuses `.docdrift/worktrees/docdrift-sweep` on
-`zvorygin/docdrift-sweep`, runs classification plus doc generation there, commits any docs changes,
-pushes the sweep branch, opens or updates the owned PR through `scripts/agent-pr.sh`, and waits with
-`scripts/wait-pr.sh`. The checkpoint advances atomically only after a no-PR range is fully processed
-or after `wait-pr.sh` confirms the sweep PR head is reachable from `origin/main`; failed checks,
-closed PRs, stale branches, dirty sweep worktrees, and fatal classifier/lifecycle failures leave the
-checkpoint unchanged.
+seed in `docs/docdrift-checkpoint.txt`, and gives each new run a unique
+`zvorygin/docdrift-sweep-<run-id>` branch plus matching isolated worktree. Before creating that
+branch it atomically writes `.docdrift/runs/<run-id>/run-state.json`; the schema-versioned record is
+updated after every lifecycle step and is the authority for the run's base/head, generated head,
+branch/worktree, PR identity and state, checkpoint target, and recovery action. With no explicit
+`--run-id`, recovery resumes only the single recorded nonterminal run; multiple candidates fail
+closed.
+
+An open PR resumes its exact recorded branch, head, PR, and first incomplete step. A missing
+worktree can be recreated from an exact local or remote recorded head, and the only automatic ref
+reconciliation is a clean local fast-forward to that exact remote head. Merged runs may finish
+their recorded idempotent checkpoint step; merged or closed-unmerged terminal runs otherwise keep
+their old refs and reports while a fresh unique run starts at fetched `origin/main`. The one legacy
+fixed branch, `zvorygin/docdrift-sweep`, can be adopted only when its clean local, remote, and
+worktree heads agree with exactly one terminal owned PR head. Automatic adoption is restricted to
+the known `68f6e958...` incident; another verified terminal head requires explicit
+`--adopt-legacy`, and the legacy ref is never resumed or rewritten. A closed PR's stale
+mergeability metadata is terminal evidence, not a conflict decision.
+
+Dirty or conflicted worktrees, in-progress Git operations, non-fast-forward or mismatched heads,
+open conflicted PRs, ambiguous PR/run matches, and ref or worktree collisions stop before refs,
+checkpoints, or GitHub state are changed. Recovery never stashes, resets, rebases, force-pushes,
+deletes, or resolves conflicts. Classification and doc generation then run on the selected safe
+worktree, `scripts/agent-pr.sh` owns PR creation, and `scripts/wait-pr.sh` proves merge reachability.
+The checkpoint advances atomically only after a no-PR range is fully processed or a recorded merged
+run is verified.
 Generated sweep PRs carry the `docdrift-sweep` label so effectiveness audits can list sweep output
 separately from PRs that merely change the sweeper tooling.
 Per-decision doc-patch skips do not block checkpoint advancement: once any generated docs PR merges,
@@ -487,8 +506,10 @@ the nightly gardener from retrying the same stale patch indefinitely. Lifecycle 
 failed checks, closed PRs, stale branches, dirty sweep worktrees, or unrecoverable git/GitHub errors
 still exit non-zero and leave the checkpoint unchanged.
 
-Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including
-`docdrift-full.{md,json}` and any classify/generate reports. Use
+Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including the recovery
+authority `run-state.json`, `docdrift-full.{md,json}`, and any classify/generate reports. The full
+report's `sweep.recoveryAction` states whether the run was created, resumed, completed after merge,
+started after a terminal PR, adopted from the legacy branch, or stopped for operator review. Use
 `scripts/docdrift-daily.sh` as the launchd-friendly daily command; pass normal
 `docdrift-sweep.mjs` options after it, for example `--dry-run` for a lifecycle preview or
 `--run-id <id>` for predictable report paths. The wrapper first fetches `origin/main`, creates or
