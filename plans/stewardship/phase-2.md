@@ -24,8 +24,10 @@ classifier/generator model.
   heads are identical and exactly one owned PR has that exact head. Record the PR's terminal state
   and base/head evidence atomically before applying the normal table below; never resume or rewrite
   the legacy head. The current regression fixture is the clean `68f6e958...` head with closed,
-  unmerged PR #627. Any different or ambiguous pre-record state fails closed with an explicit
-  operator-adoption command rather than guessing.
+  unmerged PR #627. Its terminal GitHub mergeability is currently `DIRTY`; that stale conflict
+  classification does not block this exact closed-unmerged legacy adoption because the PR can no
+  longer merge and its preserved head is verified directly. Any different or ambiguous pre-record
+  state fails closed with an explicit operator-adoption command rather than guessing.
 - Apply one deterministic policy based on PR/run state:
   - **Open PR:** preserve and reuse the same branch, commits, PR, and run identity. Resume from the
     first incomplete recorded lifecycle step rather than regenerating or opening another PR. The
@@ -37,8 +39,10 @@ classifier/generator model.
     post-merge checkpoint step supported by recorded evidence, then allocate a unique run branch and
     worktree from the current fetched `origin/main` for later unprocessed commits.
   - **Closed, unmerged PR:** preserve the branch, commits, PR identity, and unchanged checkpoint.
-    Allocate a unique new run branch and worktree from current `origin/main`; the normal checkpoint
-    range may regenerate the abandoned documentation work without rewriting the old ref.
+    Treat mergeability/conflict status as terminal metadata rather than a resumability decision;
+    exact head and identity agreement still apply. Allocate a unique new run branch and worktree
+    from current `origin/main`; the normal checkpoint range may regenerate the abandoned
+    documentation work without rewriting the old ref.
   - **No PR yet:** a clean branch tied to a recorded in-progress run may continue to its first
     incomplete push/PR step. A missing worktree may be recreated only from the exact recorded local
     or remote branch head. If generated commits cannot be tied unambiguously to one recorded run,
@@ -47,9 +51,10 @@ classifier/generator model.
   that neither local nor remote refs nor worktree paths already exist; never reuse, reset, delete,
   or force-update an old run merely to obtain the preferred name.
 - Treat dirty worktrees, unmerged index entries, merge/rebase/cherry-pick state, conflicting
-  local/remote heads, and a PR reported as conflicted or ambiguous as hard stops. Report the exact
-  branch, SHAs, PR state, worktree status, and safe operator choices. Do not automatically stash,
-  reset, rebase, force-push, delete, or resolve conflicts.
+  local/remote heads, an open PR reported as conflicted, and any ambiguous PR match as hard stops.
+  A closed-unmerged PR's stale mergeability classification follows the terminal rule above and is
+  not itself a hard stop. Report the exact branch, SHAs, PR state, worktree status, and safe operator
+  choices. Do not automatically stash, reset, rebase, force-push, delete, or resolve conflicts.
 - Keep recovery decisions visible in the full-sweep lifecycle/report so a scheduled failure says
   whether it resumed an open run, completed a merged run, created a fresh run branch, or stopped for
   human review.
@@ -86,8 +91,10 @@ classifier/generator model.
   - local-only and remote-only recorded branches recreate a missing worktree only when their exact
     heads match the run-state record;
   - the pre-record fixed-branch fixture with matching clean local/remote/worktree head and one
-    closed-unmerged PR is adopted, preserved, and followed by a unique new run branch, while any
-    second matching PR or head mismatch fails closed;
+    closed-unmerged `DIRTY` PR is adopted, preserved, and followed by a unique new run branch, while
+    any second matching PR or head mismatch fails closed;
+  - an open conflicted PR fails closed, while a recorded closed-unmerged PR with exact identity and
+    head agreement proceeds regardless of terminal mergeability metadata;
   - dirty and conflicted worktrees exit non-zero before refs, checkpoints, or stubbed GitHub state
     change; and
   - ambiguous run records, multiple matching PRs, head mismatches, and branch-name/ref collisions
