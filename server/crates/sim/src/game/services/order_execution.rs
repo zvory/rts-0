@@ -76,6 +76,23 @@ pub(crate) fn execute_anti_tank_gun_setup(
     true
 }
 
+pub(crate) fn execute_promoted_support_weapon_setup(
+    entities: &mut EntityStore,
+    id: u32,
+    x: f32,
+    y: f32,
+) -> bool {
+    let future_orders = if entities
+        .get(id)
+        .is_some_and(|entity| entity.kind == EntityKind::MortarTeam)
+    {
+        FutureOrderMode::Clear
+    } else {
+        FutureOrderMode::Preserve
+    };
+    execute_anti_tank_gun_setup(entities, id, x, y, future_orders)
+}
+
 fn is_artillery_entity(e: &Entity) -> bool {
     e.kind == EntityKind::Artillery
 }
