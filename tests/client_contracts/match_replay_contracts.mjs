@@ -112,7 +112,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     replayMatch.replayViewer = true;
     replayMatch.state = { spectator: false };
     replayMatch.applySpectatorUi();
-    assert(selectionArea.hidden, "replay viewer hides the selected-unit HUD area");
+    assert(!selectionArea.hidden, "replay viewer shows the selected-unit HUD area for inspection");
     assert(commandCard.hidden, "replay viewer keeps command card hidden");
     assert(giveUpConfirm.hidden, "replay viewer hides give-up confirmation");
 
@@ -252,6 +252,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
         this.pans.push({ dx: delta.x, dy: delta.y });
       },
     };
+    const replayState = {
+      spectator: true,
+      selection: new Set(),
+      setSelection(ids) { this.selection = new Set(ids); },
+      addToSelection(ids) { for (const id of ids) this.selection.add(id); },
+      removeFromSelection(ids) { for (const id of ids) this.selection.delete(id); },
+      clearSelection() { this.selection.clear(); },
+    };
     globalThis.window = {
       addEventListener(type, handler) {
         listeners.set(`window:${type}`, handler);
@@ -261,7 +269,37 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       },
     };
     try {
-      const replayInput = new ReplayCameraInput(viewport, camera);
+      const replayInput = new ReplayCameraInput(viewport, camera, replayState);
+      replayInput.publishSelectionScene({
+        version: 1,
+        projection: {
+          version: 1,
+          viewport: { widthCssPx: 640, heightCssPx: 480 },
+          project(point) { return { x: point.x, y: point.y, depth: 1 }; },
+        },
+        proxies: [
+          {
+            version: 1,
+            id: 41,
+            kind: "rifleman",
+            owner: 1,
+            anchor: { x: 200, y: 150, heightPx: 8 },
+            footprint: { kind: "circle", radiusPx: 10 },
+            minScreenRadiusCssPx: 6,
+            interaction: { id: 41, kind: "rifleman", owner: 1, x: 200, y: 150, hp: 72, maxHp: 100 },
+          },
+          {
+            version: 1,
+            id: 42,
+            kind: "tank",
+            owner: 2,
+            anchor: { x: 240, y: 170, heightPx: 16 },
+            footprint: { kind: "circle", radiusPx: 16 },
+            minScreenRadiusCssPx: 6,
+            interaction: { id: 42, kind: "tank", owner: 2, x: 240, y: 170, hp: 240, maxHp: 300 },
+          },
+        ],
+      });
       assert(options.get("wheel")?.passive === false, "Replay camera wheel listener is non-passive");
       let prevented = 0;
       listeners.get("wheel")({
@@ -337,6 +375,22 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       });
       assert(camera.pans.length === 2, "Replay Space+left-drag pans through shared camera navigation");
       assert(camera.pans[1].dx === -10 && camera.pans[1].dy === -10, "Replay Space+left-drag uses screen delta");
+      listeners.get("mousedown")({ button: 0, clientX: 220, clientY: 180 });
+      listeners.get("window:mouseup")({ button: 0, clientX: 220, clientY: 180 });
+      assert(replayState.selection.has(41), "Replay spectators can select a presented unit without issuing an order");
+      assert(!("command" in replayInput), "Replay selection keeps the input command-free");
+      listeners.get("mousedown")({ button: 0, clientX: 170, clientY: 130 });
+      listeners.get("window:mousemove")({ button: 0, clientX: 280, clientY: 230 });
+      assert(replayInput.screenOverlay.snapshot().marquee?.w === 110, "Replay drag publishes a selection marquee");
+      listeners.get("window:blur")();
+      assert(replayInput.screenOverlay.snapshot().marquee === null, "Replay blur cancels an in-progress selection drag");
+      listeners.get("window:mouseup")({ button: 0, clientX: 280, clientY: 230 });
+      assert(replayState.selection.size === 1, "Replay blur prevents a stale drag release from changing selection");
+      listeners.get("mousedown")({ button: 0, clientX: 170, clientY: 130 });
+      listeners.get("window:mousemove")({ button: 0, clientX: 280, clientY: 230 });
+      listeners.get("window:mouseup")({ button: 0, clientX: 280, clientY: 230 });
+      assert(replayState.selection.size === 2, "Replay spectators can box-select visible units from either player");
+      assert(replayInput.screenOverlay.snapshot().marquee === null, "Replay box selection clears its marquee on release");
       replayInput.destroy();
       assert(!listeners.has("wheel"), "Replay camera input removes wheel listener on destroy");
     } finally {

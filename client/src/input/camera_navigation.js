@@ -26,12 +26,20 @@ export class CameraNavigationInput {
     panKeyCodes = DEFAULT_PAN_KEY_CODES,
     enableSpacePan = true,
     windowRef = globalThis.window,
+    onUnconsumedMouseDown = null,
+    onUnconsumedMouseMove = null,
+    onUnconsumedMouseUp = null,
+    onRelease = null,
   } = {}) {
     this.domElement = domElement;
     this.camera = camera;
     this.panKeyCodes = panKeyCodes;
     this.enableSpacePan = enableSpacePan;
     this.window = windowRef;
+    this.onUnconsumedMouseDown = onUnconsumedMouseDown;
+    this.onUnconsumedMouseMove = onUnconsumedMouseMove;
+    this.onUnconsumedMouseUp = onUnconsumedMouseUp;
+    this.onRelease = onRelease;
     this.keys = { up: false, down: false, left: false, right: false };
     this.mouse = null;
     this.spacePan = false;
@@ -41,9 +49,17 @@ export class CameraNavigationInput {
     this.suppressMouseUntil = 0;
     this._installed = false;
 
-    this._onMouseDown = this.handleMouseDown.bind(this);
-    this._onMouseMove = this.handleMouseMove.bind(this);
-    this._onMouseUp = this.handleMouseUp.bind(this);
+    this._onMouseDown = (ev) => {
+      const point = this.screenPos(ev);
+      if (!this.handleMouseDown(ev, point)) this.onUnconsumedMouseDown?.(ev, point);
+    };
+    this._onMouseMove = (ev) => {
+      const point = this.screenPos(ev);
+      if (!this.handleMouseMove(ev, point)) this.onUnconsumedMouseMove?.(ev, point);
+    };
+    this._onMouseUp = (ev) => {
+      if (!this.handleMouseUp(ev)) this.onUnconsumedMouseUp?.(ev, this.screenPos(ev));
+    };
     this._onMouseLeave = this.handleMouseLeave.bind(this);
     this._onWheel = this.handleWheel.bind(this);
     this._onTouchStart = this.handleTouchStart.bind(this);
@@ -220,6 +236,7 @@ export class CameraNavigationInput {
     this.panDrag = null;
     this.touchGesture = null;
     this.touchIds.clear();
+    this.onRelease?.();
   }
 
   screenPos(ev) {
