@@ -89,7 +89,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
           [ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE], 320, 352],
         ],
         87,
-        [[ABILITY_CODE[ABILITY.CHARGE], 87, 2, null, 77, 45, null, 90]],
+        [[ABILITY_CODE[ABILITY.CHARGE], 87, 2, null, 77, 45, null, 90, 45]],
         66,
         true,
         [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
@@ -278,7 +278,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       decoded.entities[0].abilities[0].remainingUses === 2 &&
       decoded.entities[0].abilities[0].activeObjectId === 77 &&
       decoded.entities[0].abilities[0].availableTick === 45 &&
-      decoded.entities[0].abilities[0].expiresIn === 90,
+      decoded.entities[0].abilities[0].expiresIn === 90 &&
+      decoded.entities[0].abilities[0].chargeRechargeLeft === 45,
     "entity ability cooldowns decode",
   );
   assert(

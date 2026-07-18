@@ -11,6 +11,7 @@ import {
 import {
   abilityActiveObjectId,
   abilityAutocastEnabled,
+  abilityChargeRechargeLeft,
   abilityCooldownLeft,
   abilityRemainingUses,
   abilityUnitQueueAdmissible,
@@ -566,6 +567,9 @@ export function selectedAbilityAffordances(ctx, selection) {
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
       );
+      const chargeRecharges = carriers.map((e) =>
+        abilityChargeRechargeLeft(e, definition.ability),
+      );
       const depletedCount = carriers.filter(
         (e) => abilityRemainingUses(e, definition.ability) === 0,
       ).length;
@@ -592,7 +596,10 @@ export function selectedAbilityAffordances(ctx, selection) {
           ? abilityActiveObjectId(recastUnits[0], definition.ability)
           : null,
         autocastEnabledIds,
-        cooldownClocks: ctx.groupCooldownClocks(cooldowns, definition.cooldownTicks),
+        cooldownClocks: [
+          ...ctx.groupCooldownClocks(cooldowns, definition.cooldownTicks),
+          ...ctx.groupCooldownClocks(chargeRecharges, definition.chargeRechargeTicks),
+        ],
       };
     })
     .filter(Boolean);
@@ -774,7 +781,7 @@ function abilityDisabledReason(ctx, affordance) {
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   }
   if (affordance.depletedCount === affordance.carrierIds.length) {
-    return affordance.definition.chargeRechargeTicks != null ? "Recharging" : "Depleted";
+    return affordance.definition.title || "Depleted";
   }
   if (!affordance.affordable) return "Not enough resources";
   if (

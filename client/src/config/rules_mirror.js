@@ -208,7 +208,7 @@ export const ABILITIES = Object.freeze({
     label: "Smoke",
     icon: "SMK",
     hotkey: "D",
-    title: "Two charges; one charge regenerates every 15 seconds",
+    title: "Target a smoke grenade location",
     carriers: Object.freeze([KIND.SCOUT_CAR]),
     targetMode: "worldPoint",
     rangeTiles: SMOKE_ABILITY_RANGE_TILES,

@@ -707,6 +707,10 @@ impl Entity {
         });
     }
 
+    pub(crate) fn ability_charge_recharge_ticks(&self, ability: AbilityKind) -> Option<u16> {
+        self.ability_charge_recharge_ticks.get(&ability).copied()
+    }
+
     pub fn set_position(&mut self, x: f32, y: f32) {
         self.pos_x = x;
         self.pos_y = y;
