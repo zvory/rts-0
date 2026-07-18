@@ -124,10 +124,25 @@ export class App {
   } = {}) {
     /** @type {Net} connection opened on demand and retained across an active room + match. */
     this.net = net || new Net(wsUrl(), diagnostics);
-    // Install this capture listener before any app-owned keyboard listeners so
-    // the terminal transport overlay can actually block gameplay and menus.
-    this.onConnectionLostKeyDown = this.onConnectionLostKeyDown.bind(this);
-    window.addEventListener("keydown", this.onConnectionLostKeyDown, true);
+    dom.connectionLostClose?.addEventListener("click", () => {
+      dom.connectionLost.hidden = true;
+    });
+    dom.connectionLost?.addEventListener("dragend", (ev) => {
+      if (!ev.clientX && !ev.clientY) return;
+      const left = Math.max(0, Math.min(
+        window.innerWidth - dom.connectionLost.offsetWidth,
+        ev.clientX - dom.connectionLost.offsetWidth / 2,
+      ));
+      const top = Math.max(0, Math.min(
+        window.innerHeight - dom.connectionLost.offsetHeight,
+        ev.clientY - dom.connectionLost.offsetHeight / 2,
+      ));
+      Object.assign(dom.connectionLost.style, {
+        left: `${left}px`,
+        top: `${top}px`,
+        right: "auto",
+      });
+    });
     this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.stressTestLaunch = stressTestLaunch;
     this.stressTestRunner = stressTestLaunch
@@ -565,6 +580,7 @@ export class App {
   onOpen() {
     this.hasConnected = true;
     this.socketOpen = true;
+    if (dom.connectionLost) dom.connectionLost.hidden = true;
     this.stopHeartbeat();
     if (!this.net.offline) {
       this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
@@ -588,11 +604,8 @@ export class App {
       this.lobby?.show();
       return;
     }
-    const text = this.hasConnected
-      ? "Server connection lost. Refresh when the server is available."
-      : "Unable to connect to the server. Make sure it is running, then refresh.";
     this.labCatalog?.setConnected(false);
-    this.showConnectionLost(text);
+    this.showConnectionLost();
   }
 
   /** Clear the heartbeat interval if one is running. Idempotent. */
@@ -1132,37 +1145,11 @@ export class App {
     this.labCatalog?.setStatus(text, { error: true });
   }
 
-  /**
-   * Block the application with a persistent transport warning. Unlike a toast,
-   * this remains visible for the rest of this application session. A new
-   * socket cannot resume the current server-side player or spectator seat, so
-   * recovery requires reloading the page.
-   * @param {string} text
-   */
-  showConnectionLost(text = "The game can no longer reach the server.") {
-    if (dom.connectionLostDetail) dom.connectionLostDetail.textContent = text;
+  /** Show a persistent, non-blocking transport notice. */
+  showConnectionLost() {
     if (dom.connectionLost) dom.connectionLost.hidden = false;
-    this.match?.input?.exitPointerLock?.();
-    dom.connectionLostReload?.focus();
-    if (this.lobby) this.lobby.setStatus(text, true);
-    this.labCatalog?.setStatus(text, { error: true });
-  }
-
-  /** Keep keyboard input inside the terminal connection-loss dialog. */
-  onConnectionLostKeyDown(ev) {
-    if (!dom.connectionLost || dom.connectionLost.hidden) return;
-    ev.stopImmediatePropagation();
-    if (
-      (ev.key === "Enter" || ev.key === " ") &&
-      ev.target === dom.connectionLostReload
-    ) {
-      ev.preventDefault();
-      dom.connectionLostReload.click();
-      return;
-    }
-    if (ev.key !== "Tab") return;
-    ev.preventDefault();
-    dom.connectionLostReload?.focus();
+    if (this.lobby) this.lobby.setStatus("Server connection lost", true);
+    this.labCatalog?.setStatus("Server connection lost", { error: true });
   }
 
   /** Fetch and display the build version in the shared top-left badge. */

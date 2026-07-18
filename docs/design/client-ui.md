@@ -1594,9 +1594,9 @@ Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unj
 closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail. If an
 established ordinary-lobby socket closes, the app silently resets the joined room UI to the main
 lobby browser; dedicated launch URLs and active matches retain their existing disconnect handling.
-An unexpected disconnect in a dedicated launch or active match raises a global, input-blocking
-connection-loss overlay instead of relying on the transient toast. The overlay remains visible
-for the rest of the application session and offers a reload action; intentional idle lobby
+An unexpected disconnect in a dedicated launch or active match raises a small, draggable,
+non-blocking connection-loss notice instead of relying on the transient toast. The notice can be
+dismissed and disappears automatically when a socket reconnects; intentional idle lobby
 disconnects do not show it. A fresh socket does not resume an existing match seat.
 The create modal derives its default from the player name and the latest browser rows, adding the
 first free numeric suffix when that suggestion is already listed. The create endpoint repeats that
