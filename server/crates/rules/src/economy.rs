@@ -3,7 +3,7 @@
 //! `rules::defs` owns kind-specific data; this module answers allowed/cost/supply questions.
 
 use crate::defs;
-use crate::faction::catalog_for;
+use crate::faction::{catalog_for, UpgradeKind};
 use crate::EntityKind;
 
 /// The faction plan intentionally keeps resource costs shaped as fixed Steel/Oil fields.
@@ -121,11 +121,11 @@ pub fn can_act_as_production_anchor_for_faction(
 /// Whether a building may research this upgrade for this faction.
 pub fn can_research_for_faction(
     faction_id: &str,
-    upgrade_id: &str,
+    upgrade: UpgradeKind,
     building_kind: EntityKind,
 ) -> bool {
     catalog_for(faction_id)
-        .is_some_and(|catalog| catalog.allows_research(upgrade_id, building_kind))
+        .is_some_and(|catalog| catalog.allows_research(upgrade, building_kind))
 }
 
 /// Resource node starting amount for a node kind.
@@ -431,7 +431,7 @@ mod tests {
         ));
         assert!(!can_research_for_faction(
             faction_id,
-            crate::faction::TANK_UNLOCK_UPGRADE,
+            UpgradeKind::TankUnlock,
             EntityKind::ResearchComplex
         ));
     }

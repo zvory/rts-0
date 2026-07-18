@@ -14,23 +14,9 @@ pub struct UpgradeDefinition {
 /// All upgrade ids the simulation can decode from protocol or replay data.
 pub const ALL: &[UpgradeKind] = UpgradeKind::ALL;
 
-const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
-    UpgradeKind::Methamphetamines,
-    UpgradeKind::Panzerfausts,
-    UpgradeKind::Entrenchment,
-    UpgradeKind::AntiTankGunUnlock,
-    UpgradeKind::BallisticTables,
-    UpgradeKind::TankUnlock,
-    UpgradeKind::MortarAutocast,
-    UpgradeKind::SmokePlus,
-    UpgradeKind::ArtilleryUnlock,
-];
-
 pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
-    CURRENT_RESEARCHABLE
-        .iter()
-        .copied()
-        .filter(|upgrade| definition(*upgrade).researched_at == building)
+    crate::rules::faction::CURRENT_CATALOG
+        .researchable_upgrade_kinds(building)
         .collect()
 }
 

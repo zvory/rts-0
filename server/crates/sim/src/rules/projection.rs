@@ -400,7 +400,7 @@ pub fn project_entity(
             .filter(|(kind, _)| {
                 catalog.is_some_and(|catalog| {
                     catalog
-                        .ability(kind.to_protocol_str())
+                        .ability(**kind)
                         .is_some_and(|entry| {
                             entry.command_card && entry.carriers.contains(&entity.kind)
                         })

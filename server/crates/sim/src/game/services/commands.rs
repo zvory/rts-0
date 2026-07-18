@@ -492,7 +492,7 @@ pub(in crate::game) fn apply_commands(
                 && b.kind == definition.researched_at
                 && rules::economy::can_research_for_faction(
                     &faction_id,
-                    upgrade.to_protocol_str(),
+                    upgrade,
                     building_kind,
                 ));
                 if !ok {

@@ -755,31 +755,39 @@ impl FactionCatalog {
             .collect::<Vec<_>>()
     }
 
-    pub fn researchable_upgrades(self, building_kind: EntityKind) -> Vec<&'static str> {
+    pub fn researchable_upgrade_kinds(
+        self,
+        building_kind: EntityKind,
+    ) -> impl Iterator<Item = UpgradeKind> {
         self.upgrades
             .iter()
-            .filter(|entry| entry.researched_at == building_kind)
-            .map(|entry| entry.kind.stable_id())
+            .filter(move |entry| entry.researched_at == building_kind)
+            .map(|entry| entry.kind)
+    }
+
+    pub fn researchable_upgrades(self, building_kind: EntityKind) -> Vec<&'static str> {
+        self.researchable_upgrade_kinds(building_kind)
+            .map(UpgradeKind::stable_id)
             .collect()
     }
 
-    pub fn allows_research(self, upgrade_id: &str, building_kind: EntityKind) -> bool {
+    pub fn allows_research(self, upgrade: UpgradeKind, building_kind: EntityKind) -> bool {
         self.upgrades.iter().any(|entry| {
-            entry.kind.stable_id() == upgrade_id && entry.researched_at == building_kind
+            entry.kind == upgrade && entry.researched_at == building_kind
         })
     }
 
-    pub fn allows_ability(self, ability_id: &str, carrier: EntityKind) -> bool {
+    pub fn allows_ability(self, ability: AbilityKind, carrier: EntityKind) -> bool {
         self.abilities
             .iter()
-            .any(|entry| entry.kind.stable_id() == ability_id && entry.carriers.contains(&carrier))
+            .any(|entry| entry.kind == ability && entry.carriers.contains(&carrier))
     }
 
-    pub fn ability(self, ability_id: &str) -> Option<AbilityCatalogEntry> {
+    pub fn ability(self, ability: AbilityKind) -> Option<AbilityCatalogEntry> {
         self.abilities
             .iter()
             .copied()
-            .find(|entry| entry.kind.stable_id() == ability_id)
+            .find(|entry| entry.kind == ability)
     }
 
     pub fn abilities_for_carrier(
@@ -893,15 +901,15 @@ mod tests {
                 EntityKind::Artillery
             ]
         );
-        assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(ANTI_TANK_GUN_UNLOCK_UPGRADE, research_complex));
-        assert!(catalog.allows_research(BALLISTIC_TABLES_UPGRADE, research_complex));
-        assert!(catalog.allows_research(ARTILLERY_UNLOCK_UPGRADE, research_complex));
-        assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, research_complex));
-        assert!(catalog.allows_research(MORTAR_AUTOCAST_UPGRADE, research_complex));
-        assert!(catalog.allows_research(SMOKE_PLUS_UPGRADE, research_complex));
-        assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
+        assert!(catalog.allows_research(UpgradeKind::AntiTankGunUnlock, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::BallisticTables, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::TankUnlock, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::MortarAutocast, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::SmokePlus, research_complex));
+        assert!(!catalog.allows_research(UpgradeKind::TankUnlock, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(catalog.allows_building(EntityKind::PumpJack));
@@ -911,13 +919,13 @@ mod tests {
         );
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));
-        assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
-        assert!(catalog.allows_ability(POINT_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
-        assert!(catalog.allows_ability(BLANKET_FIRE_ABILITY, ARTILLERY_ABILITY_CARRIERS[0]));
-        assert!(catalog.allows_ability(SCOUT_PLANE_ABILITY, EntityKind::CommandCar));
-        assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));
-        assert!(!catalog.allows_ability(DISMISS_SCOUT_PLANE_ABILITY, EntityKind::ScoutPlane));
-        assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));
+        assert!(catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));
+        assert!(catalog.allows_ability(AbilityKind::PointFire, ARTILLERY_ABILITY_CARRIERS[0]));
+        assert!(catalog.allows_ability(AbilityKind::BlanketFire, ARTILLERY_ABILITY_CARRIERS[0]));
+        assert!(catalog.allows_ability(AbilityKind::ScoutPlane, EntityKind::CommandCar));
+        assert!(!catalog.allows_ability(AbilityKind::Charge, EntityKind::Rifleman));
+        assert!(!catalog.allows_ability(AbilityKind::DismissScoutPlane, EntityKind::ScoutPlane));
+        assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::Worker));
     }
 
     #[test]
@@ -934,17 +942,17 @@ mod tests {
         assert_eq!(catalog.loadout.starting_entities, EKAT_START_ENTITIES);
         assert!(catalog.can_gather(EntityKind::Golem));
         assert!(catalog.can_act_as_production_anchor(EntityKind::Zamok));
-        assert!(catalog.allows_ability(EKAT_TELEPORT_ABILITY, EntityKind::Ekat));
-        assert!(catalog.allows_ability(EKAT_LINE_SHOT_ABILITY, EntityKind::Ekat));
-        assert!(catalog.allows_ability(EKAT_MAGIC_ANCHOR_ABILITY, EntityKind::Ekat));
-        assert!(catalog.allows_ability(EKAT_CONSUME_GOLEM_ABILITY, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatTeleport, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatLineShot, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::Ekat));
+        assert!(catalog.allows_ability(AbilityKind::EkatConsumeGolem, EntityKind::Ekat));
         assert!(!catalog.allows_unit(EntityKind::Rifleman));
         assert!(!catalog.allows_building(EntityKind::CityCentre));
     }
 
     #[test]
     fn default_ability_registry_preserves_current_metadata() {
-        let smoke = CURRENT_CATALOG.ability(SMOKE_ABILITY).unwrap();
+        let smoke = CURRENT_CATALOG.ability(AbilityKind::Smoke).unwrap();
         assert_eq!(smoke.label, "Smoke");
         assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
@@ -964,7 +972,7 @@ mod tests {
         );
         assert!(smoke.command_card);
 
-        let point_fire = CURRENT_CATALOG.ability(POINT_FIRE_ABILITY).unwrap();
+        let point_fire = CURRENT_CATALOG.ability(AbilityKind::PointFire).unwrap();
         assert_eq!(point_fire.carriers, ARTILLERY_ABILITY_CARRIERS);
         assert_eq!(
             point_fire.min_range_tiles,
@@ -983,7 +991,7 @@ mod tests {
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
 
-        let blanket_fire = CURRENT_CATALOG.ability(BLANKET_FIRE_ABILITY).unwrap();
+        let blanket_fire = CURRENT_CATALOG.ability(AbilityKind::BlanketFire).unwrap();
         assert_eq!(blanket_fire.carriers, ARTILLERY_ABILITY_CARRIERS);
         assert_eq!(blanket_fire.target_mode, AbilityTargetMode::WorldPoint);
         assert_eq!(
@@ -1006,7 +1014,7 @@ mod tests {
         assert_eq!(blanket_fire.protocol_code, 10);
         assert_eq!(blanket_fire.order_stage_code, 17);
 
-        let breakthrough = CURRENT_CATALOG.ability(BREAKTHROUGH_ABILITY).unwrap();
+        let breakthrough = CURRENT_CATALOG.ability(AbilityKind::Breakthrough).unwrap();
         assert_eq!(breakthrough.target_mode, AbilityTargetMode::SelfTarget);
         assert_eq!(
             breakthrough.cooldown_ticks,
@@ -1025,28 +1033,28 @@ mod tests {
         assert!(charge.carriers.is_empty());
         assert_eq!(charge.cooldown_ticks, 0);
 
-        let teleport = EKAT_CATALOG.ability(EKAT_TELEPORT_ABILITY).unwrap();
+        let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
         assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES)
         );
 
-        let line_shot = EKAT_CATALOG.ability(EKAT_LINE_SHOT_ABILITY).unwrap();
+        let line_shot = EKAT_CATALOG.ability(AbilityKind::EkatLineShot).unwrap();
         assert_eq!(line_shot.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             line_shot.range_tiles,
             Some(balance::EKAT_LINE_SHOT_RANGE_TILES)
         );
 
-        let anchor = EKAT_CATALOG.ability(EKAT_MAGIC_ANCHOR_ABILITY).unwrap();
+        let anchor = EKAT_CATALOG.ability(AbilityKind::EkatMagicAnchor).unwrap();
         assert_eq!(anchor.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             anchor.range_tiles,
             Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
         );
 
-        let consume = EKAT_CATALOG.ability(EKAT_CONSUME_GOLEM_ABILITY).unwrap();
+        let consume = EKAT_CATALOG.ability(AbilityKind::EkatConsumeGolem).unwrap();
         assert_eq!(consume.carriers, &[EntityKind::Ekat]);
         assert_eq!(consume.target_mode, AbilityTargetMode::SelfTarget);
         assert_eq!(
@@ -1067,9 +1075,9 @@ mod tests {
         assert!(catalog.allows_unit(EntityKind::ScoutCar));
         assert!(catalog.allows_building(EntityKind::Depot));
         assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
-        assert!(!catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
-        assert!(!catalog.allows_research(ENTRENCHMENT_UPGRADE, EntityKind::TrainingCentre));
-        assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
+        assert!(!catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
+        assert!(!catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
+        assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));
     }
 
     #[test]
