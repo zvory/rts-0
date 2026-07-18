@@ -244,6 +244,40 @@ fn firing_immediately_acquires_the_next_target_for_reload_tracking() {
 }
 
 #[test]
+fn explicit_attack_kill_keeps_fallback_target_through_reload() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let commanded = entities
+        .spawn_unit(2, EntityKind::Worker, 130.0, 100.0)
+        .expect("commanded target should spawn");
+    let fallback = entities
+        .spawn_unit(2, EntityKind::Worker, 100.0, 140.0)
+        .expect("fallback target should spawn");
+    if let Some(attacker) = entities.get_mut(attacker) {
+        attacker.set_order(Order::attack(commanded));
+    }
+    if let Some(target) = entities.get_mut(commanded) {
+        target.apply_damage(target.hp.saturating_sub(1), None);
+    }
+
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(fallback),
+        "killing the commanded target should prepare an automatic fallback"
+    );
+
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(fallback),
+        "the dead explicit order must not discard its prepared fallback during reload"
+    );
+}
+
+#[test]
 fn ready_weapon_fires_at_valid_reload_target_before_post_fire_retargeting() {
     let mut entities = EntityStore::new();
     let tank = entities

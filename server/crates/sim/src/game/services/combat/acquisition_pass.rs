@@ -183,17 +183,21 @@ fn retained_target(
     }
     let attacker = entities.get(self_id)?;
     if mode == CombatMode::Ordered {
-        let target = attacker.order().attack_target()?;
-        return crate::game::services::world_query::unit_explicit_attack_target_valid(
-            entities,
-            teams,
-            fog,
-            Some(smokes),
-            owner,
-            self_id,
-            target,
-        )
-        .then_some(target);
+        if let Some(target) = attacker.order().attack_target() {
+            if crate::game::services::world_query::unit_explicit_attack_target_valid(
+                entities,
+                teams,
+                fog,
+                Some(smokes),
+                owner,
+                self_id,
+                target,
+            ) {
+                return Some(target);
+            }
+        }
+        // Once the commanded target is invalid, resolve_target() falls back to normal
+        // auto-acquisition. Preserve that fallback through its cooldown cycle too.
     }
     if mode == CombatMode::Passive {
         return None;
