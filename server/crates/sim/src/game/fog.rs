@@ -102,9 +102,7 @@ impl Fog {
         mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
-        // Legacy checkpoints have no explored grids, and a supplied grid can still omit tiles
-        // that are currently visible. Normalize both cases here so restored state always keeps
-        // the fundamental visible-implies-explored invariant.
+        // Normalize legacy/malformed state to keep visible tiles explored.
         for (&player, visible_grid) in &grids {
             let explored_grid = explored_grids
                 .entry(player)
