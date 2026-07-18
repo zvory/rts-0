@@ -324,8 +324,7 @@ impl AttackOrder {
         AttackOrder {
             intent: TargetIntent { target },
             execution: AttackExecution {
-                phase: AttackPhase::Chasing,
-                unreachable_checks: 0,
+                phase: AttackPhase::Waiting,
             },
         }
     }
@@ -334,14 +333,11 @@ impl AttackOrder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttackExecution {
     pub phase: AttackPhase,
-    /// Consecutive failed chase-path checks while the target could not be fired on.
-    /// Bounded queue promotion uses this to skip stale/unreachable explicit attacks.
-    pub unreachable_checks: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AttackPhase {
-    Chasing,
+    Waiting,
     Firing,
 }
 

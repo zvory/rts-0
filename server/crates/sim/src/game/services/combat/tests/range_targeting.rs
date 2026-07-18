@@ -1,33 +1,33 @@
 use super::*;
 
 #[test]
-fn aggressive_auto_acquisition_prefers_fireable_targets_before_chase_targets() {
+fn automatic_acquisition_considers_only_targets_in_weapon_range() {
     struct Case {
         attacker: EntityKind,
         fireable_target: EntityKind,
-        chase_target: EntityKind,
+        out_of_range_target: EntityKind,
     }
 
     for case in [
         Case {
             attacker: EntityKind::Rifleman,
             fireable_target: EntityKind::Tank,
-            chase_target: EntityKind::Worker,
+            out_of_range_target: EntityKind::Worker,
         },
         Case {
             attacker: EntityKind::Tank,
             fireable_target: EntityKind::PumpJack,
-            chase_target: EntityKind::Worker,
+            out_of_range_target: EntityKind::Worker,
         },
         Case {
             attacker: EntityKind::ScoutCar,
             fireable_target: EntityKind::Tank,
-            chase_target: EntityKind::Worker,
+            out_of_range_target: EntityKind::Worker,
         },
         Case {
             attacker: EntityKind::AntiTankGun,
             fireable_target: EntityKind::Rifleman,
-            chase_target: EntityKind::Tank,
+            out_of_range_target: EntityKind::Tank,
         },
     ] {
         let map = open_map(32);
@@ -41,38 +41,37 @@ fn aggressive_auto_acquisition_prefers_fireable_targets_before_chase_targets() {
         let profile = effective_attack_profile(attacker);
         let range_px =
             profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + RANGE_SLACK;
-        let sight_px = attacker.sight_tiles() as f32 * config::TILE_SIZE as f32;
         let fireable_x = 100.0 + range_px * 0.5;
-        let chase_x = 100.0 + (range_px + config::TILE_SIZE as f32).min(sight_px - 1.0);
-        assert!(
-            chase_x - 100.0 > range_px,
-            "{:?} fixture needs a visible target outside weapon range",
-            case.attacker
-        );
+        let out_of_range_x = 100.0 + range_px + config::TILE_SIZE as f32;
         let fireable_target = spawn_target(&mut entities, case.fireable_target, fireable_x, 100.0);
-        let chase_target = spawn_target(&mut entities, case.chase_target, chase_x, 100.0);
+        let out_of_range_target = spawn_target(
+            &mut entities,
+            case.out_of_range_target,
+            out_of_range_x,
+            100.0,
+        );
 
         let target = resolve_test_target(
             &map,
             &entities,
             &default_team_relations(),
             attacker_id,
-            sight_px,
+            range_px,
         );
 
         assert_eq!(
             target,
             Some(fireable_target),
-            "{:?} should shoot the target already in range before chasing {:?}",
+            "{:?} should select the target already in range and ignore {:?} beyond it",
             case.attacker,
-            case.chase_target
+            case.out_of_range_target
         );
-        assert_ne!(target, Some(chase_target));
+        assert_ne!(target, Some(out_of_range_target));
     }
 }
 
 #[test]
-fn chasing_units_refresh_paths_that_point_at_the_wrong_goal() {
+fn out_of_range_direct_attacks_do_not_create_or_refresh_paths() {
     for kind in [
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
@@ -101,9 +100,6 @@ fn chasing_units_refresh_paths_that_point_at_the_wrong_goal() {
         if let Some(attacker) = entities.get_mut(attacker_id) {
             attacker.set_order(Order::attack(target_id));
             attacker.set_target_id(Some(target_id));
-            attacker.set_path(vec![(500.0, 100.0)]);
-            attacker.set_path_goal(Some((500.0, 100.0)));
-            attacker.set_last_repath_tick(0);
             if kind == EntityKind::AntiTankGun {
                 attacker.set_weapon_setup(WeaponSetup::Packed);
             }
@@ -118,18 +114,21 @@ fn chasing_units_refresh_paths_that_point_at_the_wrong_goal() {
         let attacker = entities
             .get(attacker_id)
             .expect("attacker should still exist");
+        assert!(matches!(
+            attacker.order(),
+            Order::Attack(crate::game::entity::AttackOrder {
+                execution: crate::game::entity::AttackExecution {
+                    phase: crate::game::entity::AttackPhase::Waiting,
+                },
+                ..
+            })
+        ));
         assert_eq!(attacker.target_id(), Some(target_id), "{kind:?}");
-        assert_ne!(
-            attacker.path_goal(),
-            Some((500.0, 100.0)),
-            "{kind:?} should discard the stale chase path goal"
-        );
+        assert!(attacker.path_is_empty(), "{kind:?} should stay put");
         assert_eq!(
             attacker.path_goal(),
-            entities
-                .get(target_id)
-                .map(|target| (target.pos_x, target.pos_y)),
-            "{kind:?} should chase the current target position"
+            None,
+            "{kind:?} should have no pursuit goal"
         );
     }
 }

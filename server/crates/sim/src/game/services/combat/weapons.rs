@@ -194,11 +194,6 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
     kind == EntityKind::MachineGunner || supports_manual_emplacement(kind)
 }
 
-pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
-    e.kind == EntityKind::MachineGunner
-        || (supports_manual_emplacement(e.kind) && !matches!(e.weapon_setup(), WeaponSetup::Packed))
-}
-
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
         || (e.kind == EntityKind::Rifleman && methamphetamines_researched)
@@ -226,10 +221,6 @@ fn support_weapon_attack_move_waiting_without_target(e: &Entity) -> bool {
             e.weapon_setup(),
             WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
         )
-}
-
-pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
-    !supports_manual_emplacement(e.kind) || matches!(e.weapon_setup(), WeaponSetup::Packed)
 }
 
 #[derive(Clone, Copy, Debug)]

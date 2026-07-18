@@ -235,7 +235,7 @@ fn out_of_range_vehicle_does_not_suppress_normal_rifle_fire() {
 }
 
 #[test]
-fn out_of_range_launcher_does_not_block_rifle_chase_and_explicit_attack_can_close() {
+fn out_of_range_launcher_and_explicit_attack_never_create_pursuit_movement() {
     let mut game = empty_flat_game(&players());
     let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
     let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 18, 8);
@@ -260,9 +260,9 @@ fn out_of_range_launcher_does_not_block_rifle_chase_and_explicit_attack_can_clos
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("rifleman");
     assert_eq!(launches, 0);
-    assert_ne!(
+    assert_eq!(
         idle_pos, start,
-        "ordinary Rifleman combat should remain active"
+        "idle Riflemen should not pursue visible enemies"
     );
 
     game.enqueue(
@@ -275,9 +275,11 @@ fn out_of_range_launcher_does_not_block_rifle_chase_and_explicit_attack_can_clos
     );
     for _ in 0..300 {
         launches += launch_count(&game.tick(), 1, rifleman);
-        if launches > 0 {
-            break;
-        }
     }
-    assert_eq!(launches, 1);
+    let attacker = game.state.entities.get(rifleman).expect("rifleman");
+    assert_eq!((attacker.pos_x, attacker.pos_y), start);
+    assert!(attacker.path_is_empty());
+    assert_eq!(attacker.path_goal(), None);
+    assert_eq!(launches, 0);
+    assert!(game.state.entities.get(tank).is_some());
 }

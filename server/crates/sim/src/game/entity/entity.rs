@@ -365,38 +365,8 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Attack(order) = &mut m.order {
                 order.execution.phase = phase;
-                if phase == AttackPhase::Firing {
-                    order.execution.unreachable_checks = 0;
-                }
             }
         }
-    }
-
-    pub fn reset_attack_unreachable_checks(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            if let Order::Attack(order) = &mut m.order {
-                order.execution.unreachable_checks = 0;
-            }
-        }
-    }
-
-    pub fn increment_attack_unreachable_checks(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            if let Order::Attack(order) = &mut m.order {
-                order.execution.unreachable_checks =
-                    order.execution.unreachable_checks.saturating_add(1);
-            }
-        }
-    }
-
-    pub fn attack_unreachable_checks(&self) -> u16 {
-        self.movement
-            .as_ref()
-            .and_then(|m| match &m.order {
-                Order::Attack(order) => Some(order.execution.unreachable_checks),
-                _ => None,
-            })
-            .unwrap_or(0)
     }
 
     pub fn mark_gather_phase(&mut self, phase: GatherPhase) {
@@ -1253,7 +1223,7 @@ impl Entity {
         self.reset_attack_move_no_target_ticks();
     }
 
-    /// Clear active/queued movement and enter a no-chase hold-position stance.
+    /// Clear active/queued movement and enter a hold-position stance.
     pub fn hold_position(&mut self) {
         self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {

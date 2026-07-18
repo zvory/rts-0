@@ -1,6 +1,6 @@
 //! Combat service.
 //!
-//! This module owns target acquisition, chase orders, weapon facing/setup, damage, and combat
+//! This module owns in-range target acquisition, weapon facing/setup, damage, and combat
 //! events for a tick. It depends on read-only rules and derived spatial/LOS helpers.
 
 use std::collections::HashMap;
@@ -26,7 +26,6 @@ use rand::Rng;
 
 mod acquisition;
 mod activation;
-mod chase;
 mod coax;
 mod damage;
 mod events;
@@ -46,17 +45,14 @@ use acquisition::{
     resolve_target as resolve_target_with_obstruction, CombatMode, DirectFireLegality,
     DirectFireVisibility,
 };
-use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
 use shot_blocker_index::ShotBlockerIndex;
 use weapons::{
-    anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
-    deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
-    mirror_weapon_to_body, mortar_target_inside_field_of_fire, moving_fire_miss_chance,
-    moving_fire_move_order_holds_path, relax_vehicle_weapon_toward_body,
+    begin_idle_deployed_weapon_setup, can_fire_while_moving, deployed_weapon_ready_to_fire,
+    effective_attack_profile, mirror_weapon_to_body, mortar_target_inside_field_of_fire,
+    moving_fire_miss_chance, moving_fire_move_order_holds_path, relax_vehicle_weapon_toward_body,
     rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
-    update_attack_move_no_target_teardown, uses_stationary_weapon_aggro,
-    uses_vehicle_weapon_policy,
+    update_attack_move_no_target_teardown, uses_vehicle_weapon_policy,
 };
 
 #[cfg(test)]
@@ -112,8 +108,6 @@ pub(super) const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 pub(super) const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
 pub(super) const ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const ANTI_TANK_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
-pub(super) const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
-pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 const FIRING_REVEAL_RESPONSE_DELAY_TICKS: u32 = config::TICK_HZ;
 
 /// Acquire combat targets, apply damage, and emit attack events for one tick.
@@ -166,7 +160,6 @@ pub(in crate::game) fn combat_system(
             methamphetamines_researched,
             occ,
             spatial,
-            coordinator,
             fog,
             smokes,
             id,
@@ -196,8 +189,8 @@ pub(in crate::game) fn combat_system(
             if e.hp == 0 || !e.can_attack() {
                 continue;
             }
-            // Workers executing a Gather order ignore nearby enemies: chasing aggro would
-            // drag them off the resource node and stall the economy. An explicit Attack
+            // Workers executing a Gather order ignore nearby enemies so defensive fire cannot
+            // distract them from the resource node. An explicit Attack
             // order overrides Gather upstream, so this only suppresses auto-acquisition.
             if matches!(e.order(), Order::Gather(_)) {
                 continue;
@@ -225,27 +218,11 @@ pub(in crate::game) fn combat_system(
                     e.radius() + RANGE_SLACK
                 };
             let min_range_px = profile.min_range_tiles * config::TILE_SIZE as f32;
-            // Aggro radius: mobile units detect and chase enemies out to their sight radius so
-            // attack-move / auto-defend actually close the gap. Idle deployed weapons are the
-            // exception: they hold position and only auto-acquire enemies already in weapon
-            // range. Buildings never move, so they only ever engage within their firing range.
-            let aggro_px = if e.is_unit() {
-                if matches!(e.order(), Order::HoldPosition)
-                    || (uses_stationary_weapon_aggro(e) && matches!(e.order(), Order::Idle))
-                {
-                    range_px
-                } else {
-                    (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
-                }
-            } else {
-                range_px
-            };
             let mode = combat_mode_with_moving_fire(e, can_move_fire);
-            let acquire_px = if mode == CombatMode::Opportunistic {
-                range_px
-            } else {
-                aggro_px
-            };
+            // Combat acquisition is weapon-range-only. Movement comes exclusively from a
+            // player-issued movement order; seeing or explicitly targeting an enemy never
+            // creates an enemy-directed path.
+            let acquire_px = range_px;
             (
                 e.owner,
                 e.pos_x,
@@ -321,6 +298,7 @@ pub(in crate::game) fn combat_system(
                         | Order::HoldPosition
                 ) {
                     e.set_target_id(None);
+                    e.mark_attack_phase(AttackPhase::Waiting);
                     begin_idle_deployed_weapon_setup(e);
                 }
                 if uses_vehicle_weapon_policy(e) {
@@ -346,7 +324,7 @@ pub(in crate::game) fn combat_system(
                         if let Some(e) = entities.get_mut(id) {
                             e.set_target_id(None);
                         }
-                        coordinator.request_chase_path(entities, id, goal);
+                        coordinator.request_attack_move_path(entities, id, goal);
                     }
                 }
             }
@@ -529,39 +507,9 @@ pub(in crate::game) fn combat_system(
                     e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                 }
             }
-        } else if is_unit && mode != CombatMode::Opportunistic && !holds_commanded_movement_path {
-            // Out of weapon range but within aggro: chase. Tanks route to a standoff point,
-            // and statically blocked targets route to a passable perimeter tile.
-            let chase_goal =
-                chase_goal_for_target(map, entities, id, (px, py), (tx, ty), range_px, dist);
-            let chase_goal = coordinator.attack_chase_goal(entities, id, tid, chase_goal, range_px);
-            let want_repath = entities
-                .get(id)
-                .map(|e| chase_path_needs_refresh(e, chase_goal))
-                .unwrap_or(false);
-            let mut can_chase = true;
+        } else if mode == CombatMode::Ordered {
             if let Some(e) = entities.get_mut(id) {
-                if uses_vehicle_weapon_policy(e) {
-                    rotate_vehicle_weapon_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::AntiTankGun {
-                    rotate_anti_tank_gun_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::MortarTeam {
-                    rotate_mortar_for_fire(e, target_angle);
-                } else if target_angle.is_finite() {
-                    mirror_weapon_to_body(e, e.facing());
-                }
-                e.set_target_id(Some(tid));
-                e.mark_attack_phase(AttackPhase::Chasing);
-                can_chase = anti_tank_gun_can_chase(e);
-            }
-            if !can_chase {
-                continue;
-            }
-            if !deployed_weapon_ready_to_move(entities, id) {
-                continue;
-            }
-            if want_repath {
-                coordinator.request_chase_path(entities, id, chase_goal);
+                e.mark_attack_phase(AttackPhase::Waiting);
             }
         }
     }

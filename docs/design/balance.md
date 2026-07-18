@@ -198,8 +198,9 @@ Core unit roles:
   Rifleman produced after research completes one disposable 5-tile, 50%-armor-penetrating shot;
   Riflemen already on the field when research completes remain unchanged. Automatic use is
   limited to visible Scout Cars, Tanks, and Command Cars already in range; Mortar Teams, Artillery,
-  infantry, buildings, and obstacles are not launcher targets. Only an explicit Attack order may
-  chase a valid vehicle for the shot. There is no salvo coordination or overkill suppression.
+  infantry, buildings, and obstacles are not launcher targets. Explicit Attack orders remain
+  stationary, so the vehicle must already be within launcher range. There is no salvo coordination
+  or overkill suppression.
 - **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
@@ -256,14 +257,13 @@ Plain `Move` tanks, scout cars, and upgraded Riflemen only fire at enemies alrea
 weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
 following the player-issued path: auto-acquisition can aim and fire only at targets that are
 currently inside weapon range and pass hostile, visibility, smoke, line-of-sight, and blocker
-checks, but it cannot replace the commanded destination with a chase or standoff path. Non-moving-fire
-`AttackMove` units still chase when no current target is fireable, but while their path is active
-they prefer an in-range legal fallback over a softer out-of-range target. Direct `Attack` orders and
-post-arrival aggressive behavior can still pursue, with vehicle standoff goals inside firing range
-instead of the target center. Tank auto-targeting first checks in-range Anti-Tank Guns, Tanks, Tank
+checks, but it cannot replace the commanded destination with an enemy-directed path. Non-moving-fire
+`AttackMove` units pause for fireable in-range targets and then resume the original destination.
+Direct `Attack` orders and post-arrival behavior remain stationary. Tank auto-targeting first checks
+in-range Anti-Tank Guns, Tanks, Tank
 Traps, and Mortar Teams, in that order, before generic acquisition; this priority can replace a
-retained lower-priority moving-fire target but does not chase out-of-range priority targets or
-override explicit player attack orders. Forest-specific rules are future work.
+retained lower-priority moving-fire target but never considers out-of-range priority targets or
+overrides explicit player attack orders. Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
@@ -396,8 +396,8 @@ folded into default targeting.
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
   existing empty trench while stopped in its footprint. A trench can actively hold only one
   infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
-  Active occupation grants +1 tile weapon range, suppresses idle aggressive chase like Hold
-  Position, reduces incoming direct damage by 50% after normal weapon/armor/facing calculations,
+  Active occupation grants +1 tile weapon range, reduces incoming direct damage by 50% after
+  normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Entrenchment does not add a direct-shot
   miss chance; Tank cannon and Anti-Tank Gun direct shots independently give every infantry victim

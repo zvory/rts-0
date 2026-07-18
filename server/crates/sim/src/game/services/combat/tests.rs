@@ -3235,7 +3235,7 @@ fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
 }
 
 #[test]
-fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
+fn friendly_building_between_attacker_and_target_leaves_direct_attacker_stationary() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -3265,8 +3265,9 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    assert_eq!(attacker_entity.target_id(), Some(intended));
-    assert!(!attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.target_id(), None);
+    assert!(attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.path_goal(), None);
     assert_eq!(
         attacker_entity.attack_cd(),
         0,
@@ -3292,7 +3293,7 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
 }
 
 #[test]
-fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
+fn enemy_building_between_attacker_and_target_leaves_direct_attacker_stationary() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -3322,8 +3323,9 @@ fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    assert_eq!(attacker_entity.target_id(), Some(intended));
-    assert!(!attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.target_id(), None);
+    assert!(attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.path_goal(), None);
     assert_eq!(
         attacker_entity.attack_cd(),
         0,
@@ -3349,7 +3351,7 @@ fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
 }
 
 #[test]
-fn direct_attack_on_building_chases_passable_perimeter_goal() {
+fn direct_attack_on_out_of_range_building_does_not_create_a_path() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -3370,24 +3372,9 @@ fn direct_attack_on_building_chases_passable_perimeter_goal() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    let goal = attacker_entity
-        .path_goal()
-        .expect("direct attack should request a building chase path");
-    assert_ne!(
-        goal,
-        (300.0, 100.0),
-        "building chase should not path to the blocked building center"
-    );
-    let (goal_tx, goal_ty) = map.tile_of(goal.0, goal.1);
-    let occ = Occupancy::build(&map, &entities);
-    assert!(
-        !occ.building_blocked_at_tile(goal_tx as i32, goal_ty as i32),
-        "building chase goal should be outside static building footprints"
-    );
-    assert!(
-        !attacker_entity.path_is_empty(),
-        "building chase should request a reachable perimeter path"
-    );
+    assert_eq!(attacker_entity.target_id(), None);
+    assert_eq!(attacker_entity.path_goal(), None);
+    assert!(attacker_entity.path_is_empty());
 }
 
 #[test]
@@ -3419,7 +3406,8 @@ fn friendly_tank_between_attacker_and_target_prevents_firing() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    assert_eq!(attacker_entity.target_id(), Some(intended));
+    assert_eq!(attacker_entity.target_id(), None);
+    assert!(attacker_entity.path_is_empty());
     assert_eq!(
         attacker_entity.attack_cd(),
         0,
