@@ -58,12 +58,40 @@ function addAll(set, suites) {
   }
 }
 
+const configModulePolicies = new Map([
+  [
+    "client/src/config.js",
+    {
+      ciClass: "full",
+      suites: ["nextest-rules", "nextest-sim", "nextest-server", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"],
+    },
+  ],
+  [
+    "client/src/config/rules_mirror.js",
+    { ciClass: "full", suites: ["nextest-rules", "nextest-sim", "js-protocol-contracts"] },
+  ],
+  [
+    "client/src/config/factions.js",
+    {
+      ciClass: "full",
+      suites: ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"],
+    },
+  ],
+  [
+    "client/src/config/timing.js",
+    { ciClass: "full", suites: ["nextest-rules", "nextest-sim", "js-protocol-contracts"] },
+  ],
+  [
+    "client/src/config/player_palette_mirror.js",
+    { ciClass: "full", suites: ["nextest-server", "js-protocol-contracts"] },
+  ],
+  ["client/src/config/presentation.js", { ciClass: "client_only", suites: [] }],
+]);
+
 const ciClientFullFallbackPaths = new Set([
-  "client/src/config.js",
-  "client/src/config/factions.js",
-  "client/src/config/player_palette_mirror.js",
-  "client/src/config/rules_mirror.js",
-  "client/src/config/timing.js",
+  ...[...configModulePolicies]
+    .filter(([, policy]) => policy.ciClass === "full")
+    .map(([modulePath]) => modulePath),
   "client/src/lobby_view.js",
   "client/src/net.js",
   "client/src/protocol.js",
@@ -224,15 +252,6 @@ function isFactionCatalogSurface(pathname) {
   );
 }
 
-const configModuleSuites = new Map([
-  ["client/src/config.js", ["nextest-rules", "nextest-sim", "nextest-server", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
-  ["client/src/config/rules_mirror.js", ["nextest-rules", "nextest-sim", "js-protocol-contracts"]],
-  ["client/src/config/factions.js", ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
-  ["client/src/config/timing.js", ["nextest-rules", "nextest-sim", "js-protocol-contracts"]],
-  ["client/src/config/player_palette_mirror.js", ["nextest-server", "js-protocol-contracts"]],
-  ["client/src/config/presentation.js", []],
-]);
-
 function isFactionRuntimeSurface(pathname) {
   return (
     pathname === "server/src/lobby/faction_validation.rs" ||
@@ -358,7 +377,7 @@ export function selectSuites(files) {
       suites.add("client-architecture");
     }
 
-    addAll(suites, configModuleSuites.get(normalized) || []);
+    addAll(suites, configModulePolicies.get(normalized)?.suites || []);
 
     addFactionSuites(suites, normalized);
 
@@ -609,7 +628,15 @@ function verify() {
     }
   }
 
-  const classifiedConfigModules = new Set(configModuleSuites.keys());
+  for (const [modulePath, policy] of configModulePolicies) {
+    if (!["full", "client_only"].includes(policy.ciClass)) {
+      failures.push(`${modulePath} has invalid config CI classification ${policy.ciClass}`);
+    } else if (ciPolicy([modulePath]).ci_class !== policy.ciClass) {
+      failures.push(`${modulePath} does not apply its declared ${policy.ciClass} config CI classification`);
+    }
+  }
+
+  const classifiedConfigModules = new Set(configModulePolicies.keys());
   const productionConfigModules = readdirSync(path.join(repoRoot, "client/src/config"), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
     .map((entry) => `client/src/config/${entry.name}`);
