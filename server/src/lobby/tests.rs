@@ -1092,7 +1092,8 @@ async fn persisted_replay_permalink_reuses_the_active_match_room() {
         .get_or_create_persisted_replay_room(43, artifact.clone())
         .await;
 
-    assert_eq!(first, "__match_replay__:000000000000002a");
+    assert!(first.starts_with("__match_replay__:"));
+    assert_eq!(first.len(), "__match_replay__:".len() + 32);
     assert_eq!(repeated, first);
     assert_ne!(other, first);
     assert_eq!(lobby.rooms.lock().await.len(), 2);
@@ -1112,7 +1113,7 @@ async fn persisted_replay_permalink_reuses_the_active_match_room() {
     let recreated = lobby
         .get_or_create_persisted_replay_room(42, artifact)
         .await;
-    assert_eq!(recreated, first);
+    assert_ne!(recreated, first);
     assert_ne!(
         lobby
             .rooms

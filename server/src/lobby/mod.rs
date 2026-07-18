@@ -721,6 +721,7 @@ impl CreateLobbyError {
 #[derive(Clone)]
 pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
+    persisted_replay_rooms: Arc<Mutex<HashMap<i64, String>>>,
     disposal_tx: mpsc::UnboundedSender<RoomDisposalRequest>,
     next_room_identity: Arc<AtomicU64>,
     match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
@@ -731,10 +732,12 @@ pub struct Lobby {
 impl Lobby {
     pub fn new() -> Self {
         let rooms = Arc::new(Mutex::new(HashMap::new()));
+        let persisted_replay_rooms = Arc::new(Mutex::new(HashMap::new()));
         let (disposal_tx, disposal_rx) = mpsc::unbounded_channel();
-        spawn_room_disposal_task(rooms.clone(), disposal_rx);
+        spawn_room_disposal_task(rooms.clone(), persisted_replay_rooms.clone(), disposal_rx);
         Lobby {
             rooms,
+            persisted_replay_rooms,
             disposal_tx,
             next_room_identity: Arc::new(AtomicU64::new(1)),
             match_history_writer: None,
@@ -984,19 +987,30 @@ impl Lobby {
     }
 
     /// Return the shared replay room for one persisted match, creating it when no viewer has an
-    /// active room for that match. The match id is immutable, so repeated permalink launches on
-    /// one server process converge on the same room and late viewers join its current tick.
+    /// active room for that match. The match id stays in this private registry rather than the
+    /// client-visible room name, so joining a persisted replay still requires an authorized HTTP
+    /// launch. Repeated permalink launches on one server process converge on the same room and
+    /// late viewers join its current tick.
     pub async fn get_or_create_persisted_replay_room(
         &self,
         match_id: i64,
         artifact: ReplayArtifactV1,
     ) -> String {
-        let room = format!("{MATCH_REPLAY_ROOM_PREFIX}:{match_id:016x}");
+        let mut persisted_replay_rooms = self.persisted_replay_rooms.lock().await;
         let mut rooms = self.rooms.lock().await;
-        if rooms.contains_key(&room) {
-            return room;
+        if let Some(room) = persisted_replay_rooms.get(&match_id) {
+            if rooms.contains_key(room) {
+                return room.clone();
+            }
         }
+        let room = loop {
+            let candidate = format!("{MATCH_REPLAY_ROOM_PREFIX}:{:032x}", rand::random::<u128>());
+            if !rooms.contains_key(&candidate) {
+                break candidate;
+            }
+        };
         self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Replay { artifact });
+        persisted_replay_rooms.insert(match_id, room.clone());
         room
     }
 
@@ -1331,11 +1345,18 @@ fn lobby_join_sort_rank(state: LobbyJoinState) -> u8 {
 
 fn spawn_room_disposal_task(
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
+    persisted_replay_rooms: Arc<Mutex<HashMap<i64, String>>>,
     mut disposal_rx: mpsc::UnboundedReceiver<RoomDisposalRequest>,
 ) {
     tokio::spawn(async move {
         while let Some(request) = disposal_rx.recv().await {
             let removed = remove_room_if_matching(&rooms, &request.room, request.identity).await;
+            if removed {
+                persisted_replay_rooms
+                    .lock()
+                    .await
+                    .retain(|_, room| room != &request.room);
+            }
             if let Some(ack) = request.ack {
                 let _ = ack.send(removed);
             }

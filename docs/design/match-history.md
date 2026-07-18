@@ -90,9 +90,11 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   the persisted artifact only if the match is visible to the request scope, validates it against
   the running map metadata and the shared replay faction/loadout validator used by replay rooms,
   and runs embedded checkpoint restore and timeline validation before resolving a spectator-only
-  replay staging lobby and returning `{ "room": "..." }`. The room name is deterministic from
-  the immutable match id: repeated launches reuse the active shared room, while a launch after the
-  empty room was disposed creates a fresh playback room for the same stored replay. Once the first
+  replay staging lobby and returning `{ "room": "..." }`. A process-local private registry maps
+  the immutable match id to an opaque room name: repeated launches reuse the active shared room,
+  while a launch after the empty room was disposed creates a fresh playback room for the same
+  stored replay. Keeping the match id out of the room name prevents direct WebSocket joins from
+  bypassing the HTTP launch endpoint's history-visibility check. Once the first
   viewer joins, that room appears in `/api/lobbies` with `kind: "replay"` and safe room metadata
   only; the stored artifact JSON is never exposed through the lobby browser. The host starts
   playback with the normal WebSocket `start` message, without ready/team/map/AI setup checks. The
