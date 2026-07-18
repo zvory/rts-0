@@ -1418,11 +1418,11 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
-- Riflemen owned by a player with completed Panzerfausts research use a hidden server-only one-shot
-  state in combat state: `Loaded -> Windup -> Spent`. Research completion arms all current
-  Riflemen, and later Rifleman production spawns loaded; spent Riflemen are not rearmed. Direct
-  `Attack` commands may chase a valid target, while idle, Hold Position, and Attack Move only fire
-  automatically when a valid target is already inside the current 5-tile launcher range. The exact
+- Riflemen produced after their owner completes Panzerfausts research use a hidden server-only
+  one-shot state in combat state: `Loaded -> Windup -> Spent`. Research completion does not change
+  existing Riflemen; later Rifleman production spawns loaded, and spent Riflemen are not rearmed.
+  Direct `Attack` commands may chase a valid target, while idle, Hold Position, and Attack Move only
+  fire automatically when a valid target is already inside the current 5-tile launcher range. The exact
   target whitelist is Scout Car, Tank, and Command Car; buildings, Mortar Teams, Artillery, and
   infantry are excluded. Targeting is intentionally independent per Rifleman with no overkill
   coordination. Windup cancels without spending the shot if the order changes or the target stops

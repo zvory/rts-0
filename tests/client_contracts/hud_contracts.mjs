@@ -925,7 +925,7 @@ function fakeHudRootWithoutResourceSpans() {
   const trainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks, producingBarracks],
     entities: [cityCentre, barracks, producingBarracks],
-    resources: { steel: 60, oil: 0 },
+    resources: { steel: 60, oil: 10 },
   }));
   assert(trainCard.kind === "train", "production building should use train descriptor card");
   assert(trainCard.slots[0].label === "Rifleman", "Barracks first train slot should be Rifleman");

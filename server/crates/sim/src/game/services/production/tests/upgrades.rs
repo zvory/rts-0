@@ -2,7 +2,7 @@ use super::*;
 use crate::game::entity::PanzerfaustState;
 
 #[test]
-fn panzerfausts_research_arms_existing_riflemen() {
+fn panzerfausts_research_does_not_arm_existing_riflemen() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let rifleman = entities
@@ -31,7 +31,7 @@ fn panzerfausts_research_arms_existing_riflemen() {
             .get(rifleman)
             .and_then(|entity| entity.combat.as_ref())
             .and_then(|combat| combat.panzerfaust),
-        Some(PanzerfaustState::Loaded)
+        None
     );
 }
 

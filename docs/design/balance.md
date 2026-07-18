@@ -15,8 +15,9 @@ Default attack range, damage, cooldown, weapon class, and weapon-policy metadata
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
 selected weapon profile instead of inferring those behaviors only from the firing entity kind.
-The Panzerfausts Training Centre upgrade arms every current and future Rifleman with one disposable
-anti-armor shot that deals 100 base damage with 50% armor penetration and no tank-facing modifier.
+The Panzerfausts Training Centre upgrade arms every Rifleman produced after research completes
+with one disposable anti-armor shot that deals 100 base damage with 50% armor penetration and no
+tank-facing modifier.
 The shot is detached at launch; the same Rifleman immediately returns to normal movement and rifle
 combat while the projectile travels, preserving its orders, HP, control-group identity, and trench.
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
@@ -194,7 +195,8 @@ Core unit roles:
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
 - **Panzerfausts** is a Training Centre upgrade for Riflemen, not a standalone unit. It gives every
-  existing and future Rifleman one disposable 5-tile, 50%-armor-penetrating shot. Automatic use is
+  Rifleman produced after research completes one disposable 5-tile, 50%-armor-penetrating shot;
+  Riflemen already on the field when research completes remain unchanged. Automatic use is
   limited to visible Scout Cars, Tanks, and Command Cars already in range; Mortar Teams, Artillery,
   infantry, buildings, and obstacles are not launcher targets. Only an explicit Attack order may
   chase a valid vehicle for the shot. There is no salvo coordination or overkill suppression.
@@ -383,8 +385,8 @@ folded into default targeting.
   their setup and teardown timers from 30 ticks to 15. Loaded Riflemen also use the reduced
   12-tick Panzerfaust windup.
 - **Panzerfausts** (Training Centre research, protocol id `panzerfausts`): costs 100 steel / 100 oil
-  and takes 600 ticks (~20s). Completion arms all current Riflemen and every Rifleman produced later
-  with one lifetime disposable launcher shot. Spent Riflemen are never automatically rearmed.
+  and takes 600 ticks (~20s). Completion arms only Riflemen produced afterward with one lifetime
+  disposable launcher shot. Existing and spent Riflemen are never automatically armed or rearmed.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 200 steel / 0 oil
   and takes 900 ticks (~30s). The rules surface defines Riflemen and Machine Gunners
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
@@ -541,7 +543,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
+| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 60  | 10  | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-15 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
