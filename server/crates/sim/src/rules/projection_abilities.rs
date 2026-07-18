@@ -43,7 +43,7 @@ pub(super) fn active_ability_object_expires_in(
     entity: &Entity,
     ability: AbilityKind,
 ) -> Option<u16> {
-    if ability == ability::AbilityKind::Breakthrough {
+    if ability::definition(ability).effect_hook == ability::AbilityEffectHook::OwnedAreaStatus {
         return (entity.breakthrough_aura_ticks() > 0).then_some(entity.breakthrough_aura_ticks());
     }
     if ability == ability::AbilityKind::EkatMagicAnchor {

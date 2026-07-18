@@ -52,6 +52,7 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) replay_start: Option<&'a ReplayStartComposition>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn fanout_current_observer_snapshots(
     room: &str,
     players: &mut HashMap<u32, RoomPlayer>,
