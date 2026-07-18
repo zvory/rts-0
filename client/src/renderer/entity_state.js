@@ -8,7 +8,10 @@ export function isConstructionScaffold(entity) {
 
 export function buildingProgressStatus(entity) {
   if (isConstructionScaffold(entity)) {
-    return { kind: "construction", fraction: entity.buildProgress };
+    const fraction = Number.isFinite(entity.hp) && Number.isFinite(entity.maxHp) && entity.maxHp > 0
+      ? entity.hp / entity.maxHp
+      : entity.buildProgress;
+    return { kind: "construction", fraction };
   }
   if (isBuilding(entity?.kind) && typeof entity?.deconstructProgress === "number") {
     return { kind: "deconstruction", fraction: entity.deconstructProgress };

@@ -734,8 +734,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       "under-construction building draws construction status on the HP bar layer",
     );
     assert(
-      Math.abs(scaffoldHpRects[1][3] - scaffoldBarW * scaffold.buildProgress) < 0.001,
-      "under-construction HP-layer status bar uses buildProgress instead of current HP",
+      Math.abs(scaffoldHpRects[1][3] - scaffoldBarW * (scaffold.hp / scaffold.maxHp)) < 0.001,
+      "under-construction HP-layer status bar reflects remaining HP instead of build progress",
     );
     assert(
       renderer._pools.hpBars.has(completed.id),
