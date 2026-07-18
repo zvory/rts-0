@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use super::checkpoint_helpers::{
-    assert_equivalent_games, player_ids, repair_after_authoritative_test_spawn,
+    assert_equivalent_games, checkpoint_payload_text_for, player_ids,
+    repair_after_authoritative_test_spawn,
     restore_checkpoint_and_assert_equivalent, tick_pair_and_assert_equivalent, tick_pair_for,
 };
 use super::fixtures::empty_flat_game;
@@ -15,6 +16,48 @@ use crate::game::firing_reveal;
 use crate::game::fog::LingeringSightSource;
 use crate::game::map::{Map, MapMetadata};
 use crate::game::services::occupancy::footprint_center;
+
+#[test]
+fn legacy_checkpoint_restore_seeds_exploration_from_current_visibility() {
+    let mut baseline = empty_flat_game(&phase6_players());
+    spawn_unit_at_tile(&mut baseline, 1, EntityKind::Rifleman, 8, 8);
+    repair_after_authoritative_test_spawn(&mut baseline);
+    let checkpoint_text = checkpoint_payload_text_for(&baseline, "legacy fog checkpoint");
+    let mut checkpoint: serde_json::Value =
+        serde_json::from_str(&checkpoint_text).expect("checkpoint should be valid JSON");
+    checkpoint["fog"]
+        .as_object_mut()
+        .expect("checkpoint fog should be an object")
+        .remove("exploredGrids");
+    let legacy_text = serde_json::to_string(&checkpoint).expect("legacy checkpoint should encode");
+
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &legacy_text,
+        baseline.state.map.clone(),
+        baseline.map_metadata().clone(),
+    )
+    .expect("legacy checkpoint should restore");
+
+    let mut visible_tiles = 0;
+    for player in player_ids(&restored) {
+        let snapshot = restored.snapshot_for(player);
+        assert_eq!(snapshot.visible_tiles.len(), snapshot.explored_tiles.len());
+        visible_tiles += snapshot
+            .visible_tiles
+            .iter()
+            .filter(|visible| **visible == 1)
+            .count();
+        assert!(
+            snapshot
+                .visible_tiles
+                .iter()
+                .zip(&snapshot.explored_tiles)
+                .all(|(visible, explored)| *visible == 0 || *explored == 1),
+            "player {player} current visibility must be explored after legacy restore"
+        );
+    }
+    assert!(visible_tiles > 0, "fixture must exercise visible fog tiles");
+}
 
 #[test]
 fn visibility_combat_checkpoint_preserves_fog_memory_trenches_and_reveals() {

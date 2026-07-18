@@ -99,9 +99,20 @@ impl Fog {
     pub(in crate::game) fn from_checkpoint_grids(
         size: u32,
         grids: BTreeMap<u32, Vec<bool>>,
-        explored_grids: BTreeMap<u32, Vec<bool>>,
+        mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
+        // Legacy checkpoints have no explored grids, and a supplied grid can still omit tiles
+        // that are currently visible. Normalize both cases here so restored state always keeps
+        // the fundamental visible-implies-explored invariant.
+        for (&player, visible_grid) in &grids {
+            let explored_grid = explored_grids
+                .entry(player)
+                .or_insert_with(|| vec![false; visible_grid.len()]);
+            for (explored, visible) in explored_grid.iter_mut().zip(visible_grid) {
+                *explored = *explored || *visible;
+            }
+        }
         Fog {
             size,
             grids: grids.into_iter().collect(),
@@ -339,11 +350,10 @@ impl Fog {
         let mut union = vec![false; cells];
         let mut explored_union = vec![false; cells];
         for player in players {
-            let Some(grid) = self.grids.get(player) else {
-                continue;
-            };
-            for (dst, src) in union.iter_mut().zip(grid.iter()) {
-                *dst = *dst || *src;
+            if let Some(grid) = self.grids.get(player) {
+                for (dst, src) in union.iter_mut().zip(grid.iter()) {
+                    *dst = *dst || *src;
+                }
             }
             if let Some(grid) = self.explored_grids.get(player) {
                 for (dst, src) in explored_union.iter_mut().zip(grid.iter()) {
