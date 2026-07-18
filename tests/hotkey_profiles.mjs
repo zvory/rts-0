@@ -212,7 +212,7 @@ function ekatCard() {
       artillery: classic.factionBindings.kriegsia[kriegsiaCommandId("train", KIND.ARTILLERY)],
       mortarAutocast: classic.factionBindings.kriegsia[kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST)],
     },
-    { tankTrap: "KeyK", smoke: "KeyO", scoutPlane: "KeyP", artillery: "KeyR", mortarAutocast: "KeyO" },
+    { tankTrap: "KeyK", smoke: "KeyD", scoutPlane: "KeyP", artillery: "KeyR", mortarAutocast: "KeyO" },
     "Classic RTS conflict resolutions are mnemonic rather than Grid-slot fallbacks",
   );
   assert.deepEqual(
