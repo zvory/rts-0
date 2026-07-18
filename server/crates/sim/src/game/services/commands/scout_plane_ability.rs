@@ -34,7 +34,6 @@ pub(super) fn use_ability(
     {
         return;
     }
-    let mut active_blocked = false;
     let caster = dedupe_cap_units(request.units, request.max_units_per_command)
         .into_iter()
         .find(|unit| {
@@ -44,20 +43,9 @@ pub(super) fn use_ability(
             {
                 return false;
             }
-            if scout_plane::active_scout_plane_for_command_car(entities, player, unit).is_some() {
-                active_blocked = true;
-                return false;
-            }
             true
         });
     let Some(source_command_car) = caster else {
-        if active_blocked {
-            notice(
-                events,
-                player,
-                "Scout Plane already active for this Command Car",
-            );
-        }
         return;
     };
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
@@ -77,14 +65,6 @@ pub(super) fn use_ability(
                 caster.start_ability_cooldown(ability, definition.cooldown_ticks);
             }
             notice_positioned(events, player, "Scout Plane", NoticeSeverity::Info, x, y);
-        }
-        Err(ScoutPlaneLaunchError::Active) => {
-            ps.refund_cost(definition.cost);
-            notice(
-                events,
-                player,
-                "Scout Plane already active for this Command Car",
-            );
         }
         Err(ScoutPlaneLaunchError::InvalidLaunch) => {
             ps.refund_cost(definition.cost);

@@ -17,7 +17,7 @@
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
 //! the sampled visible set.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
@@ -280,13 +280,11 @@ impl Fog {
         let size = self.size;
         let building_mask = BuildingLosMask::new(store, map);
         let los = LineOfSight::with_smoke_only(map, smokes);
-        let mut seen_owners = BTreeSet::new();
         for plane in store.iter() {
             if plane.kind != EntityKind::ScoutPlane
                 || plane.owner == 0
                 || plane.hp == 0
                 || smokes.point_inside(plane.pos_x, plane.pos_y)
-                || !seen_owners.insert(plane.owner)
             {
                 continue;
             }

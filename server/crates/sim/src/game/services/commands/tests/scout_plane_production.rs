@@ -169,7 +169,7 @@ fn command_car_scout_plane_ability_does_not_interrupt_caster_orders() {
 }
 
 #[test]
-fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
+fn command_car_can_launch_again_when_ready_while_an_earlier_plane_is_active() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let command_car = entities
@@ -186,8 +186,6 @@ fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
         .get_mut(command_car)
         .expect("command car")
         .start_ability_cooldown(AbilityKind::ScoutPlane, 0);
-    let resources_before = (players[0].steel, players[0].oil);
-
     let events = apply_with_players(
         &map,
         &mut entities,
@@ -195,23 +193,19 @@ fn command_car_scout_plane_ability_rejects_active_plane_before_spending() {
         vec![(1, scout_plane_command(vec![command_car], 512.0, 512.0))],
     );
 
-    assert_eq!((players[0].steel, players[0].oil), resources_before);
+    assert_eq!((players[0].steel, players[0].oil), (900, 850));
     assert_eq!(
         entities
             .iter()
             .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
             .count(),
-        1
+        2
     );
-    assert_notice(
-        &events,
-        1,
-        "Scout Plane already active for this Command Car",
-    );
+    assert_notice(&events, 1, "Scout Plane");
 }
 
 #[test]
-fn scout_plane_command_skips_selected_car_with_active_plane() {
+fn scout_plane_command_uses_the_first_ready_selected_command_car() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let active_car = entities
@@ -227,11 +221,6 @@ fn scout_plane_command_skips_selected_car_with_active_plane() {
         &mut players,
         vec![(1, scout_plane_command(vec![active_car], 512.0, 512.0))],
     );
-    entities
-        .get_mut(active_car)
-        .expect("active command car")
-        .start_ability_cooldown(AbilityKind::ScoutPlane, 0);
-
     let events = apply_with_players(
         &map,
         &mut entities,

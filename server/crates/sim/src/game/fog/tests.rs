@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::services::occupancy::footprint_center;
+use crate::game::teams::TeamRelations;
 use crate::protocol::terrain;
 
 fn open_map(size: u32) -> Map {
@@ -187,4 +188,39 @@ fn unit_inside_smoke_does_not_stamp_vision() {
 
     assert!(!fog.is_visible(1, 2, 2));
     assert!(!fog.is_visible(1, 3, 2));
+}
+
+#[test]
+fn every_scout_plane_stamps_independent_team_vision() {
+    let map = open_map(48);
+    let mut entities = EntityStore::new();
+    let first = map.tile_center(8, 8);
+    let second = map.tile_center(39, 39);
+    entities
+        .spawn_unit(1, EntityKind::ScoutPlane, first.0, first.1)
+        .expect("first Scout Plane should spawn");
+    entities
+        .spawn_unit(1, EntityKind::ScoutPlane, second.0, second.1)
+        .expect("second Scout Plane should spawn");
+    let smokes = SmokeCloudStore::new();
+    let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
+    let mut fog = Fog::new(map.size);
+
+    fog.recompute_with_smoke(&[1, 2, 3], &entities, &map, &smokes);
+    fog.stamp_scout_plane_sources_for_teams_with_smoke(&map, &entities, &smokes, &teams);
+
+    for viewer in [1, 2] {
+        assert!(
+            fog.is_visible_world(viewer, first.0, first.1),
+            "owner and teammate should receive the first plane's sight"
+        );
+        assert!(
+            fog.is_visible_world(viewer, second.0, second.1),
+            "owner and teammate should receive the second plane's sight"
+        );
+    }
+    assert!(
+        !fog.is_visible_world(3, first.0, first.1) && !fog.is_visible_world(3, second.0, second.1),
+        "enemy players must not receive Scout Plane vision"
+    );
 }

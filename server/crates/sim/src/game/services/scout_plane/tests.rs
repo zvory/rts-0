@@ -73,10 +73,9 @@ fn scout_plane_launches_from_caster_without_a_city_centre() {
     let state = plane_state(&entities, plane);
     assert_eq!(state.source_command_car, Some(source_command_car));
     assert_eq!(state.orbit_center, (790.0, 790.0));
-    assert_eq!(
-        launch_ability(&map, &mut entities, 1, source_command_car, 128.0, 128.0,),
-        Err(ScoutPlaneLaunchError::Active)
-    );
+    let second = launch_ability(&map, &mut entities, 1, source_command_car, 128.0, 128.0)
+        .expect("an existing sortie should not invalidate another launch");
+    assert_ne!(plane, second);
     assert_eq!(
         launch_ability(&map, &mut entities, 3, 77, 128.0, 128.0),
         Err(ScoutPlaneLaunchError::InvalidLaunch)
@@ -141,7 +140,7 @@ fn scout_plane_arrival_uses_only_remaining_lifetime_for_orbit() {
 }
 
 #[test]
-fn duplicate_scout_planes_are_cleaned_up_before_extra_mission_processing() {
+fn multiple_scout_planes_survive_independent_mission_processing() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
     let first = spawn_plane(&mut entities, 1, 128.0, 128.0);
@@ -150,7 +149,7 @@ fn duplicate_scout_planes_are_cleaned_up_before_extra_mission_processing() {
     advance_scout_planes(&map, &mut entities);
 
     assert!(entities.get(first).is_some());
-    assert!(entities.get(second).is_none());
+    assert!(entities.get(second).is_some());
 }
 
 #[test]

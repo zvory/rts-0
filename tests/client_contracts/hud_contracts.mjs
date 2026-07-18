@@ -1093,9 +1093,9 @@ function fakeHudRootWithoutResourceSpans() {
     entities: [scoutPlaneCityCentre, commandCar, activeScoutPlane],
     resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
-  const activeBlockedScoutPlane = buttonByLabel(activeScoutPlaneCard, "Scout Plane");
-  assert(!activeBlockedScoutPlane.enabled, "Scout Plane ability should disable while that Command Car's plane is active");
-  assert(activeBlockedScoutPlane.title === "Scout Plane already active", "active Scout Plane block should explain the per-car limit");
+  const activeIndependentScoutPlane = buttonByLabel(activeScoutPlaneCard, "Scout Plane");
+  assert(activeIndependentScoutPlane.enabled, "an active Scout Plane should not independently block a ready Command Car");
+  assert(activeIndependentScoutPlane.intent.readyIds.join(",") === "74", "a ready Command Car remains eligible while an earlier sortie is active");
 
   const secondCommandCar = {
     ...commandCar,
@@ -1107,8 +1107,8 @@ function fakeHudRootWithoutResourceSpans() {
     resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
   const mixedScoutPlaneAbility = buttonByLabel(mixedScoutPlaneCard, "Scout Plane");
-  assert(mixedScoutPlaneAbility.enabled, "another selected Command Car can launch while the first car's plane is active");
-  assert(mixedScoutPlaneAbility.intent.readyIds.join(",") === "76", "Scout Plane targeting excludes only the source car with an active plane");
+  assert(mixedScoutPlaneAbility.enabled, "selected ready Command Cars can launch while another sortie is active");
+  assert(mixedScoutPlaneAbility.intent.readyIds.join(",") === "74,76", "Scout Plane targeting includes every ready selected Command Car");
 
   const scoutCar = {
     id: 30,

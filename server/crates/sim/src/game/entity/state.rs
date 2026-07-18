@@ -49,7 +49,7 @@ pub(in crate::game) struct ScoutPlaneState {
     pub(in crate::game) orbit_phase: f32,
     /// Whether the plane has reached the orbit area for `orbit_center`.
     pub(in crate::game) orbiting: bool,
-    /// Command Car that launched this sortie. Each car may have one active plane.
+    /// Command Car that launched this independent sortie.
     #[serde(default)]
     pub(in crate::game) source_command_car: Option<u32>,
     /// Ticks remaining in the sortie, including both transit and orbit time.

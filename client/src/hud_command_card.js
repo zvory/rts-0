@@ -323,7 +323,6 @@ export function buildUnitCard(ctx, selection) {
     `|setup:${setupGunIds.join(".")}|` +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
-      `${affordance.activeBlock ? 1 : 0}:` +
       `${affordance.depletedCount}:` +
       `${affordance.readyIds.join(".")}:` +
       `${affordance.queueAdmissibleIds.join(".")}:` +
@@ -565,17 +564,9 @@ export function selectedAbilityAffordances(ctx, selection) {
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
-      const activeScoutPlaneSources = definition.ability === ABILITY.SCOUT_PLANE
-        ? activeOwnScoutPlaneSourceIds(ctx)
-        : null;
-      const activeBlockedUnits = activeScoutPlaneSources
-        ? carriers.filter((e) => activeScoutPlaneSources.has(e.id))
-        : [];
-      const activeBlock = activeBlockedUnits.length === carriers.length;
-      const readyUnits = carriers.filter((e) =>
-        !activeScoutPlaneSources?.has(e.id) && abilityUnitReady(e, definition));
+      const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
       const queueAdmissibleUnits = carriers.filter((e) =>
-        !activeScoutPlaneSources?.has(e.id) && abilityUnitQueueAdmissible(e, definition));
+        abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
@@ -590,7 +581,6 @@ export function selectedAbilityAffordances(ctx, selection) {
         definition,
         unlocked,
         affordable: canAfford,
-        activeBlock,
         depletedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
@@ -782,7 +772,6 @@ function abilityDisabledReason(ctx, affordance) {
       .find((req) => !playerHasCompleteKind(ctx, req));
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   }
-  if (affordance.activeBlock) return "Scout Plane already active";
   if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
   if (!affordance.affordable) return "Not enough resources";
   if (
@@ -790,20 +779,4 @@ function abilityDisabledReason(ctx, affordance) {
     affordance.definition.queuePolicy !== "waitUntilReady"
   ) return "On cooldown";
   return affordance.definition.title || "";
-}
-
-function currentEntitiesOf(ctx) {
-  if (Array.isArray(ctx?.currentEntities)) return ctx.currentEntities;
-  if (Array.isArray(ctx?.entities)) return ctx.entities;
-  if (typeof ctx?.state?.entitiesInterpolated === "function") {
-    return ctx.state.entitiesInterpolated(1) || [];
-  }
-  return ctx?.selection || [];
-}
-
-function activeOwnScoutPlaneSourceIds(ctx) {
-  return new Set(currentEntitiesOf(ctx)
-    .filter((e) => isOwn(ctx, e) && e.kind === KIND.SCOUT_PLANE && e.hp !== 0)
-    .map((e) => e.scoutPlane?.sourceCommandCar)
-    .filter((id) => Number.isInteger(id) && id > 0));
 }
