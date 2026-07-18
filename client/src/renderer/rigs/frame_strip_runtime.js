@@ -91,7 +91,6 @@ function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback 
   const firingWeaponKinds = Array.isArray(strip?.firingWeaponKinds) ? strip.firingWeaponKinds : [];
   if (
     firingWeaponKinds.length > 0 &&
-    renderContext.recoilWeaponKind &&
     !firingWeaponKinds.includes(renderContext.recoilWeaponKind)
   ) {
     return null;

@@ -357,13 +357,15 @@ function snapshotLegacyState(state, entities, now, profiler) {
     copyPose(currentById, entity.id, state?._curById?.get?.(entity.id));
     copyPose(previousById, entity.id, state?._prevById?.get?.(entity.id));
     try {
+      let recoil = 0;
       if (typeof state?.weaponRecoil === "function") {
-        recoilById.set(entity.id, finiteNumber(state.weaponRecoil(entity.id, entity.kind, now), 0));
+        recoil = finiteNumber(state.weaponRecoil(entity.id, entity.kind, now), 0);
+        recoilById.set(entity.id, recoil);
       }
       if (typeof state?.weaponRecoilPhase === "function") {
         recoilPhaseById.set(entity.id, finiteNumber(state.weaponRecoilPhase(entity.id, entity.kind, now), 0));
       }
-      if (typeof state?.weaponRecoilKind === "function") {
+      if (recoil > 0 && typeof state?.weaponRecoilKind === "function") {
         const weaponKind = state.weaponRecoilKind(entity.id);
         if (weaponKind) recoilKindById.set(entity.id, weaponKind);
       }

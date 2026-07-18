@@ -69,6 +69,7 @@ const riflemanFrameDuringRecoil = frameStripFrameIndex(
     now: 0,
     recoilProgress: 1,
     recoilPhase: 0.05,
+    recoilWeaponKind: WEAPON_KIND.RIFLEMAN_RIFLE,
   },
 );
 assert(frameStripSpriteOffset(RIFLEMAN_PNG_FRAME_STRIP, RIFLEMAN_PNG_FRAME_STRIP.idleFrame).x === 10, "Rifleman art uses its corrected forward origin");
@@ -82,9 +83,18 @@ assert(
   frameStripFrameIndex(
     RIFLEMAN_PNG_FRAME_STRIP,
     { id: 11, kind: KIND.RIFLEMAN, state: STATE.ATTACK },
-    { now: 0, recoilProgress: 1, recoilPhase: 0.05 },
+    { now: 0, recoilProgress: 1, recoilPhase: 0.05, recoilWeaponKind: WEAPON_KIND.RIFLEMAN_RIFLE },
   ) === RIFLEMAN_PNG_FRAME_STRIP.firingFrames[0],
   "stationary Rifleman uses the authored firing frame during the brief recoil impulse",
+);
+
+assert(
+  frameStripFrameIndex(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.ATTACK },
+    { now: 0, recoilProgress: 1, recoilPhase: 0.05 },
+  ) === RIFLEMAN_PNG_FRAME_STRIP.idleFrame,
+  "weapon-specific Rifleman firing art fails closed when recoil kind is unavailable",
 );
 
 assert(
