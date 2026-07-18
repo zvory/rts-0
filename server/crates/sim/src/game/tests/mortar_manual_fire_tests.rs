@@ -322,14 +322,43 @@ fn queued_mortar_setup_promotes_instead_of_being_discarded() {
     assert!(mortar_entity.queued_orders().is_empty());
     assert!(matches!(
         mortar_entity.weapon_setup(),
-        WeaponSetup::TearingDownToRedeploy { .. }
+        WeaponSetup::Deployed
     ));
     assert!(
-        (mortar_entity.pending_redeploy_facing().unwrap_or_default() - std::f32::consts::FRAC_PI_2)
-            .abs()
-            < 0.001,
-        "queued mortar setup should promote toward the submitted point"
+        (mortar_entity.emplacement_facing().unwrap_or_default() - 0.0).abs() < 0.001,
+        "queued mortar setup should retain the mortar's existing facing"
     );
+}
+
+#[test]
+fn queued_mortar_setup_projects_at_the_preceding_stage_destination() {
+    let (mut game, mortar, _) = manual_fire_fixture();
+    let move_target = game.state.map.tile_center(12, 8);
+    let old_position = game.state.map.tile_center(8, 8);
+    {
+        let mortar = game
+            .state
+            .entities
+            .get_mut(mortar)
+            .expect("mortar should exist");
+        mortar.append_queued_order(OrderIntent::move_to(move_target.0, move_target.1));
+        mortar.append_queued_order(OrderIntent::setup_anti_tank_guns(
+            old_position.0,
+            old_position.1,
+        ));
+    }
+
+    let view = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == mortar)
+        .expect("owner snapshot should include mortar");
+    assert_eq!(view.order_plan.len(), 2);
+    assert_eq!(view.order_plan[0].kind, "move");
+    assert_eq!((view.order_plan[0].x, view.order_plan[0].y), move_target);
+    assert_eq!(view.order_plan[1].kind, "setupAntiTankGuns");
+    assert_eq!((view.order_plan[1].x, view.order_plan[1].y), move_target);
 }
 
 #[test]

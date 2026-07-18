@@ -879,7 +879,8 @@ keeping the panel status and cancel affordance synchronized with keyboard, point
 box-selection, and teardown paths. Starting ordinary placement, command targeting, or command-card
 build menus cancels the active lab tool so setup tools do not share state with gameplay command
 modes. Unit and building spawning are lab panel palettes backed by the client faction catalog mirror
-and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
+and playable faction labels; the unit palette excludes ability-created units such as the Command
+Car's Scout Plane. Each palette arms a persistent completed `spawnEntity` lab tool and
 clicking or dragging sends the chosen world positions through `LabClient` until cancelled. Changing
 the target player while a spawn tool is armed immediately retargets that tool, including its cursor
 preview and subsequent placements, without requiring the operator to select the unit or building again.
@@ -1495,7 +1496,10 @@ Unit abilities remain on their declared grid slots in mixed selections rather th
 unrelated empty hotkey. When abilities collide, Point Fire and Blanket Fire have the lowest command-
 card priority: Mortar Fire replaces Point Fire on `X`, and Scout Plane replaces Blanket Fire on `C`.
 The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns, Mortar Teams,
-or Artillery are present and that slot is available. A deployed selected Mortar Team draws its
+or Artillery are present and that slot is available. Mortar-only setup issues in place directly
+from the button or hotkey; holding Shift appends a terminal setup after existing queued movement.
+Selections containing Anti-Tank Guns or Artillery retain the directional world-point target step.
+A deployed selected Mortar Team draws its
 5-to-15-tile full-circle range band. Artillery-only selections still expose Point Fire, Blanket Fire,
 and Set Up together because those commands do not collide in that context.
 Command identities are stable and split by scope: global tactical/navigation/production-control

@@ -949,6 +949,40 @@ function fakeHudRootWithoutResourceSpans() {
   );
   assert(!buttonByAction(artilleryScoutPlaneCard, "dismissScoutPlane"), "mixed support-weapon plus Scout Plane selection does not expose dismiss");
 
+  const mortar = { id: 24, owner: 1, kind: KIND.MORTAR_TEAM, x: 384, y: 256 };
+  const mortarCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [mortar],
+    entities: [mortar],
+  }));
+  const mortarSetup = buttonByAction(mortarCard, "setupAntiTankGuns");
+  assert(
+    mortarSetup?.intent.type === "setupMortars" &&
+      mortarSetup.intent.unitIds.join(",") === String(mortar.id) &&
+      mortarSetup.intent.x === mortar.x &&
+      mortarSetup.intent.y === mortar.y,
+    "mortar-only Set Up issues in place without arming a world-point click",
+  );
+  const issuedMortarCommands = [];
+  const mortarHud = Object.create(HUD.prototype);
+  mortarHud.commandInteraction = { issueCommand: (command) => issuedMortarCommands.push(command) };
+  mortarHud.clientIntent = { endCommandTarget() {} };
+  mortarHud._dispatchCommandIntent(mortarSetup.intent, { shiftKey: true });
+  assert(
+    issuedMortarCommands[0]?.c === "setupAntiTankGuns" &&
+      issuedMortarCommands[0].units.join(",") === String(mortar.id) &&
+      issuedMortarCommands[0].queued === true,
+    "Shift plus mortar Set Up queues the in-place setup command directly from the HUD",
+  );
+
+  const mixedMortarArtilleryCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [mortar, scoutPlaneMixedArtillery],
+    entities: [mortar, scoutPlaneMixedArtillery],
+  }));
+  assert(
+    buttonByAction(mixedMortarArtilleryCard, "setupAntiTankGuns")?.intent.type === "beginCommandTarget",
+    "a mixed mortar and directional support-weapon selection keeps the facing-point setup step",
+  );
+
   const barracks = { id: 20, owner: 1, kind: KIND.BARRACKS, buildProgress: null };
   const producingBarracks = {
     id: 21,

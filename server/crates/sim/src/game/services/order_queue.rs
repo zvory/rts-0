@@ -20,8 +20,7 @@ use crate::game::services::order_execution::targeting::{
     stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
 };
 use crate::game::services::order_execution::{
-    execute_anti_tank_gun_setup, start_artillery_fire_promoted_order, ArtilleryFireMode,
-    FutureOrderMode,
+    execute_promoted_support_weapon_setup, start_artillery_fire_promoted_order, ArtilleryFireMode,
 };
 use crate::game::services::standability;
 use crate::game::services::world_query;
@@ -262,7 +261,7 @@ pub(crate) fn promote_ready_orders(
                 launch_self_ability(entities, events, faction_id, owner, id, ability);
             }
             PromotedIntent::SetupAntiTankGuns { x, y } => {
-                execute_anti_tank_gun_setup(entities, id, x, y, FutureOrderMode::Preserve);
+                execute_promoted_support_weapon_setup(entities, id, x, y);
             }
             PromotedIntent::PointFire { x, y } => {
                 execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point);
@@ -723,6 +722,7 @@ fn build_intent_promotion_error(
 mod tests {
     mod artillery_point_fire_tests;
     mod hold_position_tests;
+    mod mortar_setup_tests;
     mod queued_attack_tests;
 
     use super::*;
