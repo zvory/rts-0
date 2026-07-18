@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn score_apm_scales_and_rounds_the_measured_match_rate() {
         let minute = config::TICK_HZ * 60;
-        let action_ticks = std::iter::repeat(minute).take(31);
+        let action_ticks = std::iter::repeat_n(minute, 31);
         assert_eq!(average_after_opening(action_ticks, minute * 3), 16);
     }
 

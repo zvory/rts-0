@@ -4,7 +4,7 @@ use super::*;
 #[test]
 fn scores_count_starting_entities() {
     let players = human_vs_ai_players();
-    let game = Game::new(&players, 0x515C_0DE);
+    let game = Game::new(&players, 0x0515_C0DE);
     let scores = game.scores();
     let human = scores
         .iter()
@@ -28,7 +28,7 @@ fn scores_count_starting_entities() {
 #[test]
 fn scores_record_kills_and_losses_on_death() {
     let players = human_vs_ai_players();
-    let mut game = Game::new(&players, 0x515C_0DE);
+    let mut game = Game::new(&players, 0x0515_C0DE);
     let victim_unit = game
         .state
         .entities
@@ -280,7 +280,7 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
 #[test]
 fn spectator_player_resources_follow_selected_players() {
     let players = human_vs_ai_players();
-    let game = Game::new(&players, 0x515C_0DE);
+    let game = Game::new(&players, 0x0515_C0DE);
 
     let snapshot = game.snapshot_for_spectator(&[2]);
 
@@ -297,7 +297,7 @@ fn spectator_player_resources_follow_selected_players() {
 #[test]
 fn spectator_apm_counts_one_multi_unit_command_as_one_action() {
     let players = human_vs_ai_players();
-    let mut game = Game::new(&players, 0x515C_0DE);
+    let mut game = Game::new(&players, 0x0515_C0DE);
     let workers = game
         .state
         .entities
