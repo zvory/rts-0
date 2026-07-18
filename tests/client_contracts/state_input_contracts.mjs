@@ -1709,15 +1709,10 @@ function buttonByLabel(card, label) {
   const placementConfirmInput = Object.create(Input.prototype);
   const placementCommands = [];
   let confirmedPlacementEnded = 0;
-  const placementLegacySender = {
-    command(command) {
-      placementCommands.push(command);
-    },
-  };
   placementConfirmInput.state = {};
   placementConfirmInput.clientIntent = new ClientIntent();
   placementConfirmInput.commandInteraction = new CommandInteraction({
-    commandIssuer: placementLegacySender,
+    commandIssuer: { command: (command) => placementCommands.push(command) },
     clientIntent: placementConfirmInput.clientIntent,
   });
   placementConfirmInput.clientIntent.placement = { building: KIND.DEPOT, tileX: 4, tileY: 5, valid: true };
@@ -1740,15 +1735,10 @@ function buttonByLabel(card, label) {
   const trapPlacementInput = Object.create(Input.prototype);
   const trapPlacementCommands = [];
   let trapPlacementEnded = 0;
-  const trapPlacementLegacySender = {
-    command(command) {
-      trapPlacementCommands.push(command);
-    },
-  };
   trapPlacementInput.state = {};
   trapPlacementInput.clientIntent = new ClientIntent();
   trapPlacementInput.commandInteraction = new CommandInteraction({
-    commandIssuer: trapPlacementLegacySender,
+    commandIssuer: { command: (command) => trapPlacementCommands.push(command) },
     clientIntent: trapPlacementInput.clientIntent,
   });
   trapPlacementInput.clientIntent.placement = {
