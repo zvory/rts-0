@@ -55,7 +55,7 @@ export function _selectionEntities() {
 
 export function _commitClickSelection(p, additive, ctrl) {
   const hit = this._entityAtScreen(p, true, (entity) => (
-    entity?.kind !== KIND.SCOUT_PLANE || scoutPlaneInspectable(this.state)
+    entity?.kind !== KIND.SCOUT_PLANE || scoutPlaneInspectable(this.state, this.controlPolicy)
   ), (entity) => (
     ownOwner(this.state, entity?.owner, this.controlPolicy) &&
     isBuilding(entity?.kind) &&

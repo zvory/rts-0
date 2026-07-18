@@ -48,4 +48,23 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
       commands.at(-1)?.units.join(",") === String(p2Unit.id),
     "lab P2 right-clicking a P2 unit does not classify the selected owner as hostile",
   );
+
+  const p2Worker = { id: 214, owner: 2, kind: KIND.WORKER, x: 64, y: 128, hp: 30, maxHp: 30, state: STATE.IDLE };
+  const p2IncompleteDepot = {
+    id: 215,
+    owner: 2,
+    kind: KIND.DEPOT,
+    x: 160,
+    y: 160,
+    buildProgress: 0.5,
+  };
+  input.state.selectedEntities = () => [p2Worker];
+  input._entityAtScreen = () => p2IncompleteDepot;
+  input._onRightClick({ x: p2IncompleteDepot.x, y: p2IncompleteDepot.y });
+  assert(
+    commands.at(-1)?.c === "build" &&
+      commands.at(-1)?.units.join(",") === String(p2Worker.id) &&
+      commands.at(-1)?.building === KIND.DEPOT,
+    "lab P2 right-clicking its unfinished building resumes construction instead of moving",
+  );
 }

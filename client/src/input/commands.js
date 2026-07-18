@@ -187,7 +187,7 @@ function normalRightClickAction(input, p) {
     if (action) return action;
   }
 
-  if (target && ownOwner(input.state, target.owner) && _isOwnIncompleteBuilding(target)) {
+  if (target && ownOwner(input.state, target.owner, input.controlPolicy) && _isOwnIncompleteBuilding(target)) {
     const resume = _resumeConstructionIntent(target, input.state.map);
     if (resume && workers.length > 0) {
       return {
@@ -408,7 +408,7 @@ function selectedEntities(state) {
 
 function selectedOwnUnitEntities(input) {
   return selectedEntities(input.state).filter((e) =>
-    ownOwner(input.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
+    ownOwner(input.state, e.owner, input.controlPolicy) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
 }
 
 function selectedOwnLandUnitIds(input, fallbackUnitIds = []) {
@@ -773,6 +773,9 @@ function enemyOwner(state, owner, controlPolicy = null) {
 }
 
 function friendlyOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    return ownOwner(state, owner, controlPolicy) || !!controlPolicy.isCommandAllyOwner?.(owner, state);
+  }
   return ownOwner(state, owner, controlPolicy) || (
     typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner)
   );

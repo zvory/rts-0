@@ -194,7 +194,7 @@ export class HUD {
     this.elSelected = rootEl.querySelector("#selected-panel");
     this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
-    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state);
+    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state, this.controlPolicy);
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
@@ -301,7 +301,9 @@ export class HUD {
     const workers = activeIdleWorkers(frameAuthoritativeEntities(this.state), this.state);
     if (workers.length === 0) return false;
     this._intent()?.closeCommandCardMenu?.();
-    this.state.setSelection(workers.map((worker) => worker.id));
+    this.state.setSelection(workers.map((worker) => worker.id), {
+      controlPolicy: this.controlPolicy,
+    });
     this._intent()?.clearPlannedOrdersOutsideSelection?.(this.state.selection || []);
     return true;
   }

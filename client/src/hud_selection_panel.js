@@ -69,9 +69,10 @@ export function selectionBudgetGridModel(entities, overflow = null) {
 }
 
 export class HudSelectionPanel {
-  constructor(panel, state) {
+  constructor(panel, state, controlPolicy = null) {
     this.panel = panel;
     this.state = state;
+    this.controlPolicy = controlPolicy;
     this._renderSig = null;
     this._selectionOverflowSig = null;
     this._selectionOverflowUntil = 0;
@@ -235,12 +236,15 @@ export class HudSelectionPanel {
       const sel = typeof this.state.selectedEntities === "function"
         ? this.state.selectedEntities()
         : [];
-      this.state.setSelection(sel.filter((e) => e.kind === entity.kind).map((e) => e.id));
+      this.state.setSelection(
+        sel.filter((e) => e.kind === entity.kind).map((e) => e.id),
+        { controlPolicy: this.controlPolicy },
+      );
       return;
     }
 
     if (typeof this.state.setSelection === "function") {
-      this.state.setSelection([id]);
+      this.state.setSelection([id], { controlPolicy: this.controlPolicy });
     }
   }
 

@@ -9,6 +9,7 @@ import {
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import { HudSelectionPanel } from "../../client/src/hud_selection_panel.js";
 import { Minimap } from "../../client/src/minimap.js";
 import { ABILITY, KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
 import { _drawAbilityTargetPreview } from "../../client/src/renderer/feedback.js";
@@ -185,6 +186,9 @@ function commandInput(selected, entities) {
   assert(Array.from(labState.selection).join(",") === "5600", "lab operator can still box-select a Scout Plane for inspection");
   labState.setSelection([scoutPlane.id], { controlPolicy });
   assert(Array.from(labState.selection).join(",") === "5600", "lab selection admission preserves Scout Plane ids");
+  labState.clearSelection();
+  new HudSelectionPanel(null, labState, controlPolicy)._applySelectionClick(scoutPlane.id);
+  assert(Array.from(labState.selection).join(",") === "5600", "Lab HUD selection changes preserve inspectable Scout Planes");
   labState.setControlGroup(3, [scoutPlane.id], { controlPolicy });
   assert(labState.controlGroups[3].join(",") === "5600", "lab control groups can store inspectable Scout Planes");
 }
