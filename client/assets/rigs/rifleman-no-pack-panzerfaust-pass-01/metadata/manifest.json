@@ -58,13 +58,13 @@
     "bakedColorAdjustment": {"brightness": 100, "saturation": 100, "hue": 100},
     "targetColorAdjustment": {"brightness": 70, "saturation": 100, "hue": 100},
     "normal": {
-      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1",
-      "imageVersion": "recoil-review-1",
+      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1-rgba8",
+      "imageVersion": "recoil-review-1-rgba8",
       "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png"
     },
     "panzerfaustLoaded": {
-      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png?v=recoil-review-1",
-      "imageVersion": "recoil-review-1",
+      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png?v=recoil-review-1-rgba8",
+      "imageVersion": "recoil-review-1-rgba8",
       "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png",
       "routeKey": "rifleman.panzerfaustLoaded"
     }

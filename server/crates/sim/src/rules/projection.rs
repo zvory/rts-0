@@ -418,6 +418,7 @@ pub fn project_entity(
                 available_tick: return_available_tick(&context, entity, *kind),
                 lockout_until_tick: entity.ability_lockout_until_tick(*kind, context.tick),
                 expires_in: active_ability_object_expires_in(&context, entity, *kind),
+                charge_recharge_left: entity.ability_charge_recharge_ticks(*kind),
             })
             .collect();
         for entry in catalog
@@ -441,6 +442,7 @@ pub fn project_entity(
                     available_tick: return_available_tick(&context, entity, kind),
                     lockout_until_tick: entity.ability_lockout_until_tick(kind, context.tick),
                     expires_in: active_ability_object_expires_in(&context, entity, kind),
+                    charge_recharge_left: entity.ability_charge_recharge_ticks(kind),
                 });
             }
         }

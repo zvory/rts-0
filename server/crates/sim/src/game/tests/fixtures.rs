@@ -154,6 +154,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
                     available_tick: None,
                     lockout_until_tick: None,
                     expires_in: None,
+                    charge_recharge_left: e.ability_charge_recharge_ticks(kind),
                 });
             }
         }

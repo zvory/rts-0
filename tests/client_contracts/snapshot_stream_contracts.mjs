@@ -7,6 +7,7 @@ import {
   validateSnapshotStreamSample,
 } from "../../scripts/client-perf/workload_setup.mjs";
 import { COMPACT_SNAPSHOT_VERSION, S } from "../../client/src/protocol.js";
+import { GameState } from "../../client/src/state.js";
 import {
   SnapshotStreamNet,
   parseSnapshotStream,
@@ -96,10 +97,11 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
     "snapshot stream parser rejects truncated frames",
   );
 
-  const checkedArtifact = parseSnapshotStream(fs.readFileSync(new URL(
+  const checkedArtifactBytes = new Uint8Array(fs.readFileSync(new URL(
     "../../client/assets/snapshot-streams/supply-300-hellhole.rtsstream",
     import.meta.url,
   )));
+  const checkedArtifact = parseSnapshotStream(checkedArtifactBytes);
   assert(
     checkedArtifact.header.frameCount === 900 && checkedArtifact.frames.length === 900,
     "checked-in Hellhole snapshot stream contains the expected 30 seconds at 30 Hz",
@@ -117,6 +119,32 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
       checkedArtifact.header.start.map.terrain.filter((tile) => tile === 1).length === 470 &&
       checkedArtifact.header.start?.snapshotStream?.sourceScenario === "supply-300-hellhole",
     "checked-in Hellhole snapshot stream matches the canonical Player 1 2v2 projection",
+  );
+
+  const diagnostics = [];
+  const checkedNet = new SnapshotStreamNet({
+    id: "supply-300-hellhole",
+    autoStart: false,
+    diagnostics: {
+      mark: (label) => diagnostics.push(label),
+      count: () => {},
+    },
+  });
+  const checkedState = new GameState(checkedArtifact.header.start);
+  let appliedFrameCount = 0;
+  checkedNet.on(S.SNAPSHOT, (snapshot) => {
+    checkedState.applySnapshot(snapshot);
+    appliedFrameCount += 1;
+  });
+  for (const frame of checkedArtifact.frames) checkedNet._onMessage({ data: frame });
+  assert(
+    diagnostics.every((label) => label !== "server.recv.malformed") &&
+      appliedFrameCount === checkedArtifact.frames.length,
+    "current client decodes and applies every checked-in Hellhole snapshot frame",
+  );
+  assert(
+    checkedState.tick > 0 && checkedState.entitiesInterpolated(1).length > 0,
+    "checked-in Hellhole snapshots produce a non-empty current game state",
   );
 }
 

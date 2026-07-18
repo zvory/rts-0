@@ -43,7 +43,7 @@ export const MINING_CC_RANGE_TILES = 11.0;
 export const OIL_LOAD = 2;
 export const HARVEST_TICKS = 40;
 export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20;
-export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
+export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 * Math.PI / 180;
 export const ARTILLERY_MIN_RANGE_TILES = 25;
 export const ARTILLERY_MAX_RANGE_TILES = 55;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 20 * Math.PI / 180;
@@ -208,7 +208,7 @@ export const ABILITIES = Object.freeze({
     label: "Smoke",
     icon: "SMK",
     hotkey: "D",
-    title: "Two charges; one charge regenerates every 15 seconds",
+    title: "Target a smoke grenade location",
     carriers: Object.freeze([KIND.SCOUT_CAR]),
     targetMode: "worldPoint",
     rangeTiles: SMOKE_ABILITY_RANGE_TILES,
