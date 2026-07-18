@@ -131,6 +131,25 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
 }
 
 {
+  const boundedCamera = new FixedPerspectiveCamera(1920, 1080, {
+    maxVisibleWorldPx: 3200,
+  });
+  boundedCamera.setMapBounds(20_000, 20_000);
+  boundedCamera.focusAt({ x: 10_000, y: 10_000 });
+  boundedCamera.restore({
+    version: 1,
+    focus: { x: 10_000, y: 10_000 },
+    framingScale: 0.01,
+    boundsPolicy: "mapOverscroll",
+  });
+  const bounds = boundedCamera.viewportGroundBounds();
+  assert.ok(bounds.maxX - bounds.minX <= 3200.001,
+    "perspective live-player view width stays within the configured world span");
+  assert.ok(bounds.maxY - bounds.minY <= 3200.001,
+    "perspective live-player view height stays within the configured world span");
+}
+
+{
   const world = { x: 1234, y: 876, heightPx: 37 };
   const scene = worldPointToScene(world);
   const roundTrip = sceneGroundToWorld(scene);

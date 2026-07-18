@@ -31,6 +31,11 @@ function positive(value, label) {
   return number;
 }
 
+function optionalPositive(value) {
+  const number = finite(value);
+  return number != null && number > 0 ? number : null;
+}
+
 function cameraSnapshot(focus, framingScale) {
   return Object.freeze({
     version: 1,
@@ -111,6 +116,24 @@ function pointsFitViewport(state, points, paddingCssPx) {
       && projected.y >= paddingCssPx
       && projected.y <= maxY;
   });
+}
+
+function minimumScaleForGroundSpan(state, maxVisibleWorldPx) {
+  if (maxVisibleWorldPx == null || state.viewportWidthCssPx <= 0 || state.viewportHeightCssPx <= 0) {
+    return 0;
+  }
+  const unitScaleState = { ...state, focusX: 0, focusY: 0, framingScale: 1 };
+  const coeff = coefficients(unitScaleState);
+  const polygon = [
+    { x: 0, y: 0 },
+    { x: state.viewportWidthCssPx, y: 0 },
+    { x: state.viewportWidthCssPx, y: state.viewportHeightCssPx },
+    { x: 0, y: state.viewportHeightCssPx },
+  ].map((point) => groundHit(unitScaleState, coeff, point)).filter(Boolean);
+  const bounds = boundsForGroundPolygon(polygon);
+  return bounds
+    ? Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / maxVisibleWorldPx
+    : 0;
 }
 
 function clampedFocus(state) {
@@ -219,8 +242,15 @@ export class FixedPerspectiveCamera {
     this.viewportHeightCssPx = nonNegative(viewportHeightCssPx, "viewport height");
     this.mapWidthPx = 0;
     this.mapHeightPx = 0;
-    this.minZoom = positive(options.minZoom ?? CAMERA.minZoom, "minimum framing scale");
-    this.maxZoom = Math.max(this.minZoom, positive(options.maxZoom ?? CAMERA.maxZoom, "maximum framing scale"));
+    this._baseMinZoom = positive(options.minZoom ?? CAMERA.minZoom, "minimum framing scale");
+    this._baseMaxZoom = Math.max(
+      this._baseMinZoom,
+      positive(options.maxZoom ?? CAMERA.maxZoom, "maximum framing scale"),
+    );
+    this.maxVisibleWorldPx = optionalPositive(options.maxVisibleWorldPx);
+    this.minZoom = this._baseMinZoom;
+    this.maxZoom = this._baseMaxZoom;
+    this._refreshZoomLimits();
     this._listeners = new Set();
   }
 
@@ -334,7 +364,11 @@ export class FixedPerspectiveCamera {
   resize(width, height) {
     const w = nonNegative(width, "viewport width");
     const h = nonNegative(height, "viewport height");
-    this._mutate(() => { this.viewportWidthCssPx = w; this.viewportHeightCssPx = h; });
+    this._mutate(() => {
+      this.viewportWidthCssPx = w;
+      this.viewportHeightCssPx = h;
+      this._refreshZoomLimits();
+    });
   }
 
   setMapBounds(width, height) {
@@ -366,6 +400,13 @@ export class FixedPerspectiveCamera {
   }
 
   _clampScale(value) { return Math.max(this.minZoom, Math.min(this.maxZoom, value)); }
+
+  _refreshZoomLimits() {
+    const viewportMinZoom = minimumScaleForGroundSpan(this, this.maxVisibleWorldPx);
+    this.minZoom = Math.max(this._baseMinZoom, viewportMinZoom);
+    this.maxZoom = Math.max(this.minZoom, this._baseMaxZoom);
+    this.framingScale = this._clampScale(this.framingScale);
+  }
 
   _clampFocus() {
     const focus = clampedFocus(this);
