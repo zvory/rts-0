@@ -14,13 +14,13 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::acquisition::{DirectFireLegality, DirectFireVisibility};
 use super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::shot_blocker_index::ShotBlockerIndex;
+use super::target_legality::{DirectFireLegality, DirectFireVisibility};
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
 
 const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;
@@ -54,6 +54,11 @@ pub(super) fn fire_tank_coax_system(
         return;
     };
     for id in entities.ids() {
+        let ready =
+            matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
+        if !ready {
+            continue;
+        }
         let Some(snapshot) = tank_coax_snapshot(entities, id, weapon_profile) else {
             continue;
         };
@@ -89,11 +94,6 @@ pub(super) fn fire_tank_coax_system(
             if !reaction_ready {
                 continue;
             }
-        }
-        let ready =
-            matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
-        if !ready {
-            continue;
         }
         let shot_victim_owner = apply_damage(
             map,

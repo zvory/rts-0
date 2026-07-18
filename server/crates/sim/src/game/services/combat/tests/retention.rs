@@ -1,5 +1,7 @@
 use super::*;
+use crate::game::entity::Entity;
 use crate::game::fog::LingeringSightSource;
+use crate::game::services::combat::acquisition::resolve_target as resolve_target_with_obstruction;
 
 fn tank_with_retained_target(
     map: &Map,
@@ -144,6 +146,225 @@ fn lingering_death_vision_feeds_auto_acquisition() {
         ),
         Some(target),
         "death vision is normal fog and should feed auto-acquisition"
+    );
+}
+
+#[test]
+fn cooling_down_unit_keeps_committed_target_instead_of_rescanning() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let committed = entities
+        .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
+        .expect("committed target should spawn");
+    entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 100.0)
+        .expect("higher-priority target should spawn");
+    if let Some(tank) = entities.get_mut(attacker) {
+        tank.set_order(Order::HoldPosition);
+        tank.set_target_id(Some(committed));
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCannon, 10);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 10);
+    }
+
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(committed),
+        "reload ticks should revalidate the committed target without ranking alternatives"
+    );
+}
+
+#[test]
+fn ready_tank_keeps_acquired_target_while_turret_rotates() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let committed = entities
+        .spawn_unit(2, EntityKind::Worker, 100.0, 180.0)
+        .expect("initial target should spawn");
+    if let Some(tank) = entities.get_mut(attacker) {
+        tank.set_order(Order::HoldPosition);
+        tank.set_facing(0.0);
+        tank.set_weapon_facing(0.0);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
+    }
+
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(committed),
+        "tank should acquire the only initial target"
+    );
+    assert_eq!(entities.get(attacker).map(Entity::attack_cd), Some(0));
+
+    entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 150.0, 100.0)
+        .expect("higher-priority target should spawn");
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(committed),
+        "a ready tank should finish rotating toward its committed target before rescanning"
+    );
+}
+
+#[test]
+fn firing_immediately_acquires_the_next_target_for_reload_tracking() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let first = entities
+        .spawn_unit(2, EntityKind::Worker, 130.0, 100.0)
+        .expect("first target should spawn");
+    let next = entities
+        .spawn_unit(2, EntityKind::Worker, 100.0, 140.0)
+        .expect("next target should spawn");
+    if let Some(target) = entities.get_mut(first) {
+        target.apply_damage(target.hp.saturating_sub(1), None);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let attacker = entities.get(attacker).expect("attacker should exist");
+    assert!(
+        attacker.attack_cd() > 0,
+        "the first shot should begin reload"
+    );
+    assert_eq!(
+        attacker.target_id(),
+        Some(next),
+        "the post-fire acquisition pass should commit the next target during reload"
+    );
+}
+
+#[test]
+fn explicit_attack_kill_keeps_fallback_target_through_reload() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let commanded = entities
+        .spawn_unit(2, EntityKind::Worker, 130.0, 100.0)
+        .expect("commanded target should spawn");
+    let fallback = entities
+        .spawn_unit(2, EntityKind::Worker, 100.0, 140.0)
+        .expect("fallback target should spawn");
+    if let Some(attacker) = entities.get_mut(attacker) {
+        attacker.set_order(Order::attack(commanded));
+    }
+    if let Some(target) = entities.get_mut(commanded) {
+        target.apply_damage(target.hp.saturating_sub(1), None);
+    }
+
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(fallback),
+        "killing the commanded target should prepare an automatic fallback"
+    );
+
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(attacker).and_then(Entity::target_id),
+        Some(fallback),
+        "the dead explicit order must not discard its prepared fallback during reload"
+    );
+}
+
+#[test]
+fn ready_weapon_fires_at_valid_reload_target_before_post_fire_retargeting() {
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let retained = entities
+        .spawn_unit(2, EntityKind::Worker, 150.0, 100.0)
+        .expect("reload target should spawn");
+    let higher_priority = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 100.0, 150.0)
+        .expect("higher-priority target should spawn");
+    if let Some(tank) = entities.get_mut(tank) {
+        tank.set_order(Order::HoldPosition);
+        tank.set_target_id(Some(retained));
+        tank.set_facing(0.0);
+        tank.set_weapon_facing(0.0);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCannon, 1);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
+    }
+    let events = run_combat_tick(&mut entities);
+
+    assert!(
+        events.values().flatten().any(
+            |event| matches!(event, Event::Attack { from, to, .. } if *from == tank && *to == retained)
+        ),
+        "the valid target prepared during reload should receive the ready shot"
+    );
+    assert!(
+        events.values().flatten().all(
+            |event| !matches!(event, Event::Attack { from, to, .. } if *from == tank && *to == higher_priority)
+        ),
+        "the ready tick must not switch to a newly preferred target before firing"
+    );
+}
+
+#[test]
+fn ready_weapon_retargets_when_reload_target_is_gone() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let stale = entities
+        .spawn_unit(2, EntityKind::Worker, 130.0, 100.0)
+        .expect("stale target should spawn");
+    let fallback = entities
+        .spawn_unit(2, EntityKind::Worker, 140.0, 100.0)
+        .expect("fallback target should spawn");
+    if let Some(attacker) = entities.get_mut(attacker) {
+        attacker.set_target_id(Some(stale));
+        attacker.set_attack_cd(1);
+    }
+    entities.remove(stale);
+    let fallback_hp = entities.get(fallback).expect("fallback should exist").hp;
+
+    run_combat_tick(&mut entities);
+
+    assert!(
+        entities.get(fallback).expect("fallback should survive").hp < fallback_hp,
+        "an invalid reload target should trigger acquisition and fire on the ready tick"
+    );
+}
+
+#[test]
+fn ready_weapon_retargets_when_reload_target_is_out_of_range() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let out_of_range = entities
+        .spawn_unit(2, EntityKind::Worker, 500.0, 100.0)
+        .expect("prepared target should spawn");
+    let fireable = entities
+        .spawn_unit(2, EntityKind::Worker, 140.0, 100.0)
+        .expect("fireable fallback should spawn");
+    if let Some(attacker) = entities.get_mut(attacker) {
+        attacker.set_order(Order::attack_move_to(600.0, 100.0));
+        attacker.set_target_id(Some(out_of_range));
+        attacker.set_attack_cd(1);
+    }
+
+    let events = run_combat_tick(&mut entities);
+
+    assert!(
+        events.values().flatten().any(
+            |event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == fireable)
+        ),
+        "a ready weapon should replace an out-of-range reload target with a fireable target"
     );
 }
 

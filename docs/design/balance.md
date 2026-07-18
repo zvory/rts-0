@@ -260,10 +260,11 @@ currently inside weapon range and pass hostile, visibility, smoke, line-of-sight
 checks, but it cannot replace the commanded destination with an enemy-directed path. Non-moving-fire
 `AttackMove` units pause for fireable in-range targets and then resume the original destination.
 Direct `Attack` orders and post-arrival behavior remain stationary. Tank auto-targeting first checks
-in-range Anti-Tank Guns, Tanks, Tank
-Traps, and Mortar Teams, in that order, before generic acquisition; this priority can replace a
-retained lower-priority moving-fire target but never considers out-of-range priority targets or
-overrides explicit player attack orders. Forest-specific rules are future work.
+in-range Anti-Tank Guns, Tanks, Tank Traps, and Mortar Teams, in that order, before generic
+acquisition. This priority applies when the tank acquires after firing or when its committed target
+stops being fireable; a still-fireable target prepared during reload is not reranked on the ready
+tick. Priority never considers out-of-range targets or overrides explicit player attack orders.
+Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
@@ -283,12 +284,15 @@ The rules-owned `TargetFacts` surface records the current target-policy facts fo
 only. The live coax policy ranks those infantry-priority targets before fallback legal targets such
 as vehicles, buildings, support weapons, and field obstacles; resource nodes are not legal coax
 targets.
-Moving-fire retention is sticky but not absolute: Tanks, Scout Cars, and
-Methamphetamines-upgraded Riflemen keep a current legal rifle target across equal-rank comparisons so
-they do not flicker between similar enemies, but higher-rank default-weapon threats still steal
-focus. This ranking scope is limited to default attacks; future grenades, satchels, or demolition
-attacks need separate attack profiles and explicit activation/autocast policy instead of being
-folded into default targeting.
+Default weapons perform a full acquisition pass when ready and targetless, immediately after each
+shot to prepare the next engagement during reload, or when the prepared target is no longer
+fireable on the ready tick. Reload, setup, and aiming ticks revalidate only that committed target;
+they do not rerank nearby enemies. A still-fireable prepared target therefore receives the next
+shot even if a higher-priority threat appeared during reload. The post-shot pass may then select
+that higher-priority threat for the following cycle. Tank coax fire has no independent retained
+target slot, so its acquisition pass runs only when the coax cooldown is ready. This cadence is
+limited to default attacks; future grenades, satchels, or demolition attacks need separate attack
+profiles and explicit activation/autocast policy instead of being folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `ROAD_MOVEMENT_SPEED_MULTIPLIER = 1.5`. Bare road plus horizontal, vertical, NW-SE diagonal, and

@@ -261,6 +261,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/player_state.rs",
   "server/crates/sim/src/game/services/ability_orders.rs",
   "server/crates/sim/src/game/services/combat/acquisition.rs",
+  // Combat target legality centralizes the existing Mortar Team indirect-fire exception moved
+  // out of acquisition.rs; it does not expand faction admission or target policy.
+  "server/crates/sim/src/game/services/combat/target_legality.rs",
   "server/crates/sim/src/game/services/combat/damage.rs",
   "server/crates/sim/src/game/services/combat/events.rs",
   "server/crates/sim/src/game/services/combat/mod.rs",
