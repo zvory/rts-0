@@ -15,15 +15,15 @@ use rts_protocol::{
     LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope,
     NoticeSeverity, ObserverAnalysisAiDiagnostics, ObserverAnalysisKindCount,
     ObserverAnalysisPayload, ObserverAnalysisPlayer, ObserverAnalysisProduction,
-    ObserverAnalysisResourcesLost, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
-    PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags, ProtocolVocabularies,
-    RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode,
-    RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, ServerMessage,
-    SlotField, SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
-    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
-    VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
-    LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
-    LAB_REPLAY_MAX_ARTIFACT_BYTES, LAB_REPLAY_MAX_OPERATIONS,
+    ObserverAnalysisResourcesLost, ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot,
+    PlayerScore, PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
+    ProtocolVocabularies, RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata,
+    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
+    ScoutPlaneStateView, ServerMessage, SlotField, SmokeCloudView, Snapshot, SnapshotCodec,
+    SnapshotCodecContract, SnapshotEncodeError, SnapshotFrame, SnapshotNetStatus, StartPayload,
+    TeamId, TrenchView, VisibilityCapabilities, VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION,
+    COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID, LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA,
+    LAB_REPLAY_ARTIFACT_SCHEMA_VERSION, LAB_REPLAY_MAX_ARTIFACT_BYTES, LAB_REPLAY_MAX_OPERATIONS,
     LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS, MESSAGEPACK_SNAPSHOT_FRAME_MAGIC,
     PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
     SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
@@ -85,6 +85,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<MovementPathDiagnosticScope>();
     assert_type::<NoticeSeverity>();
     assert_type::<ObserverAnalysisKindCount>();
+    assert_type::<ObserverViewSelection>();
     assert_type::<ObserverAnalysisAiDiagnostics>();
     assert_type::<ObserverAnalysisPayload>();
     assert_type::<ObserverAnalysisPlayer>();
@@ -161,7 +162,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 42);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 43);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");

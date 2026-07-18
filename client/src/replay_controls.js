@@ -7,7 +7,15 @@ import { FloatingRoomTimePanel } from "./room_time_panel.js";
 const ROOM_TIME_CONFIRMATION_TIMEOUT_MS = 3_000;
 
 export class RoomTimeControls {
-  constructor({ net, state, controlPolicy = null, replayViewer = false, capabilities = null, label = null }) {
+  constructor({
+    net,
+    state,
+    controlPolicy = null,
+    replayViewer = false,
+    capabilities = null,
+    label = null,
+    initialVisionSelection = null,
+  }) {
     this.net = net;
     this.state = state;
     this.replayViewer = !!replayViewer;
@@ -16,7 +24,7 @@ export class RoomTimeControls {
     this.visibility = this.capabilities.visibility || {};
     this.actions = this.capabilities.actions || {};
     this.label = label || (this.replayViewer ? "Replay" : "Room time");
-    this.visionSelection = new Set();
+    this.visionSelection = visionSelectionIds(initialVisionSelection, this.state?.players);
     this.roomTimeState = null;
     this.roomTimeSeekPending = false;
     this.roomTimeSeekTargetTick = null;
@@ -30,7 +38,7 @@ export class RoomTimeControls {
     this.lastRoomTimeSpeed = 2;
     this.floatingPanel = null;
 
-    if (!dom.roomTimeControls || !this.roomTime.available) return;
+    if (!dom.roomTimeControls || (!this.roomTime.available && !this.visibility.visionSelection)) return;
 
     dom.roomTimeControls.hidden = false;
     dom.roomTimeControls.classList.toggle("replay-viewer-controls", this.replayViewer);
@@ -56,11 +64,22 @@ export class RoomTimeControls {
     if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
     if (this.replayViewer && this.actions.branchFromTick) this.buildBranchFromTickControl();
     if (this.visibility.visionSelection) this.buildVisionSelectionControls();
-    this.buildRoomTimeStatus();
-    if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
-    this.syncRoomTimePendingPresentation();
-    this.updateRoomTimePauseButton();
-    this.updateRoomTimeStatus();
+    if (this.roomTime.available) {
+      this.buildRoomTimeStatus();
+      if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
+      this.syncRoomTimePendingPresentation();
+      this.updateRoomTimePauseButton();
+      this.updateRoomTimeStatus();
+    }
+  }
+
+  visionSelectionRequest() {
+    const playerIds = [...this.visionSelection].sort((a, b) => a - b);
+    if (playerIds.length === 0) return { mode: VISION_SELECTION.ALL };
+    if (playerIds.length === 1) {
+      return { mode: VISION_SELECTION.PLAYER, playerId: playerIds[0] };
+    }
+    return { mode: VISION_SELECTION.PLAYERS, playerIds };
   }
 
   roomTimeControlSurface() {
@@ -338,14 +357,14 @@ export class RoomTimeControls {
     const group = document.createElement("div");
     group.className = "vision-selection-controls";
     group.setAttribute("role", "group");
-    group.setAttribute("aria-label", "Replay fog perspective");
+    group.setAttribute("aria-label", "Observer perspective");
 
     const all = document.createElement("button");
     all.type = "button";
-    all.className = "spd-btn vision-btn active";
+    all.className = "spd-btn vision-btn";
     all.dataset.vision = "all";
-    all.textContent = "All vision";
-    all.title = "Show the union of all players' fog perspectives.";
+    all.textContent = "Omniscient";
+    all.title = "Show the complete world and every owner's private details.";
     this.bindRoomTimeActivation(all, (event) => this.onVisionSelectionClick({
       target: all,
       shiftKey: event?.shiftKey,
@@ -372,6 +391,7 @@ export class RoomTimeControls {
     }
 
     surface.appendChild(group);
+    this.syncVisionSelectionButtons();
   }
 
   buildRoomTimeStatus() {
@@ -543,7 +563,7 @@ export class RoomTimeControls {
     if (!btn || btn.hidden || btn.disabled) return;
     if (btn.dataset.vision === "all") {
       this.visionSelection.clear();
-      this.net.setVisionSelection({ mode: VISION_SELECTION.ALL });
+      this.net.setVisionSelection(this.visionSelectionRequest());
       this.syncVisionSelectionButtons();
       return;
     }
@@ -557,19 +577,7 @@ export class RoomTimeControls {
       this.visionSelection.clear();
       this.visionSelection.add(id);
     }
-    if (this.visionSelection.size === 0) {
-      this.net.setVisionSelection({ mode: VISION_SELECTION.ALL });
-    } else if (this.visionSelection.size === 1) {
-      this.net.setVisionSelection({
-        mode: VISION_SELECTION.PLAYER,
-        playerId: [...this.visionSelection][0],
-      });
-    } else {
-      this.net.setVisionSelection({
-        mode: VISION_SELECTION.PLAYERS,
-        playerIds: [...this.visionSelection].sort((a, b) => a - b),
-      });
-    }
+    this.net.setVisionSelection(this.visionSelectionRequest());
     this.syncVisionSelectionButtons();
   }
 
@@ -651,6 +659,26 @@ export class RoomTimeControls {
     this.floatingPanel?.destroy();
     this.floatingPanel = null;
   }
+}
+
+function visionSelectionIds(selection, players) {
+  const knownIds = new Set(
+    (Array.isArray(players) ? players : [])
+      .map((player) => Number(player?.id))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  );
+  if (!selection || selection.mode === VISION_SELECTION.ALL) return new Set();
+
+  const candidates = selection.mode === VISION_SELECTION.PLAYER
+    ? [selection.playerId]
+    : selection.mode === VISION_SELECTION.PLAYERS
+      ? selection.playerIds
+      : [];
+  return new Set(
+    (Array.isArray(candidates) ? candidates : [])
+      .map((id) => Number(id))
+      .filter((id) => knownIds.has(id)),
+  );
 }
 
 export class ReplayControls extends RoomTimeControls {}

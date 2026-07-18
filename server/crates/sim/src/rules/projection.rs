@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::ability;
-use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     active_trench_occupation, fires_while_moving, supports_manual_emplacement,
     tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore, GatherPhase, Order,
@@ -20,6 +20,10 @@ use crate::protocol;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
+use super::projection_abilities::{
+    active_ability_object_expires_in, active_return_object_id, return_available_tick,
+};
+
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
@@ -28,7 +32,7 @@ pub struct EntityProjectionContext<'a> {
     pub fog: &'a Fog,
     pub actionable_fog: Option<&'a Fog>,
     pub private_detail_fog: Option<&'a Fog>,
-    pub private_detail_projection: PrivateDetailProjection,
+    pub private_detail_projection: PrivateDetailProjection<'a>,
     pub smokes: Option<&'a SmokeCloudStore>,
     pub fogged: bool,
     pub entities: &'a EntityStore,
@@ -60,16 +64,47 @@ impl DebugPathProjection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PrivateDetailProjection {
+pub(crate) enum PrivateDetailProjection<'a> {
     ExactViewer,
+    SelectedOwners(&'a [u32]),
     AllProjected,
 }
 
-impl PrivateDetailProjection {
+impl PrivateDetailProjection<'_> {
     fn viewer_for(self, viewer: u32, entity: &Entity) -> Option<u32> {
         match self {
             Self::ExactViewer => (entity.owner == viewer).then_some(viewer),
+            Self::SelectedOwners(player_ids) => {
+                player_ids.contains(&entity.owner).then_some(entity.owner)
+            }
             Self::AllProjected => (entity.owner != 0).then_some(entity.owner),
+        }
+    }
+
+    fn includes_owner(self, viewer: u32, owner: u32) -> bool {
+        match self {
+            Self::ExactViewer => owner == viewer,
+            Self::SelectedOwners(player_ids) => player_ids.contains(&owner),
+            Self::AllProjected => owner != 0,
+        }
+    }
+
+    fn includes_owner_or_ally(
+        self,
+        viewer: u32,
+        owner: u32,
+        teams: Option<&TeamRelations>,
+    ) -> bool {
+        match self {
+            Self::ExactViewer => teams
+                .map(|teams| teams.same_team_or_same_owner(viewer, owner))
+                .unwrap_or(owner == viewer),
+            Self::SelectedOwners(player_ids) => player_ids.iter().any(|selected| {
+                teams
+                    .map(|teams| teams.same_team_or_same_owner(*selected, owner))
+                    .unwrap_or(owner == *selected)
+            }),
+            Self::AllProjected => owner != 0,
         }
     }
 }
@@ -209,7 +244,11 @@ pub fn project_entity(
     entity: &Entity,
     context: EntityProjectionContext<'_>,
 ) -> Option<EntityView> {
+    let selected_owner = context
+        .private_detail_projection
+        .includes_owner(viewer, entity.owner);
     if context.fogged
+        && !selected_owner
         && !context
             .smokes
             .map(|smokes| entity_visible_to_with_smoke(viewer, entity, context.fog, smokes))
@@ -232,12 +271,12 @@ pub fn project_entity(
     let private_detail_fog = context.private_detail_fog.unwrap_or(actionable_fog);
     let private_detail_viewer = context.private_detail_projection.viewer_for(viewer, entity);
     let private_detail_owner = private_detail_viewer.is_some();
-    let owner_or_ally = context
-        .teams
-        .map(|teams| teams.same_team_or_same_owner(viewer, entity.owner))
-        .unwrap_or(entity.owner == viewer)
-        || private_detail_owner;
-    let exact_owner = entity.owner == viewer;
+    let owner_or_ally = context.private_detail_projection.includes_owner_or_ally(
+        viewer,
+        entity.owner,
+        context.teams,
+    );
+    let exact_owner = private_detail_owner;
     let vision_only = context.fogged
         && !owner_or_ally
         && !entity.is_node()
@@ -719,60 +758,6 @@ fn debug_path_view(entity: &Entity) -> Option<DebugPathView> {
 
 fn debug_path_point(x: f32, y: f32) -> Option<DebugPathPoint> {
     (x.is_finite() && y.is_finite()).then_some(DebugPathPoint { x, y })
-}
-
-fn active_return_object_id(
-    context: &EntityProjectionContext<'_>,
-    entity: &Entity,
-    ability: ability::AbilityKind,
-) -> Option<u32> {
-    if ability == ability::AbilityKind::EkatMagicAnchor {
-        return context
-            .ability_runtime?
-            .active_anchor(entity.owner, entity.id, ability, context.tick)
-            .map(|object| object.id.get());
-    }
-    context
-        .ability_runtime?
-        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
-        .map(|object| object.id.get())
-}
-
-fn return_available_tick(
-    context: &EntityProjectionContext<'_>,
-    entity: &Entity,
-    ability: ability::AbilityKind,
-) -> Option<u32> {
-    match context
-        .ability_runtime?
-        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)?
-        .payload
-    {
-        AbilityObjectPayload::DashReturn {
-            earliest_return_tick,
-        } => Some(earliest_return_tick),
-        _ => None,
-    }
-}
-
-fn active_ability_object_expires_in(
-    context: &EntityProjectionContext<'_>,
-    entity: &Entity,
-    ability: ability::AbilityKind,
-) -> Option<u16> {
-    if ability == ability::AbilityKind::Breakthrough {
-        return (entity.breakthrough_aura_ticks() > 0).then_some(entity.breakthrough_aura_ticks());
-    }
-    if ability == ability::AbilityKind::EkatMagicAnchor {
-        return context
-            .ability_runtime?
-            .active_anchor(entity.owner, entity.id, ability, context.tick)
-            .and_then(|object| object.expires_in(context.tick));
-    }
-    context
-        .ability_runtime?
-        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
-        .and_then(|object| object.expires_in(context.tick))
 }
 
 #[cfg(test)]

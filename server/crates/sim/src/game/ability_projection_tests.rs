@@ -176,6 +176,7 @@ fn spectator_and_full_snapshots_project_ability_objects() {
         .expect("hidden object should spawn");
 
     let spectator = game.snapshot_for_spectator(&[1, 2]);
+    let player_two = game.snapshot_for_observer(&super::ObserverView::Players(vec![2]));
     let full = game.snapshot_full_for(1);
 
     assert!(spectator
@@ -186,6 +187,11 @@ fn spectator_and_full_snapshots_project_ability_objects() {
         .ability_objects
         .iter()
         .any(|object| object.id == hidden_id));
+    assert!(player_two
+        .ability_objects
+        .iter()
+        .filter(|object| object.owner == 1)
+        .all(|object| object.owner_state.is_none()));
     assert!(full
         .ability_objects
         .iter()

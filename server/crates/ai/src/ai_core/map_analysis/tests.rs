@@ -81,6 +81,7 @@ fn start_payload_for_terrain(
         diagnostics: Default::default(),
         replay: None,
         lab: None,
+        observer_view: None,
         tick: 0,
         map: MapInfo {
             width,
@@ -645,6 +646,7 @@ fn resource_mappings_prefer_reachable_components_over_cross_wall_distance() {
         diagnostics: Default::default(),
         replay: None,
         lab: None,
+        observer_view: None,
         tick: 0,
         map: MapInfo {
             width,
@@ -725,6 +727,7 @@ fn analysis_key_tracks_static_map_start_and_resource_identity() {
         diagnostics: Default::default(),
         replay: None,
         lab: None,
+        observer_view: None,
         tick: 0,
         map: MapInfo {
             width: 4,

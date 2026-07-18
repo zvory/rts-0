@@ -2,7 +2,9 @@ use super::connection::send_or_log;
 use super::connection::CommandSimAckSample;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::participants::Participants;
-use super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
+use super::projection::{
+    scope_observer_analysis, ObserverAnalysisAudience, ProjectionPolicy, RecipientRole,
+};
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
@@ -12,6 +14,7 @@ use crate::protocol::{
 use rts_ai::{AiController, AiThinkContext};
 use rts_sim::game::replay::ReplayStartComposition;
 use rts_sim::game::Game;
+use rts_sim::game::ObserverView;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
 use tokio::time::Instant as TokioInstant;
@@ -43,10 +46,43 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) pending_client_command_acks: &'a mut Vec<PendingClientCommandAck>,
     pub(super) pending_recipient_notices: &'a mut HashMap<u32, Vec<Event>>,
     pub(super) slow_tick_count: &'a mut u32,
-    pub(super) spectator_visible_players: Vec<u32>,
-    pub(super) lab_visible_player_ids_by_recipient: HashMap<u32, Vec<u32>>,
+    pub(super) observer_views: HashMap<u32, ObserverView>,
+    pub(super) observer_include_private_notices: bool,
     pub(super) projection_policy: ProjectionPolicy,
     pub(super) replay_start: Option<&'a ReplayStartComposition>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn fanout_current_observer_snapshots(
+    room: &str,
+    players: &mut HashMap<u32, RoomPlayer>,
+    observer_views: &HashMap<u32, ObserverView>,
+    projection_policy: ProjectionPolicy,
+    recipients: impl IntoIterator<Item = u32>,
+    slow_tick_count: &mut u32,
+    tick_budget: Duration,
+    tick_start: StdInstant,
+    game: &Game,
+) {
+    let mut per_player_events = HashMap::new();
+    SnapshotFanout::new(
+        room,
+        Duration::ZERO,
+        tick_budget,
+        tick_start,
+        slow_tick_count,
+        None,
+    )
+    .send_to_recipients(players, recipients, |id, player| {
+        let projection = projection_policy.selected_perspective_snapshot_for(
+            observer_views
+                .get(&id)
+                .cloned()
+                .unwrap_or(ObserverView::Omniscient),
+        );
+        let snapshot = projection.snapshot_with_events(game, &mut per_player_events, &[]);
+        Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+    });
 }
 
 impl LiveTickDriver<'_> {
@@ -229,8 +265,7 @@ impl LiveTickDriver<'_> {
             .filter(|id| !self.outcome_sent.contains(id))
             .collect();
         let branch_live_seat_by_connection = self.branch_live_seat_by_connection;
-        let spectator_visible_players = self.spectator_visible_players.clone();
-        let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient.clone();
+        let observer_views = self.observer_views.clone();
         let pending_recipient_notices = &*self.pending_recipient_notices;
 
         let delivered_recipients = SnapshotFanout::new(
@@ -247,16 +282,21 @@ impl LiveTickDriver<'_> {
             } else {
                 RecipientRole::ActivePlayer
             };
-            let projection = match lab_visible_player_ids_by_recipient.get(&id) {
-                Some(player_ids) => self
-                    .projection_policy
-                    .selected_perspective_snapshot_for(player_ids.clone()),
-                None => self.projection_policy.live_snapshot_for(
+            let projection = if role == RecipientRole::Spectator {
+                self.projection_policy.observer_snapshot_for(
+                    observer_views
+                        .get(&id)
+                        .cloned()
+                        .unwrap_or(ObserverView::Omniscient),
+                    self.observer_include_private_notices,
+                )
+            } else {
+                self.projection_policy.live_snapshot_for(
                     role,
                     id,
                     branch_live_seat_by_connection.get(&id).copied(),
-                    &spectator_visible_players,
-                ),
+                    &[],
+                )
             };
             let snapshot =
                 projection.snapshot_with_events(game, per_player_events, &full_vision_events);
@@ -287,12 +327,25 @@ impl LiveTickDriver<'_> {
             return;
         }
 
-        let msg = ServerMessage::ObserverAnalysis(self.observer_analysis_with_ai_diagnostics(game));
+        let full_analysis = self.observer_analysis_with_ai_diagnostics(game);
         for id in spectator_ids {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
-            send_or_log(self.room, id, &player.msg_tx, msg.clone());
+            let view = self
+                .observer_views
+                .get(&id)
+                .cloned()
+                .unwrap_or(ObserverView::Omniscient);
+            send_or_log(
+                self.room,
+                id,
+                &player.msg_tx,
+                ServerMessage::ObserverAnalysis(scope_observer_analysis(
+                    full_analysis.clone(),
+                    &view,
+                )),
+            );
         }
     }
 

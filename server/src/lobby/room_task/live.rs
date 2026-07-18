@@ -82,17 +82,14 @@ impl RoomTask {
         super::super::launch::send_start_payloads(
             &self.room,
             &builder,
-            [LaunchRecipient {
-                connection_id: player_id,
-                payload_player_id: player_id,
-                prediction: LaunchPrediction::Disabled,
-                role: RecipientRole::Spectator,
-                diagnostics: projection_policy
-                    .diagnostic_capabilities_for(RecipientRole::Spectator),
-                clear_pending_snapshot: true,
-                lab: None,
-                msg_tx: player.msg_tx.clone(),
-            }],
+            [LaunchRecipient::observer(
+                player_id,
+                projection_policy.diagnostic_capabilities_for(RecipientRole::Spectator),
+                true,
+                None,
+                self.observer_view_selection_for(player_id),
+                player.msg_tx.clone(),
+            )],
         );
         if self.live_pause_controls_available() {
             self.send_live_pause_state_to(player_id);
@@ -540,6 +537,8 @@ impl RoomTask {
                     diagnostics: projection_policy.diagnostic_capabilities_for(role),
                     clear_pending_snapshot: false,
                     lab: None,
+                    observer_view: (role == RecipientRole::Spectator)
+                        .then(|| self.observer_view_selection_for(id)),
                     msg_tx: player.msg_tx.clone(),
                 })
             })
@@ -623,8 +622,7 @@ impl RoomTask {
         let tick_budget = self.current_tick_interval();
         let match_run_id = self.match_run_id.as_deref();
         let ai_player_count = self.ai_players.len();
-        let spectator_visible_players = self.spectator_visible_player_ids();
-        let lab_visible_player_ids_by_recipient = self.lab_visible_player_ids_by_recipient(&game);
+        let observer_views = self.observer_views.clone();
         let record_lab_timeline = matches!(self.mode, super::types::RoomMode::Lab(_));
         let result = LiveTickDriver {
             room: &self.room,
@@ -641,8 +639,8 @@ impl RoomTask {
             pending_client_command_acks: &mut self.pending_client_command_acks,
             pending_recipient_notices: &mut self.pending_recipient_notices,
             slow_tick_count: &mut self.slow_tick_count,
-            spectator_visible_players,
-            lab_visible_player_ids_by_recipient,
+            observer_views,
+            observer_include_private_notices: record_lab_timeline,
             projection_policy,
             replay_start: self.replay_start.as_ref(),
         }

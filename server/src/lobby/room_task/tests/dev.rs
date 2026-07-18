@@ -26,7 +26,7 @@ fn dev_scenario_start_payload_is_read_only_viewer_payload() {
     let starts = start_payloads(&mut writer);
     assert_eq!(starts.len(), 1);
     let payload = &starts[0];
-    assert_eq!(payload.player_id, task.dev_view_player_id.unwrap());
+    assert_eq!(payload.player_id, 99);
     assert!(payload.spectator);
     assert!(payload.prediction_build_id.is_none());
     assert_eq!(payload.prediction_version, 0);
@@ -41,7 +41,7 @@ fn dev_scenario_start_payload_is_read_only_viewer_payload() {
     assert!(!payload.capabilities.room_time.timeline);
     assert!(!payload.capabilities.commands.gameplay);
     assert!(!payload.capabilities.match_controls.pause);
-    assert!(!payload.capabilities.visibility.vision_selection);
+    assert!(payload.capabilities.visibility.vision_selection);
     assert!(!payload.capabilities.actions.branch_from_tick);
     assert_eq!(
         payload.diagnostics.movement_paths,

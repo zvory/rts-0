@@ -1,26 +1,26 @@
 use super::*;
 
 #[derive(Clone, Copy)]
-enum PlayerResourceProjection<'a> {
+pub(in crate::game) enum PlayerResourceProjection<'a> {
     None,
     All,
     Selected(&'a [u32]),
 }
 
 #[derive(Clone, Copy)]
-struct SnapshotMode<'a> {
-    player: u32,
-    memory_players: &'a [u32],
-    fog: &'a Fog,
-    actionable_fog: Option<&'a Fog>,
-    fogged: bool,
-    player_resource_projection: PlayerResourceProjection<'a>,
-    private_detail_projection: projection::PrivateDetailProjection,
+pub(in crate::game) struct SnapshotMode<'a> {
+    pub(in crate::game) player: u32,
+    pub(in crate::game) memory_players: &'a [u32],
+    pub(in crate::game) fog: &'a Fog,
+    pub(in crate::game) actionable_fog: Option<&'a Fog>,
+    pub(in crate::game) fogged: bool,
+    pub(in crate::game) player_resource_projection: PlayerResourceProjection<'a>,
+    pub(in crate::game) private_detail_projection: projection::PrivateDetailProjection<'a>,
+    pub(in crate::game) owner_visible_players: &'a [u32],
+    pub(in crate::game) omniscient: bool,
 }
 
 impl Game {
-    const SPECTATOR_VIEWER_ID: u32 = 0;
-
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
@@ -38,6 +38,8 @@ impl Game {
                 fogged: true,
                 player_resource_projection: PlayerResourceProjection::None,
                 private_detail_projection: projection::PrivateDetailProjection::ExactViewer,
+                owner_visible_players: &[player],
+                omniscient: false,
             },
             options,
         )
@@ -63,40 +65,18 @@ impl Game {
                 fogged: false,
                 player_resource_projection: PlayerResourceProjection::All,
                 private_detail_projection: projection::PrivateDetailProjection::AllProjected,
+                owner_visible_players: &[],
+                omniscient: true,
             },
             options,
         )
     }
 
-    /// Build a spectator snapshot from the union of all active players' current fog.
-    pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot {
-        self.snapshot_for_spectator_with_options(visible_players, SnapshotOptions::default())
-    }
-
-    pub fn snapshot_for_spectator_with_options(
+    pub(in crate::game) fn snapshot_for_mode(
         &self,
-        visible_players: &[u32],
+        mode: SnapshotMode<'_>,
         options: SnapshotOptions,
     ) -> Snapshot {
-        let actionable_fog = self
-            .state
-            .fog
-            .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
-        self.snapshot_for_mode(
-            SnapshotMode {
-                player: Self::SPECTATOR_VIEWER_ID,
-                memory_players: visible_players,
-                fog: &actionable_fog,
-                actionable_fog: Some(&actionable_fog),
-                fogged: true,
-                player_resource_projection: PlayerResourceProjection::Selected(visible_players),
-                private_detail_projection: projection::PrivateDetailProjection::ExactViewer,
-            },
-            options,
-        )
-    }
-
-    fn snapshot_for_mode(&self, mode: SnapshotMode<'_>, options: SnapshotOptions) -> Snapshot {
         let SnapshotMode {
             player,
             memory_players,
@@ -105,6 +85,8 @@ impl Game {
             fogged,
             player_resource_projection,
             private_detail_projection,
+            owner_visible_players,
+            omniscient,
         } = mode;
         let ps = self.player(player);
         let teams = self.team_relations();
@@ -166,12 +148,12 @@ impl Game {
         } else {
             Vec::new()
         };
-        let mut smokes =
-            if fogged && matches!(player_resource_projection, PlayerResourceProjection::None) {
-                self.state
-                    .smokes
-                    .iter()
-                    .filter(|cloud| {
+        let mut smokes = if fogged && !omniscient {
+            self.state
+                .smokes
+                .iter()
+                .filter(|cloud| {
+                    if owner_visible_players.is_empty() {
                         self.state.smokes.visible_to_player(
                             cloud,
                             player,
@@ -179,35 +161,49 @@ impl Game {
                             &self.state.entities,
                             &teams,
                         )
-                    })
-                    .map(|cloud| crate::protocol::SmokeCloudView {
-                        id: cloud.id,
-                        x: cloud.x,
-                        y: cloud.y,
-                        radius_tiles: cloud.radius_tiles,
-                        expires_in: cloud.expires_in(self.state.tick),
-                    })
-                    .collect::<Vec<_>>()
-            } else {
-                self.state
-                    .smokes
-                    .iter()
-                    .map(|cloud| crate::protocol::SmokeCloudView {
-                        id: cloud.id,
-                        x: cloud.x,
-                        y: cloud.y,
-                        radius_tiles: cloud.radius_tiles,
-                        expires_in: cloud.expires_in(self.state.tick),
-                    })
-                    .collect::<Vec<_>>()
-            };
+                    } else {
+                        owner_visible_players.iter().any(|selected| {
+                            let selected_fog =
+                                self.team_current_fog_for(*selected, &self.state.fog);
+                            self.state.smokes.visible_to_player(
+                                cloud,
+                                *selected,
+                                &selected_fog,
+                                &self.state.entities,
+                                &teams,
+                            )
+                        })
+                    }
+                })
+                .map(|cloud| crate::protocol::SmokeCloudView {
+                    id: cloud.id,
+                    x: cloud.x,
+                    y: cloud.y,
+                    radius_tiles: cloud.radius_tiles,
+                    expires_in: cloud.expires_in(self.state.tick),
+                })
+                .collect::<Vec<_>>()
+        } else {
+            self.state
+                .smokes
+                .iter()
+                .map(|cloud| crate::protocol::SmokeCloudView {
+                    id: cloud.id,
+                    x: cloud.x,
+                    y: cloud.y,
+                    radius_tiles: cloud.radius_tiles,
+                    expires_in: cloud.expires_in(self.state.tick),
+                })
+                .collect::<Vec<_>>()
+        };
         smokes.sort_by_key(|smoke| smoke.id);
         let mut ability_objects = ability_projection::ability_object_views_for(
             self,
             player,
             fog,
             fogged,
-            !matches!(player_resource_projection, PlayerResourceProjection::None),
+            owner_visible_players,
+            omniscient,
         );
         ability_objects.sort_by_key(|object| object.id);
         let trenches = self
@@ -233,7 +229,9 @@ impl Game {
             smokes,
             ability_objects,
             trenches,
-            visible_tiles: if fogged {
+            visible_tiles: if omniscient {
+                self.state.fog.all_visible_tiles()
+            } else if fogged {
                 fog.visible_tiles_for(player)
             } else {
                 Vec::new()
@@ -241,14 +239,18 @@ impl Game {
             remembered_buildings,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
-            upgrades: ps
-                .map(|p| {
-                    p.upgrades
-                        .iter()
-                        .map(|upgrade| upgrade.to_protocol_str().to_string())
-                        .collect()
-                })
-                .unwrap_or_default(),
+            upgrades: match player_resource_projection {
+                PlayerResourceProjection::Selected([only]) => self.player(*only),
+                PlayerResourceProjection::None | PlayerResourceProjection::All => ps,
+                PlayerResourceProjection::Selected(_) => None,
+            }
+            .map(|p| {
+                p.upgrades
+                    .iter()
+                    .map(|upgrade| upgrade.to_protocol_str().to_string())
+                    .collect()
+            })
+            .unwrap_or_default(),
             player_resources,
             net_status: crate::protocol::SnapshotNetStatus::default(),
         }
@@ -268,7 +270,13 @@ impl Game {
         let mut views: Vec<RememberedBuildingView> = Vec::new();
         for &memory_player in memory_players {
             for entry in self.state.building_memory.entries_for_player(memory_player) {
-                if self.live_entity_projects_for_remembered_building(player, entry.id, fog, teams) {
+                if self.live_entity_projects_for_remembered_building(
+                    player,
+                    memory_players,
+                    entry.id,
+                    fog,
+                    teams,
+                ) {
                     continue;
                 }
                 let view = RememberedBuildingView {
@@ -296,6 +304,7 @@ impl Game {
     fn live_entity_projects_for_remembered_building(
         &self,
         player: u32,
+        selected_players: &[u32],
         entity_id: u32,
         fog: &Fog,
         teams: &crate::game::teams::TeamRelations,
@@ -308,7 +317,9 @@ impl Game {
                     fog,
                     actionable_fog: Some(fog),
                     private_detail_fog: Some(&self.state.fog),
-                    private_detail_projection: projection::PrivateDetailProjection::ExactViewer,
+                    private_detail_projection: projection::PrivateDetailProjection::SelectedOwners(
+                        selected_players,
+                    ),
                     smokes: Some(&self.state.smokes),
                     fogged: true,
                     entities: &self.state.entities,
@@ -345,6 +356,11 @@ impl Game {
                 supply_used: player.supply_used,
                 supply_cap: config::PLAYER_SUPPLY_CAP,
                 apm: self.current_apm(player.id),
+                upgrades: player
+                    .upgrades
+                    .iter()
+                    .map(|upgrade| upgrade.to_protocol_str().to_string())
+                    .collect(),
             })
             .collect()
     }

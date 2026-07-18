@@ -476,12 +476,14 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     room: string,                // safe public lab id, not the hidden internal room prefix
     operatorId: u32,
     role: "operator"|"readOnly",
-    vision: { mode: "all" } | { mode: "team", teamId: u32 }, // recipient's lab vision
+    vision: { mode: "all" } | { mode: "team", teamId: u32 }, // legacy setup/default metadata; runtime selection uses setVisionSelection
     godModePlayers?: u32[],
     initialCamera?: { centerX: u32, centerY: u32 }, // optional world-pixel camera center from the selected setup
     dirty: bool,
     operationCount: u32
   },
+  observerView?: { mode: "all" } | { mode: "player", playerId: u32 } | { mode: "players", playerIds: u32[] },
+  // authoritative per-connection privileged observer selection; omitted for active players
   tick: u32,                     // starting tick (0 for normal starts; restored checkpoint tick for checkpoint replays)
   map: {
     width: u32, height: u32,     // in tiles
@@ -516,15 +518,17 @@ speed-only room-time capability profile: connected spectators receive room-time 
 controls, but no step, relative seek, absolute seek, or timeline capability.
 Replay branch live rooms also advertise `matchControls.pause` to both claimed-seat and observer
 recipients; gameplay commands remain claimed-seat only through the branch-live seat alias path.
-Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
-`visibility.visionSelection: true`. Replay branch creation is advertised separately with
+Every privileged observer (live spectator, replay, dev-watch, and Lab) advertises
+`visibility.visionSelection: true`. Replay playback additionally advertises room-time
+speed/pause/relative seek/absolute seek/timeline controls. Replay branch creation is advertised separately with
 `actions.branchFromTick: true` only when the current replay can accept a branch request. Dev scenario
 watch rooms advertise speed/pause/step room-time controls without seek. Lab rooms advertise
-speed/pause/step/relative seek/absolute seek/timeline controls, but still do not advertise
-vision-selection or branch-from-tick controls. Clients must not infer these shared affordances
+speed/pause/step/relative seek/absolute seek/timeline controls and generic vision selection, but
+not branch-from-tick controls. Clients must not infer these shared affordances
 from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 The browser's shared room-time controls render lab seek and keyframe metadata from these
-capabilities and `roomTimeState`; per-operator lab vision remains a separate lab-control state.
+capabilities and `roomTimeState`; observer perspective is per connection and remains separate from
+Lab command authority.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
@@ -628,7 +632,7 @@ transport decode:
   rememberedBuildings?: RememberedBuilding[], // stale enemy building intel for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
-  playerResources?: {id, steel, oil, supplyUsed, supplyCap, apm}[], // projected players; observer modes only; apm is a rolling 10-second command-envelope rate
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap, apm, upgrades?}[], // projected players; observer modes only; upgrades are that real owner's completed research
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
     tickMs: u16,              // elapsed room-tick work so far when this snapshot was built
@@ -646,10 +650,10 @@ transport decode:
 Steel, Oil, and Supply are fixed protocol fields for this faction plan. Normal snapshots,
 observer `playerResources`, compact `"s"`, compact `"pr"`, start-map resources, score values, and
 observer analysis remain on the current Steel/Oil/Supply schema; faction-specific or arbitrary
-resource vectors are deferred to a separate generic-resource migration. Replay, live spectator, and
-lab team/all-team snapshots include `playerResources` rows only for the real player ids selected by
-that view; all-player replay/live-spectator, all-team Lab, and full-world dev projections expose all
-active player rows, while one-player replay and lab team vision expose only that player/team.
+resource vectors are deferred to a separate generic-resource migration. Selected observer snapshots
+include `playerResources` rows only for the explicitly selected real player ids; omniscient views
+expose all active player rows. Each row carries that owner's completed research so multi-player
+observer views do not depend on the single-recipient top-level `upgrades` field.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
@@ -708,7 +712,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 42. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 43. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -734,7 +738,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 42,
+  "v": 43,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -755,7 +759,7 @@ adds an explicit application compression envelope.
   "wc": [1024, 2048],             // worldCombatPosition; omitted when inactive
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
-  "pr": [[id, steel, oil, supplyUsed, supplyCap, apm]], // projected observer playerResources; omitted when empty
+  "pr": [[id, steel, oil, supplyUsed, supplyCap, apm, [upgradeCode...]]], // projected observer playerResources; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
         predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
 }
@@ -1098,19 +1102,20 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 
 #### 2.5.1 Projection contract summary
 
-Projection modes select a viewer, an optional command issuer, a snapshot body, and an event policy
-separately. Normal active-player views use the recipient's living-team current fog for entity
+Projection modes select a view and an event policy separately from command authority. Normal
+active-player views use the recipient's living-team current fog for entity
 visibility but keep resources, upgrades, ability affordances, command authority, order plans, and
 rally plans exact-owner-only. Lab operator command surfaces are the exception on the client side:
 they are still spectator-shaped projections, but `issueCommandAs` names the selected real player as
 the authoritative command issuer and rejects mixed-owner selections.
 
-Replay, live spectator, and Lab team/all-team views pass selected real player ids through one
-projection seam. The same selected ids drive `visibleTiles`, visible entities, remembered-building
-memory, `playerResources`, and event unions; switching a replay viewer from all-player vision to
-one player therefore replaces both current fog and stale memory with that player's projection.
-Full-world dev projections use full-world snapshots plus full-world event unions, not a fake
-viewer id; per-entity private planning fields are evaluated against each entity's real owner.
+Live spectator, replay, dev-watch, and Lab views pass one shared `ObserverView` through one
+projection seam: `Omniscient` or a non-empty set of real player ids. Omniscient means the complete
+world, all-owner private detail, all visible tiles, and the full event union; it is not an
+all-player fog union. Selected ids drive effective team fog, `visibleTiles`, entities,
+remembered-building memory, private detail for explicitly selected owners, `playerResources`, and
+event unions. No observer view creates a command issuer. Lab `issueCommandAs` remains the only
+cross-player command path and is independently authorized.
 `artilleryFiring` remains an intentionally global visual event for minimap firing
 markers, while artillery's actionable world reveal is modeled separately as temporary live fog on
 enemy player grids without granting target-point or surrounding-terrain visibility.
@@ -1191,11 +1196,11 @@ reliable message.
 { mode: "player", playerId: u32 }
 { mode: "players", playerIds: u32[] }
 ```
-The server rejects unknown player ids, empty subsets, and duplicate subset ids. Vision selection is
-not shared between viewers unless a later protocol explicitly adds shared-view control. Replay
-snapshots are spectator-style authoritative fog snapshots from the selected real player ids; the
-default is the union of all replay players. Replay `rememberedBuildings`, `playerResources`, and
-event unions follow the same selected real player ids as the snapshot body.
+The server rejects unknown player ids, empty subsets, duplicate subset ids, active-player requests,
+and requests outside a privileged observer surface. Selection is per connection. `mode: "all"`
+means omniscient; it is the default for live spectators, replay, dev-watch, and Lab. A selected
+single/multi-player view uses the real selected owners and their effective team fog. Owner-only
+details remain limited to explicitly selected owners, even when team fog reveals an ally.
 
 `LabClientOp` is tagged by `op`:
 ```
@@ -1223,16 +1228,14 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "importScenario", scenario: LabScenarioPayload }
 { op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
 ```
-`LabVisionMode` is `{ mode: "all" }` or `{ mode: "team", teamId }`. `all` is translated to every
-current real player id and projects the union of their authoritative fog; `team` is translated to
-the current real player ids on that team. Unknown team selections are rejected.
-Lab vision is server-owned per operator, so one operator can inspect all-team fog while another uses
-team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
-Lab snapshot projection keeps snapshot body visibility and transient event visibility aligned but
-separate: all-team and single-team Lab vision receive spectator-style snapshot bodies, event
-unions, remembered building memory, and `playerResources` rows for the selected real players.
-There is no omniscient/no-fog Lab projection; tiles and entities outside every selected player's
-current fog remain hidden.
+`LabVisionMode` remains compatibility metadata for authored Lab scenarios and the legacy
+`setVision` Lab operation. At runtime, `all` maps to the shared omniscient observer view and `team`
+maps to a shared selected-player view containing the current real players on that team. Unknown
+team selections are rejected. New UI selection uses `setVisionSelection`, just like live
+spectators, replay, and dev-watch. Each connection's shared observer view drives the snapshot body,
+events, remembered-building memory, `playerResources`, and completed research. `labState.vision`
+and `start.lab.vision` retain the compatibility metadata; they are not command authority and must
+not be used to infer which player the operator can command.
 Plural mutation arrays contain 1–400 items and commit atomically. Success returns
 `outcome.items: [{index, outcome}]` in input order, with each nested `outcome` retaining the
 corresponding singular shape. Rejection returns `failedIndex`; placement rejection also returns
@@ -1573,8 +1576,9 @@ is short always-visible overlay text; `tooltip` is longer human-readable hover t
 the primitive represents. `mapAnalysis` is optional because replay analysis and non-AI live rooms do
 not currently own an AI controller cache for this data.
 
-Observer analysis uses an all-player spectator policy independent of each viewer's vision selection
-selection. It is observer-only data for analysis overlays, not an active-player information surface.
+Observer analysis follows each viewer's observer selection. Narrowed views contain only selected
+player rows and omit unscoped `mapAnalysis`; omniscient views retain all player rows and map layers.
+It is observer-only data for analysis overlays, not an active-player information surface.
 Replay playback recomputes the payload from the current authoritative replay `Game` state after
 normal playback ticks and after `ReplaySession::rebuild_to()` restores a keyframe and fast-forwards
 to the target tick. Analysis state is not serialized separately in `ReplayKeyframe`.

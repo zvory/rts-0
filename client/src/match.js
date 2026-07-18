@@ -402,13 +402,17 @@ export class Match {
     this.health.publish();
     if (this.prediction.enabled) this.initPredictionAdapter();
 
-    if (this.capabilities.roomTime.available && dom.roomTimeControls) {
+    if (
+      (this.capabilities.roomTime.available || this.capabilities.visibility.visionSelection) &&
+      dom.roomTimeControls
+    ) {
       this.roomTimeControls = new RoomTimeControls({
         net: this.net,
         state: this.state,
         controlPolicy: this.controlPolicy,
         replayViewer: this.replayViewer,
         capabilities: this.capabilities,
+        initialVisionSelection: options.initialVisionSelection,
       });
     }
     this.observerDiagnostics = new MatchObserverDiagnostics({

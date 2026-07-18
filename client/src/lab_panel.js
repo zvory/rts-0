@@ -1,4 +1,4 @@
-import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
+import { DEFAULT_FACTION_ID, LAB_ROLE } from "./protocol.js";
 import { PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
@@ -16,10 +16,6 @@ import {
   validateLabScenario,
 } from "./lab_scenario_authoring_flow.js";
 
-const labVision = Object.freeze({
-  all: () => msg.labVisionAll(),
-  team: (teamId) => msg.labVisionTeam(teamId),
-});
 const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
 const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
@@ -123,7 +119,6 @@ export class LabPanel {
     status.className = "lab-status-grid";
     this.addStatus(status, "Role", roleLabel(this.state?.role));
     this.addStatus(status, "Map", this.mapName());
-    this.addStatus(status, "Vision", labVisionLabel(this.state?.vision));
     this.addStatus(status, "Dirty", this.state?.dirty ? "Yes" : "No");
     this.addStatus(status, "Ops", String(this.state?.operationCount ?? 0));
     body.appendChild(status);
@@ -187,7 +182,6 @@ export class LabPanel {
 
   renderOptionsPanel() {
     const root = this.panelSection("Options", "lab-options");
-    root.appendChild(this.renderVisionOptions());
 
     if (!this.canOperate()) return root;
 
@@ -219,30 +213,6 @@ export class LabPanel {
       };
       this.render();
     }
-  }
-
-  renderVisionOptions() {
-    const controls = [];
-    const fullActive = this.state?.vision?.mode === "all";
-    const fullButton = this.button("Full", () => this.requestVision(labVision.all()), {
-      dataset: { active: fullActive ? "true" : "false" },
-    });
-    fullButton.setAttribute("aria-pressed", fullActive ? "true" : "false");
-    controls.push(fullButton);
-
-    for (const teamId of this.teamIds()) {
-      const teamActive = this.state?.vision?.mode === "team" &&
-        Number(this.state.vision.teamId) === teamId;
-      const teamButton = this.button(
-        `Team ${teamId}`,
-        () => this.requestVision(labVision.team(teamId)),
-        { dataset: { active: teamActive ? "true" : "false" } },
-      );
-      teamButton.setAttribute("aria-pressed", teamActive ? "true" : "false");
-      controls.push(teamButton);
-    }
-
-    return this.fieldset("Vision", controls, { className: "lab-tool-group lab-vision-group" });
   }
 
   renderToolsPanel() {
@@ -1169,10 +1139,6 @@ export class LabPanel {
     return this.state?.role === LAB_ROLE.OPERATOR;
   }
 
-  requestVision(vision) {
-    void this.labClient.setVision(vision);
-  }
-
   publicRoomName() {
     return this.launch?.publicRoom || this.state?.room || this.startPayload?.lab?.room || "default";
   }
@@ -1397,11 +1363,4 @@ function roleLabel(role) {
   if (role === LAB_ROLE.OPERATOR) return "Operator";
   if (role === LAB_ROLE.READ_ONLY) return "Read-only";
   return "-";
-}
-
-function labVisionLabel(vision) {
-  if (!vision || typeof vision !== "object") return "-";
-  if (vision.mode === "all") return "Full";
-  if (vision.mode === "team") return `Team ${vision.teamId}`;
-  return String(vision.mode || "-");
 }

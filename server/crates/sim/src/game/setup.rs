@@ -409,6 +409,7 @@ impl Game {
             diagnostics: Default::default(),
             replay: None,
             lab: None,
+            observer_view: None,
             tick: self.state.tick,
             map,
             players,

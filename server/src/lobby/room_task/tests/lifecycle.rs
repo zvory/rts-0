@@ -255,6 +255,10 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     task.match_human_count = 2;
     task.replay_start = Some(replay_start);
     task.outcome_sent.insert(players[1].id);
+    task.observer_views.insert(
+        players[0].id,
+        rts_sim::game::ObserverView::Players(vec![players[0].id]),
+    );
 
     task.players
         .get(&players[0].id)
@@ -274,7 +278,10 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     };
     assert_eq!(session.current_tick(), 0);
     assert_eq!(session.speed(), ReplaySession::DEFAULT_SPEED);
-    assert_eq!(session.vision_player_ids_for(players[0].id), vec![1, 2]);
+    assert_eq!(
+        task.observer_view_for(players[0].id),
+        rts_sim::game::ObserverView::Omniscient
+    );
     assert!(writer_a.snapshots.take().is_none());
     assert!(writer_b.snapshots.take().is_none());
 

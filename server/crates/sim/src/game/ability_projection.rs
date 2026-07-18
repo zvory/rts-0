@@ -7,14 +7,17 @@ pub(in crate::game) fn ability_object_views_for(
     player: u32,
     fog: &Fog,
     fogged: bool,
-    include_player_resources: bool,
+    owner_visible_players: &[u32],
+    omniscient: bool,
 ) -> Vec<crate::protocol::AbilityObjectView> {
     game.state
         .ability_runtime
         .world_objects()
         .filter(|object| !fogged || fog.is_visible_world(player, object.x, object.y))
         .map(|object| {
-            let owner_visible = object.owner == player || include_player_resources || !fogged;
+            let owner_visible = object.owner == player
+                || owner_visible_players.contains(&object.owner)
+                || omniscient;
             let source_caster_id = if owner_visible
                 || game
                     .state

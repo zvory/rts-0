@@ -40,9 +40,27 @@ pub struct StartPayload {
     pub replay: Option<ReplayStartMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lab: Option<LabStartMetadata>,
+    /// Authoritative per-connection observer perspective for privileged spectators. Active
+    /// players do not receive this because their view is fixed by their owned seat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observer_view: Option<ObserverViewSelection>,
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,
+}
+
+/// A read-only observer's selected perspective. This is a server-to-client reflection of the
+/// authoritative view, and shares the wire shape of a vision-selection request.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(
+    tag = "mode",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ObserverViewSelection {
+    All,
+    Player { player_id: u32 },
+    Players { player_ids: Vec<u32> },
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -446,6 +464,9 @@ pub struct PlayerResourceSnapshot {
     pub supply_cap: u32,
     /// Rolling command-envelope rate over the last ten simulated seconds.
     pub apm: u32,
+    /// Completed research for this projected player.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<String>,
 }
 
 /// Dynamic resource state the client is currently allowed to know.

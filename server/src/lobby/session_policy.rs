@@ -670,7 +670,7 @@ impl SessionPolicy {
         !matches!(self.mutation, MutationPolicy::None)
     }
 
-    pub(super) fn start_capabilities(self, gameplay_commands: bool) -> RoomCapabilities {
+    pub(super) fn start_capabilities(self, active_player: bool) -> RoomCapabilities {
         let fixed_realtime_live_pause = matches!(
             self.clock,
             ClockCapability::FixedRealtime(ClockTickSource::LiveMatch)
@@ -684,10 +684,18 @@ impl SessionPolicy {
                 pause: fixed_realtime_live_pause,
             },
             visibility: VisibilityCapabilities {
-                vision_selection: self.visibility == VisibilityPolicy::SelectablePerspective,
+                vision_selection: !active_player
+                    && matches!(
+                        self.start_payload,
+                        StartPayloadPolicy::LiveMatch
+                            | StartPayloadPolicy::ReplayViewer
+                            | StartPayloadPolicy::ReplayBranchLive
+                            | StartPayloadPolicy::DevWatch
+                            | StartPayloadPolicy::Lab
+                    ),
             },
             commands: CommandCapabilities {
-                gameplay: gameplay_commands
+                gameplay: active_player
                     && matches!(
                         self.mutation,
                         MutationPolicy::LiveGameplayCommands
@@ -1050,7 +1058,7 @@ mod tests {
         assert!(dev_caps.room_time.step);
         assert!(!dev_caps.room_time.seek_relative);
         assert!(!dev_caps.room_time.seek_absolute);
-        assert!(!dev_caps.visibility.vision_selection);
+        assert!(dev_caps.visibility.vision_selection);
         assert!(!dev_caps.match_controls.pause);
 
         let branch = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
@@ -1066,6 +1074,7 @@ mod tests {
         assert!(lab_caps.room_time.seek_relative);
         assert!(lab_caps.room_time.seek_absolute);
         assert!(lab_caps.room_time.timeline);
+        assert!(lab_caps.visibility.vision_selection);
         assert!(!lab_caps.commands.gameplay);
         assert!(!lab_caps.match_controls.pause);
     }

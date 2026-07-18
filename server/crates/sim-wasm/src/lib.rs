@@ -821,6 +821,7 @@ mod tests {
             diagnostics: Default::default(),
             replay: None,
             lab: None,
+            observer_view: None,
             tick: 10,
             map: MapInfo {
                 width: 64,

@@ -8,18 +8,20 @@ use super::super::crash_replay::{dump_crash_replay_artifact, panic_reason};
 use super::super::dev_replay::load_replay_artifact;
 use super::super::launch::{LaunchPrediction, StartPayloadBuilder, StartPayloadRecipient};
 use super::super::participants::replay_viewer;
-use super::super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
+use super::super::projection::{
+    observer_view_from_selection, scope_observer_analysis, ObserverAnalysisAudience,
+    ProjectionPolicy, RecipientRole,
+};
 use super::super::replay_session::{
     validate_vision_selection_request, ReplaySeekPlan, ReplaySession,
 };
 use super::super::session_policy::{RoomTimeOperation, RoomTimeSource, SessionPhase};
-use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::tick_control::{RoomTimeSpeed, TickControl};
 use super::super::ReplayBranchSeed;
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, RoomMode};
 use super::RoomTask;
-use crate::protocol::{Event, RoomTimeState, ServerMessage, StartPayload, VisionSelectionRequest};
+use crate::protocol::{RoomTimeState, ServerMessage, StartPayload, VisionSelectionRequest};
 use rts_sim::game::Game;
 
 impl RoomTask {
@@ -176,6 +178,7 @@ impl RoomTask {
     }
 
     fn replay_start_payload_for(
+        &self,
         session: &ReplaySession,
         watcher_id: u32,
         stamp: ReplayStartPayloadStamp,
@@ -193,6 +196,7 @@ impl RoomTask {
             prediction: LaunchPrediction::Disabled,
             diagnostics: stamp.diagnostics,
             lab: None,
+            observer_view: Some(self.observer_view_selection_for(watcher_id)),
         })
     }
 
@@ -204,7 +208,7 @@ impl RoomTask {
             return;
         };
         let payload =
-            Self::replay_start_payload_for(session, watcher_id, self.replay_start_payload_stamp());
+            self.replay_start_payload_for(session, watcher_id, self.replay_start_payload_stamp());
         send_or_log(
             &self.room,
             watcher_id,
@@ -263,10 +267,7 @@ impl RoomTask {
         {
             return;
         }
-        self.send_observer_analysis_to_ids(
-            [watcher_id],
-            ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
-        );
+        self.send_scoped_replay_observer_analysis(session, [watcher_id]);
     }
 
     fn broadcast_room_time_state_for(&self, session: &ReplaySession) {
@@ -283,23 +284,7 @@ impl RoomTask {
         {
             return;
         }
-        self.send_observer_analysis_to_ids(
-            self.order.clone(),
-            ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
-        );
-    }
-
-    fn send_observer_analysis_to_ids(
-        &self,
-        recipient_ids: impl IntoIterator<Item = u32>,
-        msg: ServerMessage,
-    ) {
-        for id in recipient_ids {
-            let Some(player) = self.players.get(&id) else {
-                continue;
-            };
-            send_or_log(&self.room, id, &player.msg_tx, msg.clone());
-        }
+        self.send_scoped_replay_observer_analysis(session, self.order.clone());
     }
 
     pub(super) fn room_time_state_for_live_game(
@@ -320,32 +305,6 @@ impl RoomTask {
             ended: false,
             controller_id,
         }
-    }
-
-    fn fanout_replay_snapshots_to(
-        &mut self,
-        session: &ReplaySession,
-        recipients: impl IntoIterator<Item = u32>,
-        mut per_player_events: HashMap<u32, Vec<Event>>,
-        context: ReplayTickContext,
-        perf: Option<&mut rts_sim::perf::TickPerf>,
-    ) {
-        SnapshotFanout::new(
-            &self.room,
-            context.scheduler_lag,
-            context.tick_budget,
-            context.tick_start,
-            &mut self.slow_tick_count,
-            perf,
-        )
-        .send_to_recipients(&mut self.players, recipients, |id, _player| {
-            let projection = context
-                .projection_policy
-                .selected_perspective_snapshot_for(session.vision_player_ids_for(id));
-            let snapshot =
-                projection.snapshot_with_events(session.game(), &mut per_player_events, &[]);
-            Some(SnapshotFanoutPayload::new(snapshot, true))
-        });
     }
 
     fn clear_pending_snapshots_for(&self, recipients: impl IntoIterator<Item = u32>) {
@@ -506,6 +465,25 @@ impl RoomTask {
         player_id: u32,
         selection: VisionSelectionRequest,
     ) {
+        if !self
+            .players
+            .get(&player_id)
+            .is_some_and(|player| player.spectator)
+        {
+            return;
+        }
+        if let Phase::InGame(game) = &self.phase {
+            let valid_ids: Vec<u32> = game.player_inits().iter().map(|player| player.id).collect();
+            if validate_vision_selection_request(&selection, &valid_ids).is_err() {
+                self.send_error_to(player_id, "Invalid vision selection");
+                return;
+            }
+            let view = observer_view_from_selection(selection);
+            self.observer_views.insert(player_id, view);
+            self.clear_pending_snapshots_for([player_id]);
+            self.fanout_current_observer_snapshots_to([player_id]);
+            return;
+        }
         let context = ReplayTickContext {
             scheduler_lag: Duration::ZERO,
             tick_budget: self.current_tick_interval(),
@@ -514,7 +492,7 @@ impl RoomTask {
         };
         let send_analysis = context.projection_policy.observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
-        let mut session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+        let session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::ReplayViewer(session) => session,
             other => {
                 self.phase = other;
@@ -533,10 +511,12 @@ impl RoomTask {
             return;
         }
 
-        session.set_vision(player_id, selection);
+        let view = observer_view_from_selection(selection);
+        self.observer_views.insert(player_id, view.clone());
         self.clear_pending_snapshots_for([player_id]);
         self.fanout_replay_snapshots_to(&session, [player_id], HashMap::new(), context, None);
-        let analysis = send_analysis.then(|| session.game().observer_analysis());
+        let analysis = send_analysis
+            .then(|| scope_observer_analysis(session.game().observer_analysis(), &view));
         if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
             send_or_log(
                 &self.room,
@@ -647,7 +627,7 @@ impl RoomTask {
                     .filter_map(|viewer_id| {
                         self.players.get(viewer_id).map(|player| {
                             let start =
-                                Self::replay_start_payload_for(&session, *viewer_id, start_stamp);
+                                self.replay_start_payload_for(&session, *viewer_id, start_stamp);
                             (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
@@ -657,7 +637,6 @@ impl RoomTask {
                     .map(|(viewer_id, _, _)| *viewer_id)
                     .collect::<Vec<_>>();
                 let state = session.state();
-                let analysis = send_analysis.then(|| session.game().observer_analysis());
 
                 self.clear_pending_snapshots_for(recipients.iter().copied());
                 for (viewer_id, msg_tx, start) in starts {
@@ -671,8 +650,8 @@ impl RoomTask {
                     context,
                     None,
                 );
-                if let Some(analysis) = analysis {
-                    self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
+                if send_analysis {
+                    self.broadcast_observer_analysis_for(&session, context.projection_policy);
                 }
             }
             Err(err) => {

@@ -36,14 +36,14 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `lobby` carries `map` (selected stable map name) and `maps[]`
   (`{name, description, minPlayers, maxPlayers}` catalog rows). Replay start metadata separately
   uses `mapName`.
-- Lab start payloads carry `lab` metadata with the public lab id, original operator id, recipient
-  role, that recipient's current lab vision mode, optional setup-authored initial camera center,
-  dirty flag, and operation count.
-- Start payloads carry recipient-scoped `capabilities` metadata for shared room-time,
-  vision-selection, and gameplay-command affordances. The client parser must not infer these from
-  replay/dev/lab mode names. Lab timeline controls use neutral room-time speed, pause, step,
-  relative seek,
-  absolute seek, and `roomTimeState` keyframe metadata; they are not `LabClientOp` messages.
+- Lab start metadata carries room/role identity, compatibility vision, initial camera, dirty state,
+  and operation count.
+- Start `capabilities` declares room-time, vision-selection, and command affordances; never infer
+  them from replay/dev/Lab mode names. Privileged viewers share one per-connection selector for
+  omniscient or selected-player views, independent of command authority. Lab timeline controls use
+  neutral room-time messages rather than `LabClientOp`.
+- Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
+  to render the shared controls; do not reconstruct it from legacy Lab metadata.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
   movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
 - Resolved AI matches send `observationReady` (replay/log lookup).
@@ -55,8 +55,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   JSON is rejected. `validateScenario` previews catalog/path/payload/map bounds without mutating
   the room or accepting client-controlled server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
-- `/api/map-handoffs` validates authored and materialized flat map data, caps records at 64, expires them after
-  two minutes, and consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.
+- `/api/map-handoffs` validates map data, caps records at 64, expires them after two minutes, and
+  consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

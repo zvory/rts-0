@@ -8,6 +8,7 @@ use super::types::AiSlot;
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
     ["itest-", "ai-itest-", "client-smoke-", "reg-"];
 pub(super) const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
+#[cfg(test)]
 pub(super) const LAB_PLAYER_ONE_ID: u32 = 1;
 #[cfg(test)]
 pub(super) const LAB_PLAYER_TWO_ID: u32 = 2;

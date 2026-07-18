@@ -273,6 +273,8 @@ function factionIdForOwner(state, owner) {
 function upgradesForOwner(state, owner) {
   const ownerId = positiveOwner(owner);
   if (ownerId == null) return [];
+  const resourceRow = rowForOwner(state?.playerResources, ownerId);
+  if (Array.isArray(resourceRow?.upgrades)) return resourceRow.upgrades;
   const perOwner = upgradeArrayForOwner(state?.playerUpgrades, ownerId) ||
     upgradeArrayForOwner(state?.upgradesByPlayer, ownerId) ||
     upgradeArrayForOwner(state?.completedResearchByPlayer, ownerId);

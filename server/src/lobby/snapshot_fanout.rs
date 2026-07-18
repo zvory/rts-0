@@ -1,7 +1,13 @@
 use super::connection::{send_or_log, SnapshotSendStatus};
+use super::projection::ProjectionPolicy;
+use super::replay_session::ReplaySession;
 use super::room_task::RoomPlayer;
 use super::snapshots::compact_snapshot_for_wire;
-use crate::protocol::{ServerMessage, Snapshot, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION};
+use super::snapshots::union_events;
+use crate::protocol::{
+    Event, ServerMessage, Snapshot, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION,
+};
+use rts_sim::game::ObserverView;
 use std::collections::HashMap;
 use std::time::{Duration, Instant as StdInstant};
 
@@ -132,6 +138,43 @@ impl<'a> SnapshotFanout<'a> {
         }
         delivered_recipients
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn fanout_replay_snapshots(
+    room: &str,
+    players: &mut HashMap<u32, RoomPlayer>,
+    observer_views: &HashMap<u32, ObserverView>,
+    projection_policy: ProjectionPolicy,
+    session: &ReplaySession,
+    recipients: impl IntoIterator<Item = u32>,
+    per_player_events: &mut HashMap<u32, Vec<Event>>,
+    scheduler_lag: Duration,
+    tick_budget: Duration,
+    tick_start: StdInstant,
+    slow_tick_count: &mut u32,
+    perf: Option<&mut rts_sim::perf::TickPerf>,
+) {
+    let full_vision_events = union_events(per_player_events.values());
+    SnapshotFanout::new(
+        room,
+        scheduler_lag,
+        tick_budget,
+        tick_start,
+        slow_tick_count,
+        perf,
+    )
+    .send_to_recipients(players, recipients, |id, _player| {
+        let projection = projection_policy.selected_perspective_snapshot_for(
+            observer_views
+                .get(&id)
+                .cloned()
+                .unwrap_or(ObserverView::Omniscient),
+        );
+        let snapshot =
+            projection.snapshot_with_events(session.game(), per_player_events, &full_vision_events);
+        Some(SnapshotFanoutPayload::new(snapshot, true))
+    });
 }
 
 fn snapshot_net_status(

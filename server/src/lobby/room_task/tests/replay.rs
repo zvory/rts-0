@@ -1,7 +1,9 @@
+use super::super::types::ReplayTickContext;
 use super::support::*;
 use rts_rules::balance::TILE_SIZE;
 use rts_sim::game::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
 use rts_sim::game::{Game, PlayerInit};
+use std::time::Instant as StdInstant;
 
 fn tile_center(tile_x: u32, tile_y: u32) -> (f32, f32) {
     let tile_size = TILE_SIZE as f32;
@@ -385,8 +387,8 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
         false,
         DrainHandle::default(),
     );
-    let writer_a = add_test_room_player(&mut task, 100, true);
-    let writer_b = add_test_room_player(&mut task, 101, true);
+    let writer_a = add_test_room_spectator(&mut task, 100);
+    let writer_b = add_test_room_spectator(&mut task, 101);
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
     for _ in 0..8 {
@@ -437,6 +439,48 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
         snapshot_a.visible_tiles, snapshot_b.visible_tiles,
         "test setup should exercise different fog perspectives"
     );
+}
+
+#[test]
+fn omniscient_replay_view_receives_the_full_event_union() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 1);
+    let replay = ReplaySession::new(artifact).unwrap();
+    let mut task = RoomTask::new(
+        "omniscient-replay-events-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let writer = add_test_room_spectator(&mut task, 100);
+    let player_one_event = Event::Notice {
+        msg: "player one event".to_string(),
+        severity: NoticeSeverity::Info,
+        x: None,
+        y: None,
+    };
+    let player_two_event = Event::Notice {
+        msg: "player two event".to_string(),
+        severity: NoticeSeverity::Warn,
+        x: None,
+        y: None,
+    };
+    let mut per_player_events = HashMap::new();
+    per_player_events.insert(players[0].id, vec![player_one_event.clone()]);
+    per_player_events.insert(players[1].id, vec![player_two_event.clone()]);
+    let context = ReplayTickContext {
+        scheduler_lag: Duration::ZERO,
+        tick_budget: Duration::from_millis(config::TICK_MS),
+        tick_start: StdInstant::now(),
+        projection_policy: task.projection_policy_for_phase(SessionPhase::ReplayViewer),
+    };
+
+    task.fanout_replay_snapshots_to(&replay, [100], per_player_events, context, None);
+
+    let snapshot = writer.snapshots.take().expect("omniscient replay snapshot");
+    assert!(snapshot.events.contains(&player_one_event));
+    assert!(snapshot.events.contains(&player_two_event));
 }
 
 #[test]
@@ -515,13 +559,6 @@ fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
         replay.tick(None);
     }
     replay.set_speed(100, 0.0);
-    replay.set_vision(
-        100,
-        VisionSelectionRequest::Player {
-            player_id: players[0].id,
-        },
-    );
-
     let mut task = RoomTask::new(
         "paused-replay-seek-snapshot-test".to_string(),
         RoomMode::Normal,
@@ -530,6 +567,10 @@ fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
         DrainHandle::default(),
     );
     let mut writer = add_test_room_spectator(&mut task, 100);
+    task.observer_views.insert(
+        100,
+        rts_sim::game::ObserverView::Players(vec![players[0].id]),
+    );
     let all_player_ids = players.iter().map(|player| player.id).collect::<Vec<_>>();
     let stale_pending = replay.game().snapshot_for_spectator(&all_player_ids);
     task.players
@@ -744,8 +785,9 @@ fn persisted_replay_room_host_start_begins_replay_viewer() {
     let Phase::ReplayViewer(session) = &task.phase else {
         panic!("confirmed replay join should keep replay viewer active");
     };
-    let visible_players = players.iter().map(|player| player.id).collect::<Vec<_>>();
-    let expected = session.game.snapshot_for_spectator(&visible_players);
+    let expected = session
+        .game
+        .snapshot_for_observer(&ObserverView::Omniscient);
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     let tick_analysis = take_observer_analysis(&writer, "confirmed replay tick");
@@ -857,7 +899,10 @@ fn saved_artifact_replay_join_uses_replay_viewer_runtime() {
         panic!("saved artifact replay should start the shared replay viewer runtime");
     };
     assert_eq!(session.artifact.command_log, artifact.command_log);
-    assert_eq!(session.vision_player_ids_for(99), vec![1, 2]);
+    assert_eq!(
+        task.observer_view_for(99),
+        rts_sim::game::ObserverView::Omniscient
+    );
     assert!(task.players.get(&99).is_some_and(|p| p.spectator));
     assert!(matches!(
         writer.reliable_rx.try_recv().unwrap(),

@@ -629,6 +629,15 @@ export class App {
     const visualProfile = labMetadata ? this.labVisualProfileState?.profile || null : null;
     const visualProfileError = labMetadata ? this.labVisualProfileState?.error || null : null;
     const scenarioInitialCamera = labMetadata?.initialCamera || payload?.snapshotStream?.initialCamera || null;
+    const previousMatch = this.match;
+    const carriedVisionSelection = sameObserverSession(previousMatch, {
+      startsReplay,
+      labMetadata,
+      devWatch: this.devWatch,
+    })
+      ? previousMatch.roomTimeControls?.visionSelectionRequest?.() || null
+      : null;
+    const initialVisionSelection = payload?.observerView || carriedVisionSelection;
 
     const carriedCamera = selectInitialCameraView({
       currentView: this.takeMatchCameraView(),
@@ -697,6 +706,7 @@ export class App {
         labControlPolicy: this.labControlPolicy,
         visualProfile,
         visualProfileError,
+        initialVisionSelection,
         // ReplayViewer always constructs Pixi, and ordinary spectators remain on Pixi even when
         // this page explicitly selected the experimental Babylon live-player renderer.
         rendererBackendBundle: rendererBackendBundleForMatch(this.rendererBackendBundle, {
@@ -1153,4 +1163,12 @@ export class App {
       this.statusBadge.setVersion("unknown");
     }
   }
+}
+
+function sameObserverSession(match, { startsReplay, labMetadata, devWatch }) {
+  if (!match || !match.roomTimeControls) return false;
+  if (match.replayViewer !== startsReplay) return false;
+  if (Boolean(match.labMetadata) !== Boolean(labMetadata)) return false;
+  if (match.devWatch !== devWatch) return false;
+  return startsReplay || Boolean(labMetadata) || Boolean(devWatch);
 }
