@@ -1614,7 +1614,7 @@ input[type="text"]:focus {
 #game-screen.branch-background #hud,
 #game-screen.branch-background #minimap-wrap,
 #game-screen.branch-background #selection-area,
-#game-screen.branch-background #command-card,
+#game-screen.branch-background #command-card-stack,
 #game-screen.branch-background .replay-analysis-overlay,
 #game-screen.branch-background .ai-diagnostics-panel-host,
 #game-screen.branch-background .ai-diagnostics-show,
@@ -1921,7 +1921,7 @@ input[type="text"]:focus {
 #minimap-wrap,
 #selection-area,
 #game-menu,
-#command-card,
+#command-card-stack,
 .lab-panel,
 #toast {
   position: absolute;
@@ -2966,15 +2966,15 @@ input[type="text"]:focus {
   width: 100%;
 }
 .game-timer {
-  flex: 0 1 66px;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 24px;
-  padding: 4px 5px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   background: rgba(15, 14, 12, 0.72);
   color: var(--ink);
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -2983,12 +2983,14 @@ input[type="text"]:focus {
   text-shadow: 1px 1px 0 #191710;
 }
 .apm-counter {
-  flex: 0 0 42px;
-  min-width: 0;
+  box-sizing: border-box;
+  width: 42px;
   min-height: 24px;
   padding: 4px 3px;
+  border: 1px solid var(--panel-edge);
   border-radius: var(--radius-sm);
-  background: rgba(15, 14, 12, 0.72);
+  background: rgba(39, 37, 31, 0.94);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: var(--ink);
   font-family: var(--mono);
   font-size: 14px;
@@ -2997,10 +2999,12 @@ input[type="text"]:focus {
   line-height: 1;
   text-align: center;
   text-shadow: 1px 1px 0 #191710;
+  pointer-events: none;
 }
 .idle-workers-button {
   appearance: none;
-  flex: 1 1 auto;
+  flex: 0 1 50%;
+  max-width: 50%;
   min-width: 0;
   min-height: 24px;
   padding: 3px 6px;
@@ -3384,9 +3388,16 @@ input[type="text"]:focus {
 }
 
 /* --- Bottom-right command card (3x3 fixed grid of buttons) --- */
-#command-card {
+#command-card-stack {
   right: 12px;
   bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+#command-card {
   padding: 13px;
   border-radius: var(--radius);
   pointer-events: auto;
@@ -5195,18 +5206,15 @@ input[type="text"]:focus {
     height: clamp(112px, 38vw, 170px);
   }
 
-  .game-timer,
+  .game-timer {
+    min-height: 26px;
+    font-size: 14px;
+  }
+
   .apm-counter {
+    width: 34px;
     min-height: 26px;
     font-size: 12px;
-  }
-
-  .game-timer {
-    flex-basis: 58px;
-  }
-
-  .apm-counter {
-    flex-basis: 34px;
   }
 
   .minimap-status-row {
@@ -5245,9 +5253,12 @@ input[type="text"]:focus {
     min-height: 36px;
   }
 
-  #command-card {
+  #command-card-stack {
     right: var(--mobile-debug-right);
     bottom: var(--mobile-debug-bottom);
+  }
+
+  #command-card {
     grid-template-columns: repeat(3, 40px);
     grid-auto-rows: 40px;
     gap: 4px;
