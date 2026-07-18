@@ -166,21 +166,21 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   hull does not need to face the target. Tanks do not clear their movement path when they fire, so
   they can continue driving while the turret tracks and shoots on both `Move` and `AttackMove`
   orders. A tank on active `Move` or `AttackMove` only opportunistically fires at enemies already in
-  range; it does not chase out-of-range enemies or replace the commanded path with a standoff route.
-  Direct `Attack` orders and post-arrival aggressive behavior can still use vehicle standoff
-  pursuit. Shoot-while-moving units retain their current valid target before falling back to
+  range and never replaces the commanded path with enemy-directed movement. Direct `Attack` orders
+  and post-arrival behavior also remain stationary. Shoot-while-moving units retain their current
+  valid target before falling back to
   nearest-target acquisition, so drive-by fire tends to finish one enemy instead of spreading damage
   across every passing unit. Projection omits enemy `weaponFacing` when it would reveal a hidden
   target direction.
 - **Rifleman Methamphetamines fire**: upgraded riflemen gain permanent moving fire and keep their
   movement path while firing at enemies in range instead of stopping to shoot. While on a plain
   `Move` or active `AttackMove`, upgraded riflemen only fire opportunistically at enemies already in
-  range and do not chase. Moving Methamphetamines shots use normal rifleman accuracy and do not add
+  range and never create enemy-directed movement. Moving Methamphetamines shots use normal rifleman accuracy and do not add
   a movement miss roll.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
-  same oriented-body/pathing/collision model as tanks, including vehicle standoff on direct pursuit
-  and firing while moving, but they use simplified car locomotion instead of tank pivot locomotion. A
+  same oriented-body/pathing/collision model as tanks and fire while moving, but they use simplified
+  car locomotion instead of tank pivot locomotion. A
   scout car's
   yaw is capped by movement budget over a 1.5-tile minimum turn radius, so it can steer
   while translating but cannot rotate in place when blocked or badly misaligned. Reverse is a
@@ -196,7 +196,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   the next leg instead of stopping near an inside corner and immediately rotating toward a diagonal
   segment. The clearance
   cost is finite, so intended narrow passages remain traversable; exact interaction paths such as
-  chase, gather, and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
+  gather and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
   route corridor rather than exact intermediate waypoint centers: an intermediate waypoint is
   consumed inside
   `VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the vehicle has passed the waypoint

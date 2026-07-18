@@ -220,7 +220,7 @@ fn entrenched_arrived_attack_move_units_do_not_leave_to_chase() {
 }
 
 #[test]
-fn non_entrenched_idle_rifleman_keeps_normal_aggressive_pursuit() {
+fn non_entrenched_idle_rifleman_also_ignores_out_of_range_enemy() {
     let map = open_map(20);
     let mut entities = EntityStore::new();
     let rifleman = entities
@@ -237,12 +237,9 @@ fn non_entrenched_idle_rifleman_keeps_normal_aggressive_pursuit() {
     );
 
     let rifleman = entities.get(rifleman).expect("rifleman should exist");
-    let enemy_entity = entities.get(enemy).expect("enemy should exist");
-    assert_eq!(rifleman.target_id(), Some(enemy));
-    assert_eq!(
-        rifleman.path_goal(),
-        Some((enemy_entity.pos_x, enemy_entity.pos_y))
-    );
+    assert_eq!(rifleman.target_id(), None);
+    assert_eq!(rifleman.path_goal(), None);
+    assert!(entities.get(enemy).is_some());
 }
 
 #[test]

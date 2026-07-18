@@ -1253,7 +1253,7 @@ impl Entity {
         self.reset_attack_move_no_target_ticks();
     }
 
-    /// Clear active/queued movement and enter a no-chase hold-position stance.
+    /// Clear active/queued movement and enter a hold-position stance.
     pub fn hold_position(&mut self) {
         self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {

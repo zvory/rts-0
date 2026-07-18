@@ -126,7 +126,7 @@ pub(crate) fn death_system(
     entities.clear_stale_miner_slots();
 
     // Clean up dangling orders that reference removed entities (build sites, attack targets)
-    // so units don't chase ghosts. Gather orders self-heal via `retarget_or_idle`.
+    // so units don't keep stale combat intent. Gather orders self-heal via `retarget_or_idle`.
     for id in entities.ids() {
         let stale = {
             let Some(e) = entities.get(id) else { continue };

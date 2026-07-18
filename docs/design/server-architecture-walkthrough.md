@@ -271,7 +271,7 @@ Combat is also tightly coupled:
 flowchart LR
     Combat["combat_system"] --> Target["target acquisition"]
     Combat --> LOS["line of sight + smoke"]
-    Combat --> Move["chase via MoveCoordinator"]
+    Combat --> Move["resume commanded Attack Move via MoveCoordinator"]
     Combat --> Damage["damage + events"]
     Combat --> AbilityRuntime["anchors/projectiles"]
     Combat --> Mortar["mortar shell scheduling"]
@@ -279,7 +279,7 @@ flowchart LR
 
 This is expected for an RTS combat phase. The main safety rule is to keep the
 coupling contained inside `combat/` and use narrower helper modules inside that
-folder for acquisition, chase, weapons, projection, events, and damage.
+folder for acquisition, weapons, projection, events, and damage.
 
 ## Snapshot and Fog Walkthrough
 

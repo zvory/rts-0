@@ -240,9 +240,8 @@ pub(super) fn resolve_target_for_weapon(
     if smokes.point_inside(px, py) {
         return None;
     }
-    // Ordered attackers keep command intent outside the ranker. If the target is
-    // still explicitly attackable and visible, the combat system may chase for a
-    // fireable shot instead of letting auto-acquisition steal focus.
+    // Ordered attackers keep command intent outside the ranker. If the target is still
+    // explicitly attackable and visible, retain it without letting auto-acquisition steal focus.
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
             if let Some(target) = e.order().attack_target() {
