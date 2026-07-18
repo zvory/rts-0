@@ -52,14 +52,14 @@ const { ok } = assertions;
   const withTurtle = A.msgs.filter((m) => m.t === "lobby").at(-1);
   const turtleAi = withTurtle.players.find((p) => p.id === ai.id);
   ok(
-    turtleAi && turtleAi.aiProfileId === "ai_turtle",
-    "host can select AI Turtle for an AI seat",
+    turtleAi && turtleAi.aiProfileId === DEFAULT_AI_PROFILE_ID,
+    "player lobby rejects the internal Turtle AI profile",
   );
   ok(
-    A.msgs.filter((m) => m.t === "lobby").length > lobbyCountBeforeTurtleSelection,
-    "AI Turtle selection updates the lobby",
+    A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeTurtleSelection,
+    "internal Turtle selection does not mutate the player lobby",
   );
-  ok(turtleAi && turtleAi.name === "AI Turtle", `AI seat uses the AI Turtle label (${turtleAi?.name})`);
+  ok(turtleAi && turtleAi.name === "AI 2.1", `AI seat keeps the supported label (${turtleAi?.name})`);
 
   const lobbyCountBeforeUnsupportedSelection = A.msgs.filter((m) => m.t === "lobby").length;
   A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "unsupported_profile" });
@@ -67,7 +67,7 @@ const { ok } = assertions;
   const afterUnsupportedSelection = A.msgs.filter((m) => m.t === "lobby").at(-1);
   const afterUnsupportedAi = afterUnsupportedSelection.players.find((p) => p.id === ai.id);
   ok(
-    afterUnsupportedAi && afterUnsupportedAi.aiProfileId === "ai_turtle",
+    afterUnsupportedAi && afterUnsupportedAi.aiProfileId === DEFAULT_AI_PROFILE_ID,
     "unsupported AI profile selection leaves the existing profile unchanged",
   );
   ok(

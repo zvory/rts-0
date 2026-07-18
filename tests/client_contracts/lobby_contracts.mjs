@@ -56,11 +56,8 @@ import { textWithin } from "./dom_text.mjs";
   );
   assertDeepEqual(
     AI_PROFILES,
-    [
-      { id: "ai_2_1", label: "AI 2.1" },
-      { id: "ai_turtle", label: "AI Turtle" },
-    ],
-    "lobby AI profile selector exposes the two supported profiles",
+    [{ id: "ai_2_1", label: "AI 2.1" }],
+    "lobby AI profile selector exposes only the supported player opponent",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -194,7 +191,6 @@ import { textWithin } from "./dom_text.mjs";
   withFakeDocument(() => {
     const root = document.createElement("div");
     const view = new LobbyRosterView(root);
-    let selectedProfile = null;
     view.render({
       players: [
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
@@ -214,9 +210,6 @@ import { textWithin } from "./dom_text.mjs";
       countdownActive: false,
       playerCount: 2,
       maxPlayers: 4,
-      onSetAiProfile: (id, aiProfileId) => {
-        selectedProfile = { id, aiProfileId };
-      },
     });
 
     const profileSelectors = findFakes(
@@ -228,13 +221,7 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes an AI 2.1 profile selector",
     );
     assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
-    profileSelectors[0].value = "ai_turtle";
-    profileSelectors[0].listeners.change?.();
-    assertDeepEqual(
-      selectedProfile,
-      { id: 2, aiProfileId: "ai_turtle" },
-      "host lobby sends a selected canonical AI profile",
-    );
+    assert(profileSelectors[0].children.length === 1, "host lobby does not expose internal AI profiles");
 
     const turtleRoot = document.createElement("div");
     const turtleView = new LobbyRosterView(turtleRoot);
@@ -258,9 +245,15 @@ import { textWithin } from "./dom_text.mjs";
       maxPlayers: 4,
     });
 
+    const staleProfileSelectors = findFakes(
+      turtleRoot,
+      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
+    );
     assert(
-      textWithin(turtleRoot).includes("AI Turtle"),
-      "host lobby labels Turtle AI seats as AI Turtle",
+      staleProfileSelectors.length === 1 &&
+        staleProfileSelectors[0].value === "ai_2_1" &&
+        staleProfileSelectors[0].children.length === 1,
+      "player lobby does not expose an internal Turtle profile received from stale state",
     );
   });
 }
