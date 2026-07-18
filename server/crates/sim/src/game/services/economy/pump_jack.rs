@@ -1,5 +1,6 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::teams::TeamRelations;
 
 const POINT_IN_RECT_EPS_PX: f32 = 0.001;
 
@@ -8,7 +9,7 @@ pub(super) struct PumpJackPayout {
     pub(super) oil: u32,
 }
 
-pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
+pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<PumpJackPayout> {
     let pump_ids: Vec<u32> = entities
         .iter()
         .filter(|e| {
@@ -29,6 +30,9 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
             let _ = entities.remove(pump_id);
             continue;
         };
+        if !has_completed_friendly_mining_anchor(entities, teams, owner, node_id) {
+            continue;
+        }
 
         let ready = match entities
             .get_mut(pump_id)
@@ -69,6 +73,29 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
     }
 
     payouts
+}
+
+fn has_completed_friendly_mining_anchor(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    owner: u32,
+    node_id: u32,
+) -> bool {
+    let Some(node) = entities.get(node_id) else {
+        return false;
+    };
+    let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
+    entities.iter().any(|anchor| {
+        matches!(anchor.kind, EntityKind::CityCentre | EntityKind::Zamok)
+            && anchor.hp > 0
+            && !anchor.under_construction()
+            && teams.same_team_or_same_owner(owner, anchor.owner)
+            && {
+                let dx = anchor.pos_x - node.pos_x;
+                let dy = anchor.pos_y - node.pos_y;
+                dx * dx + dy * dy <= range_px * range_px + 0.01
+            }
+    })
 }
 
 fn pump_jack_oil_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {

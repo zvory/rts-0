@@ -1188,6 +1188,23 @@ function buttonByLabel(card, label) {
     "worker shift-right-click on oil should queue a Pump Jack build instead of direct gather",
   );
 
+  const miningAnchorInput = Object.create(Input.prototype);
+  miningAnchorInput.state = {
+    playerId: 1,
+    isOwnOwner: (owner) => owner === 1,
+    isAllyOwner: (owner) => owner === 2,
+  };
+  miningAnchorInput._selectionEntities = () => [
+    { id: 40, owner: 3, kind: KIND.CITY_CENTRE, x: 1, y: 1, buildProgress: null },
+    { id: 41, owner: 2, kind: KIND.CITY_CENTRE, x: 8, y: 8, buildProgress: 0.5 },
+    { id: 42, owner: 2, kind: KIND.CITY_CENTRE, x: 20, y: 20, buildProgress: null },
+    { id: 43, owner: 1, kind: KIND.CITY_CENTRE, x: 40, y: 40, buildProgress: null },
+  ];
+  assert(
+    miningAnchorInput._nearestFriendlyCompletedMiningAnchor(0, 0)?.id === 42,
+    "resource-range preview should use the nearest completed owned or allied mining anchor",
+  );
+
   const rallyCityCentre = {
     id: 33,
     owner: 1,

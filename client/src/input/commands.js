@@ -691,7 +691,7 @@ export function _refreshResourceMiningPreview() {
     return;
   }
 
-  const nearest = this._nearestOwnCompletedCityCentre(target.x, target.y);
+  const nearest = this._nearestFriendlyCompletedMiningAnchor(target.x, target.y);
   if (!nearest) {
     intent?.updateResourceMiningPreview?.(null);
     return;
@@ -728,11 +728,11 @@ export function _refreshAttackTargetPreview() {
   ));
 }
 
-export function _nearestOwnCompletedCityCentre(x, y) {
+export function _nearestFriendlyCompletedMiningAnchor(x, y) {
   let best = null;
   for (const e of this._selectionEntities()) {
     if (
-      !ownOwner(this.state, e.owner, this.controlPolicy) ||
+      !friendlyOwner(this.state, e.owner, this.controlPolicy) ||
       (e.kind !== KIND.CITY_CENTRE && e.kind !== KIND.ZAMOK) ||
       (typeof e.buildProgress === "number" && e.buildProgress < 1)
     ) {

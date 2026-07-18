@@ -5,6 +5,7 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::{footprint_center, Occupancy};
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::teams::TeamRelations;
 use crate::protocol::terrain;
 
 fn flat_map(size: u32) -> Map {
@@ -14,6 +15,22 @@ fn flat_map(size: u32) -> Map {
         starts: vec![(4, 4)],
         base_sites: Vec::new(),
     }
+}
+
+fn team_relations(players: &[(u32, u32)]) -> TeamRelations {
+    TeamRelations::from_player_teams(players.iter().copied())
+}
+
+fn spawn_completed_mining_anchor(entities: &mut EntityStore, owner: u32, x: f32, y: f32) {
+    entities
+        .spawn_building(
+            owner,
+            EntityKind::CityCentre,
+            x - config::TILE_SIZE as f32 * 2.0,
+            y,
+            true,
+        )
+        .expect("completed mining anchor should spawn");
 }
 
 #[test]
@@ -55,6 +72,7 @@ fn entering_harvesting_clears_pending_queued_orders() {
         &occ,
         &spatial,
         &mut coordinator,
+        &team_relations(&[]),
         1,
     );
 
@@ -104,6 +122,7 @@ fn worker_direct_oil_gather_order_is_idled() {
         &occ,
         &spatial,
         &mut coordinator,
+        &team_relations(&[]),
         1,
     );
 
@@ -130,6 +149,8 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
     entities
         .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
         .expect("pump jack should spawn");
+    spawn_completed_mining_anchor(&mut entities, 1, pump_x, pump_y);
+    let teams = team_relations(&[(1, 1)]);
     let oil_before = entities
         .get(oil)
         .and_then(|node| node.remaining())
@@ -137,7 +158,7 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
     let mut payouts = Vec::new();
 
     for _ in 0..config::HARVEST_TICKS {
-        payouts.extend(pump_jack::tick(&mut entities));
+        payouts.extend(pump_jack::tick(&mut entities, &teams));
     }
 
     assert_eq!(payouts.len(), 1);
@@ -155,6 +176,63 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
 }
 
 #[test]
+fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
+    let (far_x, far_y) = footprint_center(&map, EntityKind::CityCentre, 24, 24);
+    let oil = entities
+        .spawn_node(EntityKind::Oil, pump_x, pump_y)
+        .expect("oil node should spawn");
+    entities
+        .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
+        .expect("pump jack should spawn");
+    entities
+        .spawn_building(1, EntityKind::CityCentre, far_x, far_y, true)
+        .expect("distant owned city centre should spawn");
+    spawn_completed_mining_anchor(&mut entities, 3, pump_x, pump_y);
+    let incomplete_ally = entities
+        .spawn_building(
+            2,
+            EntityKind::CityCentre,
+            pump_x,
+            pump_y - config::TILE_SIZE as f32 * 2.0,
+            false,
+        )
+        .expect("incomplete allied city centre should spawn");
+    let teams = team_relations(&[(1, 7), (2, 7), (3, 3)]);
+    let oil_before = entities
+        .get(oil)
+        .and_then(|node| node.remaining())
+        .expect("oil node remaining");
+
+    for _ in 0..config::HARVEST_TICKS.saturating_mul(2) {
+        assert!(pump_jack::tick(&mut entities, &teams).is_empty());
+    }
+    assert_eq!(
+        entities.get(oil).and_then(|node| node.remaining()),
+        Some(oil_before),
+        "distant owned, nearby enemy, and incomplete allied anchors must not enable extraction"
+    );
+
+    let _ = entities.remove(incomplete_ally);
+    spawn_completed_mining_anchor(&mut entities, 2, pump_x, pump_y);
+    let mut payouts = Vec::new();
+    for _ in 0..config::HARVEST_TICKS {
+        payouts.extend(pump_jack::tick(&mut entities, &teams));
+    }
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(payouts[0].owner, 1);
+    assert_eq!(payouts[0].oil, config::OIL_LOAD);
+    assert_eq!(
+        entities.get(oil).and_then(|node| node.remaining()),
+        Some(oil_before - config::OIL_LOAD),
+        "a completed allied mining anchor should activate the Pump Jack"
+    );
+}
+
+#[test]
 fn pump_jack_disappears_with_its_depleted_oil_patch() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
@@ -165,6 +243,8 @@ fn pump_jack_disappears_with_its_depleted_oil_patch() {
     let pump = entities
         .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
         .expect("pump jack should spawn");
+    spawn_completed_mining_anchor(&mut entities, 1, pump_x, pump_y);
+    let teams = team_relations(&[(1, 1)]);
     let remaining_before_final_load = entities
         .get(oil)
         .and_then(|node| node.remaining())
@@ -176,11 +256,11 @@ fn pump_jack_disappears_with_its_depleted_oil_patch() {
         .harvest_resources(remaining_before_final_load);
 
     for _ in 0..config::HARVEST_TICKS.saturating_sub(1) {
-        assert!(pump_jack::tick(&mut entities).is_empty());
+        assert!(pump_jack::tick(&mut entities, &teams).is_empty());
         assert!(entities.contains(pump));
     }
 
-    let payouts = pump_jack::tick(&mut entities);
+    let payouts = pump_jack::tick(&mut entities, &teams);
 
     assert_eq!(payouts.len(), 1);
     assert_eq!(payouts[0].oil, config::OIL_LOAD);
@@ -209,6 +289,8 @@ fn pump_jack_does_not_retarget_another_oil_patch_after_depletion() {
     let pump = entities
         .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
         .expect("pump jack should spawn");
+    spawn_completed_mining_anchor(&mut entities, 1, pump_x, pump_y);
+    let teams = team_relations(&[(1, 1)]);
     let remaining_before_final_load = entities
         .get(depleted_oil)
         .and_then(|node| node.remaining())
@@ -225,7 +307,7 @@ fn pump_jack_does_not_retarget_another_oil_patch_after_depletion() {
 
     let mut payouts = Vec::new();
     for _ in 0..config::HARVEST_TICKS {
-        payouts.extend(pump_jack::tick(&mut entities));
+        payouts.extend(pump_jack::tick(&mut entities, &teams));
     }
 
     assert_eq!(payouts.len(), 1);
@@ -256,6 +338,8 @@ fn pump_jack_mines_only_oil_centered_in_its_footprint() {
     entities
         .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
         .expect("pump jack should spawn");
+    spawn_completed_mining_anchor(&mut entities, 1, pump_x, pump_y);
+    let teams = team_relations(&[(1, 1)]);
     let adjacent_before = entities
         .get(adjacent_oil)
         .and_then(|node| node.remaining())
@@ -267,7 +351,7 @@ fn pump_jack_mines_only_oil_centered_in_its_footprint() {
 
     let mut payouts = Vec::new();
     for _ in 0..config::HARVEST_TICKS {
-        payouts.extend(pump_jack::tick(&mut entities));
+        payouts.extend(pump_jack::tick(&mut entities, &teams));
     }
 
     assert_eq!(payouts.len(), 1);
@@ -351,6 +435,7 @@ fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
         &occ,
         &spatial,
         &mut coordinator,
+        &team_relations(&[]),
         1,
     );
 
@@ -409,6 +494,7 @@ fn occupied_resource_without_free_neighbor_moves_worker_to_open_grass_and_stops_
         &occ,
         &spatial,
         &mut coordinator,
+        &team_relations(&[]),
         1,
     );
 
