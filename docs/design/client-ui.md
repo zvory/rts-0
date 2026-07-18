@@ -1882,7 +1882,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   the fog overlay and excluded from local fog-source computation and selection/command hit-testing.
   Current death-vision entities are normal visible entities and do not use this flag.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
-  two-letter stencils; under construction → translucent with a single HP-layer status bar;
+  two-letter stencils; under construction → translucent with a single HP-layer status bar whose
+  fill reflects current HP rather than changing authoritative construction progress;
   production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status
   bar and drains from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam
   hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate
