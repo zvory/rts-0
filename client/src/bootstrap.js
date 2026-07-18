@@ -295,6 +295,8 @@ export const dom = {
   viewport: document.getElementById("viewport"),
   minimap: document.getElementById("minimap"),
   toast: document.getElementById("toast"),
+  connectionLost: document.getElementById("connection-lost"),
+  connectionLostDetail: document.getElementById("connection-lost-detail"),
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),
   gameOverObservation: document.getElementById("game-over-observation"),

@@ -492,10 +492,28 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       show() { showCount += 1; },
     };
     app.showConnectionWarning = () => { warningCount += 1; };
+    app.showConnectionLost = () => { warningCount += 1; };
     app.onClose();
     assert(resetCount === 1 && showCount === 1,
       "an ordinary lobby disconnect resets and shows the main lobby browser");
     assert(warningCount === 0, "an ordinary lobby disconnect does not show a warning");
+  }
+  {
+    const connectionLost = { hidden: true };
+    const connectionLostDetail = { textContent: "" };
+    dom.connectionLost = connectionLost;
+    dom.connectionLostDetail = connectionLostDetail;
+    const app = Object.create(App.prototype);
+    app.lobby = null;
+    app.labCatalog = null;
+    app.showConnectionLost("Server connection lost.");
+    assert(!connectionLost.hidden, "connection loss opens the persistent blocking overlay");
+    assert(connectionLostDetail.textContent === "Server connection lost.",
+      "connection loss overlay shows the transport failure detail");
+    app.net = { offline: true };
+    app.stopHeartbeat = () => {};
+    app.onOpen();
+    assert(connectionLost.hidden, "connection overlay is hidden after connectivity returns");
   }
   assert(
     shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),

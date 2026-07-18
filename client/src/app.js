@@ -262,7 +262,7 @@ export class App {
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.stressTestRunner?.fail("The Hellhole workload could not be loaded.");
-      this.showConnectionWarning(
+      this.showConnectionLost(
         "Unable to connect after several attempts. Refresh to try again.",
       );
     }
@@ -548,6 +548,7 @@ export class App {
   onOpen() {
     this.hasConnected = true;
     this.socketOpen = true;
+    this.hideConnectionLost();
     this.stopHeartbeat();
     if (!this.net.offline) {
       this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
@@ -575,7 +576,7 @@ export class App {
       ? "Server connection lost. Refresh when the server is available."
       : "Unable to connect to the server. Make sure it is running, then refresh.";
     this.labCatalog?.setConnected(false);
-    this.showConnectionWarning(text);
+    this.showConnectionLost(text);
   }
 
   /** Clear the heartbeat interval if one is running. Idempotent. */
@@ -1108,6 +1109,25 @@ export class App {
     this.showToast(text);
     if (this.lobby) this.lobby.setStatus(text, true);
     this.labCatalog?.setStatus(text, { error: true });
+  }
+
+  /**
+   * Block the application with a persistent transport warning. Unlike a toast,
+   * this remains visible until the next successful WebSocket open event.
+   * @param {string} text
+   */
+  showConnectionLost(text = "The game can no longer reach the server.") {
+    if (dom.connectionLostDetail) dom.connectionLostDetail.textContent = text;
+    if (dom.connectionLost) dom.connectionLost.hidden = false;
+    if (this.lobby) this.lobby.setStatus(text, true);
+    this.labCatalog?.setStatus(text, { error: true });
+  }
+
+  /** Clear the blocking transport warning after connectivity returns. */
+  hideConnectionLost() {
+    if (!dom.connectionLost) return false;
+    dom.connectionLost.hidden = true;
+    return true;
   }
 
   /** Fetch and display the build version in the shared top-left badge. */
