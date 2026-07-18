@@ -73,6 +73,26 @@ import { KIND, TERRAIN } from "../../client/src/protocol.js";
   const nullOptionsCam = new Camera(800, 600, null);
   nullOptionsCam.setZoom(99, 400, 300);
   assertApprox(nullOptionsCam.zoom, CAMERA.maxZoom, 0.001, "Camera tolerates null options");
+
+  const boundedCam = new Camera(1920, 1080, { maxVisibleWorldPx: 3200 });
+  boundedCam.setZoom(0.01);
+  assertApprox(boundedCam.viewW / boundedCam.zoom, 3200, 0.001,
+    "wide live-player viewports stop at the configured world span");
+  assert(boundedCam.viewH / boundedCam.zoom <= 3200,
+    "the shorter live-player viewport axis stays within the configured world span");
+  boundedCam.setMapBounds(20_000, 20_000);
+  boundedCam.focusAt({ x: 10_000, y: 10_000 });
+  const focusBeforeResize = boundedCam.snapshot().focus;
+  boundedCam.resize(800, 4000);
+  boundedCam.setZoom(0.01);
+  assertApprox(boundedCam.viewH / boundedCam.zoom, 3200, 0.001,
+    "portrait live-player viewports apply the same cap to their taller axis");
+  assert(boundedCam.viewW / boundedCam.zoom <= 3200,
+    "portrait live-player viewports keep both axes within the configured world span");
+  assertApprox(boundedCam.snapshot().focus.x, focusBeforeResize.x, 0.001,
+    "orthographic cap changes preserve camera focus across viewport resizes");
+  assertApprox(boundedCam.snapshot().focus.y, focusBeforeResize.y, 0.001,
+    "orthographic cap changes preserve camera focus across viewport resizes");
 }
 
 {

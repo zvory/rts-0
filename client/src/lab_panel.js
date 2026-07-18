@@ -31,6 +31,8 @@ export class LabPanel {
     launch = null,
     startPayload = null,
     match = null,
+    controlPolicy = null,
+    commandLimitSettings = null,
     onEditMap = null,
   }) {
     this.root = root;
@@ -38,6 +40,8 @@ export class LabPanel {
     this.launch = launch;
     this.startPayload = startPayload;
     this.match = match;
+    this.controlPolicy = controlPolicy;
+    this.commandLimitSettings = commandLimitSettings;
     this.onEditMap = onEditMap;
     this.editMapPending = false;
     this.destroyed = false;
@@ -899,8 +903,7 @@ export class LabPanel {
   }
 
   setIgnoreCommandLimits(enabled) {
-    const policy = this.labControlPolicy();
-    policy?.setIgnoreCommandLimits?.(enabled);
+    this.commandLimitSettings?.setIgnoreCommandLimits?.(enabled);
     const summary = enabled ? "Unlimited commands enabled." : "Command limit restored.";
     return this.publishLocalResult("ignoreCommandLimits", true, summary);
   }
@@ -918,11 +921,7 @@ export class LabPanel {
   }
 
   ignoreCommandLimitsEnabled() {
-    return this.labControlPolicy()?.ignoreCommandLimitsEnabled?.() ?? true;
-  }
-
-  labControlPolicy() {
-    return this.match?.state?.controlPolicy || null;
+    return this.commandLimitSettings?.ignoreCommandLimitsEnabled?.() ?? true;
   }
 
   armRemoveTool() {
@@ -1133,7 +1132,7 @@ export class LabPanel {
 
   snapshotCompletedResearchForPlayer(playerId) {
     const state = this.match?.state || null;
-    const policyUpgrades = this.labControlPolicy()?.commandUpgrades?.(state, playerId);
+    const policyUpgrades = this.controlPolicy?.commandUpgrades?.(state, playerId);
     if (Array.isArray(policyUpgrades)) return policyUpgrades;
     const playerUpgrades = upgradeArrayForOwner(state?.playerUpgrades, playerId) ||
       upgradeArrayForOwner(state?.upgradesByPlayer, playerId) ||

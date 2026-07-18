@@ -109,6 +109,19 @@ const TUBE_FRAME = Object.freeze({
   pixelsPerUnitY: PPU,
 });
 
+// The generated base plate is postprocessed to a tight 128px square and
+// deliberately mapped to 16 world pixels: exactly half of one 32px tile.
+const BASE_PLATE_FRAME = Object.freeze({
+  x: 2172,
+  y: 0,
+  w: 128,
+  h: 128,
+  originX: 64,
+  originY: 64,
+  pixelsPerUnitX: 8,
+  pixelsPerUnitY: 8,
+});
+
 function carriageCropFrame(x, y, w, h) {
   return Object.freeze({
     x,
@@ -128,25 +141,36 @@ const RIGHT_TIRE_FRAME = carriageCropFrame(1072, 472, 146, 56);
 export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "mortar_team",
-  image: "/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png?v=m2-wheeled-pass01-long-thin-tube",
+  image: "/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png?v=m2-wheeled-baseplate-pass04-white-team-rearward",
   grid: {
-    profile: "three-cell-components",
-    sourceSheet: "client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png",
+    profile: "four-component-cells",
+    sourceSheet: "client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png",
     generatedSource: "client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-source.png",
-    imageVersion: "m2-wheeled-pass01-long-thin-tube",
+    basePlateGeneratedSource: "client/assets/rigs/mortar-png-pass-04/generated/mortar-baseplate-source-v3.png",
+    imageVersion: "m2-wheeled-baseplate-pass04-white-team-rearward",
     cells: [
       "reference.assembled",
       "sprite.carriage",
       "sprite.tube",
+      "sprite.basePlate",
     ],
     components: {
       assembledReference: ASSEMBLED_REFERENCE_FRAME,
       carriage: CARRIAGE_FRAME,
       tube: TUBE_FRAME,
+      basePlate: BASE_PLATE_FRAME,
     },
   },
   frames: {},
   sprites: [
+    sprite(
+      "sprite.mortar.basePlate.deployed",
+      mortarPart("basePlate", "deployed"),
+      [mortarPart("basePlate", "deployed")],
+      19,
+      BASE_PLATE_FRAME,
+      { tintSlot: "team", positionOffsetX: -20 }
+    ),
     sprite(
       "sprite.mortar.carriage.packed",
       mortarPart("axle", "packed"),

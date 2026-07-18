@@ -62,8 +62,9 @@ upgrades `/ws` to a WebSocket. It also builds one shared `Lobby`.
 `GET /api/lobbies` returns browser-safe summaries for public normal rooms and persisted replay
 staging lobbies: room name, kind, current host name, map, creation time, occupied active slots, max
 slots, spectator count, phase, and server-authored join state. `POST /api/lobbies` reserves a new
-normal lobby name with create-only semantics; duplicate, invalid, reserved/internal, and
-deploy-drain attempts fail instead of routing through the normal join-or-create WebSocket path.
+normal lobby name with create-only semantics. If the requested name exists, the registry atomically
+reserves the first free numbered variant and returns it; invalid, reserved/internal, and deploy-drain
+attempts fail instead of routing through the normal join-or-create WebSocket path.
 
 `main.rs` does not own a `Game`. It is the edge of the server, not the
 simulation.
@@ -270,7 +271,7 @@ Combat is also tightly coupled:
 flowchart LR
     Combat["combat_system"] --> Target["target acquisition"]
     Combat --> LOS["line of sight + smoke"]
-    Combat --> Move["chase via MoveCoordinator"]
+    Combat --> Move["resume commanded Attack Move via MoveCoordinator"]
     Combat --> Damage["damage + events"]
     Combat --> AbilityRuntime["anchors/projectiles"]
     Combat --> Mortar["mortar shell scheduling"]
@@ -278,7 +279,7 @@ flowchart LR
 
 This is expected for an RTS combat phase. The main safety rule is to keep the
 coupling contained inside `combat/` and use narrower helper modules inside that
-folder for acquisition, chase, weapons, projection, events, and damage.
+folder for acquisition, weapons, projection, events, and damage.
 
 ## Snapshot and Fog Walkthrough
 

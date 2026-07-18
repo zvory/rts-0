@@ -60,7 +60,11 @@ export const SMOKE_ABILITY_COOLDOWN_TICKS = 0;
 export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
 export const MORTAR_SHELL_DELAY_TICKS = Math.round(TICK_HZ * 2.25);
-export const MORTAR_RANGE_TILES = 20;
+export const MORTAR_RANGE_TILES = 15;
+export const MORTAR_MIN_RANGE_TILES = 5;
+export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
+export const MORTAR_SETUP_TICKS = TICK_HZ * 1.5;
+export const MORTAR_TEARDOWN_TICKS = TICK_HZ * 0.5;
 export const MORTAR_OUTER_RADIUS_TILES = 1.5;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
@@ -116,7 +120,7 @@ export const STATS = Object.freeze({
   [KIND.GOLEM]: { label: "Golem", icon: "GLM", size: 9, sight: 10,
     rangeTiles: 1, cost: { steel: 0, oil: 0 }, supply: 4, buildTicks: 396 },
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 11,
-    rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
+    rangeTiles: 4, cost: { steel: 60, oil: 10 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
@@ -124,7 +128,8 @@ export const STATS = Object.freeze({
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 10,
-    rangeTiles: MORTAR_RANGE_TILES, cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
+    rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
+    cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
     description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D." },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 7, body: ARTILLERY_BODY,
@@ -220,6 +225,7 @@ export const ABILITIES = Object.freeze({
     carriers: Object.freeze([KIND.MORTAR_TEAM]),
     targetMode: "worldPoint",
     rangeTiles: MORTAR_RANGE_TILES,
+    minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
@@ -376,7 +382,7 @@ export const UPGRADES = Object.freeze({
     icon: "PF+",
     cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: PANZERFAUSTS_RESEARCH_TICKS,
-    description: `Give every current and future Rifleman one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot`,
+    description: `Give newly produced Riflemen one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot`,
     researchedAt: KIND.TRAINING_CENTRE,
   }),
   [UPGRADE.ENTRENCHMENT]: Object.freeze({

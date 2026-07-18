@@ -431,6 +431,28 @@ import { textWithin } from "./dom_text.mjs";
       "production tab renders active research with mirrored upgrade labels",
     );
 
+    restored.selectedTab = "research";
+    overlay.render();
+    overlay.applyObserverAnalysis({
+      tick: 14,
+      players: [
+        { id: 1, units: [], production: [], upgrades: [UPGRADE.METHAMPHETAMINES, UPGRADE.TANK_UNLOCK] },
+        { id: 2, units: [], production: [], upgrades: [] },
+      ],
+    });
+    const researchText = textWithin(root);
+    assert(
+      researchText.includes("Completed research")
+        && researchText.includes("Red")
+        && researchText.includes("Methamphetamines")
+        && researchText.includes("Tank Production"),
+      "research tab lists each player's completed research with mirrored labels",
+    );
+    assert(
+      researchText.includes("Blue") && researchText.includes("No completed research"),
+      "research tab keeps players with no completed research visible",
+    );
+
     restored.selectedTab = "units";
     overlay.render();
     overlay.applyObserverAnalysis({
@@ -545,12 +567,20 @@ import { textWithin } from "./dom_text.mjs";
         && resourcesText.includes("Lifetime")
         && resourcesText.includes("Last 5s")
         && resourcesText.includes("Last 1m")
-        && resourcesText.includes("Total")
-        && resourcesText.includes("175")
-        && resourcesText.includes("35")
         && resourcesText.includes("120")
         && resourcesText.includes("30"),
-      "resources tab renders lifetime, short-window, and minute mined-resource totals",
+      "resources tab renders lifetime, short-window, and minute mined-resource values",
+    );
+    const resourceGroups = findFakes(root, (el) => el.classList.contains("replay-resources-group"));
+    assert(
+      resourceGroups.map((group) => group.querySelector(".replay-resources-window")?.textContent).join("|")
+        === "Last 5s|Last 1m|Lifetime",
+      "resources tab orders time windows from five seconds to one minute to lifetime",
+    );
+    assert(
+      resourceGroups.every((group) => group.querySelectorAll(".replay-resources-name")
+        .map((name) => name.textContent).join("|") === "Red|Blue"),
+      "resources tab lists every player under each time window",
     );
     assert(
       findFakes(root, (el) => el.classList.contains("replay-resources-steel"))

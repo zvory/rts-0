@@ -831,12 +831,18 @@ impl Game {
             entity.clear_orders();
             clear_lab_production_state(entity);
         }
-        production::sync_spawned_upgrade_effects(
-            &mut self.state.entities,
-            &self.state.players,
-            input.owner,
-            input.entity_id,
-        );
+        if let Some(player) = self
+            .state
+            .players
+            .iter()
+            .find(|player| player.id == input.owner)
+        {
+            production::sync_owned_upgrade_effects(
+                &mut self.state.entities,
+                input.owner,
+                &player.upgrades,
+            );
+        }
         self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
         Ok(LabOpOutcome::OwnerSet {
@@ -1469,7 +1475,7 @@ fn validate_upgrade_for_player(
 ) -> Result<(), LabError> {
     let upgrade_id = upgrade.to_protocol_str();
     let allowed = rules::faction::catalog_for(&player.faction_id)
-        .is_some_and(|catalog| catalog.upgrades.iter().any(|entry| entry.id == upgrade_id));
+        .is_some_and(|catalog| catalog.upgrades.iter().any(|entry| entry.kind == upgrade));
     if allowed {
         Ok(())
     } else {

@@ -56,11 +56,8 @@ import { textWithin } from "./dom_text.mjs";
   );
   assertDeepEqual(
     AI_PROFILES,
-    [
-      { id: "ai_2_1", label: "AI 2.1" },
-      { id: "ai_turtle", label: "AI Turtle" },
-    ],
-    "lobby AI profile selector exposes the two supported profiles",
+    [{ id: "ai_2_1", label: "AI 2.1" }],
+    "lobby AI profile selector exposes only the supported player opponent",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -172,10 +169,28 @@ import { textWithin } from "./dom_text.mjs";
 }
 
 {
+  const sentNames = [];
+  const persistedNames = [];
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    _joined: true,
+    _nameUpdateTimer: undefined,
+    _lastSentName: "Original",
+    elName: { value: "  Renamed  " },
+    net: { setName: (name) => sentNames.push(name) },
+    _persistName: (name) => persistedNames.push(name),
+  });
+
+  lobby._flushNameUpdate();
+  lobby._flushNameUpdate();
+
+  assertDeepEqual(sentNames, ["Renamed"], "joined lobby name edits send one normalized update");
+  assertDeepEqual(persistedNames, ["Renamed", "Renamed"], "joined lobby name edits persist locally");
+}
+
+{
   withFakeDocument(() => {
     const root = document.createElement("div");
     const view = new LobbyRosterView(root);
-    let selectedProfile = null;
     view.render({
       players: [
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
@@ -195,9 +210,6 @@ import { textWithin } from "./dom_text.mjs";
       countdownActive: false,
       playerCount: 2,
       maxPlayers: 4,
-      onSetAiProfile: (id, aiProfileId) => {
-        selectedProfile = { id, aiProfileId };
-      },
     });
 
     const profileSelectors = findFakes(
@@ -209,13 +221,7 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes an AI 2.1 profile selector",
     );
     assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
-    profileSelectors[0].value = "ai_turtle";
-    profileSelectors[0].listeners.change?.();
-    assertDeepEqual(
-      selectedProfile,
-      { id: 2, aiProfileId: "ai_turtle" },
-      "host lobby sends a selected canonical AI profile",
-    );
+    assert(profileSelectors[0].children.length === 1, "host lobby does not expose internal AI profiles");
 
     const turtleRoot = document.createElement("div");
     const turtleView = new LobbyRosterView(turtleRoot);
@@ -239,9 +245,15 @@ import { textWithin } from "./dom_text.mjs";
       maxPlayers: 4,
     });
 
+    const staleProfileSelectors = findFakes(
+      turtleRoot,
+      (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
+    );
     assert(
-      textWithin(turtleRoot).includes("AI Turtle"),
-      "host lobby labels Turtle AI seats as AI Turtle",
+      staleProfileSelectors.length === 1 &&
+        staleProfileSelectors[0].value === "ai_2_1" &&
+        staleProfileSelectors[0].children.length === 1,
+      "player lobby does not expose an internal Turtle profile received from stale state",
     );
   });
 }
@@ -543,16 +555,63 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly", kind: "replay" }),
     { state: "fullSpectatorOnly", joinable: true, spectator: true },
     "replay lobby rows always join as spectators");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "inGame", kind: "replay" }),
+    { state: "inGame", joinable: true, spectator: true, replayOk: true },
+    "active replay rows join the current shared playback without another confirmation");
   assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
   assert(!validateLobbyName("x".repeat(65)).ok, "lobby create mirrors the server byte-length cap");
   assert(suggestLobbyName("Alex") === "Alex's lobby", "lobby create suggests a lobby from player name");
   assert(suggestLobbyName("") === "Commander's lobby", "lobby create suggestion falls back when player name is blank");
+  assert(suggestLobbyName("Alex", ["Alex's lobby"]) === "Alex's lobby 2",
+    "lobby create suggestion numbers a taken default name");
+  assert(suggestLobbyName("Alex", [{ room: "Alex's lobby" }, { room: "Alex's lobby 2" }]) === "Alex's lobby 3",
+    "lobby create suggestion skips taken numbered names from browser rows");
   assert(validateLobbyName(suggestLobbyName("x".repeat(120))).ok,
     "lobby create suggestion stays within the public lobby name limit");
+  assert(validateLobbyName(suggestLobbyName("x".repeat(120), [{ room: suggestLobbyName("x".repeat(120)) }])).ok,
+    "numbered lobby create suggestions stay within the public lobby name limit");
   assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
     "lobby create suggestion avoids reserved internal prefixes");
+
+  {
+    let joinOptions = null;
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _browserActionPending: false,
+      async _connectForAction() { return true; },
+      _beginBrowserJoin(_row, options) { joinOptions = options; },
+    });
+    await lobby._joinBrowserLobby(
+      { room: "Active Replay", kind: "replay", joinState: "inGame" },
+      { preflight: false, spectator: true },
+    );
+    assertDeepEqual(joinOptions, { spectator: true, replayOk: true },
+      "active replay browser clicks confirm the intentional replay join");
+  }
+
+  {
+    let stoppedRefresh = null;
+    let started = 0;
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _joined: false,
+      _browserActionPending: true,
+      _pendingBrowserJoinRoom: "Active Replay",
+      _startCbs: [() => { started += 1; }],
+      _cancelNameUpdate() {},
+      _clearCountdown() {},
+      _hideReplayPrompt() {},
+      _stopLobbyBrowserAutoRefresh(options) { stoppedRefresh = options; },
+    });
+
+    lobby._handleStart();
+
+    assert(lobby._joined && !lobby._browserActionPending && !lobby._pendingBrowserJoinRoom,
+      "direct replay start completes the pending browser join");
+    assertDeepEqual(stoppedRefresh, { cancelRequest: true },
+      "direct replay start stops hidden lobby refresh work");
+    assert(started === 1, "direct replay start still notifies the app");
+  }
 
   {
     const priorDocument = globalThis.document;
@@ -686,7 +745,7 @@ import { textWithin } from "./dom_text.mjs";
       _browserActionPending: false,
       _fetchImpl: async () => ({
         ok: true,
-        async json() { return { room: "Created lobby" }; },
+        async json() { return { room: "Created lobby 2" }; },
       }),
       async _connectForAction() {
         connectionChecks += 1;
@@ -699,9 +758,28 @@ import { textWithin } from "./dom_text.mjs";
       _reflectCreateButton() {},
     });
     const created = await lobby._submitCreateLobby("Created lobby");
-    assert(created && joinedRoom === "Created lobby", "create flow joins the reserved lobby");
+    assert(created && joinedRoom === "Created lobby 2",
+      "create flow joins the server-selected available lobby name");
     assert(connectionChecks === 2,
       "create flow rechecks its socket after the HTTP reservation completes");
+  }
+
+  {
+    let initialValue = "";
+    const lobby = Object.assign(Object.create(Lobby.prototype), {
+      _joined: false,
+      _browserActionPending: false,
+      elName: { value: "Alex" },
+      browserView: { rows: [{ room: "Alex's lobby" }, { room: "Alex's lobby 2" }] },
+      createModal: {
+        open(_trigger, options) { initialValue = options.initialValue; },
+      },
+    });
+
+    lobby._openCreateLobby(null);
+
+    assert(initialValue === "Alex's lobby 3",
+      "opening create lobby preselects the first available default name");
   }
 
   const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
@@ -938,7 +1016,7 @@ import { textWithin } from "./dom_text.mjs";
     const modal = new LobbyCreateModal(host, {
       onSubmit: async (room) => {
         submitted = room;
-        modal.setError("Lobby name is already in use.");
+        modal.setError("Server is draining for deploy; new lobbies are disabled.");
         return false;
       },
     });
@@ -955,8 +1033,8 @@ import { textWithin } from "./dom_text.mjs";
     submit.click();
     await Promise.resolve();
     assert(submitted === "taken", "create lobby modal submits the trimmed lobby name");
-    assert(textWithin(host).includes("Lobby name is already in use."),
-      "duplicate create failures are displayed inline");
+    assert(textWithin(host).includes("Server is draining for deploy; new lobbies are disabled."),
+      "server-rejected create failures are displayed inline");
     modal.close();
     assert(document.activeElement === trigger, "create lobby modal returns focus to the trigger");
     modal.destroy();

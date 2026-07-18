@@ -120,6 +120,7 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
             .expect("player one should exist");
         player.add_gathered_resources(EntityKind::Steel, 80, current_tick);
         player.add_gathered_resources(EntityKind::Oil, 30, current_tick - config::TICK_HZ * 10);
+        player.upgrades.insert(upgrade::UpgradeKind::TankUnlock);
     }
 
     let victim_unit = game
@@ -175,6 +176,7 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
             && row.queue_depth == 1
             && row.progress > 0.0
     }));
+    assert_eq!(player_one.upgrades, vec!["tank_unlock"]);
     assert_eq!(player_one.resources.lifetime.steel, 80);
     assert_eq!(player_one.resources.lifetime.oil, 30);
     assert_eq!(player_one.resources.last_5s.steel, 80);
@@ -564,6 +566,10 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+        mortar_entity.set_emplacement_facing(Some(0.0));
+    }
     let spotter_pos = game.state.map.tile_center(15, 2);
     let spotter = game
         .state

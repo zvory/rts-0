@@ -29,6 +29,7 @@ src/
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery, building-footprint sizing
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
+  command_interaction.js # shared Input/HUD/Minimap command issue-and-planned-order recording
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
@@ -67,6 +68,7 @@ src/
   ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   observer_analysis_preferences.js # persisted observer analysis tab/visibility/window preferences
+  observer_analysis_research.js # completed-research tab renderer for observer analysis
   observer_analysis_resources.js # resources tab renderer and wire normalization for observer analysis
   observer_analysis_rows.js # observer analysis player row metadata joiner
   floating_panel_positioner.js # shared app-shell move-only panel interaction and placement
@@ -88,6 +90,7 @@ src/
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
+  control_policy_projection.js # frozen read-only ownership/command-surface projection
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
@@ -129,11 +132,12 @@ orders, replay controls, or a simulation clock. It reuses the normal Pixi `Rende
 `net.js`
 ```js
 export class Net {
-  constructor(url)                       // ws url; auto-derived from location in main.js
+  constructor(url, diagnostics?)         // ws url; auto-derived from location in main.js
   connect(): Promise<void>
   on(type, handler)                      // type ∈ ServerMessage tags + "open"/"close"
   off(type, handler)
   join(name, room, spectator?, replayOk?)
+  setName(name)                          // update own display name while waiting in the lobby
   ready(isReady)
   start()
   setTeamPreset(preset)                  // deprecated compatibility command; server ignores it
@@ -169,6 +173,14 @@ export class Net {
 }
 ```
 
+`Net` isolates each subscriber during dispatch. The first occurrence of a stable failure signature
+(event type truncated to 64 characters, local weakly-held handler id, and `Error` or `NonError`
+thrown-value class) is reported with `console.error("[rts-net] subscriber failure", detail)` and is
+optionally mirrored to diagnostics. Each instance retains at most 32 signatures; the next distinct
+failure emits one fixed saturation report and all later new signatures are suppressed. Reports
+never inspect thrown-value properties or message payloads, survive reconnects for the lifetime of
+the `Net`, and cannot prevent delivery to later subscribers even if console or diagnostics throws.
+
 `prediction_controller.js`
 ```js
 export class PredictionController {
@@ -189,8 +201,11 @@ export class PredictionController {
   get pendingCommandCount()
 }
 ```
-Live player command sources receive a `commandIssuer` seam from `Match` and call
-`commandIssuer.issueCommand(cmd)`. The controller owns browser-local `clientSeq` allocation and
+`Match` composes one `CommandInteraction` from its command issuer, `ClientIntent`, and current
+selected-entity snapshot. Input, HUD, and Minimap receive the same interaction and call
+`issueCommand(cmd, options?)`; it issues once and records a synchronous accepted result once for
+planned-order feedback. Promise-returning Lab issue-as commands stay non-optimistic and record no
+planned order. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
 `GameState.applySnapshot` remains authoritative. Prediction display writes go through
@@ -320,7 +335,12 @@ Prototype raster rig workflow:
   4.2-inch-inspired wheeled mortar sheet: assembled reference, team-tinted carriage/frame and
   tube/barrel assembly, plus fixed-color tire overlays. The carriage sprite follows the SVG
   carriage recoil binding while the separate tube sprite follows the stronger weapon recoil
-  binding. See
+  binding. The deployed Mortar Team also uses an image-generated square base-plate PNG in the unit
+  atlas. Its white-painted source receives the owning player's runtime team tint. The keyed and
+  tightly cropped 128px source is postprocessed to exactly 16x16 world pixels (half a tile), draws
+  below the carriage with its center offset 20 world pixels rearward, scales from zero to full size
+  with setup progress, and shrinks during teardown; the SVG part supplies animation bindings only
+  and has no visible paint. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
   passes, and next validation work.
 - `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt
@@ -410,7 +430,7 @@ shouldMountObserverAnalysisOverlay({ capabilities })
 createObserverAnalysisOverlayPreferences(storage?)
 export class ObserverAnalysisOverlay {
   constructor({ root, preferences, getEntities, getCameraBounds, getPlayers, stats })
-  applyObserverAnalysis(payload)            // renders server-backed production, unit, and losses tabs
+  applyObserverAnalysis(payload)            // renders server-backed production, research, unit, and losses tabs
   update(frameViews?)                     // refreshes viewport army value from camera/snapshot state
   destroy()
 }
@@ -422,8 +442,10 @@ seek-triggered `start` messages and spectator rematches. Preferences are stored 
 compatibility. Its titlebar is draggable, keyboard-nudgeable, viewport-clamped, and retains its
 desktop placement through replay seeks and spectator rematches; `Home` restores the default
 placement. The overlay owns its generated DOM and is read-only. The Army Value tab is
-client-side and viewport-specific; Production, Units, Units Lost, and Resources Lost render the
-latest server-authored `observerAnalysis` payload. Resources Lost follows the protocol's narrow
+client-side and viewport-specific; Production, Research, Units, Resources, Units Lost, and
+Resources Lost render the latest server-authored `observerAnalysis` payload. Research groups
+completed permanent upgrades by player, retaining an explicit empty row when a player has
+completed none. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
 harvesting, refunds, and cancelled queues.
 
@@ -599,7 +621,10 @@ export class LabCatalogScreen {
 ```
 `LabCatalogScreen` is app-owned and used only for the bare `/lab` route. It renders a blank lab row
 plus bundled checkpoint setup metadata from `GET /api/lab-scenarios`; clicking a row builds the existing
-hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start the normal lab flow.
+hidden `__lab__:<room>:map=<map>:scenario=<id>` join room, replaces the catalog URL with the
+corresponding direct scenario URL, and lets `App` start the normal lab flow. Keeping the scenario in
+the visible URL makes catalog-launched blank and bundled Labs reloadable with Lab-scoped options such
+as `visualProfile` and `rtsRenderer`.
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 
@@ -608,7 +633,7 @@ and auto-join for compatibility.
 export const INTERACT_BRIDGE_KEY = "__rtsInteract"
 export class InteractBridge {
   status()                            // readiness or launch error; no internal references
-  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/camera/reset/presentation/captureReadiness
+  call(method, input)                 // status/catalog/spawn/update/remove/order/time/inspect/select/camera/reset/presentation/captureReadiness
   destroy()
 }
 export function interactLaunchEnabled(locationLike?)
@@ -624,7 +649,9 @@ padding, defaults to a close 32-world-pixel frame for readable single-unit captu
 48 world pixels for multi-subject and non-unit framing), and returns `CameraSnapshotV1` plus
 semantic CSS viewport and ground bounds. Camera set accepts only `CameraSnapshotV1`; status,
 readiness, screenshot manifest v2, recording manifest v2, and fixed-capture manifest v2 carry the
-same versioned shape. The Lab bridge surface version is 5. Setup mutations
+same versioned shape. The Lab bridge surface version is 6. `select` resolves up to 400 visible
+entities into browser-local `GameState` selection, accepts an empty list to clear it, and waits for
+two render frames without sending a gameplay or Lab mutation. Setup mutations
 wait for the server's immediate authoritative snapshot without advancing paused simulation. Order
 calls also wait for a new snapshot and request one bounded tick when paused so the queued command is
 consumed before success.
@@ -646,7 +673,7 @@ Tailnet URL, the daemon validates the artifact and copies it into the machine-le
 copied artifact has at least 24 hours of retention, so Lab close/shutdown, idle expiry, and worktree
 removal do not invalidate issued links. A later publisher can restart the service and continue
 serving unexpired copies from its OS-temporary root.
-Operational aliases, inspection, camera focus, screenshot subjects, and corresponding bridge
+Operational aliases, inspection, selection, camera focus, screenshot subjects, and corresponding bridge
 entity-id inputs accept at most 400 references. Screenshot readiness validates the complete
 requested subject set, but returned and persisted subject detail is capped at 24 rows with total and
 `truncated` metadata; recording and fixed-capture alias detail is similarly capped at 40 rows.
@@ -668,7 +695,7 @@ representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of
 ```js
 export class InteractGameBridge {
   status()                            // isolated-match readiness and bounded semantic UI state
-  call(method, input)                 // status/inspect/move/giveUp/time/camera/presentation/captureReadiness
+  call(method, input)                 // status/inspect/select/move/giveUp/time/camera/presentation/captureReadiness
   destroy()
 }
 export function interactGameLaunchEnabled(locationLike?)
@@ -687,6 +714,10 @@ speed control is exposed for sampled time-lapse capture. Camera `overview` disab
 spectator director and fits authoritative map bounds. Game screenshots and recordings default to
 normal presentation and accept full-viewport, live-minimap, or bounded custom regions; clean
 presentation is an explicit opt-in.
+The bridge surface version is 3. Its shared game/dev-scenario `select` method replaces browser-local
+selection with up to 400 entities from the recipient's normal fog-filtered snapshot and waits for
+two render frames. It is available to players, AI-vs-AI spectators, and dev-scenario observers,
+including an empty selection for clearing, and never changes authoritative simulation state.
 
 `lab_scenario_authoring.js`
 ```js
@@ -805,18 +836,24 @@ setup checkpoint import/export through those collaborators while keeping the nor
 Lab operator starts are still spectator-shaped for projection and prediction, and
 `LabClient` treats `start.lab.vision` plus `labState.vision` as the recipient's server-authoritative
 choice; `start.lab.godModePlayers` plus `labState.godModePlayers` mirror room-scoped player god
-mode. The injected control policy exposes `canUseCommandSurface(state)` and local
-`ignoreCommandLimitsEnabled()`/`setIgnoreCommandLimits(enabled)` controls so `Match` and HUD can
+mode. `Match` wraps the injected policy in one frozen read-only projection used by selection,
+control groups, command budget, HUD/cards, Input, Minimap, renderer feedback/entities, combat audio,
+LabPanel research display, room-time controls, and shell visibility. `GameState` neither publishes
+nor discovers the policy. `App` separately injects LabPanel's narrow mutable command-limit settings
+collaborator (`ignoreCommandLimitsEnabled()`/`setIgnoreCommandLimits(enabled)`), so mutable operator
+settings never enter the read-only projection. The projection exposes
+`canUseCommandSurface(state)` so `Match` and HUD can
 keep selection plus the real command card available for operators while read-only lab viewers,
 replay viewers, and normal spectators remain passive. Lab selection itself is not toggled by this
-control. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
-`LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
+control. Operator gameplay commands still flow through the shared `CommandInteraction`; its
+underlying command issuer delegates to `LabControlPolicy`, which wraps them as lab `issueCommandAs`
+requests for the single controllable selected
 owner and includes whether that command should bypass the normal command-supply limit.
 Mixed-owner lab selections remain command-blocked, but renderer inspection treats every selected
 operator-controllable owner as a feedback owner so all-team Lab overlays such as rally/order
 markers and selected support-weapon field-of-fire wedges can be compared across players.
-Every client surface that needs ownership semantics must read through the injected control policy
-or the `GameState` helpers that delegate to it: command-card resources/faction/upgrades,
+Every client surface that needs ownership semantics must read through the injected read-only policy
+projection: command-card resources/faction/upgrades,
 right-click enemy classification, control groups, renderer feedback ownership, rally/order overlays,
 range/setup previews, minimap commands, and combat audio categories. Raw `state.playerId` remains
 the local viewer id and is not the lab command owner.
@@ -1015,7 +1052,9 @@ minimap targeting feedback uses the mirrored cloud radius and duration effect fi
 replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. If an owned or allied unit covers the patch, right-clicking that unit's body still resolves
+command. Pump Jack construction remains legal outside the completed friendly City Centre/Zamok
+mining radius, while the normal resource-mining preview warns that the distant extractor will be
+inactive. If an owned or allied unit covers the patch, right-clicking that unit's body still resolves
 to the live oil beneath its Pump Jack footprint. Advisory building placement ignores unit types whose client configuration marks them as
 non-ground placement blockers. The Scout Plane stays out of the shared ground vehicle-body
 classifier, so its body does not block build previews. Normal gameplay selection and control-group
@@ -1062,8 +1101,8 @@ rather than relying on the full mutable `GameState`. Queued support-weapon setup
 accepted move or attack-move order-plan endpoints as their field-of-fire origin, plus local pending
 move/setup stages when the command has been sent but no owner-only `orderPlan` echo has arrived;
 unqueued setup previews use the current support-weapon position. Minimap hover and click targeting
-feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns
-and Artillery. The input router owns the active preview surface: while the minimap is hovered it
+feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns,
+Mortar Teams, and Artillery. The input router owns the active preview surface: while the minimap is hovered it
 suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
 hiding minimap-authored setup cones or issued-command feedback. HUD command-target arming preserves
 Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
@@ -1253,7 +1292,9 @@ export class CameraNavigationInput {
 Live `Input` composes `CameraNavigationInput` for camera gestures, then layers pointer lock,
 selection, placement, command-card targeting, command hotkeys, minimap routing, and gameplay command
 issuance on top. Replay viewers use the same helper through `ReplayCameraInput`, with replay WASD
-pan-key aliases and no gameplay command issuer API. Replay middle-drag and Space+left-drag pan
+pan-key aliases and a composed browser-local observer selection surface, but no gameplay command
+issuer API. Replay spectators can click or box-select visible entities for selection rings and the
+read-only unit detail panel. Replay middle-drag and Space+left-drag pan
 through semantic `Camera.panByScreenDelta({x,y})`; touch drag/pinch pan and dolly without emitting
 gameplay commands. Wheel/pinch anchors and every drag delta are viewport-local CSS pixels, including
 under non-1 DPR. Mouse-wheel dolly, keyboard pan state, edge scroll state, and blur release are shared
@@ -1437,8 +1478,9 @@ ring remain valid and produce sorties that expire before arrival.
 Unit abilities remain on their declared grid slots in mixed selections rather than spilling into an
 unrelated empty hotkey. When abilities collide, Point Fire and Blanket Fire have the lowest command-
 card priority: Mortar Fire replaces Point Fire on `X`, and Scout Plane replaces Blanket Fire on `C`.
-The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns or Artillery are
-present and that slot is available. Artillery-only selections still expose Point Fire, Blanket Fire,
+The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns, Mortar Teams,
+or Artillery are present and that slot is available. A deployed selected Mortar Team draws its
+5-to-15-tile full-circle range band. Artillery-only selections still expose Point Fire, Blanket Fire,
 and Set Up together because those commands do not collide in that context.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
@@ -1485,6 +1527,7 @@ export class Lobby {
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // Name-field edits are debounced, persisted locally, and sent through Net.setName while joined.
   // Replay lobbies are keyed by explicit `kind: "replay"` metadata: the joined view hides
   // Ready, team, faction, AI, map-selection, and active-seat controls, then shows only
   // spectator occupants plus the host start control while the server reports canStart.
@@ -1504,7 +1547,7 @@ export function lobbyStatusLabel(joinState)
 export function lobbyActionLabel(joinState)
 export function lobbyJoinIntent(row)
 export function validateLobbyName(rawName)
-export function suggestLobbyName(playerName)
+export function suggestLobbyName(playerName, existingRooms?)
 export class LobbyBrowserView {
   constructor(rootEl)
   render({ rows?, loading?, loaded?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
@@ -1526,14 +1569,25 @@ in-flight list request; visibility or new activity resumes with a fresh request.
 **Refresh** button and join-action freshness preflight each remain available. Explicit launch URLs
 skip this lobby-list loop. The app also leaves the WebSocket closed on an ordinary lobby page until
 Create, Join, Watch, Replay, or an explicit launch URL requires it. An open, unjoined connection is
-closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail.
+closed when the page becomes hidden so its heartbeat cannot extend the Fly Machine idle tail. If an
+established ordinary-lobby socket closes, the app silently resets the joined room UI to the main
+lobby browser; dedicated launch URLs and active matches retain their existing disconnect handling.
+The create modal derives its default from the player name and the latest browser rows, adding the
+first free numeric suffix when that suggestion is already listed. The create endpoint repeats that
+selection atomically and returns the authoritative room name, covering stale lists and concurrent
+creates before the client joins the reserved room.
+While connected, pointer, keyboard, wheel, and foregrounding input emits a transport-only activity
+notice at most once every 30 seconds so local-only camera interaction also prevents a false AFK
+disconnect.
 
 The browser keeps in-progress rows labeled `In match` and exposes a spectator
 action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending
 `join` with `spectator: true`. Replay rows are detected from explicit `kind: "replay"` metadata,
-labelled `Replay`, and joined as spectators without setting `replayOk`, so rooms that race into
-playback still use the normal replay join confirmation. Countdown, stale, and unknown rows remain
-disabled.
+labelled `Replay`, and joined as spectators. Replay staging rows join without `replayOk`; active
+replay rows use their explicit **Join replay** action as confirmation and send `replayOk: true`, so
+the viewer enters the room's current shared playback without a second prompt. This applies both to
+persisted replay rooms and automatic post-match replay playback. Countdown, stale, and unknown rows
+remain disabled.
 
 `match_history.js` performs one initial Recent Matches fetch and exposes a manual **Refresh**
 button; it never polls. It renders the API-provided **Replay #** for each visible row. The
@@ -1784,7 +1838,14 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   30 Hz snapshots; paused, blocked, or otherwise stationary units then return to idle art while firing
   recoil frames remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
-  anchor source. It uses toned-down team tinting, with most firing recoil on the barrel assembly
+  anchor source. Artillery likewise uses a modular A-19 PNG atlas for two independent trails, its
+  frame/wheels, and its visibly elevated bulky barrel/recoil assembly; the current pass-03 review
+  pitches the complete weapon assembly toward the elevated camera so its muzzle face and recoil
+  depth remain legible from the above-view camera. It
+  temporarily colors the left trail purple and frames both full trail crops in black for
+  pivot/origin inspection. It uses
+  the existing SVG Artillery rig for setup/facing/recoil animation and the muzzle-flash overlay.
+  The Anti-Tank Gun uses toned-down team tinting, with most firing recoil on the barrel assembly
   and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi
   asset path when image, canvas, pixel-read, or texture creation fails. When browser image
   dimensions are unavailable, full strip dimensions come from frame metadata. Deployed Machine Gunners use `firingFrames` during active recoil, with the visual-effect buffer's linear recoil phase advancing the clip through rest, recoil, and reset frames. Setup and deployed frame-strip poses take priority over movement frames
@@ -1807,17 +1868,21 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   Anti-Tank Gun and artillery
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
-  Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
-  experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
+  Distinct silhouette per kind (engineer: compact block; rifleman: enabled no-backpack PNG
+  frame strip with frame 0 idle and frames 1-3 moving; machine gunner: enabled PNG frame-strip
   experiment with carried movement frames and setup/deployed frames; Panzerfausts-upgraded Riflemen:
-  distinct loaded infantry rig until launch, then the normal Rifleman rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  the matching four-frame Rifleman movement strip with an oversized launcher composited on the back
+  until launch, then the normal no-backpack Rifleman strip; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
-  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
-  support-weapon rig routed through the live renderer).
+  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
+  A-19 PNG components animated from the SVG-authored support-weapon rig).
   Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
-  with a team-colored band and switch immediately to normal rifle art after launch. Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
+  with a team-colored band and switch immediately to normal rifle art after launch. Both white-base
+  Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine
+  Gunner's tonal weight. Rifleman and loaded-Panzerfaust recoil frames remain intentionally deferred.
+  Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
@@ -1851,7 +1916,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   the fog overlay and excluded from local fog-source computation and selection/command hit-testing.
   Current death-vision entities are normal visible entities and do not use this flag.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
-  two-letter stencils; under construction → translucent with a single HP-layer status bar;
+  two-letter stencils; under construction → translucent with a single HP-layer status bar whose
+  fill reflects current HP rather than changing authoritative construction progress;
   production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status
   bar and drains from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam
   hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate
@@ -1891,9 +1957,12 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   keep runtime inputs such as movement, facing, weapon facing, recoil, setup state, occupied-trench
   tint, selection, HP bars, fog, and shot reveals on the real entity, and are resolved from checked-in
   profile/candidate registries rather than URL-provided assets.
-- Local lab visual profiles may pass checked-in frame-strip overrides by unit kind. These swap the
-  PNG strip texture/configuration used for matching real units in that lab session only, while the
-  entity ids, server state, selection, fog, HP bars, and fallback SVG shadow route remain unchanged.
+- Local lab visual profiles may pass checked-in frame-strip overrides by unit kind or by the live
+  rig key derived from authoritative entity state. Rig-key overrides apply only while that route is
+  active—for example, a loaded Panzerfaust Rifleman override stops matching as soon as
+  `panzerfaustLoaded` flips false at launch—then normal live frame-strip routing resumes for the same
+  entity id. These swaps remain local to that lab session; server state, selection, fog, HP bars,
+  and the fallback SVG shadow route remain unchanged.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
@@ -1924,7 +1993,8 @@ Current areas:
   `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `ai_diagnostics_panel.js`, `observer_analysis_overlay.js`, `observer_analysis_ai.js`,
-  `observer_analysis_preferences.js`, `observer_analysis_rows.js`, `observer_analysis_signatures.js`,
+  `observer_analysis_preferences.js`, `observer_analysis_research.js`, `observer_analysis_rows.js`,
+  `observer_analysis_signatures.js`,
   `floating_panel_positioner.js`, `replay_controls.js`, `replay_seek_notice.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
@@ -2003,8 +2073,9 @@ Supported match-launch parameters:
 - `rtsName=<display name>` defaults to `Spectator` or `Commander` from the selected role.
 - `rtsMap=<map display name>` optionally selects a server-advertised lobby map before seating AIs.
 - Repeated `rtsAi=<team>:<profile>` entries seat AI opponents in order, for example
-  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The supported profile ids are `ai_2_1` and
-  `ai_turtle`. A profile-only entry such as `rtsAi=ai_turtle` uses the next team slot.
+  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The player-facing profile id is `ai_2_1`.
+  `ai_turtle` is accepted only for internal observer launches; player-role launches normalize it
+  to `ai_2_1`. A profile-only observer entry such as `rtsAi=ai_turtle` uses the next team slot.
   Unsupported values normalize to AI 2.1; if omitted, the launch defaults to two AI 2.1 seats on
   teams 1 and 2.
 - `rtsStart=1|0` defaults to `1`. `0` prepares the lobby without pressing Start.

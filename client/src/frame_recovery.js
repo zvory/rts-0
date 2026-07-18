@@ -85,6 +85,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     const feedbackView = time(
       "match.rendererFeedbackView",
       () => buildRendererFeedbackView(match.state, {
+        controlPolicy: match.controlPolicy,
         clientIntent: match.clientIntent,
         previewSurface: match.inputRouter?.activePreviewSurface?.(),
         entities: frameViews.interpolatedEntities,

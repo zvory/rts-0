@@ -13,21 +13,24 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   attachment endpoint can serve a submitted flame graph. Database writes require the separate
   `RTS_RECORD_STRESS_TESTS` gate. See
   [`client-stress-tests.md`](client-stress-tests.md).
-- **Command unit cap and budget** (`services/commands.rs`, with mirrored budget scalars in
-  `command_budget.rs`): ordinary unit-list commands inspect at most
-  `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject
-  over-budget human commands before planning. Lab `issueCommandAs` requests that explicitly set
-  `ignoreCommandLimits` bypass the command-supply budget and inspect at most
-  `LAB_MAX_UNITS_PER_COMMAND = 4096` submitted ids, still bounded by the WebSocket frame cap. The
+- **Command unit cap and budget** (`rts-contract`, consumed by `services/commands.rs`, Lab artifact
+  validation, and checkpoint validation; budget scalars remain in `command_budget.rs`): ordinary
+  unit-list commands accept at most `MAX_UNITS_PER_COMMAND = 256` raw submitted ids and reject the
+  whole command at cap plus one before deduplication. Accepted lists preserve first-seen dedupe and
+  reject over-budget human commands before planning. Lab `issueCommandAs` requests that explicitly set
+  `ignoreCommandLimits` bypass the command-supply budget and accept at most
+  `LAB_MAX_UNITS_PER_COMMAND = 4096` raw submitted ids, with the same whole-command rejection at
+  cap plus one and still bounded by the WebSocket frame cap. Lab artifact validation uses the same
+  selected raw boundary, and checkpoint restore uses the shared 4,096 persisted-command bound. The
   human command budget is 24 supply plus
   `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each submitted
   owned Command Car, with mirrored unit supply as command weight and a fallback weight of 1.
   AI-owned players are exempt from the command-budget gameplay limit because live AI still enqueues
-  ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Rejection drops the whole
-  malformed human command and emits a private "Command supply exceeded" notice; the server does not
-  silently trim the unit list.
+  ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Raw-cap rejection drops
+  the whole malformed command without trimming; command-budget rejection also emits a private
+  "Command supply exceeded" notice.
 - **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 8`): each mobile unit stores at most
-  eight future intents. Queued command application still runs the unit-list dedupe/cap first, and
+  eight future intents. Queued command application still validates the raw cap and dedupes first, and
   queued promotion drains invalid stale intents instead of retrying them forever.
   Phase 6 kept this cap at eight because no playtest evidence in the repo justified a larger
   command buffer; mixed ability/setup replay coverage now guards the current cap and command-log
@@ -52,9 +55,12 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   scaffold and become a ghost active builder.
   The client placement ghost mirrors the intent policy for the first selected worker, but remains
   advisory; the server is authoritative.
-- **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
-  (`main.rs`); the client pings every 15s (`main.js`). This evicts half-open/stuck clients so a
-  silent player can't wedge a shared room, and frees the room slot.
+- **Connection liveness + player inactivity**: the server drops connections with no inbound frame
+  for `IDLE_TIMEOUT = 40s` (`main.rs`), while the client pings every 15s (`app.js`) to keep healthy
+  sockets alive. Independently, `PLAYER_INACTIVITY_TIMEOUT = 5m` closes any connection that sends
+  no player action or throttled browser `activity` notice; automatic `ping` and `netReport` traffic
+  does not extend that deadline. This bounds abandoned lobby and match connections without
+  disconnecting a spectator or camera-only player who is still interacting with the game.
 - **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Replay artifact and seek limits**: production `ReplaySession` construction rejects malformed or
@@ -88,11 +94,14 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   shows `Aborted` and can launch the captured replay.
 - **Deploy asset hermeticity**: release Docker builds generate browser-loadable prediction WASM
   assets with `scripts/build-sim-wasm.sh` inside the builder image, then fail if
-  `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. These
-  generated files stay ignored in git, so deploys must not depend on untracked files in a local
-  checkout. Missing static asset requests under paths such as `/vendor`, `/src`, `/assets`, or
-  root files with extensions return 404 instead of the SPA `index.html`, making packaging mistakes
-  visible to the client and probes.
+  `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. The
+  deploy context excludes local development state and rig authoring artifacts while retaining only
+  the documentation and build script used by the image; the build also fails if the checked-in
+  snapshot stream or any runtime rig texture is missing. Generated WASM files stay ignored in git,
+  so deploys must not depend on untracked files in a local checkout. Missing static asset requests
+  under paths such as `/vendor`, `/src`, `/assets`, or root files with extensions return 404 instead
+  of the SPA
+  `index.html`, making packaging mistakes visible to the client and probes.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility. Normal active-player snapshots use the union of current fog from living teammates,
@@ -157,21 +166,21 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   hull does not need to face the target. Tanks do not clear their movement path when they fire, so
   they can continue driving while the turret tracks and shoots on both `Move` and `AttackMove`
   orders. A tank on active `Move` or `AttackMove` only opportunistically fires at enemies already in
-  range; it does not chase out-of-range enemies or replace the commanded path with a standoff route.
-  Direct `Attack` orders and post-arrival aggressive behavior can still use vehicle standoff
-  pursuit. Shoot-while-moving units retain their current valid target before falling back to
+  range and never replaces the commanded path with enemy-directed movement. Direct `Attack` orders
+  and post-arrival behavior also remain stationary. Shoot-while-moving units retain their current
+  valid target before falling back to
   nearest-target acquisition, so drive-by fire tends to finish one enemy instead of spreading damage
   across every passing unit. Projection omits enemy `weaponFacing` when it would reveal a hidden
   target direction.
 - **Rifleman Methamphetamines fire**: upgraded riflemen gain permanent moving fire and keep their
   movement path while firing at enemies in range instead of stopping to shoot. While on a plain
   `Move` or active `AttackMove`, upgraded riflemen only fire opportunistically at enemies already in
-  range and do not chase. Moving Methamphetamines shots use normal rifleman accuracy and do not add
+  range and never create enemy-directed movement. Moving Methamphetamines shots use normal rifleman accuracy and do not add
   a movement miss roll.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
-  same oriented-body/pathing/collision model as tanks, including vehicle standoff on direct pursuit
-  and firing while moving, but they use simplified car locomotion instead of tank pivot locomotion. A
+  same oriented-body/pathing/collision model as tanks and fire while moving, but they use simplified
+  car locomotion instead of tank pivot locomotion. A
   scout car's
   yaw is capped by movement budget over a 1.5-tile minimum turn radius, so it can steer
   while translating but cannot rotate in place when blocked or badly misaligned. Reverse is a
@@ -187,7 +196,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   the next leg instead of stopping near an inside corner and immediately rotating toward a diagonal
   segment. The clearance
   cost is finite, so intended narrow passages remain traversable; exact interaction paths such as
-  chase, gather, and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
+  gather and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
   route corridor rather than exact intermediate waypoint centers: an intermediate waypoint is
   consumed inside
   `VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the vehicle has passed the waypoint

@@ -1,6 +1,7 @@
 import type { InteractTailnetPreview } from "./tailnet_preview.ts";
 import type { InteractDriver } from "./driver.ts";
 import type { CaptureRegion } from "./capture_region.ts";
+import { presentScreenshotResult } from "./capabilities/media.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -48,30 +49,11 @@ export async function captureGameScreenshot(
     image: { mimeType: image.mimeType, bytes: image.bytes, width: image.width, height: image.height },
     readiness: capture.readiness,
   };
-  if (!artifactPreview) return { ...visible, pngPath: capture.pngPath, manifestPath: capture.manifestPath };
-  try {
-    const preview = await artifactPreview.publish({ filePath: String(capture.pngPath), mimeType: "image/png" });
-    return {
-      ...visible,
-      preview: {
-        available: true,
-        ...preview,
-        instruction: "Share this Tailnet URL with the user to preview the Interact artifact. Do not share a local file path.",
-      },
-      manifest: { available: true, localPathWithheld: true },
-    };
-  } catch (error) {
-    return {
-      ...visible,
-      preview: {
-        available: false,
-        code: errorCode(error) || "tailnetPreviewUnavailable",
-        message: conciseError(error),
-        instruction: "Do not share a local file path. Restore Tailnet preview availability, then capture again.",
-      },
-      manifest: { available: true, localPathWithheld: true },
-    };
-  }
+  return presentScreenshotResult({
+    ...visible,
+    pngPath: String(capture.pngPath),
+    manifestPath: String(capture.manifestPath),
+  }, artifactPreview);
 }
 
 function objectArray(value: unknown): JsonObject[] {
@@ -84,14 +66,6 @@ function asObject(value: unknown): JsonObject {
 
 function isObject(value: unknown): value is JsonObject {
   return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function errorCode(error: unknown) {
-  return isObject(error) && typeof error.code === "string" ? error.code.slice(0, 80) : "";
-}
-
-function conciseError(error: unknown) {
-  return String(error instanceof Error ? error.message : "Tailnet preview unavailable.").slice(0, 1000);
 }
 
 function codedError(code: string, message: string) {

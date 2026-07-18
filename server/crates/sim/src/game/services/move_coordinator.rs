@@ -62,7 +62,7 @@ const MAX_REQUESTS_PER_TICK: usize = 8;
 /// only later requests are deferred.
 const HEAVY_PATH_EXPANSIONS: usize = 4_096;
 
-/// Minimum ticks between repaths for a single unit. Prevents chase/gather spam.
+/// Minimum ticks between repaths for a single unit. Prevents movement/gather repath spam.
 const MIN_REPATH_TICKS: u32 = 3;
 
 /// If the goal moves by more than this many world pixels, bypass the repath throttle.
@@ -385,29 +385,19 @@ impl<'a> MoveCoordinator<'a> {
             .find(|entry| entry.player == player)
     }
 
-    /// Issue an attack order against a specific target. Sets the order and requests an
-    /// initial path immediately (budget permitting).
+    /// Issue an attack order against a specific target without creating movement intent.
+    /// The unit fires only if the target is within range from its current position.
     pub fn order_attack(&mut self, entities: &mut EntityStore, id: u32, target: u32) {
-        let (tx, ty) = match entities.get(target) {
-            Some(t) => (t.pos_x, t.pos_y),
-            None => return,
-        };
+        if entities.get(target).is_none() {
+            return;
+        }
         entities.release_miner(id);
-        let mut request_initial_path = true;
         if let Some(e) = entities.get_mut(id) {
             e.replace_active_order(Order::attack(target));
             e.set_target_id(Some(target));
-            e.set_path_goal(Some((tx, ty)));
             e.reset_gather_state();
-            // An explicit attack order is not necessarily a move command for a deployed weapon:
-            // it may be able to slew and fire immediately. Combat requests a chase path only
-            // if the target is actually out of range, after teardown if needed.
-            request_initial_path = !requires_weapon_setup(e.kind);
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
-        }
-        if request_initial_path {
-            self.request_path(entities, id, (tx, ty), false, PathingRequestSource::Attack);
         }
     }
 
@@ -445,6 +435,7 @@ impl<'a> MoveCoordinator<'a> {
             ));
             e.set_path_goal(Some(staging));
             e.reset_gather_state();
+            e.begin_weapon_teardown_for_movement();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -603,24 +594,18 @@ impl<'a> MoveCoordinator<'a> {
     // Mid-tick repath requests (combat / gather)
     // -------------------------------------------------------------------
 
-    /// Request a chase path for a combat unit, respecting throttle and budget.
+    /// Resume the path for the unit's existing movement order, respecting throttle and budget.
     /// Returns `true` if a path was actually requested this call.
-    pub fn request_chase_path(
+    pub fn request_attack_move_path(
         &mut self,
         entities: &mut EntityStore,
         id: u32,
-        target_pos: (f32, f32),
+        goal: (f32, f32),
     ) -> bool {
-        if !self.can_repath(entities, id, target_pos) {
+        if !self.can_repath(entities, id, goal) {
             return false;
         }
-        self.request_path(
-            entities,
-            id,
-            target_pos,
-            false,
-            PathingRequestSource::Attack,
-        )
+        self.request_path(entities, id, goal, false, PathingRequestSource::AttackMove)
     }
 
     /// Request a path for a gatherer, respecting throttle and budget.
@@ -635,44 +620,6 @@ impl<'a> MoveCoordinator<'a> {
             return false;
         }
         self.request_path(entities, id, node_pos, false, PathingRequestSource::Gather)
-    }
-
-    /// Return a chase goal that the movement system can actually path to.
-    ///
-    /// Direct attack orders preserve the intended target id, but a target building's center can
-    /// sit inside its own static footprint, and a unit can occasionally stand on a statically
-    /// blocked tile. In those cases, path to a passable perimeter tile until combat can hit the
-    /// intended target.
-    pub fn attack_chase_goal(
-        &self,
-        entities: &EntityStore,
-        attacker: u32,
-        target: u32,
-        proposed_goal: (f32, f32),
-        range_px: f32,
-    ) -> (f32, f32) {
-        let (Some(attacker), Some(target)) = (entities.get(attacker), entities.get(target)) else {
-            return proposed_goal;
-        };
-        let proposed_tile = self.map.tile_of(proposed_goal.0, proposed_goal.1);
-        if self.tile_passable_for_kind(proposed_tile, attacker.kind) {
-            return proposed_goal;
-        }
-
-        let target_pos = (target.pos_x, target.pos_y);
-        let blocked_tiles = if target.is_building() && target.kind != EntityKind::TankTrap {
-            building_footprint(self.map, target)
-        } else {
-            vec![self.map.tile_of(target.pos_x, target.pos_y)]
-        };
-        self.adjacent_attack_goal(
-            attacker.kind,
-            &blocked_tiles,
-            (attacker.pos_x, attacker.pos_y),
-            target_pos,
-            range_px,
-        )
-        .unwrap_or(proposed_goal)
     }
 
     // -------------------------------------------------------------------
@@ -815,75 +762,6 @@ impl<'a> MoveCoordinator<'a> {
             .then_some(facing)
     }
 
-    fn adjacent_attack_goal(
-        &self,
-        attacker_kind: EntityKind,
-        blocked_tiles: &[(u32, u32)],
-        attacker_pos: (f32, f32),
-        target_pos: (f32, f32),
-        range_px: f32,
-    ) -> Option<(f32, f32)> {
-        if blocked_tiles.is_empty() {
-            return None;
-        }
-        let min_x = blocked_tiles.iter().map(|(x, _)| *x).min()? as i32;
-        let max_x = blocked_tiles.iter().map(|(x, _)| *x).max()? as i32;
-        let min_y = blocked_tiles.iter().map(|(_, y)| *y).min()? as i32;
-        let max_y = blocked_tiles.iter().map(|(_, y)| *y).max()? as i32;
-        let range2 = range_px * range_px;
-        let mut candidates = Vec::new();
-
-        for r in 1i32..=6 {
-            for ty in (min_y - r)..=(max_y + r) {
-                for tx in (min_x - r)..=(max_x + r) {
-                    if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
-                        continue;
-                    }
-                    if !self.map.in_bounds(tx, ty) {
-                        continue;
-                    }
-                    let tile = (tx as u32, ty as u32);
-                    if blocked_tiles.contains(&tile)
-                        || !self.tile_passable_for_kind(tile, attacker_kind)
-                    {
-                        continue;
-                    }
-                    let center = self.map.tile_center(tile.0, tile.1);
-                    let attacker_dist2 = {
-                        let dx = center.0 - attacker_pos.0;
-                        let dy = center.1 - attacker_pos.1;
-                        dx * dx + dy * dy
-                    };
-                    let target_dist2 = {
-                        let dx = center.0 - target_pos.0;
-                        let dy = center.1 - target_pos.1;
-                        dx * dx + dy * dy
-                    };
-                    let range_rank = u8::from(target_dist2 > range2);
-                    candidates.push((range_rank, r, attacker_dist2, tile, center));
-                }
-            }
-        }
-
-        candidates.sort_by(|left, right| {
-            left.0
-                .cmp(&right.0)
-                .then_with(|| left.1.cmp(&right.1))
-                .then_with(|| left.2.total_cmp(&right.2))
-                .then_with(|| left.3.cmp(&right.3))
-        });
-        candidates
-            .into_iter()
-            .map(|(_, _, _, _, point)| point)
-            .next()
-    }
-
-    fn tile_passable_for_kind(&self, tile: (u32, u32), kind: EntityKind) -> bool {
-        let tx = tile.0 as i32;
-        let ty = tile.1 as i32;
-        self.map.is_passable(tx, ty) && self.occ.passable_for_kind(tx, ty, kind)
-    }
-
     // -------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------
@@ -920,8 +798,6 @@ impl<'a> MoveCoordinator<'a> {
                     if matches!(e.order(), Order::Move(_)) {
                         e.set_order(Order::Idle);
                     }
-                } else if matches!(e.order(), Order::Attack(_)) {
-                    e.reset_attack_unreachable_checks();
                 }
             }
             self.consume_request_budget(None);
@@ -1000,12 +876,6 @@ impl<'a> MoveCoordinator<'a> {
                 } else {
                     MovePhase::PathFailed
                 });
-            } else if matches!(e.order(), Order::Attack(_)) {
-                if path_ok {
-                    e.reset_attack_unreachable_checks();
-                } else {
-                    e.increment_attack_unreachable_checks();
-                }
             }
         }
         self.consume_request_budget(Some(request_diagnostics));
@@ -1090,13 +960,13 @@ fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
     match order {
         Order::Move(_) => PathingRequestSource::Move,
         Order::AttackMove(_) => PathingRequestSource::AttackMove,
-        Order::Attack(_) => PathingRequestSource::Attack,
         Order::Gather(_) => PathingRequestSource::Gather,
         Order::Build(_) => PathingRequestSource::Build,
         Order::Deconstruct(_) => PathingRequestSource::Deconstruct,
         Order::Ability(_) => PathingRequestSource::Ability,
         Order::Idle
         | Order::HoldPosition
+        | Order::Attack(_)
         | Order::ArtilleryPointFire(_)
         | Order::ArtilleryBlanketFire(_) => PathingRequestSource::Other,
     }
@@ -1188,10 +1058,6 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
             (dx * dx + dy * dy).sqrt()
         }
     }
-}
-
-fn requires_weapon_setup(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::MachineGunner | EntityKind::AntiTankGun)
 }
 
 #[cfg(test)]
@@ -1551,7 +1417,7 @@ mod tests {
     }
 
     #[test]
-    fn exhausted_budget_defers_uncached_immediate_request() {
+    fn attack_order_never_requests_a_path_even_with_an_exhausted_budget() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let start = map.tile_center(3, 3);
@@ -1573,17 +1439,7 @@ mod tests {
         let attacker = entities.get(unit).expect("attacker should remain");
         assert!(matches!(attacker.order(), Order::Attack(_)));
         assert!(attacker.path_is_empty());
-        assert_eq!(attacker.path_goal(), Some(target_pos));
-
-        coordinator.budget = 1;
-        assert!(coordinator.request_path(
-            &mut entities,
-            unit,
-            target_pos,
-            false,
-            PathingRequestSource::Attack,
-        ));
-        assert!(!entities.get(unit).unwrap().path_is_empty());
+        assert_eq!(attacker.path_goal(), None);
         assert_eq!(coordinator.budget, 0);
     }
 
@@ -1710,7 +1566,7 @@ mod tests {
     }
 
     #[test]
-    fn request_chase_path_keeps_tile_guided_interaction_route() {
+    fn request_attack_move_path_keeps_tile_guided_movement_route() {
         let map = Map {
             size: 40,
             terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
@@ -1723,6 +1579,10 @@ mod tests {
             .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
             .expect("unit should spawn");
         let goal = map.tile_center(24, 16);
+        if let Some(unit) = entities.get_mut(unit) {
+            unit.set_order(Order::attack_move_to(goal.0, goal.1));
+            unit.set_path_goal(Some(goal));
+        }
         let occ = Occupancy::build(&map, &entities);
 
         let mut pathing = PathingService::new(8_192, 256);
@@ -1730,8 +1590,8 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, MIN_REPATH_TICKS);
 
         assert!(
-            coordinator.request_chase_path(&mut entities, unit, goal),
-            "fixture chase path should be found"
+            coordinator.request_attack_move_path(&mut entities, unit, goal),
+            "fixture movement path should be found"
         );
         let unit = entities.get(unit).expect("unit should still exist");
         let path = &unit
@@ -1741,12 +1601,12 @@ mod tests {
             .path;
         assert!(
             path.len() > 1,
-            "chase and other interaction paths should keep intermediate tile waypoints"
+            "resumed movement paths should keep intermediate tile waypoints"
         );
         assert_eq!(
             path.first().copied(),
             Some(goal),
-            "chase still snaps the final reverse waypoint to the interaction goal"
+            "resumed movement still snaps the final reverse waypoint to the order goal"
         );
     }
 }

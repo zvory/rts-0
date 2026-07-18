@@ -72,7 +72,7 @@ import {
   _initTrenchesForMap,
 } from "./trenches.js";
 import { VisualSampleLayer, _drawVisualSamples } from "./visual_samples.js";
-import { createLiveRigDefinitions } from "./rigs/live_routing.js";
+import { createLiveRigDefinitions, liveRigKeyForEntity } from "./rigs/live_routing.js";
 import { compileVisualUnitRigCandidates } from "./rigs/visual_override_rigs.js";
 import {
   publishVisualUnitOverrideDiagnostics,
@@ -334,7 +334,7 @@ export class Renderer {
           if (this._destroyed) return;
           console.warn(`RTS frame strip disabled for ${kind}: ${err?.message || err}`);
           throw err;
-        }), { kind, source: "liveFrameStrip" });
+        }), { kind: strip.unit || kind, source: "liveFrameStrip" });
     }
   }
 
@@ -551,7 +551,7 @@ export class Renderer {
           this._drawEntitySafely("unit", e, "units", () => {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
-              visualFrameStrip: visualFrameStripOverrideMap.get(e.kind) || null,
+              visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
             });
           });
         }
@@ -572,7 +572,7 @@ export class Renderer {
         this._drawEntitySafely("shotReveal", e, "shotReveals", () => {
           this._drawShotRevealUnit(e, colorByOwner, state, {
             visualOverride: visualUnitOverrideMap.get(e.id) || null,
-            visualFrameStrip: visualFrameStripOverrideMap.get(e.kind) || null,
+            visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
           });
         });
       }
@@ -671,6 +671,21 @@ export class Renderer {
 
   _recordRenderDiagnostic(label, amount = 1) {
     this._profiler?.recordDiagnosticCounter?.(label, amount);
+  }
+
+  _recordKnownRenderDiagnostics(labels, counts) {
+    const profiler = this._profiler;
+    if (!profiler) return;
+    if (typeof profiler.recordKnownDiagnosticCounters === "function") {
+      profiler.recordKnownDiagnosticCounters(labels, counts);
+      return;
+    }
+    const length = Math.min(labels?.length || 0, counts?.length || 0);
+    for (let i = 0; i < length; i += 1) {
+      for (let remaining = Math.trunc(counts[i] || 0); remaining > 0; remaining -= 1) {
+        profiler.recordDiagnosticCounter?.(labels[i], 1);
+      }
+    }
   }
 
   groundDecalDiagnostics() {
@@ -796,10 +811,11 @@ export class Renderer {
     const list = Array.isArray(entries) ? entries : [];
     for (const entry of list) {
       const kind = typeof entry?.kind === "string" ? entry.kind : "";
+      const rigKey = typeof entry?.rigKey === "string" && entry.rigKey ? entry.rigKey : kind;
       const strip = entry?.strip || null;
       if (!kind || !strip?.enabled || !strip?.image) continue;
       const texture = this._visualFrameStripTextureFor(kind, strip);
-      if (texture) resolved.set(kind, { strip, texture });
+      if (texture) resolved.set(rigKey, { strip, texture });
     }
     this._recordRenderDiagnostic("renderer.visualFrameStripOverrides.active", resolved.size);
     return resolved;

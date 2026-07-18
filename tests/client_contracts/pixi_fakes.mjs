@@ -5,6 +5,8 @@ class FakeGraphics {
   clear() {}
   lineStyle() {}
   beginFill() {}
+  beginHole() {}
+  endHole() {}
   endFill() {}
   drawPolygon() {}
   drawCircle() {}
@@ -32,6 +34,12 @@ export class RecordingGraphics extends FakeGraphics {
   }
   beginFill(color, alpha) {
     this.calls.push(["beginFill", color, alpha]);
+  }
+  beginHole() {
+    this.calls.push(["beginHole"]);
+  }
+  endHole() {
+    this.calls.push(["endHole"]);
   }
   clear() {
     this.calls.push(["clear"]);

@@ -34,7 +34,11 @@ seconds; a manual Refresh remains available. Recent Matches performs one request
 Create, Join, Watch, Replay, and explicit launch URLs open the WebSocket on demand. The client closes
 an open pre-join connection when its tab is hidden. This keeps passive lobby tabs and scrapers from
 sustaining polling or heartbeat traffic through the Machine's idle tail, although any individual
-HTTP request can still autostart the Machine.
+HTTP request can still autostart the Machine. Once connected, the server closes a browser after five
+minutes without a player action or throttled human-input notice in either a lobby or match;
+automatic heartbeat and network-report traffic does not count. An ordinary lobby disconnect
+silently returns the client to the main lobby browser, and an empty room follows the normal disposal
+path so Fly can observe zero active traffic.
 
 Deploy shutdown uses Fly's top-level `kill_signal = "SIGINT"` and `kill_timeout = 300`. The server
 drains active matches inside a 295-second application budget after the deploy signal, then closes

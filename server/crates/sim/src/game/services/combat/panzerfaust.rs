@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, PanzerfaustState};
+use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, PanzerfaustState};
 use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
@@ -7,12 +7,11 @@ use super::acquisition::{
     combat_mode_with_moving_fire, direct_fire_target_legal, resolve_target_for_weapon, CombatMode,
     DirectFireLegality, DirectFireVisibility,
 };
-use super::chase::{chase_goal_for_target, chase_path_needs_refresh};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::weapons::mirror_weapon_to_body;
 use super::{
-    dist2, Fog, LineOfSight, Map, MoveCoordinator, Occupancy, SmokeCloudStore, SpatialIndex,
-    TeamRelations, RANGE_SLACK,
+    dist2, Fog, LineOfSight, Map, Occupancy, SmokeCloudStore, SpatialIndex, TeamRelations,
+    RANGE_SLACK,
 };
 
 mod events;
@@ -29,7 +28,6 @@ pub(super) fn handle_combat_if_panzerfaust(
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
     spatial: &SpatialIndex,
-    coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
     id: u32,
@@ -48,7 +46,6 @@ pub(super) fn handle_combat_if_panzerfaust(
             methamphetamines_researched,
             occ,
             spatial,
-            coordinator,
             fog,
             smokes,
             id,
@@ -66,7 +63,6 @@ fn handle_loaded_combat(
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
     spatial: &SpatialIndex,
-    coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
     id: u32,
@@ -129,25 +125,11 @@ fn handle_loaded_combat(
     }
 
     if mode == CombatMode::Ordered {
-        let chase_goal =
-            chase_goal_for_target(map, entities, id, (px, py), (tx, ty), range_px, distance);
-        let chase_goal = coordinator.attack_chase_goal(entities, id, target, chase_goal, range_px);
-        let want_repath = entities
-            .get(id)
-            .map(|e| chase_path_needs_refresh(e, chase_goal))
-            .unwrap_or(false);
         if let Some(attacker) = entities.get_mut(id) {
-            if target_angle.is_finite() {
-                attacker.set_facing(target_angle);
-                mirror_weapon_to_body(attacker, target_angle);
-            }
-            attacker.set_target_id(Some(target));
-            attacker.mark_attack_phase(AttackPhase::Chasing);
-        }
-        if want_repath {
-            coordinator.request_chase_path(entities, id, chase_goal);
+            attacker.mark_attack_phase(AttackPhase::Waiting);
         }
     }
+
     true
 }
 
@@ -162,20 +144,8 @@ fn panzerfaust_combat_context(
     let range_px = panzerfaust_range_tiles(attacker) * config::TILE_SIZE as f32
         + attacker.radius()
         + RANGE_SLACK;
-    let aggro_px = if matches!(attacker.order(), Order::HoldPosition) {
-        range_px
-    } else {
-        (attacker.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
-    };
     let mode = combat_mode_with_moving_fire(attacker, false);
-    // Only an explicit attack order may chase with the disposable launcher. Automatic modes
-    // should leave out-of-range vehicles to normal movement/rifle combat until they enter the
-    // current launcher range.
-    let acquire_px = if mode == CombatMode::Ordered {
-        aggro_px
-    } else {
-        range_px
-    };
+    let acquire_px = range_px;
     Some((
         attacker.owner,
         attacker.pos_x,

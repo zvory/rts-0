@@ -4,21 +4,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND, SETUP, STATE } from "../client/src/protocol.js";
-import {
-  _drawUnit,
-  _rigRenderContextFor,
-} from "../client/src/renderer/units.js";
+import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import {
   createLiveRigDefinitions,
   liveRigKeyForEntity,
+  liveRigRoutePlanFor,
   liveRigRoutesFor,
 } from "../client/src/renderer/rigs/live_routing.js";
 import { compileVisualUnitRigCandidates } from "../client/src/renderer/rigs/visual_override_rigs.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import {
+  createRigAnimationStage,
   createRigRenderContext,
   sampleRigAnimation,
+  sampleRigAnimationInto,
   transformedRigAnchorPoint,
 } from "../client/src/renderer/rigs/animation.js";
 import {
@@ -34,9 +34,9 @@ import {
   applyFrameStripColorAdjustmentToRgba,
   FRAME_STRIP_TARGET_COLOR_ADJUSTMENT,
   frameStripRuntimeColorAdjustment,
-  isNeutralFrameStripColorAdjustment,
 } from "../client/src/renderer/rigs/frame_strip_color_profile.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
+import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
   pngAtlasCanRenderRoute,
@@ -62,12 +62,13 @@ import {
   SCOUT_CAR_RIG_SVG,
 } from "../client/src/renderer/rigs/vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
+import { createInspectionPixiFactory } from "./helpers/rig_inspection_pixi.mjs";
+import { assertAtlasSpriteUsesWorldScale } from "./helpers/rig_asset_assertions.mjs";
 import {
-  createInspectionPixiFactory,
-  createInspectionPngPixiFactory,
-  FakeContainer,
-  FakeGraphics,
-} from "./helpers/rig_inspection_pixi.mjs";
+  fakeAtlasTexture,
+  fakeFrameStripTexture,
+  makeRigRenderer,
+} from "./helpers/rig_renderer_harness.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
@@ -77,7 +78,6 @@ const machineGunnerPngManifestPath = path.join(
   "client/assets/rigs/machine-gunner-pass-01/metadata/manifest.json",
 );
 const fixedNow = 12_345;
-
 function main() {
 test("animation sampler applies game-state bindings without Pixi", () => {
   const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
@@ -105,6 +105,45 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   assert.equal(sampled.parts["part.hull"].transform.rotation, Math.PI / 2);
   assert.equal(sampled.parts["part.turret"].transform.rotation, Math.PI);
   assert.equal(sampled.parts["part.barrel"].transform.rotation, Math.PI);
+});
+
+test("reusable animation staging preserves sampled values while reusing storage", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 71,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 80,
+    y: 90,
+    hp: 60,
+    maxHp: 100,
+    state: STATE.MOVE,
+    facing: Math.PI / 2,
+    weaponFacing: Math.PI,
+  };
+  const includeParts = new Set(["part.hull", "part.turret", "part.barrel"]);
+  const stage = createRigAnimationStage(definition, { includeParts });
+  const idleContext = createRigRenderContext(entity, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0 },
+    colorByOwner: new Map([[1, 0x336699]]),
+  });
+  const idle = sampleRigAnimationInto(stage, entity, idleContext);
+  const idleParts = idle.parts;
+  const barrelState = idle.parts["part.barrel"];
+  const firingContext = createRigRenderContext(entity, {
+    now: fixedNow + 16,
+    state: { weaponRecoil: () => 1 },
+    colorByOwner: new Map([[1, 0x336699]]),
+  });
+  const firing = sampleRigAnimationInto(stage, entity, firingContext);
+  const fresh = sampleRigAnimation(definition, entity, firingContext, { includeParts });
+
+  assert.equal(firing, idle, "stage output record is reused");
+  assert.equal(firing.parts, idleParts, "part lookup is reused");
+  assert.equal(firing.parts["part.barrel"], barrelState, "part state is overwritten in place");
+  assert.deepEqual(firing, fresh, "staged sampling preserves public sampler values");
+  assert.notEqual(firing.parts, fresh.parts, "public sampling remains detached");
 });
 
 test("tank rig exposes transformed main and coax muzzle anchors", () => {
@@ -329,6 +368,48 @@ test("rig runtime reuses part graphics when only transforms change", () => {
   instance.destroy();
 });
 
+test("rig runtime batches the same diagnostic samples as the per-part callback path", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const perSampleInstance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
+  const batchedInstance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
+  const entity = {
+    id: 14,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 24,
+    y: 32,
+    facing: 0,
+    hp: 20,
+    maxHp: 30,
+  };
+  const context = createRigRenderContext(entity, {
+    now: fixedNow,
+    colorByOwner: new Map([[1, 0x225588]]),
+  });
+  const perSample = [];
+  const batched = [];
+  const batchOptions = {
+    diagnosticBatch(labels, counts) {
+      for (let i = 0; i < labels.length; i += 1) {
+        for (let sample = 0; sample < counts[i]; sample += 1) batched.push(labels[i]);
+      }
+    },
+  };
+
+  perSampleInstance.update(entity, context, { diagnostics: (label) => perSample.push(label) });
+  batchedInstance.update(entity, context, batchOptions);
+  perSampleInstance.update(entity, context, { diagnostics: (label) => perSample.push(label) });
+  batchedInstance.update(entity, context, batchOptions);
+
+  assert.deepEqual(
+    batched.toSorted(),
+    perSample.toSorted(),
+    "local SVG counts must flush every attempted, unchanged, hidden, clear, and completed sample",
+  );
+  perSampleInstance.destroy();
+  batchedInstance.destroy();
+});
+
 test("rig runtime can update one routed part group", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
@@ -481,6 +562,7 @@ test("live rig routes expose kind-specific production part groups", () => {
 
   const mortarTeamRoutes = liveRigRoutesFor(KIND.MORTAR_TEAM);
   assert.deepEqual(mortarTeamRoutes[0].parts, ["part.shadow"]);
+  assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.basePlate.deployed"), true);
   assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.tube.packed"), true);
   assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.leg.left.deployed"), true);
 
@@ -517,6 +599,51 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
   assert.equal(tankRoutes.length, 3);
   assert.deepEqual(tankRoutes[2].parts, ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
+});
+
+test("production rig route plans intern stable routes and part unions", () => {
+  const first = liveRigRoutePlanFor(KIND.TANK);
+  const second = liveRigRoutePlanFor(KIND.TANK, { visualOverride: { definition: {} } });
+  assert.strictEqual(second, first);
+  assert.strictEqual(liveRigRoutesFor(KIND.TANK), first.routes);
+  assert.equal(first.allParts.has("part.shadow"), true);
+  assert.equal(first.allParts.has("part.turret"), true);
+  assert.equal(first.allParts.has("part.tank.flashGlow"), true);
+  assert.deepEqual(first.poolNames, ["liveUnitRigShadows", "liveUnitRigs", "liveUnitRigEffects"]);
+
+  const shotPools = {
+    shadow: "shotRevealShadows",
+    unit: "shotReveals",
+    effects: "shotReveals",
+    liveRigShadow: "liveShotRevealRigShadows",
+    liveRigUnit: "liveShotRevealRigs",
+    liveRigOverlay: "liveShotRevealRigOverlays",
+    liveRigEffects: "liveShotRevealRigEffects",
+  };
+  const shot = liveRigRoutePlanFor(KIND.TANK, shotPools);
+  assert.strictEqual(liveRigRoutePlanFor(KIND.TANK, shotPools), shot);
+  assert.notStrictEqual(shot, first);
+  assert.deepEqual(shot.poolNames, [
+    "liveShotRevealRigShadows",
+    "liveShotRevealRigs",
+    "liveShotRevealRigEffects",
+  ]);
+});
+
+test("production route plans preserve inactive-pool cleanup each draw", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 91, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
+  let destroyed = 0;
+  renderer._liveRigPools.liveUnitRigEffects.set(entity.id, {
+    destroy() { destroyed += 1; },
+  });
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
+
+  assert.equal(renderer._liveRigPools.liveUnitRigEffects.has(entity.id), false);
+  assert.equal(destroyed, 1);
 });
 
 test("default Worker draw uses live SVG rig without enabling comparison", () => {
@@ -643,6 +770,10 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
     state: STATE.IDLE,
   };
   const renderer = makeRigRenderer();
+  const diagnosticBatches = [];
+  renderer._recordKnownRenderDiagnostics = (labels, counts) => {
+    diagnosticBatches.push({ labels: [...labels], counts: [...counts] });
+  };
   let contextCallCount = 0;
   renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
   renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
@@ -675,6 +806,19 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("sprite.barrel").display.rotation, Math.PI / 2);
+  const pngDiagnosticCounts = new Map();
+  for (const batch of diagnosticBatches) {
+    for (let i = 0; i < batch.labels.length; i += 1) {
+      if (!batch.labels[i].startsWith("renderer.pngRig.redraw.")) continue;
+      pngDiagnosticCounts.set(batch.labels[i], (pngDiagnosticCounts.get(batch.labels[i]) || 0) + batch.counts[i]);
+    }
+  }
+  assert.equal(
+    (pngDiagnosticCounts.get("renderer.pngRig.redraw.completed") || 0)
+      + (pngDiagnosticCounts.get("renderer.pngRig.redraw.skipped.hidden") || 0),
+    unit.parts.size,
+    "PNG rig batches account for exactly one redraw diagnostic per sprite",
+  );
 });
 
 test("PNG route coverage keeps mutable and Set part selections independent", () => {
@@ -832,7 +976,7 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(rightTrail.alpha, 0);
 });
 
-test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and fixed tires", () => {
+test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   const result = compileSvgRig(MORTAR_TEAM_RIG_SVG, { expectedKind: KIND.MORTAR_TEAM });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   const definition = result.definition;
@@ -845,7 +989,8 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
   const packedTubeSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
   const packedLeftTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.left.packed");
   const packedRightTireSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
-  for (const sprite of [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite]) assert.ok(sprite);
+  const basePlateSprite = MORTAR_TEAM_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.mortar.basePlate.deployed");
+  for (const sprite of [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite, basePlateSprite]) assert.ok(sprite);
   assert.deepEqual(
     [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite].map((sprite) => sprite.tintSlot),
     ["team-light", "team-light", "fixed", "fixed"],
@@ -858,6 +1003,12 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
   assert.equal(packedRightTireSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"), false);
   assert.ok(packedTubeSprite.sourceParts.includes("part.mortar.tube.packed"));
   assert.equal(packedTubeSprite.sourceParts.includes("part.mortar.body.packed"), false);
+  assert.deepEqual(basePlateSprite.sourceParts, ["part.mortar.basePlate.deployed"]);
+  assert.equal(basePlateSprite.tintSlot, "team");
+  assert.equal(basePlateSprite.frame.w / basePlateSprite.frame.pixelsPerUnitX, 16);
+  assert.equal(basePlateSprite.frame.h / basePlateSprite.frame.pixelsPerUnitY, 16);
+  assert.equal(basePlateSprite.positionOffsetX, -20);
+  assert.ok(basePlateSprite.drawOrder < packedCarriageSprite.drawOrder);
 
   const entity = {
     id: 46,
@@ -879,20 +1030,34 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 1 });
 
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const underlay = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  assert.ok(underlay);
   const carriage = unit.parts.get("sprite.mortar.carriage.deployed").display;
   const tube = unit.parts.get("sprite.mortar.tube.deployed").display;
   const leftTire = unit.parts.get("sprite.mortar.tire.left.deployed").display;
   const rightTire = unit.parts.get("sprite.mortar.tire.right.deployed").display;
+  const basePlate = unit.parts.get("sprite.mortar.basePlate.deployed").display;
   for (const display of [carriage, tube, leftTire, rightTire]) {
     assert.equal(display.visible, true);
     assert.equal(display.alpha, 1);
   }
+  assert.equal(basePlate.alpha, 1);
+  assert.equal(basePlate.tint, 0x336699);
+  assert.ok(Math.abs(Math.hypot(basePlate.x, basePlate.y) - 20) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleX - 1 / 8) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleY - 1 / 8) < 0.001);
   assert.notEqual(carriage.tint, 0xffffff);
   assert.notEqual(tube.tint, 0xffffff);
   assert.equal(leftTire.tint, 0xffffff);
   assert.equal(rightTire.tint, 0xffffff);
   assert.ok(Math.abs(tube.x) > Math.abs(carriage.x) * 2);
+
+  renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0.5, frameProgress: 0.5, barrel: true });
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 0 });
+  assert.equal(basePlate.alpha, 0.5);
+  assert.ok(Math.abs(basePlate.scaleX - 1 / 16) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleY - 1 / 16) < 0.001);
 
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
   renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
@@ -908,6 +1073,9 @@ test("mortar PNG atlas covers unit route with tinted carriage, tinted tube, and 
     assert.equal(display.alpha, 1);
   }
   for (const display of [carriage, tube, leftTire, rightTire]) assert.equal(display.alpha, 0);
+  assert.equal(basePlate.alpha, 0);
+  assert.equal(basePlate.scaleX, 0);
+  assert.equal(basePlate.scaleY, 0);
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
@@ -955,7 +1123,7 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: {}, weaponRecoil: () => 0 });
 
   const expectedFrame = frameStripFrameIndex(strip, entity, renderNow);
-  assert.equal(expectedFrame, 2);
+  assert.equal(strip.movementFrames.includes(expectedFrame), true);
   assert.equal(stripInstance.sprite.texture.frame.x, strip.frameWidth * expectedFrame);
   assert.equal(frameStripVisualFacing(entity), entity.facing);
   assert.equal(stripInstance.container.rotation, entity.facing);
@@ -1016,7 +1184,13 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 });
 
 test("frame-strip color profile applies shared and per-strip targets only when not already baked", () => {
-  assert.equal(isNeutralFrameStripColorAdjustment(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP)), true);
+  const dimmedRiflemanAdjustment = {
+    brightness: 70,
+    saturation: 100,
+    hue: 100,
+  };
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
   assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), {
     brightness: 145,
     saturation: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.saturation,
@@ -1205,6 +1379,32 @@ test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loa
   riflemanRig.destroy();
 });
 
+test("Rifleman PNG frame strips switch with the Panzerfaust loadout", () => {
+  const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
+  assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
+  const renderer = makeRigRenderer();
+  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true });
+  const [panzerfaustTexture, riflemanTexture] = [fakeFrameStripTexture(), fakeFrameStripTexture()];
+  renderer._liveRigDefinitionsByKind = new Map([[loadedRiflemanKey, panzerfaust.definition], [KIND.RIFLEMAN, rifleman.definition]]);
+  renderer._liveFrameStripsByKind = new Map([[loadedRiflemanKey, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP], [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP]]);
+  renderer._liveFrameStripTextures = new Map([[loadedRiflemanKey, panzerfaustTexture], [KIND.RIFLEMAN, riflemanTexture]]);
+  const colorByOwner = new Map([[1, 0x336699]]);
+  const state = { playerId: 1, selection: new Set(), weaponRecoil: () => 0 };
+  const entity = { id: 94, kind: KIND.RIFLEMAN, panzerfaustLoaded: true, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  renderer._drawUnit(entity, colorByOwner, state);
+  const panzerfaustUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(panzerfaustUnit.strip, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP);
+  assert.equal(panzerfaustUnit.texture, panzerfaustTexture);
+  renderer._drawUnit({ ...entity, panzerfaustLoaded: false }, colorByOwner, state);
+  const riflemanUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(panzerfaustUnit._destroyed, true);
+  assert.equal(riflemanUnit.strip, RIFLEMAN_PNG_FRAME_STRIP);
+  assert.equal(riflemanUnit.texture, riflemanTexture);
+  riflemanUnit.destroy();
+});
+
 test("live rig renderer rebuilds instances after a mutable route changes", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 93, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: 0 };
@@ -1284,159 +1484,6 @@ function readPngDimensions(repoRelativePath) {
     width: buffer.readUInt32BE(16),
     height: buffer.readUInt32BE(20),
   };
-}
-
-function makeRigRenderer() {
-  return {
-    _liveRigDefinitionsByKind: new Map(),
-    _liveFrameStripsByKind: new Map(),
-    _liveFrameStripTextures: new Map(),
-    _liveRigPools: {
-      liveUnitRigShadows: new Map(),
-      liveUnitRigs: new Map(),
-      liveUnitRigOverlays: new Map(),
-      liveUnitRigEffects: new Map(),
-      liveShotRevealRigShadows: new Map(),
-      liveShotRevealRigs: new Map(),
-      liveShotRevealRigOverlays: new Map(),
-      liveShotRevealRigEffects: new Map(),
-    },
-    _liveRigRoutes: {
-      liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
-      liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
-      liveUnitRigOverlays: { poolName: "liveUnitRigOverlays", layerName: "units" },
-      liveUnitRigEffects: { poolName: "liveUnitRigEffects", layerName: "units" },
-      liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
-      liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
-      liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
-      liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
-    },
-    _rigPixiFactory: createInspectionPngPixiFactory(),
-    _pools: { unitShadows: new Map(), units: new Map(), shotRevealShadows: new Map(), shotReveals: new Map() },
-    _seen: {
-      unitShadows: new Set(),
-      units: new Set(),
-      shotRevealShadows: new Set(),
-      shotReveals: new Set(),
-      liveUnitRigShadows: new Set(),
-      liveUnitRigs: new Set(),
-      liveUnitRigOverlays: new Set(),
-      liveUnitRigEffects: new Set(),
-      liveShotRevealRigShadows: new Set(),
-      liveShotRevealRigs: new Set(),
-      liveShotRevealRigOverlays: new Set(),
-      liveShotRevealRigEffects: new Set(),
-    },
-    layers: {
-      unitShadows: new FakeContainer(),
-      units: new FakeContainer(),
-      shotRevealShadows: new FakeContainer(),
-      shotReveals: new FakeContainer(),
-    },
-    _drawUnit(_entity, _colorByOwner, _state, pools = {}) {
-      return _drawUnit.call(this, _entity, _colorByOwner, _state, pools);
-    },
-    _slot(poolName, id) {
-      const pool = this._pools[poolName];
-      let graphic = pool.get(id);
-      if (!graphic) {
-        graphic = new FakeGraphics();
-        pool.set(id, graphic);
-        this.layers[poolName].addChild(graphic);
-      }
-      this._seen[poolName].add(id);
-      graphic.visible = true;
-      graphic.alpha = 1;
-      graphic.clear();
-      return graphic;
-    },
-    _shadow(g, cx, cy, radius) {
-      g.beginFill(0x000000, 0.28);
-      g.drawEllipse(cx, cy + radius * 0.35, radius, radius * 0.6);
-      g.endFill();
-    },
-    _vehicleShadow() {
-      throw new Error("worker comparison test should not draw vehicle shadow");
-    },
-    _tintFor(owner, colorByOwner) {
-      return colorByOwner.get(owner) ?? 0x9aa0a8;
-    },
-    _rigRenderContextFor(entity, colorByOwner, state) {
-      return _rigRenderContextFor.call(this, entity, colorByOwner, state);
-    },
-    _deployedWeaponSetupVisual: () => ({ prongFactor: 0, barrel: false }),
-    _tankMotionVisual: () => ({ activity: 0 }),
-    _map: { tileSize: 32 },
-  };
-}
-
-function fakeAtlasTexture() {
-  return { baseTexture: { id: "fake-tank-atlas" } };
-}
-
-function fakeFrameStripTexture() {
-  return { baseTexture: { id: "fake-rifleman-strip" } };
-}
-
-function assertAtlasSpriteUsesWorldScale(definition, atlas, spriteId) {
-  const worldScale = atlas.grid?.normalization?.worldScale;
-  assert.equal(typeof worldScale, "number");
-  const sprite = atlas.sprites.find((candidate) => candidate.id === spriteId);
-  assert.ok(sprite, `${spriteId} should exist`);
-  const visibleBounds = sprite.frame?.visibleBounds;
-  assert.ok(visibleBounds, `${spriteId} should have normalized visible bounds`);
-  const sourceBounds = unionPartBounds(definition, sprite.sourceParts);
-  const expectedPixelsPerUnitX = (visibleBounds.w / Math.max(1, sourceBounds.maxX - sourceBounds.minX)) / worldScale;
-  const expectedPixelsPerUnitY = (visibleBounds.h / Math.max(1, sourceBounds.maxY - sourceBounds.minY)) / worldScale;
-  assertAlmostEqual(sprite.frame.pixelsPerUnitX, expectedPixelsPerUnitX, `${spriteId} pixelsPerUnitX`);
-  assertAlmostEqual(sprite.frame.pixelsPerUnitY, expectedPixelsPerUnitY, `${spriteId} pixelsPerUnitY`);
-}
-
-function unionPartBounds(definition, partIds) {
-  const bounds = partIds
-    .map((partId) => definition.parts.find((part) => part.id === partId))
-    .filter(Boolean)
-    .map(partBounds);
-  assert.ok(bounds.length > 0, "sprite should reference at least one source part");
-  return {
-    minX: Math.min(...bounds.map((bound) => bound.minX)),
-    minY: Math.min(...bounds.map((bound) => bound.minY)),
-    maxX: Math.max(...bounds.map((bound) => bound.maxX)),
-    maxY: Math.max(...bounds.map((bound) => bound.maxY)),
-  };
-}
-
-function partBounds(part) {
-  const geometry = part?.geometry || {};
-  const points = [];
-  if (geometry.type === "rect") {
-    points.push([geometry.x, geometry.y], [geometry.x + geometry.width, geometry.y + geometry.height]);
-  } else if (geometry.type === "line") {
-    points.push([geometry.from.x, geometry.from.y], [geometry.to.x, geometry.to.y]);
-  } else if (geometry.type === "polygon" || geometry.type === "polyline") {
-    for (const point of geometry.points || []) points.push([point.x, point.y]);
-  } else if (geometry.type === "circle") {
-    points.push([geometry.cx - geometry.r, geometry.cy - geometry.r], [geometry.cx + geometry.r, geometry.cy + geometry.r]);
-  } else if (geometry.type === "ellipse") {
-    points.push([geometry.cx - geometry.rx, geometry.cy - geometry.ry], [geometry.cx + geometry.rx, geometry.cy + geometry.ry]);
-  }
-  assert.ok(points.length > 0, `${part?.id || "part"} should have measurable geometry`);
-  const strokePad = Math.max(part?.paint?.strokeWidth || 0, geometry.strokeWidth || 0, 1) * 0.5 + 0.5;
-  const xs = points.map(([x]) => x);
-  const ys = points.map(([, y]) => y);
-  return {
-    minX: Math.min(...xs) - strokePad,
-    minY: Math.min(...ys) - strokePad,
-    maxX: Math.max(...xs) + strokePad,
-    maxY: Math.max(...ys) + strokePad,
-  };
-}
-
-function assertAlmostEqual(actual, expected, label, epsilon = 0.000001) {
-  assert.ok(
-    Math.abs(actual - expected) <= epsilon,
-    `${label}: expected ${expected}, got ${actual}`,
-  );
 }
 
 function test(name, fn) {

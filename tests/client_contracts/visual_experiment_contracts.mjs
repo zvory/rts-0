@@ -10,10 +10,13 @@ import { Renderer } from "../../client/src/renderer/index.js";
 import { createLivePngRigAtlases } from "../../client/src/renderer/rigs/png_routing.js";
 import { pngAtlasRouteCoverage } from "../../client/src/renderer/rigs/png_runtime.js";
 import {
+  LOADED_RIFLEMAN_RIG_KEY,
   createLiveRigDefinitions,
+  liveRigKeyForEntity,
   liveRigDefinitionFor,
   liveRigRoutesFor,
 } from "../../client/src/renderer/rigs/live_routing.js";
+import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
   VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
   compileVisualUnitRigCandidates,
@@ -108,6 +111,46 @@ const NOOP_RENDERER_OVERLAYS = [
       override.strip.frameHeight === 96 &&
       override.strip.frameCount === 7,
     "rifleman recoil strip exposes the seven-cell Rifleman atlas geometry",
+  );
+}
+
+{
+  const profile = getVisualProfile("rifleman-panzerfaust-composite-1");
+  assert(profile, "composited Panzerfaust Rifleman visual profile is registered");
+  assert(profile.frameStripOverrides.length === 1, "composited Panzerfaust Rifleman profile has one frame-strip override");
+  const override = profile.frameStripOverrides[0];
+  const strip = override.strip;
+  assert(override.kind === KIND.RIFLEMAN, "composited Panzerfaust profile targets Rifleman units");
+  assert(
+    override.rigKey === LOADED_RIFLEMAN_RIG_KEY,
+    "composited Panzerfaust profile targets only Riflemen whose disposable launcher is still loaded",
+  );
+  assert(
+    strip.image.includes("/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png"),
+    "composited Panzerfaust profile uses the deterministic movement strip",
+  );
+  assert(
+    strip.frameWidth === 160 && strip.frameHeight === 112 && strip.frameCount === 4,
+    "composited Panzerfaust strip exposes one idle and three movement cells",
+  );
+  assert(
+    strip.idleFrame === 0 && strip.movementFrames.join(",") === "1,2,3" && strip.firingFrames.length === 0,
+    "composited Panzerfaust strip routes only the approved idle and movement frames",
+  );
+}
+
+{
+  const profile = getVisualProfile("rifleman-panzerfaust-composite-1");
+  const override = profile.frameStripOverrides[0];
+  const loaded = { kind: KIND.RIFLEMAN, panzerfaustLoaded: true };
+  const spent = { kind: KIND.RIFLEMAN, panzerfaustLoaded: false };
+  assert(
+    liveRigKeyForEntity(loaded) === override.rigKey,
+    "loaded Rifleman resolves to the composited Panzerfaust frame-strip route",
+  );
+  assert(
+    liveRigKeyForEntity(spent) !== override.rigKey,
+    "spent Rifleman resolves away from the composited Panzerfaust frame-strip route",
   );
 }
 
@@ -210,14 +253,14 @@ const NOOP_RENDERER_OVERLAYS = [
   const atlas = createLivePngRigAtlases().get(KIND.MORTAR_TEAM);
   assert(atlas?.enabled, "mortar PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png"),
+    atlas.image.includes("/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png"),
     "mortar PNG atlas uses the checked-in generated alpha asset",
   );
   const imageSize = readPngDimensions(atlas.image);
   assert(
     imageSize.width >= atlas.grid?.components?.tube?.x + atlas.grid?.components?.tube?.w &&
       imageSize.height >= atlas.grid?.components?.carriage?.y + atlas.grid?.components?.carriage?.h,
-    "mortar PNG atlas frame coordinates fit inside the generated three-cell sheet",
+    "mortar PNG atlas frame coordinates fit inside the generated component sheet",
   );
   for (const sprite of atlas.sprites) {
     assert(
@@ -230,6 +273,7 @@ const NOOP_RENDERER_OVERLAYS = [
   const tubeSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tube.packed");
   const leftTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.left.packed");
   const rightTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
+  const basePlateSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.basePlate.deployed");
   assert(
     carriageSprite?.tintSlot === "team-light" &&
       carriageSprite.tintAdjustment?.brightness === 78 &&
@@ -251,6 +295,14 @@ const NOOP_RENDERER_OVERLAYS = [
       rightTireSprite.drawOrder < tubeSprite?.drawOrder,
     "mortar PNG tire overlays remain fixed-color above the team-tinted carriage",
   );
+  assert(
+    basePlateSprite?.tintSlot === "team" &&
+      basePlateSprite.drawOrder < carriageSprite?.drawOrder &&
+      basePlateSprite.positionOffsetX === -20 &&
+      basePlateSprite.frame?.w / basePlateSprite.frame?.pixelsPerUnitX === 16 &&
+      basePlateSprite.frame?.h / basePlateSprite.frame?.pixelsPerUnitY === 16,
+    "mortar PNG base plate is team-tinted, half a tile wide, rearward, and draws below the carriage",
+  );
   const definitions = createLiveRigDefinitions();
   const definition = liveRigDefinitionFor(definitions, KIND.MORTAR_TEAM);
   const routes = liveRigRoutesFor(KIND.MORTAR_TEAM);
@@ -260,14 +312,16 @@ const NOOP_RENDERER_OVERLAYS = [
   const shadowCoverage = pngAtlasRouteCoverage(definition, atlas, shadowRoute);
   assert(unitCoverage.missingParts.length === 0, "mortar PNG atlas covers every unit-route part");
   assert(
-    unitCoverage.coveredParts.includes("part.mortar.body.packed") &&
+    unitCoverage.coveredParts.includes("part.mortar.basePlate.deployed") &&
+      unitCoverage.coveredParts.includes("part.mortar.body.packed") &&
       unitCoverage.coveredParts.includes("part.mortar.tube.packed"),
-    "mortar PNG atlas replaces both carriage/body and tube SVG parts",
+    "mortar PNG atlas replaces the base plate, carriage/body, and tube SVG parts",
   );
   assert(
     shadowCoverage.coveredParts.length === 0 &&
+      shadowCoverage.missingParts.length === 1 &&
       shadowCoverage.missingParts.includes("part.shadow"),
-    "mortar PNG atlas leaves the existing SVG shadow route in place",
+    "mortar PNG atlas leaves only the ordinary unit shadow on the SVG under-unit route",
   );
 }
 
@@ -361,6 +415,88 @@ const NOOP_RENDERER_OVERLAYS = [
     assert(renderer._pools.hpBars.has(rifleman.id), "selected-unit HP overlays still use the real Rifleman entity id");
     assert(Object.keys(state).sort().join(",") === beforeKeys, "frame-strip override rendering does not add GameState fields");
     assert(state.selection.has(rifleman.id), "frame-strip override rendering does not mutate selection");
+
+    renderer.destroy();
+  } finally {
+    delete globalThis.__rtsRenderErrors;
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const renderer = new Renderer(fakeParent());
+    for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
+    renderer._drawGroundDecals = () => 0;
+    renderer._drawTrenches = () => 0;
+    const profile = getVisualProfile("rifleman-panzerfaust-composite-1");
+    const override = profile.frameStripOverrides[0];
+    assert(
+      renderer._assetReadiness.get(`live-frame-strip:${LOADED_RIFLEMAN_RIG_KEY}`)?.kind === KIND.RIFLEMAN,
+      "loaded Panzerfaust strip readiness is reported for Rifleman capture subjects",
+    );
+    renderer._visualFrameStripTextures.set(
+      `${KIND.RIFLEMAN}:${override.strip.imageVersion}`,
+      PIXI.Texture.from("panzerfaust-composite-test-texture"),
+    );
+    renderer._liveFrameStripTextures.set(
+      KIND.RIFLEMAN,
+      PIXI.Texture.from("normal-rifleman-test-texture"),
+    );
+    const rifleman = {
+      id: 116,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+      x: 2003.97,
+      y: 1837.91,
+      hp: 45,
+      maxHp: 45,
+      state: STATE.ATTACK,
+      facing: 0,
+      weaponFacing: 0,
+      panzerfaustLoaded: true,
+    };
+    let recoil = 0;
+    const state = {
+      playerId: 1,
+      players: [{ id: 1, color: "#4878c8" }],
+      resources: { oil: 10 },
+      selection: new Set(),
+      rememberedBuildings: [],
+      map: { tileSize: 32 },
+      trenches: [],
+      entitiesInterpolated() {
+        return [rifleman];
+      },
+      selectedEntities() {
+        return [];
+      },
+      weaponRecoil() {
+        return recoil;
+      },
+    };
+
+    renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
+      visualFrameStripOverrides: profile.frameStripOverrides,
+    });
+    const loadedInstance = renderer._liveRigPools.liveUnitRigs.get(rifleman.id);
+    assert(
+      loadedInstance?.strip?.imageVersion === override.strip.imageVersion,
+      "loaded Rifleman renders through the composited Panzerfaust strip",
+    );
+
+    rifleman.panzerfaustLoaded = false;
+    recoil = 1;
+    renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
+      visualFrameStripOverrides: profile.frameStripOverrides,
+    });
+    const spentInstance = renderer._liveRigPools.liveUnitRigs.get(rifleman.id);
+    assert(loadedInstance._destroyed === true, "launch-time loadout change destroys the loaded carrier instance");
+    assert(
+      spentInstance?.strip?.imageVersion === RIFLEMAN_PNG_FRAME_STRIP.imageVersion,
+      "spent Rifleman immediately renders through the normal firing-capable Rifleman strip",
+    );
 
     renderer.destroy();
   } finally {

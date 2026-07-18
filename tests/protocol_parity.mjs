@@ -517,6 +517,10 @@ assert(
   "setTeamPreset builder must emit the exact wire shape",
 );
 assert(
+  JSON.stringify(msg.setName("Renamed")) === JSON.stringify({ t: "setName", name: "Renamed" }),
+  "setName builder must emit the exact wire shape",
+);
+assert(
   C.SET_TEAM === "setTeam",
   "setTeam client message tag must match Rust",
 );
@@ -636,6 +640,7 @@ for (const field of [
   "steel_value",
   "oil_value",
   "queue_depth",
+  "upgrades",
   "ai_diagnostics",
   "profile_id",
   "trace_tick",
@@ -654,6 +659,7 @@ const observerAnalysis = decodeServerMessage({
     id: 1,
     units: [{ kind: "worker", count: 2, steelValue: 100, oilValue: 0 }],
     production: [{ buildingId: 7, buildingKind: "city_centre", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
+    upgrades: ["tank_unlock"],
     unitsLost: [],
     resourcesLost: { steel: 0, oil: 0 },
     resources: {
@@ -691,6 +697,7 @@ const observerAnalysis = decodeServerMessage({
   },
 });
 assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "observerAnalysis passes through decode");
+assert(observerAnalysis.players[0].upgrades[0] === "tank_unlock", "observerAnalysis preserves completed research");
 assert(
   observerAnalysis.players[0].aiDiagnostics?.profileId === "ai_2_1",
   "observerAnalysis preserves AI diagnostics rows",

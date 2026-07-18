@@ -418,6 +418,9 @@ impl RoomTask {
     /// Transition from `Lobby` to `InGame`: create the simulation and send each player their
     /// own `start` payload. Only called from `on_start_request` once preconditions hold.
     pub(super) fn start_match(&mut self) {
+        // Defense in depth: internal observer tooling may stage experimental profiles, but no
+        // such profile may cross the authoritative launch seam into a human match.
+        self.replace_internal_ai_profiles_for_player_match();
         self.prepare_live_match_launch();
         let mut inits: Vec<PlayerInit> = self
             .active_human_ids()
@@ -510,7 +513,7 @@ impl RoomTask {
         );
         let mut payload = game.start_payload();
         payload.match_run_id = self.match_run_id.clone();
-        self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
+        self.ai_controllers = live_ai_controllers(&inits, &self.ai_players);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let start_policy = self.live_session_policy();

@@ -86,13 +86,34 @@ pub(crate) fn resource_has_completed_mining_cc(
     player: u32,
     node: u32,
 ) -> bool {
+    resource_has_completed_mining_anchor(entities, node, |anchor_owner| anchor_owner == player)
+}
+
+/// Whether a resource node is in range of a completed home-base mining anchor owned by `player`
+/// or one of their allies.
+pub(crate) fn resource_has_completed_friendly_mining_anchor(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    player: u32,
+    node: u32,
+) -> bool {
+    resource_has_completed_mining_anchor(entities, node, |anchor_owner| {
+        teams.same_team_or_same_owner(player, anchor_owner)
+    })
+}
+
+fn resource_has_completed_mining_anchor(
+    entities: &EntityStore,
+    node: u32,
+    accepts_owner: impl Fn(u32) -> bool,
+) -> bool {
     let Some(resource) = entities.get(node) else {
         return false;
     };
     if !resource.is_node() || resource.remaining().unwrap_or(0) == 0 {
         return false;
     }
-    nearest_completed_mining_anchor(entities, player, resource.pos_x, resource.pos_y)
+    nearest_completed_mining_anchor(entities, resource.pos_x, resource.pos_y, accepts_owner)
         .map(|(_, dist2)| {
             let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
             dist2 <= range_px * range_px + 0.01
@@ -115,12 +136,19 @@ pub(crate) fn steel_node_is_mineable_by_player(
 
 fn nearest_completed_mining_anchor(
     entities: &EntityStore,
-    player: u32,
     x: f32,
     y: f32,
+    accepts_owner: impl Fn(u32) -> bool,
 ) -> Option<(u32, f32)> {
-    completed_buildings(entities, player)
-        .filter(|e| is_home_base_mining_anchor(e.kind) && e.hp > 0)
+    entities
+        .iter()
+        .filter(|e| {
+            accepts_owner(e.owner)
+                && e.is_building()
+                && !e.under_construction()
+                && is_home_base_mining_anchor(e.kind)
+                && e.hp > 0
+        })
         .map(|e| {
             let dx = e.pos_x - x;
             let dy = e.pos_y - y;

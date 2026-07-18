@@ -10,7 +10,7 @@ use super::super::faction_validation::{
 use super::super::participants::{CommandIssuer, Participants};
 use super::super::{
     map_catalog::{self, active_slot_bounds, active_slot_cap},
-    next_player_id, LobbyJoinState, LobbySummary, LobbySummaryPhase, MAX_PLAYERS, PLAYER_PALETTE,
+    next_player_id, MAX_PLAYERS, PLAYER_PALETTE,
 };
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{AiSlot, Phase, RoomPlayer, MAX_LOBBY_TEAMS};
@@ -20,88 +20,6 @@ use crate::protocol::{LobbyKind, LobbyPlayer, ServerMessage, TeamId};
 impl RoomTask {
     pub(super) fn is_replay_staging_lobby(&self) -> bool {
         matches!(self.mode, super::RoomMode::Replay { .. }) && matches!(self.phase, Phase::Lobby)
-    }
-
-    fn lobby_kind(&self) -> LobbyKind {
-        if matches!(self.mode, super::RoomMode::Replay { .. }) {
-            LobbyKind::Replay
-        } else {
-            LobbyKind::Normal
-        }
-    }
-
-    fn lobby_map_name(&self) -> String {
-        match &self.mode {
-            super::RoomMode::Replay { artifact } if matches!(self.phase, Phase::Lobby) => {
-                artifact.map_name.clone()
-            }
-            _ => self.selected_map.clone(),
-        }
-    }
-
-    pub(super) fn lobby_summary(&self) -> Option<LobbySummary> {
-        let policy = self.session_policy();
-        if !policy.is_public_lobby_browser_room() {
-            return None;
-        }
-        let host_id = self.host_id?;
-        let host_name = self
-            .players
-            .get(&host_id)
-            .map(|player| player.name.clone())?;
-        let kind = self.lobby_kind();
-        let (phase, join_state, map) = if self.match_countdown_deadline.is_some() {
-            (
-                LobbySummaryPhase::Countdown,
-                LobbyJoinState::Starting,
-                self.selected_map.clone(),
-            )
-        } else {
-            match &self.phase {
-                Phase::Lobby => {
-                    let map = self.lobby_map_name();
-                    let join_state = if kind == LobbyKind::Replay
-                        || self.total_player_count() >= active_slot_cap(&map)
-                    {
-                        LobbyJoinState::FullSpectatorOnly
-                    } else {
-                        LobbyJoinState::Open
-                    };
-                    (LobbySummaryPhase::Lobby, join_state, map)
-                }
-                Phase::InGame(_) => (
-                    LobbySummaryPhase::InGame,
-                    LobbyJoinState::InGame,
-                    self.match_map_name.clone(),
-                ),
-                Phase::ReplayViewer(_) | Phase::BranchStaging(_) => return None,
-            }
-        };
-        let max_slots = if kind == LobbyKind::Replay {
-            0
-        } else {
-            active_slot_cap(&map)
-        };
-        Some(LobbySummary {
-            room: self.room.clone(),
-            kind,
-            host_name: Some(host_name),
-            map,
-            created_at_unix_ms: self.created_at_unix_ms,
-            occupied_slots: if kind == LobbyKind::Replay {
-                0
-            } else {
-                self.total_player_count()
-            },
-            max_slots,
-            spectator_count: self
-                .players
-                .values()
-                .filter(|player| player.spectator)
-                .count(),
-            phase,
-            join_state,
-        })
     }
 
     pub(in crate::lobby) fn on_join(
@@ -221,6 +139,7 @@ impl RoomTask {
         if !spectator {
             self.assign_missing_team_for(player_id);
             self.assign_missing_faction_for(player_id);
+            self.replace_internal_ai_profiles_for_player_match();
         }
         crate::log_debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
@@ -285,6 +204,23 @@ impl RoomTask {
         if broadcast_branch_staging {
             self.broadcast_branch_staging();
         }
+    }
+
+    pub(in crate::lobby) fn on_set_name(&mut self, player_id: u32, name: String) {
+        if self.is_dev_watch()
+            || self.match_countdown_deadline.is_some()
+            || !matches!(self.phase, Phase::Lobby)
+        {
+            return;
+        }
+        let Some(player) = self.players.get_mut(&player_id) else {
+            return;
+        };
+        if player.name == name {
+            return;
+        }
+        player.name = name;
+        self.broadcast_lobby();
     }
 
     pub(in crate::lobby) fn on_ready(&mut self, player_id: u32, ready: bool) {
@@ -473,6 +409,9 @@ impl RoomTask {
         let profile_id = requested_profile_id
             .as_deref()
             .and_then(rts_ai::canonical_live_profile_id)
+            .filter(|profile_id| {
+                self.active_human_count() == 0 || *profile_id == DEFAULT_LIVE_PROFILE_ID
+            })
             .unwrap_or(DEFAULT_LIVE_PROFILE_ID);
         let team_id = if let Some(team_id) = requested_team_id {
             if !self.team_move_allowed(id, team_id) {
@@ -521,6 +460,15 @@ impl RoomTask {
             );
             return;
         };
+        if self.active_human_count() > 0 && profile_id != DEFAULT_LIVE_PROFILE_ID {
+            crate::log_debug!(
+                room = %self.room,
+                target,
+                ai_profile_id = %requested_profile_id,
+                "ignoring internal-only AI profile selection in a player lobby"
+            );
+            return;
+        }
         let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == target) else {
             return;
         };
@@ -641,6 +589,7 @@ impl RoomTask {
             }
             self.assign_missing_team_for(target);
             self.assign_missing_faction_for(target);
+            self.replace_internal_ai_profiles_for_player_match();
         }
         self.broadcast_lobby();
     }
@@ -672,6 +621,24 @@ impl RoomTask {
 
     pub(super) fn active_human_count(&self) -> usize {
         self.participants().active_human_count()
+    }
+
+    pub(super) fn replace_internal_ai_profiles_for_player_match(&mut self) {
+        if self.active_human_count() == 0 {
+            return;
+        }
+        for ai in &mut self.ai_players {
+            if ai.profile_id != DEFAULT_LIVE_PROFILE_ID {
+                crate::log_warn!(
+                    room = %self.room,
+                    ai_id = ai.id,
+                    rejected_profile_id = %ai.profile_id,
+                    replacement_profile_id = DEFAULT_LIVE_PROFILE_ID,
+                    "replacing internal-only AI profile before player match"
+                );
+                ai.profile_id = DEFAULT_LIVE_PROFILE_ID;
+            }
+        }
     }
 
     pub(super) fn active_human_ids(&self) -> impl Iterator<Item = u32> + '_ {

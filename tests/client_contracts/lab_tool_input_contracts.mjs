@@ -143,14 +143,14 @@ function publishScene(input, entities) {
   input.state = {
     spectator: true,
     map: { width: 8, height: 8, tileSize: 32 },
-    controlPolicy: {
-      kind: "lab",
-      canControlOwner: () => true,
-      canSelectEntity: (entity) => !!entity && Number(entity.owner) > 0 && !entity.shotReveal && !entity.visionOnly,
-    },
     entitiesInterpolated() {
       return removable;
     },
+  };
+  input.controlPolicy = {
+      kind: "lab",
+      canControlOwner: () => true,
+      canSelectEntity: (entity) => !!entity && Number(entity.owner) > 0 && !entity.shotReveal && !entity.visionOnly,
   };
   input.pointerLocked = false;
   input.cameraNavigation = null;

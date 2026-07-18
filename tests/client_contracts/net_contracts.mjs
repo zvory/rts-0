@@ -83,6 +83,156 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
 }
 
 {
+  const nativeConsoleError = console.error;
+  const consoleReports = [];
+  const diagnosticReports = [];
+  console.error = (...args) => { consoleReports.push(args); };
+  try {
+    const diagnostics = {
+      mark(label, detail) {
+        diagnosticReports.push([label, detail]);
+      },
+    };
+    const net = new Net("ws://example.test/ws", diagnostics);
+    const payloadSentinel = "SECRET_NET_PAYLOAD_SENTINEL";
+    const payloadError = new Error(payloadSentinel);
+    payloadError.name = payloadSentinel;
+    payloadError.stack = payloadSentinel;
+    let healthyDeliveries = 0;
+    const broken = () => { throw payloadError; };
+    net.on("snapshot", broken);
+    net.on("snapshot", () => { healthyDeliveries += 1; });
+    net._emit("snapshot", { secret: payloadSentinel });
+    net._emit("snapshot", { secret: payloadSentinel });
+
+    assert(consoleReports.length === 1, "identical Net subscriber failures log once");
+    assert(diagnosticReports.length === 1, "identical Net subscriber failures mark diagnostics once");
+    assert(healthyDeliveries === 2, "later Net subscribers run after repeated handler failures");
+    assert(
+      JSON.stringify([consoleReports, diagnosticReports]).includes(payloadSentinel) === false,
+      "Net subscriber reports exclude thrown error and payload details",
+    );
+    assert(consoleReports[0][0] === "[rts-net] subscriber failure", "Net uses the fixed console failure prefix");
+    assert(consoleReports[0][1].eventType === "snapshot", "Net reports normalized event type");
+    assert(consoleReports[0][1].thrownValueClass === "Error", "Net reports the fixed Error class");
+    assert(Number.isInteger(consoleReports[0][1].handlerId), "Net reports a local numeric handler id");
+    assert(diagnosticReports[0][0] === "net.subscriberFailure", "Net mirrors failures through diagnostics mark");
+
+    const throwingGetter = new Error(payloadSentinel);
+    Object.defineProperty(throwingGetter, "name", {
+      get() { throw new Error("caught value name was inspected"); },
+    });
+    const longEventType = "event-name-that-is-deliberately-longer-than-sixty-four-characters-to-normalize-safely";
+    net.on(longEventType, () => { throw throwingGetter; });
+    net._emit(longEventType);
+    assert(consoleReports[1][1].eventType.length === 64, "Net caps reported event types at 64 characters");
+    assert(consoleReports[1][1].thrownValueClass === "Error", "Net classifies Error without reading its name");
+
+    net.on(7, () => { throw null; });
+    net._emit(7);
+    assert(consoleReports[2][1].eventType === "unknown", "Net normalizes non-string event types");
+
+    const reportsBeforeDisconnect = consoleReports.length;
+    net._connected = true;
+    net.ws = { close() {} };
+    net.disconnect();
+    net._connected = true;
+    net.ws = {};
+    net._emit("snapshot", { secret: payloadSentinel });
+    assert(
+      consoleReports.length === reportsBeforeDisconnect,
+      "Net disconnect and reconnect lifecycle does not reset subscriber failure deduplication",
+    );
+
+    const secondNet = new Net("ws://example.test/ws");
+    secondNet.on("snapshot", broken);
+    secondNet._emit("snapshot");
+    assert(consoleReports.length === reportsBeforeDisconnect + 1, "a second Net has a fresh failure registry");
+  } finally {
+    console.error = nativeConsoleError;
+  }
+}
+
+{
+  const nativeConsoleError = console.error;
+  const consoleReports = [];
+  const diagnosticReports = [];
+  console.error = (...args) => { consoleReports.push(args); };
+  try {
+    const net = new Net("ws://example.test/ws", {
+      mark(...args) { diagnosticReports.push(args); },
+    });
+    for (let i = 0; i < 33; i += 1) {
+      const handler = () => { throw new Error("ignored"); };
+      net.on(`event-${i}`, handler);
+      net._emit(`event-${i}`);
+      net.off(`event-${i}`, handler);
+    }
+    assert(net._reportedSubscriberFailureSignatures.size === 32, "Net caps recorded failure signatures at 32");
+    assert(consoleReports.length === 33, "the 33rd distinct Net failure emits one saturation report");
+    assert(
+      consoleReports.slice(0, 32).every((report) => report[0] === "[rts-net] subscriber failure"),
+      "Net reports each of the first 32 distinct signatures independently",
+    );
+    assert(
+      consoleReports[32].length === 1 &&
+        consoleReports[32][0] === "[rts-net] subscriber failure reporting saturated",
+      "Net saturation reporting contains no failure metadata",
+    );
+    assert(
+      diagnosticReports.length === 33 &&
+        diagnosticReports[32].length === 1 &&
+        diagnosticReports[32][0] === "net.subscriberFailure.reportingSaturated",
+      "Net diagnostics mirror uses one fixed saturation marker",
+    );
+    for (let i = 33; i < 1000; i += 1) {
+      const handler = () => { throw new Error("ignored"); };
+      net.on(`event-${i}`, handler);
+      net._emit(`event-${i}`);
+      net.off(`event-${i}`, handler);
+    }
+    assert(consoleReports.length === 33, "Net suppresses new signatures after saturation");
+    assert(net._subscriberHandlerIds instanceof WeakMap, "Net keeps handler diagnostic identity only in a WeakMap");
+    assert(
+      [...net._handlers.values()].every((handlers) => handlers.size === 0),
+      "Net subscribe/off churn introduces no strong handler identity registry",
+    );
+    const enumerableDiagnosticCollections = Object.entries(net).filter(([key, value]) =>
+      key.includes("SubscriberFailure") && (value instanceof Map || value instanceof Set));
+    assert(
+      enumerableDiagnosticCollections.length === 1 &&
+        enumerableDiagnosticCollections[0][1].size === 32,
+      "Net exposes only the capped signature Set as an enumerable diagnostic registry",
+    );
+  } finally {
+    console.error = nativeConsoleError;
+  }
+}
+
+{
+  const nativeConsoleError = console.error;
+  let laterDeliveries = 0;
+  let diagnosticAttempts = 0;
+  console.error = () => { throw new Error("console reporter failed"); };
+  try {
+    const net = new Net("ws://example.test/ws", {
+      mark() {
+        diagnosticAttempts += 1;
+        throw new Error("diagnostics reporter failed");
+      },
+    });
+    net.on("snapshot", () => { throw new Error("subscriber failed"); });
+    net.on("snapshot", () => { laterDeliveries += 1; });
+    net._emit("snapshot");
+    assert(laterDeliveries === 1, "Net continues delivery when handler and both reporters throw");
+    assert(diagnosticAttempts === 1, "Net diagnostics reporting remains independent when console throws");
+    assert(net._reportedSubscriberFailureSignatures.size === 1, "failed reporters still record the signature once");
+  } finally {
+    console.error = nativeConsoleError;
+  }
+}
+
+{
   const net = new Net("ws://example.test/ws");
   assert(net instanceof Net, "Net constructor should return an instance");
   assertHasMethod(net, "connect", "Net");
@@ -90,6 +240,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assertHasMethod(net, "on", "Net");
   assertHasMethod(net, "off", "Net");
   assertHasMethod(net, "join", "Net");
+  assertHasMethod(net, "setName", "Net");
   assertHasMethod(net, "ready", "Net");
   assertHasMethod(net, "start", "Net");
   assertHasMethod(net, "giveUp", "Net");
@@ -99,6 +250,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assertHasMethod(net, "command", "Net");
   assertHasMethod(net, "ping", "Net");
   assertHasMethod(net, "netReport", "Net");
+  assertHasMethod(net, "activity", "Net");
   assertHasGetter(net, "playerId", "Net");
   assert(net.playerId === null, "Net.playerId should be null before welcome");
   assertHasMethod(net, "addAi", "Net");
@@ -267,22 +419,22 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   }
   assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
   assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
+  assert(msg.activity().t === "activity", "human-activity builder tag");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
   assert(msg.setRoomTimeSpeed(2).t === "setRoomTimeSpeed", "room-time speed builder tag");
   assert(msg.stepRoomTime().t === "stepRoomTime", "room-time step builder tag");
   assert(msg.seekRoomTime(90).ticksBack === 90, "room-time relative seek builder payload");
   assert(msg.seekRoomTimeTo(450).tick === 450, "room-time absolute seek builder payload");
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
+  assert(msg.setName("Renamed").name === "Renamed", "lobby name builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
   assert(DEFAULT_AI_PROFILE_ID === "ai_2_1", "lobby defaults to AI 2.1");
   assert(
-    AI_PROFILES.length === 2 &&
+    AI_PROFILES.length === 1 &&
       AI_PROFILES[0].id === "ai_2_1" &&
-      AI_PROFILES[0].label === "AI 2.1" &&
-      AI_PROFILES[1].id === "ai_turtle" &&
-      AI_PROFILES[1].label === "AI Turtle",
-    "lobby exposes the two supported AI profiles",
+      AI_PROFILES[0].label === "AI 2.1",
+    "lobby exposes only the supported player-facing AI profile",
   );
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(

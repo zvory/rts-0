@@ -91,6 +91,11 @@ The audio listener is the ground focus, with reference distance equal to one vie
 focus plane. Navigation, minimap, audio, alerts, control groups, carryover, Lab, observer, capture,
 and diagnostics use only semantic operations.
 
+Ordinary live-player sessions limit the visible ground footprint to 100 map tiles on either
+viewport axis. `Match` converts that tile count to a world-pixel span and both camera adapters
+combine it with their existing minimum framing scale on every viewport resize. Spectators,
+replays, Lab sessions, and the Map Editor retain their wider overview ranges.
+
 ## 3. Renderer-neutral selection
 
 Selection is an app-side sibling of the presentation frame and is never sent to a backend:

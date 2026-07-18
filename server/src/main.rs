@@ -96,6 +96,45 @@ fn configured_maps_dir() -> String {
 /// (or a stuck never-ready client) is dropped instead of wedging a shared room forever.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 
+/// Disconnect a browser that has sent no player action or human-input notice for five minutes.
+/// Automatic heartbeat and diagnostics traffic deliberately do not extend this deadline, so an
+/// abandoned lobby or match cannot keep the Fly Machine running indefinitely.
+const PLAYER_INACTIVITY_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
+fn is_player_activity(message: &ClientMessage) -> bool {
+    match message {
+        ClientMessage::Ping { .. } | ClientMessage::NetReport { .. } => false,
+        ClientMessage::Join { .. }
+        | ClientMessage::SetName { .. }
+        | ClientMessage::Ready { .. }
+        | ClientMessage::Start
+        | ClientMessage::SetTeamPreset { .. }
+        | ClientMessage::SetTeam { .. }
+        | ClientMessage::SetFaction { .. }
+        | ClientMessage::AddAi { .. }
+        | ClientMessage::SetAiProfile { .. }
+        | ClientMessage::RemoveAi { .. }
+        | ClientMessage::SetSpectator { .. }
+        | ClientMessage::Command { .. }
+        | ClientMessage::GiveUp
+        | ClientMessage::PauseGame
+        | ClientMessage::UnpauseGame
+        | ClientMessage::ReturnToLobby
+        | ClientMessage::Activity
+        | ClientMessage::SetRoomTimeSpeed { .. }
+        | ClientMessage::StepRoomTime
+        | ClientMessage::SeekRoomTime { .. }
+        | ClientMessage::SeekRoomTimeTo { .. }
+        | ClientMessage::SetVisionSelection { .. }
+        | ClientMessage::Lab { .. }
+        | ClientMessage::RequestBranchFromTick
+        | ClientMessage::ClaimBranchSeat { .. }
+        | ClientMessage::ReleaseBranchSeat { .. }
+        | ClientMessage::StartBranch
+        | ClientMessage::SelectMap { .. } => true,
+    }
+}
+
 /// On deploy shutdown, keep the process alive long enough for in-progress matches to finish.
 /// Fly's shared-CPU `kill_timeout` caps at 300 seconds, so leave a few seconds for axum to stop
 /// accepting connections and exit cleanly before the platform sends its final shutdown signal.
@@ -410,7 +449,7 @@ async fn lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.lobby.summaries().await)
 }
 
-/// POST /api/lobbies — reserve a new normal lobby name without joining an existing room.
+/// POST /api/lobbies — reserve an available normal lobby name without joining an existing room.
 async fn create_lobby_handler(
     State(state): State<AppState>,
     Json(request): Json<CreateLobbyRequest>,
@@ -423,7 +462,6 @@ async fn create_lobby_handler(
 
 fn create_lobby_error_response(err: lobby::CreateLobbyError) -> axum::response::Response {
     let status = match &err {
-        lobby::CreateLobbyError::Duplicate => StatusCode::CONFLICT,
         lobby::CreateLobbyError::Draining(_) => StatusCode::SERVICE_UNAVAILABLE,
         lobby::CreateLobbyError::EmptyName
         | lobby::CreateLobbyError::NameTooLong { .. }
@@ -799,6 +837,17 @@ mod tests {
     const TEST_PLAYER_ID: u32 = 42;
 
     #[test]
+    fn only_player_actions_and_input_notices_extend_the_inactivity_deadline() {
+        assert_eq!(PLAYER_INACTIVITY_TIMEOUT, Duration::from_secs(300));
+        assert!(!is_player_activity(&ClientMessage::Ping { ts: 1.0 }));
+        assert!(!is_player_activity(&ClientMessage::NetReport {
+            report: Box::default(),
+        }));
+        assert!(is_player_activity(&ClientMessage::Activity));
+        assert!(is_player_activity(&ClientMessage::Ready { ready: true }));
+    }
+
+    #[test]
     fn sanitize_name_uses_commander_for_blank_names() {
         assert_eq!(sanitize_name(" \n\t ".to_string()), "Commander");
     }
@@ -1136,6 +1185,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     let mut current_room: Option<lobby::RoomHandle> = None;
     let mut current_room_name: Option<String> = None;
     let mut shutdown_rx = lobby.subscribe_connection_shutdown();
+    let mut player_activity_deadline = tokio::time::Instant::now() + PLAYER_INACTIVITY_TIMEOUT;
 
     loop {
         // Bound the read so a silent/half-open client is evicted rather than parked forever. The
@@ -1143,6 +1193,15 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
         let next = tokio::select! {
             _ = wait_for_connection_shutdown(&mut shutdown_rx) => {
                 rts_server::log_debug!(player_id, "server shutdown; closing connection");
+                break;
+            }
+            _ = tokio::time::sleep_until(player_activity_deadline) => {
+                rts_server::log_info!(
+                    player_id,
+                    room = current_room_name.as_deref().unwrap_or(""),
+                    timeout_seconds = PLAYER_INACTIVITY_TIMEOUT.as_secs(),
+                    "player inactivity timeout; closing connection"
+                );
                 break;
             }
             next = tokio::time::timeout(IDLE_TIMEOUT, stream.next()) => next,
@@ -1180,6 +1239,10 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                         continue;
                     }
                 };
+                if is_player_activity(&parsed) {
+                    player_activity_deadline =
+                        tokio::time::Instant::now() + PLAYER_INACTIVITY_TIMEOUT;
+                }
                 let timing = ClientMessageTiming {
                     received_unix_ms,
                     frame_received_at,
@@ -1340,6 +1403,17 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::SetName { name } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetName {
+                    player_id,
+                    name: sanitize_name(name),
+                },
+            )
+            .await;
+        }
         ClientMessage::Start => {
             send_room_event(
                 player_id,
@@ -1479,6 +1553,10 @@ async fn handle_client_message(
                 *report,
                 outbound,
             );
+        }
+        ClientMessage::Activity => {
+            // The connection loop already extended the inactivity deadline. This transport-level
+            // notice deliberately has no room state to mutate.
         }
         ClientMessage::SetRoomTimeSpeed { speed } => {
             send_room_event(

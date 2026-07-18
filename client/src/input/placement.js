@@ -206,7 +206,7 @@ export function _confirmPlacement(ev = {}) {
     return;
   }
   const queued = !!ev.shiftKey;
-  this._issueCommand(cmd.build(workers, place.building, place.tileX, place.tileY, queued));
+  this.commandInteraction.issueCommand(cmd.build(workers, place.building, place.tileX, place.tileY, queued));
   if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
   // Shift-confirm keeps placement mode active so the player can chain
   // several queued buildings; Shift keyup owns the eventual de-arm.
@@ -236,7 +236,7 @@ export function _cancelPlacementDrag() {
 export function _confirmTankTrapLinePlacement(place, workers, ev = {}) {
   const commands = tankTrapBuildCommands(workers, place.lineSites, place.building);
   if (commands.length === 0) return false;
-  for (const command of commands) this._issueCommand(command);
+  for (const command of commands) this.commandInteraction.issueCommand(command);
   if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
   if (!ev.shiftKey) clientIntent(this)?.endPlacement?.();
   return true;

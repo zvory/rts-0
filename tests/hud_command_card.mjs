@@ -332,6 +332,32 @@ function buttonSlots(card) {
 }
 
 {
+  const mortar = {
+    id: 90,
+    owner: 1,
+    kind: KIND.MORTAR_TEAM,
+    hp: 75,
+    setupState: SETUP.PACKED,
+    abilities: [{ ability: ABILITY.MORTAR_FIRE, cooldownLeft: 0 }],
+  };
+  const mortarCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: "kriegsia",
+    selection: [mortar],
+    entities: [mortar],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(
+    buttonSlots(mortarCard).find((slot) => slot.commandId === "unit.setupSupportWeapon"),
+    { commandId: "unit.setupSupportWeapon", slotIndex: 6, hotkey: "Z" },
+    "mortar setup occupies the bottom-left Z slot",
+  );
+}
+
+{
   const abilitiesByKind = {
     [KIND.SCOUT_CAR]: [ABILITY.SMOKE],
     [KIND.MORTAR_TEAM]: [ABILITY.MORTAR_FIRE],
@@ -507,6 +533,8 @@ function buttonSlots(card) {
     "training-centre",
     "research-complex",
     "research-complex-medium-guns",
+    "ekat-unit",
+    "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
@@ -516,6 +544,15 @@ function buttonSlots(card) {
         )
     ),
     "command-card context catalog samples Heavy Guns after Medium Guns so direct hotkeys can discover it",
+  );
+  assert(
+    catalog.some((entry) =>
+      entry.id === "ekat-unit" &&
+        entry.card.slots.some((slot) =>
+          slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_LINE_SHOT)
+        )
+    ),
+    "command-card context catalog samples Ekat abilities so direct hotkeys can discover them",
   );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.CITY_CENTRE,

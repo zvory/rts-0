@@ -72,6 +72,7 @@ try {
   const opened = await service.execute("open", {});
   testArtifacts.ownSession(opened.sessionId);
   await service.execute("spawn", { sessionId: opened.sessionId, spawns: [{ owner: 1, kind: "tank", x: 800, y: 800, alias: "subject" }] });
+  await service.execute("select", { sessionId: opened.sessionId, refs: ["subject"] });
   const result = await service.execute("capture-fixed", { sessionId: opened.sessionId, name: "contract", fps: 60, frameCount: 4 });
   assert.deepEqual(
     { count: result.frameSummary.count, representatives: result.frameSummary.representativeFramePaths.length },
@@ -81,6 +82,7 @@ try {
   assert.deepEqual(result.authoritative, { startTick: 1, endTick: 2 }, "service preserves exact simulation-to-frame mapping");
   assert.equal(result.fixtureMetadata.sceneRevision, 1, "manifest input identifies mutations after the launch scene");
   assert.deepEqual(result.fixtureMetadata.aliases, [{ alias: "subject", id: 100 }], "manifest input retains bounded alias identity");
+  assert.deepEqual(result.fixtureMetadata.selection, [100], "manifest input identifies the selection rendered into fixed capture frames");
   await assert.rejects(service.execute("capture-cancel", { sessionId: opened.sessionId }), (error) => error?.code === "captureInactive", "cancel reports an actionable error when no capture is active");
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "rts-li-fixed-contract-"));
   try {

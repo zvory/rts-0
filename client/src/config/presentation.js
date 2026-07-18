@@ -1,5 +1,5 @@
 // Client-owned presentation constants: rendering palette, local fog opacity,
-// fallback player colors, camera defaults, and command-card layout.
+// camera defaults, and command-card layout.
 
 import { KIND } from "../protocol.js";
 
@@ -42,16 +42,11 @@ export const COLORS = Object.freeze({
 export const FOG_EXPLORED_ALPHA = 0.48;
 export const FOG_UNEXPLORED_ALPHA = 0.8;
 
-// Player colors (server assigns from a matching palette; used as a fallback for blips).
-export const PLAYER_PALETTE = Object.freeze([
-  "#0072b2", "#d55e00", "#009e73", "#cc79a7",
-  "#56b4e9", "#e69f00", "#f0e442", "#7e57c2",
-]);
-
 export const CAMERA = Object.freeze({
   minZoom: 0.4,
   maxZoom: 2.0,
   labMaxZoom: 8.0,
+  maxVisibleTilesPerAxis: 100,
   panSpeed: 900, // world px / sec at zoom 1
   edgeScrollPx: 14, // screen-edge band that triggers panning
 });

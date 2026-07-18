@@ -68,9 +68,11 @@ set +e
 {
   refresh_runner_worktree &&
   "${command[@]}"
-} > >(tee "$stdout_log") 2> >(tee "$stderr_log" >&2)
+} >"$stdout_log" 2>"$stderr_log"
 status=$?
 set -e
+cat "$stdout_log"
+cat "$stderr_log" >&2
 
 finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 

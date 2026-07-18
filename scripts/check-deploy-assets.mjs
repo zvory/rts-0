@@ -8,6 +8,13 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
+function filesUnder(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? filesUnder(entryPath) : [entryPath];
+  });
+}
+
 function assertIncludes(text, needle, message) {
   if (!text.includes(needle)) {
     throw new Error(message);
@@ -43,9 +50,46 @@ const dockerignoreEntries = new Set(
     .filter((line) => line && !line.startsWith("#")),
 );
 
-for (const localOnlyPath of [".git", ".docdrift", "desktop"]) {
-  if (!dockerignoreEntries.has(localOnlyPath)) {
-    throw new Error(`.dockerignore must exclude local-only ${localOnlyPath} from Fly build contexts`);
+const dockerBuildRoots = new Set([
+  ".dockerignore",
+  "Dockerfile",
+  "client",
+  "docs",
+  "scripts",
+  "server",
+]);
+for (const entry of fs.readdirSync(repoRoot, { withFileTypes: true })) {
+  if (
+    entry.isDirectory() &&
+    !dockerBuildRoots.has(entry.name) &&
+    !dockerignoreEntries.has(entry.name)
+  ) {
+    throw new Error(`.dockerignore must exclude top-level non-build directory ${entry.name}`);
+  }
+}
+
+for (const excludedPath of [
+  ".git",
+  ".docdrift",
+  "desktop",
+  "node_modules",
+  "plans",
+  "target",
+  "tests",
+  "server/target",
+  "docs/*",
+  "scripts/*",
+  "client/vendor/sim-wasm/rts_sim_wasm.js",
+  "client/vendor/sim-wasm/rts_sim_wasm_bg.wasm",
+  "client/assets/rigs/**/*.*",
+]) {
+  if (!dockerignoreEntries.has(excludedPath)) {
+    throw new Error(`.dockerignore must exclude deploy-irrelevant path ${excludedPath}`);
+  }
+}
+for (const buildInput of ["!docs/context", "!docs/design", "!scripts/build-sim-wasm.sh"]) {
+  if (!dockerignoreEntries.has(buildInput)) {
+    throw new Error(`.dockerignore must retain Docker build input ${buildInput}`);
   }
 }
 
@@ -83,15 +127,52 @@ assertIncludes(
   "RUN ./scripts/build-sim-wasm.sh",
   "Dockerfile must generate browser-loadable prediction WASM assets during the image build",
 );
-for (const asset of [
+const generatedWasmAssets = [
   "./client/vendor/sim-wasm/rts_sim_wasm.js",
   "./client/vendor/sim-wasm/rts_sim_wasm_bg.wasm",
-]) {
+];
+for (const asset of generatedWasmAssets) {
   assertIncludes(
     dockerfile,
     `test -s ${asset}`,
     `Dockerfile must fail the image build when ${asset} is missing or empty`,
   );
+}
+
+const clientRuntimeSourceFiles = [
+  path.join(repoRoot, "client/index.html"),
+  path.join(repoRoot, "client/manifest.webmanifest"),
+  path.join(repoRoot, "client/styles.css"),
+  ...filesUnder(path.join(repoRoot, "client/src")),
+];
+const runtimeRigAssets = new Set();
+for (const sourceFile of clientRuntimeSourceFiles) {
+  const source = fs.readFileSync(sourceFile, "utf8");
+  for (const match of source.matchAll(/["'`(](\/assets\/rigs\/[^"'`)\s?#]+)/g)) {
+    runtimeRigAssets.add(`./client${match[1]}`);
+  }
+}
+const checkedInRuntimeAssets = [
+  "./client/assets/snapshot-streams/supply-300-hellhole.rtsstream",
+  ...Array.from(runtimeRigAssets).sort(),
+];
+for (const asset of checkedInRuntimeAssets) {
+  const localAsset = path.join(repoRoot, asset);
+  const assetStat = fs.statSync(localAsset);
+  if (!assetStat.isFile() || assetStat.size === 0) {
+    throw new Error(`${asset} must be a non-empty checked-in runtime asset`);
+  }
+  assertIncludes(
+    dockerfile,
+    `test -s ${asset}`,
+    `Dockerfile must fail the image build when ${asset} is absent from the filtered context`,
+  );
+  if (asset.includes("/assets/rigs/")) {
+    const allowlistEntry = `!${asset.slice(2)}`;
+    if (!dockerignoreEntries.has(allowlistEntry)) {
+      throw new Error(`.dockerignore must retain runtime rig texture ${allowlistEntry}`);
+    }
+  }
 }
 assertMatches(
   wasmBuildScript,

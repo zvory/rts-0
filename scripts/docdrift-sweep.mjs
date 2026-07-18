@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,9 @@ const defaultDocPatchCacheDir = ".docdrift/doc-patch-cache";
 const defaultRunRoot = ".docdrift/runs";
 const defaultSweepBranch = "zvorygin/docdrift-sweep";
 const defaultSweepWorktree = ".docdrift/worktrees/docdrift-sweep";
+const runStateSchemaVersion = 1;
+const legacySweepBranch = "zvorygin/docdrift-sweep";
+const legacyKnownHeadPrefix = "68f6e958";
 const classifierPromptVersion = "docdrift-classifier-v1";
 const docPatchPromptVersion = "docdrift-doc-patch-v1";
 const validClassifierDecisions = new Set(["move_on", "update_docs"]);
@@ -51,6 +54,7 @@ Options:
   --run-root DIR              Root directory for --full reports. Default: ${defaultRunRoot}
   --sweep-branch BRANCH       Branch for --full sweep PRs. Default: ${defaultSweepBranch}
   --sweep-worktree DIR        Isolated worktree for --full. Default: ${defaultSweepWorktree}
+  --adopt-legacy              Explicitly adopt a verified terminal fixed-branch run with an unknown head.
   --trace-map PATH            Trace map JSON path. Default: ${defaultTraceMapPath}
   --format markdown|json      Stdout format. Default: markdown.
   --max-commits N             Max considered commits for one classify run. Default: 25
@@ -103,6 +107,7 @@ export function parseArgs(argv) {
     runRoot: defaultRunRoot,
     sweepBranch: defaultSweepBranch,
     sweepWorktree: defaultSweepWorktree,
+    adoptLegacy: false,
     traceMap: defaultTraceMapPath,
   };
 
@@ -190,6 +195,8 @@ export function parseArgs(argv) {
       options.sweepBranch = readValue("--sweep-branch");
     } else if (arg === "--sweep-worktree" || arg.startsWith("--sweep-worktree=")) {
       options.sweepWorktree = readValue("--sweep-worktree");
+    } else if (arg === "--adopt-legacy") {
+      options.adoptLegacy = true;
     } else {
       throw new Error(`unknown option: ${arg}`);
     }
@@ -1585,6 +1592,7 @@ function runLifecycleCommand(lifecycle, cwd, name, command, args, options = {}) 
     status: "running",
     note: options.note,
   });
+  options.onChange?.();
   try {
     const output = execFileSync(command, args, {
       cwd,
@@ -1593,13 +1601,148 @@ function runLifecycleCommand(lifecycle, cwd, name, command, args, options = {}) 
       maxBuffer: 1024 * 1024 * 10,
     });
     lifecycle[lifecycle.length - 1].status = "completed";
+    options.onChange?.();
     return output.trim();
   } catch (error) {
     lifecycle[lifecycle.length - 1].status = "failed";
     const stderr = error.stderr?.toString().trim();
     lifecycle[lifecycle.length - 1].note = stderr || error.message;
+    options.onChange?.();
     throw error;
   }
+}
+
+function runStatePath(repoRoot, runRoot, runId) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(runId)) {
+    throw new Error(`invalid --run-id: ${runId}`);
+  }
+  return path.resolve(repoRoot, runRoot, runId, "run-state.json");
+}
+
+function writeJsonAtomic(filePath, value) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.tmp-${process.pid}`;
+  writeFileSync(tempPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  renameSync(tempPath, filePath);
+}
+
+function persistRunState(options, state, lifecycle = null) {
+  state.updatedAt = new Date().toISOString();
+  if (lifecycle) state.lifecycle = Object.fromEntries(lifecycle.map((step) => [step.name, step.status]));
+  writeJsonAtomic(runStatePath(options.repoRoot, options.runRoot, state.runId), state);
+}
+
+function readRunState(options, runId) {
+  const statePath = runStatePath(options.repoRoot, options.runRoot, runId);
+  if (!existsSync(statePath)) return null;
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  if (state.schemaVersion !== runStateSchemaVersion || state.runId !== runId) {
+    throw new Error(`unsupported or mismatched run state: ${repoRelative(options.repoRoot, statePath)}`);
+  }
+  return state;
+}
+
+function isTerminalRun(state) {
+  return ["merged", "closed", "checkpointed", "no_changes"].includes(state.status);
+}
+
+function recordedNonterminalRuns(options) {
+  const root = path.resolve(options.repoRoot, options.runRoot);
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => readRunState(options, entry.name))
+    .filter((state) => state && !isTerminalRun(state));
+}
+
+function refSha(repoRoot, ref) {
+  try {
+    return git(repoRoot, ["rev-parse", "--verify", `${ref}^{commit}`]).trim();
+  } catch {
+    return null;
+  }
+}
+
+function safeRunName(runId) {
+  return runId.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function namesForRun(options, runId) {
+  const suffix = safeRunName(runId);
+  return {
+    branch: options.sweepBranch === defaultSweepBranch ? `zvorygin/docdrift-sweep-${suffix}` : options.sweepBranch,
+    worktree:
+      options.sweepWorktree === defaultSweepWorktree
+        ? `.docdrift/worktrees/docdrift-sweep-${suffix}`
+        : options.sweepWorktree,
+  };
+}
+
+function hasGitOperation(worktreePath) {
+  const gitDir = git(worktreePath, ["rev-parse", "--git-dir"]);
+  const absoluteGitDir = path.resolve(worktreePath, gitDir);
+  return ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply"].some((name) =>
+    existsSync(path.join(absoluteGitDir, name)),
+  );
+}
+
+function assertCleanWorktree(worktreePath, branch) {
+  const actualBranch = git(worktreePath, ["branch", "--show-current"]);
+  const dirt = statusShort(worktreePath);
+  if (actualBranch !== branch || dirt || hasGitOperation(worktreePath)) {
+    throw new Error(
+      `unsafe sweep worktree branch=${actualBranch || "(detached)"} expected=${branch} status=${JSON.stringify(dirt || "clean")} operation=${hasGitOperation(worktreePath) ? "in-progress" : "none"}`,
+    );
+  }
+}
+
+function lookupOwnedPr(options, branch) {
+  const ghCommand = process.env.DOC_DRIFT_GH_COMMAND || "gh";
+  const output = execFileSync(ghCommand, [
+    "pr", "list", "--head", branch, "--state", "all", "--json",
+    "number,url,state,mergeStateStatus,headRefOid,headRefName,mergedAt",
+  ], { cwd: options.repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const matches = JSON.parse(output).filter((pr) => pr.headRefName === branch);
+  if (matches.length > 1) {
+    throw new Error(`ambiguous PR matches for ${branch}: ${matches.map((pr) => `#${pr.number}`).join(", ")}`);
+  }
+  return matches[0] ?? null;
+}
+
+function newRunState(options, runId, baseSha, headSha) {
+  const names = namesForRun(options, runId);
+  return {
+    schemaVersion: runStateSchemaVersion,
+    runId,
+    status: "initialized",
+    baseSha,
+    headSha,
+    branch: names.branch,
+    worktree: names.worktree,
+    generatedHeadSha: null,
+    pr: null,
+    checkpointTarget: null,
+    recoveryAction: "created_fresh_run",
+    lifecycle: {},
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function validateRecordedRefs(options, state, pr) {
+  const local = refSha(options.repoRoot, `refs/heads/${state.branch}`);
+  const remote = refSha(options.repoRoot, `refs/remotes/origin/${state.branch}`);
+  const expected = state.generatedHeadSha ?? state.headSha;
+  let localCanFastForward = false;
+  if (local && remote === expected && local !== remote) {
+    try {
+      git(options.repoRoot, ["merge-base", "--is-ancestor", local, remote], { stdio: "ignore" });
+      localCanFastForward = true;
+    } catch {}
+  }
+  if ((local && local !== expected && !localCanFastForward) || (remote && remote !== expected) || (pr?.headRefOid && pr.headRefOid !== expected)) {
+    throw new Error(`run/head mismatch branch=${state.branch} expected=${expected} local=${local ?? "missing"} remote=${remote ?? "missing"} pr=${pr?.headRefOid ?? "missing"}`);
+  }
+  return { local, remote, expected, localCanFastForward };
 }
 
 function branchExists(repoRoot, branch) {
@@ -1619,35 +1762,52 @@ function statusShort(repoRoot, pathspecs = []) {
   return git(repoRoot, args);
 }
 
-function ensureSweepWorktree(options, lifecycle, headSha) {
-  const worktreePath = path.resolve(options.repoRoot, options.sweepWorktree);
+function ensureSweepWorktree(options, lifecycle, state) {
+  const worktreePath = path.resolve(options.repoRoot, state.worktree);
   mkdirSync(path.dirname(worktreePath), { recursive: true });
+  const onChange = () => persistRunState(options, state, lifecycle);
 
   if (existsSync(worktreePath)) {
     const topLevel = git(worktreePath, ["rev-parse", "--show-toplevel"]);
-    if (path.resolve(topLevel) !== worktreePath) {
+    if (realpathSync(topLevel) !== realpathSync(worktreePath)) {
       throw new Error(`sweep worktree path is not its own checkout: ${worktreePath}`);
     }
     const branch = git(worktreePath, ["branch", "--show-current"]);
-    if (branch !== options.sweepBranch) {
-      throw new Error(`sweep worktree is on ${branch || "(detached)"}, expected ${options.sweepBranch}`);
+    assertCleanWorktree(worktreePath, state.branch);
+    const actualHead = git(worktreePath, ["rev-parse", "HEAD"]);
+    const expected = state.generatedHeadSha ?? state.headSha;
+    if (actualHead !== expected) {
+      const remote = refSha(options.repoRoot, `refs/remotes/origin/${state.branch}`);
+      if (remote !== expected) throw new Error(`worktree head mismatch branch=${state.branch} expected=${expected} actual=${actualHead}`);
+      runLifecycleCommand(lifecycle, worktreePath, "fast-forward recorded sweep worktree", "git", ["merge", "--ff-only", expected], { onChange });
     }
-    const dirt = statusShort(worktreePath);
-    if (dirt) {
-      throw new Error(`sweep worktree has uncommitted changes; recover or remove ${worktreePath}`);
-    }
-    runLifecycleCommand(lifecycle, worktreePath, "fast-forward sweep worktree", "git", ["merge", "--ff-only", headSha]);
     return worktreePath;
   }
 
-  if (branchExists(options.repoRoot, options.sweepBranch)) {
+  if (branchExists(options.repoRoot, state.branch)) {
     runLifecycleCommand(lifecycle, options.repoRoot, "reuse sweep branch worktree", "git", [
       "worktree",
       "add",
       worktreePath,
-      options.sweepBranch,
-    ]);
-    runLifecycleCommand(lifecycle, worktreePath, "fast-forward sweep worktree", "git", ["merge", "--ff-only", headSha]);
+      state.branch,
+    ], { onChange });
+    assertCleanWorktree(worktreePath, state.branch);
+    const actualHead = git(worktreePath, ["rev-parse", "HEAD"]);
+    const expected = state.generatedHeadSha ?? state.headSha;
+    if (actualHead !== expected) {
+      const remote = refSha(options.repoRoot, `refs/remotes/origin/${state.branch}`);
+      if (remote !== expected) throw new Error(`local-only branch mismatch branch=${state.branch} expected=${expected} local=${actualHead}`);
+      runLifecycleCommand(lifecycle, worktreePath, "fast-forward recorded sweep worktree", "git", ["merge", "--ff-only", expected], { onChange });
+    }
+    return worktreePath;
+  }
+
+  const remote = refSha(options.repoRoot, `refs/remotes/origin/${state.branch}`);
+  if (remote) {
+    const expected = state.generatedHeadSha ?? state.headSha;
+    if (remote !== expected) throw new Error(`remote-only branch mismatch branch=${state.branch} expected=${expected} remote=${remote}`);
+    runLifecycleCommand(lifecycle, options.repoRoot, "recreate local sweep branch", "git", ["branch", state.branch, remote], { onChange });
+    runLifecycleCommand(lifecycle, options.repoRoot, "recreate sweep worktree", "git", ["worktree", "add", worktreePath, state.branch], { onChange });
     return worktreePath;
   }
 
@@ -1656,10 +1816,38 @@ function ensureSweepWorktree(options, lifecycle, headSha) {
     "add",
     worktreePath,
     "-b",
-    options.sweepBranch,
-    headSha,
-  ]);
+    state.branch,
+    state.headSha,
+  ], { onChange });
+  state.status = "branch_ready";
+  persistRunState(options, state, lifecycle);
   return worktreePath;
+}
+
+function recordRecoveryFailure(options, error) {
+  if (!options.full) return;
+  let state = options.runId ? readRunState(options, options.runId) : null;
+  if (!state) {
+    const candidates = recordedNonterminalRuns(options);
+    if (candidates.length === 1) state = candidates[0];
+  }
+  if (!state) return;
+  state.recoveryAction = "stopped_for_operator_review";
+  state.lastError = error.message;
+  persistRunState(options, state);
+  const dir = fullRunDir(options, state.runId);
+  writeJsonAtomic(path.join(dir, "docdrift-recovery-failure.json"), {
+    version: 1,
+    runId: state.runId,
+    branch: state.branch,
+    worktree: state.worktree,
+    generatedHeadSha: state.generatedHeadSha,
+    pr: state.pr,
+    checkpointTarget: state.checkpointTarget,
+    recoveryAction: state.recoveryAction,
+    error: error.message,
+    updatedAt: state.updatedAt,
+  });
 }
 
 function parseAgentPrOutput(output) {
@@ -1671,6 +1859,72 @@ function parseAgentPrOutput(output) {
     number: Number.parseInt(match[1], 10),
     url: match[2],
   };
+}
+
+function adoptLegacyRun(options) {
+  const local = refSha(options.repoRoot, `refs/heads/${legacySweepBranch}`);
+  const remote = refSha(options.repoRoot, `refs/remotes/origin/${legacySweepBranch}`);
+  const worktreePath = path.resolve(options.repoRoot, defaultSweepWorktree);
+  if (!local && !remote && !existsSync(worktreePath)) return null;
+  if (!local || !remote || !existsSync(worktreePath)) {
+    throw new Error(`legacy adoption requires local, remote, and worktree heads: branch=${legacySweepBranch} local=${local ?? "missing"} remote=${remote ?? "missing"} worktree=${existsSync(worktreePath) ? "present" : "missing"}`);
+  }
+  assertCleanWorktree(worktreePath, legacySweepBranch);
+  const worktreeHead = git(worktreePath, ["rev-parse", "HEAD"]);
+  if (local !== remote || local !== worktreeHead) {
+    throw new Error(`legacy head mismatch branch=${legacySweepBranch} local=${local} remote=${remote} worktree=${worktreeHead}`);
+  }
+  const pr = lookupOwnedPr(options, legacySweepBranch);
+  if (!pr || !["CLOSED", "MERGED"].includes(pr.state) || pr.headRefOid !== local) {
+    throw new Error(`legacy adoption requires exactly one terminal PR with exact head: branch=${legacySweepBranch} head=${local} pr=${pr ? `#${pr.number}/${pr.state}/${pr.headRefOid}` : "missing"}`);
+  }
+  if (!local.startsWith(legacyKnownHeadPrefix) && !options.adoptLegacy) {
+    throw new Error(`legacy head ${local} is not the known ${legacyKnownHeadPrefix} fixture; rerun with --adopt-legacy after operator review`);
+  }
+  const runId = `legacy-docdrift-sweep-${local.slice(0, 12)}`;
+  const existing = readRunState(options, runId);
+  if (existing) return existing;
+  const state = {
+    schemaVersion: runStateSchemaVersion,
+    runId,
+    status: pr.state === "MERGED" ? "merged" : "closed",
+    baseSha: null,
+    headSha: local,
+    branch: legacySweepBranch,
+    worktree: defaultSweepWorktree,
+    generatedHeadSha: local,
+    pr: {
+      number: pr.number,
+      url: pr.url,
+      state: pr.state,
+      mergeStateStatus: pr.mergeStateStatus ?? null,
+      headSha: pr.headRefOid,
+    },
+    checkpointTarget: null,
+    recoveryAction: "adopted_terminal_legacy_run",
+    lifecycle: {},
+    updatedAt: new Date().toISOString(),
+  };
+  persistRunState(options, state);
+  return state;
+}
+
+function selectRecordedRun(options) {
+  if (options.runId) return readRunState(options, options.runId);
+  const candidates = recordedNonterminalRuns(options);
+  if (candidates.length > 1) {
+    throw new Error(`multiple nonterminal docdrift runs: ${candidates.map((state) => `${state.runId}:${state.branch}`).join(", ")}; pass --run-id`);
+  }
+  return candidates[0] ?? null;
+}
+
+function assertFreshRunTargets(options, state) {
+  const worktreePath = path.resolve(options.repoRoot, state.worktree);
+  const local = refSha(options.repoRoot, `refs/heads/${state.branch}`);
+  const remote = refSha(options.repoRoot, `refs/remotes/origin/${state.branch}`);
+  if (local || remote || existsSync(worktreePath)) {
+    throw new Error(`new run target collision run=${state.runId} branch=${state.branch} local=${local ?? "missing"} remote=${remote ?? "missing"} worktree=${existsSync(worktreePath) ? worktreePath : "missing"}`);
+  }
 }
 
 function checkpointAdvanceTarget(report, sweepHeadSha) {
@@ -1696,7 +1950,7 @@ function partialCheckpointTarget(report) {
   return report.commits[failedIndex - 1].sha;
 }
 
-function fullReport({ options, runId, runDir, lifecycle, collectionReport, generatedReport, action, checkpointAfter, pr, sweepHeadSha }) {
+function fullReport({ options, runId, runDir, lifecycle, collectionReport, generatedReport, action, checkpointAfter, pr, sweepHeadSha, state = null }) {
   const sourceReport = generatedReport ?? collectionReport;
   return {
     version: 1,
@@ -1715,8 +1969,9 @@ function fullReport({ options, runId, runDir, lifecycle, collectionReport, gener
     lifecycle,
     sweep: {
       action,
-      branch: options.sweepBranch,
-      worktree: repoRelative(options.repoRoot, path.resolve(options.repoRoot, options.sweepWorktree)),
+      recoveryAction: state?.recoveryAction ?? (options.dryRun ? "preview_only" : null),
+      branch: state?.branch ?? options.sweepBranch,
+      worktree: repoRelative(options.repoRoot, path.resolve(options.repoRoot, state?.worktree ?? options.sweepWorktree)),
       headSha: sweepHeadSha ?? null,
       prNumber: pr?.number ?? null,
       prUrl: pr?.url ?? null,
@@ -1779,7 +2034,7 @@ function plannedFullLifecycle(options) {
 }
 
 export function runFullSweep(options) {
-  const runId = options.runId ?? timestampRunId();
+  let runId = options.runId ?? timestampRunId();
   const runDir = fullRunDir(options, runId);
   mkdirSync(runDir, { recursive: true });
 
@@ -1803,13 +2058,113 @@ export function runFullSweep(options) {
 
   const lifecycle = [];
   runLifecycleCommand(lifecycle, options.repoRoot, "fetch origin/main", "git", ["fetch", "origin", "main"]);
-  const collectionReport = buildReport(options);
+  let state = selectRecordedRun(options);
+  let recoveryAction = null;
+  let terminalRunId = null;
+  if (!state) {
+    const legacy = adoptLegacyRun(options);
+    if (legacy) recoveryAction = legacy.status === "merged" ? "created_fresh_run_after_merged_legacy" : "created_fresh_run_after_closed_legacy";
+  }
+
+  if (state) {
+    const pr = lookupOwnedPr(options, state.branch);
+    const refs = validateRecordedRefs(options, state, pr);
+    if (!refs.local && !refs.remote && (state.status !== "initialized" || state.generatedHeadSha || state.pr)) {
+      throw new Error(`recorded branch is missing locally and remotely: run=${state.runId} branch=${state.branch} expected=${refs.expected}`);
+    }
+    if (pr) {
+      state.pr = {
+        number: pr.number,
+        url: pr.url,
+        state: pr.state,
+        mergeStateStatus: pr.mergeStateStatus ?? null,
+        headSha: pr.headRefOid,
+      };
+    } else if (state.pr) {
+      throw new Error(`recorded PR #${state.pr.number} is no longer the unique PR match for ${state.branch}`);
+    }
+    if (pr?.state === "OPEN" && ["DIRTY", "CONFLICTING"].includes(pr.mergeStateStatus)) {
+      throw new Error(`open PR is conflicted: branch=${state.branch} head=${refs.expected} pr=#${pr.number} mergeStateStatus=${pr.mergeStateStatus}`);
+    }
+    if (pr?.state === "CLOSED") {
+      state.status = "closed";
+      state.recoveryAction = "preserved_closed_unmerged_run";
+      persistRunState(options, state, lifecycle);
+      recoveryAction = "created_fresh_run_after_closed_unmerged";
+      terminalRunId = state.runId;
+      state = null;
+    } else if (pr?.state === "MERGED") {
+      state.status = "merged";
+      state.recoveryAction = "completed_merged_run";
+      if (state.checkpointTarget) {
+        writeCheckpointAtomic(options.repoRoot, options.checkpointFile, state.checkpointTarget);
+        state.status = "checkpointed";
+      }
+      persistRunState(options, state, lifecycle);
+      recoveryAction = "created_fresh_run_after_merged";
+      terminalRunId = state.runId;
+      state = null;
+    } else if (pr?.state === "OPEN") {
+      state.recoveryAction = "resumed_open_pr";
+      persistRunState(options, state, lifecycle);
+      const worktreePath = ensureSweepWorktree(options, lifecycle, state);
+      const waitCommand = process.env.DOC_DRIFT_WAIT_PR_COMMAND || path.join(worktreePath, "scripts", "wait-pr.sh");
+      runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", waitCommand, [String(pr.number)], {
+        onChange: () => persistRunState(options, state, lifecycle),
+      });
+      const checkpointPath = state.checkpointTarget
+        ? writeCheckpointAtomic(options.repoRoot, options.checkpointFile, state.checkpointTarget)
+        : null;
+      state.status = state.checkpointTarget ? "checkpointed" : "merged";
+      state.pr.state = "MERGED";
+      persistRunState(options, state, lifecycle);
+      const resumedOptions = { ...options, base: state.baseSha, head: state.headSha };
+      const collectionReport = buildReport(resumedOptions);
+      const generatedPath = path.join(fullRunDir(options, state.runId), "docdrift-generate.json");
+      const generatedReport = existsSync(generatedPath) ? JSON.parse(readFileSync(generatedPath, "utf8")) : null;
+      const report = fullReport({
+        options,
+        runId: state.runId,
+        runDir: fullRunDir(options, state.runId),
+        lifecycle,
+        collectionReport,
+        generatedReport,
+        action: "resumed_open_pr_merged",
+        checkpointAfter: checkpointPath ? { path: checkpointPath, sha: state.checkpointTarget } : null,
+        pr: state.pr,
+        sweepHeadSha: state.generatedHeadSha,
+        state,
+      });
+      writeOutputs(report, fullRunDir(options, state.runId));
+      return report;
+    } else {
+      state.recoveryAction = "resumed_recorded_pre_pr_run";
+      persistRunState(options, state, lifecycle);
+    }
+  }
+
+  let collectionOptions = options;
+  if (state) collectionOptions = { ...options, base: state.baseSha, head: state.headSha };
+  const collectionReport = buildReport(collectionOptions);
+
+  if (!state) {
+    runId = terminalRunId ? `${terminalRunId}-next-${timestampRunId()}` : options.runId ?? timestampRunId();
+    state = newRunState(options, runId, collectionReport.base.sha, collectionReport.head.sha);
+    state.recoveryAction = recoveryAction ?? "created_fresh_run";
+    assertFreshRunTargets(options, state);
+    persistRunState(options, state, lifecycle);
+  }
+  const activeRunDir = fullRunDir(options, state.runId);
+  mkdirSync(activeRunDir, { recursive: true });
 
   if (collectionReport.summary.noCommits) {
+    state.status = "no_changes";
+    state.recoveryAction = recoveryAction ?? state.recoveryAction;
+    persistRunState(options, state, lifecycle);
     const report = fullReport({
       options,
-      runId,
-      runDir,
+      runId: state.runId,
+      runDir: activeRunDir,
       lifecycle,
       collectionReport,
       generatedReport: null,
@@ -1817,17 +2172,21 @@ export function runFullSweep(options) {
       checkpointAfter: null,
       pr: null,
       sweepHeadSha: null,
+      state,
     });
-    writeOutputs(report, runDir);
+    writeOutputs(report, activeRunDir);
     return report;
   }
 
   if (collectionReport.summary.consideredCommits === 0) {
     const checkpointPath = writeCheckpointAtomic(options.repoRoot, options.checkpointFile, collectionReport.head.sha);
+    state.status = "checkpointed";
+    state.checkpointTarget = collectionReport.head.sha;
+    persistRunState(options, state, lifecycle);
     const report = fullReport({
       options,
-      runId,
-      runDir,
+      runId: state.runId,
+      runDir: activeRunDir,
       lifecycle,
       collectionReport,
       generatedReport: null,
@@ -1835,12 +2194,14 @@ export function runFullSweep(options) {
       checkpointAfter: { path: checkpointPath, sha: collectionReport.head.sha },
       pr: null,
       sweepHeadSha: null,
+      state,
     });
-    writeOutputs(report, runDir);
+    writeOutputs(report, activeRunDir);
     return report;
   }
 
-  const worktreePath = ensureSweepWorktree(options, lifecycle, collectionReport.head.sha);
+  validateRecordedRefs(options, state, null);
+  const worktreePath = ensureSweepWorktree(options, lifecycle, state);
   const sweepOptions = {
     ...options,
     base: collectionReport.base.sha,
@@ -1851,18 +2212,70 @@ export function runFullSweep(options) {
     outDir: null,
     repoRoot: worktreePath,
   };
-  let generatedReport = classifyReport(buildReport(sweepOptions), sweepOptions);
-  generatedReport = generateDocsReport(generatedReport, sweepOptions);
-  writeOutputs(generatedReport, runDir);
+  let generatedReport;
+  const generatedPath = path.join(activeRunDir, "docdrift-generate.json");
+  if (state.generatedHeadSha && existsSync(generatedPath)) {
+    generatedReport = JSON.parse(readFileSync(generatedPath, "utf8"));
+  } else {
+    generatedReport = classifyReport(buildReport(sweepOptions), sweepOptions);
+    generatedReport = generateDocsReport(generatedReport, sweepOptions);
+    writeOutputs(generatedReport, activeRunDir);
+    state.status = "generated";
+    persistRunState(options, state, lifecycle);
+  }
+
+  if (state.generatedHeadSha && ["committed", "pushed"].includes(state.status)) {
+    const onStateChange = () => persistRunState(options, state, lifecycle);
+    if (state.status === "committed") {
+      runLifecycleCommand(lifecycle, worktreePath, "push sweep branch", "git", ["push", "-u", "origin", state.branch], { onChange: onStateChange });
+      state.status = "pushed";
+      persistRunState(options, state, lifecycle);
+    }
+    const existingPr = lookupOwnedPr(options, state.branch);
+    if (existingPr) throw new Error(`recorded pre-PR run unexpectedly matches PR #${existingPr.number}; rerun for exact PR reconciliation`);
+    const bodyPath = writeFullPrBody(
+      path.join(activeRunDir, "docdrift-pr-body.md"),
+      generatedReport,
+      repoRelative(options.repoRoot, generatedPath),
+    );
+    const agentPrCommand = process.env.DOC_DRIFT_AGENT_PR_COMMAND || path.join(worktreePath, "scripts", "agent-pr.sh");
+    const agentOutput = runLifecycleCommand(lifecycle, worktreePath, "open or update owned PR", agentPrCommand, [
+      "--title", options.prTitle,
+      "--verification", `node scripts/docdrift-sweep.mjs --generate-docs report ${repoRelative(options.repoRoot, generatedPath)}`,
+      "--label", "docdrift-sweep", "--body-file", bodyPath,
+    ], { onChange: onStateChange });
+    const pr = parseAgentPrOutput(agentOutput);
+    state.pr = { ...pr, state: "OPEN", mergeStateStatus: null, headSha: state.generatedHeadSha };
+    state.status = "pr_open";
+    persistRunState(options, state, lifecycle);
+    const waitCommand = process.env.DOC_DRIFT_WAIT_PR_COMMAND || path.join(worktreePath, "scripts", "wait-pr.sh");
+    runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", waitCommand, [String(pr.number)], { onChange: onStateChange });
+    const checkpointSha = state.checkpointTarget;
+    const checkpointPath = checkpointSha ? writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha) : null;
+    state.status = checkpointSha ? "checkpointed" : "merged";
+    state.pr.state = "MERGED";
+    persistRunState(options, state, lifecycle);
+    const report = fullReport({
+      options, runId: state.runId, runDir: activeRunDir, lifecycle, collectionReport, generatedReport,
+      action: "resumed_pre_pr_run_merged",
+      checkpointAfter: checkpointPath ? { path: checkpointPath, sha: checkpointSha } : null,
+      pr: state.pr, sweepHeadSha: state.generatedHeadSha, state,
+    });
+    writeOutputs(report, activeRunDir);
+    return report;
+  }
 
   const docsDirt = statusShort(worktreePath, ["docs/design", "docs/context"]);
   if (!docsDirt) {
     const checkpointSha = checkpointAdvanceTarget(generatedReport, null);
     const checkpointPath = checkpointSha ? writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha) : null;
+    state.status = checkpointSha ? "checkpointed" : "no_changes";
+    state.checkpointTarget = checkpointSha;
+    persistRunState(options, state, lifecycle);
     const report = fullReport({
       options,
-      runId,
-      runDir,
+      runId: state.runId,
+      runDir: activeRunDir,
       lifecycle,
       collectionReport,
       generatedReport,
@@ -1874,12 +2287,14 @@ export function runFullSweep(options) {
       checkpointAfter: checkpointSha ? { path: checkpointPath, sha: checkpointSha } : null,
       pr: null,
       sweepHeadSha: null,
+      state,
     });
-    writeOutputs(report, runDir);
+    writeOutputs(report, activeRunDir);
     return report;
   }
 
-  runLifecycleCommand(lifecycle, worktreePath, "stage docs changes", "git", ["add", "docs/design", "docs/context"]);
+  const onStateChange = () => persistRunState(options, state, lifecycle);
+  runLifecycleCommand(lifecycle, worktreePath, "stage docs changes", "git", ["add", "docs/design", "docs/context"], { onChange: onStateChange });
   runLifecycleCommand(lifecycle, worktreePath, "commit docs changes", "git", [
     "commit",
     "-m",
@@ -1893,35 +2308,50 @@ export function runFullSweep(options) {
       generatedReport.docPatch?.summary?.skipped
         ? `Skipped doc-patch decisions: ${generatedReport.docPatch.summary.skipped}`
         : null,
-      `Report: ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
+      `Report: ${repoRelative(options.repoRoot, activeRunDir)}/docdrift-generate.json`,
     ]
       .filter(Boolean)
       .join("\n\n"),
-  ]);
+  ], { onChange: onStateChange });
   const sweepHeadSha = git(worktreePath, ["rev-parse", "HEAD"]);
-  runLifecycleCommand(lifecycle, worktreePath, "push sweep branch", "git", ["push", "-u", "origin", options.sweepBranch]);
+  state.generatedHeadSha = sweepHeadSha;
+  state.checkpointTarget = checkpointAdvanceTarget(generatedReport, sweepHeadSha);
+  state.status = "committed";
+  persistRunState(options, state, lifecycle);
+  runLifecycleCommand(lifecycle, worktreePath, "push sweep branch", "git", ["push", "-u", "origin", state.branch], { onChange: onStateChange });
+  state.status = "pushed";
+  persistRunState(options, state, lifecycle);
 
   const bodyPath = writeFullPrBody(
-    path.join(runDir, "docdrift-pr-body.md"),
+    path.join(activeRunDir, "docdrift-pr-body.md"),
     generatedReport,
-    repoRelative(options.repoRoot, path.join(runDir, "docdrift-generate.json")),
+    repoRelative(options.repoRoot, path.join(activeRunDir, "docdrift-generate.json")),
   );
-  const agentOutput = runLifecycleCommand(lifecycle, worktreePath, "open or update owned PR", path.join(worktreePath, "scripts", "agent-pr.sh"), [
+  const agentPrCommand = process.env.DOC_DRIFT_AGENT_PR_COMMAND || path.join(worktreePath, "scripts", "agent-pr.sh");
+  const agentOutput = runLifecycleCommand(lifecycle, worktreePath, "open or update owned PR", agentPrCommand, [
     "--title",
     options.prTitle,
     "--verification",
-    `node scripts/docdrift-sweep.mjs --generate-docs report ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
+    `node scripts/docdrift-sweep.mjs --generate-docs report ${repoRelative(options.repoRoot, activeRunDir)}/docdrift-generate.json`,
     "--label", "docdrift-sweep", "--body-file", bodyPath,
-  ]);
+  ], { onChange: onStateChange });
   const pr = parseAgentPrOutput(agentOutput);
-  runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", path.join(worktreePath, "scripts", "wait-pr.sh"), [String(pr.number)]);
+  state.pr = { ...pr, state: "OPEN", mergeStateStatus: null, headSha: sweepHeadSha };
+  state.status = "pr_open";
+  persistRunState(options, state, lifecycle);
+  const waitCommand = process.env.DOC_DRIFT_WAIT_PR_COMMAND || path.join(worktreePath, "scripts", "wait-pr.sh");
+  runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", waitCommand, [String(pr.number)], { onChange: onStateChange });
 
   const checkpointSha = checkpointAdvanceTarget(generatedReport, sweepHeadSha);
   const checkpointPath = checkpointSha ? writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha) : null;
+  state.status = checkpointSha ? "checkpointed" : "merged";
+  state.pr.state = "MERGED";
+  state.checkpointTarget = checkpointSha;
+  persistRunState(options, state, lifecycle);
   const report = fullReport({
     options,
-    runId,
-    runDir,
+    runId: state.runId,
+    runDir: activeRunDir,
     lifecycle,
     collectionReport,
     generatedReport,
@@ -1933,8 +2363,9 @@ export function runFullSweep(options) {
     checkpointAfter: checkpointSha ? { path: checkpointPath, sha: checkpointSha } : null,
     pr,
     sweepHeadSha,
+    state,
   });
-  writeOutputs(report, runDir);
+  writeOutputs(report, activeRunDir);
   return report;
 }
 
@@ -1978,6 +2409,11 @@ function main() {
       process.exitCode = 1;
     }
   } catch (error) {
+    try {
+      recordRecoveryFailure(options, error);
+    } catch (recordError) {
+      console.error(`docdrift recovery failure report failed: ${recordError.message}`);
+    }
     console.error(`docdrift sweep failed: ${error.message}`);
     process.exit(1);
   }

@@ -21,6 +21,8 @@ export const INITIAL_CONNECT_TIMEOUT_MS = 3000;
 const SNAPSHOT_BYTE_SOURCE = "messagepack-application-payload";
 const WEBSOCKET_COMPRESSION_NONE = "none";
 const WEBSOCKET_COMPRESSION_PERMESSAGE_DEFLATE = "permessage-deflate";
+const SUBSCRIBER_FAILURE_SIGNATURE_LIMIT = 32;
+const SUBSCRIBER_EVENT_TYPE_LIMIT = 64;
 
 const SNAPSHOT_BYTE_BUCKETS = Object.freeze([
   512,
@@ -70,6 +72,12 @@ export class Net {
     this._connected = false;
     /** @type {Map<string, Set<Function>>} type -> handlers */
     this._handlers = new Map();
+    /** Weak identity keeps unsubscribed handlers collectible. */
+    this._subscriberHandlerIds = new WeakMap();
+    this._nextSubscriberHandlerId = 1;
+    /** Bounded, payload-independent signatures already reported by this instance. */
+    this._reportedSubscriberFailureSignatures = new Set();
+    this._subscriberFailureReportingSaturated = false;
     /** @type {number|null} our assigned player id, set on `welcome`. */
     this._playerId = null;
     /** Most recently measured round-trip latency in ms (null until first pong). */
@@ -215,6 +223,10 @@ export class Net {
       set = new Set();
       this._handlers.set(type, set);
     }
+    if (!this._subscriberHandlerIds.has(handler)) {
+      this._subscriberHandlerIds.set(handler, this._nextSubscriberHandlerId);
+      this._nextSubscriberHandlerId += 1;
+    }
     set.add(handler);
   }
 
@@ -239,6 +251,11 @@ export class Net {
    */
   join(name, room, spectator = false, replayOk = false) {
     this._send(msg.join(name, room, spectator, replayOk));
+  }
+
+  /** Update our display name while waiting in the lobby. */
+  setName(name) {
+    this._send(msg.setName(name));
   }
 
   /**
@@ -343,6 +360,11 @@ export class Net {
    */
   netReport(report) {
     this._send(msg.netReport(report));
+  }
+
+  /** Report recent human input separately from automatic connection traffic. */
+  activity() {
+    return this._send(msg.activity());
   }
 
   createSnapshotReportStats() {
@@ -597,8 +619,51 @@ export class Net {
       try {
         handler(payload);
       } catch (err) {
-        // Isolate handler exceptions so one bad subscriber cannot break dispatch.
+        this._reportSubscriberFailure(type, handler, err);
       }
+    }
+  }
+
+  _reportSubscriberFailure(type, handler, thrown) {
+    try {
+      const eventType = typeof type === "string"
+        ? type.slice(0, SUBSCRIBER_EVENT_TYPE_LIMIT)
+        : "unknown";
+      const thrownValueClass = thrown instanceof Error ? "Error" : "NonError";
+      const handlerId = this._subscriberHandlerIds.get(handler);
+      const signature = JSON.stringify([eventType, thrownValueClass, handlerId]);
+      if (this._reportedSubscriberFailureSignatures.has(signature)) return;
+
+      if (this._reportedSubscriberFailureSignatures.size >= SUBSCRIBER_FAILURE_SIGNATURE_LIMIT) {
+        if (this._subscriberFailureReportingSaturated) return;
+        this._subscriberFailureReportingSaturated = true;
+        try {
+          console.error("[rts-net] subscriber failure reporting saturated");
+        } catch {
+          // Reporting must never interrupt subscriber delivery.
+        }
+        try {
+          this.diagnostics?.mark("net.subscriberFailure.reportingSaturated");
+        } catch {
+          // Diagnostics are optional and isolated from console reporting.
+        }
+        return;
+      }
+
+      this._reportedSubscriberFailureSignatures.add(signature);
+      const detail = Object.freeze({ eventType, thrownValueClass, handlerId });
+      try {
+        console.error("[rts-net] subscriber failure", detail);
+      } catch {
+        // Reporting must never interrupt subscriber delivery.
+      }
+      try {
+        this.diagnostics?.mark("net.subscriberFailure", detail);
+      } catch {
+        // Diagnostics are optional and isolated from console reporting.
+      }
+    } catch {
+      // Classification and bookkeeping are also untrusted failure boundaries.
     }
   }
 

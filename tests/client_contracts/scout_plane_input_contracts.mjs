@@ -9,6 +9,7 @@ import {
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import { HudSelectionPanel } from "../../client/src/hud_selection_panel.js";
 import { Minimap } from "../../client/src/minimap.js";
 import { ABILITY, KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
 import { _drawAbilityTargetPreview } from "../../client/src/renderer/feedback.js";
@@ -36,9 +37,10 @@ function startInfo() {
   };
 }
 
-function inputForState(state) {
+function inputForState(state, controlPolicy = null) {
   const input = Object.create(Input.prototype);
   input.state = state;
+  input.controlPolicy = controlPolicy;
   input.dom = { clientWidth: 400, clientHeight: 300 };
   input.selectionScene = buildSelectionScene({
     entities: state.entitiesInterpolated(1),
@@ -59,7 +61,7 @@ function commandInput(selected, entities) {
     entitiesInterpolated: () => entities,
     selectedEntities: () => selected,
   };
-  input.commandIssuer = {
+  input.commandInteraction = {
     issueCommand(command) {
       commands.push(command);
       return true;
@@ -166,7 +168,7 @@ function commandInput(selected, entities) {
     state: STATE.IDLE,
   };
   const labState = new GameState({ ...startInfo(), spectator: true });
-  labState.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
+  const controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
   labState.applySnapshot({
     tick: 0,
     steel: 0,
@@ -175,16 +177,19 @@ function commandInput(selected, entities) {
     supplyCap: 10,
     entities: [scoutPlane],
     events: [],
-  });
-  const labInput = inputForState(labState);
+  }, labState.visualNow(), { controlPolicy });
+  const labInput = inputForState(labState, controlPolicy);
   labInput._commitClickSelection({ x: 96, y: 96 }, false, false);
   assert(Array.from(labState.selection).join(",") === "5600", "lab operator can still click-select a Scout Plane for inspection");
   labState.clearSelection();
   labInput._commitBoxSelection({ x0: 70, y0: 70, x1: 120, y1: 120 }, false);
   assert(Array.from(labState.selection).join(",") === "5600", "lab operator can still box-select a Scout Plane for inspection");
-  labState.setSelection([scoutPlane.id]);
+  labState.setSelection([scoutPlane.id], { controlPolicy });
   assert(Array.from(labState.selection).join(",") === "5600", "lab selection admission preserves Scout Plane ids");
-  labState.setControlGroup(3, [scoutPlane.id]);
+  labState.clearSelection();
+  new HudSelectionPanel(null, labState, controlPolicy)._applySelectionClick(scoutPlane.id);
+  assert(Array.from(labState.selection).join(",") === "5600", "Lab HUD selection changes preserve inspectable Scout Planes");
+  labState.setControlGroup(3, [scoutPlane.id], { controlPolicy });
   assert(labState.controlGroups[3].join(",") === "5600", "lab control groups can store inspectable Scout Planes");
 }
 
@@ -199,7 +204,7 @@ function commandInput(selected, entities) {
   };
   minimap.clientIntent = new ClientIntent();
   minimap.clientIntent.beginCommandTarget("attack");
-  minimap._issueCommand = (command) => orders.push(command);
+  minimap.commandInteraction = { issueCommand: (command) => orders.push(command) };
   minimap._addCommandFeedback = () => {};
   minimap._issueOrder(512, 544, true);
   assert(
@@ -242,7 +247,7 @@ function commandInput(selected, entities) {
     selectedEntities: () => [rifleman, scoutPlane],
   };
   input.clientIntent = new ClientIntent();
-  input.commandIssuer = { issueCommand: (command) => commands.push(command) };
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
   input._groundAtScreen = (x, y) => ({ x, y });
   input._entityAtScreen = () => enemy;
   input._addCommandFeedback = () => {};

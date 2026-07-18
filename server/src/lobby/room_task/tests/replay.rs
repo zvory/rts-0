@@ -901,6 +901,46 @@ fn post_match_replay_join_prompts_before_attaching_viewer() {
 }
 
 #[test]
+fn confirmed_late_replay_join_receives_current_ended_state_immediately() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 3);
+    let mut replay = ReplaySession::new(artifact).unwrap();
+    let end_tick = replay.duration_ticks;
+    replay.rebuild_to(end_tick).unwrap();
+    let mut task = RoomTask::new(
+        "ended-post-match-replay-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.host_id = Some(50);
+    let _existing_writer = add_test_room_spectator(&mut task, 50);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(99, "Late Viewer".to_string(), true, true, msg_tx, ack);
+
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    assert!(matches!(
+        writer.reliable_rx.try_recv().unwrap(),
+        ServerMessage::Start(payload) if payload.spectator && payload.replay.is_some()
+    ));
+    assert!(matches!(
+        writer.reliable_rx.try_recv().unwrap(),
+        ServerMessage::RoomTimeState(state) if state.current_tick == end_tick && state.ended
+    ));
+    let snapshot = writer
+        .snapshots
+        .take()
+        .expect("late replay join should receive the current snapshot without another tick");
+    assert_eq!(snapshot.tick, end_tick);
+    let analysis = take_observer_analysis(&writer, "late ended replay join");
+    assert_eq!(analysis.tick, end_tick);
+}
+
+#[test]
 fn replay_viewer_return_detaches_only_requesting_viewer() {
     let players = replay_test_players(2);
     let (game, replay_start, _artifact) = replay_test_artifact_with_start(&players, 1);
@@ -913,12 +953,19 @@ fn replay_viewer_return_detaches_only_requesting_viewer() {
     );
     let _writer_a = add_test_room_player(&mut task, players[0].id, true);
     let writer_b = add_test_room_player(&mut task, players[1].id, true);
+    task.host_id = Some(players[0].id);
     task.match_player_count = 2;
     task.match_human_count = 2;
     task.replay_start = Some(replay_start);
 
     task.end_match(Some(players[0].id), game.scores(), Some(&game));
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+    let summary = task
+        .lobby_summary()
+        .expect("automatic post-match replay should remain joinable from the browser");
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.join_state, LobbyJoinState::InGame);
+    assert_eq!(summary.spectator_count, 2);
 
     task.on_return_to_lobby(players[0].id);
 

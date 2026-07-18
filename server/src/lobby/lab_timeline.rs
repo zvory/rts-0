@@ -246,21 +246,12 @@ impl LabTimeline {
             || old_keyframe_count != self.keyframes.len()
     }
 
-    pub(super) fn seek_back(
-        &mut self,
-        current_tick: u32,
-        ticks_back: u32,
-        replay_entry: impl FnMut(&mut Game, &LabTimelineEntry) -> Result<(), String>,
-    ) -> Result<LabTimelineSeek, String> {
-        let target_tick = current_tick.saturating_sub(ticks_back);
-        self.seek_to(current_tick, target_tick, replay_entry)
-    }
-
-    pub(super) fn seek_to(
+    pub(super) fn reconstruct_to(
         &mut self,
         current_tick: u32,
         target_tick: u32,
         mut replay_entry: impl FnMut(&mut Game, &LabTimelineEntry) -> Result<(), String>,
+        after_candidate_reconstruction: impl FnOnce(&mut Game) -> Result<(), String>,
     ) -> Result<LabTimelineSeek, String> {
         if self
             .last_seek_at
@@ -308,15 +299,19 @@ impl LabTimeline {
         while game.tick_count() < target_tick {
             game.tick();
         }
+        after_candidate_reconstruction(&mut game)?;
 
-        self.reconstructed_through_tick = Some(target_tick);
-        self.last_seek_at = Some(StdInstant::now());
         Ok(LabTimelineSeek {
             target_tick,
             keyframe_tick,
             game,
             rebuild_ms: rebuild_start.elapsed().as_millis(),
         })
+    }
+
+    pub(super) fn commit_seek(&mut self, target_tick: u32) {
+        self.reconstructed_through_tick = Some(target_tick);
+        self.last_seek_at = Some(StdInstant::now());
     }
 
     #[cfg(test)]
@@ -409,6 +404,7 @@ impl LabTimeline {
 mod tests {
     use super::*;
     use crate::lab_scenarios::export_lab_checkpoint_scenario_for_protocol;
+    use crate::lobby::reconstruction::contain_reconstruction;
     use crate::protocol::{LabScenarioLabMetadata, LabVisionMode, DEFAULT_FACTION_ID};
     use rts_sim::game::PlayerInit;
 
@@ -480,5 +476,50 @@ mod tests {
             timeline.duration_ticks(game.tick_count()),
             LabTimeline::KEYFRAME_INTERVAL_TICKS
         );
+    }
+
+    #[test]
+    fn lab_seek_error_and_panic_leave_timeline_uncommitted_and_usable() {
+        let mut game = test_game();
+        let mut timeline = LabTimeline::new(&game, test_initial_setup(&game));
+        game.tick();
+
+        let error = match contain_reconstruction("lab seek", || {
+            timeline.reconstruct_to(
+                1,
+                0,
+                |_game, _entry| Ok(()),
+                |_| Err("injected lab seek error".to_string()),
+            )
+        }) {
+            Ok(_) => panic!("injected lab seek error should fail"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("injected lab seek error"));
+        assert_eq!(timeline.reconstructed_through_tick, None);
+        assert_eq!(timeline.last_seek_at, None);
+
+        let panic = match contain_reconstruction("lab seek", || {
+            timeline.reconstruct_to(
+                1,
+                0,
+                |_game, _entry| Ok(()),
+                |_| panic!("injected lab seek panic"),
+            )
+        }) {
+            Ok(_) => panic!("injected lab seek panic should fail"),
+            Err(error) => error,
+        };
+        assert!(panic.to_string().contains("internal panic"));
+        assert_eq!(timeline.reconstructed_through_tick, None);
+        assert_eq!(timeline.last_seek_at, None);
+
+        let seek = contain_reconstruction("lab seek", || {
+            timeline.reconstruct_to(1, 0, |_game, _entry| Ok(()), |_| Ok(()))
+        })
+        .expect("timeline remains usable");
+        assert_eq!(seek.game.tick_count(), 0);
+        timeline.commit_seek(seek.target_tick);
+        assert_eq!(timeline.reconstructed_through_tick, Some(0));
     }
 }

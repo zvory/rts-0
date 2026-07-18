@@ -235,7 +235,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     events
 }
 
-fn predicted_test_mortar_impact(
+fn test_mortar_scattered_impact(
     entities: &EntityStore,
     teams: &TeamRelations,
     player_ids: &[u32],
@@ -247,8 +247,16 @@ fn predicted_test_mortar_impact(
     let map = Map::generate(2, 0x00C0_FFEE);
     let mut fog = Fog::new(map.size);
     fog.recompute(player_ids, entities, &map);
-    let (x, y) = mortar_aim_point(entities, target, tick);
-    crate::game::mortar_scatter::predicted_mortar_impact(&fog, teams, owner, attacker, x, y, tick)
+    let target = entities.get(target).expect("target should exist");
+    crate::game::mortar_scatter::scattered_mortar_impact(
+        &fog,
+        teams,
+        owner,
+        attacker,
+        target.pos_x,
+        target.pos_y,
+        tick,
+    )
 }
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
@@ -1918,15 +1926,16 @@ fn anti_tank_gun_turns_slowly_before_firing() {
 fn mortar_turns_fast_before_auto_firing() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .spawn_unit(1, EntityKind::MortarTeam, 300.0, 300.0)
         .expect("mortar should spawn");
     entities
-        .spawn_unit(2, EntityKind::Rifleman, 100.0, 20.0)
+        .spawn_unit(2, EntityKind::Rifleman, 428.6, 146.8)
         .expect("enemy should spawn");
     if let Some(mortar) = entities.get_mut(mortar_id) {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
     run_combat_tick(&mut entities);
@@ -1938,162 +1947,14 @@ fn mortar_turns_fast_before_auto_firing() {
     }
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
-        angle_delta(mortar.facing(), -std::f32::consts::FRAC_PI_2).abs()
+        angle_delta(mortar.facing(), -50_f32.to_radians()).abs()
             <= mortar::FIRE_TOLERANCE_RAD + 0.001
     );
     assert!(mortar.attack_cd() > 0);
 }
 
 #[test]
-fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
-    let target_kinds = [
-        EntityKind::Worker,
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-        EntityKind::AntiTankGun,
-        EntityKind::MortarTeam,
-        EntityKind::Tank,
-        EntityKind::ScoutCar,
-        EntityKind::CommandCar,
-        EntityKind::Artillery,
-    ];
-
-    for target_kind in target_kinds {
-        let mut entities = EntityStore::new();
-        let target_id = entities
-            .spawn_unit(2, target_kind, 220.0, 100.0)
-            .expect("target should spawn");
-        if let Some(target) = entities.get_mut(target_id) {
-            target.set_order(Order::attack_move_to(500.0, 100.0));
-            target.set_path(Vec::new());
-            target.set_path_goal(Some((500.0, 100.0)));
-            target.mark_move_phase(MovePhase::Moving);
-        }
-
-        let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-        let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
-        assert!(
-            offset <= 0.001,
-            "{target_kind:?} stationary attack-move target should not receive movement lead, got offset {offset:.2}"
-        );
-    }
-}
-
-#[test]
-fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
-    let target_kinds = [
-        EntityKind::Worker,
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-        EntityKind::AntiTankGun,
-        EntityKind::MortarTeam,
-        EntityKind::Tank,
-        EntityKind::ScoutCar,
-        EntityKind::CommandCar,
-        EntityKind::Artillery,
-    ];
-
-    for target_kind in target_kinds {
-        let mut entities = EntityStore::new();
-        let target_id = entities
-            .spawn_unit(2, target_kind, 220.0, 100.0)
-            .expect("target should spawn");
-        let speed = config::unit_stats(target_kind)
-            .map(|stats| stats.speed)
-            .expect("target should have unit stats");
-        if let Some(target) = entities.get_mut(target_id) {
-            target.set_order(Order::attack_move_to(500.0, 100.0));
-            target.set_path(vec![(500.0, 100.0)]);
-            target.set_path_goal(Some((500.0, 100.0)));
-            target.mark_move_phase(MovePhase::Moving);
-            target.set_movement_delta(speed, 0.0);
-        }
-
-        let (aim_x, _aim_y) = mortar_aim_point(&entities, target_id, 10);
-        let expected_lead = speed * config::MORTAR_SHELL_DELAY_TICKS as f32;
-        assert!(
-            aim_x >= 220.0 + expected_lead - 0.001,
-            "{target_kind:?} moving target should be led by its current movement delta, got x={aim_x:.2}"
-        );
-    }
-}
-
-#[test]
-fn mortar_autocast_leads_current_direction_not_corner_destination() {
-    let mut entities = EntityStore::new();
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Worker, 220.0, 100.0)
-        .expect("target should spawn");
-    if let Some(target) = entities.get_mut(target_id) {
-        target.set_order(Order::attack_move_to(500.0, 50.0));
-        target.set_path(vec![(500.0, 50.0), (220.0, 50.0)]);
-        target.set_path_goal(Some((500.0, 50.0)));
-        target.mark_move_phase(MovePhase::Moving);
-    }
-
-    let map = open_map(24);
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-    assert!(
-        aim_x <= 220.0 + 0.001,
-        "target moving north around a corner should not be led east toward its final destination, got x={aim_x:.2}"
-    );
-    assert!(
-        aim_y < 0.0,
-        "target moving north around a corner should be led along actual last movement, got y={aim_y:.2}"
-    );
-}
-
-#[test]
-fn mortar_autocast_velocity_clears_when_path_clears() {
-    let mut entities = EntityStore::new();
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("target should spawn");
-    if let Some(target) = entities.get_mut(target_id) {
-        target.set_movement_delta(2.0, 0.0);
-        target.clear_path();
-    }
-
-    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-    let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
-    assert!(
-        offset <= 0.001,
-        "target with cleared path should not keep stale mortar lead, got offset {offset:.2}"
-    );
-}
-
-#[test]
-fn mortar_autocast_velocity_resets_for_stationary_units_each_movement_tick() {
-    let mut entities = EntityStore::new();
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("target should spawn");
-    if let Some(target) = entities.get_mut(target_id) {
-        target.set_order(Order::attack_move_to(500.0, 100.0));
-        target.set_path(Vec::new());
-        target.mark_move_phase(MovePhase::Moving);
-        target.set_movement_delta(2.0, 0.0);
-    }
-
-    let map = open_map(24);
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
-    let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
-    assert!(
-        offset <= 0.001,
-        "stationary target should not retain stale movement-tick mortar lead, got offset {offset:.2}"
-    );
-}
-
-#[test]
-fn mortar_autocast_velocity_clears_when_target_stops_to_fire() {
+fn movement_delta_clears_when_target_stops_to_fire() {
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
@@ -2139,7 +2000,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
         .expect("enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     let (impact_x, impact_y) =
-        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
+        test_mortar_scattered_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("friendly should spawn");
@@ -2147,6 +2008,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -2156,7 +2018,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "autocast mortar should hold fire when the predicted impact would hit an owned unit"
+        "autocast mortar should hold fire when the scattered impact would hit an owned unit"
     );
 }
 
@@ -2171,7 +2033,7 @@ fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
         .expect("enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
     let (impact_x, impact_y) =
-        predicted_test_mortar_impact(&entities, &teams, &[1, 2, 3], 1, mortar_id, enemy_id, 10);
+        test_mortar_scattered_impact(&entities, &teams, &[1, 2, 3], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_unit(2, EntityKind::Rifleman, impact_x, impact_y + 24.0)
         .expect("allied unit should spawn");
@@ -2194,7 +2056,7 @@ fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "autocast mortar should hold fire when the predicted impact would hit an allied unit"
+        "autocast mortar should hold fire when the scattered impact would hit an allied unit"
     );
 }
 
@@ -2209,7 +2071,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
         .expect("enemy should spawn");
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     let (impact_x, impact_y) =
-        predicted_test_mortar_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
+        test_mortar_scattered_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
     entities
         .spawn_building(1, EntityKind::Depot, impact_x, impact_y + 40.0, true)
         .expect("depot should spawn");
@@ -2226,23 +2088,24 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "autocast mortar should hold fire when the predicted impact would hit an owned building"
+        "autocast mortar should hold fire when the scattered impact would hit an owned building"
     );
 }
 
 #[test]
-fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
+fn mortar_autocast_fires_when_scattered_impact_is_clear_of_owned_entities() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
         .expect("mortar should spawn");
     entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
         .expect("enemy should spawn");
     if let Some(mortar) = entities.get_mut(mortar_id) {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -2251,7 +2114,7 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
         mortar.attack_cd() > 0,
-        "autocast mortar should fire when no owned entity is inside the predicted impact"
+        "autocast mortar should fire when no owned entity is inside the scattered impact"
     );
 }
 
@@ -2259,8 +2122,8 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
 fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
     let map = map_with_rock_at((4, 3));
     let mortar_pos = map.tile_center(2, 3);
-    let target_pos = map.tile_center(6, 3);
-    let spotter_pos = map.tile_center(6, 6);
+    let target_pos = map.tile_center(8, 3);
+    let spotter_pos = map.tile_center(8, 6);
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
@@ -2275,6 +2138,7 @@ fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -2293,7 +2157,7 @@ fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
 fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
     let map = map_with_rock_at((4, 3));
     let mortar_pos = map.tile_center(2, 3);
-    let target_pos = map.tile_center(6, 3);
+    let target_pos = map.tile_center(8, 3);
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
@@ -2305,6 +2169,7 @@ fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_emplacement_facing(Some(0.0));
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
@@ -3370,7 +3235,7 @@ fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
 }
 
 #[test]
-fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
+fn friendly_building_between_attacker_and_target_leaves_direct_attacker_stationary() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -3400,8 +3265,9 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    assert_eq!(attacker_entity.target_id(), Some(intended));
-    assert!(!attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.target_id(), None);
+    assert!(attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.path_goal(), None);
     assert_eq!(
         attacker_entity.attack_cd(),
         0,
@@ -3427,7 +3293,7 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
 }
 
 #[test]
-fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
+fn enemy_building_between_attacker_and_target_leaves_direct_attacker_stationary() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -3457,8 +3323,9 @@ fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    assert_eq!(attacker_entity.target_id(), Some(intended));
-    assert!(!attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.target_id(), None);
+    assert!(attacker_entity.path_is_empty());
+    assert_eq!(attacker_entity.path_goal(), None);
     assert_eq!(
         attacker_entity.attack_cd(),
         0,
@@ -3484,7 +3351,7 @@ fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
 }
 
 #[test]
-fn direct_attack_on_building_chases_passable_perimeter_goal() {
+fn direct_attack_on_out_of_range_building_does_not_create_a_path() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -3505,24 +3372,9 @@ fn direct_attack_on_building_chases_passable_perimeter_goal() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    let goal = attacker_entity
-        .path_goal()
-        .expect("direct attack should request a building chase path");
-    assert_ne!(
-        goal,
-        (300.0, 100.0),
-        "building chase should not path to the blocked building center"
-    );
-    let (goal_tx, goal_ty) = map.tile_of(goal.0, goal.1);
-    let occ = Occupancy::build(&map, &entities);
-    assert!(
-        !occ.building_blocked_at_tile(goal_tx as i32, goal_ty as i32),
-        "building chase goal should be outside static building footprints"
-    );
-    assert!(
-        !attacker_entity.path_is_empty(),
-        "building chase should request a reachable perimeter path"
-    );
+    assert_eq!(attacker_entity.target_id(), None);
+    assert_eq!(attacker_entity.path_goal(), None);
+    assert!(attacker_entity.path_is_empty());
 }
 
 #[test]
@@ -3554,7 +3406,8 @@ fn friendly_tank_between_attacker_and_target_prevents_firing() {
     );
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
-    assert_eq!(attacker_entity.target_id(), Some(intended));
+    assert_eq!(attacker_entity.target_id(), None);
+    assert!(attacker_entity.path_is_empty());
     assert_eq!(
         attacker_entity.attack_cd(),
         0,

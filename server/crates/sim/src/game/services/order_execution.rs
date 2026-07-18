@@ -1,5 +1,7 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{
+    supports_manual_emplacement, Entity, EntityKind, EntityStore, Order, WeaponSetup,
+};
 
 pub(crate) mod targeting;
 
@@ -27,7 +29,7 @@ pub(crate) fn execute_anti_tank_gun_setup(
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
+    if !supports_manual_emplacement(e.kind)
         || e.under_construction()
         || !x.is_finite()
         || !y.is_finite()
@@ -53,7 +55,7 @@ pub(crate) fn execute_anti_tank_gun_setup(
     } else {
         e.set_pending_redeploy_facing(Some(facing));
         e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
-            ticks: setup_ticks_for(e.kind),
+            ticks: teardown_ticks_for(e.kind),
         });
     }
     e.reset_gather_state();
@@ -142,5 +144,12 @@ fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
         _ => config::ANTI_TANK_GUN_SETUP_TICKS,
+    }
+}
+
+fn teardown_ticks_for(kind: EntityKind) -> u16 {
+    match kind {
+        EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
+        _ => setup_ticks_for(kind),
     }
 }

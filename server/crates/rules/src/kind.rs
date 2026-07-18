@@ -153,6 +153,13 @@ pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     )
 }
 
+pub fn supports_manual_emplacement(kind: EntityKind) -> bool {
+    matches!(
+        kind,
+        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MovementBodyClass {
     InfantryLike,

@@ -8,12 +8,19 @@ const EMPTY_ARRAY = Object.freeze([]);
  * transient effect markers stay behind one explicit boundary.
  *
  * @param {object} state GameState-compatible browser model.
- * @param {{clientIntent?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, now?:number}=} options
+ * @param {{clientIntent?:object|null, controlPolicy?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, now?:number}=} options
  * @returns {object}
  */
 export function buildRendererFeedbackView(
   state,
-  { clientIntent = null, previewSurface = null, entities = EMPTY_ARRAY, selectedEntities = null, now = defaultNow() } = {},
+  {
+    clientIntent = null,
+    controlPolicy = null,
+    previewSurface = null,
+    entities = EMPTY_ARRAY,
+    selectedEntities = null,
+    now = defaultNow(),
+  } = {},
 ) {
   const selectedStateEntities = Array.isArray(selectedEntities)
     ? selectedEntities
@@ -23,7 +30,7 @@ export function buildRendererFeedbackView(
   const selected = selectRenderedEntities(entities, selectedStateEntities);
   const entityLookup = buildEntityLookup(entities, selected);
   const intent = clientIntent || null;
-  const controlOwner = buildControlOwnerReadModel(state, selected);
+  const controlOwner = buildControlOwnerReadModel(state, selected, controlPolicy);
 
   const commandFeedback = liveArray(intent, "liveCommandFeedback", now);
   const smokeCanisters = liveArray(state, "liveSmokeCanisters", now);
@@ -108,8 +115,7 @@ export function buildRendererFeedbackView(
   };
 }
 
-function buildControlOwnerReadModel(state, selected) {
-  const policy = state?.controlPolicy || null;
+function buildControlOwnerReadModel(state, selected, policy = null) {
   const isLabPolicy = policy?.kind === "lab";
   const issueAsOwnerId = typeof policy?.issueAsOwnerForSelection === "function"
     ? normalizeOwner(policy.issueAsOwnerForSelection(selected))

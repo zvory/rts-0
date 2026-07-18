@@ -252,6 +252,7 @@ has been removed; future unit-art changes should keep the permanent rig contract
 node tests/rig_schema.mjs
 node tests/svg_rig_importer.mjs
 node tests/rig_runtime.mjs
+node tests/artillery_png_atlas.mjs
 node scripts/check-client-architecture.mjs
 ```
 

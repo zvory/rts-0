@@ -23,6 +23,8 @@ export function renderObserverAnalysisBody(overlay, tab, frameViews, ids, { prof
   const analysisSig = observerAnalysisBodySignature(overlay.analysis, overlay.getPlayers());
   if (tab.id === ids.production) {
     replace(analysisSig, () => overlay.renderProduction(overlay.analysis));
+  } else if (tab.id === ids.research) {
+    replace(analysisSig, () => overlay.renderResearch(overlay.analysis));
   } else if (tab.id === ids.units) {
     replace(analysisSig, () => overlay.renderUnits(overlay.analysis));
   } else if (tab.id === ids.resources) {

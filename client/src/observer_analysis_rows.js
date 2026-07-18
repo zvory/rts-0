@@ -19,6 +19,7 @@ export function playerAnalysisRows({ analysis, players }) {
       color: safeCssColor(meta.color || "#e7dfc5"),
       units: player.units,
       production: player.production,
+      upgrades: player.upgrades,
       unitsLost: player.unitsLost,
       resourcesLost: player.resourcesLost,
       resources: player.resources,

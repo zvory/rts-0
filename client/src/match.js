@@ -27,7 +27,9 @@ import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture, renderFixedCaptureFrame } from "./match_fixed_capture.js";
 import { ClientIntent } from "./client_intent.js";
-import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
+import { CommandInteraction } from "./command_interaction.js";
+import { createControlPolicyProjection } from "./control_policy_projection.js";
+import { CAMERA, INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
@@ -199,16 +201,30 @@ export class Match {
     // Module graph.
     this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);
-    this.state.controlPolicy = this.labControlPolicy;
+    this.controlPolicy = this._timeInit(
+      "match.controlPolicy",
+      () => createControlPolicyProjection(this.labControlPolicy),
+    );
     this.combatAudio = this._timeInit(
       "match.combatAudio",
-      () => new MatchCombatAudio({ audio: this.audio, state: this.state }),
+      () => new MatchCombatAudio({ audio: this.audio, state: this.state, controlPolicy: this.controlPolicy }),
     );
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
+    this.commandInteraction = this._timeInit(
+      "match.commandInteraction",
+      () => new CommandInteraction({
+        commandIssuer: this.commandIssuer,
+        clientIntent: this.clientIntent,
+        selectedEntities: () => this.state.selectedEntities(),
+      }),
+    );
     this.rendererBackendBundle = options.rendererBackendBundle || createPixiBackendBundle();
     this.camera = this._timeInit("match.camera", () => this.rendererBackendBundle.createCamera({
       minZoom: autoSpectatorCameraMinZoom(this, payload),
       maxZoom: options.cameraMaxZoom,
+      maxVisibleWorldPx: !this.labMetadata && !this.replayViewer && !payload?.spectator
+        ? CAMERA.maxVisibleTilesPerAxis * this.state.map.tileSize
+        : undefined,
     }));
     this.autoSpectator = this._timeInit(
       "match.autoSpectator",
@@ -231,11 +247,11 @@ export class Match {
       () => new HUD(
         dom.gameScreen,
         this.state,
-        this.commandIssuer,
+        this.commandInteraction,
         this.audio,
         this.hotkeyProfiles,
         this.clientIntent,
-        this.labControlPolicy,
+        this.controlPolicy,
         this.camera,
         this.apmTracker,
       ),
@@ -251,9 +267,10 @@ export class Match {
     this.unregisterDomInputZone = this.inputRouter.registerZone(this.domInputZone);
     this.minimap = this._timeInit(
       "match.minimap",
-      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandIssuer, this.inputRouter, {
+      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandInteraction, this.inputRouter, {
         commandsEnabled: !!this.capabilities.commands.gameplay,
         clientIntent: this.clientIntent,
+        controlPolicy: this.controlPolicy,
         artilleryIconSvg: ARTILLERY_RIG_SVG,
       }),
     );
@@ -271,12 +288,12 @@ export class Match {
     this.input = this._timeInit(
       "match.input",
       () => this.replayViewer
-        ? new ReplayCameraInput(dom.viewport, this.camera)
+        ? new ReplayCameraInput(dom.viewport, this.camera, this.state)
         : new Input(
           dom.viewport,
           this.camera,
           this.state,
-          this.commandIssuer,
+          this.commandInteraction,
           () => {},
           this.fog,
           this.audio,
@@ -289,6 +306,8 @@ export class Match {
             cancel: (reason) => this.cancelLabTool(reason),
           },
           this.hud.hotkeyActions(),
+          undefined,
+          this.controlPolicy,
         ),
     );
 
@@ -316,7 +335,7 @@ export class Match {
       recordSnapshotProcessing(
         this.snapshotProcessingReport,
         () => this.prediction.applyAuthoritativeSnapshot(m),
-        () => this.state.applySnapshot(m),
+        () => this.state.applySnapshot(m, this.state.visualNow(), { controlPolicy: this.controlPolicy }),
         () => {
           notePredictionAuthoritativeSnapshot(this);
           this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
@@ -387,6 +406,7 @@ export class Match {
       this.roomTimeControls = new RoomTimeControls({
         net: this.net,
         state: this.state,
+        controlPolicy: this.controlPolicy,
         replayViewer: this.replayViewer,
         capabilities: this.capabilities,
       });
@@ -625,10 +645,10 @@ export class Match {
   }
 
   applySpectatorUi() {
-    const hidden = this.replayViewer ||
-      !((this.state?.controlPolicy || this.labControlPolicy)?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
-    if (dom.selectionArea) dom.selectionArea.hidden = hidden;
-    if (dom.commandCard) dom.commandCard.hidden = hidden;
+    const commandSurfaceHidden = this.replayViewer ||
+      !(this.controlPolicy?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
+    if (dom.selectionArea) dom.selectionArea.hidden = !this.replayViewer && commandSurfaceHidden;
+    if (dom.commandCard) dom.commandCard.hidden = commandSurfaceHidden;
     this.closeGiveUpConfirm();
   }
 

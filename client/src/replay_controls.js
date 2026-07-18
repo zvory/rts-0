@@ -7,7 +7,7 @@ import { FloatingRoomTimePanel } from "./room_time_panel.js";
 const ROOM_TIME_CONFIRMATION_TIMEOUT_MS = 3_000;
 
 export class RoomTimeControls {
-  constructor({ net, state, replayViewer = false, capabilities = null, label = null }) {
+  constructor({ net, state, controlPolicy = null, replayViewer = false, capabilities = null, label = null }) {
     this.net = net;
     this.state = state;
     this.replayViewer = !!replayViewer;
@@ -26,7 +26,7 @@ export class RoomTimeControls {
     this.roomTimeNotice = "";
     this.controlActivationBindings = [];
     this.timelineHoverBindings = [];
-    this.roomTimeAccessDenied = state?.controlPolicy?.kind === "lab" && state.controlPolicy.isOperator?.() === false;
+    this.roomTimeAccessDenied = controlPolicy?.kind === "lab" && controlPolicy.isOperator?.() === false;
     this.lastRoomTimeSpeed = 2;
     this.floatingPanel = null;
 

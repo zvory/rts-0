@@ -127,7 +127,11 @@ async function testLabLaunchConfig() {
     localStorage: { getItem: () => null },
   };
   try {
-    const { labCatalogRouteConfig, labLaunchConfig } = await import("../../client/src/bootstrap.js");
+    const {
+      labCatalogRouteConfig,
+      labLaunchConfig,
+      replaceLabCatalogRoute,
+    } = await import("../../client/src/bootstrap.js");
     let config = labLaunchConfig();
     assert(config, "lab route launch config should be recognized");
     assert(config.publicRoom === "sandbox", "lab launch keeps public room label");
@@ -211,6 +215,53 @@ async function testLabLaunchConfig() {
 
     globalThis.window.location = new URL("http://localhost/?room=sandbox");
     assert(labLaunchConfig() === null, "non-lab route does not auto-join a lab");
+
+    let replacedUrl = "";
+    const historyLike = {
+      state: { retained: true },
+      replaceState(state, _title, url) {
+        assert(state.retained === true, "lab route replacement retains the current history state");
+        replacedUrl = url;
+      },
+    };
+    const blankUrl = replaceLabCatalogRoute(
+      {
+        publicRoom: "default",
+        map: "1v1",
+        scenario: "blank",
+        visualProfileId: "",
+      },
+      {
+        locationLike: new URL("http://localhost/lab"),
+        historyLike,
+      },
+    );
+    assert(
+      blankUrl === "/lab?scenario=blank" && replacedUrl === blankUrl,
+      "starting the blank catalog row exposes its scenario in the browser URL",
+    );
+
+    const profiledUrl = replaceLabCatalogRoute(
+      {
+        publicRoom: "sandbox",
+        map: "Chokes",
+        scenario: "lategame",
+        visualProfileId: "trench-variants-1",
+      },
+      {
+        locationLike: new URL("http://localhost/lab?visualProfile=trench-variants-1&rtsRenderer=babylon"),
+        historyLike,
+      },
+    );
+    const profiledParams = new URL(`http://localhost${profiledUrl}`).searchParams;
+    assert(
+      profiledParams.get("scenario") === "lategame" &&
+        profiledParams.get("map") === "Chokes" &&
+        profiledParams.get("room") === "sandbox" &&
+        profiledParams.get("visualProfile") === "trench-variants-1" &&
+        profiledParams.get("rtsRenderer") === "babylon",
+      "catalog route replacement preserves the selected setup, custom visual profile, and renderer",
+    );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
@@ -260,7 +311,15 @@ async function testMatchLaunchConfig() {
   ));
   assert(
     JSON.stringify(config.ai) === JSON.stringify([{ teamId: 1, aiProfileId: "ai_turtle" }]),
-    "profile-only AI entries preserve AI Turtle",
+    "observer-only internal launch entries preserve AI Turtle",
+  );
+
+  config = matchLaunchConfig(new URL(
+    "http://localhost/?rtsLaunch=match&rtsRoom=player-match&rtsRole=player&rtsAi=2:ai_turtle",
+  ));
+  assert(
+    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 2, aiProfileId: "ai_2_1" }]),
+    "player launch URLs cannot select the internal Turtle profile",
   );
 
   config = matchLaunchConfig(new URL("http://localhost/?rtsLaunch=match&rtsRoom=bad%0Aroom"));

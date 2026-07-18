@@ -21,24 +21,21 @@ export function renderResourcesMetric({ analysis, players }) {
     return wrap;
   }
 
-  const total = rows.reduce((acc, player) => addResourceWindows(acc, player.resources), emptyResourceWindows());
-  wrap.appendChild(renderResourceWindowGroup({
-    className: "replay-resources-group is-total",
-    name: "Total",
-    color: "#e7dfc5",
-    resources: total,
-  }));
-
-  for (const player of rows) {
+  for (const window of RESOURCE_WINDOWS) {
     wrap.appendChild(renderResourceWindowGroup({
-      className: "replay-resources-group",
-      name: player.name,
-      color: player.color,
-      resources: player.resources,
+      label: window.label,
+      resourceKey: window.resourceKey,
+      players: rows,
     }));
   }
   return wrap;
 }
+
+const RESOURCE_WINDOWS = [
+  { label: "Last 5s", resourceKey: "last5s" },
+  { label: "Last 1m", resourceKey: "lastMinute" },
+  { label: "Lifetime", resourceKey: "lifetime" },
+];
 
 function normalizeResourceTotals(totals) {
   return {
@@ -64,12 +61,31 @@ function renderEmptyMetric(text) {
   return empty;
 }
 
-function renderResourceWindowGroup({ className, name, color, resources }) {
+function renderResourceWindowGroup({ label, resourceKey, players }) {
   const group = document.createElement("div");
-  group.className = className;
+  group.className = "replay-resources-group";
 
   const heading = document.createElement("div");
-  heading.className = "replay-resources-heading";
+  heading.className = "replay-resources-window";
+  heading.textContent = label;
+  group.appendChild(heading);
+
+  for (const player of players) {
+    group.appendChild(renderResourcePlayerRow({
+      name: player.name,
+      color: player.color,
+      totals: player.resources?.[resourceKey],
+    }));
+  }
+  return group;
+}
+
+function renderResourcePlayerRow({ name, color, totals }) {
+  const row = document.createElement("div");
+  row.className = "replay-resources-row";
+
+  const player = document.createElement("span");
+  player.className = "replay-resources-player";
 
   const swatch = document.createElement("span");
   swatch.className = "replay-analysis-player-swatch";
@@ -79,44 +95,13 @@ function renderResourceWindowGroup({ className, name, color, resources }) {
   const nameEl = document.createElement("span");
   nameEl.className = "replay-resources-name";
   nameEl.textContent = name;
-  heading.append(swatch, nameEl);
-  group.appendChild(heading);
-
-  group.appendChild(renderResourceWindowRow("Lifetime", resources?.lifetime));
-  group.appendChild(renderResourceWindowRow("Last 5s", resources?.last5s));
-  group.appendChild(renderResourceWindowRow("Last 1m", resources?.lastMinute));
-  return group;
-}
-
-function renderResourceWindowRow(label, totals) {
-  const row = document.createElement("div");
-  row.className = "replay-resources-row";
-
-  const labelEl = document.createElement("span");
-  labelEl.className = "replay-resources-window";
-  labelEl.textContent = label;
+  player.append(swatch, nameEl);
 
   const steelEl = resourceValueElement("steel", totals?.steel || 0, "replay-resources-steel");
   const oilEl = resourceValueElement("oil", totals?.oil || 0, "replay-resources-oil");
 
-  row.append(labelEl, steelEl, oilEl);
+  row.append(player, steelEl, oilEl);
   return row;
-}
-
-function emptyResourceWindows() {
-  return {
-    lifetime: { steel: 0, oil: 0 },
-    last5s: { steel: 0, oil: 0 },
-    lastMinute: { steel: 0, oil: 0 },
-  };
-}
-
-function addResourceWindows(acc, resources) {
-  for (const key of ["lifetime", "last5s", "lastMinute"]) {
-    acc[key].steel += Math.max(0, Math.trunc(Number(resources?.[key]?.steel) || 0));
-    acc[key].oil += Math.max(0, Math.trunc(Number(resources?.[key]?.oil) || 0));
-  }
-  return acc;
 }
 
 function safeCssColor(color) {

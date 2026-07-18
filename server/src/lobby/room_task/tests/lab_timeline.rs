@@ -1,4 +1,5 @@
 use super::support::*;
+use crate::lobby::room_task::types::LabSeekTarget;
 
 #[test]
 fn lab_timeline_records_mutations_and_issue_as_commands() {
@@ -243,6 +244,79 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
 }
 
 #[test]
+fn lab_seek_error_and_panic_preserve_room_state_driver_and_metadata() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Chokes".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (operator_tx, mut operator_writer) = ConnectionSink::new();
+    let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(
+        99,
+        "Operator".to_string(),
+        true,
+        false,
+        operator_tx,
+        operator_ack,
+    );
+    while operator_writer.reliable_rx.try_recv().is_ok() {}
+    task.on_lab_request(
+        99,
+        60,
+        LabClientOp::SetPlayerResources {
+            player_id: LAB_PLAYER_ONE_ID,
+            steel: 654,
+            oil: 32,
+        },
+    );
+    assert!(lab_results(&mut operator_writer)[0].ok);
+    task.on_tick(TokioInstant::now());
+    task.on_tick(TokioInstant::now());
+    task.lab_driver = crate::lobby::lab_scenario_driver::lab_scenario_driver_for(
+        crate::tools::hellhole_spec::SCENARIO_ID,
+    );
+
+    let tick_before = in_game_tick(&task);
+    let resources_before = lab_player_resources(&task, LAB_PLAYER_ONE_ID);
+    let timeline_entries_before = task.lab_timeline.as_ref().unwrap().replay_entry_count();
+    let session = task.lab_session.as_ref().unwrap();
+    let vision_before = session.vision_for(99);
+    let dirty_before = session.dirty;
+    let log_len_before = session.operation_log.len();
+    assert!(task.lab_driver.is_some());
+
+    task.on_seek_lab_room_time_with_hook(99, LabSeekTarget::Absolute(0), |_game| {
+        Err("injected lab room seek error".to_string())
+    });
+    task.on_seek_lab_room_time_with_hook(99, LabSeekTarget::Absolute(0), |_game| {
+        panic!("injected lab room seek panic")
+    });
+
+    assert_eq!(in_game_tick(&task), tick_before);
+    assert_eq!(
+        lab_player_resources(&task, LAB_PLAYER_ONE_ID),
+        resources_before
+    );
+    assert_eq!(
+        task.lab_timeline.as_ref().unwrap().replay_entry_count(),
+        timeline_entries_before
+    );
+    let session = task.lab_session.as_ref().unwrap();
+    assert_eq!(session.vision_for(99), vision_before);
+    assert_eq!(session.dirty, dirty_before);
+    assert_eq!(session.operation_log.len(), log_len_before);
+    assert!(task.lab_driver.is_some());
+    assert_eq!(task.lab_room_time_controller_id, None);
+
+    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
+    assert_eq!(in_game_tick(&task), 0);
+    assert_eq!(task.lab_room_time_controller_id, Some(99));
+}
+
+#[test]
 fn lab_seek_replays_issue_as_commands_through_rebuild() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Chokes".to_string(),
@@ -415,7 +489,36 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
         reopened_ack,
     );
     while reopened_writer.reliable_rx.try_recv().is_ok() {}
+    reopened.on_lab_request(
+        99,
+        90,
+        LabClientOp::SetPlayerResources {
+            player_id: LAB_PLAYER_ONE_ID,
+            steel: 777,
+            oil: 88,
+        },
+    );
+    assert!(lab_results(&mut reopened_writer)[0].ok);
+    reopened.lab_session.as_mut().unwrap().initial_camera = Some(crate::protocol::InitialCamera {
+        center_x: 64,
+        center_y: 96,
+    });
+    reopened.lab_driver = crate::lobby::lab_scenario_driver::lab_scenario_driver_for(
+        crate::tools::hellhole_spec::SCENARIO_ID,
+    );
     let resources_before_timed_out_import = lab_player_resources(&reopened, LAB_PLAYER_ONE_ID);
+    let tick_before_failed_imports = in_game_tick(&reopened);
+    let timeline_entries_before_failed_imports = reopened
+        .lab_timeline
+        .as_ref()
+        .expect("lab timeline")
+        .replay_entry_count();
+    let session_before_failed_imports = reopened.lab_session.as_ref().expect("lab session");
+    let vision_before_failed_imports = session_before_failed_imports.vision_for(99);
+    let camera_before_failed_imports = session_before_failed_imports.initial_camera;
+    let dirty_before_failed_imports = session_before_failed_imports.dirty;
+    let log_len_before_failed_imports = session_before_failed_imports.operation_log.len();
+    assert!(reopened.lab_driver.is_some());
     let timed_out = reopened
         .load_lab_replay_artifact_before(99, reopened_artifact.clone(), std::time::Instant::now())
         .expect_err("expired import must stop before replacing room state");
@@ -424,6 +527,45 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
         lab_player_resources(&reopened, LAB_PLAYER_ONE_ID),
         resources_before_timed_out_import
     );
+    let injected_error = reopened
+        .load_lab_replay_artifact_with_hook(99, reopened_artifact.clone(), |_game| {
+            Err("injected import error".to_string())
+        })
+        .expect_err("injected import error must discard the candidate");
+    assert!(injected_error.contains("injected import error"));
+    let injected_panic = reopened
+        .load_lab_replay_artifact_with_hook(99, reopened_artifact.clone(), |_game| {
+            panic!("injected import panic")
+        })
+        .expect_err("injected import panic must discard the candidate");
+    assert!(injected_panic.contains("internal panic"));
+    assert_eq!(in_game_tick(&reopened), tick_before_failed_imports);
+    assert_eq!(
+        lab_player_resources(&reopened, LAB_PLAYER_ONE_ID),
+        resources_before_timed_out_import
+    );
+    assert_eq!(
+        reopened.lab_timeline.as_ref().unwrap().replay_entry_count(),
+        timeline_entries_before_failed_imports
+    );
+    let session_after_failed_imports = reopened.lab_session.as_ref().unwrap();
+    assert_eq!(
+        session_after_failed_imports.vision_for(99),
+        vision_before_failed_imports
+    );
+    assert_eq!(
+        session_after_failed_imports.initial_camera,
+        camera_before_failed_imports
+    );
+    assert_eq!(
+        session_after_failed_imports.dirty,
+        dirty_before_failed_imports
+    );
+    assert_eq!(
+        session_after_failed_imports.operation_log.len(),
+        log_len_before_failed_imports
+    );
+    assert!(reopened.lab_driver.is_some());
     reopened
         .load_lab_replay_artifact(99, reopened_artifact)
         .expect("lab replay open");
@@ -440,6 +582,7 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
     assert_eq!(game.lab_god_mode_players(), vec![LAB_PLAYER_TWO_ID]);
     assert_eq!(game.command_log().len(), 1);
     assert_eq!(game.command_log()[0].player_id, LAB_PLAYER_ONE_ID);
+    assert!(reopened.lab_driver.is_none());
     let reopened_session = reopened.lab_session.as_ref().expect("lab session");
     assert_eq!(
         reopened_session.vision_for(99),
@@ -447,6 +590,10 @@ fn lab_replay_export_reopens_process_cold_from_serialized_artifact() {
     );
     assert!(!reopened_session.dirty);
     assert!(reopened_session.operation_log.is_empty());
+    assert_eq!(
+        reopened_session.initial_camera,
+        artifact.initial_setup.metadata.lab.initial_camera
+    );
     let reopened_timeline = reopened.lab_timeline.as_ref().expect("lab timeline");
     assert_eq!(reopened_timeline.replay_entry_count(), 3);
     reopened.send_lab_room_time_state_to(99);

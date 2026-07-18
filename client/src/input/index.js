@@ -57,7 +57,7 @@ import {
   _activateCommandHotkey,
   _cancel,
   _issueTargetedCommand,
-  _nearestOwnCompletedCityCentre,
+  _nearestCompletedMiningAnchor,
   _onRightClick,
   _quickCastCommandTarget,
   _refreshAttackTargetPreview,
@@ -152,14 +152,14 @@ function isMacPlatform() {
 
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
- * mutations (on `state`) and protocol commands (via `commandIssuer.issueCommand`).
+ * mutations (on `state`) and protocol commands (via `commandInteraction.issueCommand`).
  */
 export class Input {
   /**
    * @param {HTMLElement} domElement the #viewport element that receives listeners
    * @param {import("../camera.js").Camera} camera world<->screen transforms & zoom
    * @param {import("../state.js").GameState} state selection + entities
-   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam
+   * @param {{issueCommand(command: object, options?:object): object|boolean}} commandInteraction gameplay command interaction.
    * @param {(rect:object|null)=>void} drawMarquee backend screen-overlay operation
    * @param {import("../fog.js").Fog} fog kept for parity / future hit-test filtering
    * @param {import("../audio.js").Audio} [audio] optional audio engine for local cues
@@ -169,12 +169,13 @@ export class Input {
    * @param {object} [labToolController] active lab setup tool callback seam.
    * @param {{commandId:string,activate:()=>boolean}[]} [globalHotkeyActions] injected non-command-card actions.
    * @param {object} [desktopCursor] optional native desktop cursor bridge injected by the shell.
+   * @param {object} [controlPolicy] read-only ownership and command-surface projection.
    */
   constructor(
     domElement,
     camera,
     state,
-    commandIssuer,
+    commandInteraction,
     drawMarquee,
     fog,
     audio,
@@ -184,12 +185,14 @@ export class Input {
     labToolController = null,
     globalHotkeyActions = [],
     desktopCursor = null,
+    controlPolicy = null,
   ) {
     this.dom = domElement;
     this.renderElement = domElement.querySelector?.("canvas") || null;
     this.camera = camera;
     this.state = state;
-    this.commandIssuer = commandIssuer;
+    this.commandInteraction = commandInteraction;
+    this.controlPolicy = controlPolicy;
     this.screenOverlay = new ScreenOverlay(drawMarquee);
     this.fog = fog;
     this.audio = audio || null;
@@ -339,15 +342,6 @@ export class Input {
     }
   }
 
-  _issueCommand(command) {
-    const selected = typeof this.state?.selectedEntities === "function"
-      ? this.state.selectedEntities()
-      : [];
-    const result = issueGameplayCommand(this.commandIssuer, command);
-    this._intent()?.recordPlannedCommand?.(command, selected, result);
-    return result;
-  }
-
   _intent() {
     return this.clientIntent;
   }
@@ -383,7 +377,7 @@ export class Input {
       append,
       radiusTiles,
       now,
-      commandFeedbackOwner(this.state),
+      commandFeedbackOwner(this.state, this.controlPolicy),
     );
   }
 
@@ -784,7 +778,7 @@ export class Input {
 
     const hit = this._entityAtScreen(p, /*ownPreferred=*/ true);
     if (!hit) return false;
-    const own = controllableOwner(this.state, hit.owner);
+    const own = controllableOwner(this.state, hit.owner, this.controlPolicy);
     if (!own) return false;
     if (!isUnit(hit.kind) && !isBuilding(hit.kind)) return false;
 
@@ -892,22 +886,12 @@ export class Input {
 
 }
 
-function issueGameplayCommand(sender, command) {
-  if (sender && typeof sender.issueCommand === "function") {
-    return sender.issueCommand(command);
-  }
-  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
-    return sender.command(command);
-  }
-  return false;
-}
-
-function commandFeedbackOwner(state) {
-  if (state?.controlPolicy?.kind === "lab") {
-    const owner = typeof state.controlPolicy.feedbackOwner === "function"
-      ? state.controlPolicy.feedbackOwner(state)
-      : typeof state.controlPolicy.issueAsOwnerForSelection === "function"
-        ? state.controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+function commandFeedbackOwner(state, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    const owner = typeof controlPolicy.feedbackOwner === "function"
+      ? controlPolicy.feedbackOwner(state)
+      : typeof controlPolicy.issueAsOwnerForSelection === "function"
+        ? controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
         : null;
     const ownerId = Number(owner);
     return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
@@ -916,12 +900,12 @@ function commandFeedbackOwner(state) {
   return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
 }
 
-function controllableOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    if (typeof state.controlPolicy.isCommandOwner === "function") {
-      return !!state.controlPolicy.isCommandOwner(owner, state);
+function controllableOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    if (typeof controlPolicy.isCommandOwner === "function") {
+      return !!controlPolicy.isCommandOwner(owner, state);
     }
-    return !!state.controlPolicy.canControlOwner?.(owner, state);
+    return !!controlPolicy.canControlOwner?.(owner, state);
   }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
@@ -954,7 +938,7 @@ Object.assign(Input.prototype, {
   _refreshAntiTankGunSetupPreview,
   _refreshAbilityTargetPreview,
   _refreshResourceMiningPreview,
-  _nearestOwnCompletedCityCentre,
+  _nearestCompletedMiningAnchor,
   _refreshPlacement,
   _footprintValid,
   _confirmPlacement,

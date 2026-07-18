@@ -28,6 +28,7 @@ node scripts/interact/cli.mjs lab spawn '{"sessionId":"<id>","spawns":[{"owner":
 node scripts/interact/cli.mjs lab update '{"sessionId":"<id>","updates":[{"operation":"move","entity":"subject","x":1100,"y":960}]}'
 node scripts/interact/cli.mjs lab remove '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/interact/cli.mjs lab inspect '{"sessionId":"<id>","refs":["subject"]}'
+node scripts/interact/cli.mjs lab select '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/interact/cli.mjs lab camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/interact/cli.mjs lab screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
 node scripts/interact/cli.mjs lab record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000,"resumeSpeed":1}'
@@ -52,6 +53,7 @@ The bounded normal-match surface is separate from Lab authoring:
 node scripts/interact/cli.mjs game open '{"opponent":"ai_2_1","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs game open '{"spectate":["ai_2_1","ai_turtle"],"viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs game inspect '{"sessionId":"<id>","ownership":"owned","limit":100}'
+node scripts/interact/cli.mjs game select '{"sessionId":"<id>","ids":[42]}'
 node scripts/interact/cli.mjs game camera '{"sessionId":"<id>","camera":{"action":"focus","entities":[42]}}'
 node scripts/interact/cli.mjs game camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
 node scripts/interact/cli.mjs game screenshot '{"sessionId":"<id>","name":"minimap","region":"minimap"}'
@@ -71,6 +73,7 @@ Dev scenarios use their existing server-owned launch fields and expose no gamepl
 ```bash
 node scripts/interact/cli.mjs dev-scenario open '{"id":"direct_reverse_order","unit":"tank","count":1,"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs dev-scenario inspect '{"sessionId":"<id>","limit":100}'
+node scripts/interact/cli.mjs dev-scenario select '{"sessionId":"<id>","ids":[42]}'
 node scripts/interact/cli.mjs dev-scenario camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
 node scripts/interact/cli.mjs dev-scenario screenshot '{"sessionId":"<id>","name":"before"}'
 node scripts/interact/cli.mjs dev-scenario record-start '{"sessionId":"<id>","name":"full-run","maxDurationMs":10000}'
@@ -83,13 +86,13 @@ node scripts/interact/cli.mjs dev-scenario shutdown
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
-`time`, `inspect`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
+`time`, `inspect`, `select`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
 `import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
 writes exactly one JSON envelope to stdout. Failure writes a concise JSON error to stderr and exits
 nonzero. Every command has an exact, bounded input shape; arbitrary state patches, protocol
 messages, browser evaluation, and caller-selected artifact paths are not accepted.
 
-The complete `game` surface is `open`, `close`, `status`, `inspect`, `move`, `camera`, `screenshot`,
+The complete `game` surface is `open`, `close`, `status`, `inspect`, `select`, `move`, `camera`, `screenshot`,
 `record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, `give-up`, and
 `shutdown`. `game open` creates a fresh public-name-prefixed lobby. `opponent` creates exactly one
 local player and one AI; `spectate:[ai,ai]` creates exactly two opposing AI seats and one spectator,
@@ -101,8 +104,11 @@ ability, input-event, DOM-selector, or browser-evaluation surface. `give-up` use
 surrender flow and returns only after the score screen appears. Spectator sessions expose neither
 move nor surrender; their only mutation is the AI-only room's existing bounded speed control used
 internally by time-lapse capture.
+`select` replaces browser-local selection with up to 400 ids from the recipient's normal
+fog-filtered snapshot; an empty list clears it. Player and spectator sessions may use selection to
+drive the authentic renderer overlays and HUD, but selection itself sends no gameplay command.
 
-The complete `dev-scenario` surface is `open`, `close`, `status`, `inspect`, `camera`, `screenshot`,
+The complete `dev-scenario` surface is `open`, `close`, `status`, `inspect`, `select`, `camera`, `screenshot`,
 `record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, and `shutdown`.
 `dev-scenario open` accepts the same `id`, `unit`, `count`, optional `blocker`, and optional `case`
 fields listed by `/dev/scenarios`. Its launch gate requires `watchScenario=1` and
@@ -110,6 +116,8 @@ fields listed by `/dev/scenarios`. Its launch gate requires `watchScenario=1` an
 spawn, order, move, build, arbitrary protocol, input-event, DOM-selector, or browser-evaluation
 surface. Scenario media defaults to clean presentation; use `presentation:"normal"` when the HUD
 or minimap is part of the review.
+Scenario `select` uses the same browser-local, visible-entity contract and does not expand the
+namespace's server authority.
 
 Global help returns the namespace catalog. `lab --help`, `lab help <command>`, and
 `lab <command> --help` return the Lab command catalog or a command's exact accepted shape and
@@ -130,12 +138,23 @@ The application dependency direction is intentionally small:
 ```text
 cli.mjs -> cli.ts / daemon.ts
         |
-command registry + command service + session coordinator
+command registry + command service lifecycle/dispatch + session coordinator
+        |
+namespace handlers normalize policy and public input
+        |
+shared inspect / select / camera / media capabilities
         |
 driver + private server + recording / fixed capture / Tailnet / runtime helpers
         |
 process runner / filesystem / Puppeteer / FFmpeg / Rust server / Tailscale
 ```
+
+`command_service.ts` owns session lifecycle and generic registry dispatch. Namespace handlers own
+their public policy and normalize differences such as Lab aliases versus Game entity ids,
+inspection ownership, and presentation defaults. After normalization, shared capabilities own the
+common inspect, select, camera, screenshot, recording, and capture workflows. A capability does not
+expand a namespace's authority: the namespace handler must admit the command before calling it.
+Driver and infrastructure ownership remains unchanged.
 
 `session_coordinator.ts` owns the only generic semantic FIFO. Commands use four explicit lanes:
 
@@ -245,7 +264,7 @@ data and is not part of daemon authentication.
 
 Query `catalog` before selecting owners, entity kinds, upgrades, abilities, or commands. Confirm
 mutations with `inspect`, control authoritative time with `time`, and compose with `camera`.
-Aliases, inspection, camera focus, and screenshot subjects accept up to 400 entity references.
+Aliases, inspection, selection, camera focus, and screenshot subjects accept up to 400 entity references.
 `screenshot` waits for fonts, relevant assets, two error-free render frames, and
 authoritative state. The CLI returns an opaque Tailnet Preview URL plus bounded metadata; it
 deliberately withholds local PNG and manifest paths so callers share the Tailnet URL rather than a

@@ -202,8 +202,9 @@ pub struct SnapshotOptions {
 `SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
 envelopes and replay artifacts are translated into it at the boundary. Live transport metadata
 such as `clientSeq` stays in the room/connection layer and is not part of the sim command or replay
-command-log contract. `game::upgrade::UpgradeKind` is public because `SimCommand::Research` carries
-it and external AI controllers construct ordinary `SimCommand`s. `CommandLogEntry.command` remains
+command-log contract. `rts-rules::faction::UpgradeKind` is re-exported through `game::upgrade`
+because `SimCommand::Research` carries it and external AI controllers construct ordinary
+`SimCommand`s. `CommandLogEntry.command` remains
 the serde `Command` from `rts-protocol` so replay JSON stays wire-compatible. `StartPayload`,
 `Snapshot`, `Event`, and `PlayerScore` are also serde types from `rts-protocol`.
 
@@ -753,6 +754,19 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   artifacts reject before playback. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, selected-player resource rows, and
   selected-player remembered building memory, never full-world state.
+- Replay and Lab reconstruction are commit-on-success room operations. Ordinary replay seek clones
+  the selected keyframe into a candidate `Game`, command cursor, and keyframe list, replays entirely
+  against that candidate, and replaces the active session fields only after reaching the requested
+  tick. Lab timeline seek retains its existing candidate `Game` and commits seek/cooldown metadata
+  only after reconstruction succeeds; Lab replay import prepares one replacement bundle containing
+  the duration-tick game, timeline, cleared scenario driver, imported operator/default vision,
+  initial camera, clean flag, and cleared operation log before its first active-room assignment.
+  `lobby::reconstruction::contain_reconstruction` is the deliberately bounded panic-containment
+  seam for these three workflows: it converts ordinary errors and unwind payloads into contextual
+  internal failures for room logging and client errors, while discarded candidates leave the prior
+  authoritative game and all room/session metadata usable. It is not a general room transaction or
+  rollback mechanism; successful reconstruction and unrelated room operations retain their existing
+  ownership and commit paths.
 
 Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
 AI controllers, or Tokio coordination into `rts-sim`. `RoomTask` remains the single Tokio owner of
@@ -926,14 +940,17 @@ ordinary queue is empty and inserts a normal paid item only after cost and suppl
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
-`rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the
-stable id, label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
+`rules::faction` owns `AbilityKind`, `UpgradeKind`, `AbilityTargetMode`, their stable ids, and the
+faction-aware ability/upgrade catalog rows. Each `AbilityCatalogEntry` records its typed kind,
+label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
 finite charges, Steel/Oil cost, tech requirement, queue policy, autocast support, command-card
-visibility, and compact protocol/order-stage codes. `game/ability.rs` keeps the typed
-`AbilityKind` and converts those registry rows into the sim-facing `AbilityDefinition`; it is not a
-second source of metadata. Adding a registry-backed ability means adding a global `AbilityKind` and
-protocol id, adding the faction catalog entry, updating the client mirror/parity check, and then
-adding only the effect-specific code that the registry cannot express.
+visibility, and compact protocol/order-stage codes. `game/ability.rs` thinly re-exports the
+rules-owned types and converts total typed catalog lookups into the sim-facing `AbilityDefinition`;
+it is not a second identity or metadata source. Its planner codes and effect hooks remain
+simulation-only details. Raw command, replay/Lab, and checkpoint strings still parse fallibly at
+their trust boundaries. Adding a registry-backed ability means adding the rules-owned typed
+kind/catalog row and dependency-required protocol wire mirror, extending their parity coverage,
+updating the client mirror, and then adding only effect-specific code the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
 effect shapes that actually exist today: legacy no-op (`charge` compatibility), reserved no-op
@@ -1053,8 +1070,8 @@ one tile of weapon range through `entrenchment_combat::attack_range_tiles`, incl
 Rifleman's Panzerfaust shot. Combat target acquisition treats actively entrenched units, including
 units retaining an arrived Attack Move stance, and Machine Gunners that are setting up or deployed
 like Hold Position: they can acquire and fire at legal targets inside current weapon range but do
-not request chase paths or tear down the weapon to pursue. A fresh Attack, Move, or Attack Move
-order remains authoritative and may move or chase the unit out of the trench or emplacement;
+not request enemy-directed paths or tear down the weapon to pursue. A fresh Move or Attack Move
+order may move the unit out of the trench or emplacement; Attack remains stationary;
 command application and lab moves clear active occupation before later combat decisions use it.
 
 Incoming direct-fire accuracy is weapon-specific: Anti-Tank Gun and Tank cannon shots give each
@@ -1114,8 +1131,11 @@ They damage owned, allied, and enemy units/buildings with the same falloff and a
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is
 unattributed: it does not update `last_damage_owner`/position/tick, does not trigger AI worker
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
-Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research: before
-scheduling a shell, combat checks the scattered predicted impact point against owned and allied
+Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research plus a
+fully deployed Mortar Team. Acquisition and firing are restricted to the full 360-degree field of
+fire and the five-to-15-tile range band. Autocast targets each unit's current position without
+movement lead, then applies normal deterministic scatter. Before
+scheduling a shell, combat checks the deterministic scattered impact point against owned and allied
 units/buildings at their current positions and holds fire if any would be inside the damaging radius. Autocast
 target acquisition uses the same safety check, so Mortar Teams face the nearest target that can be
 autocast safely instead of tracking an unsafe closer enemy. Manual mortar fire is intentionally
@@ -1177,7 +1197,7 @@ Entrenchment research takes 30 seconds.
 
 Deployed anti-tank guns rank in-field automatic target candidates ahead of out-of-arc candidates. If no in-field candidate exists, acquisition retains the out-of-arc target so the weapon clamps toward the fixed field edge without firing.
 
-Aggressive automatic acquisition applies the existing priority ranking to currently fireable enemy candidates first and considers enemy chase candidates only when no candidate can be fired on immediately. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. Opportunistic moving-fire acquisition for a plain Move considers only fireable enemy candidates. Chasing units refresh paths whose goals are materially wrong, including direct attacks and all attack-moves.
+Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible; they never create movement toward it. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
 
 Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from the selected Command Car without a City Centre requirement, permits one active Scout Plane per Command Car, and starts a 30-second cooldown on that Command Car. Different Command Cars may maintain simultaneous sorties. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 20-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
@@ -1282,7 +1302,7 @@ Overpenetration checks use the target's pre-damage entrenchment state, so lethal
 Entrenchment auto-occupation chooses the nearest trench that has a legal occupation slot for the
 unit. A closer trench with no legal slot does not block searching for a farther usable trench. For
 dig-in progress, explicit attack orders count as holding ground only after combat advances them to
-the `Firing` phase; chasing or unreachable attack orders do not create trench progress. Lab move
+the `Firing` phase; waiting attack orders do not create trench progress. Lab move
 operations clear trench occupation and dig-in state when repositioning an entity so snapshots do not
 retain stale `occupiedTrenchId` values before the next tick.
 
@@ -1313,36 +1333,33 @@ General rules:
   idle on arrival; attack-move orders keep their aggressive stance.
 - Non-queued `HoldPosition` clears each selected unit's active order and queued intents, then marks
   the unit as held. Queued `HoldPosition` appends a terminal intent, so the unit finishes earlier
-  queued stages before entering that same held stance. Held units do not voluntarily move or chase
-  targets, but they keep normal collision behavior and may fire at enemies already inside current
-  weapon range.
+  queued stages before entering that same held stance. Held units keep normal collision behavior
+  and may fire at enemies already inside current weapon range.
 - Scout Plane entities are non-combat aerial units. Normal selection and command surfaces filter
   them out; direct move, attack, attack-move, hold-position, gather/build/repair/setup, rally,
   train, and research semantics are ignored for planes.
 - Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
-  hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
-  seek a fireable position. Shared line-of-sight raycasts stop as reached when a grid-corner side
+  hard blocker would absorb the current shot, but remain stationary and wait rather than seeking a
+  fireable position. Shared line-of-sight raycasts stop as reached when a grid-corner side
   step enters the target tile, while preserving opaque-target handling and the two-stone corner
   blocker behavior. Tank Traps are not combat shot blockers, so damage continues to the
-  target behind them; tanks and normal buildings still block shots. Building targets and statically
-  blocked target tiles use a passable perimeter chase goal instead of the blocked footprint center.
+  target behind them; tanks and normal buildings still block shots.
   Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
   survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
-  acquisition remains stricter while the movement path is active: it chooses currently fireable
-  targets first, and only uses out-of-range acquisition/chase targets when no current target is
-  fireable. Setup weapons that stopped to engage during an unfinished attack-move keep their
+  acquisition considers only currently fireable targets inside weapon range. Setup weapons that
+  stopped to engage during an unfinished attack-move keep their
   emplacement for a one-second no-target grace period; if the attack-move order still exists after
   that grace, they tear down and continue toward the original attack-move destination.
 - Active moving-fire `Move` orders preserve the player-issued destination while they are still in
   `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is opportunistic:
   it may retain, aim at, expose, and fire on targets that are currently inside weapon range and
   pass hostile, visibility, smoke, terrain line-of-sight, and blocker checks, but it must not
-  request chase paths, vehicle standoff paths, or enemy-directed replacements for `path_goal`.
-  Moving-fire `AttackMove` orders instead use the ordinary aggressive acquisition and chase policy:
-  once they reach a fireable enemy, they clear their movement path and stop to engage; after combat
-  clears before arrival, they resume the original player-issued destination. Direct `Attack` orders
-  and idle-aggressive behavior remain separate and may still pursue.
+  request enemy-directed paths or replacements for `path_goal`. `AttackMove` follows the same
+  in-range acquisition boundary: once a non-moving-fire unit reaches a fireable enemy, it clears
+  its movement path and stops to engage; after combat clears before arrival, it resumes the original
+  player-issued destination. Moving-fire units keep advancing along that destination while firing.
+  Direct `Attack` and idle behavior are stationary as well.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local
   `services::combat::priority` ranker. Candidate construction stores a `rules::target::TargetFacts`
@@ -1350,9 +1367,9 @@ General rules:
   ranker selects one named `rules::combat::TargetPriorityPolicyId` and applies that policy's
   declarative terms: default-weapon fit, Tank cannon immediate-threat order, vehicle Tank Trap route
   obstruction, shoot-while-moving target retention, unit-over-building preference, and nearest/id
-  tie-breaks. Aggressive auto-acquisition ranks currently fireable candidates first; only when no
-  target is already in weapon range does it fall back to ranking legal chase candidates. Explicit
-  `Attack` orders keep their commanded target while it remains hostile and visible. The
+  tie-breaks. Auto-acquisition only ranks candidates already inside current weapon range. Explicit
+  `Attack` orders keep their commanded target while it remains hostile and visible without moving
+  toward it. The
   `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks
   Worker, Rifleman, and Machine Gunner targets before all other legal non-resource fallbacks, then
   uses distance/id ties without Tank cannon threat ordering. The ranker does not decide fog, smoke,
@@ -1398,11 +1415,11 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
-- Riflemen owned by a player with completed Panzerfausts research use a hidden server-only one-shot
-  state in combat state: `Loaded -> Windup -> Spent`. Research completion arms all current
-  Riflemen, and later Rifleman production spawns loaded; spent Riflemen are not rearmed. Direct
-  `Attack` commands may chase a valid target, while idle, Hold Position, and Attack Move only fire
-  automatically when a valid target is already inside the current 5-tile launcher range. The exact
+- Riflemen produced after their owner completes Panzerfausts research use a hidden server-only
+  one-shot state in combat state: `Loaded -> Windup -> Spent`. Research completion does not change
+  existing Riflemen; later Rifleman production spawns loaded, and spent Riflemen are not rearmed.
+  Direct `Attack`, idle, Hold Position, and Attack Move all fire the launcher only when a valid
+  target is already inside the current 5-tile launcher range; none creates pursuit movement. The exact
   target whitelist is Scout Car, Tank, and Command Car; buildings, Mortar Teams, Artillery, and
   infantry are excluded. Targeting is intentionally independent per Rifleman with no overkill
   coordination. Windup cancels without spending the shot if the order changes or the target stops
@@ -1492,8 +1509,9 @@ Allocation rules:
   chosen idle caster's active order with an ability movement order. Abilities may also explicitly
   allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
   stops the mortar's current movement and clears future queued intents.
-- Anti-Tank Gun setup is a queueable facing intent for selected Anti-Tank Guns only. The stored point means
-  "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
+- Support-weapon setup is a queueable facing intent for selected Anti-Tank Guns, Mortar Teams, and
+  Artillery. The stored point means "face toward this world point from wherever the weapon is when
+  the setup stage promotes"; mixed
   selections ignore non-setup-capable units for setup but keep them for later compatible orders.
 - Artillery Point Fire and Blanket Fire are queueable, terminal per-gun fire orders. Issue-time
   admission stores a locked effective fire point for Point Fire or locked blanket center for
@@ -1568,8 +1586,8 @@ as visible but do not project sight through themselves. Fog may reveal the block
 itself and the visible edge of a smoke cloud, but not tiles behind blockers.
 Units inside smoke do not stamp vision; friendly units inside smoke remain owner-visible through
 projection, while enemy units inside smoke are withheld and cannot be targeted. Combat
-auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders may chase
-toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Direct-fire shot
+auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders remain
+stationary behind terrain, smoke, or entity blockers and cannot fire until the shot is clear. Direct-fire shot
 projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
 shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules
 and this service instead of adding ad hoc checks to fog or combat.

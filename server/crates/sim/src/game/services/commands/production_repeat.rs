@@ -1,7 +1,7 @@
 use crate::game::entity::{EntityKind, EntityStore};
 use crate::rules;
 
-use super::guards::dedupe_cap_units;
+use super::guards::dedupe_units;
 
 pub(super) fn adjust(
     entities: &mut EntityStore,
@@ -16,28 +16,30 @@ pub(super) fn adjust(
         return;
     }
 
-    let candidate = dedupe_cap_units(buildings, max_buildings)
-        .into_iter()
-        .filter_map(|building| {
-            let producer = entities.get(building)?;
-            if producer.owner != player || !producer.is_building() || producer.under_construction()
-            {
+    // Keep live command admission consistent with Lab replay validation: a raw list beyond the
+    // selected cap rejects the whole command rather than silently applying its prefix.
+    if buildings.len() > max_buildings {
+        return;
+    }
+
+    let candidate = dedupe_units(buildings).into_iter().filter_map(|building| {
+        let producer = entities.get(building)?;
+        if producer.owner != player || !producer.is_building() || producer.under_construction() {
+            return None;
+        }
+        let repeat_units = &producer.production.as_ref()?.repeat_units;
+        let repeats_unit = repeat_units.contains(&unit);
+        if delta > 0 {
+            let compatible = rules::economy::trainable_units_for_faction(faction_id, producer.kind)
+                .contains(&unit);
+            if !compatible || repeats_unit {
                 return None;
             }
-            let repeat_units = &producer.production.as_ref()?.repeat_units;
-            let repeats_unit = repeat_units.contains(&unit);
-            if delta > 0 {
-                let compatible =
-                    rules::economy::trainable_units_for_faction(faction_id, producer.kind)
-                        .contains(&unit);
-                if !compatible || repeats_unit {
-                    return None;
-                }
-            } else if !repeats_unit {
-                return None;
-            }
-            Some((repeat_units.len(), building))
-        });
+        } else if !repeats_unit {
+            return None;
+        }
+        Some((repeat_units.len(), building))
+    });
 
     // Additions spread standing orders across the least-loaded compatible producers. Removals
     // peel from the most-loaded producer so it keeps another standing order whenever possible.

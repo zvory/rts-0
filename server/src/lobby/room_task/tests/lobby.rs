@@ -1,6 +1,49 @@
 use super::support::*;
 
 #[test]
+fn lobby_name_update_changes_roster_and_host_summary() {
+    let mut task = summary_task("rename-lobby");
+    let mut observer = add_test_room_spectator(&mut task, 2);
+
+    task.on_set_name(1, "Renamed".to_string());
+
+    assert_eq!(
+        task.players.get(&1).map(|player| player.name.as_str()),
+        Some("Renamed")
+    );
+    assert_eq!(
+        task.lobby_summary().and_then(|summary| summary.host_name),
+        Some("Renamed".to_string())
+    );
+    let lobby = std::iter::from_fn(|| observer.reliable_rx.try_recv().ok())
+        .find_map(|message| match message {
+            ServerMessage::Lobby { players, .. } => Some(players),
+            _ => None,
+        })
+        .expect("rename should broadcast an updated lobby roster");
+    assert_eq!(
+        lobby
+            .iter()
+            .find(|player| player.id == 1)
+            .map(|player| player.name.as_str()),
+        Some("Renamed")
+    );
+}
+
+#[test]
+fn lobby_name_update_is_ignored_during_countdown() {
+    let mut task = summary_task("countdown-rename");
+    task.match_countdown_deadline = Some(TokioInstant::now() + Duration::from_secs(3));
+
+    task.on_set_name(1, "Too Late".to_string());
+
+    assert_eq!(
+        task.players.get(&1).map(|player| player.name.as_str()),
+        Some("Player 1")
+    );
+}
+
+#[test]
 fn lobby_summary_reports_open_waiting_room_state() {
     let task = summary_task("open-summary");
 
@@ -70,6 +113,26 @@ fn lobby_summary_includes_live_normal_rooms_as_non_joinable() {
 }
 
 #[test]
+fn lobby_summary_marks_post_match_replay_as_joinable_replay() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 3);
+    let mut task = summary_task("post-match-replay-summary");
+    task.phase = Phase::ReplayViewer(Box::new(ReplaySession::new(artifact).unwrap()));
+
+    let summary = task
+        .lobby_summary()
+        .expect("post-match replay should remain visible");
+
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.map, "Chokes");
+    assert_eq!(summary.occupied_slots, 0);
+    assert_eq!(summary.max_slots, 0);
+    assert_eq!(summary.spectator_count, 1);
+    assert_eq!(summary.phase, LobbySummaryPhase::InGame);
+    assert_eq!(summary.join_state, LobbyJoinState::InGame);
+}
+
+#[test]
 fn lobby_summary_marks_persisted_replay_lobbies() {
     let replay_players = replay_test_players(2);
     let (_live, replay_artifact) = replay_test_artifact(&replay_players, 0);
@@ -99,6 +162,36 @@ fn lobby_summary_marks_persisted_replay_lobbies() {
     assert_eq!(summary.spectator_count, 1);
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
+}
+
+#[test]
+fn lobby_summary_keeps_persisted_replay_visible_during_playback() {
+    let replay_players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&replay_players, 3);
+    let replay = ReplaySession::new(artifact.clone()).unwrap();
+    let mut task = RoomTask::new(
+        "__match_replay__:00000002".to_string(),
+        RoomMode::Replay { artifact },
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.created_at_unix_ms = 123_456;
+    task.host_id = Some(99);
+    add_test_room_spectator(&mut task, 99);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    let summary = task
+        .lobby_summary()
+        .expect("persisted replay playback should remain visible");
+
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.map, "Chokes");
+    assert_eq!(summary.occupied_slots, 0);
+    assert_eq!(summary.max_slots, 0);
+    assert_eq!(summary.spectator_count, 1);
+    assert_eq!(summary.phase, LobbySummaryPhase::InGame);
+    assert_eq!(summary.join_state, LobbyJoinState::InGame);
 }
 
 #[test]

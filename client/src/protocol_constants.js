@@ -32,6 +32,7 @@ export const LOBBY_KIND = Object.freeze({
 // --- Client -> Server message tags ---
 export const C = Object.freeze({
   JOIN: "join",
+  SET_NAME: "setName",
   READY: "ready",
   START: "start",
   SET_TEAM_PRESET: "setTeamPreset",
@@ -48,6 +49,7 @@ export const C = Object.freeze({
   RETURN_TO_LOBBY: "returnToLobby",
   PING: "ping",
   NET_REPORT: "netReport",
+  ACTIVITY: "activity",
   SET_ROOM_TIME_SPEED: "setRoomTimeSpeed",
   STEP_ROOM_TIME: "stepRoomTime",
   SEEK_ROOM_TIME: "seekRoomTime",

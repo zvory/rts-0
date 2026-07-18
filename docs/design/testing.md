@@ -163,7 +163,7 @@ Current scenario ids:
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
 - Rifleman Panzerfaust inspection is composed in Lab: enable `panzerfausts` research for the owner,
   spawn Riflemen plus Scout Car/Tank/Command Car targets, and compare loaded versus spent art,
-  cancellable windup, detached impact, exact target filtering, and explicit-Attack chase behavior.
+  cancellable windup, detached impact, exact target filtering, and stationary explicit-Attack behavior.
   The bundled `render-preview` and `supply-300-hellhole` scenarios include loaded Riflemen for
   renderer and high-density coverage.
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
@@ -340,7 +340,8 @@ canary runs own a private server; the browser shard passes its existing loopback
   client smoke. Include Node integration when protocol decode or network behavior changed.
 
 `scripts/check-source-file-sizes.mjs` runs as a cheap policy gate and enforces a 1500-line cap for
-Rust, JS, and MJS source/test files under `server/`, `client/src/`, `tests/`, and `scripts/`.
+Rust, JS, and MJS source/test files under `server/`, `client/src/`, `tests/`, and `scripts/`, plus
+the checked-in production stylesheet at `client/styles.css`.
 Files that were already above the cap are frozen in `scripts/source-file-size-baseline.json`; new
 over-cap files fail, and frozen exceptions fail on growth. Shrinkage prints a ratchet note so the
 baseline can be lowered or removed.
@@ -383,9 +384,12 @@ Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative
 `client/` paths and skips Rust nextest, lint, and Rust architecture work while still building the
-server and running live Node plus browser coverage. Contract-adjacent client paths
-such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
-`client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
+server and running live Node plus browser coverage. Contract-adjacent client paths such as the
+`client/src/config.js` facade and the explicitly classified rules, faction, timing, and
+player-palette mirror modules, along with `client/src/protocol.js`, `client/src/net.js`,
+`client/src/lobby_view.js`, and generated sim-WASM assets, fall back to `full`. Client-owned
+`client/src/config/presentation.js` remains client-only, and selector verification requires each
+production config module to declare one classification. Branch protection
 should require this single aggregate full-gate check unless a plan phase explicitly changes the
 contract.
 
@@ -468,13 +472,32 @@ can decide whether to follow up manually.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed
-seed in `docs/docdrift-checkpoint.txt`, creates or reuses `.docdrift/worktrees/docdrift-sweep` on
-`zvorygin/docdrift-sweep`, runs classification plus doc generation there, commits any docs changes,
-pushes the sweep branch, opens or updates the owned PR through `scripts/agent-pr.sh`, and waits with
-`scripts/wait-pr.sh`. The checkpoint advances atomically only after a no-PR range is fully processed
-or after `wait-pr.sh` confirms the sweep PR head is reachable from `origin/main`; failed checks,
-closed PRs, stale branches, dirty sweep worktrees, and fatal classifier/lifecycle failures leave the
-checkpoint unchanged.
+seed in `docs/docdrift-checkpoint.txt`, and gives each new run a unique
+`zvorygin/docdrift-sweep-<run-id>` branch plus matching isolated worktree. Before creating that
+branch it atomically writes `.docdrift/runs/<run-id>/run-state.json`; the schema-versioned record is
+updated after every lifecycle step and is the authority for the run's base/head, generated head,
+branch/worktree, PR identity and state, checkpoint target, and recovery action. With no explicit
+`--run-id`, recovery resumes only the single recorded nonterminal run; multiple candidates fail
+closed.
+
+An open PR resumes its exact recorded branch, head, PR, and first incomplete step. A missing
+worktree can be recreated from an exact local or remote recorded head, and the only automatic ref
+reconciliation is a clean local fast-forward to that exact remote head. Merged runs may finish
+their recorded idempotent checkpoint step; merged or closed-unmerged terminal runs otherwise keep
+their old refs and reports while a fresh unique run starts at fetched `origin/main`. The one legacy
+fixed branch, `zvorygin/docdrift-sweep`, can be adopted only when its clean local, remote, and
+worktree heads agree with exactly one terminal owned PR head. Automatic adoption is restricted to
+the known `68f6e958...` incident; another verified terminal head requires explicit
+`--adopt-legacy`, and the legacy ref is never resumed or rewritten. A closed PR's stale
+mergeability metadata is terminal evidence, not a conflict decision.
+
+Dirty or conflicted worktrees, in-progress Git operations, non-fast-forward or mismatched heads,
+open conflicted PRs, ambiguous PR/run matches, and ref or worktree collisions stop before refs,
+checkpoints, or GitHub state are changed. Recovery never stashes, resets, rebases, force-pushes,
+deletes, or resolves conflicts. Classification and doc generation then run on the selected safe
+worktree, `scripts/agent-pr.sh` owns PR creation, and `scripts/wait-pr.sh` proves merge reachability.
+The checkpoint advances atomically only after a no-PR range is fully processed or a recorded merged
+run is verified.
 Generated sweep PRs carry the `docdrift-sweep` label so effectiveness audits can list sweep output
 separately from PRs that merely change the sweeper tooling.
 Per-decision doc-patch skips do not block checkpoint advancement: once any generated docs PR merges,
@@ -483,8 +506,10 @@ the nightly gardener from retrying the same stale patch indefinitely. Lifecycle 
 failed checks, closed PRs, stale branches, dirty sweep worktrees, or unrecoverable git/GitHub errors
 still exit non-zero and leave the checkpoint unchanged.
 
-Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including
-`docdrift-full.{md,json}` and any classify/generate reports. Use
+Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including the recovery
+authority `run-state.json`, `docdrift-full.{md,json}`, and any classify/generate reports. The full
+report's `sweep.recoveryAction` states whether the run was created, resumed, completed after merge,
+started after a terminal PR, adopted from the legacy branch, or stopped for operator review. Use
 `scripts/docdrift-daily.sh` as the launchd-friendly daily command; pass normal
 `docdrift-sweep.mjs` options after it, for example `--dry-run` for a lifecycle preview or
 `--run-id <id>` for predictable report paths. The wrapper first fetches `origin/main`, creates or

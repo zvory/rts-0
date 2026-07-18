@@ -1,11 +1,18 @@
 import { hexToInt, lightenColor } from "../shared.js";
-import { sampleRigAnimation } from "./animation.js";
+import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
+import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { isImmutablePartSelection, normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const ATLAS_SPRITES_CACHE = new WeakMap();
 const ROUTE_COVERAGE_CACHE = new WeakMap();
 const ALL_ROUTE_PARTS = Object.freeze({});
+const PNG_RIG_DIAGNOSTIC_LABELS = Object.freeze([
+  "renderer.pngRig.redraw.skipped.hidden",
+  "renderer.pngRig.redraw.completed",
+]);
+const PNG_RIG_HIDDEN = 0;
+const PNG_RIG_COMPLETED = 1;
 
 export function renderPngUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   const atlas = options.atlas;
@@ -13,44 +20,54 @@ export function renderPngUnitRig(renderer, entity, colorByOwner, state, definiti
   if (!definition || !atlas || !atlasTexture) return null;
   const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
-  const rendered = [];
-  for (const route of options.routes || []) {
-    if (!options.routesCovered && !pngAtlasCanRenderRoute(definition, atlas, route)) continue;
-    const pool = renderer._liveRigPools?.[route.poolName];
-    if (!pool) continue;
-    let instance = pool.get(entity.id);
-    if (instance && !instance.matchesPngAtlasRig?.(entity.kind, definition, atlas, atlasTexture, route.parts)) {
-      instance.destroy?.();
-      pool.delete(entity.id);
-      instance = null;
-      renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.rebuilt.${route.poolName}`);
+  const rendered = options.collectResults === false ? null : [];
+  if (options.route) {
+    const instance = renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture, context, options.route, options);
+    if (instance && rendered) rendered.push(instance);
+  } else {
+    for (const route of options.routes || []) {
+      const instance = renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture, context, route, options);
+      if (instance && rendered) rendered.push(instance);
     }
-    if (!instance) {
-      instance = new PngAtlasRigInstance(
-        entity.kind,
-        definition,
-        atlas,
-        atlasTexture,
-        renderer._rigPixiFactory ?? createDefaultPngPixiFactory(),
-        { includeParts: route.parts },
-      );
-      renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.created.${route.poolName}`);
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigContainer");
-      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigPart", instance.parts?.size || 0);
-    } else {
-      renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.reused.${route.poolName}`);
-    }
-    pool.set(entity.id, instance);
-    renderer._seen[route.poolName]?.add(entity.id);
-    const layer = renderer.layers[route.layerName];
-    if (!instance.container.parent && layer) layer.addChild(instance.container);
-    instance.update(entity, context, {
-      sampledAnimation: options.sampledAnimation,
-      diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
-    });
-    rendered.push(instance);
   }
   return rendered;
+}
+
+function renderPngUnitRigRoute(renderer, entity, definition, atlas, atlasTexture, context, route, options) {
+  if (!options.routesCovered && !pngAtlasCanRenderRoute(definition, atlas, route)) return null;
+  const pool = renderer._liveRigPools?.[route.poolName];
+  if (!pool) return null;
+  let instance = pool.get(entity.id);
+  if (instance && !instance.matchesPngAtlasRig?.(entity.kind, definition, atlas, atlasTexture, route.parts)) {
+    instance.destroy?.();
+    pool.delete(entity.id);
+    instance = null;
+    renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.rebuilt.${route.poolName}`);
+  }
+  if (!instance) {
+    instance = new PngAtlasRigInstance(
+      entity.kind,
+      definition,
+      atlas,
+      atlasTexture,
+      renderer._rigPixiFactory ?? createDefaultPngPixiFactory(),
+      { includeParts: route.parts },
+    );
+    renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.created.${route.poolName}`);
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigContainer");
+    renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.pngRigPart", instance.parts?.size || 0);
+  } else {
+    renderer._recordRenderDiagnostic?.(`renderer.pngRig.instance.reused.${route.poolName}`);
+  }
+  pool.set(entity.id, instance);
+  renderer._seen[route.poolName]?.add(entity.id);
+  const layer = renderer.layers[route.layerName];
+  if (!instance.container.parent && layer) layer.addChild(instance.container);
+  instance.update(entity, context, {
+    sampledAnimation: options.sampledAnimation,
+    diagnosticRecorder: renderer,
+  });
+  return instance;
 }
 
 export function pngAtlasCanRenderRoute(definition, atlas, route) {
@@ -131,9 +148,17 @@ class PngAtlasRigInstance {
       const display = pixiFactory.createSprite(baseFrame.texture);
       display.rtsRigPartId = sprite.id;
       display.anchor?.set?.(0, 0);
-      this.parts.set(sprite.id, { sprite, display, baseFrame, paletteFrames });
+      this.parts.set(sprite.id, {
+        sprite,
+        display,
+        baseFrame,
+        paletteFrames,
+        transform: { initialized: false },
+      });
       this.container.addChild(display);
     }
+    this._animationStage = null;
+    this._diagnosticCounts = new Uint32Array(PNG_RIG_DIAGNOSTIC_LABELS.length);
   }
 
   matchesPngAtlasRig(kind, definition, atlas, atlasTexture, includeParts = null) {
@@ -155,23 +180,28 @@ class PngAtlasRigInstance {
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 
-    const sampled = options.sampledAnimation ?? sampleRigAnimation(
-      this.definition,
-      entity,
-      renderContext,
-      { includeParts: animationPartIds(this.parts) },
-    );
+    let sampled = options.sampledAnimation;
+    if (!sampled) {
+      if (!this._animationStage) {
+        const animationPartIds = new Set([...this.parts.values()].map((rec) => rec.sprite.animationPart));
+        this._animationStage = createRigAnimationStage(this.definition, { includeParts: animationPartIds });
+      }
+      sampled = sampleRigAnimationInto(this._animationStage, entity, renderContext);
+    }
+    const diagnosticCounts = this._diagnosticCounts;
+    diagnosticCounts.fill(0);
     for (const [spriteId, rec] of this.parts) {
       const partState = sampled.parts[rec.sprite.animationPart];
       if (!partState) {
         rec.display.visible = false;
-        options.diagnostics?.("renderer.pngRig.redraw.skipped.hidden");
+        diagnosticCounts[PNG_RIG_HIDDEN] += 1;
         continue;
       }
       const frameRecord = frameRecordForContext(rec, sampled.context);
       if (rec.display.texture !== frameRecord.texture) rec.display.texture = frameRecord.texture;
-      applySpriteState(rec.display, rec.sprite, frameRecord.frame, partState, sampled.context, options.diagnostics);
+      applySpriteState(rec, frameRecord.frame, partState, sampled.context, diagnosticCounts);
     }
+    flushRigDiagnosticCounts(options, PNG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }
 
   destroy() {
@@ -200,30 +230,30 @@ function createPaletteFrameRecords(paletteFrames, baseTexture, pixiFactory) {
   if (!paletteFrames || typeof paletteFrames !== "object") return null;
   const records = new Map();
   for (const [key, frame] of Object.entries(paletteFrames)) {
-    const colorKey = normalizedColorKey(key);
-    if (!colorKey || !frame) continue;
+    const colorKey = normalizedColorValue(key);
+    if (colorKey === null || !frame) continue;
     records.set(colorKey, createFrameRecord(frame, baseTexture, pixiFactory));
   }
   return records.size > 0 ? records : null;
 }
 
 function frameRecordForContext(rec, context) {
-  const colorKey = normalizedColorKey(context?.teamColor);
-  return colorKey && rec.paletteFrames?.get(colorKey) ? rec.paletteFrames.get(colorKey) : rec.baseFrame;
+  const colorKey = normalizedColorValue(context?.teamColor);
+  return colorKey !== null && rec.paletteFrames?.has(colorKey) ? rec.paletteFrames.get(colorKey) : rec.baseFrame;
 }
 
-function applySpriteState(display, part, frame, state, context, diagnostics = null) {
+function applySpriteState(rec, frame, state, context, diagnosticCounts) {
+  const { display, sprite: part } = rec;
   display.visible = state.visible;
   if (!state.visible) {
-    diagnostics?.("renderer.pngRig.redraw.skipped.hidden");
+    diagnosticCounts[PNG_RIG_HIDDEN] += 1;
     return;
   }
 
-  const transform = displayTransform(state, frame, part);
-  applyDisplayTransform(display, transform);
+  applyDisplayTransform(display, state, frame, part, rec.transform);
   display.alpha = state.alpha;
   display.tint = tintForSlot(part.tintSlot ?? state.tintSlot, context, part);
-  diagnostics?.("renderer.pngRig.redraw.completed");
+  diagnosticCounts[PNG_RIG_COMPLETED] += 1;
 }
 
 function atlasSprites(definition, atlas) {
@@ -299,51 +329,64 @@ function cacheRouteCoverage(definition, atlas, routeParts, coverage) {
   byRoute.set(routeParts, coverage);
 }
 
-function animationPartIds(parts) {
-  return new Set([...parts.values()].map((rec) => rec.sprite.animationPart));
-}
-
 function spriteMatchesRoute(sprite, includeParts) {
   if (!includeParts) return true;
   return sprite.sourceParts.some((partId) => includeParts.has(partId));
 }
 
-function displayTransform(state, frame, part = null) {
+function applyDisplayTransform(display, state, frame, part, last) {
   const pixelsPerUnitX = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
   const pixelsPerUnitY = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
-  const localOffset = rotateOffset(state.localOffset, state.transform.rotation);
+  const stateRotation = state.transform.rotation;
+  const cos = Math.cos(stateRotation);
+  const sin = Math.sin(stateRotation);
+  const localX = state.localOffset?.x ?? 0;
+  const localY = state.localOffset?.y ?? 0;
+  const rotatedLocalX = localX === 0 && localY === 0 ? 0 : localX * cos - localY * sin;
+  const rotatedLocalY = localX === 0 && localY === 0 ? 0 : localX * sin + localY * cos;
   const defaultPivotX = frame.originX + state.pivot.x * pixelsPerUnitX;
   const defaultPivotY = frame.originY + state.pivot.y * pixelsPerUnitY;
   const pivotX = part?.rotationPivotX ?? frame.rotationPivotX ?? defaultPivotX;
   const pivotY = part?.rotationPivotY ?? frame.rotationPivotY ?? defaultPivotY;
-  const spriteOffset = rotateOffset({
-    x: part?.positionOffsetX ?? frame.positionOffsetX ?? 0,
-    y: part?.positionOffsetY ?? frame.positionOffsetY ?? 0,
-  }, state.transform.rotation);
-  const pivotReferenceRotation = state.transform.rotation + (
+  const spriteOffsetX = part?.positionOffsetX ?? frame.positionOffsetX ?? 0;
+  const spriteOffsetY = part?.positionOffsetY ?? frame.positionOffsetY ?? 0;
+  const rotatedSpriteX = spriteOffsetX === 0 && spriteOffsetY === 0
+    ? 0
+    : spriteOffsetX * cos - spriteOffsetY * sin;
+  const rotatedSpriteY = spriteOffsetX === 0 && spriteOffsetY === 0
+    ? 0
+    : spriteOffsetX * sin + spriteOffsetY * cos;
+  const pivotReferenceRotation = stateRotation + (
     part?.rotationPivotReferenceOffset ?? frame.rotationPivotReferenceOffset ?? 0
   );
-  const pivotOffset = rotateOffset({
-    x: (pivotX - defaultPivotX) / pixelsPerUnitX,
-    y: (pivotY - defaultPivotY) / pixelsPerUnitY,
-  }, pivotReferenceRotation);
-  const rotation = state.transform.rotation + (part?.rotationOffset ?? frame.rotationOffset ?? 0);
-  return {
-    x: state.transform.x + localOffset.x + spriteOffset.x + pivotOffset.x,
-    y: state.transform.y + localOffset.y + spriteOffset.y + pivotOffset.y,
-    pivotX,
-    pivotY,
-    scaleX: (state.transform.scaleX * (state.geometryScale?.x ?? 1)) / pixelsPerUnitX,
-    scaleY: (state.transform.scaleY * (state.geometryScale?.y ?? 1)) / pixelsPerUnitY,
-    rotation,
-  };
-}
+  const pivotReferenceCos = Math.cos(pivotReferenceRotation);
+  const pivotReferenceSin = Math.sin(pivotReferenceRotation);
+  const pivotLocalX = (pivotX - defaultPivotX) / pixelsPerUnitX;
+  const pivotLocalY = (pivotY - defaultPivotY) / pixelsPerUnitY;
+  const pivotOffsetX = pivotLocalX === 0 && pivotLocalY === 0
+    ? 0
+    : pivotLocalX * pivotReferenceCos - pivotLocalY * pivotReferenceSin;
+  const pivotOffsetY = pivotLocalX === 0 && pivotLocalY === 0
+    ? 0
+    : pivotLocalX * pivotReferenceSin + pivotLocalY * pivotReferenceCos;
+  const x = state.transform.x + rotatedLocalX + rotatedSpriteX + pivotOffsetX;
+  const y = state.transform.y + rotatedLocalY + rotatedSpriteY + pivotOffsetY;
+  const scaleX = (state.transform.scaleX * (state.geometryScale?.x ?? 1)) / pixelsPerUnitX;
+  const scaleY = (state.transform.scaleY * (state.geometryScale?.y ?? 1)) / pixelsPerUnitY;
+  const rotation = stateRotation + (part?.rotationOffset ?? frame.rotationOffset ?? 0);
 
-function applyDisplayTransform(display, transform) {
-  setPoint(display.position, transform.x, transform.y);
-  setPoint(display.pivot, transform.pivotX, transform.pivotY);
-  setPoint(display.scale, transform.scaleX, transform.scaleY);
-  display.rotation = transform.rotation;
+  if (!last.initialized || last.x !== x || last.y !== y) setPoint(display.position, x, y);
+  if (!last.initialized || last.pivotX !== pivotX || last.pivotY !== pivotY) setPoint(display.pivot, pivotX, pivotY);
+  if (!last.initialized || last.scaleX !== scaleX || last.scaleY !== scaleY) setPoint(display.scale, scaleX, scaleY);
+  if (!last.initialized || last.rotation !== rotation) display.rotation = rotation;
+  last.initialized = true;
+  last.x = x;
+  last.y = y;
+  last.pivotX = pivotX;
+  last.pivotY = pivotY;
+  last.scaleX = scaleX;
+  last.scaleY = scaleY;
+  last.rotation = rotation;
 }
 
 function tintForSlot(slot, context, part) {
@@ -382,20 +425,10 @@ function clampByte(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-function normalizedColorKey(color) {
+function normalizedColorValue(color) {
   const value = typeof color === "string" || typeof color === "number" ? hexToInt(color) : null;
   if (!Number.isFinite(value)) return null;
-  return `#${(value & 0xffffff).toString(16).padStart(6, "0").toLowerCase()}`;
-}
-
-function rotateOffset(offset, rotation) {
-  if (!offset || (offset.x === 0 && offset.y === 0)) return { x: 0, y: 0 };
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
-  return {
-    x: offset.x * cos - offset.y * sin,
-    y: offset.x * sin + offset.y * cos,
-  };
+  return value & 0xffffff;
 }
 
 function setPoint(point, x, y) {

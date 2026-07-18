@@ -10,6 +10,9 @@ import {
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
   MORTAR_INNER_RADIUS_TILES,
+  MORTAR_FIELD_OF_FIRE_RAD,
+  MORTAR_MIN_RANGE_TILES,
+  MORTAR_RANGE_TILES,
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
@@ -590,6 +593,13 @@ function fieldOfFireProfile(kind, tileSize) {
       minRadius: 0,
       maxRadius: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES * tileSize,
       arc: ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
+    };
+  }
+  if (kind === KIND.MORTAR_TEAM) {
+    return {
+      minRadius: MORTAR_MIN_RANGE_TILES * tileSize,
+      maxRadius: MORTAR_RANGE_TILES * tileSize,
+      arc: MORTAR_FIELD_OF_FIRE_RAD,
     };
   }
   return null;

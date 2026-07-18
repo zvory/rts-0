@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use rand::rngs::SmallRng;
-use rand::SeedableRng;
 use rts_ai::AiController;
 use rts_sim::game::PlayerInit;
 
@@ -65,9 +63,7 @@ pub(super) fn late_spectator_notice_name(name: &str) -> String {
 pub(super) fn live_ai_controllers(
     players: &[PlayerInit],
     ai_slots: &[AiSlot],
-    seed: u32,
 ) -> Vec<AiController> {
-    let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
     players
         .iter()
         .filter(|player| player.is_ai)
@@ -76,7 +72,7 @@ pub(super) fn live_ai_controllers(
                 .iter()
                 .find(|ai| ai.id == player.id)
                 .map(|ai| ai.profile_id)
-                .unwrap_or_else(|| rts_ai::random_live_profile_id(&mut rng));
+                .unwrap_or(rts_ai::DEFAULT_LIVE_PROFILE_ID);
             let profile_id = rts_ai::resolve_live_profile_id_for_match(profile_id);
             AiController::with_profile_id(player.id, profile_id)
         })

@@ -39,7 +39,6 @@ pub struct EntityCounts {
 pub(crate) enum PathingRequestSource {
     Move,
     AttackMove,
-    Attack,
     Gather,
     Build,
     Deconstruct,
@@ -51,7 +50,6 @@ pub(crate) enum PathingRequestSource {
 pub(crate) struct PathingSourceCounts {
     pub(crate) move_orders: u32,
     pub(crate) attack_move: u32,
-    pub(crate) attack: u32,
     pub(crate) gather: u32,
     pub(crate) build: u32,
     pub(crate) deconstruct: u32,
@@ -66,7 +64,6 @@ impl PathingSourceCounts {
             PathingRequestSource::AttackMove => {
                 self.attack_move = self.attack_move.saturating_add(count);
             }
-            PathingRequestSource::Attack => self.attack = self.attack.saturating_add(count),
             PathingRequestSource::Gather => self.gather = self.gather.saturating_add(count),
             PathingRequestSource::Build => self.build = self.build.saturating_add(count),
             PathingRequestSource::Deconstruct => {
@@ -80,7 +77,6 @@ impl PathingSourceCounts {
     fn add(&mut self, other: Self) {
         self.move_orders = self.move_orders.saturating_add(other.move_orders);
         self.attack_move = self.attack_move.saturating_add(other.attack_move);
-        self.attack = self.attack.saturating_add(other.attack);
         self.gather = self.gather.saturating_add(other.gather);
         self.build = self.build.saturating_add(other.build);
         self.deconstruct = self.deconstruct.saturating_add(other.deconstruct);
@@ -92,7 +88,6 @@ impl PathingSourceCounts {
         let (label, count) = [
             ("move", self.move_orders),
             ("attackMove", self.attack_move),
-            ("attack", self.attack),
             ("gather", self.gather),
             ("build", self.build),
             ("deconstruct", self.deconstruct),
@@ -113,7 +108,6 @@ impl PathingSourceCounts {
         compact_counts([
             ("move", self.move_orders),
             ("attackMove", self.attack_move),
-            ("attack", self.attack),
             ("gather", self.gather),
             ("build", self.build),
             ("deconstruct", self.deconstruct),
@@ -300,9 +294,7 @@ impl PathingPassDiagnostics {
     pub(crate) fn record_path_request(&mut self, request: PathingRequestSample) {
         self.requests_processed = self.requests_processed.saturating_add(1);
         self.source_counts.record(request.source, 1);
-        self.total_request_duration = self
-            .total_request_duration
-            .saturating_add(request.duration);
+        self.total_request_duration = self.total_request_duration.saturating_add(request.duration);
         self.worst_request = self.worst_request.max(request.duration);
         if request.path_ok {
             self.path_success = self.path_success.saturating_add(1);

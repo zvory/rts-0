@@ -30,7 +30,8 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 /// The default live-lobby profile id.
 pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ID;
 
-/// Canonical profile ids accepted for ordinary lobby AI opponents.
+/// Canonical profile ids understood by the live adapter. Experimental profiles are available to
+/// internal observer-only sessions; the room actor prevents them from entering human matches.
 pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_2_1_ID, AI_TURTLE_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
@@ -511,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_pool_exposes_supported_lobby_choices() {
+    fn live_adapter_knows_public_and_internal_profiles() {
         assert_eq!(LIVE_PROFILE_IDS, [AI_2_1_ID, AI_TURTLE_ID]);
     }
 
@@ -521,12 +522,13 @@ mod tests {
     }
 
     #[test]
-    fn random_live_profile_selection_uses_live_pool() {
+    fn random_live_profile_selection_uses_the_full_internal_pool() {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
+        let mut selected = BTreeSet::new();
         for _ in 0..32 {
-            let selected = random_live_profile_id(&mut rng);
-            assert!(LIVE_PROFILE_IDS.contains(&selected));
+            selected.insert(random_live_profile_id(&mut rng));
         }
+        assert_eq!(selected, BTreeSet::from([AI_2_1_ID, AI_TURTLE_ID]));
     }
 
     #[test]

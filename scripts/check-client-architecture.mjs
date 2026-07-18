@@ -35,6 +35,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "ai_diagnostics_panel.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
   "observer_analysis_preferences.js": "app-shell",
+  "observer_analysis_research.js": "app-shell",
   "observer_analysis_resources.js": "app-shell",
   "observer_analysis_rows.js": "app-shell",
   "observer_analysis_signatures.js": "app-shell",
@@ -45,12 +46,14 @@ const AREA_BY_FILE = new Map(Object.entries({
   "room_time_panel.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
+  "control_policy_projection.js": "app-shell",
   "room_capabilities.js": "app-shell",
   "visual_profiles.js": "app-shell",
   "camera_view_selection.js": "app-shell",
   "launch_url.js": "app-shell",
   "interact_bridge.js": "app-shell",
   "interact_game_bridge.js": "app-shell",
+  "interact_selection.js": "app-shell",
   "clean_presentation.js": "app-shell",
   "map_editor_app.js": "app-shell",
   "map_editor_viewport.js": "app-shell",
@@ -62,6 +65,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "state_visual_effects.js": "model",
   "apm_tracker.js": "model",
   "client_intent.js": "model",
+  "command_interaction.js": "model",
   "command_budget.js": "model",
   "command_composer.js": "model",
   "progress_extrapolator.js": "model",
@@ -90,6 +94,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "hud_ability_affordance.js": "ui",
   "hud_command_dom.js": "ui",
   "hud_command_card.js": "ui",
+  "hud_command_card_contexts.js": "ui",
   "hud_train_card_helpers.js": "ui",
   "hud_control_groups.js": "ui",
   "hud_resources.js": "ui",
@@ -266,6 +271,7 @@ for (const file of files) {
   });
   checkLargeFileBaseline(file, source);
   checkForbiddenGameStateIntentShims(file, source);
+  checkForbiddenGameStateControlPolicy(file, source);
   checkRawCameraRepresentation(file, source);
   checkRoomCapabilityParser(file, source);
   checkRigOnlyUnitVisuals(file, source);
@@ -368,6 +374,14 @@ function checkForbiddenGameStateIntentShims(file, source) {
     if (directStateRe.test(source)) {
       failures.push(`${file}: forbidden GameState intent shim reference ${name}; use injected ClientIntent or a narrow view model`);
     }
+  }
+}
+
+function checkForbiddenGameStateControlPolicy(file, source) {
+  if (/(?:\bstate|\bthis\.state)(?:\.controlPolicy\b|\?\.controlPolicy\b)/.test(source)) {
+    failures.push(
+      `${file}: forbidden GameState controlPolicy discovery; inject the read-only policy projection explicitly`,
+    );
   }
 }
 

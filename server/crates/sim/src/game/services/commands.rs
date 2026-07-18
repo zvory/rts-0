@@ -6,7 +6,8 @@ use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::entity::{
-    EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
+    supports_manual_emplacement, EntityKind, EntityStore, Order, OrderIntent, ProdItem,
+    RallyIntent, ResearchItem, WeaponSetup,
 };
 use crate::game::firing_reveal::{
     record_global_firing_reveals_for_enemy_players, FiringRevealSource,
@@ -40,11 +41,8 @@ use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules::{self, combat::WeaponKind};
+use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 use std::collections::HashMap;
-/// Max submitted unit ids inspected per multi-unit command. Caps the per-id work a single command
-/// can force, so a repeated/huge id list can't be used to stall the tick loop.
-const MAX_UNITS_PER_COMMAND: usize = 256;
-const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
 mod artillery_scatter;
 mod cancel;
@@ -56,7 +54,7 @@ mod scout_plane_ability;
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
-    dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
+    dedupe_cap_units, dedupe_units, is_constructing, player_is_ai, rally_intent_for_map,
     unit_can_accept_ground_command, unit_can_accept_player_command,
 };
 use self::planner_facts::{
@@ -306,7 +304,7 @@ pub(in crate::game) fn apply_commands(
                     let Some(e) = entities.get_mut(id) else {
                         continue;
                     };
-                    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
+                    if !supports_manual_emplacement(e.kind) {
                         continue;
                     }
                     if matches!(
@@ -316,7 +314,7 @@ pub(in crate::game) fn apply_commands(
                         e.clear_orders();
                         e.set_path_goal(None);
                         e.set_weapon_setup(WeaponSetup::TearingDown {
-                            ticks: setup_ticks_for(e.kind),
+                            ticks: teardown_ticks_for(e.kind),
                         });
                     } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
                         e.set_emplacement_facing(None);
@@ -494,7 +492,7 @@ pub(in crate::game) fn apply_commands(
                 && b.kind == definition.researched_at
                 && rules::economy::can_research_for_faction(
                     &faction_id,
-                    upgrade.to_protocol_str(),
+                    upgrade,
                     building_kind,
                 ));
                 if !ok {
@@ -613,7 +611,10 @@ fn validate_command_units(
     units: Vec<u32>,
     admission: CommandAdmissionPolicy,
 ) -> Option<Vec<u32>> {
-    let units = dedupe_cap_units(units, admission.max_units_per_command);
+    if units.len() > admission.max_units_per_command {
+        return None;
+    }
+    let units = dedupe_units(units);
     if admission.enforce_budget && guards::command_budget_exceeded(entities, player, &units) {
         notice(events, player, "Command supply exceeded");
         return None;
@@ -1094,11 +1095,11 @@ fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
 }
 
 fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
-    planner::AbilityId(ability.to_planner_code())
+    planner::AbilityId(ability::planner_code(ability))
 }
 
 fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
-    AbilityKind::from_planner_code(ability.0)
+    ability::from_planner_code(ability.0)
 }
 
 fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryFireMode> {
@@ -1560,6 +1561,13 @@ fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
         _ => config::ANTI_TANK_GUN_SETUP_TICKS,
+    }
+}
+
+fn teardown_ticks_for(kind: EntityKind) -> u16 {
+    match kind {
+        EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
+        _ => setup_ticks_for(kind),
     }
 }
 

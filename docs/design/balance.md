@@ -15,8 +15,9 @@ Default attack range, damage, cooldown, weapon class, and weapon-policy metadata
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
 selected weapon profile instead of inferring those behaviors only from the firing entity kind.
-The Panzerfausts Training Centre upgrade arms every current and future Rifleman with one disposable
-anti-armor shot that deals 100 base damage with 50% armor penetration and no tank-facing modifier.
+The Panzerfausts Training Centre upgrade arms every Rifleman produced after research completes
+with one disposable anti-armor shot that deals 100 base damage with 50% armor penetration and no
+tank-facing modifier.
 The shot is detached at launch; the same Rifleman immediately returns to normal movement and rifle
 combat while the projectile travels, preserving its orders, HP, control-group identity, and trench.
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
@@ -194,10 +195,12 @@ Core unit roles:
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
 - **Panzerfausts** is a Training Centre upgrade for Riflemen, not a standalone unit. It gives every
-  existing and future Rifleman one disposable 5-tile, 50%-armor-penetrating shot. Automatic use is
+  Rifleman produced after research completes one disposable 5-tile, 50%-armor-penetrating shot;
+  Riflemen already on the field when research completes remain unchanged. Automatic use is
   limited to visible Scout Cars, Tanks, and Command Cars already in range; Mortar Teams, Artillery,
-  infantry, buildings, and obstacles are not launcher targets. Only an explicit Attack order may
-  chase a valid vehicle for the shot. There is no salvo coordination or overkill suppression.
+  infantry, buildings, and obstacles are not launcher targets. Explicit Attack orders remain
+  stationary, so the vehicle must already be within launcher range. There is no salvo coordination
+  or overkill suppression.
 - **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
@@ -254,14 +257,13 @@ Plain `Move` tanks, scout cars, and upgraded Riflemen only fire at enemies alrea
 weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
 following the player-issued path: auto-acquisition can aim and fire only at targets that are
 currently inside weapon range and pass hostile, visibility, smoke, line-of-sight, and blocker
-checks, but it cannot replace the commanded destination with a chase or standoff path. Non-moving-fire
-`AttackMove` units still chase when no current target is fireable, but while their path is active
-they prefer an in-range legal fallback over a softer out-of-range target. Direct `Attack` orders and
-post-arrival aggressive behavior can still pursue, with vehicle standoff goals inside firing range
-instead of the target center. Tank auto-targeting first checks in-range Anti-Tank Guns, Tanks, Tank
+checks, but it cannot replace the commanded destination with an enemy-directed path. Non-moving-fire
+`AttackMove` units pause for fireable in-range targets and then resume the original destination.
+Direct `Attack` orders and post-arrival behavior remain stationary. Tank auto-targeting first checks
+in-range Anti-Tank Guns, Tanks, Tank
 Traps, and Mortar Teams, in that order, before generic acquisition; this priority can replace a
-retained lower-priority moving-fire target but does not chase out-of-range priority targets or
-override explicit player attack orders. Forest-specific rules are future work.
+retained lower-priority moving-fire target but never considers out-of-range priority targets or
+overrides explicit player attack orders. Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
@@ -295,7 +297,9 @@ folded into default targeting.
   including passability, construction, cover, concealment, and line of sight.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
-- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 20`,
+- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
+  `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
+  `MORTAR_RANGE_TILES = 15`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
@@ -303,15 +307,18 @@ folded into default targeting.
   `MORTAR_BLIND_MEDIAN_SCATTER_TILES = 4.0`.
   Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
-  The inner radius is fully armor-piercing against armored targets; the outer radius keeps
-  semi-armor-piercing damage against armored targets. Manual Fire uses hotkey `X`; autocast
-  uses normal idle/attack-move acquisition after Mortar Autocast research completes. Manual and
-  autocast shots scatter from the intended impact point: if the point is visible to the firing team,
+  Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
+  resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
+  `X` and remains a player-directed override that does not require setup, but it must land in the
+  5-to-15-tile range band. Autocast uses normal idle/attack-move acquisition after Mortar Autocast
+  research completes and fires only while fully deployed, at targets inside the same range band and
+  its full 360-degree field of fire. Autocast aims at a target's current position and does not lead
+  movement. Manual and autocast shots scatter from the intended impact point: if the point is visible to the firing team,
   the deterministic radial scatter has a one-tile median miss radius; otherwise it has a four-tile
-  median miss radius. Autocast prefers targets whose scattered predicted impact avoids same-team
+  median miss radius. Autocast prefers targets whose deterministic scattered impact avoids same-team
   units/buildings when alternatives are available.
   Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
-  scattered predicted impact points that would hit any same-team unit or building at its current position,
+  deterministic scattered impact points that would hit any same-team unit or building at its current position,
   while manual fire remains unrestricted.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
@@ -378,8 +385,8 @@ folded into default targeting.
   their setup and teardown timers from 30 ticks to 15. Loaded Riflemen also use the reduced
   12-tick Panzerfaust windup.
 - **Panzerfausts** (Training Centre research, protocol id `panzerfausts`): costs 100 steel / 100 oil
-  and takes 600 ticks (~20s). Completion arms all current Riflemen and every Rifleman produced later
-  with one lifetime disposable launcher shot. Spent Riflemen are never automatically rearmed.
+  and takes 600 ticks (~20s). Completion arms only Riflemen produced afterward with one lifetime
+  disposable launcher shot. Existing and spent Riflemen are never automatically armed or rearmed.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 200 steel / 0 oil
   and takes 900 ticks (~30s). The rules surface defines Riflemen and Machine Gunners
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
@@ -389,8 +396,8 @@ folded into default targeting.
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
   existing empty trench while stopped in its footprint. A trench can actively hold only one
   infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
-  Active occupation grants +1 tile weapon range, suppresses idle aggressive chase like Hold
-  Position, reduces incoming direct damage by 50% after normal weapon/armor/facing calculations,
+  Active occupation grants +1 tile weapon range, reduces incoming direct damage by 50% after
+  normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Entrenchment does not add a direct-shot
   miss chance; Tank cannon and Anti-Tank Gun direct shots independently give every infantry victim
@@ -492,7 +499,7 @@ folded into default targeting.
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
   each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
   nearest whole-unit node capacity to the 2.6:1 target).
-- Supply: every active player has an intrinsic `200` supply allowance, which is also the hard cap.
+- Supply: every active player has an intrinsic `300` supply allowance, which is also the hard cap.
   Buildings do not provide supply: City Centres, Zamoks, and legacy fixture/replay Depots all grant
   `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
@@ -536,9 +543,9 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
+| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 11    | 60  | 10  | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 20 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-15 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
@@ -562,7 +569,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after Medium Guns, and Artillery after Heavy Guns; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
-| pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; ejects friendly footprint occupants when its builder arrives; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed City Centre/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

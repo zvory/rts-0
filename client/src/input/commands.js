@@ -57,7 +57,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     : null;
   const resource = this._resourceAtScreen(p);
   const world = this._groundAtScreen(p.x, p.y);
-  if (!world && !explicitAttackCommandTarget(this.state, pickedTarget)) return false;
+  if (!world && !explicitAttackCommandTarget(this.state, pickedTarget, this.controlPolicy)) return false;
   if (ownUnits.length === 0) {
     if (producers.length === 0 || !world) return true;
     const queued = !!ev.shiftKey;
@@ -65,7 +65,7 @@ export function _issueTargetedCommand(p, ev = {}) {
       if (resource) return true;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
+        this.commandInteraction.issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
       }
       this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
     }
@@ -76,7 +76,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     const antiTankGuns = this._selectedOwnAntiTankGunIds();
     if (antiTankGuns.length > 0) {
       const queued = !!ev.shiftKey;
-      this._issueCommand(cmd.setupAntiTankGuns(antiTankGuns, world.x, world.y, queued));
+      this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(antiTankGuns, world.x, world.y, queued));
       this._addCommandFeedback("move", world.x, world.y, queued);
     }
     return true;
@@ -89,7 +89,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     const units = Array.isArray(carriers)
       ? this.state
           .selectedEntities()
-          .filter((e) => ownOwner(this.state, e.owner) && carriers.includes(e.kind))
+          .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && carriers.includes(e.kind))
           .map((e) => e.id)
       : ownUnits;
     if (units.length === 0) return true;
@@ -100,7 +100,7 @@ export function _issueTargetedCommand(p, ev = {}) {
         ? cmd.blanketFire(units, world.x, world.y, queued)
         : cmd.useAbility(ability, units, world.x, world.y, queued);
     const selectedCarriers = this.state.selectedEntities().filter((e) => units.includes(e.id));
-    const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state);
+    const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state, this.controlPolicy);
     const artilleryLocks = isArtilleryFireAbility(ability)
       ? buildArtilleryTargetLocks({
         ability,
@@ -113,7 +113,7 @@ export function _issueTargetedCommand(p, ev = {}) {
         queued,
       })
       : [];
-    this._issueCommand(command);
+    this.commandInteraction.issueCommand(command);
     if (isArtilleryFireAbility(ability)) {
       for (const lock of artilleryLocks) {
         this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
@@ -128,13 +128,13 @@ export function _issueTargetedCommand(p, ev = {}) {
   }
   if (commandTarget === "move") {
     if (!world) return false;
-    this._issueCommand(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
+    this.commandInteraction.issueCommand(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
     this._addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
     return true;
   }
 
   const target = pickedTarget;
-  if (explicitAttackCommandTarget(this.state, target)) {
+  if (explicitAttackCommandTarget(this.state, target, this.controlPolicy)) {
     const issuedAttack = issueTargetAttackForLandUnits(this, landUnits, target, !!ev.shiftKey);
     if (issuedAttack) {
       this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
@@ -187,7 +187,7 @@ function normalRightClickAction(input, p) {
     if (action) return action;
   }
 
-  if (target && ownOwner(input.state, target.owner) && _isOwnIncompleteBuilding(target)) {
+  if (target && ownOwner(input.state, target.owner, input.controlPolicy) && _isOwnIncompleteBuilding(target)) {
     const resume = _resumeConstructionIntent(target, input.state.map);
     if (resume && workers.length > 0) {
       return {
@@ -208,7 +208,7 @@ function normalRightClickAction(input, p) {
       feedback: rightClickFeedback("move", target.x, target.y),
     };
   }
-  if (target && enemyOwner(input.state, target.owner) && isAttackableEntityTarget(target)) {
+  if (target && enemyOwner(input.state, target.owner, input.controlPolicy) && isAttackableEntityTarget(target)) {
     return {
       kind: "attack",
       units: landUnits,
@@ -259,7 +259,7 @@ function pumpJackOilUnderFriendlyUnit(input, target, workers) {
     workers.length === 0 ||
     !target ||
     !isUnit(target.kind) ||
-    !friendlyOwner(input.state, target.owner)
+    !friendlyOwner(input.state, target.owner, input.controlPolicy)
   ) {
     return null;
   }
@@ -295,25 +295,25 @@ function issueNormalRightClickAction(input, action, queued) {
   switch (action.kind) {
     case "setRally":
       for (const building of action.producers) {
-        input._issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage));
+        input.commandInteraction.issueCommand(cmd.setRally(building, action.x, action.y, queued, action.stage));
       }
       break;
     case "build":
-      input._issueCommand(cmd.build(action.units, action.building, action.tileX, action.tileY, queued));
+      input.commandInteraction.issueCommand(cmd.build(action.units, action.building, action.tileX, action.tileY, queued));
       break;
     case "gather":
-      input._issueCommand(cmd.gather(action.units, action.target.id, queued));
+      input.commandInteraction.issueCommand(cmd.gather(action.units, action.target.id, queued));
       break;
     case "deconstruct":
-      input._issueCommand(cmd.deconstruct(action.units, action.target.id, queued));
+      input.commandInteraction.issueCommand(cmd.deconstruct(action.units, action.target.id, queued));
       break;
     case "attack":
       if (action.units.length > 0) {
-        input._issueCommand(cmd.attack(action.units, action.target.id, queued));
+        input.commandInteraction.issueCommand(cmd.attack(action.units, action.target.id, queued));
       }
       break;
     case "move":
-      input._issueCommand(cmd.move(action.units, action.x, action.y, queued));
+      input.commandInteraction.issueCommand(cmd.move(action.units, action.x, action.y, queued));
       break;
     default:
       return;
@@ -325,7 +325,7 @@ function issueNormalRightClickAction(input, action, queued) {
 
 function issueTargetAttackForLandUnits(input, landUnits, target, queued) {
   if (landUnits.length > 0) {
-    input._issueCommand(cmd.attack(landUnits, target.id, queued));
+    input.commandInteraction.issueCommand(cmd.attack(landUnits, target.id, queued));
     return true;
   }
   return false;
@@ -333,7 +333,7 @@ function issueTargetAttackForLandUnits(input, landUnits, target, queued) {
 
 function issueAttackMoveForLandUnits(input, landUnits, x, y, queued) {
   if (landUnits.length > 0) {
-    input._issueCommand(cmd.attackMove(landUnits, x, y, queued));
+    input.commandInteraction.issueCommand(cmd.attackMove(landUnits, x, y, queued));
     return true;
   }
   return false;
@@ -343,10 +343,10 @@ function rightClickFeedback(kind, x, y) {
   return { kind, x, y };
 }
 
-function explicitAttackCommandTarget(state, target) {
+function explicitAttackCommandTarget(state, target, controlPolicy = null) {
   return !!target &&
     isAttackableEntityTarget(target) &&
-    (ownOwner(state, target.owner) || enemyOwner(state, target.owner));
+    (ownOwner(state, target.owner, controlPolicy) || enemyOwner(state, target.owner, controlPolicy));
 }
 
 function isAttackableEntityTarget(target) {
@@ -365,7 +365,7 @@ function attackTargetPreviewForRightClickAction(action) {
 
 export function _selectedOwnUnitIds() {
   return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE)
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE)
     .map((e) => e.id);
 }
 
@@ -375,27 +375,30 @@ export function _selectedOwnLandUnitIds() {
 
 export function _selectedProducerBuildingIds() {
   return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner) && isBuilding(e.kind) && isProducerBuilding(e.kind))
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && isBuilding(e.kind) && isProducerBuilding(e.kind))
     .map((e) => e.id);
 }
 
 export function _selectedWorkerIds() {
   return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner) && e.kind === KIND.WORKER)
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && e.kind === KIND.WORKER)
     .map((e) => e.id);
 }
 
 export function _selectedGathererIds() {
   return selectedEntities(this.state)
     .filter((e) =>
-      ownOwner(this.state, e.owner) &&
+      ownOwner(this.state, e.owner, this.controlPolicy) &&
       (e.kind === KIND.WORKER || e.kind === KIND.GOLEM))
     .map((e) => e.id);
 }
 
 export function _selectedOwnAntiTankGunIds() {
   return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY))
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && (
+      e.kind === KIND.ANTI_TANK_GUN ||
+      e.kind === KIND.MORTAR_TEAM ||
+      e.kind === KIND.ARTILLERY))
     .map((e) => e.id);
 }
 
@@ -405,7 +408,7 @@ function selectedEntities(state) {
 
 function selectedOwnUnitEntities(input) {
   return selectedEntities(input.state).filter((e) =>
-    ownOwner(input.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
+    ownOwner(input.state, e.owner, input.controlPolicy) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE);
 }
 
 function selectedOwnLandUnitIds(input, fallbackUnitIds = []) {
@@ -472,7 +475,7 @@ export function _refreshAbilityTargetPreview() {
   }
   const carriers = this.state
     .selectedEntities()
-    .filter((e) => ownOwner(this.state, e.owner) && definition.carriers.includes(e.kind))
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && definition.carriers.includes(e.kind))
     .map((e) => plannedEntityForIntent(intent, e));
   if (carriers.length === 0) {
     intent?.updateAbilityTargetPreview?.(null);
@@ -523,7 +526,7 @@ export function _refreshAbilityTargetPreview() {
     .filter((object) =>
       object.kind === ABILITY_OBJECT_KIND.RETURN_MARKER &&
       object.ability === target.ability &&
-      ownOwner(this.state, object.owner) &&
+      ownOwner(this.state, object.owner, this.controlPolicy) &&
       Number.isFinite(object.x) &&
       Number.isFinite(object.y))
     .map((object) => ({
@@ -538,7 +541,7 @@ export function _refreshAbilityTargetPreview() {
     ? abilityObjects
       .filter((object) =>
         object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR &&
-        ownOwner(this.state, object.owner) &&
+        ownOwner(this.state, object.owner, this.controlPolicy) &&
         Number.isFinite(object.x) &&
         Number.isFinite(object.y))
       .map((object) => ({
@@ -558,7 +561,7 @@ export function _refreshAbilityTargetPreview() {
     radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
   }));
   const primaryLock = artilleryLocks[0] || null;
-  const radiusTiles = abilityTargetRadiusTiles(definition, target.ability, this.state);
+  const radiusTiles = abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
   intent?.updateAbilityTargetPreview?.({
     ability: target.ability,
     mouseX: primaryLock?.x ?? world.x,
@@ -589,7 +592,10 @@ export function _refreshAntiTankGunSetupPreview() {
   }
   const guns = this.state
     .selectedEntities()
-    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY))
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && (
+      e.kind === KIND.ANTI_TANK_GUN ||
+      e.kind === KIND.MORTAR_TEAM ||
+      e.kind === KIND.ARTILLERY))
     .map((e) => supportWeaponSetupPreviewEntity(plannedEntityForIntent(intent, e), setupPreviewQueued(this, intent)));
   if (guns.length === 0) {
     intent?.updateAntiTankGunSetupPreview?.(null);
@@ -685,7 +691,11 @@ export function _refreshResourceMiningPreview() {
     return;
   }
 
-  const nearest = this._nearestOwnCompletedCityCentre(target.x, target.y);
+  const nearest = this._nearestCompletedMiningAnchor(
+    target.x,
+    target.y,
+    target.kind === KIND.OIL,
+  );
   if (!nearest) {
     intent?.updateResourceMiningPreview?.(null);
     return;
@@ -722,11 +732,13 @@ export function _refreshAttackTargetPreview() {
   ));
 }
 
-export function _nearestOwnCompletedCityCentre(x, y) {
+export function _nearestCompletedMiningAnchor(x, y, includeAllies = false) {
   let best = null;
   for (const e of this._selectionEntities()) {
     if (
-      !ownOwner(this.state, e.owner) ||
+      !(includeAllies
+        ? friendlyOwner(this.state, e.owner, this.controlPolicy)
+        : ownOwner(this.state, e.owner, this.controlPolicy)) ||
       (e.kind !== KIND.CITY_CENTRE && e.kind !== KIND.ZAMOK) ||
       (typeof e.buildProgress === "number" && e.buildProgress < 1)
     ) {
@@ -740,34 +752,37 @@ export function _nearestOwnCompletedCityCentre(x, y) {
   return best;
 }
 
-function ownOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    if (typeof state.controlPolicy.isCommandOwner === "function") {
-      return state.controlPolicy.isCommandOwner(owner, state);
+function ownOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    if (typeof controlPolicy.isCommandOwner === "function") {
+      return controlPolicy.isCommandOwner(owner, state);
     }
-    return state.controlPolicy.canControlOwner(owner, state);
+    return controlPolicy.canControlOwner(owner, state);
   }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;
 }
 
-function enemyOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    if (typeof state.controlPolicy.isCommandEnemyOwner === "function") {
-      return state.controlPolicy.isCommandEnemyOwner(owner, state);
+function enemyOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    if (typeof controlPolicy.isCommandEnemyOwner === "function") {
+      return controlPolicy.isCommandEnemyOwner(owner, state);
     }
-    const commandOwner = typeof state.controlPolicy.commandOwner === "function"
-      ? state.controlPolicy.commandOwner(state)
-      : state.controlPolicy.issueAsOwnerForSelection?.(state.selectedEntities?.() || []);
+    const commandOwner = typeof controlPolicy.commandOwner === "function"
+      ? controlPolicy.commandOwner(state)
+      : controlPolicy.issueAsOwnerForSelection?.(state.selectedEntities?.() || []);
     return fallbackEnemyOwner(commandOwner, owner);
   }
   if (typeof state?.isEnemyOwner === "function") return state.isEnemyOwner(owner);
   return fallbackEnemyOwner(state?.playerId, owner);
 }
 
-function friendlyOwner(state, owner) {
-  return ownOwner(state, owner) || (
+function friendlyOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    return ownOwner(state, owner, controlPolicy) || !!controlPolicy.isCommandAllyOwner?.(owner, state);
+  }
+  return ownOwner(state, owner, controlPolicy) || (
     typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner)
   );
 }
@@ -782,17 +797,17 @@ function fallbackEnemyOwner(commandOwner, owner) {
     ownerId !== commandOwnerId;
 }
 
-function abilityTargetRadiusTiles(definition, ability, state) {
+function abilityTargetRadiusTiles(definition, ability, state, controlPolicy = null) {
   const baseRadius = definition?.radiusTiles || 0;
-  if (ability === ABILITY.SMOKE && commandUpgrades(state).includes(UPGRADE.SMOKE_PLUS)) {
+  if (ability === ABILITY.SMOKE && commandUpgrades(state, controlPolicy).includes(UPGRADE.SMOKE_PLUS)) {
     return definition?.upgradedRadiusTiles || baseRadius;
   }
   return baseRadius;
 }
 
-function commandUpgrades(state) {
-  if (typeof state?.controlPolicy?.commandUpgrades === "function") {
-    const upgrades = state.controlPolicy.commandUpgrades(state);
+function commandUpgrades(state, controlPolicy = null) {
+  if (typeof controlPolicy?.commandUpgrades === "function") {
+    const upgrades = controlPolicy.commandUpgrades(state);
     return Array.isArray(upgrades) ? upgrades : [];
   }
   return Array.isArray(state?.upgrades) ? state.upgrades : [];

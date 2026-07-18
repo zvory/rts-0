@@ -59,6 +59,7 @@ import {
 } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
+import { CommandInteraction } from "../../client/src/command_interaction.js";
 
 const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ABILITIES",
@@ -114,11 +115,15 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "METHAMPHETAMINES_RESEARCH_TICKS",
   "MINING_CC_RANGE_TILES",
   "MORTAR_AUTOCAST_RESEARCH_TICKS",
+  "MORTAR_FIELD_OF_FIRE_RAD",
   "MORTAR_FIRE_COOLDOWN_TICKS",
   "MORTAR_INNER_RADIUS_TILES",
+  "MORTAR_MIN_RANGE_TILES",
   "MORTAR_OUTER_RADIUS_TILES",
   "MORTAR_RANGE_TILES",
+  "MORTAR_SETUP_TICKS",
   "MORTAR_SHELL_DELAY_TICKS",
+  "MORTAR_TEARDOWN_TICKS",
   "PANZERFAUSTS_RESEARCH_TICKS",
   "PANZERFAUST_ARMOR_PENETRATION",
   "PANZERFAUST_DAMAGE",
@@ -323,12 +328,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Barracks no longer exposes a standalone Panzerfaust unit",
   );
   assert(
+    STATS[KIND.RIFLEMAN].cost.steel === 60 &&
+      STATS[KIND.RIFLEMAN].cost.oil === 10,
+    "Rifleman cost mirrors server",
+  );
+  assert(
     UPGRADES[UPGRADE.PANZERFAUSTS].researchedAt === KIND.TRAINING_CENTRE &&
       UPGRADES[UPGRADE.PANZERFAUSTS].cost.steel === 100 &&
       UPGRADES[UPGRADE.PANZERFAUSTS].cost.oil === 100 &&
       UPGRADES[UPGRADE.PANZERFAUSTS].researchTicks === PANZERFAUSTS_RESEARCH_TICKS &&
       PANZERFAUSTS_RESEARCH_TICKS === TICK_HZ * 20 &&
-      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("every current and future Rifleman") &&
+      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("newly produced Riflemen") &&
       UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("one disposable 5-tile anti-vehicle shot"),
     "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and Rifleman effect",
   );
@@ -589,9 +599,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     playerId,
     selectedEntities: () => selectedProductionBuildings,
   };
-  hud.commandIssuer = {
-    command: (command) => trained.push(command),
-  };
+  hud.commandInteraction = new CommandInteraction({
+    commandIssuer: { command: (command) => trained.push(command) },
+    clientIntent: null,
+    selectedEntities: () => selectedProductionBuildings,
+  });
   hud._trainRoundRobin = new Map();
   hud._cancelRoundRobin = new Map();
 
@@ -730,7 +742,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    researchHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    researchHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     researchHud._cardSig = null;
     researchHud._resourceIcons = {};
 
@@ -788,7 +800,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    mortarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    mortarHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     mortarHud.audio = null;
     mortarHud._cardSig = null;
     renderCommandCard(mortarHud);
@@ -910,7 +922,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    commandCarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    commandCarHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     commandCarHud.audio = null;
     commandCarHud._cardSig = null;
     renderCommandCard(commandCarHud);
@@ -1022,7 +1034,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       selectedEntities: () => [selectedFactory],
       entitiesInterpolated: () => [selectedFactory],
     };
-    factoryHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    factoryHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     factoryHud._cardSig = null;
     factoryHud._trainRoundRobin = new Map();
     factoryHud._cancelRoundRobin = new Map();
@@ -1140,7 +1152,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       selectedEntities: () => [selectedGunWorks],
       entitiesInterpolated: () => [selectedGunWorks],
     };
-    gunWorksHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    gunWorksHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     gunWorksHud._cardSig = null;
     gunWorksHud._trainRoundRobin = new Map();
     gunWorksHud._cancelRoundRobin = new Map();
@@ -1176,7 +1188,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       selectedEntities: () => [selectedResearchComplex],
       entitiesInterpolated: () => [selectedResearchComplex],
     };
-    rdHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    rdHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     rdHud._cardSig = null;
     rdHud._trainRoundRobin = new Map();
     rdHud._cancelRoundRobin = new Map();
@@ -1232,7 +1244,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         placements += 1;
       },
     };
-    shortResourceHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    shortResourceHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     shortResourceHud.audio = {
       play(id) {
         playedNotices.push(id);
@@ -1298,13 +1310,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     sent.length = 0;
     const selectedAntiTankGun = { id: 88, owner: playerId, kind: KIND.ANTI_TANK_GUN, setupState: SETUP.DEPLOYED };
     const selectedArtillery = { id: 89, owner: playerId, kind: KIND.ARTILLERY, setupState: SETUP.PACKED };
+    const setupSelectedMortar = { id: 90, owner: playerId, kind: KIND.MORTAR_TEAM, setupState: SETUP.PACKED };
     const antiTankGunHud = Object.create(HUD.prototype);
     antiTankGunHud.state = {
       playerId,
       resources: { steel: 0, oil: 0 },
       commandTarget: null,
-      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
-      entitiesInterpolated: () => [selectedAntiTankGun, selectedArtillery],
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery, setupSelectedMortar],
+      entitiesInterpolated: () => [selectedAntiTankGun, selectedArtillery, setupSelectedMortar],
       beginCommandTarget(kind) {
         this.commandTarget = kind;
       },
@@ -1312,7 +1325,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    antiTankGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    antiTankGunHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     antiTankGunHud._cardSig = null;
 
     renderCommandCard(antiTankGunHud);
@@ -1325,22 +1338,23 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const setupInput = Object.create(Input.prototype);
     setupInput.state = {
       playerId,
-      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery, setupSelectedMortar],
     };
     setupInput.clientIntent = new ClientIntent();
     setupInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
     setupInput.clientIntent.addCommandFeedback = () => {};
-    setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
+    setupInput.commandInteraction = { issueCommand: (command) => setupCommands.push(command) };
     setupInput._groundAtScreen = (x, y) => ({ x, y });
     setupInput._entityAtScreen = () => null;
-    setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id];
+    setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id, setupSelectedMortar.id];
     setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
     assert(
       setupCommands[0]?.c === "setupAntiTankGuns" &&
         setupCommands[0].units.includes(selectedAntiTankGun.id) &&
         setupCommands[0].units.includes(selectedArtillery.id) &&
+        setupCommands[0].units.includes(setupSelectedMortar.id) &&
         setupCommands[0].queued === true,
-      "setupAntiTankGuns targeting includes selected artillery as setup-capable support weapons",
+      "setupAntiTankGuns targeting includes selected artillery and mortars as setup-capable support weapons",
     );
 
     const movingAntiTankGun = {

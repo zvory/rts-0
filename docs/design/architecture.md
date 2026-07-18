@@ -24,7 +24,10 @@
 - Lobby-time spectators are connected humans who are not seated in the simulation. They receive
   snapshots filtered to the union of all active players' current fog, all player resource rows,
   and no controllable units/buildings.
-  Spectators must join or switch roles before the match starts; mid-match joins are rejected.
+  Spectators may join before or during a normal live match; active-player late joins and lobby role
+  switches after match start are rejected. Shared replay playback also accepts late viewers at its
+  current room-owned cursor, whether it came from a persisted replay lobby or automatic post-match
+  replay.
 - The **client** renders snapshots, interpolating entity positions between them for
   smoothness, and draws the **fog overlay** from the server-provided current visibility grid
   while keeping explored history locally. Local sight stamping exists only as a fallback for

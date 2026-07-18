@@ -87,7 +87,7 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         };
         println!(
             "{indent}    {{\"id\":\"{}\",\"researchedAt\":\"{}\"}}{comma}",
-            upgrade.id,
+            upgrade.kind.stable_id(),
             upgrade.researched_at.stable_id()
         );
     }
@@ -101,7 +101,7 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         };
         print!(
             "{indent}    {{\"id\":\"{}\",\"label\":\"{}\",\"icon\":\"{}\",\"hotkey\":{},\"title\":\"{}\",\"carriers\":",
-            ability.id,
+            ability.kind.stable_id(),
             ability.label,
             ability.icon,
             json_string_or_null(ability.hotkey),
@@ -281,6 +281,22 @@ fn print_client_constants(indent: &str) {
     println!(
         "{indent}    \"antiTankGunFieldOfFireRad\": {},",
         json_f32(balance::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD)
+    );
+    println!(
+        "{indent}    \"mortarMinRangeTiles\": {},",
+        balance::MORTAR_MIN_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"mortarFieldOfFireRad\": {},",
+        json_f32(balance::MORTAR_FIELD_OF_FIRE_RAD)
+    );
+    println!(
+        "{indent}    \"mortarSetupTicks\": {},",
+        balance::MORTAR_TEAM_SETUP_TICKS
+    );
+    println!(
+        "{indent}    \"mortarTeardownTicks\": {},",
+        balance::MORTAR_TEAM_TEARDOWN_TICKS
     );
     println!(
         "{indent}    \"artilleryMinRangeTiles\": {},",

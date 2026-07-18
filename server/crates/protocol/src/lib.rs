@@ -16,16 +16,16 @@ mod server_message;
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
+#[cfg(test)]
+use contract_metadata::kind_code;
 pub use contract_metadata::{
-    abilities, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states, terrain,
-    upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes, ProtocolContract,
-    ProtocolMessageTags, ProtocolVocabularies, SlotField, SnapshotCodecContract,
+    abilities, ability_code, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states,
+    terrain, upgrade_code, upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes,
+    ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, SlotField, SnapshotCodecContract,
     COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION,
     SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION,
     SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
 };
-#[cfg(test)]
-use contract_metadata::{ability_code, kind_code};
 pub use lab_replay::*;
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
@@ -65,6 +65,8 @@ pub enum ClientMessage {
         #[serde(default)]
         replay_ok: bool,
     },
+    /// Update this connection's display name while it is still in a lobby.
+    SetName { name: String },
     /// Toggle ready state in the lobby.
     Ready { ready: bool },
     /// Host requests the match to begin.
@@ -125,6 +127,9 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
     NetReport { report: Box<ClientNetReport> },
+    /// Throttled notice that the connected browser received human input. This is distinct from
+    /// automatic heartbeat and diagnostics traffic so the server can expire abandoned sessions.
+    Activity,
     /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
     SetRoomTimeSpeed { speed: f32 },
     /// Advance room-controlled time by one simulation tick where the clock allows stepping.
@@ -715,6 +720,13 @@ mod contract_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn set_name_deserializes() {
+        let msg: ClientMessage =
+            serde_json::from_str(r#"{"t":"setName","name":"Renamed"}"#).unwrap();
+        assert!(matches!(msg, ClientMessage::SetName { name } if name == "Renamed"));
+    }
 
     #[test]
     fn client_net_report_deserializes() {

@@ -75,7 +75,12 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
   const { ReplayControls, RoomTimeControls } = await import("../../client/src/replay_controls.js");
   const { applyMatchUnitRanges } = await import("../../client/src/match_settings_toggles.js");
-  const { shouldWarnBeforeUnload } = await import("../../client/src/app.js");
+  const {
+    App,
+    shouldReportPlayerActivity,
+    shouldReturnToLobbyBrowserAfterDisconnect,
+    shouldWarnBeforeUnload,
+  } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
@@ -107,7 +112,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     replayMatch.replayViewer = true;
     replayMatch.state = { spectator: false };
     replayMatch.applySpectatorUi();
-    assert(selectionArea.hidden, "replay viewer hides the selected-unit HUD area");
+    assert(!selectionArea.hidden, "replay viewer shows the selected-unit HUD area for inspection");
     assert(commandCard.hidden, "replay viewer keeps command card hidden");
     assert(giveUpConfirm.hidden, "replay viewer hides give-up confirmation");
 
@@ -124,10 +129,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     commandCard.hidden = true;
     const labOperatorMatch = Object.create(Match.prototype);
     labOperatorMatch.replayViewer = false;
-    labOperatorMatch.state = {
-      spectator: true,
-      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
-    };
+    labOperatorMatch.state = { spectator: true };
+    labOperatorMatch.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
     labOperatorMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
     assert(!commandCard.hidden, "lab operator keeps the command card visible");
@@ -136,10 +139,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     commandCard.hidden = false;
     const labViewerMatch = Object.create(Match.prototype);
     labViewerMatch.replayViewer = false;
-    labViewerMatch.state = {
-      spectator: true,
-      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }),
-    };
+    labViewerMatch.state = { spectator: true };
+    labViewerMatch.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
     labViewerMatch.applySpectatorUi();
     assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
     assert(commandCard.hidden, "read-only lab viewer hides the command card");
@@ -251,6 +252,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
         this.pans.push({ dx: delta.x, dy: delta.y });
       },
     };
+    const replayState = {
+      spectator: true,
+      selection: new Set(),
+      setSelection(ids) { this.selection = new Set(ids); },
+      addToSelection(ids) { for (const id of ids) this.selection.add(id); },
+      removeFromSelection(ids) { for (const id of ids) this.selection.delete(id); },
+      clearSelection() { this.selection.clear(); },
+    };
     globalThis.window = {
       addEventListener(type, handler) {
         listeners.set(`window:${type}`, handler);
@@ -260,7 +269,37 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       },
     };
     try {
-      const replayInput = new ReplayCameraInput(viewport, camera);
+      const replayInput = new ReplayCameraInput(viewport, camera, replayState);
+      replayInput.publishSelectionScene({
+        version: 1,
+        projection: {
+          version: 1,
+          viewport: { widthCssPx: 640, heightCssPx: 480 },
+          project(point) { return { x: point.x, y: point.y, depth: 1 }; },
+        },
+        proxies: [
+          {
+            version: 1,
+            id: 41,
+            kind: "rifleman",
+            owner: 1,
+            anchor: { x: 200, y: 150, heightPx: 8 },
+            footprint: { kind: "circle", radiusPx: 10 },
+            minScreenRadiusCssPx: 6,
+            interaction: { id: 41, kind: "rifleman", owner: 1, x: 200, y: 150, hp: 72, maxHp: 100 },
+          },
+          {
+            version: 1,
+            id: 42,
+            kind: "tank",
+            owner: 2,
+            anchor: { x: 240, y: 170, heightPx: 16 },
+            footprint: { kind: "circle", radiusPx: 16 },
+            minScreenRadiusCssPx: 6,
+            interaction: { id: 42, kind: "tank", owner: 2, x: 240, y: 170, hp: 240, maxHp: 300 },
+          },
+        ],
+      });
       assert(options.get("wheel")?.passive === false, "Replay camera wheel listener is non-passive");
       let prevented = 0;
       listeners.get("wheel")({
@@ -336,6 +375,22 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       });
       assert(camera.pans.length === 2, "Replay Space+left-drag pans through shared camera navigation");
       assert(camera.pans[1].dx === -10 && camera.pans[1].dy === -10, "Replay Space+left-drag uses screen delta");
+      listeners.get("mousedown")({ button: 0, clientX: 220, clientY: 180 });
+      listeners.get("window:mouseup")({ button: 0, clientX: 220, clientY: 180 });
+      assert(replayState.selection.has(41), "Replay spectators can select a presented unit without issuing an order");
+      assert(!("command" in replayInput), "Replay selection keeps the input command-free");
+      listeners.get("mousedown")({ button: 0, clientX: 170, clientY: 130 });
+      listeners.get("window:mousemove")({ button: 0, clientX: 280, clientY: 230 });
+      assert(replayInput.screenOverlay.snapshot().marquee?.w === 110, "Replay drag publishes a selection marquee");
+      listeners.get("window:blur")();
+      assert(replayInput.screenOverlay.snapshot().marquee === null, "Replay blur cancels an in-progress selection drag");
+      listeners.get("window:mouseup")({ button: 0, clientX: 280, clientY: 230 });
+      assert(replayState.selection.size === 1, "Replay blur prevents a stale drag release from changing selection");
+      listeners.get("mousedown")({ button: 0, clientX: 170, clientY: 130 });
+      listeners.get("window:mousemove")({ button: 0, clientX: 280, clientY: 230 });
+      listeners.get("window:mouseup")({ button: 0, clientX: 280, clientY: 230 });
+      assert(replayState.selection.size === 2, "Replay spectators can box-select visible units from either player");
+      assert(replayInput.screenOverlay.snapshot().marquee === null, "Replay box selection clears its marquee on release");
       replayInput.destroy();
       assert(!listeners.has("wheel"), "Replay camera input removes wheel listener on destroy");
     } finally {
@@ -388,6 +443,60 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(!listeners.has("window:keydown"), "Shared camera navigation removes key listeners on destroy");
   }
   assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
+  assert(
+    shouldReturnToLobbyBrowserAfterDisconnect(),
+    "an ordinary lobby socket close returns to the main lobby browser",
+  );
+  assert(
+    !shouldReturnToLobbyBrowserAfterDisconnect({ match: {} }),
+    "an in-game socket close remains on the match disconnect path",
+  );
+  assert(
+    !shouldReturnToLobbyBrowserAfterDisconnect({ requiresConnectionOnStart: true }),
+    "an explicit connected launch keeps its dedicated disconnect handling",
+  );
+  assert(
+    shouldReportPlayerActivity({ socketOpen: true, nowMs: 30000, lastReportMs: 0 }),
+    "human input is reportable after the throttle interval",
+  );
+  assert(
+    !shouldReportPlayerActivity({ socketOpen: false, nowMs: 30000, lastReportMs: 0 }),
+    "human input is not reported without a socket",
+  );
+  assert(
+    !shouldReportPlayerActivity({ socketOpen: true, nowMs: 29999, lastReportMs: 0 }),
+    "human input reports are throttled",
+  );
+  {
+    const app = Object.create(App.prototype);
+    let activityCount = 0;
+    app.socketOpen = true;
+    app.lastPlayerActivityReportMs = 0;
+    app.net = { activity() { activityCount += 1; return true; } };
+    assert(app.reportPlayerActivity(30000), "eligible human input sends an activity notice");
+    assert(!app.reportPlayerActivity(30001), "a sent activity notice re-arms the throttle");
+    assert(activityCount === 1, "throttled activity emits one wire message");
+  }
+  {
+    const app = Object.create(App.prototype);
+    let resetCount = 0;
+    let showCount = 0;
+    let warningCount = 0;
+    app.stopHeartbeat = () => {};
+    app.socketOpen = true;
+    app.intentionalIdleDisconnect = false;
+    app.match = null;
+    app.requiresConnectionOnStart = () => false;
+    app.lobby = {
+      resetToBrowser() { resetCount += 1; },
+      show() { showCount += 1; },
+    };
+    app.showConnectionWarning = () => { warningCount += 1; };
+    app.onClose();
+    assert(resetCount === 1 && showCount === 1,
+      "an ordinary lobby disconnect resets and shows the main lobby browser");
+    assert(warningCount === 0, "an ordinary lobby disconnect does not show a warning");
+  }
   assert(
     shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),
     "live player match warns before unload",

@@ -625,7 +625,7 @@ fn queued_move_ignores_stale_ids_and_invalid_coordinates() {
 }
 
 #[test]
-fn oversized_queued_unit_lists_are_deduped_and_capped_before_appending() {
+fn queued_unit_lists_accept_raw_cap_then_reject_cap_plus_one_whole() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let owned = entities
@@ -634,8 +634,8 @@ fn oversized_queued_unit_lists_are_deduped_and_capped_before_appending() {
     let enemy = entities
         .spawn_unit(2, EntityKind::Rifleman, 130.0, 100.0)
         .expect("enemy unit should spawn");
-    let mut units = vec![owned; 20_000];
-    units.extend([99_999, enemy, owned]);
+    let mut units = vec![owned; MAX_UNITS_PER_COMMAND - 2];
+    units.extend([99_999, enemy]);
 
     apply(
         &map,
@@ -667,6 +667,29 @@ fn oversized_queued_unit_lists_are_deduped_and_capped_before_appending() {
             .queued_orders()
             .is_empty(),
         "enemy ids in a hostile queued command must be ignored"
+    );
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![owned; MAX_UNITS_PER_COMMAND + 1],
+                x: 220.0,
+                y: 220.0,
+                queued: true,
+            },
+        )],
+    );
+    assert_eq!(
+        entities
+            .get(owned)
+            .expect("owned unit should exist")
+            .queued_orders()
+            .len(),
+        1,
+        "raw cap plus one must reject the whole queued command"
     );
 }
 

@@ -2,7 +2,8 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
-    BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
+    supports_manual_emplacement, BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
+    OrderIntent, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -35,7 +36,6 @@ use self::attack::{attack_can_fire_now, panzerfaust_attack_cycle_active};
 
 mod attack;
 
-const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct PointPromotionKey {
     owner: u32,
@@ -541,7 +541,7 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
+    if !supports_manual_emplacement(e.kind)
         || e.under_construction()
         || !x.is_finite()
         || !y.is_finite()
@@ -598,8 +598,7 @@ fn attack_order_complete(
     if panzerfaust_attack_cycle_active(attacker) {
         return false;
     }
-    attacker.attack_unreachable_checks() >= ATTACK_UNREACHABLE_PROMOTION_CHECKS
-        && !attack_can_fire_now(map, entities, attacker, target)
+    !attack_can_fire_now(map, entities, attacker, target)
 }
 
 fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
@@ -1480,7 +1479,7 @@ mod tests {
     }
 
     #[test]
-    fn unreachable_attack_promotes_next_queued_order() {
+    fn stationary_attack_that_cannot_fire_promotes_next_queued_order() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let attacker = entities
@@ -1493,9 +1492,6 @@ mod tests {
             let unit = entities.get_mut(attacker).expect("attacker should exist");
             unit.set_order(Order::attack(target));
             unit.set_target_id(Some(target));
-            for _ in 0..ATTACK_UNREACHABLE_PROMOTION_CHECKS {
-                unit.increment_attack_unreachable_checks();
-            }
             unit.append_queued_order(OrderIntent::move_to(220.0, 100.0));
         }
         let players = vec![player_state(1), player_state(2)];
@@ -1505,7 +1501,7 @@ mod tests {
         let unit = entities.get(attacker).expect("attacker should exist");
         assert!(
             matches!(unit.order(), Order::Move(_)),
-            "bounded unreachable attack should not stall the queued move forever"
+            "a stationary attack that cannot fire should not stall the queued move forever"
         );
         assert!(unit.queued_orders().is_empty());
     }

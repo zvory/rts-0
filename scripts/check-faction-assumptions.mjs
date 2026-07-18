@@ -360,7 +360,9 @@ const approvedSpecialCaseBudgets = new Map([
   // Artillery Fire Control adds one R&D catalog entry for the current Kriegsia tech tree.
   // Scout Plane ability adds a Command Car carrier to the catalog.
   // Entrenchment Phase 1 adds one Training Centre research entry and its negative Ekat assertion.
-  ["server/crates/rules/src/faction.rs", 96],
+  // Stewardship Phase 3 moved ability and upgrade identity into this authoritative catalog owner;
+  // the typed enum declarations and catalog rows intentionally raise the owner-file baseline.
+  ["server/crates/rules/src/faction.rs", 120],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],

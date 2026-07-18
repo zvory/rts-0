@@ -17,9 +17,8 @@ import { SESSION_EXECUTION_LANES } from "./interact/session_coordinator.ts";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const interactRoot = path.join(repoRoot, "scripts", "interact");
 const failures = [];
-const sources = new Map(readdirSync(interactRoot)
-  .filter((name) => name.endsWith(".ts") || name === "cli.mjs")
-  .map((name) => [name, readFileSync(path.join(interactRoot, name), "utf8")]));
+const sources = new Map(sourceFiles(interactRoot)
+  .map((filePath) => [path.relative(interactRoot, filePath), readFileSync(filePath, "utf8")]));
 
 checkRegistry();
 checkCliNamespace();
@@ -104,9 +103,20 @@ function expectMetadata(label, field, value, expected) {
 
 function checkServiceRouting() {
   const service = sources.get("command_service.ts") || "";
-  const routes = `${service}\n${sources.get("observation_session.ts") || ""}`;
+  const routes = [service, ...[...sources]
+    .filter(([name]) => name.startsWith("namespaces/"))
+    .map(([, source]) => source)].join("\n");
   if (!service.includes("executeSession(definition.handlerKey")) {
     failures.push("command_service.ts must route registry handler keys into session handlers");
+  }
+  for (const [modulePath, executor] of [
+    ["namespaces/lab/commands.ts", "executeLabCommand"],
+    ["namespaces/game/commands.ts", "executeGameCommand"],
+    ["namespaces/dev_scenario/commands.ts", "executeDevScenarioCommand"],
+  ]) {
+    if (!relativeImports(service, "command_service.ts").includes(modulePath) || !service.includes(`${executor}(`)) {
+      failures.push(`command_service.ts must import and dispatch through ${executor} from ${modulePath}`);
+    }
   }
   for (const definition of Object.values(INTERACT_COMMAND_REGISTRY)) {
     if (!routes.includes(`"${definition.handlerKey}"`) && !routes.includes(`'${definition.handlerKey}'`)) {
@@ -116,7 +126,7 @@ function checkServiceRouting() {
 }
 
 function checkImports() {
-  const imports = new Map([...sources].map(([name, source]) => [name, relativeImports(source)]));
+  const imports = new Map([...sources].map(([name, source]) => [name, relativeImports(source, name)]));
   forbidImports(imports, "driver.ts", ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "cli.mjs", "daemon.ts"]);
   forbidImports(imports, "runtime.ts", ["command_inputs.ts", "command_registry.ts", "command_service.ts", "session_coordinator.ts", "cli.mjs", "daemon.ts"]);
   for (const name of ["abort_signal.ts", "process_runner.ts", "private_server.ts", "server_build_failure.ts", "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "workspace_inspection.ts"]) {
@@ -135,13 +145,33 @@ function checkImports() {
   if ((sources.get("command_service.ts") || "").includes("puppeteer-core")) {
     failures.push("command_service.ts must use structural application types instead of Puppeteer adapter types");
   }
+  for (const [owner, dependencies] of imports) {
+    if (owner.startsWith("capabilities/")) {
+      for (const dependency of dependencies) {
+        if (["command_service.ts", "daemon.ts", "cli.ts", "cli.mjs"].includes(dependency) || dependency.startsWith("namespaces/")) {
+          failures.push(`${owner} may not import upward from ${dependency}`);
+        }
+      }
+    }
+    if (owner.startsWith("namespaces/")) {
+      const ownerNamespace = owner.split("/").slice(0, 2).join("/");
+      for (const dependency of dependencies) {
+        if (["command_service.ts", "daemon.ts", "cli.ts", "cli.mjs"].includes(dependency)) {
+          failures.push(`${owner} may not import upward from ${dependency}`);
+        }
+        if (dependency.startsWith("namespaces/") && !dependency.startsWith(`${ownerNamespace}/`)) {
+          failures.push(`${owner} may not import sibling namespace ${dependency}`);
+        }
+      }
+    }
+  }
 }
 
 function checkAdapterOwnership() {
-  const driverImports = relativeImports(sources.get("driver.ts") || "");
+  const driverImports = relativeImports(sources.get("driver.ts") || "", "driver.ts");
   if (!driverImports.includes("private_server.ts")) failures.push("driver.ts must delegate private-server lifecycle to private_server.ts");
   if (!driverImports.includes("workspace_inspection.ts")) failures.push("driver.ts must keep bounded pre-request workspace inspection outside the request-path process check");
-  const privateServerImports = relativeImports(sources.get("private_server.ts") || "");
+  const privateServerImports = relativeImports(sources.get("private_server.ts") || "", "private_server.ts");
   if (!privateServerImports.includes("process_runner.ts")) failures.push("private_server.ts must use process_runner.ts for finite Cargo builds");
 
   const allowedChildOwners = new Set([
@@ -165,10 +195,11 @@ function checkAdapterOwnership() {
 }
 
 function checkBlockingProcesses() {
-  const requestPath = [
+  const requestPath = new Set([
     "command_service.ts", "driver.ts", "private_server.ts", "server_build_failure.ts", "process_runner.ts",
     "recording.ts", "fixed_capture.ts", "tailnet_preview.ts", "daemon.ts",
-  ];
+    ...[...sources.keys()].filter((name) => name.startsWith("capabilities/") || name.startsWith("namespaces/")),
+  ]);
   for (const name of requestPath) {
     if (/\b(?:spawnSync|execSync|execFileSync)\b/.test(sources.get(name) || "")) {
       failures.push(`${name} contains a blocking child process in the daemon request path`);
@@ -215,7 +246,10 @@ function checkDependencyOwnership() {
   })) {
     if (compiler[field] !== expected) failures.push(`Interact TypeScript config must set ${field} to ${JSON.stringify(expected)}`);
   }
-  const implementationMjs = readdirSync(interactRoot).filter((name) => name.endsWith(".mjs"));
+  if (tsconfig?.include?.join("\0") !== "./**/*.ts") {
+    failures.push("Interact TypeScript config must recursively include ./**/*.ts");
+  }
+  const implementationMjs = [...sources.keys()].filter((name) => name.endsWith(".mjs"));
   if (implementationMjs.join("\0") !== "cli.mjs") failures.push("cli.mjs must be the only JavaScript implementation file in scripts/interact");
   const bootstrap = sources.get("cli.mjs") || "";
   if (!bootstrap.includes('await import("./cli.ts")') || !bootstrap.includes("22.18")) {
@@ -242,8 +276,18 @@ function readJson(file) {
   try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; }
 }
 
-function relativeImports(source) {
-  return [...source.matchAll(/from\s+["']\.\/([^"']+)["']/g)].map((match) => match[1]);
+function sourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const filePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(filePath);
+    return entry.name.endsWith(".ts") || entry.name === "cli.mjs" ? [filePath] : [];
+  });
+}
+
+function relativeImports(source, owner = "") {
+  return [...source.matchAll(/from\s+["'](\.\.?\/[^"']+)["']/g)].map((match) =>
+    path.posix.normalize(path.posix.join(path.posix.dirname(owner), match[1]))
+  );
 }
 
 function forbidImports(imports, owner, forbidden) {
@@ -280,8 +324,9 @@ function checkSignalOwnership() {
 
 function checkSizeRatchets() {
   for (const [name, maximum] of [
-    // The second namespace adds cross-kind lifecycle guards; game media work stays extracted.
-    ["command_service.ts", 1_060],
+    ["command_service.ts", 420],
+    ["namespaces/lab/commands.ts", 650],
+    ["capabilities/media.ts", 200],
     ["driver.ts", 1_400],
     ["abort_signal.ts", 60],
     ["process_runner.ts", 210],

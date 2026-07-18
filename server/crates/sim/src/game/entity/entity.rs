@@ -10,10 +10,10 @@ use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 #[cfg(test)]
 use super::EntityStateGroups;
 use super::{
-    AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
-    GatherPhase, MovePhase, MovementState, Order, OrderIntent, PanzerfaustState, ProductionState,
-    ResourceExtractorState, ResourceNodeState, ScoutPlaneState, WeaponSetup, WorkerState,
-    MAX_QUEUED_ORDERS, NEUTRAL,
+    supports_manual_emplacement, AttackPhase, BuildPhase, CombatState, ConstructionState,
+    DeconstructPhase, EntityKind, GatherPhase, MovePhase, MovementState, Order, OrderIntent,
+    PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, ScoutPlaneState,
+    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 mod production;
@@ -365,38 +365,8 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Attack(order) = &mut m.order {
                 order.execution.phase = phase;
-                if phase == AttackPhase::Firing {
-                    order.execution.unreachable_checks = 0;
-                }
             }
         }
-    }
-
-    pub fn reset_attack_unreachable_checks(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            if let Order::Attack(order) = &mut m.order {
-                order.execution.unreachable_checks = 0;
-            }
-        }
-    }
-
-    pub fn increment_attack_unreachable_checks(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            if let Order::Attack(order) = &mut m.order {
-                order.execution.unreachable_checks =
-                    order.execution.unreachable_checks.saturating_add(1);
-            }
-        }
-    }
-
-    pub fn attack_unreachable_checks(&self) -> u16 {
-        self.movement
-            .as_ref()
-            .and_then(|m| match &m.order {
-                Order::Attack(order) => Some(order.execution.unreachable_checks),
-                _ => None,
-            })
-            .unwrap_or(0)
     }
 
     pub fn mark_gather_phase(&mut self, phase: GatherPhase) {
@@ -1028,6 +998,7 @@ impl Entity {
         let teardown_ticks = match self.kind {
             EntityKind::MachineGunner => config::MACHINE_GUNNER_SETUP_TICKS,
             EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
+            EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
             EntityKind::Artillery => {
                 self.reset_artillery_accuracy();
                 self.reset_artillery_blanket_sequence();
@@ -1035,7 +1006,7 @@ impl Entity {
             }
             _ => return true,
         };
-        if matches!(self.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
+        if supports_manual_emplacement(self.kind) {
             self.set_emplacement_facing(None);
             self.set_pending_redeploy_facing(None);
         }
@@ -1252,7 +1223,7 @@ impl Entity {
         self.reset_attack_move_no_target_ticks();
     }
 
-    /// Clear active/queued movement and enter a no-chase hold-position stance.
+    /// Clear active/queued movement and enter a hold-position stance.
     pub fn hold_position(&mut self) {
         self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
@@ -1349,9 +1320,7 @@ fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {
         let Some(charges) = entry.charges else {
             continue;
         };
-        let Ok(ability) = entry.id.parse::<AbilityKind>() else {
-            continue;
-        };
+        let ability = entry.kind;
         uses.insert(ability, charges);
     }
     uses

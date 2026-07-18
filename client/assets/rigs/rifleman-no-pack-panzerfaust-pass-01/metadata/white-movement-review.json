@@ -1,0 +1,37 @@
+{
+  "status": "accepted movement sources; normal strip is live and Panzerfaust motion is replaced by the deterministic composite",
+  "source": "built-in image_gen",
+  "frameGeometry": {
+    "width": 160,
+    "height": 112,
+    "count": 4,
+    "order": ["standing", "movement 1", "movement 2", "movement 3"]
+  },
+  "sheets": {
+    "rifleman": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/rifleman-no-pack-white-review-strip.png",
+    "panzerfaustCarrier": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/rifleman-panzerfaust-white-review-strip.png",
+    "combinedFourTimesReview": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/rifleman-white-review-sheets-4x.png"
+  },
+  "riflemanSources": [
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/idle-source.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/movement-01-source.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/movement-02-source.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/movement-03-source.png"
+  ],
+  "panzerfaustSources": [
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/idle-source.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/movement-01-source.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/movement-02-source.png",
+    "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/movement-03-source.png"
+  ],
+  "rejected": {
+    "reason": "Generated movement frame mirrored the shoulder and hand assignment.",
+    "directory": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/rejected"
+  },
+  "notes": [
+    "The upper review row is the normal Rifleman; the lower row carries the Panzerfaust.",
+    "All accepted cells retain the same right-handed rifle grip.",
+    "The accepted normal cells are the live ordinary/spent Rifleman frames.",
+    "The separately generated Panzerfaust movement cells remain provenance only; live launcher motion uses the deterministic composite over the accepted normal body frames."
+  ]
+}

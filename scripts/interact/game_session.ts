@@ -2,7 +2,7 @@ export function gameSessionCapabilities(role: unknown, maxSessions: number) {
   const player = role === "player";
   const spectator = role === "spectator";
   return {
-    aliases: false, inspectUi: true, orders: player ? ["move"] : [], giveUp: player,
+    aliases: false, inspectUi: true, selection: true, orders: player ? ["move"] : [], giveUp: player,
     media: spectator ? ["screenshot", "recording", "timelapse"] : ["screenshot", "recording"],
     role, maxSessions,
   };
@@ -12,6 +12,7 @@ export function scenarioSessionCapabilities(maxSessions: number) {
   return {
     aliases: false,
     inspectUi: true,
+    selection: true,
     orders: [],
     giveUp: false,
     media: ["screenshot", "recording", "timelapse"],

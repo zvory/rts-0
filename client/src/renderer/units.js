@@ -1,15 +1,23 @@
 import { SNAPSHOT_MS, STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
-import { liveRigDefinitionFor, liveRigKeyForEntity, liveRigRoutesFor } from "./rigs/live_routing.js";
+import { liveRigDefinitionFor, liveRigKeyForEntity, liveRigRoutePlanFor } from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
-import { createRigRenderContext, sampleRigAnimation } from "./rigs/animation.js";
+import { createRigRenderContext, sampleRigAnimationInto } from "./rigs/animation.js";
+import {
+  animationStageFor,
+  frameStripDrawPlanFor,
+  pngDrawPlanFor,
+  reconcileActiveLiveRigPools,
+} from "./rigs/draw_plans.js";
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
-import { pngAtlasRouteCoverage, renderPngUnitRig } from "./rigs/png_runtime.js";
+import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
+  MORTAR_DEPLOYED_WEAPON_ANIM_MS,
+  MORTAR_TEARDOWN_WEAPON_ANIM_MS,
 } from "./palette.js";
 import {
   angleDelta,
@@ -33,7 +41,11 @@ export function _deployedWeaponSetupVisual(e) {
   const elapsed = now - rec.changedAt;
   const durationMs = e.kind === KIND.ARTILLERY
     ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
-    : DEPLOYED_WEAPON_ANIM_MS;
+    : e.kind === KIND.MORTAR_TEAM
+      ? setupState === SETUP.TEARING_DOWN
+        ? MORTAR_TEARDOWN_WEAPON_ANIM_MS
+        : MORTAR_DEPLOYED_WEAPON_ANIM_MS
+      : DEPLOYED_WEAPON_ANIM_MS;
   const progress = clamp01(elapsed / durationMs);
   const t = smoothstep01(progress);
 
@@ -155,8 +167,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     throw new Error(`missing live SVG rig definition for unit kind ${e.kind}`);
   }
 
-  const routes = liveRigRoutesFor(rigKey, pools);
-  if (routes.length === 0) {
+  const routePlan = liveRigRoutePlanFor(rigKey, pools);
+  if (routePlan.routes.length === 0) {
     throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
   }
 
@@ -171,32 +183,29 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       renderContext.frameStripMoving = frameStripMovement.moving;
       renderContext.frameStripMovementActivity = frameStripMovement.activity;
     }
-    const rendered = [];
-    const activePoolNames = new Set();
-    const shadowRoute = routes.find((route) => route.parts?.includes?.("part.shadow"));
-    if (shadowRoute) {
-      const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
-        includeParts: shadowRoute.parts,
-      });
-      activePoolNames.add(shadowRoute.poolName);
-      rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-        routes: [shadowRoute],
+    const drawPlan = frameStripDrawPlanFor(routePlan);
+    if (drawPlan.shadowRoute) {
+      const sampledAnimation = sampleRigAnimationInto(
+        animationStageFor(definition, drawPlan.sampledParts),
+        e,
+        renderContext,
+      );
+      renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+        route: drawPlan.shadowRoute,
         alpha: pools.alpha,
         renderContext,
         sampledAnimation,
-      }) || []));
+        collectResults: false,
+      });
     }
-    const poolName = pools.liveRigUnit || "liveUnitRigs";
-    activePoolNames.add(poolName);
-    const stripInstance = renderFrameStripUnit(this, e, frameStrip, frameStripTexture, {
-      poolName,
-      layerName: pools.unit || "units",
+    renderFrameStripUnit(this, e, frameStrip, frameStripTexture, {
+      poolName: drawPlan.unitRoute.poolName,
+      layerName: drawPlan.unitRoute.layerName,
       alpha: pools.alpha,
       renderContext,
     });
-    if (stripInstance) rendered.push(stripInstance);
-    destroyInactiveLiveRigInstances(this, e.id, activePoolNames);
-    return rendered;
+    reconcileActiveLiveRigPools(this, e.id, drawPlan.activePoolNames);
+    return null;
   }
 
   const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, rigKey);
@@ -204,117 +213,57 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
     applyRigAlpha(renderContext, pools.alpha);
-    const rendered = [];
-    const activePoolNames = new Set();
-    const routedCoverage = routes.map((route) => ({
-      route,
-      coverage: pngAtlasRouteCoverage(definition, pngAtlas, route),
-    }));
-    const sampledParts = new Set();
-    for (const { coverage } of routedCoverage) {
-      for (const partId of coverage.animationParts) sampledParts.add(partId);
-      for (const partId of coverage.missingParts) sampledParts.add(partId);
-    }
-    const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
-      includeParts: sampledParts,
-    });
-    for (const { route, coverage } of routedCoverage) {
-      if (coverage.coveredParts.length > 0) {
-        const pngRoute = coverage.missingParts.length === 0
-          ? route
-          : { ...route, parts: coverage.coveredParts };
-        activePoolNames.add(pngRoute.poolName);
-        rendered.push(...(renderPngUnitRig(this, e, colorByOwner, state, definition, {
+    const drawPlan = pngDrawPlanFor(definition, pngAtlas, routePlan);
+    const sampledAnimation = sampleRigAnimationInto(
+      animationStageFor(definition, drawPlan.sampledParts),
+      e,
+      renderContext,
+    );
+    for (const step of drawPlan.steps) {
+      if (step.runtime === "png") {
+        renderPngUnitRig(this, e, colorByOwner, state, definition, {
           atlas: pngAtlas,
           atlasTexture: pngAtlasTexture,
-          routes: [pngRoute],
+          route: step.route,
           alpha: pools.alpha,
           renderContext,
           sampledAnimation,
           routesCovered: true,
-        }) || []));
-      }
-      if (coverage.missingParts.length > 0) {
-        const svgRoute = coverage.coveredParts.length > 0
-          ? { ...pngFallbackSvgRoute(route, pools), parts: coverage.missingParts }
-          : { ...route, parts: coverage.missingParts };
-        activePoolNames.add(svgRoute.poolName);
-        rendered.push(...(renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-          routes: [svgRoute],
+          collectResults: false,
+        });
+      } else {
+        renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+          route: step.route,
           alpha: pools.alpha,
           renderContext,
           sampledAnimation,
-        }) || []));
+          collectResults: false,
+        });
       }
     }
-    destroyInactiveLiveRigInstances(this, e.id, activePoolNames);
-    return rendered;
+    reconcileActiveLiveRigPools(this, e.id, drawPlan.activePoolNames);
+    return null;
   }
 
-  destroyInactiveLiveRigInstances(this, e.id, routePoolNames(routes));
+  reconcileActiveLiveRigPools(this, e.id, routePlan.poolNames);
   const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
   applyRigAlpha(renderContext, pools.alpha);
-  const sampledAnimation = sampleRigAnimation(definition, e, renderContext, {
-    includeParts: routePartIds(routes),
-  });
+  const sampledAnimation = sampleRigAnimationInto(
+    animationStageFor(definition, routePlan.allParts),
+    e,
+    renderContext,
+  );
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-    routes,
+    routes: routePlan.routes,
     alpha: pools.alpha,
     renderContext,
     sampledAnimation,
+    collectResults: false,
   });
 }
 
 function applyRigAlpha(renderContext, alpha) {
   if (typeof alpha === "number") renderContext.shotRevealAlpha = alpha;
-}
-
-function routePartIds(routes) {
-  const parts = new Set();
-  for (const route of routes || []) {
-    for (const partId of route.parts || []) parts.add(partId);
-  }
-  return parts;
-}
-
-function pngFallbackSvgRoute(route, pools = {}) {
-  return {
-    ...route,
-    poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
-    layerName: pools.overlay || route.layerName,
-  };
-}
-
-function routePoolNames(...routeGroups) {
-  const out = new Set();
-  for (const routes of routeGroups) {
-    for (const route of routes || []) out.add(route.poolName);
-  }
-  return out;
-}
-
-const UNIT_RIG_POOL_NAMES = Object.freeze([
-  "liveUnitRigShadows",
-  "liveUnitRigs",
-  "liveUnitRigOverlays",
-  "liveUnitRigEffects",
-  "liveShotRevealRigShadows",
-  "liveShotRevealRigs",
-  "liveShotRevealRigOverlays",
-  "liveShotRevealRigEffects",
-]);
-
-function destroyInactiveLiveRigInstances(renderer, entityId, activePoolNames = new Set()) {
-  for (const poolName of UNIT_RIG_POOL_NAMES) {
-    if (activePoolNames.has(poolName)) continue;
-    const pool = renderer._liveRigPools?.[poolName];
-    const instance = pool?.get?.(entityId);
-    if (!instance) continue;
-    instance.destroy?.();
-    pool.delete(entityId);
-    renderer._seen?.[poolName]?.delete?.(entityId);
-    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
-  }
 }
 
 export function _rigRenderContextFor(e, colorByOwner, state) {

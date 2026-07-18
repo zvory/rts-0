@@ -1,4 +1,4 @@
-import { assert } from "./assertions.mjs";
+import { assert, assertDeepEqual } from "./assertions.mjs";
 import {
   RENDER_FRAME_BUDGET_MS,
   RENDER_FRAME_BUDGET_TARGETS,
@@ -181,6 +181,84 @@ export function runFrameProfilerContracts() {
     surface.reset();
     assert(profiler.summary().frameCount === 0, "FrameProfiler debug surface reset clears aggregates");
     assert(profiler.summary().renderDiagnostics.counters.length === 0, "FrameProfiler reset clears diagnostics");
+  }
+
+  {
+    const perSample = new FrameProfiler();
+    const batched = new FrameProfiler();
+    const labels = Object.freeze([
+      "renderer.rig.redraw.skipped.hidden",
+      "renderer.rig.redraw.attempted",
+      "renderer.rig.redraw.skipped.unchanged",
+    ]);
+    const recordRepeated = (profiler, counts) => {
+      for (let i = 0; i < labels.length; i += 1) {
+        for (let sample = 0; sample < counts[i]; sample += 1) {
+          profiler.recordDiagnosticCounter(labels[i], 1);
+        }
+      }
+    };
+
+    recordRepeated(perSample, [2, 0, 1]);
+    batched.recordKnownDiagnosticCounters(labels, new Uint32Array([2, 0, 1]));
+    perSample.beginFrame({ at: 10, frameGapMs: 16 });
+    batched.beginFrame({ at: 10, frameGapMs: 16 });
+    recordRepeated(perSample, [3, 5, 4]);
+    batched.recordKnownDiagnosticCounters(labels, new Uint32Array([3, 5, 4]));
+    perSample.endFrame({ at: 18 });
+    batched.endFrame({ at: 18 });
+
+    assertDeepEqual(
+      batched.summary().renderDiagnostics,
+      perSample.summary().renderDiagnostics,
+      "known-label diagnostic batches preserve samples, totals, max samples, frames, and max frames",
+    );
+    assertDeepEqual(
+      batched.summary().recentFrames[0].diagnosticCounters,
+      perSample.summary().recentFrames[0].diagnosticCounters,
+      "known-label diagnostic batches preserve active-frame diagnostic totals",
+    );
+    assertDeepEqual(
+      batched.reportSummary().renderDiagnostics,
+      perSample.reportSummary().renderDiagnostics,
+      "known-label diagnostic batches preserve report-window aggregates",
+    );
+
+    perSample.resetReportWindow();
+    batched.resetReportWindow();
+    recordRepeated(perSample, [1, 2, 0]);
+    batched.recordKnownDiagnosticCounters(labels, new Uint32Array([1, 2, 0]));
+    perSample.beginFrame({ at: 20, frameGapMs: 12 });
+    batched.beginFrame({ at: 20, frameGapMs: 12 });
+    recordRepeated(perSample, [2, 1, 6]);
+    batched.recordKnownDiagnosticCounters(labels, new Uint32Array([2, 1, 6]));
+    perSample.endFrame({ at: 24 });
+    batched.endFrame({ at: 24 });
+
+    assertDeepEqual(
+      batched.summary().renderDiagnostics,
+      perSample.summary().renderDiagnostics,
+      "known-label diagnostic batches preserve cumulative aggregates across report resets",
+    );
+    assertDeepEqual(
+      batched.reportSummary().renderDiagnostics,
+      perSample.reportSummary().renderDiagnostics,
+      "known-label diagnostic batches preserve post-reset report-window aggregates",
+    );
+    assertDeepEqual(
+      batched.reportSummary().renderDiagnosticCounters,
+      perSample.reportSummary().renderDiagnosticCounters,
+      "known-label diagnostic batches preserve grouped report counters",
+    );
+    const hidden = batched.summary().renderDiagnostics.counters.find((counter) => counter.label === labels[0]);
+    assert(
+      hidden?.samples === 8
+        && hidden.total === 8
+        && hidden.maxSample === 1
+        && hidden.frames === 2
+        && hidden.maxFrame === 3,
+      "known-label unit batches retain the exact CounterAggregate fields",
+    );
   }
 
   {

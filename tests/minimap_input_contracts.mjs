@@ -3,6 +3,7 @@
 
 import { MatchInputRouter } from "../client/src/input/router.js";
 import { ClientIntent } from "../client/src/client_intent.js";
+import { CommandInteraction } from "../client/src/command_interaction.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { Minimap } from "../client/src/minimap.js";
 import {
@@ -253,7 +254,6 @@ function minimapHarness({
     },
     players: [],
   };
-  if (controlPolicy) state.controlPolicy = controlPolicy;
   if (commandTarget && clientIntent) clientIntent.beginCommandTarget(commandTarget);
   const camera = {
     focusAt(point) {
@@ -276,9 +276,15 @@ function minimapHarness({
           this.sent.push(command);
         },
       };
-  const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, {
+  const commandInteraction = new CommandInteraction({
+    commandIssuer,
+    clientIntent,
+    selectedEntities: () => state.selectedEntities(),
+  });
+  const minimap = new Minimap(canvas, state, camera, null, commandInteraction, router, {
     commandsEnabled,
     clientIntent,
+    controlPolicy,
   });
   return {
     router,
@@ -288,6 +294,7 @@ function minimapHarness({
     camera,
     net: commandIssuer,
     commandIssuer,
+    commandInteraction,
     minimap,
     centers,
     clientIntent,
@@ -694,6 +701,7 @@ function pointerEvent(canvas, clientX, clientY, {
     { id: 30, owner: 1, kind: KIND.RIFLEMAN, x: 10, y: 20 },
     { id: 31, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 30, y: 40 },
     { id: 32, owner: 1, kind: KIND.ARTILLERY, x: 50, y: 60 },
+    { id: 33, owner: 1, kind: KIND.MORTAR_TEAM, x: 70, y: 80 },
   ];
   const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
   assert(h.router.pointerMove(lockedEvent(190, 290, 0)), "setup minimap hover is consumed");
@@ -701,10 +709,12 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(preview?.source === "minimap", "setup minimap hover records the minimap as preview source");
   assertApprox(preview.mouseX, 90, 0.001, "setup minimap preview world x");
   assertApprox(preview.mouseY, 90, 0.001, "setup minimap preview world y");
-  assert(preview.guns.length === 2, "setup minimap preview filters to support weapons");
+  assert(preview.guns.length === 3, "setup minimap preview filters to support weapons");
   assert(
-    preview.guns.some((e) => e.id === 31) && preview.guns.some((e) => e.id === 32),
-    "setup minimap preview includes anti-tank guns and artillery",
+    preview.guns.some((e) => e.id === 31) &&
+      preview.guns.some((e) => e.id === 32) &&
+      preview.guns.some((e) => e.id === 33),
+    "setup minimap preview includes anti-tank guns, artillery, and mortars",
   );
   assert(h.router.releaseSource("locked"), "pointer-lock exit releases minimap preview ownership");
   h.clientIntent.updateAntiTankGunSetupPreview({
@@ -881,12 +891,18 @@ function pointerEvent(canvas, clientX, clientY, {
   const selected = [
     { id: 31, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 30, y: 40 },
     { id: 32, owner: 1, kind: KIND.ARTILLERY, x: 50, y: 60 },
+    { id: 33, owner: 1, kind: KIND.MORTAR_TEAM, x: 70, y: 80 },
   ];
   const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
   assert(h.router.pointerDown(lockedEvent(200, 300, 0)), "setup minimap click is consumed");
   assert(h.net.sent.length === 1, "setup minimap click sends one command");
   assert(h.net.sent[0].c === "setupAntiTankGuns", "setup minimap click sends setupAntiTankGuns");
-  assert(h.net.sent[0].units.includes(31) && h.net.sent[0].units.includes(32), "setup minimap click includes support weapons");
+  assert(
+    h.net.sent[0].units.includes(31) &&
+      h.net.sent[0].units.includes(32) &&
+      h.net.sent[0].units.includes(33),
+    "setup minimap click includes support weapons",
+  );
   assertApprox(h.net.sent[0].x, 100, 0.001, "setup minimap command x");
   assertApprox(h.net.sent[0].y, 100, 0.001, "setup minimap command y");
   assert(h.clientIntent.commandTarget === null, "setup minimap click exits target mode");

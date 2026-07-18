@@ -19,7 +19,6 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
       { id: 1, teamId: 1 },
       { id: 2, teamId: 2 },
     ],
-    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
     selectedEntities() {
       return [p2Unit];
     },
@@ -27,13 +26,14 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
       return [p2Unit, p1Target, p2Target];
     },
   };
+  input.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
   input._groundAtScreen = (x, y) => ({ x, y });
   input._entityAtScreen = (point) => point.x < 112 ? p1Target : p2Target;
   input._resourceAtScreen = () => null;
   input._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
   input._selectedWorkerIds = Input.prototype._selectedWorkerIds;
   input._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;
-  input._issueCommand = (command) => commands.push(command);
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
 
   input._onRightClick({ x: p1Target.x, y: p1Target.y });
   assert(
@@ -47,5 +47,24 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
     commands.at(-1)?.c === "move" &&
       commands.at(-1)?.units.join(",") === String(p2Unit.id),
     "lab P2 right-clicking a P2 unit does not classify the selected owner as hostile",
+  );
+
+  const p2Worker = { id: 214, owner: 2, kind: KIND.WORKER, x: 64, y: 128, hp: 30, maxHp: 30, state: STATE.IDLE };
+  const p2IncompleteDepot = {
+    id: 215,
+    owner: 2,
+    kind: KIND.DEPOT,
+    x: 160,
+    y: 160,
+    buildProgress: 0.5,
+  };
+  input.state.selectedEntities = () => [p2Worker];
+  input._entityAtScreen = () => p2IncompleteDepot;
+  input._onRightClick({ x: p2IncompleteDepot.x, y: p2IncompleteDepot.y });
+  assert(
+    commands.at(-1)?.c === "build" &&
+      commands.at(-1)?.units.join(",") === String(p2Worker.id) &&
+      commands.at(-1)?.building === KIND.DEPOT,
+    "lab P2 right-clicking its unfinished building resumes construction instead of moving",
   );
 }

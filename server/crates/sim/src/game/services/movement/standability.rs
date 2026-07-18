@@ -1,4 +1,6 @@
-use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, Order, WeaponSetup};
+use crate::game::entity::{
+    supports_manual_emplacement, uses_oriented_vehicle_body, Entity, EntityKind, Order, WeaponSetup,
+};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability as static_standability;
@@ -58,10 +60,7 @@ fn worker_has_pass_through_work_order(e: &Entity) -> bool {
 }
 
 pub(super) fn requires_weapon_setup(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::MachineGunner | EntityKind::AntiTankGun | EntityKind::Artillery
-    )
+    kind == EntityKind::MachineGunner || supports_manual_emplacement(kind)
 }
 
 pub(super) fn footing_resistance(profile: FootingProfile) -> f32 {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::entity::WeaponSetup;
+use crate::game::entity::{PanzerfaustState, WeaponSetup};
 use crate::game::services::occupancy::footprint_center;
 use crate::protocol::{terrain, LabMapTile};
 
@@ -704,6 +704,78 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
         game.apply_lab_op(LabOp::DeleteEntity { entity_id }),
         Err(LabError::StaleEntity { .. })
     ));
+}
+
+#[test]
+fn lab_owner_change_preserves_rifleman_panzerfaust_state() {
+    let mut game = new_game();
+    game.apply_lab_op(LabOp::SetCompletedResearch(LabSetCompletedResearch {
+        player_id: 1,
+        upgrade: UpgradeKind::Panzerfausts,
+        completed: true,
+    }))
+    .expect("research should be accepted");
+
+    let (loaded_x, loaded_y) = tile_center(&game, 30, 30);
+    let LabOpOutcome::Spawned {
+        entity_id: loaded_rifleman,
+    } = game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 1,
+            kind: EntityKind::Rifleman,
+            x: loaded_x,
+            y: loaded_y,
+            completed: true,
+        }))
+        .expect("upgraded Rifleman should spawn")
+    else {
+        panic!("unexpected outcome");
+    };
+
+    let (unloaded_x, unloaded_y) = tile_center(&game, 32, 30);
+    let LabOpOutcome::Spawned {
+        entity_id: unloaded_rifleman,
+    } = game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 2,
+            kind: EntityKind::Rifleman,
+            x: unloaded_x,
+            y: unloaded_y,
+            completed: true,
+        }))
+        .expect("unupgraded Rifleman should spawn")
+    else {
+        panic!("unexpected outcome");
+    };
+
+    game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
+        entity_id: loaded_rifleman,
+        owner: 2,
+    }))
+    .expect("loaded Rifleman transfer should be accepted");
+    game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
+        entity_id: unloaded_rifleman,
+        owner: 1,
+    }))
+    .expect("unloaded Rifleman transfer should be accepted");
+
+    let panzerfaust_state = |entity_id| {
+        game.state
+            .entities
+            .get(entity_id)
+            .and_then(|entity| entity.combat.as_ref())
+            .and_then(|combat| combat.panzerfaust)
+    };
+    assert_eq!(
+        panzerfaust_state(loaded_rifleman),
+        Some(PanzerfaustState::Loaded),
+        "transferring to an unupgraded owner must not remove a launcher"
+    );
+    assert_eq!(
+        panzerfaust_state(unloaded_rifleman),
+        None,
+        "transferring to an upgraded owner must not grant a launcher"
+    );
 }
 
 #[test]
