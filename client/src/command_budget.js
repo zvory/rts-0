@@ -19,12 +19,18 @@ export function commandBudgetForEntities(entities) {
   return { used, cap, over: used > cap };
 }
 
-export function admitSelectionIds(state, ids, { baseIds = [], entityById = null } = {}) {
+export function admitSelectionIds(state, ids, { baseIds = [], entityById = null, controlPolicy = null } = {}) {
   const resolveEntity = typeof entityById === "function" ? entityById : (id) => state?.entityById?.(id);
-  const base = uniqueLiveSelectionEntities(state, baseIds, new Set(), resolveEntity);
-  const candidates = uniqueLiveSelectionEntities(state, ids, new Set(base.map((entity) => entity.id)), resolveEntity);
+  const base = uniqueLiveSelectionEntities(state, baseIds, new Set(), resolveEntity, controlPolicy);
+  const candidates = uniqueLiveSelectionEntities(
+    state,
+    ids,
+    new Set(base.map((entity) => entity.id)),
+    resolveEntity,
+    controlPolicy,
+  );
 
-  if (!shouldBudgetSelection(state, base, candidates)) {
+  if (!shouldBudgetSelection(state, base, candidates, controlPolicy)) {
     return {
       ids: base.concat(candidates).map((entity) => entity.id),
       overflow: false,
@@ -98,26 +104,32 @@ function selectableCountsForCommandBudget(entity) {
   return !!entity && (isUnit(entity.kind) || isBuilding(entity.kind));
 }
 
-function uniqueLiveSelectionEntities(state, ids, seen = new Set(), resolveEntity = (id) => state?.entityById?.(id)) {
+function uniqueLiveSelectionEntities(
+  state,
+  ids,
+  seen = new Set(),
+  resolveEntity = (id) => state?.entityById?.(id),
+  controlPolicy = null,
+) {
   const out = [];
   for (const id of ids || []) {
     if (!Number.isInteger(id) || seen.has(id)) continue;
     const entity = resolveEntity(id);
     if (!entity || entity.shotReveal || entity.visionOnly) continue;
-    if (entity.kind === KIND.SCOUT_PLANE && !allowsScoutPlaneInspection(state)) continue;
+    if (entity.kind === KIND.SCOUT_PLANE && !allowsScoutPlaneInspection(state, controlPolicy)) continue;
     seen.add(id);
     out.push(entity);
   }
   return out;
 }
 
-function allowsScoutPlaneInspection(state) {
-  return state?.controlPolicy?.kind === "lab" || !!state?.spectator;
+function allowsScoutPlaneInspection(state, controlPolicy = null) {
+  return controlPolicy?.kind === "lab" || !!state?.spectator;
 }
 
-function shouldBudgetSelection(state, base, candidates) {
+function shouldBudgetSelection(state, base, candidates, controlPolicy = null) {
   if (!state) return false;
-  if (state.controlPolicy?.kind === "lab") {
+  if (controlPolicy?.kind === "lab") {
     return false;
   }
   if (state.spectator) return false;

@@ -572,9 +572,15 @@ function sentSeqs(sent) {
   ];
   for (const [file, label] of files) {
     const source = fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-    assert(source.includes("this._issueCommand"), `${file} routes ${label} through the guarded command issuer`);
+    assert(source.includes("this.commandInteraction.issueCommand"), `${file} routes ${label} through the shared command interaction`);
     assert(!source.includes(".net.command("), `${file} does not send gameplay commands through Net`);
   }
+  const interactionSource = fs.readFileSync(new URL("../client/src/command_interaction.js", import.meta.url), "utf8");
+  assert(
+    interactionSource.includes("function issueGameplayCommand") &&
+      interactionSource.includes("sender.issueCommand(command, options)"),
+    "CommandInteraction owns the guarded command issuer",
+  );
   const matchSource = fs.readFileSync(new URL("../client/src/match.js", import.meta.url), "utf8");
   assert(matchSource.includes("new SimWasmPredictionAdapter"), "Match wires the WASM prediction adapter");
   assert(matchSource.includes("predictor: this.predictionAdapter"), "PredictionController receives the adapter");

@@ -6,7 +6,7 @@
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a
 // stable selection does not thrash the DOM (and so hotkeys keep working). All gameplay
-// effects go through `commandIssuer.issueCommand(...)` or the injected client intent facade.
+// effects go through the injected command interaction or client intent facade.
 
 import { cmd } from "./protocol.js";
 import { ABILITY, KIND, STATE, isBuilding, isUnit } from "./protocol.js";
@@ -158,17 +158,17 @@ export class HUD {
    * @param {HTMLElement} rootEl the game screen root (`#game-screen`); used to scope
    *   element lookups so multiple screens could coexist.
    * @param {import("./state.js").GameState} state shared game state (selection, resources).
-   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
+   * @param {{issueCommand(command: object, options?:object): object|boolean}} commandInteraction shared gameplay command interaction.
    * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    * @param {object} [controlPolicy] policy that decides command-surface and owner control.
    * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
    */
-  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
+  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
     this.root = rootEl;
     this.state = state;
-    this.commandIssuer = commandIssuer;
+    this.commandInteraction = commandInteraction;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
@@ -194,7 +194,7 @@ export class HUD {
     this.elSelected = rootEl.querySelector("#selected-panel");
     this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
-    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state);
+    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state, this.controlPolicy);
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
@@ -258,15 +258,6 @@ export class HUD {
     this._idleWorkersSig = null;
   }
 
-  _issueCommand(command, options = {}) {
-    const selected = typeof this.state?.selectedEntities === "function"
-      ? this.state.selectedEntities()
-      : [];
-    const result = issueGameplayCommand(this.commandIssuer, command, options);
-    this._intent()?.recordPlannedCommand?.(command, selected, result);
-    return result;
-  }
-
   _intent() {
     return this.clientIntent;
   }
@@ -310,7 +301,9 @@ export class HUD {
     const workers = activeIdleWorkers(frameAuthoritativeEntities(this.state), this.state);
     if (workers.length === 0) return false;
     this._intent()?.closeCommandCardMenu?.();
-    this.state.setSelection(workers.map((worker) => worker.id));
+    this.state.setSelection(workers.map((worker) => worker.id), {
+      controlPolicy: this.controlPolicy,
+    });
     this._intent()?.clearPlannedOrdersOutsideSelection?.(this.state.selection || []);
     return true;
   }
@@ -390,7 +383,7 @@ export class HUD {
 
   _controlGroupSummaries(frameViews = null) {
     const selected = frameSelectedEntities(this.state, frameViews);
-    return buildControlGroupSummaries(this.state, selected);
+    return buildControlGroupSummaries(this.state, selected, this.controlPolicy);
   }
 
   _dominantControlGroupKind(entities) {
@@ -562,11 +555,11 @@ export class HUD {
         this._intent()?.beginPlacement?.(intent.building);
         return;
       case "stop":
-        this._issueCommand(cmd.stop(intent.unitIds || []));
+        this.commandInteraction.issueCommand(cmd.stop(intent.unitIds || []));
         this._intent()?.endCommandTarget?.();
         return;
       case "holdPosition":
-        this._issueCommand(cmd.holdPosition(intent.unitIds || [], !!ev.shiftKey));
+        this.commandInteraction.issueCommand(cmd.holdPosition(intent.unitIds || [], !!ev.shiftKey));
         this._intent()?.endCommandTarget?.();
         return;
       case "train":
@@ -577,7 +570,7 @@ export class HUD {
         return;
       case "cancelConstruction":
         if (Number.isInteger(intent.buildingId)) {
-          this._issueCommand(cmd.cancelConstruction(intent.buildingId));
+          this.commandInteraction.issueCommand(cmd.cancelConstruction(intent.buildingId));
         }
         return;
       case "research":
@@ -587,11 +580,11 @@ export class HUD {
         this._dispatchAbilityIntent(intent, ev);
         return;
       case "setAutocast":
-        this._issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
+        this.commandInteraction.issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
         this._intent()?.endCommandTarget?.();
         return;
       case "adjustProductionRepeat":
-        this._issueCommand(cmd.adjustProductionRepeat(
+        this.commandInteraction.issueCommand(cmd.adjustProductionRepeat(
           intent.buildingIds || [],
           intent.unit,
           ev.shiftKey ? -1 : 1,
@@ -607,7 +600,7 @@ export class HUD {
 
   _dispatchAbilityIntent(intent, ev = {}) {
     if (intent.targetMode === "recast") {
-      this._issueCommand(cmd.recastAbility(
+      this.commandInteraction.issueCommand(cmd.recastAbility(
         intent.ability,
         intent.readyIds || [],
         intent.targetObjectId ?? null,
@@ -619,7 +612,7 @@ export class HUD {
     if (intent.targetMode === "worldPoint") {
       this._intent()?.beginCommandTarget?.({ kind: "ability", ability: intent.ability }, { shiftKey: !!ev.shiftKey });
     } else {
-      this._issueCommand(cmd.useAbility(
+      this.commandInteraction.issueCommand(cmd.useAbility(
         intent.ability,
         intent.readyIds || [],
         null,
@@ -778,7 +771,7 @@ export class HUD {
   _issueTrain(unit) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
-    this._issueCommand(cmd.train(building.id, unit), {
+    this.commandInteraction.issueCommand(cmd.train(building.id, unit), {
       optimism: {
         family: "train",
         building: building.id,
@@ -805,7 +798,7 @@ export class HUD {
   _issueCancelProduction(kind) {
     const building = this._previousProducingBuildingForKind(kind);
     if (!building) return;
-    this._issueCommand(cmd.cancel(building.id));
+    this.commandInteraction.issueCommand(cmd.cancel(building.id));
   }
 
   _issueResearch(upgrade) {
@@ -815,7 +808,7 @@ export class HUD {
       (e) => this._isOwn(e) && e.kind === def.researchedAt && e.buildProgress == null,
     );
     if (!building) return;
-    this._issueCommand(cmd.research(building.id, upgrade));
+    this.commandInteraction.issueCommand(cmd.research(building.id, upgrade));
   }
 
   // --- Shared helpers --------------------------------------------------------
@@ -917,7 +910,7 @@ export class HUD {
   }
 
   _commandOwnerForSelection(selection = null) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     const selected = selection || (typeof this.state?.selectedEntities === "function" ? this.state.selectedEntities() || [] : []);
     const owner = typeof policy?.commandOwnerForSelection === "function"
       ? policy.commandOwnerForSelection(selected, this.state)
@@ -929,7 +922,7 @@ export class HUD {
   }
 
   _commandResources(owner = this._commandOwnerForSelection()) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     if (typeof policy?.commandResources === "function") {
       return policy.commandResources(this.state, owner);
     }
@@ -937,7 +930,7 @@ export class HUD {
   }
 
   _commandFactionId(owner = this._commandOwnerForSelection()) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     if (typeof policy?.commandFactionId === "function") {
       return policy.commandFactionId(this.state, owner);
     }
@@ -945,7 +938,7 @@ export class HUD {
   }
 
   _commandUpgrades(owner = this._commandOwnerForSelection()) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     if (typeof policy?.commandUpgrades === "function") {
       return policy.commandUpgrades(this.state, owner);
     }
@@ -997,14 +990,4 @@ export class HUD {
   _resourceIcon(kind) {
     return resourceIconHtml(kind);
   }
-}
-
-function issueGameplayCommand(sender, command, options = {}) {
-  if (sender && typeof sender.issueCommand === "function") {
-    return sender.issueCommand(command, options);
-  }
-  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
-    return sender.command(command);
-  }
-  return false;
 }

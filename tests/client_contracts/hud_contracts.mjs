@@ -291,9 +291,7 @@ function fakeHudRootWithoutResourceSpans() {
 {
   const issued = [];
   const hud = {
-    _issueCommand(command) {
-      issued.push(command);
-    },
+    commandInteraction: { issueCommand: (command) => issued.push(command) },
     _intent() {
       return { endCommandTarget() {} };
     },
@@ -312,9 +310,7 @@ function fakeHudRootWithoutResourceSpans() {
 {
   const issued = [];
   const hud = {
-    _issueCommand(command) {
-      issued.push(command);
-    },
+    commandInteraction: { issueCommand: (command) => issued.push(command) },
   };
   HUD.prototype._dispatchCommandIntent.call(
     hud,
@@ -330,9 +326,7 @@ function fakeHudRootWithoutResourceSpans() {
 {
   const issued = [];
   const hud = {
-    _issueCommand(command) {
-      issued.push(command);
-    },
+    commandInteraction: { issueCommand: (command) => issued.push(command) },
   };
   const intent = {
     type: "adjustProductionRepeat",

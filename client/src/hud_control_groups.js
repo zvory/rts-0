@@ -1,13 +1,13 @@
 import { STATS } from "./config.js";
 
-export function buildControlGroupSummaries(state, selected = []) {
+export function buildControlGroupSummaries(state, selected = [], controlPolicy = null) {
   const selectedIds = new Set((selected || []).map((entity) => entity.id));
   const selectedCount = selectedIds.size;
   const out = [];
   const groups = state?.controlGroups || [];
   for (let slot = 0; slot < groups.length; slot++) {
     const entities = typeof state?.controlGroupEntities === "function"
-      ? state.controlGroupEntities(slot)
+      ? state.controlGroupEntities(slot, { controlPolicy })
       : [];
     if (!entities || entities.length === 0) {
       out.push(null);

@@ -1,6 +1,6 @@
 export function applyInteractSelection(match, entityIds) {
   match.clientIntent?.closeCommandCardMenu?.();
-  match.state.setSelection(entityIds);
+  match.state.setSelection(entityIds, { controlPolicy: match.controlPolicy });
   match.clientIntent?.clearPlannedOrdersOutsideSelection?.(match.state.selection || []);
 }
 

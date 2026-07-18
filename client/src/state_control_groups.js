@@ -1,13 +1,13 @@
 import { admitSelectionIds } from "./command_budget.js";
 import { KIND, isBuilding, isUnit } from "./protocol.js";
 
-export function admitControlGroupIds(state, ids, { baseIds = [], entityById = null } = {}) {
-  if (state?.controlPolicy?.kind === "lab") {
-    return admitLabControlGroupIds(state, ids, { baseIds, entityById });
+export function admitControlGroupIds(state, ids, { baseIds = [], entityById = null, controlPolicy = null } = {}) {
+  if (controlPolicy?.kind === "lab") {
+    return admitLabControlGroupIds(state, ids, { baseIds, entityById, controlPolicy });
   }
   const base = ownControllableIds(state, baseIds, entityById);
   const candidates = ownControllableIds(state, ids, entityById);
-  return admitSelectionIds(state, candidates, { baseIds: base, entityById });
+  return admitSelectionIds(state, candidates, { baseIds: base, entityById, controlPolicy });
 }
 
 function ownControllableIds(state, ids, entityById = null) {
@@ -26,11 +26,11 @@ function ownControllableIds(state, ids, entityById = null) {
   return out;
 }
 
-function admitLabControlGroupIds(state, ids, { baseIds = [], entityById = null } = {}) {
+function admitLabControlGroupIds(state, ids, { baseIds = [], entityById = null, controlPolicy = null } = {}) {
   const baseEntities = labControlGroupEntities(state, baseIds, new Set(), entityById);
   const baseOwner = singleOwner(baseEntities);
   if (baseEntities.length > 0 && baseOwner == null) {
-    return admitSelectionIds(state, [], { baseIds: [], entityById });
+    return admitSelectionIds(state, [], { baseIds: [], entityById, controlPolicy });
   }
 
   const baseSeen = new Set(baseEntities.map((entity) => entity.id));
@@ -41,10 +41,11 @@ function admitLabControlGroupIds(state, ids, { baseIds = [], entityById = null }
     return admitSelectionIds(state, [], {
       baseIds: baseEntities.map((entity) => entity.id),
       entityById,
+      controlPolicy,
     });
   }
-  if (owner != null && typeof state.controlPolicy?.canIssueAs === "function" && !state.controlPolicy.canIssueAs(owner)) {
-    return admitSelectionIds(state, [], { baseIds: [], entityById });
+  if (owner != null && typeof controlPolicy?.canIssueAs === "function" && !controlPolicy.canIssueAs(owner)) {
+    return admitSelectionIds(state, [], { baseIds: [], entityById, controlPolicy });
   }
 
   const base = owner == null
@@ -53,7 +54,7 @@ function admitLabControlGroupIds(state, ids, { baseIds = [], entityById = null }
   const candidates = owner == null
     ? []
     : candidateEntities.filter((entity) => Number(entity.owner) === owner).map((entity) => entity.id);
-  return admitSelectionIds(state, candidates, { baseIds: base, entityById });
+  return admitSelectionIds(state, candidates, { baseIds: base, entityById, controlPolicy });
 }
 
 function labControlGroupEntities(state, ids, seen = new Set(), entityById = null) {

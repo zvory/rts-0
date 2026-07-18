@@ -259,7 +259,7 @@ export class GameState extends VisualEffectBackedState {
    * events and the id->entity index are refreshed from the latest snapshot.
    * @param {object} msg a §2.4 snapshot payload.
    */
-  applySnapshot(msg, visualNow = this.visualNow()) {
+  applySnapshot(msg, visualNow = this.visualNow(), { controlPolicy = null } = {}) {
     // Snapshots can arrive batched in a single event-loop turn (a throttled or
     // backgrounded tab drains its socket buffer at once) and performance.now()
     // is clamped to a coarse resolution, so two consecutive snapshots could
@@ -316,7 +316,7 @@ export class GameState extends VisualEffectBackedState {
       : [];
     this.events = events;
     this._pruneSelection();
-    this._pruneControlGroups();
+    this._pruneControlGroups({ controlPolicy });
 
     this.visualEffects.applySnapshotEvents(this.events, visualNow, (id) => this.entityById(id));
   }
@@ -649,7 +649,7 @@ export class GameState extends VisualEffectBackedState {
    */
   addToControlGroup(slot, ids, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
-    this._pruneControlGroup(slot, { entityById: options.entityById });
+    this._pruneControlGroup(slot, options);
     const admitted = this._admitControlGroupIds(ids, { ...options, baseIds: this.controlGroups[slot] || [] });
     this.controlGroups[slot] = admitted.ids;
     this._recordSelectionBudgetOverflow(admitted);
@@ -659,11 +659,12 @@ export class GameState extends VisualEffectBackedState {
   /**
    * Resolve a control group to live entities, pruning dead/stale ids first.
    * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
+   * @param {{controlPolicy?: object|null}} [options] injected ownership policy.
    * @returns {Array<object>}
    */
-  controlGroupEntities(slot) {
+  controlGroupEntities(slot, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
-    this._pruneControlGroup(slot);
+    this._pruneControlGroup(slot, options);
     const out = [];
     for (const id of this.controlGroups[slot]) {
       const e = this._curById.get(id);
@@ -677,12 +678,12 @@ export class GameState extends VisualEffectBackedState {
    * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
    * @returns {Array<number>} selected ids.
    */
-  selectControlGroup(slot) {
+  selectControlGroup(slot, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
-    const pruned = this._pruneControlGroup(slot);
+    const pruned = this._pruneControlGroup(slot, options);
     const ids = this.controlGroups[slot] || [];
     if (ids.length === 0) return [];
-    this.setSelection(ids);
+    this.setSelection(ids, options);
     if (pruned?.overflow) this._recordSelectionBudgetOverflow(pruned);
     return Array.from(this.selection);
   }
@@ -691,12 +692,12 @@ export class GameState extends VisualEffectBackedState {
     return Number.isInteger(slot) && slot >= 0 && slot < this.controlGroups.length;
   }
 
-  _admitControlGroupIds(ids, { baseIds = [], entityById = null } = {}) {
-    return admitControlGroupIds(this, ids, { baseIds, entityById });
+  _admitControlGroupIds(ids, { baseIds = [], entityById = null, controlPolicy = null } = {}) {
+    return admitControlGroupIds(this, ids, { baseIds, entityById, controlPolicy });
   }
 
-  _pruneControlGroups() {
-    for (let i = 0; i < this.controlGroups.length; i++) this._pruneControlGroup(i);
+  _pruneControlGroups(options = {}) {
+    for (let i = 0; i < this.controlGroups.length; i++) this._pruneControlGroup(i, options);
   }
 
   _pruneControlGroup(slot, options = {}) {

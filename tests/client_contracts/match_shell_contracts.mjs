@@ -324,13 +324,13 @@ import {
   const labCombatAudio = new MatchCombatAudio({
     state: {
       playerId: 1,
-      controlPolicy: {
-        kind: "lab",
-        feedbackOwner() {
-          return 2;
-        },
-      },
       entityById: (id) => labEntities.get(id) || null,
+    },
+    controlPolicy: {
+      kind: "lab",
+      feedbackOwner() {
+        return 2;
+      },
     },
     audio: {
       pickVariant: (ids) => ids[0],

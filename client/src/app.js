@@ -700,6 +700,11 @@ export class App {
         launch: this.labLaunch,
         startPayload: payload,
         match: this.match,
+        controlPolicy: this.match.controlPolicy,
+        commandLimitSettings: {
+          ignoreCommandLimitsEnabled: () => this.labControlPolicy?.ignoreCommandLimitsEnabled?.() ?? true,
+          setIgnoreCommandLimits: (enabled) => this.labControlPolicy?.setIgnoreCommandLimits?.(enabled),
+        },
         onEditMap: () => this.openCurrentLabMapInEditor(),
       });
     }

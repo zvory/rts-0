@@ -188,17 +188,18 @@ export class Minimap {
    * @param {import("./state.js").GameState} state shared game state.
    * @param {import("./camera.js").Camera} camera semantic camera (for viewport footprint + focus).
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
-   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
+   * @param {{issueCommand(command: object, options?:object): object|boolean}} commandInteraction shared gameplay command interaction.
    * @param {import("./client_intent.js").ClientIntent} [options.clientIntent] browser-local command/placement intent facade.
    * @param {boolean|function(): boolean} [options.commandsEnabled] whether minimap clicks may issue commands.
    */
-  constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter = null, options = {}) {
+  constructor(canvasEl, state, camera, fog, commandInteraction, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext("2d");
     this.state = state;
     this.camera = camera;
     this.fog = fog;
-    this.commandIssuer = commandIssuer;
+    this.commandInteraction = commandInteraction;
+    this.controlPolicy = options.controlPolicy || null;
     this.clientIntent = options.clientIntent || null;
     this.inputRouter = inputRouter;
     this.commandsEnabled = options.commandsEnabled ?? true;
@@ -815,8 +816,8 @@ export class Minimap {
   /** Blip color for an entity: own=green, ally=blue, enemy=player color/red, neutral=yellow. */
   _blipColor(e) {
     if (e.owner === 0 || isResource(e.kind)) return hex(COLORS.selectNeutral);
-    if (ownOwner(this.state, e.owner)) return hex(COLORS.selectOwn);
-    if (allyOwner(this.state, e.owner)) return hex(COLORS.selectAlly);
+    if (ownOwner(this.state, e.owner, this.controlPolicy)) return hex(COLORS.selectOwn);
+    if (allyOwner(this.state, e.owner, this.controlPolicy)) return hex(COLORS.selectAlly);
     // Enemy: prefer the player's assigned color if we know it, else the enemy tint.
     const player = this._playerById(e.owner);
     return (player && player.color) || hex(COLORS.selectEnemy);
@@ -824,8 +825,8 @@ export class Minimap {
 
   _markerOwnerColor(owner) {
     if (owner === 0) return hex(COLORS.selectNeutral);
-    if (ownOwner(this.state, owner)) return hex(COLORS.selectOwn);
-    if (allyOwner(this.state, owner)) return hex(COLORS.selectAlly);
+    if (ownOwner(this.state, owner, this.controlPolicy)) return hex(COLORS.selectOwn);
+    if (allyOwner(this.state, owner, this.controlPolicy)) return hex(COLORS.selectAlly);
     const player = this._playerById(owner);
     return (player && player.color) || hex(COLORS.selectEnemy);
   }
@@ -1014,15 +1015,6 @@ export class Minimap {
     this._fogLayerSignature = null;
   }
 
-  _issueCommand(command) {
-    const selected = typeof this.state?.selectedEntities === "function"
-      ? this.state.selectedEntities()
-      : [];
-    const result = issueGameplayCommand(this.commandIssuer, command);
-    this._intent()?.recordPlannedCommand?.(command, selected, result);
-    return result;
-  }
-
   _intent() {
     return this.clientIntent;
   }
@@ -1035,7 +1027,7 @@ export class Minimap {
       append,
       radiusTiles,
       performance.now(),
-      commandFeedbackOwner(this.state),
+      commandFeedbackOwner(this.state, this.controlPolicy),
     );
   }
 
@@ -1081,8 +1073,8 @@ export class Minimap {
   }
 
   _commandsEnabled() {
-    if (this.state?.controlPolicy?.kind === "lab") {
-      return !!this.state.controlPolicy.canUseCommandSurface?.(this.state);
+    if (this.controlPolicy?.kind === "lab") {
+      return !!this.controlPolicy.canUseCommandSurface?.(this.state);
     }
     if (typeof this.commandsEnabled === "function") return this.commandsEnabled() !== false;
     return this.commandsEnabled !== false;
@@ -1321,7 +1313,7 @@ export class Minimap {
   _selectedOwnSupportWeapons() {
     const sel = this.state.selectedEntities() || [];
     return sel.filter((e) =>
-      ownOwner(this.state, e.owner) &&
+      ownOwner(this.state, e.owner, this.controlPolicy) &&
       (e.kind === KIND.ANTI_TANK_GUN ||
         e.kind === KIND.MORTAR_TEAM ||
         e.kind === KIND.ARTILLERY));
@@ -1334,7 +1326,7 @@ export class Minimap {
     if (commandTarget === "setupAntiTankGuns") {
       const supportWeapons = this._selectedOwnSupportWeapons().map((e) => e.id);
       if (supportWeapons.length > 0) {
-        this._issueCommand(cmd.setupAntiTankGuns(supportWeapons, wx, wy, queued));
+        this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(supportWeapons, wx, wy, queued));
         this._addCommandFeedback("move", wx, wy, queued);
       }
       return;
@@ -1342,27 +1334,27 @@ export class Minimap {
     const landUnitIds = [];
     for (const e of sel) {
       // Only own, controllable units take move orders (skip buildings/resources/enemies).
-      if (ownOwner(this.state, e.owner) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE) {
+      if (ownOwner(this.state, e.owner, this.controlPolicy) && isUnit(e.kind) && e.kind !== KIND.SCOUT_PLANE) {
         landUnitIds.push(e.id);
       }
     }
     if (landUnitIds.length === 0) {
       const producers = sel
-        .filter((e) => ownOwner(this.state, e.owner) && isProducerBuilding(e.kind))
+        .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && isProducerBuilding(e.kind))
         .map((e) => e.id);
       if (producers.length === 0) return;
       const resource = resourceRallyTargetAt(this.state.map, wx, wy);
       if (resource) return;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
-        this._issueCommand(cmd.setRally(building, wx, wy, queued, kind));
+        this.commandInteraction.issueCommand(cmd.setRally(building, wx, wy, queued, kind));
       }
       this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
       return;
     }
     if (commandTarget === "attack") {
       if (landUnitIds.length > 0) {
-        this._issueCommand(cmd.attackMove(landUnitIds, wx, wy, queued));
+        this.commandInteraction.issueCommand(cmd.attackMove(landUnitIds, wx, wy, queued));
       }
       if (landUnitIds.length > 0) {
         this._addCommandFeedback("attack", wx, wy, queued);
@@ -1375,7 +1367,7 @@ export class Minimap {
       const carriers = definition?.carriers;
       const abilityUnits = Array.isArray(carriers)
         ? sel
-            .filter((e) => ownOwner(this.state, e.owner) && carriers.includes(e.kind))
+            .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && carriers.includes(e.kind))
             .map((e) => e.id)
         : landUnitIds;
       if (abilityUnits.length === 0) return;
@@ -1394,8 +1386,8 @@ export class Minimap {
           queued,
         })
         : [];
-      const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state);
-      this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
+      const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state, this.controlPolicy);
+      this.commandInteraction.issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
       if (isArtilleryFireAbility(ability)) {
         for (const lock of artilleryLocks) {
           this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
@@ -1405,38 +1397,38 @@ export class Minimap {
       this._addCommandFeedback("attack", wx, wy, queued, radiusTiles);
       return;
     }
-    this._issueCommand(cmd.move(landUnitIds, wx, wy, queued));
+    this.commandInteraction.issueCommand(cmd.move(landUnitIds, wx, wy, queued));
     this._addCommandFeedback("move", wx, wy, queued);
   }
 }
 
-function ownOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    if (typeof state.controlPolicy.isCommandOwner === "function") {
-      return state.controlPolicy.isCommandOwner(owner, state);
+function ownOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    if (typeof controlPolicy.isCommandOwner === "function") {
+      return controlPolicy.isCommandOwner(owner, state);
     }
-    return state.controlPolicy.canControlOwner(owner, state);
+    return controlPolicy.canControlOwner(owner, state);
   }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;
 }
 
-function allyOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    return typeof state.controlPolicy.isCommandAllyOwner === "function"
-      ? state.controlPolicy.isCommandAllyOwner(owner, state)
+function allyOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    return typeof controlPolicy.isCommandAllyOwner === "function"
+      ? controlPolicy.isCommandAllyOwner(owner, state)
       : false;
   }
   return typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner);
 }
 
-function commandFeedbackOwner(state) {
-  if (state?.controlPolicy?.kind === "lab") {
-    const owner = typeof state.controlPolicy.feedbackOwner === "function"
-      ? state.controlPolicy.feedbackOwner(state)
-      : typeof state.controlPolicy.issueAsOwnerForSelection === "function"
-        ? state.controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+function commandFeedbackOwner(state, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    const owner = typeof controlPolicy.feedbackOwner === "function"
+      ? controlPolicy.feedbackOwner(state)
+      : typeof controlPolicy.issueAsOwnerForSelection === "function"
+        ? controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
         : null;
     const ownerId = Number(owner);
     return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
@@ -1445,28 +1437,18 @@ function commandFeedbackOwner(state) {
   return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
 }
 
-function abilityTargetRadiusTiles(definition, ability, state) {
+function abilityTargetRadiusTiles(definition, ability, state, controlPolicy = null) {
   const baseRadius = definition?.radiusTiles || 0;
-  if (ability === ABILITY.SMOKE && commandUpgrades(state).includes(UPGRADE.SMOKE_PLUS)) {
+  if (ability === ABILITY.SMOKE && commandUpgrades(state, controlPolicy).includes(UPGRADE.SMOKE_PLUS)) {
     return definition?.upgradedRadiusTiles || baseRadius;
   }
   return baseRadius;
 }
 
-function commandUpgrades(state) {
-  if (typeof state?.controlPolicy?.commandUpgrades === "function") {
-    const upgrades = state.controlPolicy.commandUpgrades(state);
+function commandUpgrades(state, controlPolicy = null) {
+  if (typeof controlPolicy?.commandUpgrades === "function") {
+    const upgrades = controlPolicy.commandUpgrades(state);
     return Array.isArray(upgrades) ? upgrades : [];
   }
   return Array.isArray(state?.upgrades) ? state.upgrades : [];
-}
-
-function issueGameplayCommand(sender, command) {
-  if (sender && typeof sender.issueCommand === "function") {
-    return sender.issueCommand(command);
-  }
-  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
-    return sender.command(command);
-  }
-  return false;
 }

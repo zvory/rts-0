@@ -59,6 +59,7 @@ import {
 } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
+import { CommandInteraction } from "../../client/src/command_interaction.js";
 
 const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ABILITIES",
@@ -593,9 +594,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     playerId,
     selectedEntities: () => selectedProductionBuildings,
   };
-  hud.commandIssuer = {
-    command: (command) => trained.push(command),
-  };
+  hud.commandInteraction = new CommandInteraction({
+    commandIssuer: { command: (command) => trained.push(command) },
+    clientIntent: null,
+    selectedEntities: () => selectedProductionBuildings,
+  });
   hud._trainRoundRobin = new Map();
   hud._cancelRoundRobin = new Map();
 
@@ -734,7 +737,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    researchHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    researchHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     researchHud._cardSig = null;
     researchHud._resourceIcons = {};
 
@@ -792,7 +795,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    mortarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    mortarHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     mortarHud.audio = null;
     mortarHud._cardSig = null;
     renderCommandCard(mortarHud);
@@ -914,7 +917,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    commandCarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    commandCarHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     commandCarHud.audio = null;
     commandCarHud._cardSig = null;
     renderCommandCard(commandCarHud);
@@ -1026,7 +1029,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       selectedEntities: () => [selectedFactory],
       entitiesInterpolated: () => [selectedFactory],
     };
-    factoryHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    factoryHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     factoryHud._cardSig = null;
     factoryHud._trainRoundRobin = new Map();
     factoryHud._cancelRoundRobin = new Map();
@@ -1144,7 +1147,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       selectedEntities: () => [selectedGunWorks],
       entitiesInterpolated: () => [selectedGunWorks],
     };
-    gunWorksHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    gunWorksHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     gunWorksHud._cardSig = null;
     gunWorksHud._trainRoundRobin = new Map();
     gunWorksHud._cancelRoundRobin = new Map();
@@ -1180,7 +1183,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       selectedEntities: () => [selectedResearchComplex],
       entitiesInterpolated: () => [selectedResearchComplex],
     };
-    rdHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    rdHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     rdHud._cardSig = null;
     rdHud._trainRoundRobin = new Map();
     rdHud._cancelRoundRobin = new Map();
@@ -1236,7 +1239,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         placements += 1;
       },
     };
-    shortResourceHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    shortResourceHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     shortResourceHud.audio = {
       play(id) {
         playedNotices.push(id);
@@ -1317,7 +1320,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
         this.commandTarget = null;
       },
     };
-    antiTankGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    antiTankGunHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
     antiTankGunHud._cardSig = null;
 
     renderCommandCard(antiTankGunHud);
@@ -1335,7 +1338,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     setupInput.clientIntent = new ClientIntent();
     setupInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
     setupInput.clientIntent.addCommandFeedback = () => {};
-    setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
+    setupInput.commandInteraction = { issueCommand: (command) => setupCommands.push(command) };
     setupInput._groundAtScreen = (x, y) => ({ x, y });
     setupInput._entityAtScreen = () => null;
     setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id, setupSelectedMortar.id];

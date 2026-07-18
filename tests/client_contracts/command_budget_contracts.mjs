@@ -68,15 +68,10 @@ import {
     "client command guard allows 24 one-supply units",
   );
 
-  const labState = {
-    ...budgetState(tanks),
-    controlPolicy: {
-      kind: "lab",
-      ignoreCommandLimitsEnabled: () => false,
-    },
-  };
+  const labState = budgetState(tanks);
+  const controlPolicy = { kind: "lab" };
   assert(
-    admitSelectionIds(labState, tanks.map((tank) => tank.id)).ids.length === tanks.length,
+    admitSelectionIds(labState, tanks.map((tank) => tank.id), { controlPolicy }).ids.length === tanks.length,
     "lab selection is not changed by the command-limit option",
   );
   assert(

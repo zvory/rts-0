@@ -29,6 +29,7 @@ src/
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery, building-footprint sizing
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
+  command_interaction.js # shared Input/HUD/Minimap command issue-and-planned-order recording
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
@@ -89,6 +90,7 @@ src/
   lab_tool_detail.js # Pure armed-tool instruction text for LabPanel status
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
+  control_policy_projection.js # frozen read-only ownership/command-surface projection
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
@@ -191,8 +193,11 @@ export class PredictionController {
   get pendingCommandCount()
 }
 ```
-Live player command sources receive a `commandIssuer` seam from `Match` and call
-`commandIssuer.issueCommand(cmd)`. The controller owns browser-local `clientSeq` allocation and
+`Match` composes one `CommandInteraction` from its command issuer, `ClientIntent`, and current
+selected-entity snapshot. Input, HUD, and Minimap receive the same interaction and call
+`issueCommand(cmd, options?)`; it issues once and records a synchronous accepted result once for
+planned-order feedback. Promise-returning Lab issue-as commands stay non-optimistic and record no
+planned order. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
 `GameState.applySnapshot` remains authoritative. Prediction display writes go through
@@ -823,18 +828,24 @@ setup checkpoint import/export through those collaborators while keeping the nor
 Lab operator starts are still spectator-shaped for projection and prediction, and
 `LabClient` treats `start.lab.vision` plus `labState.vision` as the recipient's server-authoritative
 choice; `start.lab.godModePlayers` plus `labState.godModePlayers` mirror room-scoped player god
-mode. The injected control policy exposes `canUseCommandSurface(state)` and local
-`ignoreCommandLimitsEnabled()`/`setIgnoreCommandLimits(enabled)` controls so `Match` and HUD can
+mode. `Match` wraps the injected policy in one frozen read-only projection used by selection,
+control groups, command budget, HUD/cards, Input, Minimap, renderer feedback/entities, combat audio,
+LabPanel research display, room-time controls, and shell visibility. `GameState` neither publishes
+nor discovers the policy. `App` separately injects LabPanel's narrow mutable command-limit settings
+collaborator (`ignoreCommandLimitsEnabled()`/`setIgnoreCommandLimits(enabled)`), so mutable operator
+settings never enter the read-only projection. The projection exposes
+`canUseCommandSurface(state)` so `Match` and HUD can
 keep selection plus the real command card available for operators while read-only lab viewers,
 replay viewers, and normal spectators remain passive. Lab selection itself is not toggled by this
-control. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
-`LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
+control. Operator gameplay commands still flow through the shared `CommandInteraction`; its
+underlying command issuer delegates to `LabControlPolicy`, which wraps them as lab `issueCommandAs`
+requests for the single controllable selected
 owner and includes whether that command should bypass the normal command-supply limit.
 Mixed-owner lab selections remain command-blocked, but renderer inspection treats every selected
 operator-controllable owner as a feedback owner so all-team Lab overlays such as rally/order
 markers and selected support-weapon field-of-fire wedges can be compared across players.
-Every client surface that needs ownership semantics must read through the injected control policy
-or the `GameState` helpers that delegate to it: command-card resources/faction/upgrades,
+Every client surface that needs ownership semantics must read through the injected read-only policy
+projection: command-card resources/faction/upgrades,
 right-click enemy classification, control groups, renderer feedback ownership, rally/order overlays,
 range/setup previews, minimap commands, and combat audio categories. Raw `state.playerId` remains
 the local viewer id and is not the lab command owner.

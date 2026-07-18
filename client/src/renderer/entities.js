@@ -165,14 +165,6 @@ export function _drawSelectionAndHp(e, selection, state) {
 
 function ownOwner(state, owner) {
   if (typeof state?.isFeedbackOwner === "function") return state.isFeedbackOwner(owner);
-  if (state?.controlPolicy?.kind === "lab") {
-    if (typeof state.controlPolicy.isFeedbackOwner === "function") {
-      return state.controlPolicy.isFeedbackOwner(owner, state);
-    }
-    if (typeof state.controlPolicy.canControlOwner === "function") {
-      return state.controlPolicy.canControlOwner(owner, state);
-    }
-  }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;

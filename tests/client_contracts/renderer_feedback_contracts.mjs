@@ -14,6 +14,7 @@ import {
   WEAPON_KIND,
 } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import { createControlPolicyProjection } from "../../client/src/control_policy_projection.js";
 import { buildRendererFeedbackView } from "../../client/src/renderer/feedback_view_model.js";
 import { createLiveRigDefinitions } from "../../client/src/renderer/rigs/live_routing.js";
 import { _drawSelectionAndHp } from "../../client/src/renderer/entities.js";
@@ -529,6 +530,9 @@ function nearPoint(call, point, epsilon = 0.001) {
       weaponRangeTiles: 7,
     },
   ];
+  const controlPolicy = createControlPolicyProjection(
+    createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+  );
   const feedbackState = {
     playerId: 1,
     spectator: true,
@@ -536,7 +540,6 @@ function nearPoint(call, point, epsilon = 0.001) {
       { id: 1, teamId: 1 },
       { id: 2, teamId: 2 },
     ],
-    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
     showUnitRangesEnabled: true,
     debugPathOverlaysEnabled: true,
     showAllDebugPathOverlays: false,
@@ -560,6 +563,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     },
   };
   const feedbackView = buildRendererFeedbackView(feedbackState, {
+    controlPolicy,
     selectedEntities: selected,
     clientIntent: {
       liveCommandFeedback() {
@@ -736,7 +740,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     },
     selected[0],
     new Set([selected[0].id]),
-    feedbackState,
+    feedbackView,
   );
   assert(
     ringGfx.calls.some((call) => call[0] === "lineStyle" && call[2] === COLORS.selectOwn),
@@ -789,6 +793,9 @@ function nearPoint(call, point, epsilon = 0.001) {
       setupFacing: Math.PI,
     },
   ];
+  const controlPolicy = createControlPolicyProjection(
+    createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+  );
   const feedbackState = {
     playerId: 1,
     spectator: true,
@@ -796,13 +803,12 @@ function nearPoint(call, point, epsilon = 0.001) {
       { id: 1, teamId: 1 },
       { id: 2, teamId: 2 },
     ],
-    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
     showUnitRangesEnabled: false,
     selectedEntities() {
       return selected;
     },
   };
-  const feedbackView = buildRendererFeedbackView(feedbackState, { selectedEntities: selected });
+  const feedbackView = buildRendererFeedbackView(feedbackState, { controlPolicy, selectedEntities: selected });
   assert(feedbackView.issueAsOwnerId === null, "mixed-owner lab selection has no issue-as owner");
   assert(feedbackView.feedbackOwnerId === null, "mixed-owner lab selection has no single feedback owner");
   assert(

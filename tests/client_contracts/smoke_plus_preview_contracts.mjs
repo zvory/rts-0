@@ -21,7 +21,9 @@ import { Input } from "../../client/src/input/index.js";
     playerId: 1,
     map: { tileSize: 32 },
     upgrades: [],
-    controlPolicy: {
+    selectedEntities: () => [{ id: 77, owner: 2, kind: KIND.SCOUT_CAR, x: 100, y: 100 }],
+  };
+  smokeInput.controlPolicy = {
       kind: "lab",
       isCommandOwner(owner) {
         return Number(owner) === 2;
@@ -29,8 +31,6 @@ import { Input } from "../../client/src/input/index.js";
       commandUpgrades() {
         return [UPGRADE.SMOKE_PLUS];
       },
-    },
-    selectedEntities: () => [{ id: 77, owner: 2, kind: KIND.SCOUT_CAR, x: 100, y: 100 }],
   };
   smokeInput.clientIntent = new ClientIntent();
   smokeInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.SMOKE });

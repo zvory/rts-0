@@ -26,7 +26,7 @@ export function _controlGroupSaveModifierActive(ev, runtime = {}) {
 
 export function _handleControlGroupHotkey(ev) {
   const slot = this._controlGroupSlotFromKey(ev);
-  if (slot == null || !controlGroupsEnabled(this.state)) return false;
+  if (slot == null || !controlGroupsEnabled(this.state, this.controlPolicy)) return false;
 
   const save = _controlGroupSaveModifierActive(ev, {
     isInstalledApp: typeof this.installedAppRuntime === "function" && this.installedAppRuntime(),
@@ -41,6 +41,7 @@ export function _handleControlGroupHotkey(ev) {
   if (save) {
     this.state.setControlGroup(slot, this._visibleSelectionIds(this.state.selection), {
       entityById: (id) => this._selectionEntityById(id),
+      controlPolicy: this.controlPolicy,
     });
     this._lastControlGroupTap = null;
     return true;
@@ -48,6 +49,7 @@ export function _handleControlGroupHotkey(ev) {
   if (add) {
     this.state.addToControlGroup(slot, this._visibleSelectionIds(this.state.selection), {
       entityById: (id) => this._selectionEntityById(id),
+      controlPolicy: this.controlPolicy,
     });
     this._lastControlGroupTap = null;
     return true;
@@ -57,7 +59,10 @@ export function _handleControlGroupHotkey(ev) {
   const last = this._lastControlGroupTap;
   const doubleTap = last && last.slot === slot && now - last.t <= CONTROL_GROUP_DOUBLE_TAP_MS;
   const ids = this._visibleSelectionIds(this.state.controlGroups?.[slot] || []);
-  this.state.setSelection(ids, { entityById: (id) => this._selectionEntityById(id) });
+  this.state.setSelection(ids, {
+    entityById: (id) => this._selectionEntityById(id),
+    controlPolicy: this.controlPolicy,
+  });
   if (ids.length === 0) {
     this._lastControlGroupTap = null;
     return true;
@@ -71,9 +76,9 @@ export function _handleControlGroupHotkey(ev) {
   return true;
 }
 
-function controlGroupsEnabled(state) {
-  if (state?.controlPolicy?.kind === "lab") {
-    return !!state.controlPolicy.canUseCommandSurface?.(state);
+function controlGroupsEnabled(state, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    return !!controlPolicy.canUseCommandSurface?.(state);
   }
   return !state?.spectator;
 }
