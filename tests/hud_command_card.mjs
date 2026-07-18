@@ -251,7 +251,7 @@ function buttonSlots(card) {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 1 }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
   };
   const abilityCard = buildCommandCardDescriptors({
     playerId: 1,
@@ -383,7 +383,7 @@ function buttonSlots(card) {
     abilities: (abilitiesByKind[kind] || []).map((ability) => ({
       ability,
       cooldownLeft: 0,
-      remainingUses: ability === ABILITY.SMOKE ? 1 : null,
+      remainingUses: null,
     })),
   }));
   const combinedCard = buildCommandCardDescriptors({
@@ -447,7 +447,7 @@ function buttonSlots(card) {
     id: 42,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 1 }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
   };
   const fixtureScoutCard = buildCommandCardDescriptors({
     playerId: 1,

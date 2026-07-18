@@ -59,7 +59,6 @@ export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
 export const SMOKE_PLUS_CLOUD_RADIUS_TILES = SMOKE_CLOUD_RADIUS_TILES * 1.5;
 export const SMOKE_PLUS_CLOUD_DURATION_TICKS = SMOKE_CLOUD_DURATION_TICKS * 2;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 0;
-export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
 export const MORTAR_SHELL_DELAY_TICKS = Math.round(TICK_HZ * 2.25);
 export const MORTAR_RANGE_TILES = 15;
@@ -212,7 +211,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: SMOKE_ABILITY_RANGE_TILES,
     cooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
-    charges: SCOUT_CAR_SMOKE_USES,
+    charges: null,
     cost: SMOKE_ABILITY_COST,
     techRequirement: KIND.RESEARCH_COMPLEX,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,

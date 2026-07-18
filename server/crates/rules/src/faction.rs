@@ -346,7 +346,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         range_tiles: Some(balance::SMOKE_ABILITY_RANGE_TILES),
         min_range_tiles: None,
         cooldown_ticks: balance::SMOKE_ABILITY_COOLDOWN_TICKS,
-        charges: Some(balance::SCOUT_CAR_SMOKE_USES),
+        charges: None,
         cost: ResourceCost::new(
             balance::SMOKE_ABILITY_COST_STEEL,
             balance::SMOKE_ABILITY_COST_OIL,
@@ -958,7 +958,7 @@ mod tests {
         assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
         assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES));
-        assert_eq!(smoke.charges, Some(balance::SCOUT_CAR_SMOKE_USES));
+        assert_eq!(smoke.charges, None);
         assert_eq!(
             smoke.tech_requirement,
             Some(EntityKind::ResearchComplex),
