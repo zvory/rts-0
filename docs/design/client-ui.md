@@ -132,7 +132,7 @@ orders, replay controls, or a simulation clock. It reuses the normal Pixi `Rende
 `net.js`
 ```js
 export class Net {
-  constructor(url)                       // ws url; auto-derived from location in main.js
+  constructor(url, diagnostics?)         // ws url; auto-derived from location in main.js
   connect(): Promise<void>
   on(type, handler)                      // type ∈ ServerMessage tags + "open"/"close"
   off(type, handler)
@@ -172,6 +172,14 @@ export class Net {
   get bufferedAmount()
 }
 ```
+
+`Net` isolates each subscriber during dispatch. The first occurrence of a stable failure signature
+(event type truncated to 64 characters, local weakly-held handler id, and `Error` or `NonError`
+thrown-value class) is reported with `console.error("[rts-net] subscriber failure", detail)` and is
+optionally mirrored to diagnostics. Each instance retains at most 32 signatures; the next distinct
+failure emits one fixed saturation report and all later new signatures are suppressed. Reports
+never inspect thrown-value properties or message payloads, survive reconnects for the lifetime of
+the `Net`, and cannot prevent delivery to later subscribers even if console or diagnostics throws.
 
 `prediction_controller.js`
 ```js
