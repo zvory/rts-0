@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, ScoutPlaneState};
 use crate::game::map::Map;
@@ -9,7 +7,6 @@ const ORBIT_PHASE_EPS: f32 = 0.001;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScoutPlaneLaunchError {
-    Active,
     InvalidLaunch,
 }
 
@@ -21,9 +18,6 @@ pub(crate) fn launch_ability(
     x: f32,
     y: f32,
 ) -> Result<u32, ScoutPlaneLaunchError> {
-    if active_scout_plane_for_command_car(entities, owner, source_command_car).is_some() {
-        return Err(ScoutPlaneLaunchError::Active);
-    }
     let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
         return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
@@ -51,27 +45,8 @@ pub(crate) fn launch_ability(
     Ok(spawned)
 }
 
-pub(crate) fn active_scout_plane_for_command_car(
-    entities: &EntityStore,
-    owner: u32,
-    source_command_car: u32,
-) -> Option<u32> {
-    entities
-        .iter()
-        .filter(|plane| {
-            plane.kind == EntityKind::ScoutPlane
-                && plane.owner == owner
-                && plane.hp > 0
-                && plane
-                    .scout_plane_state()
-                    .is_some_and(|state| state.source_command_car == Some(source_command_car))
-        })
-        .map(|plane| plane.id)
-        .min()
-}
-
 pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
-    dismiss_inactive_or_duplicate_planes(entities);
+    dismiss_inactive_planes(entities);
 
     let world_max = (map.world_size_px() - 0.01).max(0.0);
     let speed = config::unit_stats(EntityKind::ScoutPlane)
@@ -117,8 +92,7 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
     }
 }
 
-fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
-    let mut seen_sorties = BTreeSet::new();
+fn dismiss_inactive_planes(entities: &mut EntityStore) {
     let mut dismissals = Vec::new();
     for id in entities.ids() {
         let Some(plane) = entities.get(id) else {
@@ -127,13 +101,7 @@ fn dismiss_inactive_or_duplicate_planes(entities: &mut EntityStore) {
         if plane.kind != EntityKind::ScoutPlane {
             continue;
         }
-        let source_command_car = plane
-            .scout_plane_state()
-            .and_then(|state| state.source_command_car);
-        if plane.hp == 0
-            || plane.owner == 0
-            || !seen_sorties.insert((plane.owner, source_command_car))
-        {
+        if plane.hp == 0 || plane.owner == 0 {
             dismissals.push(id);
         }
     }
