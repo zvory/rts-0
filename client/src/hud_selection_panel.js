@@ -301,6 +301,10 @@ export class HudSelectionPanel {
       ? `<div class="sel-stat"><span>Oil Used:</span>` +
         `<strong>${formatTankOilUsed(e.oilUsed)}</strong></div>`
       : "";
+    const resourceRemainingHtml = isResourceNodeKind(e.kind)
+      ? `<div class="sel-stat sel-resource-remaining"><span>${st.label || e.kind} Remaining:</span>` +
+        `<strong>${formatResourceRemaining(e.remaining)}</strong></div>`
+      : "";
     const entrenchment = entrenchmentSelectionStatus(e, this.state);
     const entrenchmentHtml = entrenchment
       ? `<div class="sel-stat sel-trench-status"><span>${entrenchment.label}:</span>` +
@@ -314,6 +318,7 @@ export class HudSelectionPanel {
       `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
       `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
       tankOilHtml +
+      resourceRemainingHtml +
       entrenchmentHtml +
       prodHtml;
     return node;
@@ -378,6 +383,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
     entity.kind === KIND.TANK ? formatTankOilUsed(entity.oilUsed) : "",
+    isResourceNodeKind(entity.kind) ? formatResourceRemaining(entity.remaining) : "",
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
     sigValue(entity.prodUpgrade),
@@ -385,6 +391,15 @@ function selectionDetailSignature(entity, state = null) {
     entity.prodWaiting ? 1 : 0,
     entity.optimisticProduction ? 1 : 0,
   ].join(":");
+}
+
+function isResourceNodeKind(kind) {
+  return kind === KIND.STEEL || kind === KIND.OIL;
+}
+
+function formatResourceRemaining(value) {
+  const remaining = Number(value);
+  return Number.isFinite(remaining) ? String(Math.max(0, Math.round(remaining))) : "0";
 }
 
 function isEntrenchmentEligibleKind(kind) {
