@@ -114,7 +114,7 @@ review.
 | Terrain, health, selection, placement, and drag colors | None in Rust; rendering-only choices | `client/src/config.js` `COLORS` except resource identity colors that should stay consistent with Steel/Oil presentation | UI-only presentation data | None | Exclusion list in future config parity check | Client owns visual palette; it does not affect simulation, wire DTO shape, or authoritative fog | No compact impact |
 | Fog overlay alpha | Authoritative fog visibility is in sim snapshots; alpha is not a Rust value | `client/src/config.js` `FOG_EXPLORED_ALPHA`, `FOG_UNEXPLORED_ALPHA` | UI-only presentation data | None | Exclusion list in future config parity check | Client owns opacity; Rust owns which tiles/entities are visible | No compact impact |
 | Camera defaults | None in Rust | `client/src/config.js` `CAMERA` | UI-only presentation data | None | Exclusion list in future config parity check | Client-only input/render affordance | No compact impact |
-| Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 30 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc | No compact impact |
+| Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 35 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc | No compact impact |
 
 ### Parity exclusions after the split
 
@@ -322,7 +322,7 @@ folded into default targeting.
   while manual fire remains unrestricted.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
-  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 degrees total`.
+  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`.
 - Panzerfausts research gives Riflemen a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
   `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,
@@ -474,8 +474,9 @@ folded into default targeting.
   does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
   inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
   visible to the player occupying it.
-  The command card shows the selected Scout Car's remaining charges and reports `Recharging` at
-  zero charges.
+  The command card shows the selected Scout Car's remaining charges as `2`, `1`, or `0`. While a
+  missing charge regenerates, the ability's existing clock animation shows progress toward the
+  next charge; recharge does not disable a stored charge that is still available.
 - **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
   owned units within 9 tiles a 1.4x speed multiplier. This passive aura has no smoke interaction,
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active

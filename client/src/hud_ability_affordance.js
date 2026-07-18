@@ -16,6 +16,13 @@ export function abilityRemainingUses(entity, ability) {
     : null;
 }
 
+export function abilityChargeRechargeLeft(entity, ability) {
+  const projected = abilityStatus(entity, ability);
+  return projected && typeof projected.chargeRechargeLeft === "number"
+    ? projected.chargeRechargeLeft
+    : 0;
+}
+
 export function abilityAutocastEnabled(entity, ability) {
   const projected = abilityStatus(entity, ability);
   return projected && typeof projected.autocastEnabled === "boolean"

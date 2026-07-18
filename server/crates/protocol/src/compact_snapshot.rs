@@ -839,6 +839,9 @@ impl Serialize for CompactAbilityCooldown<'_> {
         if ability.expires_in.is_some() {
             len = 8;
         }
+        if ability.charge_recharge_left.is_some() {
+            len = 9;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&ability_code(&ability.ability))?;
         seq.serialize_element(&ability.cooldown_left)?;
@@ -859,6 +862,9 @@ impl Serialize for CompactAbilityCooldown<'_> {
         }
         if len > 7 {
             seq.serialize_element(&ability.expires_in)?;
+        }
+        if len > 8 {
+            seq.serialize_element(&ability.charge_recharge_left)?;
         }
         seq.end()
     }

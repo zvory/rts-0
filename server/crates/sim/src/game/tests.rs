@@ -33,6 +33,7 @@ mod replay_artifact_tests;
 mod resources_mining_tests;
 mod road_terrain_tests;
 mod scoring_projection_tests;
+mod smoke_charge_tests;
 mod smoke_mortar_tests;
 mod smoke_mortar_visibility_tests;
 mod tank_trap_tests;

@@ -41,6 +41,12 @@ checked-in runtime strip; raw frame strips such as Machine Gunner pass 01 receiv
 delta once at client texture-load time, preserving the original generated source sheets. A strip can
 override the target when that generated unit needs its own brightness match.
 
+Browser-facing rig textures are 8-bit PNGs with neither dimension above 2048 pixels. Generated
+full-resolution sources stay beside their production derivatives when the runtime texture is the
+only reproducible source. The deploy-asset contract enforces both limits. Production derivatives
+may be downsampled independently as long as atlas frames, origins, pixels-per-unit, and frame-strip
+world scale preserve the authored world-space presentation.
+
 Default color strategy for future generated PNG unit sprites: generate team-colorable paint,
 uniform, and armor regions as weathered matte white or off-white source art, not blue, gray-blue, or
 any final owner color. Keep dark outlines, panel seams, equipment details, and light gray shading so
@@ -83,6 +89,8 @@ material colors; the `#ff00ff` key remains only the background key, never the un
 - `client/src/renderer/rigs/rifleman_png_strip.js` and
   `client/src/renderer/rigs/machine_gunner_png_strip.js` record the enabled frame-strip metadata,
   including any color adjustment already baked into the checked-in runtime strip.
+- `client/assets/rigs/scout-car-pass-02-team/generated/` keeps the full-resolution team atlas as
+  `scout-car-pass-02-team-atlas-source.png` and serves a half-resolution RGBA8 production atlas.
 - `client/src/renderer/rigs/frame_strip_runtime.js` and `frame_strip_routing.js` render full-frame
   unit strips. `frame_strip_color_profile.js` owns the shared brightness/saturation target applied
   at texture-load time when a strip is not already baked to that baseline.
@@ -352,13 +360,15 @@ cheap checks before any generated atlas can be enabled.
 - `machine-gunner-pass-01`: active experiment. Generated carry and setup/deployed sheets are kept
   in raw color, and the client applies a per-unit `brightness: 145`, `saturation: 118`, `hue: 100`
   frame-strip target at texture-load time so its runtime brightness can be tuned against Rifleman
-  and Tank without destructively rewriting the source art.
+  and Tank without destructively rewriting the source art. The production strip uses 64px RGBA8
+  cells while the generated component sheets remain at source resolution.
 - `mortar-png-pass-01`: active experiment. Generated as a three-cell M2 4.2-inch-inspired wheeled
   mortar sheet: assembled reference, carriage/frame/wheels component, and separate tube component.
   The checked-in alpha source is routed through `mortar_team_png_atlas.js`; the carriage and tube
   components receive runtime `team-light` tint with a dimmed saturation/brightness adjustment, tire
   overlays remain fixed-color, and the tube still follows the stronger SVG weapon recoil binding
-  independently from the carriage recoil.
+  independently from the carriage recoil. Its production atlas is a half-resolution RGBA8
+  derivative; generated source sheets remain unchanged.
 - `artillery-a19-pass-03`: active modular raster rig. Regenerated as four disconnected A-19
   components: two support arms, a frame/wheel carriage, and a separate elevated barrel with an
   oversized recoil assembly pitched out of the ground plane toward the elevated camera. The visible

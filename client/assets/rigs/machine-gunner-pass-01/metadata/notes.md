@@ -14,7 +14,7 @@ used as the reference for the deploy-only generation.
 - The frame-strip renderer maps `setting_up` and `tearing_down` progress onto frames 6-11. A fully
   `deployed` Machine Gunner holds frame 11.
 - Frames 12-14 are a no-muzzle-flare firing recoil strip. They are transformed to 85% scale and
-  shifted 5 px north in each 128x128 runtime cell so firing aligns with the deployed pose.
+  shifted north before the production strip is downsampled to 64x64 RGBA8 cells.
 - The deployed art points down/south in the sheet, so runtime setup/deployed rendering applies a
   `PI/2` forward-angle offset to align that sprite direction with authoritative `weaponFacing`.
 

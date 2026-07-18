@@ -818,7 +818,7 @@ after `debugPath` in compact snapshots to preserve older optional slot positions
 same owner-private projection policy, is capped at four stages, and uses the same `[kind, x, y]`
 compact stage encoding with `move` and `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
-`[ability, cooldownLeft, remainingUses?, autocastEnabled?, activeObjectId?, availableTick?, lockoutUntilTick?, expiresIn?]`,
+`[ability, cooldownLeft, remainingUses?, autocastEnabled?, activeObjectId?, availableTick?, lockoutUntilTick?, expiresIn?, chargeRechargeLeft?]`,
 where `ability` uses the `ability` compact code table above. `charge` is legacy and currently has
 no eligible carriers, cooldown, or runtime status.
 The server projects ability affordances only when the owning player's faction catalog exposes that
@@ -830,6 +830,9 @@ Smoke order promotes, so losing the R&D Complex relocks the ability.
 `remainingUses` is present for charged or finite-use abilities; a value of `0` means the ability
 cannot currently be used by that caster. Scout Car Smoke projects its current 0-to-2 charge count;
 its authoritative sequential recharge restores one missing charge every 15 seconds.
+`chargeRechargeLeft` is owner-private and present while a charged ability is regenerating. It is
+the authoritative ticks remaining for the next charge and drives the command card's existing clock
+animation independently of activation cooldown readiness.
 `autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and
 toggle autocast without exposing enemy data.
 `activeObjectId`, `availableTick`, and `expiresIn` are owner-only per-caster affordance fields for

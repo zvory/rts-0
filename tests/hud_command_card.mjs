@@ -27,6 +27,17 @@ const researchComplex = {
   kind: KIND.RESEARCH_COMPLEX,
 };
 
+function testGroupCooldownClocks(values, totalTicks) {
+  return values
+    .filter((value) => value > 0 && totalTicks > 0)
+    .map((value) => ({
+      count: 1,
+      cooldownLeft: value,
+      progress: 1 - value / totalTicks,
+      rotationDeg: (1 - value / totalTicks) * 360,
+    }));
+}
+
 function rAndDCard(upgrades = []) {
   return buildCommandCardDescriptors({
     playerId: 1,
@@ -251,7 +262,12 @@ function buttonSlots(card) {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
+    abilities: [{
+      ability: ABILITY.SMOKE,
+      cooldownLeft: 0,
+      remainingUses: 2,
+      chargeRechargeLeft: 0,
+    }],
   };
   const abilityCard = buildCommandCardDescriptors({
     playerId: 1,
@@ -259,7 +275,7 @@ function buttonSlots(card) {
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
-    groupCooldownClocks: () => [],
+    groupCooldownClocks: testGroupCooldownClocks,
   });
   const smokeCommandId = kriegsiaCommandId("ability", ABILITY.SMOKE);
   const smoke = abilityCard.slots.find((slot) => slot?.commandId === smokeCommandId);
@@ -278,17 +294,24 @@ function buttonSlots(card) {
     playerId: 1,
     selection: [{
       ...scoutCar,
-      abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 0 }],
+      abilities: [{
+        ability: ABILITY.SMOKE,
+        cooldownLeft: 0,
+        remainingUses: 0,
+        chargeRechargeLeft: 225,
+      }],
     }],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
-    groupCooldownClocks: () => [],
+    groupCooldownClocks: testGroupCooldownClocks,
   });
   const rechargingSmoke = rechargingCard.slots.find((slot) => slot?.commandId === smokeCommandId);
   assert.equal(rechargingSmoke.enabled, false);
-  assert.equal(rechargingSmoke.title, "Recharging");
+  assert.equal(rechargingSmoke.title, "Target a smoke grenade location");
   assert.equal(rechargingSmoke.countBadge, "0");
+  assert.equal(rechargingSmoke.cooldownClocks.length, 1);
+  assert.equal(rechargingSmoke.cooldownClocks[0].rotationDeg, 180);
 }
 
 {
