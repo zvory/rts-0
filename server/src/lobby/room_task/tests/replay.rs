@@ -1,7 +1,9 @@
+use super::super::types::ReplayTickContext;
 use super::support::*;
 use rts_rules::balance::TILE_SIZE;
 use rts_sim::game::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
 use rts_sim::game::{Game, PlayerInit};
+use std::time::Instant as StdInstant;
 
 fn tile_center(tile_x: u32, tile_y: u32) -> (f32, f32) {
     let tile_size = TILE_SIZE as f32;
@@ -437,6 +439,48 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
         snapshot_a.visible_tiles, snapshot_b.visible_tiles,
         "test setup should exercise different fog perspectives"
     );
+}
+
+#[test]
+fn omniscient_replay_view_receives_the_full_event_union() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 1);
+    let replay = ReplaySession::new(artifact).unwrap();
+    let mut task = RoomTask::new(
+        "omniscient-replay-events-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let writer = add_test_room_spectator(&mut task, 100);
+    let player_one_event = Event::Notice {
+        msg: "player one event".to_string(),
+        severity: NoticeSeverity::Info,
+        x: None,
+        y: None,
+    };
+    let player_two_event = Event::Notice {
+        msg: "player two event".to_string(),
+        severity: NoticeSeverity::Warn,
+        x: None,
+        y: None,
+    };
+    let mut per_player_events = HashMap::new();
+    per_player_events.insert(players[0].id, vec![player_one_event.clone()]);
+    per_player_events.insert(players[1].id, vec![player_two_event.clone()]);
+    let context = ReplayTickContext {
+        scheduler_lag: Duration::ZERO,
+        tick_budget: Duration::from_millis(config::TICK_MS),
+        tick_start: StdInstant::now(),
+        projection_policy: task.projection_policy_for_phase(SessionPhase::ReplayViewer),
+    };
+
+    task.fanout_replay_snapshots_to(&replay, [100], per_player_events, context, None);
+
+    let snapshot = writer.snapshots.take().expect("omniscient replay snapshot");
+    assert!(snapshot.events.contains(&player_one_event));
+    assert!(snapshot.events.contains(&player_two_event));
 }
 
 #[test]

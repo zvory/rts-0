@@ -3,6 +3,7 @@ use super::projection::ProjectionPolicy;
 use super::replay_session::ReplaySession;
 use super::room_task::RoomPlayer;
 use super::snapshots::compact_snapshot_for_wire;
+use super::snapshots::union_events;
 use crate::protocol::{
     Event, ServerMessage, Snapshot, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION,
 };
@@ -154,6 +155,7 @@ pub(super) fn fanout_replay_snapshots(
     slow_tick_count: &mut u32,
     perf: Option<&mut rts_sim::perf::TickPerf>,
 ) {
+    let full_vision_events = union_events(per_player_events.values());
     SnapshotFanout::new(
         room,
         scheduler_lag,
@@ -169,7 +171,8 @@ pub(super) fn fanout_replay_snapshots(
                 .cloned()
                 .unwrap_or(ObserverView::Omniscient),
         );
-        let snapshot = projection.snapshot_with_events(session.game(), per_player_events, &[]);
+        let snapshot =
+            projection.snapshot_with_events(session.game(), per_player_events, &full_vision_events);
         Some(SnapshotFanoutPayload::new(snapshot, true))
     });
 }
