@@ -14,13 +14,13 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::acquisition::{DirectFireLegality, DirectFireVisibility};
 use super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::shot_blocker_index::ShotBlockerIndex;
+use super::target_legality::{DirectFireLegality, DirectFireVisibility};
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
 
 const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;

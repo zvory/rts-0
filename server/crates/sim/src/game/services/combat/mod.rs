@@ -36,6 +36,7 @@ mod panzerfaust;
 mod priority;
 mod projection;
 mod shot_blocker_index;
+mod target_legality;
 mod target_policy;
 mod weapons;
 
@@ -43,12 +44,10 @@ mod weapons;
 mod tests;
 #[cfg(test)]
 use acquisition::{combat_mode, resolve_target as resolve_target_with_obstruction};
-use acquisition::{
-    combat_mode_with_moving_fire, direct_fire_target_legal, CombatMode, DirectFireLegality,
-    DirectFireVisibility,
-};
+use acquisition::{combat_mode_with_moving_fire, CombatMode};
 use damage::apply_damage;
 use shot_blocker_index::ShotBlockerIndex;
+use target_legality::{direct_fire_target_legal, DirectFireLegality, DirectFireVisibility};
 use weapons::{
     begin_idle_deployed_weapon_setup, can_fire_while_moving, deployed_weapon_ready_to_fire,
     effective_attack_profile, mirror_weapon_to_body, mortar_target_inside_field_of_fire,

@@ -3,10 +3,10 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
-use crate::rules::terrain::{self, TerrainKind};
 
 use super::acquisition::{resolve_target, CombatMode};
 use super::shot_blocker_index::ShotBlockerIndex;
+use super::target_legality::auto_target_legality;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn acquire(
@@ -205,26 +205,25 @@ fn retained_target(
 
     let target_id = attacker.target_id()?;
     let target = entities.get(target_id)?;
-    if !crate::game::services::world_query::is_enemy_targetable(target, teams, owner, self_id)
-        || (!attacker_can_fire_while_moving
-            && !super::acquisition::target_relevant_for_auto_acquisition(attacker.kind, target))
-    {
-        return None;
-    }
-    let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
-    let dx = target.pos_x - px;
-    let dy = target.pos_y - py;
-    let distance_sq = dx * dx + dy * dy;
-    let effective_acquire_px = acquire_px * concealment;
-    let effective_weapon_range_px = weapon_range_px * concealment;
-    if !effective_acquire_px.is_finite()
-        || distance_sq > effective_acquire_px * effective_acquire_px
-        || (require_weapon_range || mode == CombatMode::Opportunistic)
-            && (!effective_weapon_range_px.is_finite()
-                || distance_sq > effective_weapon_range_px * effective_weapon_range_px)
-        || !super::acquisition::target_has_legal_shot(
-            map, entities, blockers, teams, los, fog, smokes, self_id, owner, px, py, target,
-        )
+    let legality = auto_target_legality(
+        map,
+        entities,
+        blockers,
+        teams,
+        los,
+        fog,
+        smokes,
+        self_id,
+        owner,
+        px,
+        py,
+        acquire_px,
+        weapon_range_px,
+        attacker.kind,
+        attacker_can_fire_while_moving,
+        target,
+    )?;
+    if ((require_weapon_range || mode == CombatMode::Opportunistic) && !legality.in_weapon_range)
         || !target_filter(target_id)
     {
         return None;
