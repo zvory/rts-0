@@ -86,15 +86,6 @@ impl<'a> StartPayloadBuilder<'a> {
     pub(super) fn build(&self, recipient: &StartPayloadRecipient) -> StartPayload {
         let active_player = recipient.role == RecipientRole::ActivePlayer;
         let mut capabilities = self.policy.start_capabilities(active_player);
-        capabilities.visibility.vision_selection = !active_player
-            && matches!(
-                self.policy.start_payload,
-                StartPayloadPolicy::LiveMatch
-                    | StartPayloadPolicy::ReplayViewer
-                    | StartPayloadPolicy::ReplayBranchLive
-                    | StartPayloadPolicy::DevWatch
-                    | StartPayloadPolicy::Lab
-            );
         let replay = match (&self.source, self.policy.start_payload) {
             (
                 StartPayloadSource::Replay {

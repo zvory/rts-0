@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::time::{Duration, Instant as StdInstant};
 
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
@@ -17,7 +16,6 @@ use super::super::lab_timeline::LabTimeline;
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
-use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{LabRoomConfig, Phase, RoomMode, RoomPlayer};
@@ -28,7 +26,7 @@ use crate::lab_scenarios::{
 };
 use crate::lobby::lab_scenario_driver::lab_scenario_driver_for;
 use crate::protocol::{
-    Event, InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
+    InitialCamera, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioPayload,
     LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode, ServerMessage,
     DEFAULT_FACTION_ID,
 };
@@ -837,37 +835,7 @@ impl RoomTask {
         if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::Lab) {
             return;
         }
-        let projection_policy = self.projection_policy();
-        let tick_budget = self.current_tick_interval();
-        let tick_start = StdInstant::now();
-        let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
-            Phase::InGame(game) => game,
-            other => {
-                self.phase = other;
-                return;
-            }
-        };
-        let mut per_player_events: HashMap<u32, Vec<Event>> = HashMap::new();
-        let observer_views = self.observer_views.clone();
-        let recipients = self.order.clone();
-        SnapshotFanout::new(
-            &self.room,
-            Duration::ZERO,
-            tick_budget,
-            tick_start,
-            &mut self.slow_tick_count,
-            None,
-        )
-        .send_to_recipients(&mut self.players, recipients, |id, player| {
-            let view = observer_views
-                .get(&id)
-                .cloned()
-                .unwrap_or(ObserverView::Omniscient);
-            let projection = projection_policy.selected_perspective_snapshot_for(view);
-            let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
-            Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
-        });
-        self.phase = Phase::InGame(game);
+        self.fanout_current_observer_snapshots_to(self.order.clone());
     }
 
     pub(super) fn on_lab_request(&mut self, player_id: u32, request_id: u32, op: LabClientOp) {

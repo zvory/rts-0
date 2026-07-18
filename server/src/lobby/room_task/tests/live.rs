@@ -763,6 +763,39 @@ fn late_spectator_join_gets_pause_control_and_read_only_snapshot() {
 }
 
 #[test]
+fn paused_live_vision_selection_sends_current_snapshot_immediately() {
+    let mut task = RoomTask::new(
+        "paused-live-vision-selection-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let _writer_one = add_test_room_player(&mut task, 1, true);
+    let _writer_two = add_test_room_player(&mut task, 2, true);
+    let writer_spectator = add_test_room_spectator(&mut task, 99);
+    task.start_match();
+    task.on_tick(TokioInstant::now());
+    let _ = writer_spectator.snapshots.take();
+    task.live_paused = true;
+
+    task.on_set_vision_selection(99, VisionSelectionRequest::Player { player_id: 1 });
+
+    let snapshot = writer_spectator
+        .snapshots
+        .take()
+        .expect("paused live perspective change should enqueue a current snapshot");
+    let Phase::InGame(game) = &task.phase else {
+        panic!("normal live match should remain active");
+    };
+    let mut expected = game.snapshot_for_observer(&ObserverView::Players(vec![1]));
+    compact_snapshot_for_wire(&mut expected);
+    assert_eq!(snapshot.tick, expected.tick);
+    assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
+    assert_eq!(snapshot.player_resources, expected.player_resources);
+}
+
+#[test]
 fn late_spectator_notice_targets_existing_recipients_once() {
     let mut task = RoomTask::new(
         "late-spectator-notice-targeting-test".to_string(),

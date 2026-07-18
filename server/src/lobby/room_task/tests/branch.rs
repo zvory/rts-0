@@ -638,9 +638,8 @@ fn branch_live_late_join_start_payload_attaches_as_observer_without_resetting_st
     assert!(start.spectator);
     assert_eq!(start.prediction_build_id, None);
     assert_eq!(start.prediction_version, 0);
-    let mut expected_capabilities =
+    let expected_capabilities =
         SessionPolicy::for_room(&task.mode, SessionPhase::LiveMatch).start_capabilities(false);
-    expected_capabilities.visibility.vision_selection = true;
     assert_eq!(start.capabilities, expected_capabilities);
     assert!(start.diagnostics.observer_analysis);
     assert!(!start.capabilities.commands.gameplay);

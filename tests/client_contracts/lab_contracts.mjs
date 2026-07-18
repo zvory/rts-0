@@ -303,10 +303,14 @@ await withFakeDocument(() => {
     upgrades: [UPGRADE.TANK_UNLOCK],
     playerResources: [
       { id: 1, steel: 999, oil: 999, supplyUsed: 1, supplyCap: 99 },
-      { id: 2, steel: 125, oil: 50, supplyUsed: 7, supplyCap: 12 },
-    ],
-    playerUpgrades: [
-      { id: 2, upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] },
+      {
+        id: 2,
+        steel: 125,
+        oil: 50,
+        supplyUsed: 7,
+        supplyCap: 12,
+        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+      },
     ],
     players: [
       { id: 1, teamId: 1, factionId: DEFAULT_FACTION_ID },

@@ -547,9 +547,7 @@ impl RoomTask {
             let view = observer_view_from_request(selection);
             self.observer_views.insert(player_id, view);
             self.clear_pending_snapshots_for([player_id]);
-            if self.session_policy().clock.room_time_source() == Some(RoomTimeSource::Lab) {
-                self.fanout_current_lab_snapshots();
-            }
+            self.fanout_current_observer_snapshots_to([player_id]);
             return;
         }
         let context = ReplayTickContext {

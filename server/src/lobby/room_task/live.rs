@@ -1,5 +1,5 @@
-use std::collections::HashSet;
-use std::time::Instant as StdInstant;
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant as StdInstant};
 
 use tokio::time::Instant as TokioInstant;
 
@@ -9,6 +9,7 @@ use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilde
 use super::super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase};
+use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::{normalize_start_team_id, CommandLifecycleTiming, PlayerInit};
 use super::helpers::{late_spectator_notice_name, live_ai_controllers, LIVE_PAUSE_LIMIT};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
@@ -19,9 +20,46 @@ use crate::protocol::{
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
-use rts_sim::game::Game;
+use rts_sim::game::{Game, ObserverView};
 
 impl RoomTask {
+    pub(super) fn fanout_current_observer_snapshots_to(
+        &mut self,
+        recipients: impl IntoIterator<Item = u32>,
+    ) {
+        let projection_policy = self.projection_policy();
+        let tick_budget = self.current_tick_interval();
+        let tick_start = StdInstant::now();
+        let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::InGame(game) => game,
+            other => {
+                self.phase = other;
+                return;
+            }
+        };
+        let mut per_player_events: HashMap<u32, Vec<Event>> = HashMap::new();
+        let observer_views = self.observer_views.clone();
+        let recipients = recipients.into_iter().collect::<Vec<_>>();
+        SnapshotFanout::new(
+            &self.room,
+            Duration::ZERO,
+            tick_budget,
+            tick_start,
+            &mut self.slow_tick_count,
+            None,
+        )
+        .send_to_recipients(&mut self.players, recipients, |id, player| {
+            let view = observer_views
+                .get(&id)
+                .cloned()
+                .unwrap_or(ObserverView::Omniscient);
+            let projection = projection_policy.selected_perspective_snapshot_for(view);
+            let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
+            Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+        });
+        self.phase = Phase::InGame(game);
+    }
+
     pub(super) fn on_join_live_spectator(
         &mut self,
         player_id: u32,
