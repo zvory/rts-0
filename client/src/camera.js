@@ -38,6 +38,11 @@ function resolveMaxZoom(value, minZoom) {
   return Math.max(minZoom, resolved);
 }
 
+function resolveMaxVisibleWorldPx(value) {
+  const span = Number(value);
+  return Number.isFinite(span) && span > 0 ? span : null;
+}
+
 function clampZoom(value, minZoom, maxZoom) {
   return Math.max(minZoom, Math.min(maxZoom, value));
 }
@@ -72,7 +77,8 @@ export class Camera {
   /**
    * @param {number} [viewW] initial viewport width in screen px
    * @param {number} [viewH] initial viewport height in screen px
-   * @param {{minZoom?:number,maxZoom?:number}} [options] optional per-session zoom limits
+   * @param {{minZoom?:number,maxZoom?:number,maxVisibleWorldPx?:number}} [options]
+   *   optional per-session zoom limits and maximum visible ground span on either axis
    */
   constructor(viewW = 0, viewH = 0, options = {}) {
     /** World x of the viewport's top-left corner. */
@@ -82,8 +88,11 @@ export class Camera {
     /** Zoom factor: screen px per world px. */
     this.zoom = 1;
     /** Zoom limits for this session. Defaults to the live-match range. */
-    this.minZoom = resolveMinZoom(options?.minZoom);
-    this.maxZoom = resolveMaxZoom(options?.maxZoom, this.minZoom);
+    this._baseMinZoom = resolveMinZoom(options?.minZoom);
+    this._baseMaxZoom = resolveMaxZoom(options?.maxZoom, this._baseMinZoom);
+    this.maxVisibleWorldPx = resolveMaxVisibleWorldPx(options?.maxVisibleWorldPx);
+    this.minZoom = this._baseMinZoom;
+    this.maxZoom = this._baseMaxZoom;
 
     /** Map extent in world px. Set via {@link Camera#setBounds}. */
     this.worldW = 0;
@@ -91,6 +100,7 @@ export class Camera {
     /** Viewport extent in screen px. */
     this.viewW = requireNonNegative(viewW, "viewport width");
     this.viewH = requireNonNegative(viewH, "viewport height");
+    this._refreshZoomLimits();
 
     /** @private Last valid world-pixel audio reference distance. */
     this._lastAudioReferenceDistancePx = 1920;
@@ -119,6 +129,7 @@ export class Camera {
     this.worldH = next.worldH;
     this.viewW = next.viewW;
     this.viewH = next.viewH;
+    this._refreshZoomLimits();
     this._clamp();
     this._emitIfChanged(before);
   }
@@ -399,9 +410,11 @@ export class Camera {
     const width = requireNonNegative(viewportWidthCssPx, "viewport width");
     const height = requireNonNegative(viewportHeightCssPx, "viewport height");
     const before = this._rawView();
+    const focus = this.snapshot().focus;
     this.viewW = width;
     this.viewH = height;
-    this._clamp();
+    this._refreshZoomLimits();
+    this._centerOn(focus.x, focus.y);
     this._emitIfChanged(before);
   }
 
@@ -541,6 +554,16 @@ export class Camera {
     this.x += before.x - after.x;
     this.y += before.y - after.y;
     this._clamp();
+  }
+
+  /** @private */
+  _refreshZoomLimits() {
+    const viewportMinZoom = this.maxVisibleWorldPx == null
+      ? 0
+      : Math.max(this.viewW, this.viewH) / this.maxVisibleWorldPx;
+    this.minZoom = Math.max(this._baseMinZoom, viewportMinZoom);
+    this.maxZoom = Math.max(this.minZoom, this._baseMaxZoom);
+    this.zoom = clampZoom(this.zoom, this.minZoom, this.maxZoom);
   }
 
   /** @private */

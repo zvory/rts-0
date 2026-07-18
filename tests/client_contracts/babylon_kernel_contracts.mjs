@@ -131,6 +131,40 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
 }
 
 {
+  const boundedCamera = new FixedPerspectiveCamera(1920, 1080, {
+    maxVisibleWorldPx: 3200,
+  });
+  boundedCamera.setMapBounds(20_000, 20_000);
+  boundedCamera.focusAt({ x: 10_000, y: 10_000 });
+  boundedCamera.restore({
+    version: 1,
+    focus: { x: 10_000, y: 10_000 },
+    framingScale: 0.01,
+    boundsPolicy: "mapOverscroll",
+  });
+  const bounds = boundedCamera.viewportGroundBounds();
+  assert.ok(bounds.maxX - bounds.minX <= 3200.001,
+    "perspective live-player view width stays within the configured world span");
+  assert.ok(bounds.maxY - bounds.minY <= 3200.001,
+    "perspective live-player view height stays within the configured world span");
+  const focusBeforeResize = boundedCamera.snapshot().focus;
+  boundedCamera.resize(800, 4000);
+  boundedCamera.restore({
+    version: 1,
+    focus: focusBeforeResize,
+    framingScale: 0.01,
+    boundsPolicy: "mapOverscroll",
+  });
+  const portraitBounds = boundedCamera.viewportGroundBounds();
+  assert.ok(portraitBounds.maxX - portraitBounds.minX <= 3200.001,
+    "perspective portrait view width stays within the configured world span after resize");
+  assert.ok(portraitBounds.maxY - portraitBounds.minY <= 3200.001,
+    "perspective portrait view height stays within the configured world span after resize");
+  assert.deepEqual(boundedCamera.snapshot().focus, focusBeforeResize,
+    "perspective cap changes preserve camera focus across viewport resizes");
+}
+
+{
   const world = { x: 1234, y: 876, heightPx: 37 };
   const scene = worldPointToScene(world);
   const roundTrip = sceneGroundToWorld(scene);

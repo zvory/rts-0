@@ -26,7 +26,7 @@ import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture, renderFixedCaptureFrame } from "./match_fixed_capture.js";
 import { ClientIntent } from "./client_intent.js";
-import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
+import { CAMERA, INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
@@ -206,6 +206,9 @@ export class Match {
     this.camera = this._timeInit("match.camera", () => this.rendererBackendBundle.createCamera({
       minZoom: autoSpectatorCameraMinZoom(this, payload),
       maxZoom: options.cameraMaxZoom,
+      maxVisibleWorldPx: !this.labMetadata && !this.replayViewer && !payload?.spectator
+        ? CAMERA.maxVisibleTilesPerAxis * this.state.map.tileSize
+        : undefined,
     }));
     this.autoSpectator = this._timeInit(
       "match.autoSpectator",

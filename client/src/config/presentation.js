@@ -52,6 +52,7 @@ export const CAMERA = Object.freeze({
   minZoom: 0.4,
   maxZoom: 2.0,
   labMaxZoom: 8.0,
+  maxVisibleTilesPerAxis: 100,
   panSpeed: 900, // world px / sec at zoom 1
   edgeScrollPx: 14, // screen-edge band that triggers panning
 });
