@@ -285,6 +285,9 @@ export class HUD {
 
   _renderApm() {
     if (!this.elApmCounter) return;
+    const observing = Array.isArray(this.state?.playerResources) && this.state.playerResources.length > 0;
+    this.elApmCounter.hidden = observing;
+    if (observing) return;
     const apm = this.apmTracker?.currentApm?.(this.state?.tick ?? 0) ?? 0;
     const text = String(Math.max(0, Math.trunc(Number(apm) || 0)));
     if (text === this._apmSig) return;

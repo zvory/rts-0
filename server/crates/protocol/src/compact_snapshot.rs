@@ -154,7 +154,7 @@ impl Serialize for CompactSnapshot<'_> {
                 &snapshot
                     .player_resources
                     .iter()
-                    .map(|p| [p.id, p.steel, p.oil, p.supply_used, p.supply_cap])
+                    .map(|p| [p.id, p.steel, p.oil, p.supply_used, p.supply_cap, p.apm])
                     .collect::<Vec<_>>(),
             )?;
         }

@@ -295,6 +295,34 @@ fn spectator_player_resources_follow_selected_players() {
 }
 
 #[test]
+fn spectator_apm_counts_one_multi_unit_command_as_one_action() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0x515C_0DE);
+    let workers = game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
+        .map(|entity| entity.id)
+        .collect::<Vec<_>>();
+    let destination = game.state.map.tile_center(12, 12);
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: workers,
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let snapshot = game.snapshot_for_spectator(&[1]);
+    assert_eq!(snapshot.player_resources[0].apm, 6);
+}
+
+#[test]
 fn death_vision_lingers_as_normal_vision_for_five_seconds() {
     let players = [
         PlayerInit {

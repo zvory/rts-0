@@ -87,7 +87,7 @@ export class GameState extends VisualEffectBackedState {
     // --- derived latest state ---
     /** @type {{steel:number,oil:number,supplyUsed:number,supplyCap:number}} */
     this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
-    /** @type {Array<{id:number,steel:number,oil:number,supplyUsed:number,supplyCap:number}>} */
+    /** @type {Array<{id:number,steel:number,oil:number,supplyUsed:number,supplyCap:number,apm:number}>} */
     this.playerResources = [];
     /** @type {Array<object>} latest snapshot's transient events. */
     this.events = [];

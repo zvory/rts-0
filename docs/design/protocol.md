@@ -628,7 +628,7 @@ transport decode:
   rememberedBuildings?: RememberedBuilding[], // stale enemy building intel for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
-  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // projected players; observer modes only
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap, apm}[], // projected players; observer modes only; apm is a rolling 10-second command-envelope rate
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
     tickMs: u16,              // elapsed room-tick work so far when this snapshot was built
@@ -708,7 +708,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 41. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 42. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -734,7 +734,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 41,
+  "v": 42,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -755,7 +755,7 @@ adds an explicit application compression envelope.
   "wc": [1024, 2048],             // worldCombatPosition; omitted when inactive
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
-  "pr": [[id, steel, oil, supplyUsed, supplyCap]], // projected observer playerResources; omitted when empty
+  "pr": [[id, steel, oil, supplyUsed, supplyCap, apm]], // projected observer playerResources; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
         predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
 }

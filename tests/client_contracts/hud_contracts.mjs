@@ -23,6 +23,7 @@ import {
   selectionBudgetGridModel,
 } from "../../client/src/hud.js";
 import { entrenchmentSelectionStatus } from "../../client/src/hud_selection_panel.js";
+import { renderAllPlayersResources } from "../../client/src/hud_resources.js";
 import {
   buildCommandCardContextCatalog,
   buildCommandCardDescriptors,
@@ -402,6 +403,9 @@ function fakeHudRootWithoutResourceSpans() {
   hud._renderApm();
   assert(apmEl.textContent === "42", "HUD renders the current rolling command rate as a raw number");
   assert(apmEl.title === "Current actions per minute: 42", "HUD explains the raw APM number accessibly");
+  state.playerResources = [{ id: 1, apm: 42 }];
+  hud._renderApm();
+  assert(apmEl.hidden, "HUD hides the local-only APM counter when observer player rows are visible");
   hud.destroy();
   assert(apmEl.textContent === "0" && reset, "HUD resets APM display state between matches");
 }
@@ -434,6 +438,20 @@ function fakeHudRootWithoutResourceSpans() {
   hud._renderSinglePlayerResources();
   assert(ids.get("res-steel").textContent === "326", "changed HUD steel still updates after dirty guard");
 }
+
+withFakeHudDocument(({ FakeElement }) => {
+  const elHud = new FakeElement("section");
+  const result = renderAllPlayersResources({
+    state: { players: [{ id: 1, name: "One", color: "#fff" }] },
+    playerResources: [{ id: 1, steel: 325, oil: 80, supplyUsed: 7, supplyCap: 14, apm: 42 }],
+    elHud,
+    currentSig: null,
+  });
+  const row = elHud.children[0]?.children[0];
+  assert(result.sig.endsWith(":42"), "observer resource dirty signature includes rolling APM");
+  assert(row?.innerHTML.includes("replay-apm-val"), "observer resource row renders its APM section");
+  assert(row?.innerHTML.includes(">42</span>"), "observer resource row renders APM as a raw number");
+});
 
 // ---------------------------------------------------------------------------
 // HUD selection budget grid

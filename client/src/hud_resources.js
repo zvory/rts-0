@@ -67,7 +67,7 @@ export function renderAllPlayersResources({
   if (!elHud) return { sig: currentSig };
 
   const sig = "multi:" + playerResources.map(
-    (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}`,
+    (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}:${p.apm}`,
   ).join("|");
   if (sig === currentSig) {
     recordDiagnostic("hud.dirty.resources.hit");
@@ -83,6 +83,7 @@ export function renderAllPlayersResources({
     const color = (playerInfo && playerInfo.color) || PLAYER_PALETTE[idx % PLAYER_PALETTE.length] || "#888";
     const name = (playerInfo && playerInfo.name) || `P${resources.id}`;
     const supplyCapped = resources.supplyCap > 0 && resources.supplyUsed >= resources.supplyCap;
+    const apm = Math.max(0, Math.trunc(Number(resources.apm) || 0));
 
     const row = document.createElement("div");
     row.className = "res replay-player-res";
@@ -91,7 +92,8 @@ export function renderAllPlayersResources({
       `${resourceIconHtml("steel")}<span class="replay-res-val">${resources.steel}</span>` +
       `${resourceIconHtml("oil")}<span class="replay-res-val">${resources.oil}</span>` +
       `${resourceIconHtml("supply")}` +
-      `<span class="replay-res-val${supplyCapped ? " supply-capped" : ""}">${resources.supplyUsed} / ${resources.supplyCap}</span>`;
+      `<span class="replay-res-val${supplyCapped ? " supply-capped" : ""}">${resources.supplyUsed} / ${resources.supplyCap}</span>` +
+      `<span class="replay-res-val replay-apm-val" title="Current actions per minute: ${apm}" aria-label="${apm} actions per minute">${apm}</span>`;
     frag.appendChild(row);
   }
 

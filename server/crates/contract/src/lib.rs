@@ -444,6 +444,8 @@ pub struct PlayerResourceSnapshot {
     pub oil: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
+    /// Rolling command-envelope rate over the last ten simulated seconds.
+    pub apm: u32,
 }
 
 /// Dynamic resource state the client is currently allowed to know.

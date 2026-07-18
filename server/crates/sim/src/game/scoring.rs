@@ -1,6 +1,7 @@
 use super::*;
 
 const APM_OPENING_SECONDS: u32 = 60;
+const LIVE_APM_WINDOW_SECONDS: u32 = 10;
 
 impl PlayerState {
     pub(crate) fn record_entity_created(&mut self, kind: EntityKind) {
@@ -46,6 +47,22 @@ pub(super) fn entity_score_value(kind: EntityKind) -> u32 {
 }
 
 impl Game {
+    pub(super) fn current_apm(&self, player_id: u32) -> u32 {
+        let window_ticks = config::TICK_HZ.saturating_mul(LIVE_APM_WINDOW_SECONDS);
+        let oldest_tick = self.state.tick.saturating_sub(window_ticks);
+        let has_full_window = self.state.tick > window_ticks;
+        rolling_apm(
+            self.state
+                .command_log
+                .iter()
+                .rev()
+                .take_while(|entry| !has_full_window || entry.tick > oldest_tick)
+                .filter(|entry| entry.player_id == player_id)
+                .map(|entry| entry.tick),
+            self.state.tick,
+        )
+    }
+
     pub fn scores(&self) -> Vec<PlayerScore> {
         let duration_ticks = self.state.tick;
         self.state
@@ -73,6 +90,21 @@ impl Game {
             })
             .collect()
     }
+}
+
+fn rolling_apm(action_ticks: impl Iterator<Item = u32>, current_tick: u32) -> u32 {
+    let window_ticks = config::TICK_HZ.saturating_mul(LIVE_APM_WINDOW_SECONDS);
+    let oldest_tick = current_tick.saturating_sub(window_ticks);
+    let actions = action_ticks
+        .filter(|tick| {
+            *tick <= current_tick && (current_tick <= window_ticks || *tick > oldest_tick)
+        })
+        .count() as u64;
+    actions
+        .saturating_mul(60)
+        .checked_div(LIVE_APM_WINDOW_SECONDS as u64)
+        .unwrap_or(0)
+        .min(u32::MAX as u64) as u32
 }
 
 fn average_apm_after_opening(action_ticks: impl Iterator<Item = u32>, duration_ticks: u32) -> u32 {
@@ -112,5 +144,16 @@ mod tests {
         let minute = config::TICK_HZ * 60;
         let action_ticks = std::iter::repeat(minute).take(31);
         assert_eq!(average_apm_after_opening(action_ticks, minute * 3), 16);
+    }
+
+    #[test]
+    fn rolling_apm_counts_command_envelopes_in_the_last_ten_seconds() {
+        let window = config::TICK_HZ * LIVE_APM_WINDOW_SECONDS;
+        assert_eq!(rolling_apm([0].into_iter(), 1), 6);
+        assert_eq!(rolling_apm([0, 1, window].into_iter(), window), 18);
+        assert_eq!(
+            rolling_apm([0, 1, window, window + 1].into_iter(), window + 1),
+            12
+        );
     }
 }

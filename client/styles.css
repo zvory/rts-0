@@ -2946,6 +2946,12 @@ input[type="text"]:focus {
 .replay-res-val.supply-capped {
   color: var(--bad);
 }
+.replay-apm-val {
+  min-width: 32px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(202, 193, 163, 0.34);
+  text-align: right;
+}
 
 /* --- Bottom-left minimap frame --- */
 #minimap-wrap {
