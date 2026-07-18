@@ -149,7 +149,10 @@ function commandCardCtx({
     },
   };
   let idleHotkey = "T";
-  const hotkeys = { hotkeyForCommand: () => idleHotkey };
+  const hotkeys = {
+    hotkeyForCommand: () => idleHotkey,
+    hotkeyCodeForCommand: () => `Key${idleHotkey}`,
+  };
   const hud = new HUD(root, state, {}, null, hotkeys, intent);
   assert(
     count.textContent === "2" && button.disabled === true && button.dataset.selectable === "true",
@@ -1257,6 +1260,7 @@ function fakeHudRootWithoutResourceSpans() {
       commandId: "train.rifleman",
       slotIndex: 0,
       hotkey: "Q",
+      hotkeyCode: "KeyQ",
       cost: { steel: 50, oil: 0 },
       enabled: true,
       repeatable: true,
@@ -1268,6 +1272,7 @@ function fakeHudRootWithoutResourceSpans() {
     assert(button.dataset.commandId === "train.rifleman", "command button should expose command identity dataset");
     assert(button.dataset.slotIndex === "0", "command button should expose rendered slot dataset");
     assert(button.dataset.hotkey === "Q", "command button should expose hotkey dataset");
+    assert(button.dataset.hotkeyCode === "KeyQ", "command button should expose physical hotkey code");
     assert(button.dataset.repeatable === "true", "repeatable command button should expose repeatable dataset");
     assert(!button.disabled, "enabled command button should not be disabled");
     assert(button.innerHTML.includes("cmd-icon"), "command button should render icon span");
