@@ -264,7 +264,7 @@ fn rally_order_intent(unit_can_gather: bool, rally: RallyIntent) -> OrderIntent 
     }
 }
 
-fn sync_entity_upgrade_effects(
+fn sync_owner_dependent_upgrade_effects(
     entity: &mut Entity,
     upgrades: &std::collections::BTreeSet<UpgradeKind>,
 ) {
@@ -283,7 +283,7 @@ pub(crate) fn sync_owned_upgrade_effects(
 ) {
     for id in entities.ids() {
         if let Some(entity) = entities.get_mut(id).filter(|entity| entity.owner == owner) {
-            sync_entity_upgrade_effects(entity, upgrades);
+            sync_owner_dependent_upgrade_effects(entity, upgrades);
         }
     }
 }
@@ -308,7 +308,7 @@ pub(crate) fn sync_spawned_upgrade_effects(
         return;
     };
     if let Some(entity) = entities.get_mut(entity_id) {
-        sync_entity_upgrade_effects(entity, upgrades);
+        sync_owner_dependent_upgrade_effects(entity, upgrades);
         entity.set_panzerfaust_upgrade(upgrades.contains(&UpgradeKind::Panzerfausts));
     }
 }

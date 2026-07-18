@@ -831,12 +831,18 @@ impl Game {
             entity.clear_orders();
             clear_lab_production_state(entity);
         }
-        production::sync_spawned_upgrade_effects(
-            &mut self.state.entities,
-            &self.state.players,
-            input.owner,
-            input.entity_id,
-        );
+        if let Some(player) = self
+            .state
+            .players
+            .iter()
+            .find(|player| player.id == input.owner)
+        {
+            production::sync_owned_upgrade_effects(
+                &mut self.state.entities,
+                input.owner,
+                &player.upgrades,
+            );
+        }
         self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
         Ok(LabOpOutcome::OwnerSet {
