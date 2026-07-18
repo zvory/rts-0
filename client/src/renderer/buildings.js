@@ -144,8 +144,12 @@ export function _drawBuilding(e, colorByOwner, state) {
     this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);
   }
 
-  if (typeof e.prodProgress === "number" && e.prodProgress > 0) {
-    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress}`;
+  const hasProductionProgress = typeof e.prodProgress === "number" && e.prodProgress > 0;
+  const extractorInactive = e.kind === KIND.PUMP_JACK
+    && e.extractorActive === false
+    && !underConstruction;
+  if (hasProductionProgress || extractorInactive) {
+    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress ?? ""}|${extractorInactive}`;
     const overlay = this._staticSlot?.(
       "buildingOverlays",
       e.id,
@@ -153,16 +157,21 @@ export function _drawBuilding(e, colorByOwner, state) {
     ) || this._slot("buildingOverlays", e.id);
     overlay.position.set(0, 0);
     if (overlay.rtsStaticRedraw !== false) {
-      // Unit production progress bar along the roof line.
-      const bw = w * 0.78;
-      const bx = e.x - bw / 2;
-      const by = y0 + 6;
-      overlay.beginFill(COLORS.hpBack, 0.9);
-      overlay.drawRect(bx, by, bw, 5);
-      overlay.endFill();
-      overlay.beginFill(COLORS.hpGood);
-      overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
-      overlay.endFill();
+      if (hasProductionProgress) {
+        // Unit production progress bar along the roof line.
+        const bw = w * 0.78;
+        const bx = e.x - bw / 2;
+        const by = y0 + 6;
+        overlay.beginFill(COLORS.hpBack, 0.9);
+        overlay.drawRect(bx, by, bw, 5);
+        overlay.endFill();
+        overlay.beginFill(COLORS.hpGood);
+        overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
+        overlay.endFill();
+      }
+      if (extractorInactive) {
+        drawInactiveExtractorBadge(overlay, e.x, y0, ts);
+      }
       overlay.rtsStaticRenderKey = overlayKey;
     }
   }
@@ -170,6 +179,23 @@ export function _drawBuilding(e, colorByOwner, state) {
   // Queue depth label: show items waiting behind the active production slot.
   const queueDepth = (e.prodQueue ?? 0) - 1;
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
+}
+
+function drawInactiveExtractorBadge(g, cx, buildingTop, tileSize) {
+  const radius = Math.max(7, tileSize * 0.28);
+  const cy = buildingTop - radius * 0.55;
+  const diagonal = radius * 0.68;
+
+  g.lineStyle(0);
+  g.beginFill(0x211715, 0.92);
+  g.drawCircle(cx, cy, radius + 2.5);
+  g.endFill();
+
+  g.lineStyle(Math.max(2.5, radius * 0.34), 0xe34b3f, 1);
+  g.drawCircle(cx, cy, radius);
+  g.moveTo(cx - diagonal, cy - diagonal);
+  g.lineTo(cx + diagonal, cy + diagonal);
+  g.lineStyle(0);
 }
 
 function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {

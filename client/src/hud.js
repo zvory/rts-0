@@ -530,6 +530,7 @@ export class HUD {
       label: descriptor.label,
       ability: descriptor.ability,
       hotkey: descriptor.hotkey,
+      hotkeyCode: descriptor.hotkeyCode,
       cost: descriptor.cost,
       enabled: descriptor.enabled,
       unaffordable: descriptor.unaffordable,

@@ -19,6 +19,23 @@ fn pump_jack_has_completed_friendly_mining_anchor(
     world_query::resource_has_completed_friendly_mining_anchor(entities, teams, owner, node)
 }
 
+pub(crate) fn pump_jack_is_active(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    pump_id: u32,
+) -> bool {
+    let Some(pump) = entities.get(pump_id) else {
+        return false;
+    };
+    if pump.kind != EntityKind::PumpJack || pump.hp == 0 || pump.under_construction() {
+        return false;
+    }
+    let Some(node) = pump_jack::oil_node(entities, pump_id) else {
+        return false;
+    };
+    pump_jack_has_completed_friendly_mining_anchor(entities, teams, pump.owner, node)
+}
+
 const SCATTER_RESOURCE_RANGE_TILES: f32 = 10.0;
 
 /// Gatherer harvest loop: walk to node -> latch onto one free patch -> mine in place.

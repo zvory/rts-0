@@ -1382,9 +1382,9 @@ function buttonByLabel(card, label) {
       assert(id === "command-card", "repeated command hotkeys should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "repeated command hotkeys should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "repeated command hotkeys should query physical-code buttons");
           return [{
-            dataset: { hotkey: "W", repeatable: repeatable ? "true" : "false" },
+            dataset: { hotkey: "W", hotkeyCode: "KeyW", repeatable: repeatable ? "true" : "false" },
             disabled: false,
             click() {
               repeatClicks += 1;
@@ -1561,9 +1561,9 @@ function buttonByLabel(card, label) {
       assert(id === "command-card", "command hotkeys should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "command hotkeys should query hotkey buttons");
+          assert(selector === "button[data-hotkey-code]", "command hotkeys should query physical-code buttons");
           return [{
-            dataset: { hotkey: "Y" },
+            dataset: { hotkey: "Y", hotkeyCode: "KeyY" },
             disabled: false,
             click() {
               hotkeyTargetedInput.clientIntent.beginCommandTarget("attack", { now: 100 + hotkeyIssues.length * 100 });

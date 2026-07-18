@@ -744,7 +744,7 @@ adds an explicit application compression envelope.
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
-      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?
+      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -943,6 +943,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   buildActive?: bool,            // owner-only; true when server advanced this scaffold this tick
+  extractorActive?: bool,        // visible completed Pump Jack is currently extracting
   // Tank Trap deconstruction:
   deconstructProgress?: f32,     // 1..0 remaining dismantle progress; render reverse progress bar
   // gatherers:

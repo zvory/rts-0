@@ -10,6 +10,7 @@ const ENTITY_FIELDS = Object.freeze([
   "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodRepeatKinds",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
   "panzerfaustLoaded", "breakthroughTicks", "breakthroughAuraTicks", "abilities",
+  "extractorActive",
   "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",
   "attackArcRad", "attackMinRangePx", "attackMinRangeTiles", "attackRangePx",
   "attackRangeTiles", "attackRangeProfile", "firingArcRad", "firingMinRangePx",

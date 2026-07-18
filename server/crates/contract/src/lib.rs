@@ -556,6 +556,10 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "is_false")]
     pub prod_waiting: bool,
 
+    /// Whether a visible completed Pump Jack can currently extract oil.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extractor_active: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_progress: Option<f32>,
     #[serde(default, skip_serializing_if = "is_false")]
@@ -640,6 +644,7 @@ impl EntityView {
             prod_repeat_kinds: Vec::new(),
             prod_scout_plane_queued: false,
             prod_waiting: false,
+            extractor_active: None,
             build_progress: None,
             build_active: false,
             deconstruct_progress: None,

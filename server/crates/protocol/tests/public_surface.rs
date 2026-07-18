@@ -219,6 +219,8 @@ fn compact_snapshot_encodes_appended_entity_state() {
         states::IDLE,
     );
     command_car.breakthrough_aura_ticks = Some(90);
+    let mut pump_jack = EntityView::new(7, 1, kinds::PUMP_JACK, 260.0, 270.0, 50, 50, states::IDLE);
+    pump_jack.extractor_active = Some(false);
 
     let snapshot = Snapshot {
         tick: 1,
@@ -227,7 +229,7 @@ fn compact_snapshot_encodes_appended_entity_state() {
         oil: 0,
         supply_used: 0,
         supply_cap: 0,
-        entities: vec![plane, command_car],
+        entities: vec![plane, command_car, pump_jack],
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),
@@ -256,4 +258,6 @@ fn compact_snapshot_encodes_appended_entity_state() {
     assert_eq!(value["e"][0][33], serde_json::json!([[512.0, 544.0], 74]));
     assert_eq!(value["e"][1].as_array().unwrap().len(), 39);
     assert_eq!(value["e"][1][38], serde_json::json!(90));
+    assert_eq!(value["e"][2].as_array().unwrap().len(), 40);
+    assert_eq!(value["e"][2][39], serde_json::json!(false));
 }

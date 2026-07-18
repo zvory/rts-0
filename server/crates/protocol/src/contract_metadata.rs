@@ -844,6 +844,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_code_field(36, "prodRepeatKinds", "kind"),
             optional_field(37, "prodWaiting"),
             optional_field(38, "breakthroughAuraTicks"),
+            optional_field(39, "extractorActive"),
         ],
         event: event_slot_schemas(),
         trench: vec![

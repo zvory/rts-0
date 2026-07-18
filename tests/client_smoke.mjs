@@ -315,8 +315,8 @@ try {
     return save && !save.disabled;
   }, { timeout: 2000 });
   await page.click("#hotkey-save-profile");
-  await page.waitForFunction(() => window.__rts?.hotkeyProfiles?.getActiveProfile?.()?.bindings?.["unit.move"] === "B", { timeout: 2000 });
-  ok(true, "HOTKEYS: settings editor saved a changed Move binding");
+  await page.waitForFunction(() => window.__rts?.hotkeyProfiles?.getActiveProfile?.()?.bindings?.["unit.move"] === "KeyB", { timeout: 2000 });
+  ok(true, "HOTKEYS: settings editor saved a changed physical Move binding");
   await page.keyboard.press("Escape");
   await sleep(100);
   const afterMenuEscape = await page.evaluate(() => ({

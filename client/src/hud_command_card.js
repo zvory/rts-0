@@ -66,11 +66,13 @@ function card(kind, signature, slots, extras = {}) {
 
 function renderedDescriptor(descriptor, slotIndex) {
   const commandId = descriptor.commandId || descriptor.id;
+  const hotkey = gridHotkeyForSlot(slotIndex);
   return {
     ...descriptor,
     commandId,
     slotIndex,
-    hotkey: gridHotkeyForSlot(slotIndex),
+    hotkey,
+    hotkeyCode: hotkey ? `Key${hotkey}` : "",
   };
 }
 

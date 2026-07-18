@@ -150,7 +150,10 @@ function commandCardCtx({
     },
   };
   let idleHotkey = "T";
-  const hotkeys = { hotkeyForCommand: () => idleHotkey };
+  const hotkeys = {
+    hotkeyForCommand: () => idleHotkey,
+    hotkeyCodeForCommand: () => `Key${idleHotkey}`,
+  };
   const hud = new HUD(root, state, {}, null, hotkeys, intent);
   assert(
     count.textContent === "2" && button.disabled === true && button.dataset.selectable === "true",
@@ -544,6 +547,39 @@ withFakeHudDocument(({ FakeElement }) => {
     assert(panel.children[0] !== stableNode, "HUD selected detail updates when displayed health changes");
     assert(panel.children[0].innerHTML.includes("40 / 100"), "HUD selected detail renders changed health after dirty guard");
   });
+
+  for (const [kind, label] of [[KIND.STEEL, "Steel"], [KIND.OIL, "Oil"]]) {
+    withFakeHudDocument(({ FakeElement }) => {
+      const panel = new FakeElement("section");
+      const root = {
+        querySelector(selector) {
+          return selector === "#selected-panel" ? panel : null;
+        },
+      };
+      const selected = { id: kind === KIND.STEEL ? 2201 : 2202, owner: 0, kind, hp: 1, maxHp: 1, remaining: 625 };
+      const state = {
+        selectionBudgetOverflow: null,
+        selectedEntities() {
+          return [selected];
+        },
+      };
+      const hud = new HUD(root, state, {}, null);
+      hud._renderSelectedPanel();
+      const originalNode = panel.children[0];
+      assert(
+        originalNode.innerHTML.includes(`${label} Remaining:</span><strong>625</strong>`),
+        `HUD selected ${label.toLowerCase()} patch shows its remaining resources`,
+      );
+
+      selected.remaining = 417;
+      hud._renderSelectedPanel();
+      assert(panel.children[0] !== originalNode, `HUD selected ${label.toLowerCase()} patch refreshes after mining`);
+      assert(
+        panel.children[0].innerHTML.includes(`${label} Remaining:</span><strong>417</strong>`),
+        `HUD selected ${label.toLowerCase()} patch shows the updated remaining resources`,
+      );
+    });
+  }
 
   {
     const ownResearchState = {
@@ -1263,6 +1299,7 @@ withFakeHudDocument(({ FakeElement }) => {
       commandId: "train.rifleman",
       slotIndex: 0,
       hotkey: "Q",
+      hotkeyCode: "KeyQ",
       cost: { steel: 50, oil: 0 },
       enabled: true,
       repeatable: true,
@@ -1274,6 +1311,7 @@ withFakeHudDocument(({ FakeElement }) => {
     assert(button.dataset.commandId === "train.rifleman", "command button should expose command identity dataset");
     assert(button.dataset.slotIndex === "0", "command button should expose rendered slot dataset");
     assert(button.dataset.hotkey === "Q", "command button should expose hotkey dataset");
+    assert(button.dataset.hotkeyCode === "KeyQ", "command button should expose physical hotkey code");
     assert(button.dataset.repeatable === "true", "repeatable command button should expose repeatable dataset");
     assert(!button.disabled, "enabled command button should not be disabled");
     assert(button.innerHTML.includes("cmd-icon"), "command button should render icon span");

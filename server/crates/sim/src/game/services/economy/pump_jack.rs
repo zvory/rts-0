@@ -26,7 +26,7 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
         let Some(owner) = entities.get(pump_id).map(|pump| pump.owner) else {
             continue;
         };
-        let Some(node_id) = pump_jack_oil_node(entities, pump_id) else {
+        let Some(node_id) = oil_node(entities, pump_id) else {
             let _ = entities.remove(pump_id);
             continue;
         };
@@ -75,7 +75,7 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
     payouts
 }
 
-fn pump_jack_oil_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {
+pub(super) fn oil_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {
     let pump = entities.get(pump_id)?;
     if pump.kind != EntityKind::PumpJack {
         return None;

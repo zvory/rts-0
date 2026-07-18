@@ -910,13 +910,16 @@ export class HotkeyProfileService {
   parseImportText(text, options?)
   resolveCard(card, profile?)
   resolveSlot(slot, profile?)
+  hotkeyForCommand(commandId, profile?)
+  hotkeyCodeForCommand(commandId, profile?)
   storedProfilePayload(profile)
 }
 
 buildHotkeyCommandCatalog(cards)
-normalizeHotkey(value)
+normalizeHotkeyCode(value)
+hotkeyLabelForCode(value)
 profileBindingForCommand(profile, commandId)
-setProfileBindingForCommand(profile, commandId, key)
+setProfileBindingForCommand(profile, commandId, code)
 ```
 
 `hotkey_editor.js`
@@ -929,7 +932,18 @@ export class HotkeyEditor {
 }
 ```
 
-Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
+Hotkey profile schema v2 is physical-only: every binding value is a DOM `KeyboardEvent.code` such
+as `KeyQ`, never a layout-translated character from `KeyboardEvent.key`. Runtime activation,
+rebinding capture, held-target release, repeat handling, and conflict detection all use the physical
+code. Resolved command descriptors keep identity and presentation separate as `hotkeyCode` and the
+canonical QWERTY-position `hotkey` label; command buttons mirror those as `data-hotkey-code` and
+`data-hotkey`. Text entry remains layout-aware and never routes through gameplay bindings. The
+Map Editor's WASD camera controls likewise use physical `KeyW`/`KeyA`/`KeyS`/`KeyD` positions.
+
+Schema-v1 custom profiles and active-profile selections are intentionally reset rather than
+migrated: v2 uses new `rts.hotkeyProfiles.v2` and `rts.activeHotkeyProfile.v2` local-storage keys,
+and v1 imports are rejected. Exported hotkey JSON is intentionally client-local: `schemaVersion`,
+`profileId`, `mode`, `name`,
 `description`, `createdWithBuild`, `basePreset`, `bindings`, and `factionBindings`. Direct-mode
 `bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.holdPosition`,
 `unit.stop`, `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Grid
@@ -1054,7 +1068,9 @@ Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
 command. Pump Jack construction remains legal outside the completed friendly City Centre/Zamok
 mining radius, while the normal resource-mining preview warns that the distant extractor will be
-inactive. If an owned or allied unit covers the patch, right-clicking that unit's body still resolves
+inactive. Completed owned or allied Pump Jacks with inactive extraction show a red prohibited-sign
+badge above the building until a completed friendly mining anchor comes into range. If an owned or
+allied unit covers the patch, right-clicking that unit's body still resolves
 to the live oil beneath its Pump Jack footprint. Advisory building placement ignores unit types whose client configuration marks them as
 non-ground placement blockers. The Scout Plane stays out of the shared ground vehicle-body
 classifier, so its body does not block build previews. Normal gameplay selection and control-group

@@ -35,6 +35,7 @@ pub struct EntityProjectionContext<'a> {
     pub target: Option<&'a Entity>,
     pub debug_path_projection: DebugPathProjection,
     pub active_construction_sites: Option<&'a BTreeSet<u32>>,
+    pub extractor_active: Option<bool>,
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
     pub ability_runtime: Option<&'a AbilityRuntime>,
@@ -245,6 +246,10 @@ pub fn project_entity(
             .map(|smokes| entity_visible_to_with_smoke(viewer, entity, actionable_fog, smokes))
             .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog));
     view.vision_only = vision_only;
+
+    if entity.kind == EntityKind::PumpJack && !entity.under_construction() {
+        view.extractor_active = context.extractor_active;
+    }
 
     if entity.is_unit() {
         view.facing = Some(entity.facing());
@@ -850,12 +855,52 @@ mod tests {
                 target,
                 debug_path_projection,
                 active_construction_sites,
+                extractor_active: None,
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
                 ability_runtime: None,
                 tick: 0,
             },
         )
+    }
+
+    #[test]
+    fn pump_jack_extractor_state_projects_for_every_visible_pump() {
+        let mut entities = EntityStore::new();
+        let pump_id = entities
+            .spawn_building(1, EntityKind::PumpJack, 128.0, 128.0, true)
+            .expect("pump jack should spawn");
+        let pump = entities.get(pump_id).expect("pump jack entity");
+        let fog = Fog::new(16);
+        let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
+        let project = |viewer| {
+            project_entity(
+                viewer,
+                pump,
+                EntityProjectionContext {
+                    fog: &fog,
+                    actionable_fog: Some(&fog),
+                    private_detail_fog: Some(&fog),
+                    private_detail_projection: PrivateDetailProjection::ExactViewer,
+                    smokes: None,
+                    fogged: false,
+                    entities: &entities,
+                    target: None,
+                    debug_path_projection: DebugPathProjection::None,
+                    active_construction_sites: None,
+                    extractor_active: Some(false),
+                    teams: Some(&teams),
+                    owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
+                    ability_runtime: None,
+                    tick: 0,
+                },
+            )
+            .expect("unfogged pump jack should project")
+        };
+
+        assert_eq!(project(1).extractor_active, Some(false));
+        assert_eq!(project(2).extractor_active, Some(false));
+        assert_eq!(project(3).extractor_active, Some(false));
     }
 
     #[test]

@@ -35,6 +35,8 @@ import {
   HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
+  HOTKEY_STORAGE_ACTIVE_KEY,
+  HOTKEY_STORAGE_PROFILES_KEY,
   HotkeyProfileService,
   buildHotkeyCommandCatalog,
 } from "../../client/src/hotkey_profiles.js";
@@ -44,6 +46,38 @@ function hotkeyService() {
     storage: memoryStorage(),
     catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
   });
+}
+
+{
+  assert(HOTKEY_PROFILE_SCHEMA_VERSION === 2, "hotkeys: physical-code profiles use schema v2");
+  assert(HOTKEY_STORAGE_PROFILES_KEY.endsWith(".v2"), "hotkeys: schema v2 uses isolated profile storage");
+  assert(HOTKEY_STORAGE_ACTIVE_KEY.endsWith(".v2"), "hotkeys: schema v2 uses isolated active-profile storage");
+  const storage = memoryStorage({
+    "rts.hotkeyProfiles.v1": JSON.stringify({
+      schemaVersion: 1,
+      profiles: [{
+        schemaVersion: 1,
+        id: "custom.legacy",
+        type: "custom",
+        mode: "direct",
+        name: "Legacy",
+        bindings: { "unit.move": "M" },
+        factionBindings: {},
+      }],
+    }),
+    "rts.activeHotkeyProfile.v1": "custom.legacy",
+  });
+  const hotkeys = new HotkeyProfileService({
+    storage,
+    catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
+  });
+  assert(hotkeys.allProfiles().length === 2, "hotkeys: schema-v1 custom profiles are intentionally discarded");
+  assert(hotkeys.getActiveProfile().id !== "custom.legacy", "hotkeys: schema-v1 active profile is ignored");
+  assert(
+    hotkeys.importProfile({ schemaVersion: 1, profileId: "custom.legacy", mode: "direct" })
+      .errors.some((error) => error.code === "unsupportedSchemaVersion"),
+    "hotkeys: schema-v1 imports require rebinding in the physical schema",
+  );
 }
 
 {
@@ -64,6 +98,7 @@ function hotkeyService() {
     "resolveCard",
     "resolveSlot",
     "hotkeyForCommand",
+    "hotkeyCodeForCommand",
   ]) {
     assertHasMethod(hotkeys, method, "HotkeyProfileService");
   }
@@ -258,7 +293,7 @@ function hotkeyService() {
     const moveButton = findFakes(root, (el) => el.dataset?.commandId === "unit.move")[0];
     assert(moveButton?.dataset.slotIndex === "0", "hotkey editor: command slot stays fixed before rebind");
     moveButton.listeners.click({ preventDefault() {} });
-    assert(findFakes(root, (el) => /Press a letter/.test(el.textContent || "")).length > 0,
+    assert(findFakes(root, (el) => /physical A-Z key position/i.test(el.textContent || "")).length > 0,
       "hotkey editor: clicking a command starts key capture");
     windowListeners.keydown({
       key: "1",
@@ -268,24 +303,25 @@ function hotkeyService() {
     });
     assert(findFakeById(root, "hotkey-save-profile").disabled,
       "hotkey editor: unsupported keys keep valid save blocked");
-    assert(findFakes(root, (el) => /Use a single A-Z letter/.test(el.textContent || "")).length > 0,
+    assert(findFakes(root, (el) => /Use a physical A-Z key position/.test(el.textContent || "")).length > 0,
       "hotkey editor: unsupported key warning is visible");
 
     moveButton.listeners.click({ preventDefault() {} });
     windowListeners.keydown({
-      key: "M",
-      code: "KeyM",
+      key: "'",
+      code: "KeyQ",
       preventDefault() {},
       stopPropagation() {},
     });
     const reboundMove = findFakes(root, (el) => el.dataset?.commandId === "unit.move")[0];
-    assert(reboundMove?.dataset.hotkey === "M", "hotkey editor: valid rebind updates preview label");
+    assert(reboundMove?.dataset.hotkey === "Q", "hotkey editor: Dvorak symbol key captures its physical Q position");
+    assert(reboundMove?.dataset.hotkeyCode === "KeyQ", "hotkey editor: preview exposes the physical key code");
     assert(reboundMove?.dataset.slotIndex === "0", "hotkey editor: rebind does not move the command slot");
 
     const save = findFakeById(root, "hotkey-save-profile");
     assert(!save.disabled, "hotkey editor: valid cloned profile can be saved");
     save.listeners.click();
-    assert(hotkeys.getActiveProfile().bindings["unit.move"] === "M",
+    assert(hotkeys.getActiveProfile().bindings["unit.move"] === "KeyQ",
       "hotkey editor: saved profile applies immediately as the active profile");
 
     cleanup();
@@ -316,7 +352,7 @@ function hotkeyService() {
     });
     findFakeById(root, "hotkey-save-profile").listeners.click();
     assert(
-      hotkeys.hotkeyForCommand(HOTKEY_COMMAND_SELECT_IDLE_WORKERS) === "K",
+      hotkeys.hotkeyCodeForCommand(HOTKEY_COMMAND_SELECT_IDLE_WORKERS) === "KeyK",
       "hotkey editor: saves and activates a customized idle-worker key",
     );
     cleanup();
@@ -345,7 +381,7 @@ function hotkeyService() {
       name: "Conflict Editor",
       description: "",
       basePresetId: HOTKEY_PRESET_CLASSIC,
-      bindings: { ...classic.bindings, "unit.move": "A", "unit.attack": "A" },
+      bindings: { ...classic.bindings, "unit.move": "KeyA", "unit.attack": "KeyA" },
     }];
     hotkeys.setActiveProfile("custom.conflict-editor");
 
