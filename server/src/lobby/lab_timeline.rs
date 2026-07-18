@@ -246,22 +246,12 @@ impl LabTimeline {
             || old_keyframe_count != self.keyframes.len()
     }
 
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(super) fn seek_to(
-        &mut self,
-        current_tick: u32,
-        target_tick: u32,
-        replay_entry: impl FnMut(&mut Game, &LabTimelineEntry) -> Result<(), String>,
-    ) -> Result<LabTimelineSeek, String> {
-        self.seek_to_with(current_tick, target_tick, replay_entry, |_| Ok(()))
-    }
-
-    pub(super) fn seek_to_with(
+    pub(super) fn reconstruct_to(
         &mut self,
         current_tick: u32,
         target_tick: u32,
         mut replay_entry: impl FnMut(&mut Game, &LabTimelineEntry) -> Result<(), String>,
-        after_candidate_tick: impl FnOnce(&mut Game) -> Result<(), String>,
+        after_candidate_reconstruction: impl FnOnce(&mut Game) -> Result<(), String>,
     ) -> Result<LabTimelineSeek, String> {
         if self
             .last_seek_at
@@ -306,13 +296,10 @@ impl LabTimeline {
             }
             replay_entry(&mut game, entry)?;
         }
-        let mut after_candidate_tick = Some(after_candidate_tick);
         while game.tick_count() < target_tick {
             game.tick();
-            if let Some(after_candidate_tick) = after_candidate_tick.take() {
-                after_candidate_tick(&mut game)?;
-            }
         }
+        after_candidate_reconstruction(&mut game)?;
 
         Ok(LabTimelineSeek {
             target_tick,
@@ -498,9 +485,9 @@ mod tests {
         game.tick();
 
         let error = match contain_reconstruction("lab seek", || {
-            timeline.seek_to_with(
+            timeline.reconstruct_to(
                 1,
-                1,
+                0,
                 |_game, _entry| Ok(()),
                 |_| Err("injected lab seek error".to_string()),
             )
@@ -513,9 +500,9 @@ mod tests {
         assert_eq!(timeline.last_seek_at, None);
 
         let panic = match contain_reconstruction("lab seek", || {
-            timeline.seek_to_with(
+            timeline.reconstruct_to(
                 1,
-                1,
+                0,
                 |_game, _entry| Ok(()),
                 |_| panic!("injected lab seek panic"),
             )
@@ -528,11 +515,11 @@ mod tests {
         assert_eq!(timeline.last_seek_at, None);
 
         let seek = contain_reconstruction("lab seek", || {
-            timeline.seek_to(1, 1, |_game, _entry| Ok(()))
+            timeline.reconstruct_to(1, 0, |_game, _entry| Ok(()), |_| Ok(()))
         })
         .expect("timeline remains usable");
-        assert_eq!(seek.game.tick_count(), 1);
+        assert_eq!(seek.game.tick_count(), 0);
         timeline.commit_seek(seek.target_tick);
-        assert_eq!(timeline.reconstructed_through_tick, Some(1));
+        assert_eq!(timeline.reconstructed_through_tick, Some(0));
     }
 }

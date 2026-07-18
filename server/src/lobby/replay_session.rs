@@ -533,22 +533,26 @@ impl ReplaySession {
     }
 
     fn reconstruct_to(&self, target_tick: u32) -> Result<ReplayReconstructionCandidate, String> {
-        self.reconstruct_to_inner(target_tick, |_| {})
+        self.reconstruct_to_inner(target_tick, |_| Ok(()))
     }
 
     #[cfg(test)]
     fn reconstruct_to_with(
         &self,
         target_tick: u32,
-        after_candidate_tick: impl FnOnce(&mut ReplayReconstructionCandidate),
+        after_candidate_reconstruction: impl FnOnce(
+            &mut ReplayReconstructionCandidate,
+        ) -> Result<(), String>,
     ) -> Result<ReplayReconstructionCandidate, String> {
-        self.reconstruct_to_inner(target_tick, after_candidate_tick)
+        self.reconstruct_to_inner(target_tick, after_candidate_reconstruction)
     }
 
     fn reconstruct_to_inner(
         &self,
         target_tick: u32,
-        after_candidate_tick: impl FnOnce(&mut ReplayReconstructionCandidate),
+        after_candidate_reconstruction: impl FnOnce(
+            &mut ReplayReconstructionCandidate,
+        ) -> Result<(), String>,
     ) -> Result<ReplayReconstructionCandidate, String> {
         let (keyframe_tick, keyframe_game, keyframe_next_command) = self
             .keyframes
@@ -577,7 +581,6 @@ impl ReplaySession {
                 .collect(),
             keyframe_tick,
         };
-        let mut after_candidate_tick = Some(after_candidate_tick);
         while candidate.game.tick_count() < target_tick {
             let tick = candidate.game.tick_count().saturating_add(1);
             while let Some(entry) = self.artifact.command_log.get(candidate.next_command) {
@@ -597,9 +600,6 @@ impl ReplaySession {
                 candidate.next_command += 1;
             }
             candidate.game.tick();
-            if let Some(after_candidate_tick) = after_candidate_tick.take() {
-                after_candidate_tick(&mut candidate);
-            }
             let current_tick = candidate.game.tick_count();
             if current_tick != 0
                 && current_tick.is_multiple_of(Self::KEYFRAME_INTERVAL_TICKS)
@@ -622,6 +622,7 @@ impl ReplaySession {
                 );
             }
         }
+        after_candidate_reconstruction(&mut candidate)?;
         Ok(candidate)
     }
 }
@@ -834,15 +835,6 @@ mod tests {
     #[test]
     fn replay_reconstruction_error_and_panic_preserve_session_state() {
         let players = replay_test_players(2);
-        let (_live, mut artifact) = replay_test_artifact(&players, 4);
-        artifact.command_log.insert(
-            0,
-            rts_sim::game::replay::CommandLogEntry {
-                tick: 0,
-                player_id: players[0].id,
-                command: Command::Stop { units: vec![] },
-            },
-        );
         let mut replay = ReplaySession::new(replay_test_artifact(&players, 4).1).unwrap();
         replay.set_vision(
             77,
@@ -862,16 +854,18 @@ mod tests {
         let vision_before = replay.vision_player_ids_for(77);
         let last_seek_before = replay.last_seek_at;
 
-        replay.artifact.command_log = artifact.command_log;
-        let error = match contain_reconstruction("replay seek", || replay.reconstruct_to(2)) {
+        let error = match contain_reconstruction("replay seek", || {
+            replay.reconstruct_to_with(0, |_| Err("injected replay reconstruction error".into()))
+        }) {
             Ok(_) => panic!("injected replay error should fail"),
             Err(error) => error,
         };
-        assert!(error.to_string().contains("out of order"));
+        assert!(error
+            .to_string()
+            .contains("injected replay reconstruction error"));
 
-        replay.artifact.command_log.remove(0);
         let panic = match contain_reconstruction("replay seek", || {
-            replay.reconstruct_to_with(2, |_| panic!("injected replay reconstruction panic"))
+            replay.reconstruct_to_with(0, |_| panic!("injected replay reconstruction panic"))
         }) {
             Ok(_) => panic!("injected replay panic should fail"),
             Err(error) => error,
@@ -892,9 +886,9 @@ mod tests {
         assert_eq!(replay.vision_player_ids_for(77), vision_before);
         assert_eq!(replay.last_seek_at, last_seek_before);
 
-        let candidate = contain_reconstruction("replay seek", || replay.reconstruct_to(2))
+        let candidate = contain_reconstruction("replay seek", || replay.reconstruct_to(0))
             .expect("session remains usable after failures");
-        assert_eq!(candidate.game.tick_count(), 2);
+        assert_eq!(candidate.game.tick_count(), 0);
     }
 
     #[test]

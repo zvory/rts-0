@@ -311,16 +311,16 @@ impl RoomTask {
         &mut self,
         player_id: u32,
         target: LabSeekTarget,
-        after_candidate_tick: impl FnOnce(&mut Game) -> Result<(), String>,
+        after_candidate_reconstruction: impl FnOnce(&mut Game) -> Result<(), String>,
     ) {
-        self.on_seek_lab_room_time_with(player_id, target, after_candidate_tick);
+        self.on_seek_lab_room_time_with(player_id, target, after_candidate_reconstruction);
     }
 
     fn on_seek_lab_room_time_with(
         &mut self,
         player_id: u32,
         target: LabSeekTarget,
-        after_candidate_tick: impl FnOnce(&mut Game) -> Result<(), String>,
+        after_candidate_reconstruction: impl FnOnce(&mut Game) -> Result<(), String>,
     ) {
         if !self.lab_room_time_control_allowed(player_id) {
             self.send_error_to(player_id, "Only lab operators can seek lab time.");
@@ -339,11 +339,11 @@ impl RoomTask {
                 LabSeekTarget::Relative(ticks_back) => current_tick.saturating_sub(ticks_back),
                 LabSeekTarget::Absolute(tick) => tick,
             };
-            timeline.seek_to_with(
+            timeline.reconstruct_to(
                 current_tick,
                 target_tick,
                 Self::replay_lab_timeline_entry,
-                after_candidate_tick,
+                after_candidate_reconstruction,
             )
         });
         match seek_result {

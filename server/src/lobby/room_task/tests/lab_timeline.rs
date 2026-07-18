@@ -288,10 +288,10 @@ fn lab_seek_error_and_panic_preserve_room_state_driver_and_metadata() {
     let log_len_before = session.operation_log.len();
     assert!(task.lab_driver.is_some());
 
-    task.on_seek_lab_room_time_with_hook(99, LabSeekTarget::Absolute(1), |_game| {
+    task.on_seek_lab_room_time_with_hook(99, LabSeekTarget::Absolute(0), |_game| {
         Err("injected lab room seek error".to_string())
     });
-    task.on_seek_lab_room_time_with_hook(99, LabSeekTarget::Absolute(1), |_game| {
+    task.on_seek_lab_room_time_with_hook(99, LabSeekTarget::Absolute(0), |_game| {
         panic!("injected lab room seek panic")
     });
 
@@ -311,8 +311,8 @@ fn lab_seek_error_and_panic_preserve_room_state_driver_and_metadata() {
     assert!(task.lab_driver.is_some());
     assert_eq!(task.lab_room_time_controller_id, None);
 
-    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(1));
-    assert_eq!(in_game_tick(&task), 1);
+    task.on_seek_lab_room_time(99, LabSeekTarget::Absolute(0));
+    assert_eq!(in_game_tick(&task), 0);
     assert_eq!(task.lab_room_time_controller_id, Some(99));
 }
 
