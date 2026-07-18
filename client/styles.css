@@ -4025,7 +4025,8 @@ input[type="text"]:focus {
   letter-spacing: 0;
   text-transform: uppercase;
 }
-.replay-analysis-metric-heading {
+.replay-analysis-metric-heading,
+.replay-resources-window {
   color: var(--ink-faint);
   font-size: 10px;
   font-weight: 800;
@@ -4040,11 +4041,14 @@ input[type="text"]:focus {
   font-size: 10px;
   line-height: 1.35;
 }
-.replay-analysis-player-heading {
+.replay-analysis-player-heading,
+.replay-resources-player {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
   align-items: center;
   gap: 7px;
+}
+.replay-analysis-player-heading {
   margin-top: 4px;
   color: var(--ink);
   font-size: 11px;
@@ -4130,28 +4134,18 @@ input[type="text"]:focus {
   gap: 4px;
 }
 .replay-resources-window {
-  color: var(--ink-faint);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0;
   margin-top: 4px;
-  text-transform: uppercase;
 }
 .replay-resources-player {
-  display: grid;
-  grid-template-columns: 10px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
   min-width: 0;
 }
 .replay-resources-row {
   grid-template-columns: minmax(0, 1fr) minmax(48px, auto) minmax(42px, auto);
   min-height: 25px;
 }
-.replay-resources-row .replay-resources-steel,
-.replay-resources-row .replay-resources-oil {
+.replay-resources-row .res-icon,
+.replay-resources-row .resource-value-number {
   font-size: 13px;
-  line-height: 1.1;
 }
 .replay-resources-lost-row {
   grid-template-columns: 10px minmax(0, 1fr) minmax(44px, auto) minmax(38px, auto);
