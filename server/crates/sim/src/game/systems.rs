@@ -315,8 +315,8 @@ pub(crate) fn run_tick(
             entities,
             players,
             &post_movement.occupancy,
-            &post_movement.spatial,
             &mut coordinator,
+            &teams,
             tick,
         );
     });

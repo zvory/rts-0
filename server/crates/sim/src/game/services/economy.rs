@@ -4,11 +4,20 @@ use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
-use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
+use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 
 mod pump_jack;
+
+fn pump_jack_has_completed_friendly_mining_anchor(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    owner: u32,
+    node: u32,
+) -> bool {
+    world_query::resource_has_completed_friendly_mining_anchor(entities, teams, owner, node)
+}
 
 const SCATTER_RESOURCE_RANGE_TILES: f32 = 10.0;
 
@@ -19,8 +28,8 @@ pub(crate) fn gather_system(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     occ: &Occupancy,
-    _spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
+    teams: &TeamRelations,
     tick: u32,
 ) {
     for id in entities.ids() {
@@ -45,7 +54,7 @@ pub(crate) fn gather_system(
             }
         }
     }
-    for payout in pump_jack::tick(entities) {
+    for payout in pump_jack::tick(entities, teams) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == payout.owner) {
             ps.add_gathered_resources(EntityKind::Oil, payout.oil, tick);
         }

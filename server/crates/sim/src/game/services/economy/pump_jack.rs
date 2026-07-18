@@ -1,5 +1,6 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::teams::TeamRelations;
 
 const POINT_IN_RECT_EPS_PX: f32 = 0.001;
 
@@ -8,7 +9,7 @@ pub(super) struct PumpJackPayout {
     pub(super) oil: u32,
 }
 
-pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
+pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<PumpJackPayout> {
     let pump_ids: Vec<u32> = entities
         .iter()
         .filter(|e| {
@@ -29,6 +30,9 @@ pub(super) fn tick(entities: &mut EntityStore) -> Vec<PumpJackPayout> {
             let _ = entities.remove(pump_id);
             continue;
         };
+        if !super::pump_jack_has_completed_friendly_mining_anchor(entities, teams, owner, node_id) {
+            continue;
+        }
 
         let ready = match entities
             .get_mut(pump_id)
