@@ -36,7 +36,11 @@ pub(crate) fn execute_anti_tank_gun_setup(
     {
         return false;
     }
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    let facing = if e.kind == EntityKind::MortarTeam {
+        e.facing()
+    } else {
+        (y - e.pos_y).atan2(x - e.pos_x)
+    };
     if !facing.is_finite() {
         return false;
     }
@@ -49,7 +53,15 @@ pub(crate) fn execute_anti_tank_gun_setup(
         FutureOrderMode::Clear => e.clear_orders(),
     }
     e.set_path_goal(None);
-    if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+    if e.kind == EntityKind::MortarTeam
+        && matches!(
+            e.weapon_setup(),
+            WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+        )
+    {
+        // Mortars have a full-circle field of fire. Reissuing their in-place setup while they are
+        // already setting up or deployed is a terminal stop, not a needless redeploy cycle.
+    } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
         e.set_emplacement_facing(Some(facing));
         e.set_desired_weapon_facing(facing);
     } else {

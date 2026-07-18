@@ -1479,7 +1479,10 @@ Unit abilities remain on their declared grid slots in mixed selections rather th
 unrelated empty hotkey. When abilities collide, Point Fire and Blanket Fire have the lowest command-
 card priority: Mortar Fire replaces Point Fire on `X`, and Scout Plane replaces Blanket Fire on `C`.
 The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns, Mortar Teams,
-or Artillery are present and that slot is available. A deployed selected Mortar Team draws its
+or Artillery are present and that slot is available. Mortar-only setup issues in place directly
+from the button or hotkey; holding Shift appends a terminal setup after existing queued movement.
+Selections containing Anti-Tank Guns or Artillery retain the directional world-point target step.
+A deployed selected Mortar Team draws its
 5-to-15-tile full-circle range band. Artillery-only selections still expose Point Fire, Blanket Fire,
 and Set Up together because those commands do not collide in that context.
 Command identities are stable and split by scope: global tactical/navigation/production-control

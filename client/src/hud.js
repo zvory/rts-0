@@ -562,6 +562,15 @@ export class HUD {
         this.commandInteraction.issueCommand(cmd.holdPosition(intent.unitIds || [], !!ev.shiftKey));
         this._intent()?.endCommandTarget?.();
         return;
+      case "setupMortars":
+        this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
+          intent.unitIds || [],
+          Number.isFinite(intent.x) ? intent.x : 0,
+          Number.isFinite(intent.y) ? intent.y : 0,
+          !!ev.shiftKey,
+        ));
+        this._intent()?.endCommandTarget?.();
+        return;
       case "train":
         this._issueTrain(intent.unit);
         return;

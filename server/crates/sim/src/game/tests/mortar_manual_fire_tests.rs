@@ -322,13 +322,11 @@ fn queued_mortar_setup_promotes_instead_of_being_discarded() {
     assert!(mortar_entity.queued_orders().is_empty());
     assert!(matches!(
         mortar_entity.weapon_setup(),
-        WeaponSetup::TearingDownToRedeploy { .. }
+        WeaponSetup::Deployed
     ));
     assert!(
-        (mortar_entity.pending_redeploy_facing().unwrap_or_default() - std::f32::consts::FRAC_PI_2)
-            .abs()
-            < 0.001,
-        "queued mortar setup should promote toward the submitted point"
+        (mortar_entity.emplacement_facing().unwrap_or_default() - 0.0).abs() < 0.001,
+        "queued mortar setup should retain the mortar's existing facing"
     );
 }
 

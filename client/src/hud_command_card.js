@@ -20,6 +20,7 @@ import {
   attackDescriptor,
   holdDescriptor,
   moveDescriptor,
+  setupSupportWeaponDescriptor,
   stopDescriptor,
 } from "./hud_unit_commands.js";
 import {
@@ -313,6 +314,7 @@ export function buildUnitCard(ctx, selection) {
       e.kind === KIND.MORTAR_TEAM ||
       e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
+  const setupWeapons = ownUnits.filter((e) => setupGunIds.includes(e.id));
   const abilityAffordances = selectedAbilityAffordances(ctx, ownUnits);
   const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
   const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
@@ -425,18 +427,7 @@ export function buildUnitCard(ctx, selection) {
   if (setupGunIds.length > 0) {
     const setupSlot = GRID_HOTKEYS.indexOf("Z");
     if (slots[setupSlot] == null) {
-      slots[setupSlot] = {
-        id: "unit:setup",
-        commandId: "unit.setupSupportWeapon",
-        kind: "button",
-        action: "setupAntiTankGuns",
-        intent: { type: "beginCommandTarget", target: "setupAntiTankGuns" },
-        icon: "SET",
-        label: "Set Up",
-        title: "Set up selected support weapons toward a target point",
-        enabled: true,
-        cls: ctx.commandTarget === "setupAntiTankGuns" ? "active" : "",
-      };
+      slots[setupSlot] = setupSupportWeaponDescriptor(ctx, setupWeapons);
     }
   }
 

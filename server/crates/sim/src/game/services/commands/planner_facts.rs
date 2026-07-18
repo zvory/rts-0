@@ -78,7 +78,8 @@ pub(super) fn planner_facts(
                     OrderIntent::PointFire(_)
                         | OrderIntent::BlanketFire(_)
                         | OrderIntent::HoldPosition
-                )
+                ) || (e.kind == EntityKind::MortarTeam
+                    && matches!(intent, OrderIntent::SetupAntiTankGuns(_)))
             });
             facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
             facts.activity = match e.order() {
