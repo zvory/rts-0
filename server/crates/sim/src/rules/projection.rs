@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::ability;
-use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     active_trench_occupation, fires_while_moving, supports_manual_emplacement,
     tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore, GatherPhase, Order,
@@ -19,6 +19,10 @@ use crate::game::teams::TeamRelations;
 use crate::protocol;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
+
+use super::projection_abilities::{
+    active_ability_object_expires_in, active_return_object_id, return_available_tick,
+};
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
@@ -754,60 +758,6 @@ fn debug_path_view(entity: &Entity) -> Option<DebugPathView> {
 
 fn debug_path_point(x: f32, y: f32) -> Option<DebugPathPoint> {
     (x.is_finite() && y.is_finite()).then_some(DebugPathPoint { x, y })
-}
-
-fn active_return_object_id(
-    context: &EntityProjectionContext<'_>,
-    entity: &Entity,
-    ability: ability::AbilityKind,
-) -> Option<u32> {
-    if ability == ability::AbilityKind::EkatMagicAnchor {
-        return context
-            .ability_runtime?
-            .active_anchor(entity.owner, entity.id, ability, context.tick)
-            .map(|object| object.id.get());
-    }
-    context
-        .ability_runtime?
-        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
-        .map(|object| object.id.get())
-}
-
-fn return_available_tick(
-    context: &EntityProjectionContext<'_>,
-    entity: &Entity,
-    ability: ability::AbilityKind,
-) -> Option<u32> {
-    match context
-        .ability_runtime?
-        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)?
-        .payload
-    {
-        AbilityObjectPayload::DashReturn {
-            earliest_return_tick,
-        } => Some(earliest_return_tick),
-        _ => None,
-    }
-}
-
-fn active_ability_object_expires_in(
-    context: &EntityProjectionContext<'_>,
-    entity: &Entity,
-    ability: ability::AbilityKind,
-) -> Option<u16> {
-    if ability == ability::AbilityKind::Breakthrough {
-        return (entity.breakthrough_aura_ticks() > 0).then_some(entity.breakthrough_aura_ticks());
-    }
-    if ability == ability::AbilityKind::EkatMagicAnchor {
-        return context
-            .ability_runtime?
-            .active_anchor(entity.owner, entity.id, ability, context.tick)
-            .and_then(|object| object.expires_in(context.tick));
-    }
-    context
-        .ability_runtime?
-        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
-        .and_then(|object| object.expires_in(context.tick))
 }
 
 #[cfg(test)]

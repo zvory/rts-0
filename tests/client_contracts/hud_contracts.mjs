@@ -826,14 +826,8 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
     playerResources: [
       { id: 1, steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
-      {
-        id: 2,
-        steel: 25,
-        oil: 0,
-        supplyUsed: 4,
-        supplyCap: 50,
-        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
-      },
+      { id: 2, steel: 25, oil: 0, supplyUsed: 4, supplyCap: 50,
+        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] },
     ],
     upgrades: [],
     players: [
@@ -856,14 +850,8 @@ withFakeHudDocument(({ FakeElement }) => {
     "lab command card affordability uses the selected owner's resources instead of the viewer resources",
   );
   p2Selection = [p2Steelworks];
-  p2LabHudState.playerResources[1] = {
-    id: 2,
-    steel: 1000,
-    oil: 1000,
-    supplyUsed: 4,
-    supplyCap: 50,
-    upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
-  };
+  p2LabHudState.playerResources[1] = { id: 2, steel: 1000, oil: 1000, supplyUsed: 4,
+    supplyCap: 50, upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] };
   const p2SteelworksCard = buildCommandCardDescriptors(
     p2Hud._commandDescriptorContext({ selectedEntities: p2Selection, currentEntities: p2Entities }),
   );
