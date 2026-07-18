@@ -147,6 +147,21 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     "perspective live-player view width stays within the configured world span");
   assert.ok(bounds.maxY - bounds.minY <= 3200.001,
     "perspective live-player view height stays within the configured world span");
+  const focusBeforeResize = boundedCamera.snapshot().focus;
+  boundedCamera.resize(800, 4000);
+  boundedCamera.restore({
+    version: 1,
+    focus: focusBeforeResize,
+    framingScale: 0.01,
+    boundsPolicy: "mapOverscroll",
+  });
+  const portraitBounds = boundedCamera.viewportGroundBounds();
+  assert.ok(portraitBounds.maxX - portraitBounds.minX <= 3200.001,
+    "perspective portrait view width stays within the configured world span after resize");
+  assert.ok(portraitBounds.maxY - portraitBounds.minY <= 3200.001,
+    "perspective portrait view height stays within the configured world span after resize");
+  assert.deepEqual(boundedCamera.snapshot().focus, focusBeforeResize,
+    "perspective cap changes preserve camera focus across viewport resizes");
 }
 
 {

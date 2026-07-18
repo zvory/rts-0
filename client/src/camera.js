@@ -410,10 +410,11 @@ export class Camera {
     const width = requireNonNegative(viewportWidthCssPx, "viewport width");
     const height = requireNonNegative(viewportHeightCssPx, "viewport height");
     const before = this._rawView();
+    const focus = this.snapshot().focus;
     this.viewW = width;
     this.viewH = height;
     this._refreshZoomLimits();
-    this._clamp();
+    this._centerOn(focus.x, focus.y);
     this._emitIfChanged(before);
   }
 
