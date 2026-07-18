@@ -1201,8 +1201,12 @@ function buttonByLabel(card, label) {
     { id: 43, owner: 1, kind: KIND.CITY_CENTRE, x: 40, y: 40, buildProgress: null },
   ];
   assert(
-    miningAnchorInput._nearestFriendlyCompletedMiningAnchor(0, 0)?.id === 42,
+    miningAnchorInput._nearestCompletedMiningAnchor(0, 0, true)?.id === 42,
     "resource-range preview should use the nearest completed owned or allied mining anchor",
+  );
+  assert(
+    miningAnchorInput._nearestCompletedMiningAnchor(0, 0)?.id === 43,
+    "steel resource-range preview should continue to require an owned mining anchor",
   );
 
   const rallyCityCentre = {

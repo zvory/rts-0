@@ -4,7 +4,6 @@ use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::{footprint_center, Occupancy};
 use crate::game::services::pathing::PathingService;
-use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
 use crate::protocol::terrain;
 
@@ -59,7 +58,6 @@ fn entering_harvesting_clears_pending_queued_orders() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
@@ -70,7 +68,6 @@ fn entering_harvesting_clears_pending_queued_orders() {
         &mut entities,
         &mut players,
         &occ,
-        &spatial,
         &mut coordinator,
         &team_relations(&[]),
         1,
@@ -109,7 +106,6 @@ fn worker_direct_oil_gather_order_is_idled() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
@@ -120,7 +116,6 @@ fn worker_direct_oil_gather_order_is_idled() {
         &mut entities,
         &mut players,
         &occ,
-        &spatial,
         &mut coordinator,
         &team_relations(&[]),
         1,
@@ -422,7 +417,6 @@ fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
@@ -433,7 +427,6 @@ fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
         &mut entities,
         &mut players,
         &occ,
-        &spatial,
         &mut coordinator,
         &team_relations(&[]),
         1,
@@ -481,7 +474,6 @@ fn occupied_resource_without_free_neighbor_moves_worker_to_open_grass_and_stops_
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
@@ -492,7 +484,6 @@ fn occupied_resource_without_free_neighbor_moves_worker_to_open_grass_and_stops_
         &mut entities,
         &mut players,
         &occ,
-        &spatial,
         &mut coordinator,
         &team_relations(&[]),
         1,

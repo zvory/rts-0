@@ -30,7 +30,7 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
             let _ = entities.remove(pump_id);
             continue;
         };
-        if !has_completed_friendly_mining_anchor(entities, teams, owner, node_id) {
+        if !super::pump_jack_has_completed_friendly_mining_anchor(entities, teams, owner, node_id) {
             continue;
         }
 
@@ -73,29 +73,6 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
     }
 
     payouts
-}
-
-fn has_completed_friendly_mining_anchor(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    owner: u32,
-    node_id: u32,
-) -> bool {
-    let Some(node) = entities.get(node_id) else {
-        return false;
-    };
-    let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
-    entities.iter().any(|anchor| {
-        matches!(anchor.kind, EntityKind::CityCentre | EntityKind::Zamok)
-            && anchor.hp > 0
-            && !anchor.under_construction()
-            && teams.same_team_or_same_owner(owner, anchor.owner)
-            && {
-                let dx = anchor.pos_x - node.pos_x;
-                let dy = anchor.pos_y - node.pos_y;
-                dx * dx + dy * dy <= range_px * range_px + 0.01
-            }
-    })
 }
 
 fn pump_jack_oil_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {
