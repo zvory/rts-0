@@ -35,6 +35,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {string} opts.label visible name.
  * @param {string} [opts.ability] ability id for dynamic cooldown-clock refreshes.
  * @param {string} [opts.hotkey] keyboard hint shown in a corner.
+ * @param {string} [opts.hotkeyCode] physical KeyboardEvent.code used to activate the command.
  * @param {{steel:number,oil:number}} [opts.cost] cost badge (omitted if absent).
  * @param {boolean} opts.enabled whether the action is currently available.
  * @param {boolean} [opts.unaffordable] true when tech is available but resources are short.
@@ -73,6 +74,7 @@ export function createCommandButton(opts) {
   if (opts.hotkey) {
     btn.dataset.hotkey = opts.hotkey;
   }
+  if (opts.hotkeyCode) btn.dataset.hotkeyCode = opts.hotkeyCode;
   if (opts.commandId) btn.dataset.commandId = opts.commandId;
   if (Number.isInteger(opts.slotIndex)) btn.dataset.slotIndex = String(opts.slotIndex);
   if (opts.ability) btn.dataset.ability = opts.ability;

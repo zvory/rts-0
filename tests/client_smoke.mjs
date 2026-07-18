@@ -1,7 +1,7 @@
 // Headless client smoke test. Drives the real client in headless Chrome and asserts it
 // loads, renders the PixiJS scene, and that the full UI command loop works end-to-end:
-// lobby -> ready -> start -> render -> box-select -> worker build card (with the former Depot
-// slot empty) -> train-card rendering.
+// lobby -> ready -> start -> render -> box-select -> worker build card (with Pump Jack in the
+// former Depot slot) -> train-card rendering.
 // Fails on ANY console/page error.
 //
 // Requires a local Chrome. `tests/run-all.sh` installs the repository-owned puppeteer-core
@@ -322,8 +322,8 @@ try {
     return save && !save.disabled;
   }, { timeout: 2000 });
   await page.click("#hotkey-save-profile");
-  await page.waitForFunction(() => window.__rts?.hotkeyProfiles?.getActiveProfile?.()?.bindings?.["unit.move"] === "B", { timeout: 2000 });
-  ok(true, "HOTKEYS: settings editor saved a changed Move binding");
+  await page.waitForFunction(() => window.__rts?.hotkeyProfiles?.getActiveProfile?.()?.bindings?.["unit.move"] === "KeyB", { timeout: 2000 });
+  ok(true, "HOTKEYS: settings editor saved a changed physical Move binding");
   await page.keyboard.press("Escape");
   await sleep(100);
   const afterMenuEscape = await page.evaluate(() => ({

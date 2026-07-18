@@ -377,10 +377,9 @@ export function isTextEntry(el) {
   return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable === true;
 }
 
-/** Command-card hotkeys are single letter keys, matched against button data-hotkey. */
-export function commandHotkeyFromEvent(ev) {
-  if (!ev || typeof ev.code !== "string" || !ev.code.startsWith("Key")) return "";
-  return ev.code.slice(3).toUpperCase();
+/** Command-card hotkeys use the physical KeyboardEvent.code identity. */
+export function commandHotkeyCodeFromEvent(ev) {
+  return /^Key[A-Z]$/.test(ev?.code || "") ? ev.code : "";
 }
 
 function clientIntent(input) {

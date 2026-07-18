@@ -146,6 +146,9 @@ impl Game {
                     target,
                     debug_path_projection: options.debug_path_projection(),
                     active_construction_sites: Some(&self.state.active_construction_sites),
+                    extractor_active: (e.kind == EntityKind::PumpJack).then(|| {
+                        services::economy::pump_jack_is_active(&self.state.entities, &teams, e.id)
+                    }),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
                     ability_runtime: Some(&self.state.ability_runtime),
@@ -312,6 +315,7 @@ impl Game {
                     target: None,
                     debug_path_projection: projection::DebugPathProjection::None,
                     active_construction_sites: Some(&self.state.active_construction_sites),
+                    extractor_active: None,
                     teams: Some(teams),
                     owner_faction_id: self.player(entity.owner).map(|p| p.faction_id.as_str()),
                     ability_runtime: Some(&self.state.ability_runtime),

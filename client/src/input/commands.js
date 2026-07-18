@@ -22,7 +22,7 @@ import {
   isArtilleryFireAbility,
 } from "./artillery_targeting.js";
 import {
-  commandHotkeyFromEvent,
+  commandHotkeyCodeFromEvent,
   entityIntersectsRect,
   pumpJackBuildIntentForResource,
 } from "./placement.js";
@@ -807,12 +807,12 @@ function commandUpgrades(state, controlPolicy = null) {
 }
 
 export function _activateCommandHotkey(ev) {
-  const key = commandHotkeyFromEvent(ev);
-  if (!key) return false;
+  const code = commandHotkeyCodeFromEvent(ev);
+  if (!code) return false;
   const card = document.getElementById("command-card");
   if (!card) return false;
-  for (const btn of card.querySelectorAll("button[data-hotkey]")) {
-    if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
+  for (const btn of card.querySelectorAll("button[data-hotkey-code]")) {
+    if (btn.dataset.hotkeyCode !== code) continue;
     if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
     const contextAction = commandContextActionRequested(btn, ev);
@@ -827,6 +827,7 @@ export function _activateCommandHotkey(ev) {
       handled: true,
       commandId: btn.dataset.commandId || null,
       hotkey: btn.dataset.hotkey || null,
+      hotkeyCode: btn.dataset.hotkeyCode || null,
       slotIndex: btn.dataset.slotIndex != null ? Number(btn.dataset.slotIndex) : null,
       contextAction,
       armed: clientIntent(this)?.lastCommandTargetArm || null,

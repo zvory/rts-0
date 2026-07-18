@@ -64,6 +64,22 @@ import {
 } from "../../client/src/map_editor_session.js";
 
 {
+  const viewport = { keys: { up: false, down: false, left: false, right: false } };
+  let prevented = 0;
+  const dvorakQwertyWPosition = {
+    code: "KeyW",
+    key: ",",
+    target: null,
+    preventDefault() { prevented += 1; },
+  };
+  MapEditorViewport.prototype.handleKey.call(viewport, dvorakQwertyWPosition, true);
+  assert.equal(viewport.keys.up, true, "Map Editor pan uses the physical W position on Dvorak");
+  MapEditorViewport.prototype.handleKey.call(viewport, dvorakQwertyWPosition, false);
+  assert.equal(viewport.keys.up, false, "Map Editor releases physical-position pan keys");
+  assert.equal(prevented, 2);
+}
+
+{
   const savedCancel = globalThis.cancelAnimationFrame;
   const savedWindow = globalThis.window;
   const cancelled = [];
