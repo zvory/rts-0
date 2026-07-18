@@ -422,9 +422,7 @@ pub fn project_entity(
             .flat_map(|catalog| catalog.abilities_for_carrier(entity.kind))
             .filter(|entry| entry.command_card)
         {
-            let Ok(kind) = entry.id.parse::<ability::AbilityKind>() else {
-                continue;
-            };
+            let kind = entry.kind;
             if ability::carried_by(kind, entity.kind)
                 && !view
                     .abilities

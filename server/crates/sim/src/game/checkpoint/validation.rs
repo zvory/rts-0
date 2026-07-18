@@ -10,10 +10,11 @@ use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::replay::CommandLogEntry;
 use crate::game::SimCommand;
 use crate::rules;
+use rts_contract::LAB_MAX_UNITS_PER_COMMAND;
 
 use super::{
     BuildingMemoryV1, CheckpointPayloadError, EntityStoreV1, FogStateV1, PlayerStateV1,
-    MAX_COMPLETED_UPGRADES_PER_PLAYER, MAX_UNITS_PER_CHECKPOINT_COMMAND,
+    MAX_COMPLETED_UPGRADES_PER_PLAYER,
 };
 
 mod firing_reveal;
@@ -464,15 +465,36 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
         | SimCommand::Rejected { .. } => None,
     };
     if let Some(units) = units {
-        validate_count(
-            "command.units",
-            units.len(),
-            MAX_UNITS_PER_CHECKPOINT_COMMAND,
-        )?;
+        validate_count("command.units", units.len(), LAB_MAX_UNITS_PER_COMMAND)?;
     }
     Ok(())
 }
 
 fn in_world(x: f32, y: f32, world: f32) -> bool {
     x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0 && x < world && y < world
+}
+
+#[cfg(test)]
+mod command_unit_cap_tests {
+    use super::*;
+
+    #[test]
+    fn persisted_command_uses_shared_lab_cap_boundary() {
+        let at_cap = SimCommand::Stop {
+            units: vec![1; LAB_MAX_UNITS_PER_COMMAND],
+        };
+        validate_command_units(&at_cap).expect("persisted command at shared cap should validate");
+
+        let above_cap = SimCommand::Stop {
+            units: vec![1; LAB_MAX_UNITS_PER_COMMAND + 1],
+        };
+        assert!(matches!(
+            validate_command_units(&above_cap),
+            Err(CheckpointPayloadError::CountCapExceeded {
+                field: "command.units",
+                max: LAB_MAX_UNITS_PER_COMMAND,
+                ..
+            })
+        ));
+    }
 }

@@ -115,7 +115,7 @@ fn command_car_bonus_offsets_own_supply_and_stacks() {
 }
 
 #[test]
-fn command_unit_id_processing_remains_absolutely_bounded() {
+fn ordinary_raw_cap_accepts_then_dedupes_and_cap_plus_one_rejects_whole_command() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let worker = entities
@@ -125,8 +125,7 @@ fn command_unit_id_processing_remains_absolutely_bounded() {
         .get_mut(worker)
         .expect("worker should exist")
         .set_order(Order::move_to(10.0, 10.0));
-    let mut units = vec![worker; MAX_UNITS_PER_COMMAND + 2_000];
-    units.extend(spawn_units(&mut entities, 1, EntityKind::Tank, 20));
+    let units = vec![worker; MAX_UNITS_PER_COMMAND];
 
     apply(&map, &mut entities, vec![(1, SimCommand::Stop { units })]);
 
@@ -135,8 +134,27 @@ fn command_unit_id_processing_remains_absolutely_bounded() {
             entities.get(worker).map(|entity| entity.order()),
             Some(Order::Idle)
         ),
-        "only the bounded leading id window should be inspected"
+        "a raw list exactly at the ordinary cap should be accepted and deduped"
     );
+
+    entities
+        .get_mut(worker)
+        .expect("worker should exist")
+        .set_order(Order::move_to(10.0, 10.0));
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Stop {
+                units: vec![worker; MAX_UNITS_PER_COMMAND + 1],
+            },
+        )],
+    );
+    assert!(matches!(
+        entities.get(worker).map(|entity| entity.order()),
+        Some(Order::Move(_))
+    ));
 }
 
 #[test]
@@ -169,4 +187,45 @@ fn lab_command_admission_ignores_budget_and_uses_large_bounded_window() {
         )),
         "lab command-limit bypass should let one command affect 1,000 units"
     );
+}
+
+#[test]
+fn lab_raw_cap_accepts_then_dedupes_and_cap_plus_one_rejects_whole_command() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+        .expect("worker should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    let mut smokes = SmokeCloudStore::new();
+
+    for (count, should_apply) in [
+        (LAB_MAX_UNITS_PER_COMMAND, true),
+        (LAB_MAX_UNITS_PER_COMMAND + 1, false),
+    ] {
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::move_to(10.0, 10.0));
+        apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            vec![PendingCommand {
+                player: 1,
+                command: SimCommand::Stop {
+                    units: vec![worker; count],
+                },
+                admission: CommandAdmission::LabIgnoreCommandLimits,
+            }],
+        );
+        assert_eq!(
+            matches!(
+                entities.get(worker).map(|entity| entity.order()),
+                Some(Order::Idle)
+            ),
+            should_apply
+        );
+    }
 }

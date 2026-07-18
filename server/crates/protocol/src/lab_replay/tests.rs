@@ -420,6 +420,35 @@ fn lab_replay_artifact_rejects_nonfinite_set_rally_coordinates() {
 }
 
 #[test]
+fn lab_replay_command_raw_caps_accept_cap_and_reject_cap_plus_one() {
+    for (ignore_command_limits, cap) in [
+        (false, MAX_UNITS_PER_COMMAND),
+        (true, LAB_MAX_UNITS_PER_COMMAND),
+    ] {
+        let mut artifact = valid_artifact();
+        artifact.operations[0].op = LabReplayOperation::IssueCommandAs {
+            player_id: 1,
+            cmd: Command::Stop {
+                units: vec![1; cap],
+            },
+            ignore_command_limits,
+        };
+        validate_lab_replay_artifact(&artifact).expect("raw list exactly at cap should validate");
+
+        let LabReplayOperation::IssueCommandAs { cmd, .. } = &mut artifact.operations[0].op else {
+            panic!("test operation should remain an issue command");
+        };
+        let Command::Stop { units } = cmd else {
+            panic!("test command should remain stop");
+        };
+        units.push(1);
+        let error = validate_lab_replay_artifact(&artifact)
+            .expect_err("raw list at cap plus one should be rejected whole");
+        assert!(error.to_string().contains(&format!("at most {cap} ids")));
+    }
+}
+
+#[test]
 fn lab_replay_artifact_rejects_unsupported_vision_metadata_operation() {
     let mut value = serde_json::to_value(valid_artifact()).unwrap();
     value["operations"][0]["op"] = json!({

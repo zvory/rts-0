@@ -6,6 +6,7 @@ use crate::{
     terrain, Command, LabCheckpointScenarioV1, LabScenarioEntityIdRemap, LabSpawnEntitySpec,
     LabUpdateSpec, LabVisionMode, TeamId,
 };
+use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 
 pub const LAB_REPLAY_ARTIFACT_SCHEMA: &str = "rts.labReplay";
 pub const LAB_REPLAY_ARTIFACT_KIND: &str = "labReplay";
@@ -24,8 +25,6 @@ pub const LAB_REPLAY_MAX_AUTHORING_TAG_BYTES: usize = 32;
 pub const LAB_REPLAY_MAX_MAP_TILES: usize = 1_000_000;
 pub const LAB_REPLAY_MAX_MAP_STARTS: usize = 8;
 pub const LAB_REPLAY_MAX_MAP_BASE_SITES: usize = 64;
-pub const LAB_REPLAY_MAX_UNITS_PER_COMMAND: usize = 256;
-pub const LAB_REPLAY_LAB_MAX_UNITS_PER_COMMAND: usize = 4_096;
 pub const LAB_REPLAY_MAX_MUTATION_BATCH: usize = 400;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -525,9 +524,9 @@ fn validate_command(
     state: &ValidationState,
 ) -> Result<(), LabReplayValidationError> {
     let unit_cap = if ignore_command_limits {
-        LAB_REPLAY_LAB_MAX_UNITS_PER_COMMAND
+        LAB_MAX_UNITS_PER_COMMAND
     } else {
-        LAB_REPLAY_MAX_UNITS_PER_COMMAND
+        MAX_UNITS_PER_COMMAND
     };
     match command {
         Command::Move { units, x, y, .. }

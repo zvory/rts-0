@@ -71,7 +71,6 @@ const MAX_SCHEDULED_MORTAR_SHELLS: usize = 4_096;
 const MAX_SCHEDULED_ARTILLERY_SHELLS: usize = 4_096;
 const MAX_SCHEDULED_PANZERFAUST_SHOTS: usize = 4_096;
 const MAX_COMPLETED_UPGRADES_PER_PLAYER: usize = 32;
-const MAX_UNITS_PER_CHECKPOINT_COMMAND: usize = 4_096;
 
 #[allow(dead_code)]
 impl Game {

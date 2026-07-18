@@ -1,65 +1,5 @@
-use std::str::FromStr;
-
 use crate::game::entity::EntityKind;
-use serde::{Deserialize, Serialize};
-
-const METHAMPHETAMINES: &str = "methamphetamines";
-const PANZERFAUSTS: &str = "panzerfausts";
-const ENTRENCHMENT: &str = "entrenchment";
-const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
-const ARTILLERY_UNLOCK: &str = "artillery_unlock";
-const BALLISTIC_TABLES: &str = "ballistic_tables";
-const TANK_UNLOCK: &str = "tank_unlock";
-const MORTAR_AUTOCAST: &str = "mortar_autocast";
-const SMOKE_PLUS: &str = "smoke_plus";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum UpgradeKind {
-    Methamphetamines,
-    Panzerfausts,
-    Entrenchment,
-    AntiTankGunUnlock,
-    ArtilleryUnlock,
-    BallisticTables,
-    TankUnlock,
-    MortarAutocast,
-    SmokePlus,
-}
-
-impl UpgradeKind {
-    pub fn to_protocol_str(self) -> &'static str {
-        match self {
-            UpgradeKind::Methamphetamines => METHAMPHETAMINES,
-            UpgradeKind::Panzerfausts => PANZERFAUSTS,
-            UpgradeKind::Entrenchment => ENTRENCHMENT,
-            UpgradeKind::AntiTankGunUnlock => ANTI_TANK_GUN_UNLOCK,
-            UpgradeKind::ArtilleryUnlock => ARTILLERY_UNLOCK,
-            UpgradeKind::BallisticTables => BALLISTIC_TABLES,
-            UpgradeKind::TankUnlock => TANK_UNLOCK,
-            UpgradeKind::MortarAutocast => MORTAR_AUTOCAST,
-            UpgradeKind::SmokePlus => SMOKE_PLUS,
-        }
-    }
-}
-
-impl FromStr for UpgradeKind {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            METHAMPHETAMINES => Ok(UpgradeKind::Methamphetamines),
-            PANZERFAUSTS => Ok(UpgradeKind::Panzerfausts),
-            ENTRENCHMENT => Ok(UpgradeKind::Entrenchment),
-            ANTI_TANK_GUN_UNLOCK => Ok(UpgradeKind::AntiTankGunUnlock),
-            ARTILLERY_UNLOCK => Ok(UpgradeKind::ArtilleryUnlock),
-            BALLISTIC_TABLES => Ok(UpgradeKind::BallisticTables),
-            TANK_UNLOCK => Ok(UpgradeKind::TankUnlock),
-            MORTAR_AUTOCAST => Ok(UpgradeKind::MortarAutocast),
-            SMOKE_PLUS => Ok(UpgradeKind::SmokePlus),
-            _ => Err(()),
-        }
-    }
-}
+pub use crate::rules::faction::UpgradeKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeDefinition {
@@ -72,17 +12,7 @@ pub struct UpgradeDefinition {
 }
 
 /// All upgrade ids the simulation can decode from protocol or replay data.
-pub const ALL: &[UpgradeKind] = &[
-    UpgradeKind::Methamphetamines,
-    UpgradeKind::Panzerfausts,
-    UpgradeKind::Entrenchment,
-    UpgradeKind::AntiTankGunUnlock,
-    UpgradeKind::ArtilleryUnlock,
-    UpgradeKind::BallisticTables,
-    UpgradeKind::TankUnlock,
-    UpgradeKind::MortarAutocast,
-    UpgradeKind::SmokePlus,
-];
+pub const ALL: &[UpgradeKind] = UpgradeKind::ALL;
 
 const CURRENT_RESEARCHABLE: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
@@ -105,10 +35,11 @@ pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
 }
 
 pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
+    let catalog = crate::rules::faction::upgrade_definition(kind);
     match kind {
         UpgradeKind::Methamphetamines => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::TrainingCentre,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::METHAMPHETAMINES_COST_STEEL,
             cost_oil: crate::config::METHAMPHETAMINES_COST_OIL,
@@ -116,7 +47,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::Panzerfausts => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::TrainingCentre,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::PANZERFAUSTS_COST_STEEL,
             cost_oil: crate::config::PANZERFAUSTS_COST_OIL,
@@ -124,7 +55,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::Entrenchment => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::TrainingCentre,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::ENTRENCHMENT_COST_STEEL,
             cost_oil: crate::config::ENTRENCHMENT_COST_OIL,
@@ -132,7 +63,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::AntiTankGunUnlock => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::ResearchComplex,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::ANTI_TANK_GUN_UNLOCK_COST_STEEL,
             cost_oil: crate::config::ANTI_TANK_GUN_UNLOCK_COST_OIL,
@@ -140,7 +71,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::ArtilleryUnlock => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::ResearchComplex,
+            researched_at: catalog.researched_at,
             requires_upgrade: Some(UpgradeKind::AntiTankGunUnlock),
             cost_steel: crate::config::ARTILLERY_UNLOCK_COST_STEEL,
             cost_oil: crate::config::ARTILLERY_UNLOCK_COST_OIL,
@@ -148,7 +79,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::BallisticTables => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::ResearchComplex,
+            researched_at: catalog.researched_at,
             requires_upgrade: Some(UpgradeKind::ArtilleryUnlock),
             cost_steel: crate::config::BALLISTIC_TABLES_COST_STEEL,
             cost_oil: crate::config::BALLISTIC_TABLES_COST_OIL,
@@ -156,7 +87,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::TankUnlock => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::ResearchComplex,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::TANK_UNLOCK_COST_STEEL,
             cost_oil: crate::config::TANK_UNLOCK_COST_OIL,
@@ -164,7 +95,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::MortarAutocast => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::ResearchComplex,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::MORTAR_AUTOCAST_COST_STEEL,
             cost_oil: crate::config::MORTAR_AUTOCAST_COST_OIL,
@@ -172,7 +103,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         },
         UpgradeKind::SmokePlus => UpgradeDefinition {
             kind,
-            researched_at: EntityKind::ResearchComplex,
+            researched_at: catalog.researched_at,
             requires_upgrade: None,
             cost_steel: crate::config::SMOKE_PLUS_COST_STEEL,
             cost_oil: crate::config::SMOKE_PLUS_COST_OIL,

@@ -6,17 +6,20 @@ use crate::rules;
 
 use super::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 
-/// Dedupe a command's unit ids (preserving first-seen order) and cap inspected ids at
-/// the caller's bounded command window.
-pub(super) fn dedupe_cap_units(units: Vec<u32>, max_units_per_command: usize) -> Vec<u32> {
+/// Dedupe an already raw-cap-validated command's unit ids, preserving first-seen order.
+pub(super) fn dedupe_units(units: Vec<u32>) -> Vec<u32> {
     let mut seen = HashSet::new();
-    let mut out = Vec::with_capacity(units.len().min(max_units_per_command));
-    for id in units.into_iter().take(max_units_per_command) {
+    let mut out = Vec::with_capacity(units.len());
+    for id in units {
         if seen.insert(id) {
             out.push(id);
         }
     }
     out
+}
+
+pub(super) fn dedupe_cap_units(units: Vec<u32>, cap: usize) -> Vec<u32> {
+    dedupe_units(units.into_iter().take(cap).collect())
 }
 
 pub(super) fn player_is_ai(mut players: impl Iterator<Item = (u32, bool)>, player: u32) -> bool {

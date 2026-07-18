@@ -1350,9 +1350,7 @@ fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {
         let Some(charges) = entry.charges else {
             continue;
         };
-        let Ok(ability) = entry.id.parse::<AbilityKind>() else {
-            continue;
-        };
+        let ability = entry.kind;
         uses.insert(ability, charges);
     }
     uses

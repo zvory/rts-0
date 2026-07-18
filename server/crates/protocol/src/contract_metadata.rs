@@ -76,6 +76,20 @@ pub mod abilities {
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
     pub const EKAT_CONSUME_GOLEM: &str = "ekatConsumeGolem";
+    pub const ALL: &[&str] = &[
+        CHARGE,
+        SMOKE,
+        MORTAR_FIRE,
+        POINT_FIRE,
+        BLANKET_FIRE,
+        BREAKTHROUGH,
+        SCOUT_PLANE,
+        DISMISS_SCOUT_PLANE,
+        EKAT_TELEPORT,
+        EKAT_LINE_SHOT,
+        EKAT_MAGIC_ANCHOR,
+        EKAT_CONSUME_GOLEM,
+    ];
 }
 
 /// `AbilityObjectView.kind` values.
@@ -102,6 +116,17 @@ pub mod upgrades {
     pub const BALLISTIC_TABLES: &str = "ballistic_tables";
     pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
     pub const SMOKE_PLUS: &str = "smoke_plus";
+    pub const ALL: &[&str] = &[
+        METHAMPHETAMINES,
+        PANZERFAUSTS,
+        ENTRENCHMENT,
+        ANTI_TANK_GUN_UNLOCK,
+        ARTILLERY_UNLOCK,
+        BALLISTIC_TABLES,
+        TANK_UNLOCK,
+        MORTAR_AUTOCAST,
+        SMOKE_PLUS,
+    ];
 }
 
 /// Closed `Event::Attack.weaponKind` values.
@@ -1014,7 +1039,7 @@ pub(crate) fn order_stage_code(kind: &str) -> u8 {
     lookup_code(ORDER_STAGE_CODES, kind)
 }
 
-pub(crate) fn ability_code(ability: &str) -> u8 {
+pub fn ability_code(ability: &str) -> u8 {
     lookup_code(ABILITY_CODES, ability)
 }
 
@@ -1022,7 +1047,7 @@ pub(crate) fn ability_object_kind_code(kind: &str) -> u8 {
     lookup_code(ABILITY_OBJECT_KIND_CODES, kind)
 }
 
-pub(crate) fn upgrade_code(upgrade: &str) -> u8 {
+pub fn upgrade_code(upgrade: &str) -> u8 {
     lookup_code(UPGRADE_CODES, upgrade)
 }
 
