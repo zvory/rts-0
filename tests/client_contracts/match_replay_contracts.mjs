@@ -502,9 +502,13 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     const connectionLost = { hidden: true };
     const connectionLostDetail = { textContent: "" };
     let reloadFocusCount = 0;
+    let reloadClickCount = 0;
     dom.connectionLost = connectionLost;
     dom.connectionLostDetail = connectionLostDetail;
-    dom.connectionLostReload = { focus() { reloadFocusCount += 1; } };
+    dom.connectionLostReload = {
+      focus() { reloadFocusCount += 1; },
+      click() { reloadClickCount += 1; },
+    };
     const app = Object.create(App.prototype);
     app.lobby = null;
     app.labCatalog = null;
@@ -522,11 +526,27 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     let prevented = 0;
     app.onConnectionLostKeyDown({
       key: "Tab",
-      stopPropagation() { stopped += 1; },
+      stopImmediatePropagation() { stopped += 1; },
       preventDefault() { prevented += 1; },
     });
     assert(stopped === 1 && prevented === 1 && reloadFocusCount === 2,
       "connection loss traps keyboard focus and blocks gameplay hotkeys");
+    app.onConnectionLostKeyDown({
+      key: "Enter",
+      target: dom.connectionLostReload,
+      stopImmediatePropagation() { stopped += 1; },
+      preventDefault() { prevented += 1; },
+    });
+    assert(stopped === 2 && prevented === 2 && reloadClickCount === 1,
+      "the keyboard guard preserves keyboard activation of the reload action");
+    connectionLost.hidden = true;
+    app.onConnectionLostKeyDown({
+      key: "Tab",
+      stopImmediatePropagation() { stopped += 1; },
+      preventDefault() { prevented += 1; },
+    });
+    assert(stopped === 2 && prevented === 2,
+      "the global keyboard guard is inert while the connection loss overlay is hidden");
   }
   assert(
     shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),

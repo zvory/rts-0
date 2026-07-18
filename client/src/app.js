@@ -123,6 +123,10 @@ export class App {
   } = {}) {
     /** @type {Net} connection opened on demand and retained across an active room + match. */
     this.net = net || new Net(wsUrl(), diagnostics);
+    // Install this capture listener before any app-owned keyboard listeners so
+    // the terminal transport overlay can actually block gameplay and menus.
+    this.onConnectionLostKeyDown = this.onConnectionLostKeyDown.bind(this);
+    window.addEventListener("keydown", this.onConnectionLostKeyDown, true);
     this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.stressTestLaunch = stressTestLaunch;
     this.stressTestRunner = stressTestLaunch
@@ -203,7 +207,6 @@ export class App {
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
-    this.onConnectionLostKeyDown = this.onConnectionLostKeyDown.bind(this);
     this.onPlayerActivity = () => this.reportPlayerActivity();
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
@@ -239,7 +242,6 @@ export class App {
     dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
     window.addEventListener("beforeunload", this.onBeforeUnload);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
-    dom.connectionLost?.addEventListener("keydown", this.onConnectionLostKeyDown);
     for (const eventName of PLAYER_ACTIVITY_EVENTS) {
       document.addEventListener(eventName, this.onPlayerActivity, { passive: true });
     }
@@ -1130,7 +1132,16 @@ export class App {
 
   /** Keep keyboard input inside the terminal connection-loss dialog. */
   onConnectionLostKeyDown(ev) {
-    ev.stopPropagation();
+    if (!dom.connectionLost || dom.connectionLost.hidden) return;
+    ev.stopImmediatePropagation();
+    if (
+      (ev.key === "Enter" || ev.key === " ") &&
+      ev.target === dom.connectionLostReload
+    ) {
+      ev.preventDefault();
+      dom.connectionLostReload.click();
+      return;
+    }
     if (ev.key !== "Tab") return;
     ev.preventDefault();
     dom.connectionLostReload?.focus();
