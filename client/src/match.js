@@ -284,7 +284,7 @@ export class Match {
     this.input = this._timeInit(
       "match.input",
       () => this.replayViewer
-        ? new ReplayCameraInput(dom.viewport, this.camera)
+        ? new ReplayCameraInput(dom.viewport, this.camera, this.state)
         : new Input(
           dom.viewport,
           this.camera,
@@ -641,10 +641,10 @@ export class Match {
   }
 
   applySpectatorUi() {
-    const hidden = this.replayViewer ||
+    const commandSurfaceHidden = this.replayViewer ||
       !(this.controlPolicy?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
-    if (dom.selectionArea) dom.selectionArea.hidden = hidden;
-    if (dom.commandCard) dom.commandCard.hidden = hidden;
+    if (dom.selectionArea) dom.selectionArea.hidden = !this.replayViewer && commandSurfaceHidden;
+    if (dom.commandCard) dom.commandCard.hidden = commandSurfaceHidden;
     this.closeGiveUpConfirm();
   }
 

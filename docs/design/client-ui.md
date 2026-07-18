@@ -1292,7 +1292,9 @@ export class CameraNavigationInput {
 Live `Input` composes `CameraNavigationInput` for camera gestures, then layers pointer lock,
 selection, placement, command-card targeting, command hotkeys, minimap routing, and gameplay command
 issuance on top. Replay viewers use the same helper through `ReplayCameraInput`, with replay WASD
-pan-key aliases and no gameplay command issuer API. Replay middle-drag and Space+left-drag pan
+pan-key aliases and a composed browser-local observer selection surface, but no gameplay command
+issuer API. Replay spectators can click or box-select visible entities for selection rings and the
+read-only unit detail panel. Replay middle-drag and Space+left-drag pan
 through semantic `Camera.panByScreenDelta({x,y})`; touch drag/pinch pan and dolly without emitting
 gameplay commands. Wheel/pinch anchors and every drag delta are viewport-local CSS pixels, including
 under non-1 DPR. Mouse-wheel dolly, keyboard pan state, edge scroll state, and blur release are shared
