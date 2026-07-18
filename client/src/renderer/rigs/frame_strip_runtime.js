@@ -88,6 +88,13 @@ function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame 
 function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback = 0) {
   const firingFrames = validFrameList(strip, strip?.firingFrames);
   if (firingFrames.length === 0) return null;
+  const firingWeaponKinds = Array.isArray(strip?.firingWeaponKinds) ? strip.firingWeaponKinds : [];
+  if (
+    firingWeaponKinds.length > 0 &&
+    !firingWeaponKinds.includes(renderContext.recoilWeaponKind)
+  ) {
+    return null;
+  }
   if (clamp01(finite(renderContext.recoilProgress, 0)) <= 0) return null;
   const phase = clamp01(finite(renderContext.recoilPhase, 0));
   const holdPhase = finite(strip?.firingFrameHoldPhase, 0);
@@ -123,6 +130,14 @@ export function frameStripWorldScale(strip, entity, renderContext = null) {
     return Math.max(0.01, finite(strip?.movementWorldScale, baseScale));
   }
   return baseScale;
+}
+
+export function frameStripSpriteOffset(strip, frameIndex) {
+  const forwardPx = finite(strip?.originForwardPx, 0);
+  const lateralPx = finite(strip?.originLateralPx, 0);
+  const firingFrames = validFrameList(strip, strip?.firingFrames);
+  const recoilPx = firingFrames.includes(frameIndex) ? Math.max(0, finite(strip?.firingRecoilPx, 0)) : 0;
+  return { x: forwardPx - recoilPx, y: lateralPx };
 }
 
 function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
@@ -181,6 +196,8 @@ class FrameStripUnitInstance {
 
     const worldScale = frameStripWorldScale(this.strip, entity, renderContext);
     setPoint(this.sprite.scale, worldScale, worldScale);
+    const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex);
+    setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
     this.sprite.alpha = 1;
     this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;

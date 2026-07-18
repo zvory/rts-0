@@ -121,7 +121,7 @@ function isClientOnlyCiPath(pathname) {
 
 function isSourceFileSizePath(pathname) {
   return (
-    pathname === "client/styles.css" ||
+    (pathname.startsWith("client/") && pathname.endsWith(".css")) ||
     pathname === "scripts/source-file-size-baseline.json" ||
     pathname === "tests/run-all.sh" ||
     (
@@ -522,6 +522,7 @@ function verify() {
     [["client/src/config/timing.js"], ["nextest-rules", "nextest-sim", "js-protocol-contracts", "client-architecture", "client-smoke"]],
     [["client/src/config/player_palette_mirror.js"], ["nextest-server", "js-protocol-contracts", "client-architecture", "client-smoke"]],
     [["client/styles.css"], ["source-file-sizes", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    [["client/connection_lost.css"], ["source-file-sizes", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
     [["scripts/interact/driver.ts"], ["source-file-sizes", "interact-contracts", "client-smoke"]],

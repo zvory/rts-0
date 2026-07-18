@@ -59,14 +59,14 @@ client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
 # traversable without making Fly's context scanner count their ignored contents.
 client/assets/rigs/**/*.*
 !client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png
-!client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha-debug.png
+!client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png
 !client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png
 !client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png
 !client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png
 !client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png
 !client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png
-!client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/rifleman-no-pack-white-review-strip.png
-!client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png
+!client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png
+!client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png
 !client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png
 !client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png
 !client/assets/rigs/tank-ps1/tank-atlas.png

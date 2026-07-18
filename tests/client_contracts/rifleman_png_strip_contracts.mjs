@@ -30,9 +30,13 @@ for (const [label, strip, variant] of [
   assert(strip.frameCount === runtime.frameCount, `${label} frame count matches the manifest`);
   assert(strip.idleFrame === runtime.idleFrame, `${label} idle frame matches the manifest`);
   assert(JSON.stringify(strip.movementFrames) === JSON.stringify(runtime.movementFrames), `${label} movement frames match the manifest`);
-  assert(JSON.stringify(strip.firingFrames) === JSON.stringify(runtime.firingFrames), `${label} firing frames match the deferred-recoil manifest`);
+  assert(JSON.stringify(strip.firingFrames) === JSON.stringify(runtime.firingFrames), `${label} firing frames match the manifest`);
+  assert(JSON.stringify(strip.firingWeaponKinds) === JSON.stringify(runtime.firingWeaponKinds), `${label} firing weapon routing matches the manifest`);
+  assert(strip.firingFrameHoldPhase === runtime.firingFrameHoldPhase, `${label} firing-frame timing matches the manifest`);
   assert(strip.fps === runtime.fps, `${label} FPS matches the manifest`);
   assert(strip.worldScale === runtime.worldScale, `${label} world scale matches the manifest`);
+  assert(strip.originForwardPx === runtime.originForwardPx, `${label} torso origin offset matches the manifest`);
+  assert(strip.firingRecoilPx === runtime.firingRecoilPx, `${label} firing recoil offset matches the manifest`);
   assert(strip.tintSlot === runtime.tintSlot, `${label} tint slot matches the manifest`);
   assert(JSON.stringify(strip.bakedColorAdjustment) === JSON.stringify(runtime.bakedColorAdjustment), `${label} baked color adjustment matches the manifest`);
   assert(JSON.stringify(strip.targetColorAdjustment) === JSON.stringify(runtime.targetColorAdjustment), `${label} darker runtime color target matches the manifest`);

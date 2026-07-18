@@ -126,16 +126,16 @@ const NOOP_RENDERER_OVERLAYS = [
     "composited Panzerfaust profile targets only Riflemen whose disposable launcher is still loaded",
   );
   assert(
-    strip.image.includes("/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png"),
-    "composited Panzerfaust profile uses the deterministic movement strip",
+    strip.image.includes("/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png"),
+    "composited Panzerfaust profile uses the deterministic recoil strip",
   );
   assert(
-    strip.frameWidth === 160 && strip.frameHeight === 112 && strip.frameCount === 4,
-    "composited Panzerfaust strip exposes one idle and three movement cells",
+    strip.frameWidth === 160 && strip.frameHeight === 112 && strip.frameCount === 5,
+    "composited Panzerfaust strip exposes idle, movement, and firing cells",
   );
   assert(
-    strip.idleFrame === 0 && strip.movementFrames.join(",") === "1,2,3" && strip.firingFrames.length === 0,
-    "composited Panzerfaust strip routes only the approved idle and movement frames",
+    strip.idleFrame === 0 && strip.movementFrames.join(",") === "1,2,3" && strip.firingFrames.join(",") === "4",
+    "composited Panzerfaust strip routes the approved idle, movement, and firing frames",
   );
 }
 

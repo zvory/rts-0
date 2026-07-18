@@ -11,14 +11,13 @@ face is visible, the barrel is foreshortened, and the recoil housing exposes
 clear depth while the carriage and trails retain an RTS above-view. This makes
 the elevation read as indirect-fire artillery rather than a diagonal flat gun.
 
-Runtime review treatment remains temporary:
+The selected source sheet is now used without diagnostic framing. Runtime placement:
 
-- the upper source trail maps to the in-game left trail and receives a fixed
-  purple tint;
-- both complete trail crop frames carry a black rectangular border;
+- the upper source trail maps to the in-game left trail;
+- both trails receive the owner-team tint;
+- each trail moves rearward by half of its rendered length and outward by one
+  tenth of its rendered width;
 - the mounting-ring center is the origin for each trail;
-- a fixed sheet-space rotation aligns the pitched weapon assembly with the SVG
-  rig's authoritative weapon-facing angle;
 - the SVG Artillery rig remains authoritative for setup visibility, carriage
   and weapon facing, recoil, muzzle flash, and gameplay anchors.
 

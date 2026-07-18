@@ -126,6 +126,7 @@ const start = {
   assert(flashes[0].weaponKind === WEAPON_KIND.TANK_CANNON, "same-tick cannon feedback stays first");
   assert(flashes[1].weaponKind === WEAPON_KIND.TANK_COAX, "same-tick coax feedback stays second");
   assert(state.weaponRecoil(25, KIND.TANK, performance.now()) > 0, "same-tick cannon recoil is preserved when followed by coax feedback");
+  assert(state.weaponRecoilKind(25) === WEAPON_KIND.TANK_CANNON, "recoil preserves the weapon that owns the authored animation");
 }
 
 {
