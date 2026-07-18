@@ -84,7 +84,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   pointFireInput.clientIntent.addCommandFeedback = (kind, x, y, queued, radiusTiles) => {
     artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
   };
-  pointFireInput.commandIssuer = { issueCommand: (command) => artilleryCommands.push(command) };
+  pointFireInput.commandInteraction = { issueCommand: (command) => artilleryCommands.push(command) };
   pointFireInput._groundAtScreen = (x, y) => ({ x, y });
   pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
   const closeRawPoint = {

@@ -183,30 +183,22 @@ const hash2 = (x, y) => {
  * frame after fog/state have been updated.
  */
 export class Minimap {
-  get commandIssuer() {
-    return this.commandInteraction;
-  }
-
-  set commandIssuer(value) {
-    this.commandInteraction = value;
-  }
-
   /**
    * @param {HTMLCanvasElement} canvasEl the `#minimap` canvas.
    * @param {import("./state.js").GameState} state shared game state.
    * @param {import("./camera.js").Camera} camera semantic camera (for viewport footprint + focus).
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
-   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
+   * @param {{issueCommand(command: object, options?:object): object|boolean}} commandInteraction shared gameplay command interaction.
    * @param {import("./client_intent.js").ClientIntent} [options.clientIntent] browser-local command/placement intent facade.
    * @param {boolean|function(): boolean} [options.commandsEnabled] whether minimap clicks may issue commands.
    */
-  constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter = null, options = {}) {
+  constructor(canvasEl, state, camera, fog, commandInteraction, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext("2d");
     this.state = state;
     this.camera = camera;
     this.fog = fog;
-    this.commandInteraction = commandIssuer;
+    this.commandInteraction = commandInteraction;
     this.controlPolicy = options.controlPolicy || null;
     this.clientIntent = options.clientIntent || null;
     this.inputRouter = inputRouter;

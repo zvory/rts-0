@@ -18,7 +18,7 @@ input.state = {
   isAllyOwner: (owner) => owner === 2,
   addCommandFeedback() {},
 };
-input.commandIssuer = { issueCommand(command) { commands.push(command); } };
+input.commandInteraction = { issueCommand(command) { commands.push(command); } };
 input._groundAtScreen = (x, y) => ({ x, y });
 input.selectionScene = buildSelectionScene({
   entities: input.state.entitiesInterpolated(),

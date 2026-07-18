@@ -112,7 +112,7 @@ import { ClientIntent } from "../../client/src/client_intent.js";
     },
   };
   facadeHud.clientIntent = explicitHudIntent;
-  facadeHud.commandIssuer = { issueCommand() {} };
+  facadeHud.commandInteraction = { issueCommand() {} };
   facadeHud._dispatchCommandIntent({ type: "openWorkerBuildMenu" });
   assert(explicitHudIntent.commandCardMode === "workerBuild", "HUD dispatch opens build menu through injected ClientIntent");
   facadeHud._dispatchCommandIntent({ type: "beginPlacement", building: KIND.DEPOT });

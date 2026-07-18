@@ -233,7 +233,7 @@ function scene(entities, projection = orthographic(), options = {}) {
   input.selectionScene = scene([unit], fakePerspective({ groundAtScreen: false }));
   input.clientIntent = new ClientIntent();
   input.clientIntent.beginCommandTarget("move");
-  input.commandIssuer = { issueCommand(command) { commands.push(command); } };
+  input.commandInteraction = { issueCommand(command) { commands.push(command); } };
   input._addCommandFeedback = () => {};
   assert(input._issueTargetedCommand({ x: 200, y: 20 }) === false, "armed point command remains unissued on a ground miss");
   assert(commands.length === 0, "ground misses cannot emit commands with invalid or cached coordinates");

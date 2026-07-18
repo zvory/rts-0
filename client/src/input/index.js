@@ -152,17 +152,9 @@ function isMacPlatform() {
 
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
- * mutations (on `state`) and protocol commands (via `commandIssuer.issueCommand`).
+ * mutations (on `state`) and protocol commands (via `commandInteraction.issueCommand`).
  */
 export class Input {
-  get commandIssuer() {
-    return this.commandInteraction;
-  }
-
-  set commandIssuer(value) {
-    this.commandInteraction = value;
-  }
-
   /**
    * @param {HTMLElement} domElement the #viewport element that receives listeners
    * @param {import("../camera.js").Camera} camera world<->screen transforms & zoom

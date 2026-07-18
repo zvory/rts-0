@@ -1156,7 +1156,7 @@ function buttonByLabel(card, label) {
     addCommandFeedback() {},
   };
   const rightClickCommands = [];
-  input.commandIssuer = { issueCommand(command) { rightClickCommands.push(command); } };
+  input.commandInteraction = { issueCommand(command) { rightClickCommands.push(command); } };
   input._groundAtScreen = (x, y) => ({ x, y });
   publishSelectionTestScene(input);
   input._onRightClick({ x: 100, y: 100 });
@@ -1437,7 +1437,7 @@ function buttonByLabel(card, label) {
   };
   targetedInput.clientIntent = targetedIntent;
   targetedInput.screenOverlay = { setMarquee() {}, clearMarquee() {} };
-  targetedInput.commandIssuer = { issueCommand: (command) => sentCommands.push(command) };
+  targetedInput.commandInteraction = { issueCommand: (command) => sentCommands.push(command) };
   targetedInput._groundAtScreen = (x, y) => ({ x, y });
   targetedInput._entityAtScreen = () => ownBuilding;
   targetedInput._selectedOwnUnitIds = () => [7];
@@ -1720,7 +1720,6 @@ function buttonByLabel(card, label) {
     commandIssuer: placementLegacySender,
     clientIntent: placementConfirmInput.clientIntent,
   });
-  placementConfirmInput.commandIssuer = placementConfirmInput.commandInteraction;
   placementConfirmInput.clientIntent.placement = { building: KIND.DEPOT, tileX: 4, tileY: 5, valid: true };
   placementConfirmInput.clientIntent.endPlacement = () => {
     confirmedPlacementEnded += 1;
@@ -1752,7 +1751,6 @@ function buttonByLabel(card, label) {
     commandIssuer: trapPlacementLegacySender,
     clientIntent: trapPlacementInput.clientIntent,
   });
-  trapPlacementInput.commandIssuer = trapPlacementInput.commandInteraction;
   trapPlacementInput.clientIntent.placement = {
     building: KIND.TANK_TRAP,
     tileX: 0,

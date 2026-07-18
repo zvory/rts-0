@@ -60,7 +60,7 @@ function commandInput(selected, entities) {
     entitiesInterpolated: () => entities,
     selectedEntities: () => selected,
   };
-  input.commandIssuer = {
+  input.commandInteraction = {
     issueCommand(command) {
       commands.push(command);
       return true;
@@ -243,7 +243,7 @@ function commandInput(selected, entities) {
     selectedEntities: () => [rifleman, scoutPlane],
   };
   input.clientIntent = new ClientIntent();
-  input.commandIssuer = { issueCommand: (command) => commands.push(command) };
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
   input._groundAtScreen = (x, y) => ({ x, y });
   input._entityAtScreen = () => enemy;
   input._addCommandFeedback = () => {};

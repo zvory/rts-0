@@ -154,29 +154,21 @@ export function formatGameTime(tick, tickHz = TICK_HZ) {
  * Wiring (main.js) constructs one HUD and calls `update()` once per rendered frame.
  */
 export class HUD {
-  get commandIssuer() {
-    return this.commandInteraction;
-  }
-
-  set commandIssuer(value) {
-    this.commandInteraction = value;
-  }
-
   /**
    * @param {HTMLElement} rootEl the game screen root (`#game-screen`); used to scope
    *   element lookups so multiple screens could coexist.
    * @param {import("./state.js").GameState} state shared game state (selection, resources).
-   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
+   * @param {{issueCommand(command: object, options?:object): object|boolean}} commandInteraction shared gameplay command interaction.
    * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    * @param {object} [controlPolicy] policy that decides command-surface and owner control.
    * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
    */
-  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
+  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
     this.root = rootEl;
     this.state = state;
-    this.commandInteraction = commandIssuer;
+    this.commandInteraction = commandInteraction;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
