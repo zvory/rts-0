@@ -124,6 +124,12 @@ fn handle_loaded_combat(
         return true;
     }
 
+    if mode == CombatMode::Ordered {
+        if let Some(attacker) = entities.get_mut(id) {
+            attacker.mark_attack_phase(AttackPhase::Waiting);
+        }
+    }
+
     true
 }
 

@@ -544,7 +544,7 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
         unit.order(),
         Order::Attack(AttackOrder {
             execution: AttackExecution {
-                phase: AttackPhase::Chasing,
+                phase: AttackPhase::Waiting,
                 ..
             },
             ..

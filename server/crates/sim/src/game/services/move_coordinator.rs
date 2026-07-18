@@ -596,7 +596,7 @@ impl<'a> MoveCoordinator<'a> {
 
     /// Resume the path for the unit's existing movement order, respecting throttle and budget.
     /// Returns `true` if a path was actually requested this call.
-    pub fn request_order_path(
+    pub fn request_attack_move_path(
         &mut self,
         entities: &mut EntityStore,
         id: u32,
@@ -605,11 +605,7 @@ impl<'a> MoveCoordinator<'a> {
         if !self.can_repath(entities, id, goal) {
             return false;
         }
-        let source = entities
-            .get(id)
-            .map(|entity| pathing_source_from_order(&entity.order()))
-            .unwrap_or(PathingRequestSource::Move);
-        self.request_path(entities, id, goal, false, source)
+        self.request_path(entities, id, goal, false, PathingRequestSource::AttackMove)
     }
 
     /// Request a path for a gatherer, respecting throttle and budget.
@@ -802,8 +798,6 @@ impl<'a> MoveCoordinator<'a> {
                     if matches!(e.order(), Order::Move(_)) {
                         e.set_order(Order::Idle);
                     }
-                } else if matches!(e.order(), Order::Attack(_)) {
-                    e.reset_attack_unreachable_checks();
                 }
             }
             self.consume_request_budget(None);
@@ -882,12 +876,6 @@ impl<'a> MoveCoordinator<'a> {
                 } else {
                     MovePhase::PathFailed
                 });
-            } else if matches!(e.order(), Order::Attack(_)) {
-                if path_ok {
-                    e.reset_attack_unreachable_checks();
-                } else {
-                    e.increment_attack_unreachable_checks();
-                }
             }
         }
         self.consume_request_budget(Some(request_diagnostics));
@@ -972,13 +960,13 @@ fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
     match order {
         Order::Move(_) => PathingRequestSource::Move,
         Order::AttackMove(_) => PathingRequestSource::AttackMove,
-        Order::Attack(_) => PathingRequestSource::Attack,
         Order::Gather(_) => PathingRequestSource::Gather,
         Order::Build(_) => PathingRequestSource::Build,
         Order::Deconstruct(_) => PathingRequestSource::Deconstruct,
         Order::Ability(_) => PathingRequestSource::Ability,
         Order::Idle
         | Order::HoldPosition
+        | Order::Attack(_)
         | Order::ArtilleryPointFire(_)
         | Order::ArtilleryBlanketFire(_) => PathingRequestSource::Other,
     }
@@ -1578,7 +1566,7 @@ mod tests {
     }
 
     #[test]
-    fn request_order_path_keeps_tile_guided_movement_route() {
+    fn request_attack_move_path_keeps_tile_guided_movement_route() {
         let map = Map {
             size: 40,
             terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
@@ -1602,7 +1590,7 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, MIN_REPATH_TICKS);
 
         assert!(
-            coordinator.request_order_path(&mut entities, unit, goal),
+            coordinator.request_attack_move_path(&mut entities, unit, goal),
             "fixture movement path should be found"
         );
         let unit = entities.get(unit).expect("unit should still exist");

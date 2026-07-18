@@ -1302,7 +1302,7 @@ Overpenetration checks use the target's pre-damage entrenchment state, so lethal
 Entrenchment auto-occupation chooses the nearest trench that has a legal occupation slot for the
 unit. A closer trench with no legal slot does not block searching for a farther usable trench. For
 dig-in progress, explicit attack orders count as holding ground only after combat advances them to
-the `Firing` phase; chasing or unreachable attack orders do not create trench progress. Lab move
+the `Firing` phase; waiting attack orders do not create trench progress. Lab move
 operations clear trench occupation and dig-in state when repositioning an entity so snapshots do not
 retain stale `occupiedTrenchId` values before the next tick.
 

@@ -114,6 +114,15 @@ fn out_of_range_direct_attacks_do_not_create_or_refresh_paths() {
         let attacker = entities
             .get(attacker_id)
             .expect("attacker should still exist");
+        assert!(matches!(
+            attacker.order(),
+            Order::Attack(crate::game::entity::AttackOrder {
+                execution: crate::game::entity::AttackExecution {
+                    phase: crate::game::entity::AttackPhase::Waiting,
+                },
+                ..
+            })
+        ));
         assert_eq!(attacker.target_id(), Some(target_id), "{kind:?}");
         assert!(attacker.path_is_empty(), "{kind:?} should stay put");
         assert_eq!(

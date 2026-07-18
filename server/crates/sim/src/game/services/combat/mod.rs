@@ -298,6 +298,7 @@ pub(in crate::game) fn combat_system(
                         | Order::HoldPosition
                 ) {
                     e.set_target_id(None);
+                    e.mark_attack_phase(AttackPhase::Waiting);
                     begin_idle_deployed_weapon_setup(e);
                 }
                 if uses_vehicle_weapon_policy(e) {
@@ -323,7 +324,7 @@ pub(in crate::game) fn combat_system(
                         if let Some(e) = entities.get_mut(id) {
                             e.set_target_id(None);
                         }
-                        coordinator.request_order_path(entities, id, goal);
+                        coordinator.request_attack_move_path(entities, id, goal);
                     }
                 }
             }
@@ -505,6 +506,10 @@ pub(in crate::game) fn combat_system(
                 if let Some(e) = entities.get_mut(id) {
                     e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                 }
+            }
+        } else if mode == CombatMode::Ordered {
+            if let Some(e) = entities.get_mut(id) {
+                e.mark_attack_phase(AttackPhase::Waiting);
             }
         }
     }
