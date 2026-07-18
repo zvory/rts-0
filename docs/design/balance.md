@@ -320,9 +320,9 @@ folded into default targeting.
   Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
   deterministic scattered impact points that would hit any same-team unit or building at its current position,
   while manual fire remains unrestricted.
-- anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20`,
-  `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
-  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`.
+- anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
+  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`; packed, setting-up, and tearing-down guns
+  cannot fire.
 - Panzerfausts research gives Riflemen a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
   `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,

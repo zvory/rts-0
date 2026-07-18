@@ -1820,7 +1820,7 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 }
 
 #[test]
-fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
+fn packed_anti_tank_gun_cannot_fire() {
     let mut entities = EntityStore::new();
     entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
@@ -1838,8 +1838,8 @@ fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
 
     assert_eq!(
         entities.get(tank_id).expect("enemy should exist").hp,
-        enemy_hp - 75,
-        "packed anti-tank gun should deal 75% of its deployed 100 damage"
+        enemy_hp,
+        "packed anti-tank gun must finish setup before it can fire"
     );
 }
 #[test]
