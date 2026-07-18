@@ -18,6 +18,7 @@ const BARREL_PPU_Y = 11.9;
 const TRAIL_ROOT_X = -3.024;
 const TRAIL_BACK_SHIFT_RATIO = 0.5;
 const TRAIL_LATERAL_SHIFT_RATIO = 0.1;
+const DEPLOYED_TRAIL_LATERAL_LENGTH_RATIO = 0.1;
 const DEPLOYED_TRAIL_ROTATION = 0.54;
 const PACKED_TRAIL_ROTATION = 0.22;
 const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 82, saturation: 90 });
@@ -149,7 +150,10 @@ function trailSprite(side, suffix, frame, rotationOffset) {
       tintSlot: "team-light",
       tintAdjustment: TEAM_TINT_ADJUSTMENT,
       positionOffsetX: TRAIL_ROOT_X - trailLength * TRAIL_BACK_SHIFT_RATIO,
-      positionOffsetY: lateralDirection * trailWidth * TRAIL_LATERAL_SHIFT_RATIO,
+      positionOffsetY: lateralDirection * (
+        trailWidth * TRAIL_LATERAL_SHIFT_RATIO
+        + (deployed ? trailLength * DEPLOYED_TRAIL_LATERAL_LENGTH_RATIO : 0)
+      ),
       rotationOffset,
     },
   );
