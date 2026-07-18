@@ -1,7 +1,7 @@
 // Headless client smoke test. Drives the real client in headless Chrome and asserts it
 // loads, renders the PixiJS scene, and that the full UI command loop works end-to-end:
-// lobby -> ready -> start -> render -> box-select -> worker build card (with the former Depot
-// slot empty) -> train-card rendering.
+// lobby -> ready -> start -> render -> box-select -> worker build card (with Pump Jack in the
+// former Depot slot) -> train-card rendering.
 // Fails on ANY console/page error.
 //
 // Requires a local Chrome. `tests/run-all.sh` installs the repository-owned puppeteer-core
@@ -246,14 +246,23 @@ try {
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker build hotkey opened the build submenu",
   );
-  const depotSlot = await page.evaluate(() => {
-    const slots = [...document.querySelectorAll("#command-card > *")];
+  const pumpJackSlot = await page.evaluate(() => {
+    const button = document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]');
     return {
       hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.depot"]'),
-      wSlotEmpty: slots[1]?.classList.contains("cmd-empty"),
+      hotkey: button?.dataset.hotkey || null,
+      tooltip: button?.querySelector('.cmd-tooltip')?.textContent || "",
     };
   });
-  ok(!depotSlot.hasDepotButton && depotSlot.wSlotEmpty, "BUILD: Supply Depot is absent while its W slot stays empty");
+  ok(
+    !pumpJackSlot.hasDepotButton &&
+      pumpJackSlot.hotkey === "W" &&
+      pumpJackSlot.tooltip.includes("50") &&
+      pumpJackSlot.tooltip.includes("20s") &&
+      pumpJackSlot.tooltip.includes("oil patch") &&
+      pumpJackSlot.tooltip.includes("Extracts 2 Oil"),
+    "BUILD: Pump Jack occupies W with cost, build time, oil-patch placement, and extraction details",
+  );
 
   const trainBtn = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;

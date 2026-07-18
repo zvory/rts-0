@@ -110,6 +110,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "FIXTURE_FACTION_ID",
   "FOG_EXPLORED_ALPHA",
   "FOG_UNEXPLORED_ALPHA",
+  "HARVEST_TICKS",
   "INTERP_DELAY_MS",
   "METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS",
   "METHAMPHETAMINES_RESEARCH_TICKS",
@@ -124,6 +125,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "MORTAR_SETUP_TICKS",
   "MORTAR_SHELL_DELAY_TICKS",
   "MORTAR_TEARDOWN_TICKS",
+  "OIL_LOAD",
   "PANZERFAUSTS_RESEARCH_TICKS",
   "PANZERFAUST_ARMOR_PENETRATION",
   "PANZERFAUST_DAMAGE",
@@ -544,9 +546,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     !WORKER_BUILDABLE.includes(KIND.DEPOT) &&
-      WORKER_BUILD_CARD_SLOTS[1] == null &&
+      WORKER_BUILDABLE.includes(KIND.PUMP_JACK) &&
+      WORKER_BUILD_CARD_SLOTS[1] === KIND.PUMP_JACK &&
       WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.join(","),
-    "Supply Depot is unavailable while its worker-card W slot remains empty",
+    "Supply Depot stays unavailable while Pump Jack occupies the worker-card W slot",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [

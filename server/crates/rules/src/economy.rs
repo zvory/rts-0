@@ -96,12 +96,7 @@ pub fn can_build_for_faction(
     builder_kind: EntityKind,
     building_kind: EntityKind,
 ) -> bool {
-    catalog_for(faction_id).is_some_and(|catalog| {
-        catalog.can_build(builder_kind, building_kind)
-            || (builder_kind == EntityKind::Worker
-                && building_kind == EntityKind::PumpJack
-                && catalog.allows_building(EntityKind::PumpJack))
-    })
+    catalog_for(faction_id).is_some_and(|catalog| catalog.can_build(builder_kind, building_kind))
 }
 
 /// Whether `unit_kind` can gather resources for this faction.

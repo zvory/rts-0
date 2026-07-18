@@ -40,6 +40,8 @@ export const COMMAND_CAR_BODY = Object.freeze({
 
 // Gatherers can mine a resource only when a completed home-base mining anchor is within range.
 export const MINING_CC_RANGE_TILES = 11.0;
+export const OIL_LOAD = 2;
+export const HARVEST_TICKS = 40;
 export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20;
 export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
 export const ARTILLERY_MIN_RANGE_TILES = 25;
@@ -189,7 +191,11 @@ export const STATS = Object.freeze({
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [] },
+    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
+    description:
+      "Build on an oil patch. " +
+      `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
+      `${MINING_CC_RANGE_TILES} tiles of a completed friendly City Centre or Zamok.` },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -467,6 +473,7 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
   KIND.CITY_CENTRE,
+  KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.RESEARCH_COMPLEX,

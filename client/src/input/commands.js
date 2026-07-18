@@ -21,7 +21,11 @@ import {
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./artillery_targeting.js";
-import { commandHotkeyCodeFromEvent, entityIntersectsRect } from "./placement.js";
+import {
+  commandHotkeyCodeFromEvent,
+  entityIntersectsRect,
+  pumpJackBuildIntentForResource,
+} from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 
 export function _onRightClick(p, ev = {}) {
@@ -232,7 +236,7 @@ function normalRightClickAction(input, p) {
 }
 
 function resourceRightClickAction(resource, world, gatherers, workers, map) {
-  const pumpJack = _pumpJackBuildIntentForResource(resource, map);
+  const pumpJack = pumpJackBuildIntentForResource(resource, map);
   if (resource.kind === KIND.OIL && workers.length > 0 && pumpJack) {
     return {
       kind: "build",
@@ -271,7 +275,7 @@ function pumpJackOilUnderFriendlyUnit(input, target, workers) {
   const matches = [];
   for (const candidate of input._selectionEntities?.() || []) {
     if (candidate.kind !== KIND.OIL || candidate.remaining === 0) continue;
-    const intent = _pumpJackBuildIntentForResource(candidate, map);
+    const intent = pumpJackBuildIntentForResource(candidate, map);
     if (!intent) continue;
     const minX = intent.tileX * tileSize;
     const minY = intent.tileY * tileSize;
@@ -441,17 +445,6 @@ function _resumeConstructionIntent(target, map) {
   const tileY = Math.round(target.y / tileSize - stat.footH * 0.5);
   if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
   return { building: target.kind, tileX, tileY };
-}
-
-export function _pumpJackBuildIntentForResource(resource, map) {
-  if (!resource || resource.kind !== KIND.OIL || !map) return null;
-  const stat = STATS[KIND.PUMP_JACK];
-  if (!stat?.footW || !stat?.footH) return null;
-  const tileSize = map.tileSize || DEFAULT_TILE_SIZE;
-  const tileX = Math.round(resource.x / tileSize - stat.footW * 0.5);
-  const tileY = Math.round(resource.y / tileSize - stat.footH * 0.5);
-  if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
-  return { building: KIND.PUMP_JACK, tileX, tileY };
 }
 
 export function _refreshAbilityTargetPreview() {

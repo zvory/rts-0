@@ -274,6 +274,8 @@ fn print_client_constants(indent: &str) {
         "{indent}    \"miningCcRangeTiles\": {},",
         json_f32(balance::MINING_CC_RANGE_TILES)
     );
+    println!("{indent}    \"oilLoad\": {},", balance::OIL_LOAD);
+    println!("{indent}    \"harvestTicks\": {},", balance::HARVEST_TICKS);
     println!(
         "{indent}    \"antiTankGunDeployedRangeTiles\": {},",
         balance::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES

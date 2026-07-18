@@ -51,10 +51,11 @@ export const CAMERA = Object.freeze({
   edgeScrollPx: 14, // screen-edge band that triggers panning
 });
 
-// Keep the former Supply Depot W slot visibly empty during the depot-free supply experiment.
+// Pump Jack occupies the former Supply Depot W slot so its economy role stays
+// legible even though workers can also build one by right-clicking an oil patch.
 export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
   KIND.CITY_CENTRE,
-  null,
+  KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.RESEARCH_COMPLEX,

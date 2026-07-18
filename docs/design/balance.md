@@ -512,8 +512,10 @@ folded into default targeting.
   anchor is close enough, gatherers ignore new gather orders for that steel patch and active miners
   scatter roughly one tile away from the patch. When a patch empties the gatherer goes idle (no
   automatic retarget).
-- Oil extraction: workers do not directly mine oil. A worker right-click or contextual build on a
-  live oil patch issues a Pump Jack build at that patch. Completed Pump Jacks mine
+- Oil extraction: workers do not directly mine oil. The worker build card exposes Pump Jack in its
+  top-middle `W` slot with the normal cost and build-time tooltip. Arming it snaps the placement
+  preview to the nearest live oil patch within one map tile of the cursor. A worker right-click on
+  a live oil patch continues to issue the same Pump Jack build directly. Completed Pump Jacks mine
   `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
   underlying oil node. When that final load empties the patch, its Pump Jack disappears with it.
   Pump Jack placement requires overlap with a live oil node, but has no tech or mining-anchor
