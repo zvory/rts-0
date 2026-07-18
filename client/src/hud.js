@@ -6,7 +6,7 @@
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a
 // stable selection does not thrash the DOM (and so hotkeys keep working). All gameplay
-// effects go through `commandIssuer.issueCommand(...)` or the injected client intent facade.
+// effects go through the injected command interaction or client intent facade.
 
 import { cmd } from "./protocol.js";
 import { ABILITY, KIND, STATE, isBuilding, isUnit } from "./protocol.js";
@@ -381,7 +381,7 @@ export class HUD {
 
   _controlGroupSummaries(frameViews = null) {
     const selected = frameSelectedEntities(this.state, frameViews);
-    return buildControlGroupSummaries(this.state, selected);
+    return buildControlGroupSummaries(this.state, selected, this.controlPolicy);
   }
 
   _dominantControlGroupKind(entities) {

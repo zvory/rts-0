@@ -659,11 +659,12 @@ export class GameState extends VisualEffectBackedState {
   /**
    * Resolve a control group to live entities, pruning dead/stale ids first.
    * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
+   * @param {{controlPolicy?: object|null}} [options] injected ownership policy.
    * @returns {Array<object>}
    */
-  controlGroupEntities(slot) {
+  controlGroupEntities(slot, options = {}) {
     if (!this._validControlGroupSlot(slot)) return [];
-    this._pruneControlGroup(slot);
+    this._pruneControlGroup(slot, options);
     const out = [];
     for (const id of this.controlGroups[slot]) {
       const e = this._curById.get(id);

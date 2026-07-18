@@ -4,6 +4,8 @@
 import { assert } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
 import { Input } from "../../client/src/input/index.js";
+import { buildControlGroupSummaries } from "../../client/src/hud_control_groups.js";
+import { createControlPolicyProjection } from "../../client/src/control_policy_projection.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
 
@@ -26,7 +28,9 @@ const start = {
 
 {
   const state = new GameState(start);
-  const controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
+  const controlPolicy = createControlPolicyProjection(
+    createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+  );
   const p2Worker = { id: 301, owner: 2, kind: KIND.WORKER, x: 32, y: 96, hp: 40, maxHp: 40, state: STATE.IDLE };
   const p2Rifle = { id: 302, owner: 2, kind: KIND.RIFLEMAN, x: 64, y: 96, hp: 45, maxHp: 45, state: STATE.IDLE };
   const p1Worker = { id: 303, owner: 1, kind: KIND.WORKER, x: 96, y: 96, hp: 40, maxHp: 40, state: STATE.IDLE };
@@ -44,6 +48,11 @@ const start = {
   assert(
     state.controlGroups[3].join(",") === "301,302",
     "lab control groups save selected P2 controllables even though the start payload is spectator-shaped",
+  );
+  const summaries = buildControlGroupSummaries(state, state.selectedEntities(), controlPolicy);
+  assert(
+    summaries[3]?.count === 2 && state.controlGroups[3].join(",") === "301,302",
+    "lab control-group HUD summaries preserve groups for a controlled non-local player",
   );
   state.setSelection([p1Worker.id], { controlPolicy });
   state.selectControlGroup(3, { controlPolicy });
