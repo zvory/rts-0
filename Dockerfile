@@ -23,7 +23,7 @@ RUN ./scripts/build-sim-wasm.sh \
 
 RUN test -s ./client/assets/snapshot-streams/supply-300-hellhole.rtsstream \
     && test -s ./client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png \
-    && test -s ./client/assets/rigs/artillery-a19-pass-01/generated/artillery-a19-components-pass-01-alpha-debug.png \
+    && test -s ./client/assets/rigs/artillery-a19-pass-02/generated/artillery-a19-components-pass-02-alpha-debug.png \
     && test -s ./client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png \
     && test -s ./client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png \
     && test -s ./client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png \

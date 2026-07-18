@@ -2,9 +2,9 @@
 
 Status: active visual experiment only. The checked-in tank PNG rig path is enabled for a pass-11
 white-painted Tiger I no-track hull/turret/barrel experiment, Rifleman pass 02 is enabled as a
-full-frame PNG strip, and Artillery uses a modular A-19 alignment-review atlas. The generated images
-are not final game art. This note records what worked, what failed, and how to reproduce the next
-experiment without rediscovering the same traps.
+full-frame PNG strip, and Artillery uses the modular A-19 pass-02 alignment-review atlas. The
+generated images are not final game art. This note records what worked, what failed, and how to
+reproduce the next experiment without rediscovering the same traps.
 
 ## Goal
 
@@ -72,7 +72,7 @@ material colors; the `#ff00ff` key remains only the background key, never the un
   currently `true` for the pass-11 experiment.
 - `client/src/renderer/rigs/png_runtime.js` and `png_routing.js` render atlas sprites in place of
   SVG pixels when an atlas is enabled and loaded.
-- `client/assets/rigs/artillery-a19-pass-01/` keeps the generated modular A-19 source sheet, the
+- `client/assets/rigs/artillery-a19-pass-02/` keeps the regenerated modular A-19 source sheet, the
   alpha-converted diagnostic atlas, and its prompt summary. `artillery_png_atlas.js` maps the two
   independent trails, carriage, and barrel/recoil assembly back onto the Artillery SVG animation
   bindings. The left trail is deliberately purple and both trail crop frames carry black borders
@@ -358,10 +358,11 @@ cheap checks before any generated atlas can be enabled.
   components receive runtime `team-light` tint with a dimmed saturation/brightness adjustment, tire
   overlays remain fixed-color, and the tube still follows the stronger SVG weapon recoil binding
   independently from the carriage recoil.
-- `artillery-a19-pass-01`: active alignment experiment. Generated as four disconnected A-19
+- `artillery-a19-pass-02`: active alignment experiment. Regenerated as four disconnected A-19
   components: two support arms, a frame/wheel carriage, and a separate elevated barrel with an
-  oversized recoil assembly. The SVG rig remains authoritative for setup visibility, carriage and
-  weapon facing, recoil, muzzle flash, and anchors. Runtime review colors the left arm purple and
+  oversized recoil assembly with a clearly visible indirect-fire elevation. The SVG rig remains
+  authoritative for setup visibility, carriage and weapon facing, recoil, muzzle flash, and anchors.
+  Runtime review colors the left arm purple and
   renders a black rectangle around each arm's complete crop frame so subsequent rotation feedback
   can refer to the actual image footprint and mounting origin. The frame treatment and fixed trail
   colors are temporary diagnostics, not accepted production presentation.

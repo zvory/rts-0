@@ -1835,8 +1835,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   recoil frames remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
   carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
   anchor source. Artillery likewise uses a modular A-19 PNG atlas for two independent trails, its
-  frame/wheels, and its bulky barrel/recoil assembly; the current review pass temporarily colors the
-  left trail purple and frames both full trail crops in black for pivot/origin inspection. It uses
+  frame/wheels, and its visibly elevated bulky barrel/recoil assembly; the current pass-02 review
+  temporarily colors the left trail purple and frames both full trail crops in black for
+  pivot/origin inspection. It uses
   the existing SVG Artillery rig for setup/facing/recoil animation and the muzzle-flash overlay.
   The Anti-Tank Gun uses toned-down team tinting, with most firing recoil on the barrel assembly
   and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi
