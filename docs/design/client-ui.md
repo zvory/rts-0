@@ -608,7 +608,10 @@ export class LabCatalogScreen {
 ```
 `LabCatalogScreen` is app-owned and used only for the bare `/lab` route. It renders a blank lab row
 plus bundled checkpoint setup metadata from `GET /api/lab-scenarios`; clicking a row builds the existing
-hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start the normal lab flow.
+hidden `__lab__:<room>:map=<map>:scenario=<id>` join room, replaces the catalog URL with the
+corresponding direct scenario URL, and lets `App` start the normal lab flow. Keeping the scenario in
+the visible URL makes catalog-launched blank and bundled Labs reloadable with Lab-scoped options such
+as `visualProfile` and `rtsRenderer`.
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 
