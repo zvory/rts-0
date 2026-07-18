@@ -288,6 +288,11 @@ The integrated workload is opt-in and is excluded from the default workload set 
 
 Browser client performance harness:
 
+Before proposing an optimization, read
+[client-performance-optimization-lessons.md](client-performance-optimization-lessons.md). It records
+the corrected source-rig versus live-route model, measured failed experiments, merged wins, and
+work that was accepted locally but never merged.
+
 ```bash
 node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10

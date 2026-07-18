@@ -12,6 +12,7 @@ then refresh the capsule's section list if structure changed.
 | Simulation, tick, services, AI, self-play harness   | [server-sim.md](server-sim.md)         |
 | Plain-language server architecture walkthrough      | [../design/server-architecture-walkthrough.md](../design/server-architecture-walkthrough.md) |
 | Rendering, camera/projection, input, HUD, teardown  | [client-ui.md](client-ui.md)           |
+| Client renderer performance, prior wins, and dead ends | [client-ui.md](client-ui.md)        |
 | Wire messages, snapshot shape, fog filtering        | [protocol.md](protocol.md)             |
 | Costs, supply, sight, unit/building stats           | [balance.md](balance.md)               |
 | Node integration tests, regression, client smoke    | [testing.md](testing.md)               |
