@@ -1045,19 +1045,18 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   assert.equal(basePlate.alpha, 1);
   assert.equal(basePlate.tint, 0x336699);
   assert.ok(Math.abs(Math.hypot(basePlate.x, basePlate.y) - 20) < 0.001);
-  assert.ok(Math.abs(basePlate.scaleX - 1 / 4) < 0.001);
-  assert.ok(Math.abs(basePlate.scaleY - 1 / 4) < 0.001);
+  for (const scale of [basePlate.scaleX, basePlate.scaleY]) assert.ok(Math.abs(scale - 1 / 4) < 0.001);
   assert.notEqual(carriage.tint, 0xffffff);
   assert.notEqual(tube.tint, 0xffffff);
   assert.equal(leftTire.tint, 0xffffff);
   assert.equal(rightTire.tint, 0xffffff);
+  for (const tire of [leftTire, rightTire]) assert.deepEqual([tire.scaleX, tire.scaleY], [carriage.scaleX, carriage.scaleY]);
   assert.ok(Math.abs(tube.x) > Math.abs(carriage.x) * 2);
 
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0.5, frameProgress: 0.5, barrel: true });
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 0 });
   assert.equal(basePlate.alpha, 0.5);
-  assert.ok(Math.abs(basePlate.scaleX - 1 / 8) < 0.001);
-  assert.ok(Math.abs(basePlate.scaleY - 1 / 8) < 0.001);
+  for (const scale of [basePlate.scaleX, basePlate.scaleY]) assert.ok(Math.abs(scale - 1 / 8) < 0.001);
 
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
   renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
@@ -1072,6 +1071,7 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
     assert.equal(display.visible, true);
     assert.equal(display.alpha, 1);
   }
+  for (const tire of [packedLeftTire, packedRightTire]) assert.deepEqual([tire.scaleX, tire.scaleY], [packedCarriage.scaleX, packedCarriage.scaleY]);
   for (const display of [carriage, tube, leftTire, rightTire]) assert.equal(display.alpha, 0);
   assert.equal(basePlate.alpha, 0);
   assert.equal(basePlate.scaleX, 0);

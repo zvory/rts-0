@@ -30,8 +30,12 @@ function assertMatches(text, pattern, message) {
 
 function readPngHeader(filePath) {
   const buffer = fs.readFileSync(filePath);
-  if (buffer.length < 26 || buffer.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") {
-    return null;
+  const hasPngSignature = buffer.subarray(0, 8).toString("hex") === "89504e470d0a1a0a";
+  const hasIhdr = buffer.length >= 29 &&
+    buffer.readUInt32BE(8) === 13 &&
+    buffer.subarray(12, 16).toString("ascii") === "IHDR";
+  if (!hasPngSignature || !hasIhdr) {
+    throw new Error(`${path.relative(repoRoot, filePath)} must be a valid PNG runtime rig texture`);
   }
   return {
     width: buffer.readUInt32BE(16),
@@ -182,16 +186,13 @@ for (const asset of checkedInRuntimeAssets) {
   );
   if (asset.includes("/assets/rigs/")) {
     const png = readPngHeader(localAsset);
-    if (
-      png &&
-      (png.width > MAX_RUNTIME_RIG_TEXTURE_DIMENSION || png.height > MAX_RUNTIME_RIG_TEXTURE_DIMENSION)
-    ) {
+    if (png.width > MAX_RUNTIME_RIG_TEXTURE_DIMENSION || png.height > MAX_RUNTIME_RIG_TEXTURE_DIMENSION) {
       throw new Error(
         `${asset} is ${png.width}x${png.height}; runtime rig textures must fit within ` +
           `${MAX_RUNTIME_RIG_TEXTURE_DIMENSION}x${MAX_RUNTIME_RIG_TEXTURE_DIMENSION}`,
       );
     }
-    if (png && png.bitDepth > 8) {
+    if (png.bitDepth !== 8) {
       throw new Error(
         `${asset} uses ${png.bitDepth}-bit PNG channels; runtime rig textures must use 8-bit channels`,
       );

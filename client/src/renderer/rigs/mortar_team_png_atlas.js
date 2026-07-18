@@ -130,8 +130,8 @@ function carriageCropFrame(x, y, w, h) {
     h,
     originX: CARRIAGE_FRAME.originX - (x - CARRIAGE_FRAME.x),
     originY: CARRIAGE_FRAME.originY - (y - CARRIAGE_FRAME.y),
-    pixelsPerUnitX: PPU,
-    pixelsPerUnitY: PPU,
+    pixelsPerUnitX: CARRIAGE_FRAME.pixelsPerUnitX,
+    pixelsPerUnitY: CARRIAGE_FRAME.pixelsPerUnitY,
   });
 }
 
