@@ -25,6 +25,7 @@ import {
   dom,
   formatScore,
   labLaunchConfig,
+  replaceLabCatalogRoute,
   replayLaunchConfig,
   wsUrl,
 } from "./bootstrap.js";
@@ -497,6 +498,7 @@ export class App {
           visualProfileError: this.labCatalogLaunch?.visualProfileError || null,
         };
         this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch);
+        replaceLabCatalogRoute(this.labLaunch);
         this.maybeAutoJoinLab();
       },
     });

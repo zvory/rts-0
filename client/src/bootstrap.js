@@ -228,6 +228,34 @@ export function labLaunchConfig() {
   });
 }
 
+export function replaceLabCatalogRoute(launch, {
+  locationLike = window.location,
+  historyLike = window.history,
+} = {}) {
+  if (!isLabPath(locationLike?.pathname) || !launch?.scenario) return "";
+  const params = new URLSearchParams(locationLike.search || "");
+  params.delete("handoff");
+  params.delete("workspace");
+  params.set("scenario", safeLabToken(launch.scenario, "blank", 48));
+
+  const mapName = safeLabToken(launch.map, "1v1", 48);
+  if (mapName === "1v1") params.delete("map");
+  else params.set("map", mapName);
+
+  const room = safeLabToken(launch.publicRoom, "default", 40);
+  if (room === "default") params.delete("room");
+  else params.set("room", room);
+
+  const visualProfile = safeLabVisualProfile(launch.visualProfileId);
+  if (visualProfile.id) params.set("visualProfile", visualProfile.id);
+  else params.delete("visualProfile");
+
+  const search = params.toString();
+  const url = `${locationLike.pathname}${search ? `?${search}` : ""}${locationLike.hash || ""}`;
+  historyLike?.replaceState?.(historyLike.state ?? null, "", url);
+  return url;
+}
+
 export function labHandoffLaunchConfig() {
   if (!isLabPath(window.location.pathname)) return null;
   const params = new URLSearchParams(window.location.search);
