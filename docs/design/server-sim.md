@@ -754,6 +754,19 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   artifacts reject before playback. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, selected-player resource rows, and
   selected-player remembered building memory, never full-world state.
+- Replay and Lab reconstruction are commit-on-success room operations. Ordinary replay seek clones
+  the selected keyframe into a candidate `Game`, command cursor, and keyframe list, replays entirely
+  against that candidate, and replaces the active session fields only after reaching the requested
+  tick. Lab timeline seek retains its existing candidate `Game` and commits seek/cooldown metadata
+  only after reconstruction succeeds; Lab replay import prepares one replacement bundle containing
+  the duration-tick game, timeline, cleared scenario driver, imported operator/default vision,
+  initial camera, clean flag, and cleared operation log before its first active-room assignment.
+  `lobby::reconstruction::contain_reconstruction` is the deliberately bounded panic-containment
+  seam for these three workflows: it converts ordinary errors and unwind payloads into contextual
+  internal failures for room logging and client errors, while discarded candidates leave the prior
+  authoritative game and all room/session metadata usable. It is not a general room transaction or
+  rollback mechanism; successful reconstruction and unrelated room operations retain their existing
+  ownership and commit paths.
 
 Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
 AI controllers, or Tokio coordination into `rts-sim`. `RoomTask` remains the single Tokio owner of

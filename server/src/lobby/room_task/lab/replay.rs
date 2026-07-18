@@ -7,8 +7,9 @@ use super::super::super::current_unix_ms;
 use super::super::super::lab_replay_operations::{
     lab_op_to_replay_operation, lab_replay_operation_kind, lab_replay_operation_to_entry_kind,
 };
-use super::super::super::lab_scenario_driver::LabScenarioAction;
+use super::super::super::lab_scenario_driver::{LabScenarioAction, LabScenarioDriver};
 use super::super::super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
+use super::super::super::reconstruction::contain_reconstruction;
 use super::super::super::session_policy::RoomTimeSource;
 use super::super::types::{LabSeekTarget, Phase};
 use super::super::RoomTask;
@@ -26,6 +27,13 @@ use crate::protocol::{
 
 pub(super) enum LabReplayRebaseSource {
     Checkpoint(Box<LabCheckpointScenarioV1>),
+}
+
+struct LabReplayImportCommit {
+    phase: Phase,
+    timeline: Option<LabTimeline>,
+    lab_driver: Option<LabScenarioDriver>,
+    session: Option<super::LabSession>,
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -295,6 +303,25 @@ impl RoomTask {
         player_id: u32,
         target: LabSeekTarget,
     ) {
+        self.on_seek_lab_room_time_with(player_id, target, |_| Ok(()));
+    }
+
+    #[cfg(test)]
+    pub(in crate::lobby::room_task) fn on_seek_lab_room_time_with_hook(
+        &mut self,
+        player_id: u32,
+        target: LabSeekTarget,
+        after_candidate_tick: impl FnOnce(&mut Game) -> Result<(), String>,
+    ) {
+        self.on_seek_lab_room_time_with(player_id, target, after_candidate_tick);
+    }
+
+    fn on_seek_lab_room_time_with(
+        &mut self,
+        player_id: u32,
+        target: LabSeekTarget,
+        after_candidate_tick: impl FnOnce(&mut Game) -> Result<(), String>,
+    ) {
         if !self.lab_room_time_control_allowed(player_id) {
             self.send_error_to(player_id, "Only lab operators can seek lab time.");
             return;
@@ -304,20 +331,21 @@ impl RoomTask {
             return;
         };
         let viewer_count = self.players.len();
-        let seek_result = {
+        let seek_result = contain_reconstruction("lab seek", || {
             let Some(timeline) = &mut self.lab_timeline else {
-                self.send_error_to(player_id, "Lab seek failed: timeline is not available.");
-                return;
+                return Err("timeline is not available".to_string());
             };
-            match target {
-                LabSeekTarget::Relative(ticks_back) => {
-                    timeline.seek_back(current_tick, ticks_back, Self::replay_lab_timeline_entry)
-                }
-                LabSeekTarget::Absolute(tick) => {
-                    timeline.seek_to(current_tick, tick, Self::replay_lab_timeline_entry)
-                }
-            }
-        };
+            let target_tick = match target {
+                LabSeekTarget::Relative(ticks_back) => current_tick.saturating_sub(ticks_back),
+                LabSeekTarget::Absolute(tick) => tick,
+            };
+            timeline.seek_to_with(
+                current_tick,
+                target_tick,
+                Self::replay_lab_timeline_entry,
+                after_candidate_tick,
+            )
+        });
         match seek_result {
             Ok(seek) => {
                 crate::log_info!(
@@ -330,6 +358,9 @@ impl RoomTask {
                     rebuild_ms = seek.rebuild_ms,
                     "lab seek rebuilt"
                 );
+                if let Some(timeline) = &mut self.lab_timeline {
+                    timeline.commit_seek(seek.target_tick);
+                }
                 if let (Some(driver), Some(timeline)) = (&mut self.lab_driver, &self.lab_timeline) {
                     driver.sync_to_tick(seek.target_tick, timeline.replay_entries());
                 }
@@ -342,7 +373,7 @@ impl RoomTask {
             }
             Err(err) => {
                 crate::log_warn!(room = %self.room, error = %err, "lab seek failed");
-                self.send_error_to(player_id, &err);
+                self.send_error_to(player_id, &err.to_string());
             }
         }
     }
@@ -446,20 +477,56 @@ impl RoomTask {
         artifact: LabReplayArtifactV1,
         deadline: Option<Instant>,
     ) -> Result<(), String> {
+        self.load_lab_replay_artifact_with(operator_id, artifact, deadline, |_| Ok(()))
+    }
+
+    #[cfg(test)]
+    pub(in crate::lobby::room_task) fn load_lab_replay_artifact_with_hook(
+        &mut self,
+        operator_id: u32,
+        artifact: LabReplayArtifactV1,
+        after_rebuild: impl FnOnce(&mut Game) -> Result<(), String>,
+    ) -> Result<(), String> {
+        self.load_lab_replay_artifact_with(operator_id, artifact, None, after_rebuild)
+    }
+
+    fn load_lab_replay_artifact_with(
+        &mut self,
+        operator_id: u32,
+        artifact: LabReplayArtifactV1,
+        deadline: Option<Instant>,
+        after_rebuild: impl FnOnce(&mut Game) -> Result<(), String>,
+    ) -> Result<(), String> {
         let bytes = serde_json::to_vec(&artifact)
             .map_err(|err| format!("lab replay artifact could not be serialized: {err}"))?;
         let artifact = lab_replay_artifact_from_slice(&bytes)
             .map_err(|err| format!("lab replay artifact rejected: {err}"))?;
-        let (game, timeline) = Self::rebuild_lab_replay_artifact(&artifact, deadline)?;
-        self.phase = Phase::InGame(Box::new(game));
-        self.lab_timeline = Some(timeline);
-        self.lab_driver = None;
-        if let Some(session) = &mut self.lab_session {
-            session.import_vision_for(operator_id, artifact.initial_setup.metadata.lab.vision);
-            session.initial_camera = artifact.initial_setup.metadata.lab.initial_camera;
-            session.dirty = false;
-            session.operation_log.clear();
-        }
+        let commit = contain_reconstruction("lab replay import", || {
+            let (mut game, timeline) = Self::rebuild_lab_replay_artifact(&artifact, deadline)?;
+            after_rebuild(&mut game)?;
+            let mut session = self.lab_session.clone();
+            if let Some(session) = &mut session {
+                session.import_vision_for(
+                    operator_id,
+                    artifact.initial_setup.metadata.lab.vision.clone(),
+                );
+                session.initial_camera = artifact.initial_setup.metadata.lab.initial_camera;
+                session.dirty = false;
+                session.operation_log.clear();
+            }
+            Ok(LabReplayImportCommit {
+                phase: Phase::InGame(Box::new(game)),
+                timeline: Some(timeline),
+                lab_driver: None,
+                session,
+            })
+        })
+        .map_err(|failure| failure.to_string())?;
+
+        self.phase = commit.phase;
+        self.lab_timeline = commit.timeline;
+        self.lab_driver = commit.lab_driver;
+        self.lab_session = commit.session;
         Ok(())
     }
 

@@ -39,6 +39,7 @@ use replay::LabReplayRebaseSource;
 
 mod replay;
 
+#[derive(Clone)]
 pub(super) struct LabSession {
     pub(super) public_id: String,
     pub(super) operator_id: u32,

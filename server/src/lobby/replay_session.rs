@@ -1,3 +1,4 @@
+use super::reconstruction::contain_reconstruction;
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
 use crate::protocol::{
@@ -92,6 +93,13 @@ pub(super) struct ReplayKeyframe {
     pub(super) tick: u32,
     pub(super) game: Box<Game>,
     pub(super) next_command: usize,
+}
+
+struct ReplayReconstructionCandidate {
+    game: Box<Game>,
+    next_command: usize,
+    keyframes: Vec<ReplayKeyframe>,
+    keyframe_tick: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -489,7 +497,13 @@ impl ReplaySession {
     ) -> Result<u32, String> {
         debug_assert_eq!(self.current_tick(), plan.from_tick);
         let seek_start = StdInstant::now();
-        let keyframe_tick = self.rebuild_to(plan.target_tick)?;
+        let candidate =
+            contain_reconstruction("replay seek", || self.reconstruct_to(plan.target_tick))
+                .map_err(|failure| failure.to_string())?;
+        let keyframe_tick = candidate.keyframe_tick;
+        self.game = candidate.game;
+        self.next_command = candidate.next_command;
+        self.keyframes = candidate.keyframes;
         self.last_seek_at = Some(StdInstant::now());
         self.last_controller_id = Some(controller_id);
         crate::log_info!(
@@ -508,7 +522,34 @@ impl ReplaySession {
         Ok(plan.target_tick)
     }
 
+    #[cfg(test)]
     pub(super) fn rebuild_to(&mut self, target_tick: u32) -> Result<u32, String> {
+        let candidate = self.reconstruct_to(target_tick)?;
+        let keyframe_tick = candidate.keyframe_tick;
+        self.game = candidate.game;
+        self.next_command = candidate.next_command;
+        self.keyframes = candidate.keyframes;
+        Ok(keyframe_tick)
+    }
+
+    fn reconstruct_to(&self, target_tick: u32) -> Result<ReplayReconstructionCandidate, String> {
+        self.reconstruct_to_inner(target_tick, |_| {})
+    }
+
+    #[cfg(test)]
+    fn reconstruct_to_with(
+        &self,
+        target_tick: u32,
+        after_candidate_tick: impl FnOnce(&mut ReplayReconstructionCandidate),
+    ) -> Result<ReplayReconstructionCandidate, String> {
+        self.reconstruct_to_inner(target_tick, after_candidate_tick)
+    }
+
+    fn reconstruct_to_inner(
+        &self,
+        target_tick: u32,
+        after_candidate_tick: impl FnOnce(&mut ReplayReconstructionCandidate),
+    ) -> Result<ReplayReconstructionCandidate, String> {
         let (keyframe_tick, keyframe_game, keyframe_next_command) = self
             .keyframes
             .iter()
@@ -522,14 +563,66 @@ impl ReplaySession {
                 )
             })
             .ok_or_else(|| "replay has no valid keyframe".to_string())?;
-        *self.game = keyframe_game;
-        self.next_command = keyframe_next_command;
-        while self.current_tick() < target_tick {
-            self.enqueue_for_current_tick()?;
-            self.game.tick();
-            self.record_keyframe_if_due();
+        let mut candidate = ReplayReconstructionCandidate {
+            game: Box::new(keyframe_game),
+            next_command: keyframe_next_command,
+            keyframes: self
+                .keyframes
+                .iter()
+                .map(|keyframe| ReplayKeyframe {
+                    tick: keyframe.tick,
+                    game: Box::new(keyframe.game.clone_for_replay_keyframe()),
+                    next_command: keyframe.next_command,
+                })
+                .collect(),
+            keyframe_tick,
+        };
+        let mut after_candidate_tick = Some(after_candidate_tick);
+        while candidate.game.tick_count() < target_tick {
+            let tick = candidate.game.tick_count().saturating_add(1);
+            while let Some(entry) = self.artifact.command_log.get(candidate.next_command) {
+                if entry.tick < tick {
+                    return Err(format!(
+                        "replay command {} is out of order: tick {} before {}",
+                        candidate.next_command, entry.tick, tick
+                    ));
+                }
+                if entry.tick != tick {
+                    break;
+                }
+                candidate.game.enqueue(
+                    entry.player_id,
+                    SimCommand::from_protocol(entry.command.clone()),
+                );
+                candidate.next_command += 1;
+            }
+            candidate.game.tick();
+            if let Some(after_candidate_tick) = after_candidate_tick.take() {
+                after_candidate_tick(&mut candidate);
+            }
+            let current_tick = candidate.game.tick_count();
+            if current_tick != 0
+                && current_tick.is_multiple_of(Self::KEYFRAME_INTERVAL_TICKS)
+                && candidate
+                    .keyframes
+                    .binary_search_by_key(&current_tick, |keyframe| keyframe.tick)
+                    .is_err()
+            {
+                let index = candidate
+                    .keyframes
+                    .binary_search_by_key(&current_tick, |keyframe| keyframe.tick)
+                    .unwrap_err();
+                candidate.keyframes.insert(
+                    index,
+                    ReplayKeyframe {
+                        tick: current_tick,
+                        game: Box::new(candidate.game.clone_for_replay_keyframe()),
+                        next_command: candidate.next_command,
+                    },
+                );
+            }
         }
-        Ok(keyframe_tick)
+        Ok(candidate)
     }
 }
 
@@ -736,6 +829,72 @@ mod tests {
                 expected.snapshot_for(player.id)
             );
         }
+    }
+
+    #[test]
+    fn replay_reconstruction_error_and_panic_preserve_session_state() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 4);
+        artifact.command_log.insert(
+            0,
+            rts_sim::game::replay::CommandLogEntry {
+                tick: 0,
+                player_id: players[0].id,
+                command: Command::Stop { units: vec![] },
+            },
+        );
+        let mut replay = ReplaySession::new(replay_test_artifact(&players, 4).1).unwrap();
+        replay.set_vision(
+            77,
+            VisionSelectionRequest::Player {
+                player_id: players[0].id,
+            },
+        );
+        replay.set_speed(77, 3.0);
+        let tick_before = replay.current_tick();
+        let cursor_before = replay.next_command;
+        let keyframes_before = replay
+            .keyframes
+            .iter()
+            .map(|frame| frame.tick)
+            .collect::<Vec<_>>();
+        let state_before = replay.state();
+        let vision_before = replay.vision_player_ids_for(77);
+        let last_seek_before = replay.last_seek_at;
+
+        replay.artifact.command_log = artifact.command_log;
+        let error = match contain_reconstruction("replay seek", || replay.reconstruct_to(2)) {
+            Ok(_) => panic!("injected replay error should fail"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("out of order"));
+
+        replay.artifact.command_log.remove(0);
+        let panic = match contain_reconstruction("replay seek", || {
+            replay.reconstruct_to_with(2, |_| panic!("injected replay reconstruction panic"))
+        }) {
+            Ok(_) => panic!("injected replay panic should fail"),
+            Err(error) => error,
+        };
+        assert!(panic.to_string().contains("internal panic"));
+
+        assert_eq!(replay.current_tick(), tick_before);
+        assert_eq!(replay.next_command, cursor_before);
+        assert_eq!(
+            replay
+                .keyframes
+                .iter()
+                .map(|frame| frame.tick)
+                .collect::<Vec<_>>(),
+            keyframes_before
+        );
+        assert_eq!(replay.state(), state_before);
+        assert_eq!(replay.vision_player_ids_for(77), vision_before);
+        assert_eq!(replay.last_seek_at, last_seek_before);
+
+        let candidate = contain_reconstruction("replay seek", || replay.reconstruct_to(2))
+            .expect("session remains usable after failures");
+        assert_eq!(candidate.game.tick_count(), 2);
     }
 
     #[test]

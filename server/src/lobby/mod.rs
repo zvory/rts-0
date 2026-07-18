@@ -56,6 +56,7 @@ mod map_catalog;
 mod match_history_writes;
 mod participants;
 mod projection;
+mod reconstruction;
 mod replay_branch;
 mod replay_session;
 mod replay_validation;
