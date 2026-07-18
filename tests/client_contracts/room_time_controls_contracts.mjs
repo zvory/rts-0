@@ -837,10 +837,8 @@ readOnlyLabControls.appendChild(readOnlyLabSpeed);
 dom.roomTimeControls = readOnlyLabControls;
 const readOnlyLabUi = new RoomTimeControls({
   net: replayNet,
-  state: {
-    ...roomTimeState,
-    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }),
-  },
+  state: { ...roomTimeState },
+  controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }),
   capabilities: createRoomCapabilities({
     startPayload: {
       capabilities: { roomTime: { available: true, setSpeed: true } },

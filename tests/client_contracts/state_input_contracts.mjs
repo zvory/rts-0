@@ -58,6 +58,7 @@ import {
 } from "../../client/src/input/tank_trap_line.js";
 import { armPostQuickCastSelectionGuard } from "../../client/src/input/quick_cast_selection_guard.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
+import { CommandInteraction } from "../../client/src/command_interaction.js";
 import { Minimap } from "../../client/src/minimap.js";
 import { _drawBuilding } from "../../client/src/renderer/buildings.js";
 import {
@@ -808,7 +809,7 @@ function buttonByLabel(card, label) {
   rightClickInput._selectedGathererIds = Input.prototype._selectedGathererIds;
   rightClickInput._selectedWorkerIds = Input.prototype._selectedWorkerIds;
   rightClickInput._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;
-  rightClickInput._issueCommand = (command) => alliedRightClickCommands.push(command);
+  rightClickInput.commandInteraction = { issueCommand: (command) => alliedRightClickCommands.push(command) };
   teamSelectionState.setSelection([ownWorker.id]);
   rightClickInput._onRightClick({ x: allyWorker.x, y: allyWorker.y });
   assert(
@@ -1708,13 +1709,18 @@ function buttonByLabel(card, label) {
   const placementConfirmInput = Object.create(Input.prototype);
   const placementCommands = [];
   let confirmedPlacementEnded = 0;
-  placementConfirmInput.commandIssuer = {
+  const placementLegacySender = {
     command(command) {
       placementCommands.push(command);
     },
   };
   placementConfirmInput.state = {};
   placementConfirmInput.clientIntent = new ClientIntent();
+  placementConfirmInput.commandInteraction = new CommandInteraction({
+    commandIssuer: placementLegacySender,
+    clientIntent: placementConfirmInput.clientIntent,
+  });
+  placementConfirmInput.commandIssuer = placementConfirmInput.commandInteraction;
   placementConfirmInput.clientIntent.placement = { building: KIND.DEPOT, tileX: 4, tileY: 5, valid: true };
   placementConfirmInput.clientIntent.endPlacement = () => {
     confirmedPlacementEnded += 1;
@@ -1735,13 +1741,18 @@ function buttonByLabel(card, label) {
   const trapPlacementInput = Object.create(Input.prototype);
   const trapPlacementCommands = [];
   let trapPlacementEnded = 0;
-  trapPlacementInput.commandIssuer = {
+  const trapPlacementLegacySender = {
     command(command) {
       trapPlacementCommands.push(command);
     },
   };
   trapPlacementInput.state = {};
   trapPlacementInput.clientIntent = new ClientIntent();
+  trapPlacementInput.commandInteraction = new CommandInteraction({
+    commandIssuer: trapPlacementLegacySender,
+    clientIntent: trapPlacementInput.clientIntent,
+  });
+  trapPlacementInput.commandIssuer = trapPlacementInput.commandInteraction;
   trapPlacementInput.clientIntent.placement = {
     building: KIND.TANK_TRAP,
     tileX: 0,

@@ -3,6 +3,7 @@
 
 import { MatchInputRouter } from "../client/src/input/router.js";
 import { ClientIntent } from "../client/src/client_intent.js";
+import { CommandInteraction } from "../client/src/command_interaction.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { Minimap } from "../client/src/minimap.js";
 import {
@@ -253,7 +254,6 @@ function minimapHarness({
     },
     players: [],
   };
-  if (controlPolicy) state.controlPolicy = controlPolicy;
   if (commandTarget && clientIntent) clientIntent.beginCommandTarget(commandTarget);
   const camera = {
     focusAt(point) {
@@ -276,9 +276,15 @@ function minimapHarness({
           this.sent.push(command);
         },
       };
-  const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, {
+  const commandInteraction = new CommandInteraction({
+    commandIssuer,
+    clientIntent,
+    selectedEntities: () => state.selectedEntities(),
+  });
+  const minimap = new Minimap(canvas, state, camera, null, commandInteraction, router, {
     commandsEnabled,
     clientIntent,
+    controlPolicy,
   });
   return {
     router,
@@ -288,6 +294,7 @@ function minimapHarness({
     camera,
     net: commandIssuer,
     commandIssuer,
+    commandInteraction,
     minimap,
     centers,
     clientIntent,

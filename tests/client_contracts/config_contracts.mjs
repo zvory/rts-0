@@ -59,6 +59,7 @@ import {
 } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
+import { CommandInteraction } from "../../client/src/command_interaction.js";
 
 const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ABILITIES",
@@ -593,9 +594,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     playerId,
     selectedEntities: () => selectedProductionBuildings,
   };
-  hud.commandIssuer = {
-    command: (command) => trained.push(command),
-  };
+  hud.commandInteraction = new CommandInteraction({
+    commandIssuer: { command: (command) => trained.push(command) },
+    clientIntent: null,
+    selectedEntities: () => selectedProductionBuildings,
+  });
   hud._trainRoundRobin = new Map();
   hud._cancelRoundRobin = new Map();
 

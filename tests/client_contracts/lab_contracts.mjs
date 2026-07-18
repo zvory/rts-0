@@ -535,14 +535,6 @@ await withFakeDocument(async () => {
       playerUpgrades: [
         { id: 2, upgrades: [] },
       ],
-      controlPolicy: {
-        ignoreCommandLimitsEnabled() {
-          return ignoreCommandLimits;
-        },
-        setIgnoreCommandLimits(enabled) {
-          ignoreCommandLimits = !!enabled;
-        },
-      },
       selectedEntities() {
         return selectedEntities;
       },
@@ -598,6 +590,15 @@ await withFakeDocument(async () => {
       ],
     },
     match,
+    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+    commandLimitSettings: {
+      ignoreCommandLimitsEnabled() {
+        return ignoreCommandLimits;
+      },
+      setIgnoreCommandLimits(enabled) {
+        ignoreCommandLimits = !!enabled;
+      },
+    },
   });
   const buttonByText = (label) => findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === label)[0];
   const playerButtonById = (id) => findFakes(root, (el) => (

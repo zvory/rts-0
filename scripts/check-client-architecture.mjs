@@ -46,6 +46,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "room_time_panel.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
+  "control_policy_projection.js": "app-shell",
   "room_capabilities.js": "app-shell",
   "visual_profiles.js": "app-shell",
   "camera_view_selection.js": "app-shell",
@@ -63,6 +64,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "state_ground_decals.js": "model",
   "state_visual_effects.js": "model",
   "client_intent.js": "model",
+  "command_interaction.js": "model",
   "command_budget.js": "model",
   "command_composer.js": "model",
   "progress_extrapolator.js": "model",
@@ -268,6 +270,7 @@ for (const file of files) {
   });
   checkLargeFileBaseline(file, source);
   checkForbiddenGameStateIntentShims(file, source);
+  checkForbiddenGameStateControlPolicy(file, source);
   checkRawCameraRepresentation(file, source);
   checkRoomCapabilityParser(file, source);
   checkRigOnlyUnitVisuals(file, source);
@@ -370,6 +373,14 @@ function checkForbiddenGameStateIntentShims(file, source) {
     if (directStateRe.test(source)) {
       failures.push(`${file}: forbidden GameState intent shim reference ${name}; use injected ClientIntent or a narrow view model`);
     }
+  }
+}
+
+function checkForbiddenGameStateControlPolicy(file, source) {
+  if (/(?:\bstate|\bthis\.state)(?:\.controlPolicy\b|\?\.controlPolicy\b)/.test(source)) {
+    failures.push(
+      `${file}: forbidden GameState controlPolicy discovery; inject the read-only policy projection explicitly`,
+    );
   }
 }
 

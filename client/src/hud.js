@@ -154,6 +154,14 @@ export function formatGameTime(tick, tickHz = TICK_HZ) {
  * Wiring (main.js) constructs one HUD and calls `update()` once per rendered frame.
  */
 export class HUD {
+  get commandIssuer() {
+    return this.commandInteraction;
+  }
+
+  set commandIssuer(value) {
+    this.commandInteraction = value;
+  }
+
   /**
    * @param {HTMLElement} rootEl the game screen root (`#game-screen`); used to scope
    *   element lookups so multiple screens could coexist.
@@ -168,7 +176,7 @@ export class HUD {
   constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null) {
     this.root = rootEl;
     this.state = state;
-    this.commandIssuer = commandIssuer;
+    this.commandInteraction = commandIssuer;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
@@ -256,15 +264,6 @@ export class HUD {
     this._controlGroupSig = null;
     this._gameTimerSig = null;
     this._idleWorkersSig = null;
-  }
-
-  _issueCommand(command, options = {}) {
-    const selected = typeof this.state?.selectedEntities === "function"
-      ? this.state.selectedEntities()
-      : [];
-    const result = issueGameplayCommand(this.commandIssuer, command, options);
-    this._intent()?.recordPlannedCommand?.(command, selected, result);
-    return result;
   }
 
   _intent() {
@@ -562,11 +561,11 @@ export class HUD {
         this._intent()?.beginPlacement?.(intent.building);
         return;
       case "stop":
-        this._issueCommand(cmd.stop(intent.unitIds || []));
+        this.commandInteraction.issueCommand(cmd.stop(intent.unitIds || []));
         this._intent()?.endCommandTarget?.();
         return;
       case "holdPosition":
-        this._issueCommand(cmd.holdPosition(intent.unitIds || [], !!ev.shiftKey));
+        this.commandInteraction.issueCommand(cmd.holdPosition(intent.unitIds || [], !!ev.shiftKey));
         this._intent()?.endCommandTarget?.();
         return;
       case "train":
@@ -577,7 +576,7 @@ export class HUD {
         return;
       case "cancelConstruction":
         if (Number.isInteger(intent.buildingId)) {
-          this._issueCommand(cmd.cancelConstruction(intent.buildingId));
+          this.commandInteraction.issueCommand(cmd.cancelConstruction(intent.buildingId));
         }
         return;
       case "research":
@@ -587,11 +586,11 @@ export class HUD {
         this._dispatchAbilityIntent(intent, ev);
         return;
       case "setAutocast":
-        this._issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
+        this.commandInteraction.issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
         this._intent()?.endCommandTarget?.();
         return;
       case "adjustProductionRepeat":
-        this._issueCommand(cmd.adjustProductionRepeat(
+        this.commandInteraction.issueCommand(cmd.adjustProductionRepeat(
           intent.buildingIds || [],
           intent.unit,
           ev.shiftKey ? -1 : 1,
@@ -607,7 +606,7 @@ export class HUD {
 
   _dispatchAbilityIntent(intent, ev = {}) {
     if (intent.targetMode === "recast") {
-      this._issueCommand(cmd.recastAbility(
+      this.commandInteraction.issueCommand(cmd.recastAbility(
         intent.ability,
         intent.readyIds || [],
         intent.targetObjectId ?? null,
@@ -619,7 +618,7 @@ export class HUD {
     if (intent.targetMode === "worldPoint") {
       this._intent()?.beginCommandTarget?.({ kind: "ability", ability: intent.ability }, { shiftKey: !!ev.shiftKey });
     } else {
-      this._issueCommand(cmd.useAbility(
+      this.commandInteraction.issueCommand(cmd.useAbility(
         intent.ability,
         intent.readyIds || [],
         null,
@@ -778,7 +777,7 @@ export class HUD {
   _issueTrain(unit) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
-    this._issueCommand(cmd.train(building.id, unit), {
+    this.commandInteraction.issueCommand(cmd.train(building.id, unit), {
       optimism: {
         family: "train",
         building: building.id,
@@ -805,7 +804,7 @@ export class HUD {
   _issueCancelProduction(kind) {
     const building = this._previousProducingBuildingForKind(kind);
     if (!building) return;
-    this._issueCommand(cmd.cancel(building.id));
+    this.commandInteraction.issueCommand(cmd.cancel(building.id));
   }
 
   _issueResearch(upgrade) {
@@ -815,7 +814,7 @@ export class HUD {
       (e) => this._isOwn(e) && e.kind === def.researchedAt && e.buildProgress == null,
     );
     if (!building) return;
-    this._issueCommand(cmd.research(building.id, upgrade));
+    this.commandInteraction.issueCommand(cmd.research(building.id, upgrade));
   }
 
   // --- Shared helpers --------------------------------------------------------
@@ -917,7 +916,7 @@ export class HUD {
   }
 
   _commandOwnerForSelection(selection = null) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     const selected = selection || (typeof this.state?.selectedEntities === "function" ? this.state.selectedEntities() || [] : []);
     const owner = typeof policy?.commandOwnerForSelection === "function"
       ? policy.commandOwnerForSelection(selected, this.state)
@@ -929,7 +928,7 @@ export class HUD {
   }
 
   _commandResources(owner = this._commandOwnerForSelection()) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     if (typeof policy?.commandResources === "function") {
       return policy.commandResources(this.state, owner);
     }
@@ -937,7 +936,7 @@ export class HUD {
   }
 
   _commandFactionId(owner = this._commandOwnerForSelection()) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     if (typeof policy?.commandFactionId === "function") {
       return policy.commandFactionId(this.state, owner);
     }
@@ -945,7 +944,7 @@ export class HUD {
   }
 
   _commandUpgrades(owner = this._commandOwnerForSelection()) {
-    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const policy = this.controlPolicy;
     if (typeof policy?.commandUpgrades === "function") {
       return policy.commandUpgrades(this.state, owner);
     }
@@ -997,14 +996,4 @@ export class HUD {
   _resourceIcon(kind) {
     return resourceIconHtml(kind);
   }
-}
-
-function issueGameplayCommand(sender, command, options = {}) {
-  if (sender && typeof sender.issueCommand === "function") {
-    return sender.issueCommand(command, options);
-  }
-  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
-    return sender.command(command);
-  }
-  return false;
 }

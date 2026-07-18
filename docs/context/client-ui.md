@@ -11,9 +11,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 
 ## Code map
 - `app-shell`: `main.js`, `app.js`, stress-test modules, `interact_bridge.js`, `interact_game_bridge.js`, `launch_url.js`, `match.js`, `match_*.js`, diagnostics, observer analysis,
-  AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`, and
-  `room_capabilities.js`.
-- `model`: `state.js`, `state_ground_decals.js` (client-only received death/impact decal queue), `client_intent.js`, `command_budget.js`,
+  AI diagnostics, room-time controls, replay/spectator/lab wiring, `lab_control_policy.js`,
+  `control_policy_projection.js`, and `room_capabilities.js`.
+- `model`: `state.js`, `state_ground_decals.js` (client-only received death/impact decal queue), `client_intent.js`, `command_interaction.js`, `command_budget.js`,
   `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js` facade + `config/`.
@@ -50,6 +50,11 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   mode, active lab tools, previews, or command feedback through `GameState` shims. Lab setup tools
   are armed through `Match` and consumed by input world clicks, not by panel-owned viewport
   listeners.
+- **Command and ownership interactions are explicit.** `Match` injects one `CommandInteraction`
+  into Input, HUD, and Minimap for issue-and-planned-order recording. It also injects one frozen
+  read-only control-policy projection into ownership consumers; `GameState` does not carry the
+  policy, and LabPanel receives mutable command-limit settings through a separate narrow app-owned
+  collaborator.
 - **Teardown.** Any module that holds DOM/window listeners or GPU resources must implement
   `destroy()`. `Match.destroy()` calls it on every module between matches.
 - **Coordinates.** World pixels on the wire and in client code, except fields ending in `Tile`.

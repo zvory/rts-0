@@ -98,11 +98,13 @@ export class MatchCombatAudio {
   constructor({
     audio,
     state,
+    controlPolicy = null,
     setTimer = globalThis.setTimeout.bind(globalThis),
     clearTimer = globalThis.clearTimeout.bind(globalThis),
   }) {
     this.audio = audio;
     this.state = state;
+    this.controlPolicy = controlPolicy;
     this.setTimer = setTimer;
     this.clearTimer = clearTimer;
     this.missingCombatSoundKinds = new Set();
@@ -167,7 +169,7 @@ export class MatchCombatAudio {
     }
     const id = this.audio.pickVariant(spec.ids);
     if (!id) return;
-    const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
+    const category = from && audioSelfOwner(this.state, from.owner, this.controlPolicy) ? "combat_self" : "combat_other";
     const key =
       from?.kind === KIND.MACHINE_GUNNER
         && feedbackKind === KIND.MACHINE_GUNNER
@@ -193,7 +195,7 @@ export class MatchCombatAudio {
     const pos = positionalEventSoundPosition(ev, this.state);
     if (!pos) return;
     const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
-    const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
+    const category = from && audioSelfOwner(this.state, from.owner, this.controlPolicy) ? "combat_self" : "combat_other";
     const opts = {
       x: pos.x,
       y: pos.y,
@@ -215,7 +217,7 @@ export class MatchCombatAudio {
     const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
     const delayMs = Math.max(0, (delayTicks / TICK_HZ) * 1000 - ARTILLERY_LANDING_LEAD_MS);
     const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
-    const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
+    const category = from && audioSelfOwner(this.state, from.owner, this.controlPolicy) ? "combat_self" : "combat_other";
     let timer = null;
     timer = this.setTimer(() => {
       this.pendingArtilleryLandingTimers.delete(timer);
@@ -287,12 +289,12 @@ function positionalEventSoundPosition(ev, state) {
   return null;
 }
 
-function audioSelfOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    const feedbackOwner = typeof state.controlPolicy.feedbackOwner === "function"
-      ? state.controlPolicy.feedbackOwner(state)
-      : typeof state.controlPolicy.issueAsOwnerForSelection === "function"
-        ? state.controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+function audioSelfOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    const feedbackOwner = typeof controlPolicy.feedbackOwner === "function"
+      ? controlPolicy.feedbackOwner(state)
+      : typeof controlPolicy.issueAsOwnerForSelection === "function"
+        ? controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
         : null;
     const ownerId = Number(feedbackOwner);
     if (Number.isInteger(ownerId) && ownerId > 0) return Number(owner) === ownerId;

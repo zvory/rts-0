@@ -33,7 +33,7 @@ export function _entityAtScreen(
   const proxy = pickSelectionProxy(this.selectionScene, screen, {
     eligible: (candidate) => eligible(entityForProxy(candidate), candidate),
     preference: (candidate) => {
-      const ownPreference = ownPreferred && ownOwner(this.state, candidate.owner) ? 1 : 0;
+      const ownPreference = ownPreferred && ownOwner(this.state, candidate.owner, this.controlPolicy) ? 1 : 0;
       return ownPreference + preference(entityForProxy(candidate), candidate);
     },
   });
@@ -57,7 +57,7 @@ export function _commitClickSelection(p, additive, ctrl) {
   const hit = this._entityAtScreen(p, true, (entity) => (
     entity?.kind !== KIND.SCOUT_PLANE || scoutPlaneInspectable(this.state)
   ), (entity) => (
-    ownOwner(this.state, entity?.owner) &&
+    ownOwner(this.state, entity?.owner, this.controlPolicy) &&
     isBuilding(entity?.kind) &&
     Number.isFinite(entity?.buildProgress)
       ? 1
@@ -67,13 +67,13 @@ export function _commitClickSelection(p, additive, ctrl) {
     if (!additive) clearSelection(this);
     return;
   }
-  if (ctrl && isUnit(hit.kind) && ownOwner(this.state, hit.owner)) {
+  if (ctrl && isUnit(hit.kind) && ownOwner(this.state, hit.owner, this.controlPolicy)) {
     const ids = this._closestOwnUnitKindInViewport(hit);
     if (additive) addToSelection(this, ids);
     else setSelection(this, ids);
     return;
   }
-  if (ctrl && isBuilding(hit.kind) && ownOwner(this.state, hit.owner)) {
+  if (ctrl && isBuilding(hit.kind) && ownOwner(this.state, hit.owner, this.controlPolicy)) {
     const ids = this._ownBuildingsOfKindInViewport(hit.kind);
     if (additive) addToSelection(this, ids);
     else setSelection(this, ids);
@@ -89,7 +89,7 @@ export function _commitClickSelection(p, additive, ctrl) {
 
 export function _ownBuildingsOfKindInViewport(kind) {
   return (this.selectionScene?.proxies || [])
-    .filter((proxy) => ownOwner(this.state, proxy.owner) && proxy.kind === kind)
+    .filter((proxy) => ownOwner(this.state, proxy.owner, this.controlPolicy) && proxy.kind === kind)
     .filter((proxy) => proxyIntersectsViewport(this.selectionScene, proxy))
     .sort((a, b) => a.id - b.id)
     .map((proxy) => proxy.id);
@@ -114,7 +114,7 @@ export function _closestOwnUnitKindInViewport(anchorOrKind, anchorX, anchorY, ex
     heightPx: anchorProxy?.anchor?.heightPx || 0,
   });
   return (this.selectionScene?.proxies || [])
-    .filter((proxy) => ownOwner(this.state, proxy.owner) && (
+    .filter((proxy) => ownOwner(this.state, proxy.owner, this.controlPolicy) && (
       anchor ? _unitSelectionGroup(entityForProxy(proxy)) === anchorGroup : proxy.kind === kind
     ))
     .filter((proxy) => proxyIntersectsViewport(this.selectionScene, proxy))
@@ -152,7 +152,7 @@ export function _selectableProxiesInDragRect(drag, options = {}) {
       const entity = entityForProxy(proxy);
       if (options.unitsOnly && !isUnit(proxy.kind)) return false;
       if (options.buildingsOnly && !isBuilding(proxy.kind)) return false;
-      return selectableEntity(this.state, entity, spectator);
+      return selectableEntity(this.state, entity, spectator, this.controlPolicy);
     },
   });
 }
@@ -178,25 +178,25 @@ export function _visibleSelectionIds(ids) {
   return out;
 }
 
-function ownOwner(state, owner) {
-  if (state?.controlPolicy?.kind === "lab") {
-    return state.controlPolicy.canControlOwner(owner, state);
+function ownOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    return controlPolicy.canControlOwner(owner, state);
   }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;
 }
 
-export function selectableEntity(state, entity, spectator) {
+export function selectableEntity(state, entity, spectator, controlPolicy = null) {
   if (!entity || entity.shotReveal || entity.visionOnly) return false;
-  if (state?.controlPolicy?.kind === "lab") return state.controlPolicy.canSelectEntity(entity, state);
-  if (entity.kind === KIND.SCOUT_PLANE) return scoutPlaneInspectable(state);
-  if (!spectator) return ownOwner(state, entity.owner);
+  if (controlPolicy?.kind === "lab") return controlPolicy.canSelectEntity(entity, state);
+  if (entity.kind === KIND.SCOUT_PLANE) return scoutPlaneInspectable(state, controlPolicy);
+  if (!spectator) return ownOwner(state, entity.owner, controlPolicy);
   return entity.owner !== 0;
 }
 
-function scoutPlaneInspectable(state) {
-  return state?.controlPolicy?.kind === "lab" || !!state?.spectator;
+function scoutPlaneInspectable(state, controlPolicy = null) {
+  return controlPolicy?.kind === "lab" || !!state?.spectator;
 }
 
 function finiteClampedGroundPoint(input, point) {
@@ -232,13 +232,19 @@ function closeCommandCardMenu(input) {
 
 function setSelection(input, ids) {
   closeCommandCardMenu(input);
-  input.state.setSelection(ids, { entityById: (id) => input._selectionEntityById(id) });
+  input.state.setSelection(ids, {
+    entityById: (id) => input._selectionEntityById(id),
+    controlPolicy: input.controlPolicy,
+  });
   reconcileLocalPlannedOrders(input);
 }
 
 function addToSelection(input, ids) {
   closeCommandCardMenu(input);
-  input.state.addToSelection(ids, { entityById: (id) => input._selectionEntityById(id) });
+  input.state.addToSelection(ids, {
+    entityById: (id) => input._selectionEntityById(id),
+    controlPolicy: input.controlPolicy,
+  });
   reconcileLocalPlannedOrders(input);
 }
 

@@ -129,10 +129,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     commandCard.hidden = true;
     const labOperatorMatch = Object.create(Match.prototype);
     labOperatorMatch.replayViewer = false;
-    labOperatorMatch.state = {
-      spectator: true,
-      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
-    };
+    labOperatorMatch.state = { spectator: true };
+    labOperatorMatch.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
     labOperatorMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
     assert(!commandCard.hidden, "lab operator keeps the command card visible");
@@ -141,10 +139,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     commandCard.hidden = false;
     const labViewerMatch = Object.create(Match.prototype);
     labViewerMatch.replayViewer = false;
-    labViewerMatch.state = {
-      spectator: true,
-      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }),
-    };
+    labViewerMatch.state = { spectator: true };
+    labViewerMatch.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
     labViewerMatch.applySpectatorUi();
     assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
     assert(commandCard.hidden, "read-only lab viewer hides the command card");

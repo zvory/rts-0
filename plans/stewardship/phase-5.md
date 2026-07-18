@@ -1,6 +1,6 @@
 # Phase 5 - Make Client Command Interaction Explicit
 
-Status: Incomplete.
+Status: Done.
 
 ## Objective
 

@@ -19,7 +19,6 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
       { id: 1, teamId: 1 },
       { id: 2, teamId: 2 },
     ],
-    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
     selectedEntities() {
       return [p2Unit];
     },
@@ -27,13 +26,14 @@ import { KIND, LAB_ROLE, STATE } from "../../client/src/protocol.js";
       return [p2Unit, p1Target, p2Target];
     },
   };
+  input.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
   input._groundAtScreen = (x, y) => ({ x, y });
   input._entityAtScreen = (point) => point.x < 112 ? p1Target : p2Target;
   input._resourceAtScreen = () => null;
   input._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
   input._selectedWorkerIds = Input.prototype._selectedWorkerIds;
   input._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;
-  input._issueCommand = (command) => commands.push(command);
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
 
   input._onRightClick({ x: p1Target.x, y: p1Target.y });
   assert(
