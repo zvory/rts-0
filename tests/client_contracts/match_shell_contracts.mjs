@@ -1,7 +1,7 @@
 // tests/client_contracts/match_shell_contracts.mjs
 // Match shell collaborator contracts imported by ../client_contracts.mjs.
 
-import { assert } from "./assertions.mjs";
+import { assert, assertApprox } from "./assertions.mjs";
 import { withFakeSettingsDocument } from "./fakes.mjs";
 import { MatchCombatAudio } from "../../client/src/match_combat_audio.js";
 import {
@@ -301,6 +301,7 @@ import {
   combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 1 });
   assert(plays[0].id === "combat_mg_burst_02", "match combat audio picks machine-gun combat sound");
   assert(plays[0].opts.category === "combat_self", "match combat audio classifies own fire as combat_self");
+  assertApprox(plays[0].opts.gain, 0.49, 0.0001, "machine-gun fire uses the quieter combat mix");
   assert(plays[0].opts.key === "combat:machine_gunner:1", "match combat audio keys looping machine-gunner bursts");
   combatAudio.stopInactiveMachineGunSounds();
   assert(stopped.length === 0, "match combat audio keeps active machine-gunner target audio");
@@ -310,10 +311,12 @@ import {
   combatAudio.playPointFireSound({ e: EVENT.MORTAR_LAUNCH, fromX: 12, fromY: 24 });
   assert(plays.at(-1).id === "combat_mortar_launch_04", "match combat audio routes mortar launches");
   assert(plays.at(-1).opts.x === 12 && plays.at(-1).opts.y === 24, "match combat audio preserves point-fire source position");
+  assertApprox(plays.at(-1).opts.gain, 0.595, 0.0001, "mortar launches use the quieter combat mix");
   combatAudio.playPointFireSound({ e: EVENT.MORTAR_IMPACT, x: 48, y: 96 });
   assert(plays.at(-1).id === "combat_mortar_impact_01", "match combat audio routes mortar impacts");
   assert(plays.at(-1).opts.x === 48 && plays.at(-1).opts.y === 96, "mortar impact sound is spatialized at the landing point");
   assert(plays.at(-1).opts.category === "combat_other", "source-less mortar impacts avoid claiming self ownership");
+  assertApprox(plays.at(-1).opts.gain, 0.7, 0.0001, "mortar impacts use the quieter combat mix");
   const playCountBeforeSelfReveal = plays.length;
   combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 3, to: 3, weaponKind: WEAPON_KIND.ARTILLERY_GUN });
   assert(
@@ -347,6 +350,7 @@ import {
   });
   labCombatAudio.playAttackSound({ e: EVENT.ATTACK, from: 2 });
   assert(labPlays[0].opts.category === "combat_self", "lab combat audio uses selected issue-as owner for self fire");
+  assertApprox(labPlays[0].opts.gain, 0.175, 0.0001, "rifle fire uses the quieter combat mix");
 }
 
 {
@@ -386,6 +390,7 @@ import {
     delayTicks: 150,
   });
   assert(plays[0].id === "combat_artillery_fire_05", "artillery target still plays its firing cue immediately");
+  assertApprox(plays[0].opts.gain, 0.84, 0.0001, "artillery fire uses the quieter combat mix");
   assert(timers.length === 1, "artillery target schedules one landing cue");
   assert(
     Math.abs(timers[0].delay - 2191.678) < 0.01,
@@ -395,6 +400,7 @@ import {
   assert(plays.at(-1).id === "combat_artillery_landing_01", "scheduled artillery landing uses its dedicated cue");
   assert(plays.at(-1).opts.x === 512 && plays.at(-1).opts.y === 640, "landing cue is spatialized at the impact point");
   assert(plays.at(-1).opts.category === "combat_self", "own artillery landing uses the self combat bus");
+  assertApprox(plays.at(-1).opts.gain, 0.7, 0.0001, "artillery landings use the quieter combat mix");
   combatAudio.playPointFireSound({
     e: EVENT.ARTILLERY_TARGET,
     from: 8,
