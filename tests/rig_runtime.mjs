@@ -1380,6 +1380,54 @@ test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loa
   riflemanRig.destroy();
 });
 
+test("Rifleman PNG frame strips switch with the Panzerfaust loadout", () => {
+  const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
+  assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
+  assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
+
+  const renderer = makeRigRenderer();
+  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true });
+  const panzerfaustTexture = fakeFrameStripTexture();
+  const riflemanTexture = fakeFrameStripTexture();
+  renderer._liveRigDefinitionsByKind = new Map([
+    [loadedRiflemanKey, panzerfaust.definition],
+    [KIND.RIFLEMAN, rifleman.definition],
+  ]);
+  renderer._liveFrameStripsByKind = new Map([
+    [loadedRiflemanKey, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP],
+    [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP],
+  ]);
+  renderer._liveFrameStripTextures = new Map([
+    [loadedRiflemanKey, panzerfaustTexture],
+    [KIND.RIFLEMAN, riflemanTexture],
+  ]);
+  const colorByOwner = new Map([[1, 0x336699]]);
+  const state = { playerId: 1, selection: new Set(), weaponRecoil: () => 0 };
+  const entity = {
+    id: 94,
+    kind: KIND.RIFLEMAN,
+    panzerfaustLoaded: true,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    state: STATE.IDLE,
+  };
+
+  renderer._drawUnit(entity, colorByOwner, state);
+  const panzerfaustUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(panzerfaustUnit.strip, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP);
+  assert.equal(panzerfaustUnit.texture, panzerfaustTexture);
+
+  renderer._drawUnit({ ...entity, panzerfaustLoaded: false }, colorByOwner, state);
+  const riflemanUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(panzerfaustUnit._destroyed, true);
+  assert.equal(riflemanUnit.strip, RIFLEMAN_PNG_FRAME_STRIP);
+  assert.equal(riflemanUnit.texture, riflemanTexture);
+  riflemanUnit.destroy();
+});
+
 test("live rig renderer rebuilds instances after a mutable route changes", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 93, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: 0 };
