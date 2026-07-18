@@ -499,7 +499,7 @@ folded into default targeting.
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
   each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
   nearest whole-unit node capacity to the 2.6:1 target).
-- Supply: every active player has an intrinsic `200` supply allowance, which is also the hard cap.
+- Supply: every active player has an intrinsic `300` supply allowance, which is also the hard cap.
   Buildings do not provide supply: City Centres, Zamoks, and legacy fixture/replay Depots all grant
   `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
