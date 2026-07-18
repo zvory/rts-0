@@ -625,10 +625,7 @@ async fn match_replay_launch_handler(
         return (StatusCode::CONFLICT, Json(ApiError { error: reason })).into_response();
     }
 
-    let room = state
-        .lobby
-        .get_or_create_persisted_replay_room(match_id, artifact)
-        .await;
+    let room = state.lobby.persisted_replay_room(match_id, artifact).await;
     Json(MatchReplayLaunchResponse { room }).into_response()
 }
 

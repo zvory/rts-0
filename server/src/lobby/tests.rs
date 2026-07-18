@@ -1082,15 +1082,9 @@ async fn empty_persisted_replay_room_is_disposed_after_visible_staging_lobby() {
 async fn persisted_replay_permalink_reuses_the_active_match_room() {
     let lobby = Lobby::new();
     let artifact = registry_test_replay_artifact();
-    let first = lobby
-        .get_or_create_persisted_replay_room(42, artifact.clone())
-        .await;
-    let repeated = lobby
-        .get_or_create_persisted_replay_room(42, artifact.clone())
-        .await;
-    let other = lobby
-        .get_or_create_persisted_replay_room(43, artifact.clone())
-        .await;
+    let first = lobby.persisted_replay_room(42, artifact.clone()).await;
+    let repeated = lobby.persisted_replay_room(42, artifact.clone()).await;
+    let other = lobby.persisted_replay_room(43, artifact.clone()).await;
 
     assert!(first.starts_with("__match_replay__:"));
     assert_eq!(first.len(), "__match_replay__:".len() + 32);
@@ -1110,9 +1104,7 @@ async fn persisted_replay_permalink_reuses_the_active_match_room() {
             .request_room_disposal_for_test(&first, first_identity)
             .await
     );
-    let recreated = lobby
-        .get_or_create_persisted_replay_room(42, artifact)
-        .await;
+    let recreated = lobby.persisted_replay_room(42, artifact).await;
     assert_ne!(recreated, first);
     assert_ne!(
         lobby

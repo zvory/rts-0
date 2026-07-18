@@ -991,11 +991,7 @@ impl Lobby {
     /// client-visible room name, so joining a persisted replay still requires an authorized HTTP
     /// launch. Repeated permalink launches on one server process converge on the same room and
     /// late viewers join its current tick.
-    pub async fn get_or_create_persisted_replay_room(
-        &self,
-        match_id: i64,
-        artifact: ReplayArtifactV1,
-    ) -> String {
+    pub async fn persisted_replay_room(&self, match_id: i64, artifact: ReplayArtifactV1) -> String {
         let mut persisted_replay_rooms = self.persisted_replay_rooms.lock().await;
         let mut rooms = self.rooms.lock().await;
         if let Some(room) = persisted_replay_rooms.get(&match_id) {
