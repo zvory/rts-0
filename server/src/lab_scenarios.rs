@@ -32,7 +32,7 @@ const MAX_SCENARIO_TAG_LEN: usize = 32;
 const MAX_SCENARIO_NAME_LEN: usize = 80;
 const MAX_SCENARIO_CATALOG_ENTRIES: usize = 256;
 const MAX_AUTHORING_SCENARIO_ENTITIES: usize = 2000;
-pub const MAX_LAB_SCENARIO_IMPORT_JSON_BYTES: usize = 1_000_000;
+pub const MAX_LAB_SCENARIO_IMPORT_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAX_AUTHORING_SCENARIO_JSON_BYTES: usize = MAX_LAB_SCENARIO_IMPORT_JSON_BYTES;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -1283,10 +1283,10 @@ mod tests {
         let loaded =
             load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
         let LabScenarioPayload::Checkpoint(mut scenario) = loaded.scenario;
+        let padding =
+            MAX_AUTHORING_SCENARIO_JSON_BYTES.saturating_sub(scenario.checkpoint_payload.len() + 1);
         scenario.checkpoint_payload.push('\n');
-        scenario
-            .checkpoint_payload
-            .push_str(&" ".repeat(MAX_AUTHORING_SCENARIO_JSON_BYTES));
+        scenario.checkpoint_payload.push_str(&" ".repeat(padding));
         let import_err =
             lab_scenario_payload_to_lab_op(LabScenarioPayload::Checkpoint(scenario.clone()))
                 .expect_err("oversized import payload should be rejected before restore");

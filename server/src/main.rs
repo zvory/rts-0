@@ -48,7 +48,8 @@ const DEFAULT_CLIENT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../client
 const DEFAULT_MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
 const RTS_CLIENT_DIR_ENV: &str = "RTS_CLIENT_DIR";
 const RTS_MAPS_DIR_ENV: &str = "RTS_MAPS_DIR";
-const MAX_CLIENT_MESSAGE_BYTES: usize = 1_000_000 + 64 * 1024; // lab scenario cap + envelope
+const MAX_CLIENT_MESSAGE_BYTES: usize =
+    rts_server::lab_scenarios::MAX_LAB_SCENARIO_IMPORT_JSON_BYTES + 64 * 1024;
 
 #[derive(Clone, Copy)]
 struct ClientMessageTiming {
