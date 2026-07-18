@@ -128,7 +128,7 @@ export function buildCommandCardContextCatalog() {
     id: 12,
     owner: playerId,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
   };
   const mortar = {
     id: 13,
@@ -326,6 +326,7 @@ export function buildUnitCard(ctx, selection) {
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
       `${affordance.depletedCount}:` +
+      `${affordance.remainingUsesTotal ?? ""}:` +
       `${affordance.readyIds.join(".")}:` +
       `${affordance.queueAdmissibleIds.join(".")}:` +
       `${affordance.autocastEnabledIds.join(".")}:` +
@@ -379,6 +380,7 @@ export function buildUnitCard(ctx, selection) {
       ? affordance.recastReadyIds
       : intentAbilityIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
+    const showChargeCount = definition.charges != null && affordance.remainingUsesTotal != null;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
     // Ability collisions stay in place: later, higher-priority abilities replace lower-priority
@@ -405,7 +407,9 @@ export function buildUnitCard(ctx, selection) {
       ability: definition.ability,
       enabled: affordance.unlocked && commandableCount > 0 && affordance.affordable,
       unaffordable: affordance.unlocked && commandableCount > 0 && !affordance.affordable,
-      countBadge: showReadyCount ? `${readyCount}` : "",
+      countBadge: showChargeCount
+        ? `${affordance.remainingUsesTotal}`
+        : (showReadyCount ? `${readyCount}` : ""),
       cooldownClocks: affordance.cooldownClocks,
       cost: definition.cost,
       cls: [
@@ -565,6 +569,11 @@ export function selectedAbilityAffordances(ctx, selection) {
       const depletedCount = carriers.filter(
         (e) => abilityRemainingUses(e, definition.ability) === 0,
       ).length;
+      const projectedUses = carriers.map((e) => abilityRemainingUses(e, definition.ability));
+      const remainingUsesTotal = definition.charges != null &&
+        projectedUses.every((uses) => typeof uses === "number")
+        ? projectedUses.reduce((total, uses) => total + uses, 0)
+        : null;
       const autocastEnabledIds = carriers
         .filter((e) => abilityAutocastEnabled(e, definition.ability))
         .map((e) => e.id);
@@ -573,6 +582,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         unlocked,
         affordable: canAfford,
         depletedCount,
+        remainingUsesTotal,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
         queueAdmissibleIds: queueAdmissibleUnits.map((e) => e.id),
@@ -763,7 +773,9 @@ function abilityDisabledReason(ctx, affordance) {
       .find((req) => !playerHasCompleteKind(ctx, req));
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   }
-  if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
+  if (affordance.depletedCount === affordance.carrierIds.length) {
+    return affordance.definition.chargeRechargeTicks != null ? "Recharging" : "Depleted";
+  }
   if (!affordance.affordable) return "Not enough resources";
   if (
     affordance.readyIds.length === 0 &&

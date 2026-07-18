@@ -1200,7 +1200,7 @@ withFakeHudDocument(({ FakeElement }) => {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: null }],
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
   };
   const smokeResearchComplex = {
     id: 29,
@@ -1231,6 +1231,7 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(smoke.intent.targetMode === "worldPoint", "world-point ability should carry targeting intent");
   assert(smoke.cls.includes("active"), "active ability targeting should keep active class");
   assert(smoke.enabled, "ready affordable ability should be enabled");
+  assert(smoke.countBadge === "2", "Smoke should show its remaining charge count");
 
   const artillery = {
     id: 31,

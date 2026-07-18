@@ -327,6 +327,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
@@ -340,13 +341,14 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         label: "Smoke",
         icon: "SMK",
         hotkey: Some("D"),
-        title: "Target a smoke grenade location",
+        title: "Two charges; one charge regenerates every 15 seconds",
         carriers: &[EntityKind::ScoutCar],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::SMOKE_ABILITY_RANGE_TILES),
         min_range_tiles: None,
         cooldown_ticks: balance::SMOKE_ABILITY_COOLDOWN_TICKS,
-        charges: None,
+        charges: Some(balance::SCOUT_CAR_SMOKE_CHARGES),
+        charge_recharge_ticks: Some(balance::SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS),
         cost: ResourceCost::new(
             balance::SMOKE_ABILITY_COST_STEEL,
             balance::SMOKE_ABILITY_COST_OIL,
@@ -370,6 +372,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: Some(balance::MORTAR_MIN_RANGE_TILES),
         cooldown_ticks: (balance::TICK_HZ as u16) * 2,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueWaitUntilReady,
@@ -390,6 +393,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
         cooldown_ticks: balance::ARTILLERY_RELOAD_TICKS as u16,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
@@ -410,6 +414,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
         cooldown_ticks: balance::ARTILLERY_RELOAD_TICKS as u16,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
@@ -430,6 +435,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: None,
         cooldown_ticks: balance::BREAKTHROUGH_COOLDOWN_TICKS,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
@@ -450,6 +456,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: None,
         cooldown_ticks: balance::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(
             balance::SCOUT_PLANE_COST_STEEL,
             balance::SCOUT_PLANE_COST_OIL,
@@ -473,6 +480,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
@@ -499,6 +507,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         min_range_tiles: None,
         cooldown_ticks: balance::EKAT_TELEPORT_COOLDOWN_TICKS,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
@@ -519,6 +528,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         min_range_tiles: None,
         cooldown_ticks: balance::EKAT_LINE_SHOT_COOLDOWN_TICKS,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
@@ -539,6 +549,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
@@ -559,6 +570,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
+        charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
@@ -670,6 +682,7 @@ pub struct AbilityCatalogEntry {
     pub min_range_tiles: Option<u32>,
     pub cooldown_ticks: u16,
     pub charges: Option<u16>,
+    pub charge_recharge_ticks: Option<u16>,
     pub cost: ResourceCost,
     pub tech_requirement: Option<EntityKind>,
     pub queue_policy: AbilityQueuePolicy,
@@ -958,7 +971,11 @@ mod tests {
         assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
         assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES));
-        assert_eq!(smoke.charges, None);
+        assert_eq!(smoke.charges, Some(balance::SCOUT_CAR_SMOKE_CHARGES));
+        assert_eq!(
+            smoke.charge_recharge_ticks,
+            Some(balance::SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS)
+        );
         assert_eq!(
             smoke.tech_requirement,
             Some(EntityKind::ResearchComplex),

@@ -109,12 +109,13 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         );
         print_kind_array_inline(ability.carriers);
         print!(
-            ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
+            ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"chargeRechargeTicks\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
             ability.target_mode.stable_id(),
             json_u32_or_null(ability.range_tiles),
             json_u32_or_null(ability.min_range_tiles),
             ability.cooldown_ticks,
             json_u16_or_null(ability.charges),
+            json_u16_or_null(ability.charge_recharge_ticks),
             ability.cost.steel,
             ability.cost.oil,
             json_kind_or_null(ability.tech_requirement),
@@ -351,6 +352,14 @@ fn print_client_constants(indent: &str) {
     println!(
         "{indent}    \"smokeAbilityCooldownTicks\": {},",
         balance::SMOKE_ABILITY_COOLDOWN_TICKS
+    );
+    println!(
+        "{indent}    \"scoutCarSmokeCharges\": {},",
+        balance::SCOUT_CAR_SMOKE_CHARGES
+    );
+    println!(
+        "{indent}    \"scoutCarSmokeChargeRechargeTicks\": {},",
+        balance::SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS
     );
     println!(
         "{indent}    \"scoutPlaneOrbitRadiusTiles\": {},",

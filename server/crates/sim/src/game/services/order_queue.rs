@@ -1361,33 +1361,48 @@ mod tests {
     }
 
     #[test]
-    fn queued_world_ability_rechecks_cooldown_at_promotion() {
+    fn queued_world_ability_rechecks_cooldown_and_charges_at_promotion() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let target = map.tile_center(10, 8);
         let cooling = entities
             .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
             .expect("cooling scout car should spawn");
-        let unit = entities.get_mut(cooling).expect("scout car should exist");
-        unit.append_queued_order(OrderIntent::ability(AbilityKind::Smoke, target.0, target.1));
-        unit.append_queued_order(OrderIntent::move_to(target.0 + 96.0, target.1));
+        let spent = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 128.0, target.1)
+            .expect("spent scout car should spawn");
+        for scout in [cooling, spent] {
+            let unit = entities.get_mut(scout).expect("scout car should exist");
+            unit.append_queued_order(OrderIntent::ability(AbilityKind::Smoke, target.0, target.1));
+            unit.append_queued_order(OrderIntent::move_to(target.0 + 96.0, target.1));
+        }
         entities
             .get_mut(cooling)
             .expect("cooling scout car should exist")
             .start_ability_cooldown(AbilityKind::Smoke, 5);
+        assert!(entities
+            .get_mut(spent)
+            .expect("spent scout car should exist")
+            .consume_ability_use(AbilityKind::Smoke));
+        assert!(entities
+            .get_mut(spent)
+            .expect("spent scout car should exist")
+            .consume_ability_use(AbilityKind::Smoke));
         let players = vec![player_state(1), player_state(2)];
 
         promote_with_players(&map, &mut entities, &players);
 
-        let unit = entities.get(cooling).expect("scout car should exist");
-        assert!(
-            matches!(unit.order(), Order::Move(_)),
-            "stale queued Smoke should be skipped and the later move should promote"
-        );
-        assert!(
-            unit.queued_orders().is_empty(),
-            "promotion should drain the stale Smoke intent and promoted fallback"
-        );
+        for scout in [cooling, spent] {
+            let unit = entities.get(scout).expect("scout car should exist");
+            assert!(
+                matches!(unit.order(), Order::Move(_)),
+                "stale queued Smoke should be skipped and the later move should promote"
+            );
+            assert!(
+                unit.queued_orders().is_empty(),
+                "promotion should drain the stale Smoke intent and promoted fallback"
+            );
+        }
     }
 
     #[test]

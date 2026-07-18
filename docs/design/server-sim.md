@@ -264,7 +264,7 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, episode-keyed firing-reveal reaction gates, combat state, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
 | `fog` | `authoritative/serialized` | Serialize the latest 15 Hz visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` atomically records whether each sampled revealed entity needed its firing reveal before stamping the actionable tile. Combat, commands, and snapshots consume the same held sample. Phase 0.5 compares per-player visible tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, and snapshot resource rows are all read from `players`. |
@@ -943,7 +943,7 @@ ordinary queue is empty and inserts a normal paid item only after cost and suppl
 `rules::faction` owns `AbilityKind`, `UpgradeKind`, `AbilityTargetMode`, their stable ids, and the
 faction-aware ability/upgrade catalog rows. Each `AbilityCatalogEntry` records its typed kind,
 label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
-finite charges, Steel/Oil cost, tech requirement, queue policy, autocast support, command-card
+optional charges and sequential charge-recharge interval, Steel/Oil cost, tech requirement, queue policy, autocast support, command-card
 visibility, and compact protocol/order-stage codes. `game/ability.rs` thinly re-exports the
 rules-owned types and converts total typed catalog lookups into the sim-facing `AbilityDefinition`;
 it is not a second identity or metadata source. Its planner codes and effect hooks remain
@@ -1468,8 +1468,9 @@ General rules:
   skipped if stale at promotion. `QueueWaitUntilReady` abilities, such as Mortar Fire, may append
   while the carrier is otherwise valid but on ability cooldown or weapon reload; promotion turns the
   stored intent into an active ability order that waits for readiness before firing. Finite-use
-  abilities also reserve already-active and already-queued same-ability intents at issue time.
-  Scout Car Smoke is unlimited, so its queued intents are bounded only by the normal unit queue cap.
+  abilities also reserve already-active and already-queued same-ability intents at issue time, so
+  queued Smoke clicks cannot exceed the Scout Car's currently stored charges. Spent Smoke charges
+  regenerate sequentially at one charge per 15-second interval, up to the two-charge maximum.
 - Later orders still apply to every compatible selected unit. Earlier specialized stages do not
   remove non-carriers from the plan; for example, a queued smoke applies to one scout car, while the
   following queued attack-move applies to all selected units that can receive attack-move.

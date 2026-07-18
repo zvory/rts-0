@@ -825,8 +825,9 @@ projects separate `pointFire` and `blanketFire` affordances for selected owning 
 Scout Car `smoke` remains visible but disabled until the owner has a completed R&D Complex. The
 server checks that building requirement when a Smoke command is issued and again when a queued
 Smoke order promotes, so losing the R&D Complex relocks the ability.
-`remainingUses` is present for finite-use abilities; a value of `0` means the ability is depleted
-and cannot be used by that caster. Scout Car Smoke has unlimited uses, so it omits this field.
+`remainingUses` is present for charged or finite-use abilities; a value of `0` means the ability
+cannot currently be used by that caster. Scout Car Smoke projects its current 0-to-2 charge count;
+its authoritative sequential recharge restores one missing charge every 15 seconds.
 `autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and
 toggle autocast without exposing enemy data.
 `activeObjectId`, `availableTick`, and `expiresIn` are owner-only per-caster affordance fields for

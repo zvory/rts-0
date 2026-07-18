@@ -17,6 +17,7 @@ use super::{
     MAX_COMPLETED_UPGRADES_PER_PLAYER,
 };
 
+mod ability_charges;
 mod firing_reveal;
 pub(super) use firing_reveal::validate_reaction_gates_against_visibility;
 use firing_reveal::{validate_firing_reveal_reaction_gates, validate_firing_reveal_visibility};
@@ -203,6 +204,7 @@ fn validate_entity(
     )?;
     validate_tank_armor_reaction_lock(entity, world, tick)?;
     validate_firing_reveal_reaction_gates(entity, next_id, tick)?;
+    ability_charges::validate(entity)?;
     Ok(())
 }
 

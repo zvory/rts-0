@@ -289,8 +289,8 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
             .get(scout)
             .expect("scout should exist")
             .ability_uses_remaining(ability::AbilityKind::Smoke),
-        None,
-        "Scout Car Smoke should remain unlimited in checkpointed state"
+        Some(1),
+        "Smoke charge count and its active recharge timer should be checkpointed entity state"
     );
 
     let mut restored = restore_checkpoint_and_assert_equivalent(
