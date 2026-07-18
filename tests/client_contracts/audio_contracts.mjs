@@ -648,7 +648,7 @@ assert(
   assert(plays[0].opts.loop === true, "world combat bed is looped");
   assert(plays[0].opts.x === 1024 && plays[0].opts.y === 2048, "world combat bed uses the coarse combat area");
   assert(plays[0].opts.directionalOnly === true, "world combat bed pans without attenuation");
-  assertApprox(plays[0].opts.gain, 0.035, 0.0001, "world combat bed stays very quiet");
+  assertApprox(plays[0].opts.gain, 0.0245, 0.0001, "world combat bed uses the quieter combat mix");
   assert(plays[0].opts.fadeInMs === 750, "world combat bed fades in gently");
   combatAudio.updateWorldCombatBed(null);
   assert(stops.at(-1).opts.fadeOutMs === 2500, "world combat bed releases slowly");
@@ -689,11 +689,21 @@ assert(
 
   assert(plays[0].id === "combat_mg_burst_02", "tank coax uses the machine-gun burst cue");
   assert(plays[0].opts.category === "combat_self", "own tank coax cue uses the self combat bus");
+  assertApprox(plays[0].opts.gain, 0.49, 0.0001, "machine-gun bursts use the quieter combat mix");
   assert(!plays[0].opts.key, "tank coax bursts do not start the sustained MG loop key");
   assert(
     combatAudio.activeMachineGunSoundKeys.size === 0,
     "tank coax audio does not register as a persistent machine-gunner loop",
   );
+
+  combatAudio.playAttackSound({
+    e: EVENT.ATTACK,
+    from: 21,
+    to: 22,
+    weaponKind: WEAPON_KIND.TANK_CANNON,
+  });
+  assert(plays.at(-1).id === "combat_tank_01", "tank cannons use the cannon cue");
+  assertApprox(plays.at(-1).opts.gain, 1.4, 0.0001, "tank cannons use the quieter combat mix");
 }
 
 {
@@ -727,6 +737,7 @@ assert(
   assert(plays[0].id === PANZERFAUST_LAUNCH_SOUND_ID, "match combat audio routes Panzerfaust launches");
   assert(plays[0].opts.x === 300 && plays[0].opts.y === 340, "Panzerfaust launch audio uses the projected launch point");
   assert(plays[0].opts.category === "combat_self", "own visible Panzerfaust launches use the self combat bus");
+  assertApprox(plays[0].opts.gain, 0.364, 0.0001, "Panzerfaust launches use the quieter combat mix");
   assert(plays[0].opts.cooldownMs >= 120, "Panzerfaust launch audio applies an anti-spam cooldown");
   assert(
     plays[0].opts.dedupKey.startsWith("panzerfaust_launch:combat_self:"),
@@ -737,6 +748,7 @@ assert(
   assert(plays.at(-1).id === PANZERFAUST_IMPACT_SOUND_ID, "match combat audio routes Panzerfaust impacts");
   assert(plays.at(-1).opts.x === 352 && plays.at(-1).opts.y === 340, "Panzerfaust impact audio uses the projected impact point");
   assert(plays.at(-1).opts.category === "combat_other", "Panzerfaust impacts without a visible source avoid claiming self ownership");
+  assertApprox(plays.at(-1).opts.gain, 0.294, 0.0001, "Panzerfaust impacts use the quieter combat mix");
   assert(plays.at(-1).opts.gain < plays[0].opts.gain, "Panzerfaust impact cue is quieter than the launch cue");
 
 }

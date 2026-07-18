@@ -9,17 +9,19 @@ import {
 import { TICK_HZ } from "./config.js";
 import { EVENT, KIND } from "./protocol.js";
 
-const KAR98K_GAIN = 0.25;
-const MG_BURST_GAIN = 0.7;
-const MORTAR_LAUNCH_GAIN = 0.85;
-const MORTAR_IMPACT_GAIN = 1;
-const ARTILLERY_FIRE_GAIN = 1.2;
-const ARTILLERY_LANDING_GAIN = 1;
-const PANZERFAUST_LAUNCH_GAIN = 0.52;
-const PANZERFAUST_IMPACT_GAIN = 0.42;
+const COMBAT_GAIN_SCALE = 0.7;
+const KAR98K_GAIN = 0.25 * COMBAT_GAIN_SCALE;
+const MG_BURST_GAIN = 0.7 * COMBAT_GAIN_SCALE;
+const TANK_CANNON_GAIN = 2 * COMBAT_GAIN_SCALE;
+const MORTAR_LAUNCH_GAIN = 0.85 * COMBAT_GAIN_SCALE;
+const MORTAR_IMPACT_GAIN = COMBAT_GAIN_SCALE;
+const ARTILLERY_FIRE_GAIN = 1.2 * COMBAT_GAIN_SCALE;
+const ARTILLERY_LANDING_GAIN = COMBAT_GAIN_SCALE;
+const PANZERFAUST_LAUNCH_GAIN = 0.52 * COMBAT_GAIN_SCALE;
+const PANZERFAUST_IMPACT_GAIN = 0.42 * COMBAT_GAIN_SCALE;
 const WORLD_COMBAT_BED_ID = "combat_distant_bed_01";
 const WORLD_COMBAT_BED_KEY = "combat:world_activity_bed";
-const WORLD_COMBAT_BED_GAIN = 0.035;
+const WORLD_COMBAT_BED_GAIN = 0.035 * COMBAT_GAIN_SCALE;
 const WORLD_COMBAT_BED_FADE_IN_MS = 750;
 const WORLD_COMBAT_BED_FADE_OUT_MS = 2500;
 
@@ -42,7 +44,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
     ids: ["combat_tank_01"],
     priority: 4,
-    gain: 2,
+    gain: TANK_CANNON_GAIN,
   },
   [KIND.SCOUT_CAR]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
@@ -57,7 +59,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.ANTI_TANK_GUN]: {
     ids: ["combat_tank_01"],
     priority: 4,
-    gain: 2,
+    gain: TANK_CANNON_GAIN,
   },
   [KIND.MACHINE_GUNNER]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
