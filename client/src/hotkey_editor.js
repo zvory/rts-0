@@ -461,8 +461,6 @@ export class HotkeyEditor {
         return "Stored hotkey profiles could not be read.";
       case "importParseFailed":
         return "Import file is not valid JSON.";
-      case "legacySchemaMigrated":
-        return "The profile was updated to physical key bindings.";
       default:
         return "Profile has unresolved hotkey issues.";
     }

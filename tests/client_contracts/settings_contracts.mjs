@@ -71,22 +71,12 @@ function hotkeyService() {
     storage,
     catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
   });
-  assert(hotkeys.allProfiles().length === 3, "hotkeys: schema-v1 custom profiles are migrated");
-  assert(hotkeys.getActiveProfile().id === "custom.legacy", "hotkeys: schema-v1 active profile is preserved");
+  assert(hotkeys.allProfiles().length === 2, "hotkeys: schema-v1 custom profiles are intentionally discarded");
+  assert(hotkeys.getActiveProfile().id !== "custom.legacy", "hotkeys: schema-v1 active profile is ignored");
   assert(
-    hotkeys.getActiveProfile().bindings["unit.move"] === "KeyM",
-    "hotkeys: schema-v1 labels migrate to the equivalent physical key codes",
-  );
-  assert(storage.data.has(HOTKEY_STORAGE_PROFILES_KEY), "hotkeys: migrated profiles are persisted in schema-v2 storage");
-  assert(storage.data.get(HOTKEY_STORAGE_ACTIVE_KEY) === "custom.legacy", "hotkeys: migrated active profile is persisted");
-  assert(
-    hotkeys.importProfile({
-      schemaVersion: 1,
-      profileId: "custom.imported-legacy",
-      mode: "grid",
-      bindings: { "unit.move": "M" },
-    }).profile.bindings["unit.move"] === "KeyM",
-    "hotkeys: schema-v1 profile files import with equivalent physical key codes",
+    hotkeys.importProfile({ schemaVersion: 1, profileId: "custom.legacy", mode: "direct" })
+      .errors.some((error) => error.code === "unsupportedSchemaVersion"),
+    "hotkeys: schema-v1 imports require rebinding in the physical schema",
   );
 }
 
