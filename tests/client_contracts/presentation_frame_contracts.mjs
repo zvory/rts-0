@@ -52,6 +52,7 @@ const normal = {
   y: 24,
   hp: 30,
   maxHp: 40,
+  extractorActive: false,
   secretAuthoritativeVariant: { x: 999, y: 999 },
 };
 const intel = { id: 2, kind: "barracks", owner: 2, x: 40, y: 48, visionOnly: true };
@@ -127,6 +128,7 @@ assert(frame.layers.fogGatedWorld[0].selected === true, "visual selected state i
 assert(frame.layers.fogGatedWorld[0].relationship === "own", "viewer relationship is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].teamColor === "#123456", "team color is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].anchors.hp.heightPx === 10, "presentation anchors use semantic mirrored size");
+assert(frame.layers.fogGatedWorld[0].extractorActive === false, "extractor status crosses the presentation boundary");
 assert(!("secretAuthoritativeVariant" in frame.layers.fogGatedWorld[0]), "unadmitted entity fields do not cross the boundary");
 assert(!JSON.stringify(frame).includes("hidden-sentinel"), "authoritative variants never enter the renderer frame");
 assert(!JSON.stringify(frame).includes("hidden-fog-source"), "fog-source variants never enter the renderer frame");

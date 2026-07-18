@@ -30,5 +30,5 @@ fn protocol_contract_metadata_matches_public_constants() {
         serde_json::json!(ability_code(abilities::EKAT_MAGIC_ANCHOR))
     );
     let entity_schema = contract["compactSlotSchemas"]["entity"].as_array().unwrap();
-    assert_eq!(entity_schema[38]["name"], "breakthroughAuraTicks");
+    assert_eq!(entity_schema[39]["name"], "extractorActive");
 }
