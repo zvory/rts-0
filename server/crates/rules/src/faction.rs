@@ -772,9 +772,9 @@ impl FactionCatalog {
     }
 
     pub fn allows_research(self, upgrade: UpgradeKind, building_kind: EntityKind) -> bool {
-        self.upgrades.iter().any(|entry| {
-            entry.kind == upgrade && entry.researched_at == building_kind
-        })
+        self.upgrades
+            .iter()
+            .any(|entry| entry.kind == upgrade && entry.researched_at == building_kind)
     }
 
     pub fn allows_ability(self, ability: AbilityKind, carrier: EntityKind) -> bool {

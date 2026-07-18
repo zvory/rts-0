@@ -124,8 +124,7 @@ pub fn can_research_for_faction(
     upgrade: UpgradeKind,
     building_kind: EntityKind,
 ) -> bool {
-    catalog_for(faction_id)
-        .is_some_and(|catalog| catalog.allows_research(upgrade, building_kind))
+    catalog_for(faction_id).is_some_and(|catalog| catalog.allows_research(upgrade, building_kind))
 }
 
 /// Resource node starting amount for a node kind.
