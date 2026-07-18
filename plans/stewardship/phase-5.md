@@ -37,9 +37,11 @@ command feedback, combat audio, and rendered ownership cues.
   fallback. Lab issue-as ownership, mixed-owner blocking, ignore-limit behavior, read-only command
   suppression, and the viewer's real `playerId` semantics must remain unchanged.
 - Add focused contract coverage for a command issued from each of Input, HUD, and Minimap, proving
-  each is sent once and records the same planned-command result once. Cover normal prediction and
-  Lab issue-as paths plus passive spectator/replay/read-only blocking. Include a queued/Shift path
-  proving command options and queued semantics pass through unchanged.
+  each is sent once and, for an accepted synchronous ordinary command, records the same
+  planned-command result once. Preserve the existing Lab behavior: issue-as returns a Promise and
+  records no optimistic planned order, so each Lab surface must issue once and record zero times.
+  Cover normal prediction and Lab issue-as paths plus passive spectator/replay/read-only blocking.
+  Include a queued/Shift path proving command options and queued semantics pass through unchanged.
 - Add focused ownership-projection coverage for selection/control groups, command cards, command
   budget, renderer feedback, minimap feedback, and combat-audio categorization. Prefer extending
   the existing client contract files over building a new integration framework. Cover LabPanel's
@@ -80,7 +82,8 @@ command feedback, combat audio, and rendered ownership cues.
 ## Verification
 
 - Focused client contracts proving Input, HUD, and Minimap share issue-and-record semantics across
-  normal, queued, Lab, and passive viewer modes.
+  normal and queued modes, preserve zero optimistic planned-order recording for asynchronous Lab
+  issue-as, and remain blocked in passive viewer modes.
 - Focused ownership tests proving the read-only projection preserves selection, command-surface,
   feedback, audio, visual ownership decisions, and Lab room-time operator access without
   `GameState.controlPolicy`.

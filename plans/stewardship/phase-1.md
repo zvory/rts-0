@@ -44,6 +44,9 @@ runtime values, exports, styling, or CI topology.
 - Extend the source-size inventory to the checked-in production stylesheet at
   `client/styles.css`. Exclude vendor, generated, and artifact CSS just as their source equivalents
   are excluded.
+- Make a `client/styles.css`-only change select the existing `source-file-sizes` suite. Inventory
+  coverage without selector coverage is not sufficient because the ratchet must run on the future
+  stylesheet-only changes it is intended to guard.
 - Refresh `scripts/source-file-size-baseline.json` mechanically from current tracked files: remove
   exceptions now at or below the cap, lower frozen counts for files that have shrunk but remain
   above it, remove paths no longer tracked, and add the current oversized stylesheet with a concise
@@ -83,6 +86,8 @@ runtime values, exports, styling, or CI topology.
 - Run selector output for the same six paths and assert their path-specific suites, including
   protocol parity for the palette mirror and the absence of Rust/faction suites for a
   presentation-only change.
+- Run selector output for `client/styles.css` alone and assert that it includes
+  `source-file-sizes` without changing the stylesheet's existing client-only CI class.
 - `node scripts/check-source-file-sizes.mjs`
 - Exercise focused size-check fixtures proving that an unbaselined oversized production CSS file
   fails, growth above a frozen CSS count fails, and shrinkage below a frozen count succeeds with an

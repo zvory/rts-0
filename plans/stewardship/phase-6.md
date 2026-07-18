@@ -15,17 +15,19 @@ continue to later subscribers.
   delivery to later subscribers.
 - Give each subscribed handler a stable, per-`Net` numeric identifier when it is first registered,
   using a `WeakMap<Function, number>` so diagnostic identity does not retain unsubscribed handlers.
-  Define the signature as normalized event type (maximum 64 characters), normalized error name
-  (maximum 64), and that local handler identifier. Non-string or missing type/name fields use fixed
-  `unknown`/`Error` fallbacks. Do not include `error.message` or `error.stack`, because a subscriber
-  may derive either from payload data; do not stringify, inspect, retain, or log the event payload.
+  Define the signature as normalized event type (maximum 64 characters), a fixed thrown-value class
+  (`Error` when the caught value is an `Error`, otherwise `NonError`), and that local handler
+  identifier. A non-string event type uses the fixed `unknown` fallback. Do not read any property
+  from the caught value, including `name`, `message`, or `stack`, because a subscriber may derive it
+  from payload data or expose it through a throwing getter; do not stringify, inspect, retain, or
+  log the event payload.
 - Store reported signatures in a `Set` capped at 32 entries on each `Net` instance. Log only the
   first occurrence while capacity remains. When a 33rd distinct signature arrives, emit one fixed
   saturation report and suppress it and all later new signatures without growing memory; repeated
   recorded signatures remain suppressed. A newly constructed `Net` starts empty; reconnects and
   `disconnect()` do not reset the set, so deduplication semantics remain per instance.
 - Emit always-on `console.error("[rts-net] subscriber failure", detail)` for a new signature, where
-  `detail` contains only the normalized event type, normalized error name, and handler identifier.
+  `detail` contains only the normalized event type, fixed thrown-value class, and handler identifier.
   Emit `console.error("[rts-net] subscriber failure reporting saturated")` once at saturation. If a
   diagnostics collector is present, mirror the same bounded metadata through its existing mark
   seam; the console report must not depend on debug mode being enabled.
@@ -33,8 +35,9 @@ continue to later subscribers.
   throws, continue dispatching the remaining subscribers and do not recurse through `Net._emit`.
 - Add focused tests proving identical failures log once, distinct signatures log independently up
   to 32, the 33rd emits only the fixed saturation marker, a second `Net` gets a fresh registry, and
-  reconnect/disconnect do not reset it. Throw an error whose message and stack contain a payload
-  sentinel and prove neither appears in console or diagnostics metadata; also prove diagnostics
+  reconnect/disconnect do not reset it. Throw an error whose name, message, and stack contain a
+  payload sentinel and prove none appears in console or diagnostics metadata; repeat with a
+  throwing `name` getter to prove reporting never inspects the caught value. Also prove diagnostics
   mirroring is optional and later subscribers run even when the handler and both reporters throw.
   Exercise repeated subscribe/off churn with fresh handlers and prove the only enumerable
   diagnostic registry remains capped at 32 and no strong handler-identity collection is introduced.
@@ -61,9 +64,9 @@ continue to later subscribers.
 ## Verification
 
 - Focused Net contracts for once-per-signature reporting, 32-entry saturation, fresh-instance
-  initialization, no reset across disconnect/reconnect, message/stack/payload exclusion, optional
-  diagnostics mirroring, subscribe/off churn without strong handler retention, and delivery after
-  reporter failure.
+  initialization, no reset across disconnect/reconnect, caught-value-property/payload exclusion,
+  optional diagnostics mirroring, subscribe/off churn without strong handler retention, and
+  delivery after reporter failure.
 - `node tests/client_contracts.mjs`
 - `node scripts/check-client-architecture.mjs`
 - `node tests/select-suites.mjs --verify`
@@ -79,6 +82,6 @@ before committing.
 ## Handoff
 
 Mark this phase done in its implementation commit. Report the stable payload-independent signature
-fields, registry cap and saturation behavior, console prefix/level, optional diagnostics mark, and
-evidence that later subscribers still run when reporting fails. Explicitly leave broader
-Match/App startup transaction work deferred.
+fields and fixed thrown-value classes, registry cap and saturation behavior, console prefix/level,
+optional diagnostics mark, and evidence that later subscribers still run when reporting fails.
+Explicitly leave broader Match/App startup transaction work deferred.
