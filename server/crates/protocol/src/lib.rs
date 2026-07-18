@@ -1271,6 +1271,7 @@ mod tests {
             available_tick: None,
             lockout_until_tick: None,
             expires_in: None,
+            charge_recharge_left: Some(45),
         }];
         worker.vision_only = true;
         worker.occupied_trench_id = Some(80);
@@ -1489,7 +1490,10 @@ mod tests {
             ])
         );
         assert_eq!(value["e"][0][22], serde_json::json!(87));
-        assert_eq!(value["e"][0][23], serde_json::json!([[1, 87, 2]]));
+        assert_eq!(
+            value["e"][0][23],
+            serde_json::json!([[1, 87, 2, null, null, null, null, null, 45]])
+        );
         assert_eq!(value["e"][0][24], serde_json::Value::Null);
         assert_eq!(value["e"][0][25], serde_json::json!(true));
         assert_eq!(value["e"][0][32], serde_json::json!(80));

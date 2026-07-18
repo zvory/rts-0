@@ -42,6 +42,7 @@ import {
   cmd,
 } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import { createCommandButton } from "../../client/src/hud_command_dom.js";
 import { _handleKeyDown } from "../../client/src/input/camera_controls.js";
 
 function commandCardCtx({
@@ -1200,7 +1201,12 @@ withFakeHudDocument(({ FakeElement }) => {
     id: 30,
     owner: 1,
     kind: KIND.SCOUT_CAR,
-    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
+    abilities: [{
+      ability: ABILITY.SMOKE,
+      cooldownLeft: 0,
+      remainingUses: 2,
+      chargeRechargeLeft: TICK_HZ * 7.5,
+    }],
   };
   const smokeResearchComplex = {
     id: 29,
@@ -1232,6 +1238,30 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(smoke.cls.includes("active"), "active ability targeting should keep active class");
   assert(smoke.enabled, "ready affordable ability should be enabled");
   assert(smoke.countBadge === "2", "Smoke should show its remaining charge count");
+  assert(
+    smoke.cooldownClocks.length === 1 && smoke.cooldownClocks[0].rotationDeg === 180,
+    "Smoke should animate the existing clock from authoritative charge recharge progress",
+  );
+
+  withFakeDocument(() => {
+    const button = createCommandButton({
+      icon: smoke.icon,
+      label: smoke.label,
+      enabled: false,
+      title: smoke.title,
+      countBadge: "0",
+      cooldownClocks: smoke.cooldownClocks,
+    });
+    assert(
+      button.innerHTML.includes('<span class="cmd-ready-count">0</span>'),
+      "the rendered Smoke button should contain the zero-charge badge",
+    );
+    assert(
+      button.innerHTML.includes("cmd-cd-clock") && button.innerHTML.includes("cmd-cd-arm"),
+      "the rendered Smoke button should contain the existing cooldown clock and arm",
+    );
+    assert(button.title !== "Recharging", "the rendered Smoke button should not invent Recharging copy");
+  });
 
   const artillery = {
     id: 31,

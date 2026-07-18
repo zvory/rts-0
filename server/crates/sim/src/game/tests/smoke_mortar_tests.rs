@@ -1416,6 +1416,23 @@ fn scout_car_smoke_recharges_two_spent_charges_sequentially() {
         0,
         "Smoke should retain its existing cooldown"
     );
+    let owner_snapshot = game.snapshot_for(1);
+    let owner_scout = owner_snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == scout)
+        .expect("owner snapshot should include the Scout Car");
+    let smoke_status = owner_scout
+        .abilities
+        .iter()
+        .find(|status| status.ability == ability::AbilityKind::Smoke.to_protocol_str())
+        .expect("owner snapshot should include Smoke charge status");
+    assert_eq!(smoke_status.remaining_uses, Some(0));
+    assert_eq!(
+        smoke_status.charge_recharge_left,
+        Some(config::SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS),
+        "owner snapshot should drive the HUD recharge clock from the authoritative timer"
+    );
 
     for _ in 0..config::SMOKE_LAUNCH_MAX_DELAY_TICKS {
         game.tick();

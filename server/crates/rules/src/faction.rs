@@ -341,7 +341,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         label: "Smoke",
         icon: "SMK",
         hotkey: Some("D"),
-        title: "Two charges; one charge regenerates every 15 seconds",
+        title: "Target a smoke grenade location",
         carriers: &[EntityKind::ScoutCar],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::SMOKE_ABILITY_RANGE_TILES),

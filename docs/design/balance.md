@@ -474,8 +474,9 @@ folded into default targeting.
   does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
   inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
   visible to the player occupying it.
-  The command card shows the selected Scout Car's remaining charges and reports `Recharging` at
-  zero charges.
+  The command card shows the selected Scout Car's remaining charges as `2`, `1`, or `0`. While a
+  missing charge regenerates, the ability's existing clock animation shows progress toward the
+  next charge; recharge does not disable a stored charge that is still available.
 - **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
   owned units within 9 tiles a 1.4x speed multiplier. This passive aura has no smoke interaction,
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active

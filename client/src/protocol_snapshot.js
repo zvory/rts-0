@@ -325,8 +325,8 @@ function assignAbilities(target, fields, index) {
 }
 
 function readAbilityCooldown(record, label) {
-  const fields = readArray(record, label, 8);
-  if (fields.length < 2 || fields.length > 8) throw new Error(`${label} field count mismatch`);
+  const fields = readArray(record, label, 9);
+  if (fields.length < 2 || fields.length > 9) throw new Error(`${label} field count mismatch`);
   const ability = {
     ability: readCode(fields[0], ABILITY_BY_CODE, `${label}.ability`),
     cooldownLeft: readU32(fields[1], `${label}.cooldownLeft`),
@@ -348,6 +348,9 @@ function readAbilityCooldown(record, label) {
   }
   if (fields.length > 7 && fields[7] != null) {
     ability.expiresIn = readU32(fields[7], `${label}.expiresIn`);
+  }
+  if (fields.length > 8 && fields[8] != null) {
+    ability.chargeRechargeLeft = readU32(fields[8], `${label}.chargeRechargeLeft`);
   }
   return ability;
 }

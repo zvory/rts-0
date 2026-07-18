@@ -504,6 +504,8 @@ pub struct AbilityCooldownView {
     pub lockout_until_tick: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_in: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charge_recharge_left: Option<u16>,
 }
 
 /// Owner/spectator-only Scout Plane state. Enemy snapshots that can see the plane still omit this
