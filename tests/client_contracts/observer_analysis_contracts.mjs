@@ -567,12 +567,20 @@ import { textWithin } from "./dom_text.mjs";
         && resourcesText.includes("Lifetime")
         && resourcesText.includes("Last 5s")
         && resourcesText.includes("Last 1m")
-        && resourcesText.includes("Total")
-        && resourcesText.includes("175")
-        && resourcesText.includes("35")
         && resourcesText.includes("120")
         && resourcesText.includes("30"),
-      "resources tab renders lifetime, short-window, and minute mined-resource totals",
+      "resources tab renders lifetime, short-window, and minute mined-resource values",
+    );
+    const resourceGroups = findFakes(root, (el) => el.classList.contains("replay-resources-group"));
+    assert(
+      resourceGroups.map((group) => group.querySelector(".replay-resources-window")?.textContent).join("|")
+        === "Last 5s|Last 1m|Lifetime",
+      "resources tab orders time windows from five seconds to one minute to lifetime",
+    );
+    assert(
+      resourceGroups.every((group) => group.querySelectorAll(".replay-resources-name")
+        .map((name) => name.textContent).join("|") === "Red|Blue"),
+      "resources tab lists every player under each time window",
     );
     assert(
       findFakes(root, (el) => el.classList.contains("replay-resources-steel"))

@@ -4093,7 +4093,6 @@ input[type="text"]:focus {
 .replay-production-main,
 .replay-research-label,
 .replay-units-label,
-.replay-resources-window,
 .replay-resources-name,
 .replay-resources-lost-name {
   overflow: hidden;
@@ -4128,24 +4127,36 @@ input[type="text"]:focus {
 }
 .replay-resources-group {
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
-.replay-resources-heading {
+.replay-resources-window {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.replay-resources-player {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
   align-items: center;
   gap: 7px;
-  margin-top: 4px;
+  min-width: 0;
 }
 .replay-resources-row {
-  grid-template-columns: minmax(0, 1fr) minmax(44px, auto) minmax(38px, auto);
-  padding-left: 17px;
+  grid-template-columns: minmax(0, 1fr) minmax(48px, auto) minmax(42px, auto);
+  min-height: 25px;
+}
+.replay-resources-row .replay-resources-steel,
+.replay-resources-row .replay-resources-oil {
+  font-size: 13px;
+  line-height: 1.1;
 }
 .replay-resources-lost-row {
   grid-template-columns: 10px minmax(0, 1fr) minmax(44px, auto) minmax(38px, auto);
 }
 .replay-units-row.is-total,
-.replay-resources-group.is-total,
 .replay-resources-lost-row.is-total {
   border-bottom: 1px solid rgba(231, 223, 197, 0.1);
   padding-bottom: 3px;
@@ -4154,10 +4165,6 @@ input[type="text"]:focus {
 .replay-units-row.is-total .replay-units-count,
 .replay-units-row.is-total .replay-units-steel,
 .replay-units-row.is-total .replay-units-oil,
-.replay-resources-group.is-total .replay-resources-name,
-.replay-resources-group.is-total .replay-resources-window,
-.replay-resources-group.is-total .replay-resources-steel,
-.replay-resources-group.is-total .replay-resources-oil,
 .replay-resources-lost-row.is-total .replay-resources-lost-name,
 .replay-resources-lost-row.is-total .replay-resources-lost-steel,
 .replay-resources-lost-row.is-total .replay-resources-lost-oil {
@@ -4165,7 +4172,6 @@ input[type="text"]:focus {
   font-weight: 800;
 }
 .replay-units-row.is-total .resource-value-number,
-.replay-resources-group.is-total .resource-value-number,
 .replay-resources-lost-row.is-total .resource-value-number {
   color: var(--accent);
 }
