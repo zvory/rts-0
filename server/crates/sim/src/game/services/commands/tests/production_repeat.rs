@@ -210,3 +210,75 @@ fn repeat_adjustment_can_clear_stale_incompatible_intent() {
         Some(EntityKind::Rifleman)
     );
 }
+
+#[test]
+fn repeat_adjustment_accepts_raw_cap_then_rejects_cap_plus_one_whole() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+    let barracks = entities
+        .spawn_building(1, EntityKind::Barracks, x, y, true)
+        .expect("barracks should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    let mut smokes = SmokeCloudStore::new();
+
+    for (cap, admission) in [
+        (MAX_UNITS_PER_COMMAND, CommandAdmission::Normal),
+        (
+            LAB_MAX_UNITS_PER_COMMAND,
+            CommandAdmission::LabIgnoreCommandLimits,
+        ),
+    ] {
+        apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            vec![PendingCommand {
+                player: 1,
+                command: SimCommand::AdjustProductionRepeat {
+                    buildings: vec![barracks; cap],
+                    unit: EntityKind::Rifleman,
+                    delta: 1,
+                },
+                admission,
+            }],
+        );
+        assert_eq!(
+            entities
+                .get(barracks)
+                .expect("barracks")
+                .repeat_production(),
+            Some(EntityKind::Rifleman),
+            "a raw list at the selected cap should be accepted and deduped"
+        );
+
+        entities
+            .get_mut(barracks)
+            .expect("barracks")
+            .set_repeat_production(Some(EntityKind::Rifleman), false);
+        apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            vec![PendingCommand {
+                player: 1,
+                command: SimCommand::AdjustProductionRepeat {
+                    buildings: vec![barracks; cap + 1],
+                    unit: EntityKind::Rifleman,
+                    delta: 1,
+                },
+                admission,
+            }],
+        );
+        assert!(
+            entities
+                .get(barracks)
+                .expect("barracks")
+                .repeat_production()
+                .is_none(),
+            "a raw list above the selected cap must reject the whole command"
+        );
+    }
+}
