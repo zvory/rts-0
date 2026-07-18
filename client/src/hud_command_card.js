@@ -34,6 +34,7 @@ import {
   trainLimitSignature,
   trainSlotForUnit,
 } from "./hud_train_card_helpers.js";
+import { buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -200,6 +201,7 @@ export function buildCommandCardContextCatalog() {
         upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
       })),
     },
+    ...buildEkatCommandCardContextSamples(buildCommandCardDescriptors),
   ];
 }
 
