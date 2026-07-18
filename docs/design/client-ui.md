@@ -1838,17 +1838,21 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   Anti-Tank Gun and artillery
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
-  Distinct silhouette per kind (engineer: compact block; rifleman: enabled PNG frame-strip
-  experiment with frame 0 idle, frames 1-4 moving, and frame 5 standing recoil; machine gunner: enabled PNG frame-strip
+  Distinct silhouette per kind (engineer: compact block; rifleman: enabled no-backpack PNG
+  frame strip with frame 0 idle and frames 1-3 moving; machine gunner: enabled PNG frame-strip
   experiment with carried movement frames and setup/deployed frames; Panzerfausts-upgraded Riflemen:
-  distinct loaded infantry rig until launch, then the normal Rifleman rig; Anti-Tank Gun: wheeled gun; mortar team: crewless
+  the matching four-frame Rifleman movement strip with an oversized launcher composited on the back
+  until launch, then the normal no-backpack Rifleman strip; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
   support-weapon rig routed through the live renderer).
   Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
-  with a team-colored band and switch immediately to normal rifle art after launch. Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
+  with a team-colored band and switch immediately to normal rifle art after launch. Both white-base
+  Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine
+  Gunner's tonal weight. Rifleman and loaded-Panzerfaust recoil frames remain intentionally deferred.
+  Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
@@ -1923,9 +1927,12 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   keep runtime inputs such as movement, facing, weapon facing, recoil, setup state, occupied-trench
   tint, selection, HP bars, fog, and shot reveals on the real entity, and are resolved from checked-in
   profile/candidate registries rather than URL-provided assets.
-- Local lab visual profiles may pass checked-in frame-strip overrides by unit kind. These swap the
-  PNG strip texture/configuration used for matching real units in that lab session only, while the
-  entity ids, server state, selection, fog, HP bars, and fallback SVG shadow route remain unchanged.
+- Local lab visual profiles may pass checked-in frame-strip overrides by unit kind or by the live
+  rig key derived from authoritative entity state. Rig-key overrides apply only while that route is
+  active—for example, a loaded Panzerfaust Rifleman override stops matching as soon as
+  `panzerfaustLoaded` flips false at launch—then normal live frame-strip routing resumes for the same
+  entity id. These swaps remain local to that lab session; server state, selection, fog, HP bars,
+  and the fallback SVG shadow route remain unchanged.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.

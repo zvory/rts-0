@@ -34,9 +34,9 @@ import {
   applyFrameStripColorAdjustmentToRgba,
   FRAME_STRIP_TARGET_COLOR_ADJUSTMENT,
   frameStripRuntimeColorAdjustment,
-  isNeutralFrameStripColorAdjustment,
 } from "../client/src/renderer/rigs/frame_strip_color_profile.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
+import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
   pngAtlasCanRenderRoute,
@@ -1124,7 +1124,7 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: {}, weaponRecoil: () => 0 });
 
   const expectedFrame = frameStripFrameIndex(strip, entity, renderNow);
-  assert.equal(expectedFrame, 2);
+  assert.equal(strip.movementFrames.includes(expectedFrame), true);
   assert.equal(stripInstance.sprite.texture.frame.x, strip.frameWidth * expectedFrame);
   assert.equal(frameStripVisualFacing(entity), entity.facing);
   assert.equal(stripInstance.container.rotation, entity.facing);
@@ -1185,7 +1185,13 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 });
 
 test("frame-strip color profile applies shared and per-strip targets only when not already baked", () => {
-  assert.equal(isNeutralFrameStripColorAdjustment(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP)), true);
+  const dimmedRiflemanAdjustment = {
+    brightness: 70,
+    saturation: 100,
+    hue: 100,
+  };
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
   assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), {
     brightness: 145,
     saturation: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.saturation,

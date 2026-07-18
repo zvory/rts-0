@@ -1,0 +1,72 @@
+{
+  "pipelineVersion": 1,
+  "source": "built-in image_gen",
+  "status": "live runtime art",
+  "unit": "rifleman",
+  "variants": {
+    "noPack": {
+      "source": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-no-pack-source.png",
+      "alpha": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-no-pack-alpha.png",
+      "runtimeAlignedColorPreview": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-no-pack-runtime-aligned-color.png",
+      "prompt": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/metadata/prompt-rifleman-no-pack.md"
+    },
+    "panzerfaustOnBack": {
+      "source": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-panzerfaust-back-source.png",
+      "alpha": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-panzerfaust-back-alpha.png",
+      "runtimeAlignedColorPreview": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-panzerfaust-back-runtime-aligned-color.png",
+      "prompt": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/metadata/prompt-rifleman-panzerfaust-back.md"
+    }
+  },
+  "references": {
+    "productionIdleSource": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-production-idle-reference.png",
+    "productionIdleAlpha": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-production-idle-reference-alpha.png",
+    "productionIdleRuntime": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-production-idle-runtime-reference.png"
+  },
+  "comparison": {
+    "runtimeScale": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-comparison-runtime-color.png",
+    "fourTimesPreview": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-comparison-runtime-color-4x.png",
+    "order": ["production idle", "no backpack", "Panzerfaust on back"]
+  },
+  "alignment": {
+    "canvas": {"width": 160, "height": 112},
+    "productionIdleOpaqueBounds": {"width": 133, "height": 59, "x": 19, "y": 26},
+    "noPackOpaqueBounds": {"width": 133, "height": 59, "x": 19, "y": 26},
+    "panzerfaustVariantOpaqueBounds": {"width": 143, "height": 94, "x": 1, "y": 5},
+    "sharedTransform": "rotate source 90 degrees counterclockwise, resize full 887x1774 canvas to 222x105, composite at -39,+2 on 160x112",
+    "colorAdjustment": {"brightness": 170, "saturation": 118, "hue": 100}
+  },
+  "runtime": {
+    "normalModule": "client/src/renderer/rigs/rifleman_png_strip.js",
+    "loadedModule": "client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js",
+    "frameWidth": 160,
+    "frameHeight": 112,
+    "frameCount": 4,
+    "idleFrame": 0,
+    "movementFrames": [1, 2, 3],
+    "firingFrames": [],
+    "fps": 8,
+    "worldScale": 0.34,
+    "tintSlot": "team-light",
+    "bakedColorAdjustment": {"brightness": 100, "saturation": 100, "hue": 100},
+    "targetColorAdjustment": {"brightness": 70, "saturation": 100, "hue": 100},
+    "normal": {
+      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/rifleman-no-pack-white-review-strip.png?v=no-pack-white-dim70-1",
+      "imageVersion": "no-pack-white-dim70-1",
+      "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/rifleman-no-pack-white-review-strip.png"
+    },
+    "panzerfaustLoaded": {
+      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png?v=panzerfaust-composited-dim70-1",
+      "imageVersion": "panzerfaust-composited-dim70-1",
+      "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png",
+      "routeKey": "rifleman.panzerfaustLoaded"
+    }
+  },
+  "notes": [
+    "The no-pack preview matches the production idle frame's opaque bounding box exactly.",
+    "The Panzerfaust variant uses the same full-canvas transform as the no-pack variant, preserving the underlying soldier anchor while allowing the oversized launcher to expand the silhouette.",
+    "The four-frame no-pack strip is the live ordinary and spent Rifleman route.",
+    "The composited four-frame launcher strip is live only while panzerfaustLoaded is true; launch immediately returns the same entity to the normal strip.",
+    "Both strips use a 70% runtime brightness target to reduce the white-source luminance before team tinting.",
+    "Firing/recoil frames are intentionally deferred to the next art pass."
+  ]
+}
