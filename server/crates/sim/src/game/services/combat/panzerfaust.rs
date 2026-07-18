@@ -3,11 +3,9 @@ use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Panzerfa
 use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
-use super::acquisition::{
-    combat_mode_with_moving_fire, direct_fire_target_legal, resolve_target_for_weapon, CombatMode,
-    DirectFireLegality, DirectFireVisibility,
-};
+use super::acquisition::{combat_mode_with_moving_fire, resolve_target_for_weapon, CombatMode};
 use super::shot_blocker_index::ShotBlockerIndex;
+use super::target_legality::{direct_fire_target_legal, DirectFireLegality, DirectFireVisibility};
 use super::weapons::mirror_weapon_to_body;
 use super::{
     dist2, Fog, LineOfSight, Map, Occupancy, SmokeCloudStore, SpatialIndex, TeamRelations,

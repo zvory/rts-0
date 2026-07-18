@@ -1,8 +1,8 @@
-use super::super::acquisition::{
-    direct_fire_target_legal, DirectFireLegality, DirectFireVisibility,
-};
 use super::super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
+};
+use super::super::target_legality::{
+    direct_fire_target_legal, DirectFireLegality, DirectFireVisibility,
 };
 use super::*;
 

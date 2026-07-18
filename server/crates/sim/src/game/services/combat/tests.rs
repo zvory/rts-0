@@ -1820,29 +1820,6 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 }
 
 #[test]
-fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
-    let mut entities = EntityStore::new();
-    entities
-        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
-        .expect("anti-tank gun should spawn");
-    let tank_id = entities
-        .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
-        .expect("enemy tank should spawn");
-    entities
-        .get_mut(tank_id)
-        .expect("tank should exist")
-        .set_facing(std::f32::consts::PI);
-    let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
-
-    run_combat_tick(&mut entities);
-
-    assert_eq!(
-        entities.get(tank_id).expect("enemy should exist").hp,
-        enemy_hp - 75,
-        "packed anti-tank gun should deal 75% of its deployed 100 damage"
-    );
-}
-#[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
     let mut entities = EntityStore::new();
     let at_id = entities

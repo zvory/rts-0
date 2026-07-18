@@ -4,8 +4,8 @@ use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 
-use super::acquisition::{direct_fire_target_legal, DirectFireLegality};
 use super::shot_blocker_index::ShotBlockerIndex;
+use super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct SecondaryWeaponActivationConstraints {

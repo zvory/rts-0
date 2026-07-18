@@ -118,6 +118,10 @@ assert(
   "Panzerfaust combat cues are exposed through the shared sound manifest",
 );
 assert(
+  SOUND_MANIFEST.some((entry) => entry.id === "combat_mortar_impact_01" && entry.url.startsWith("/assets/sound/combat/")),
+  "mortar impact cue is exposed through the shared sound manifest",
+);
+assert(
   SOUND_MANIFEST.some((entry) => entry.id === "combat_distant_bed_01"),
   "world combat activity bed is exposed through the shared sound manifest",
 );
