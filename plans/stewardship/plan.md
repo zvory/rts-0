@@ -101,6 +101,21 @@ section naming the current-main proof and stating that no implementation was per
 its executor command below in the same PR. Otherwise record only the narrowed touch points; do not
 mark incomplete work done.
 
+### Checkpoint Result (2026-07-17)
+
+Audited current `origin/main` at `b7c4a0e6` after Phase 4 merged. Both approved defects remain and
+neither phase is canceled: execute Phases 5 and 6 unchanged.
+
+- Phase 5: `Match` still publishes `labControlPolicy` through `state.controlPolicy`; the hidden
+  consumers remain in command budget, HUD, Input and its selection/control-group helpers, Minimap,
+  renderer ownership/feedback, combat audio, LabPanel, ReplayControls, and Match shell visibility.
+  Input, HUD, and Minimap still each own the same issue-selected-snapshot-record wrapper and local
+  `issueGameplayCommand` compatibility helper. These are the exact approved ownership seams; do not
+  broaden the phase beyond them.
+- Phase 6: `client/src/net.js` `Net._emit` still catches each subscriber exception and discards it
+  silently before continuing. The bounded, payload-independent first-signature reporting work
+  remains necessary and its existing touch points are unchanged.
+
 ## Final Checkpoint After Phase 6
 
 Rerun the focused architecture and contract checks and review whether hidden policy access and
