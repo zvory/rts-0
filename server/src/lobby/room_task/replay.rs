@@ -465,12 +465,13 @@ impl RoomTask {
         player_id: u32,
         selection: VisionSelectionRequest,
     ) {
-        if !self
-            .players
-            .get(&player_id)
-            .is_some_and(|player| player.spectator)
-        {
+        let Some(player) = self.players.get(&player_id) else {
             return;
+        };
+        match &self.phase {
+            Phase::ReplayViewer(_) => {}
+            Phase::InGame(_) if player.spectator => {}
+            _ => return,
         }
         if let Phase::InGame(game) = &self.phase {
             let valid_ids: Vec<u32> = game.player_inits().iter().map(|player| player.id).collect();
@@ -500,10 +501,6 @@ impl RoomTask {
             }
         };
 
-        if !self.players.contains_key(&player_id) {
-            self.phase = Phase::ReplayViewer(session);
-            return;
-        }
         let valid_ids = session.active_player_ids();
         if validate_vision_selection_request(&selection, &valid_ids).is_err() {
             self.send_error_to(player_id, "Invalid vision selection");

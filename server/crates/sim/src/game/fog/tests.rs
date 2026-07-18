@@ -37,6 +37,52 @@ fn stone_blocks_authoritative_fog_behind_it() {
 }
 
 #[test]
+fn explored_tiles_persist_after_current_sight_is_lost() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let origin = map.tile_center(2, 2);
+    entities
+        .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
+        .expect("worker should spawn");
+    let mut fog = Fog::new(map.size);
+
+    fog.recompute(&[1], &entities, &map);
+    let tile = (2 * map.size + 2) as usize;
+    assert_eq!(fog.explored_tiles_for(1)[tile], 1);
+
+    fog.recompute(&[1], &EntityStore::new(), &map);
+
+    assert_eq!(fog.visible_tiles_for(1)[tile], 0);
+    assert_eq!(fog.explored_tiles_for(1)[tile], 1);
+}
+
+#[test]
+fn team_visibility_is_accumulated_into_each_viewers_exploration() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let first = map.tile_center(2, 2);
+    let second = map.tile_center(9, 9);
+    entities
+        .spawn_unit(1, EntityKind::Worker, first.0, first.1)
+        .expect("player one worker should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Worker, second.0, second.1)
+        .expect("player two worker should spawn");
+    let mut fog = Fog::new(map.size);
+
+    fog.recompute(&[1, 2], &entities, &map);
+    fog.accumulate_explored_for_viewers(&[(1, vec![1, 2]), (2, vec![1, 2])]);
+
+    let first_tile = (2 * map.size + 2) as usize;
+    let second_tile = (9 * map.size + 9) as usize;
+    for player in [1, 2] {
+        let explored = fog.explored_tiles_for(player);
+        assert_eq!(explored[first_tile], 1);
+        assert_eq!(explored[second_tile], 1);
+    }
+}
+
+#[test]
 fn building_sight_reveals_footprint_and_one_tile_perimeter() {
     let map = open_map(8);
     let mut entities = EntityStore::new();

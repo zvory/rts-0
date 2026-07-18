@@ -132,6 +132,9 @@ impl Serialize for CompactSnapshot<'_> {
         if !snapshot.visible_tiles.is_empty() {
             map.serialize_entry("fg", &encode_visibility_runs(&snapshot.visible_tiles))?;
         }
+        if !snapshot.explored_tiles.is_empty() {
+            map.serialize_entry("eg", &encode_visibility_runs(&snapshot.explored_tiles))?;
+        }
         if !snapshot.remembered_buildings.is_empty() {
             map.serialize_entry(
                 "mb",
@@ -289,6 +292,13 @@ fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
             .iter()
             .filter(|tile| **tile != 0)
             .count()
+            .saturating_add(
+                snapshot
+                    .explored_tiles
+                    .iter()
+                    .filter(|tile| **tile != 0)
+                    .count(),
+            )
             .saturating_add(snapshot.remembered_buildings.len()),
     );
     insert_count(
@@ -330,7 +340,7 @@ fn add_u32(counts: &mut BTreeMap<&'static str, u32>, section: &'static str, valu
 fn section_for_compact_key(key: &str) -> &'static str {
     match key {
         "e" => SECTION_ENTITIES,
-        "fg" | "mb" => SECTION_VISIBILITY,
+        "fg" | "eg" | "mb" => SECTION_VISIBILITY,
         "r" => SECTION_RESOURCE_DELTAS,
         "ev" => SECTION_EVENTS,
         "sm" => SECTION_SMOKES,

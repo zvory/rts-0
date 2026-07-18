@@ -601,6 +601,19 @@ impl Game {
             &self.state.entities,
             &self.state.smokes,
         );
+        let viewer_sources = player_ids
+            .iter()
+            .map(|&player| {
+                let mut sources = self.living_team_player_ids_for_vision(player);
+                if sources.is_empty() {
+                    sources.push(player);
+                }
+                (player, sources)
+            })
+            .collect::<Vec<_>>();
+        self.state
+            .fog
+            .accumulate_explored_for_viewers(&viewer_sources);
         self.retain_active_firing_reveal_reaction_gates();
     }
 

@@ -45,7 +45,7 @@ src/
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
   renderer/lab_tool_preview.js # Armed Lab unit/remove-tool cursor ghosts
   renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
-  fog.js          # Fog overlay: accumulate explored, compute visible from own entities
+  fog.js          # Fog overlay: apply authoritative visible/explored grids; local stamping fallback
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots
   audio_spatial.js # renderer-neutral distance, pan, low-pass, and priority profiles
@@ -1242,7 +1242,7 @@ their RAFs during teardown, and renderer destruction is idempotent.
 ```js
 export class Fog {
   constructor(mapWidth, mapHeight, terrain?)
-  update(ownEntities, tileSize, serverVisibleTiles?) // copy server visibility when provided; accumulate explored
+  update(ownEntities, tileSize, serverVisibleTiles?, serverExploredTiles?)
   isVisible(tileX,tileY), isExplored(tileX,tileY)
   setRevealAll(enabled)
   // renderer reads the grids to draw the black/dim overlay; minimap caches against revision
@@ -1252,9 +1252,10 @@ export class Fog {
 ```
 `match.js` must exclude legacy/special `visionOnly` and shot-reveal entities from `ownEntities`
 before calling `fog.update`; those views are rendered as intel, not as local fog sources. Normal
-match snapshots provide `visibleTiles`, so the overlay follows server-authoritative fog including
-smoke blockers and five-second lingering death sight; local stamping remains a fallback for
-older/dev object snapshots. That fallback still rebuilds the complete visibility union on every
+match snapshots provide `visibleTiles` and `exploredTiles`, so the overlay replaces both grids from
+the current authoritative perspective, including smoke blockers, five-second lingering death
+sight, and replayed exploration history. Local stamping and cumulative exploration remain a
+fallback for older/dev object snapshots. That fallback still rebuilds the complete visibility union on every
 rendered frame. It may reuse one entity's previously computed tile stamp only while identity, kind,
 exact world position, tile size, sight, footprint, and terrain are unchanged; any changed input
 invalidates the stamp and performs the ordinary line-of-sight rays in the same frame. This is exact

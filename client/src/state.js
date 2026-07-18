@@ -125,6 +125,8 @@ export class GameState extends VisualEffectBackedState {
     this.rememberedBuildings = [];
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
     this.visibleTiles = [];
+    /** @type {number[]|Uint8Array} row-major server-authoritative exploration history. */
+    this.exploredTiles = [];
 
     this.groundDecals = new GroundDecalBuffer();
     /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
@@ -164,6 +166,7 @@ export class GameState extends VisualEffectBackedState {
     this.trenches = [];
     this.rememberedBuildings = [];
     this.visibleTiles = [];
+    this.exploredTiles = [];
     this.groundDecals = new GroundDecalBuffer();
     this.visualEffects = new VisualEffectBuffers();
     this.predictedById.clear();
@@ -313,6 +316,9 @@ export class GameState extends VisualEffectBackedState {
       : [];
     this.visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
       ? msg.visibleTiles
+      : [];
+    this.exploredTiles = Array.isArray(msg.exploredTiles) || msg.exploredTiles instanceof Uint8Array
+      ? msg.exploredTiles
       : [];
     this.events = events;
     this._pruneSelection();

@@ -629,6 +629,7 @@ transport decode:
   abilityObjects?: AbilityObject[], // active ability world objects visible to this recipient; omitted when empty
   trenches?: Trench[],           // neutral trench terrain visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
+  exploredTiles?: u8[],          // row-major server-owned exploration history for this perspective
   rememberedBuildings?: RememberedBuilding[], // stale enemy building intel for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
@@ -659,7 +660,10 @@ For normal active-player snapshots, entity visibility and `visibleTiles` are pro
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
 team. A defeated/disconnected teammate stops contributing live sight; if that player's team still
 has a living member, their own connection continues to receive the surviving team's current
-visibility. Allied non-resource entities visible through team current fog expose full read-only
+visibility. `exploredTiles` is the cumulative server-owned history of those team-visible tiles; it
+is checkpointed and replayed, and clients replace their local exploration grid on every snapshot
+instead of accumulating whichever observer perspectives they happened to render. Allied
+non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
 legacy Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
 status, and safe combat tracers.
@@ -712,7 +716,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 43. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 44. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -738,7 +742,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 43,
+  "v": 44,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -756,6 +760,7 @@ adds an explicit application compression envelope.
   "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?]], // abilityObjects; omitted when empty
   "tr": [[id, x, y, radiusTiles]], // trenches; omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
+  "eg": [firstValue, runLen, ...], // RLE exploredTiles; omitted when empty/no-fog
   "wc": [1024, 2048],             // worldCombatPosition; omitted when inactive
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
@@ -1111,8 +1116,9 @@ the authoritative command issuer and rejects mixed-owner selections.
 
 Live spectator, replay, dev-watch, and Lab views pass one shared `ObserverView` through one
 projection seam: `Omniscient` or a non-empty set of real player ids. Omniscient means the complete
-world, all-owner private detail, all visible tiles, and the full event union; it is not an
-all-player fog union. Selected ids drive effective team fog, `visibleTiles`, entities,
+world, all-owner private detail, all visible and explored tiles, and the full event union; it is
+not an all-player fog union. Selected ids drive effective team fog, `visibleTiles`,
+`exploredTiles`, entities,
 remembered-building memory, private detail for explicitly selected owners, `playerResources`, and
 event unions. No observer view creates a command issuer. Lab `issueCommandAs` remains the only
 cross-player command path and is independently authorized.

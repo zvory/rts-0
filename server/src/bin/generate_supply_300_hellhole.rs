@@ -93,10 +93,11 @@ fn run(out: PathBuf) -> Result<(), String> {
     let json = serde_json::to_string(&payload)
         .map_err(|err| format!("failed to serialize scenario JSON: {err}"))?
         + "\n";
-    if json.len() > 1_000_000 {
+    if json.len() > rts_server::lab_scenarios::MAX_LAB_SCENARIO_IMPORT_JSON_BYTES {
         return Err(format!(
-            "scenario JSON is too large: {} bytes > 1,000,000",
-            json.len()
+            "scenario JSON is too large: {} bytes > {}",
+            json.len(),
+            rts_server::lab_scenarios::MAX_LAB_SCENARIO_IMPORT_JSON_BYTES
         ));
     }
     std::fs::write(&out, json)

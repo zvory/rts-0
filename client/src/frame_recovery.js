@@ -74,7 +74,12 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       frameViews.debug.selectedEntitiesCalls,
     );
     time("match.fog", () => {
-      match.fog.update(frameViews.fogSourceEntities, match.state.map.tileSize, match.state.visibleTiles);
+      match.fog.update(
+        frameViews.fogSourceEntities,
+        match.state.map.tileSize,
+        match.state.visibleTiles,
+        match.state.exploredTiles,
+      );
     });
 
     const projection = match.camera.projectionSnapshot();

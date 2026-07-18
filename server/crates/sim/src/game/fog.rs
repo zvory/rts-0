@@ -13,9 +13,9 @@
 //! provenance so combat can distinguish ordinary visibility from reveal-only visibility without
 //! maintaining a duplicate fog grid.
 //!
-//! Note the server only needs *currently visible* — the client maintains the "explored but
-//! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
-//! the sampled visible set.
+//! The server also owns cumulative per-player exploration. Keeping that history beside the
+//! authoritative current grids makes observer perspective changes and replay seeks independent of
+//! which views a particular client happened to render.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -76,6 +76,8 @@ pub struct Fog {
     size: u32,
     /// player id -> row-major visibility grid (`true` = visible in the latest sample).
     grids: HashMap<u32, Vec<bool>>,
+    /// player id -> cumulative row-major exploration grid (`true` = ever visible).
+    explored_grids: HashMap<u32, Vec<bool>>,
     /// Sampled firing-reveal provenance, rebuilt atomically with `grids`.
     ///
     /// The nested keys are viewer id -> revealed entity id. `reveal_only` means the entity's
@@ -89,6 +91,7 @@ impl Fog {
         Fog {
             size,
             grids: HashMap::new(),
+            explored_grids: HashMap::new(),
             firing_reveal_visibility: BTreeMap::new(),
         }
     }
@@ -96,11 +99,22 @@ impl Fog {
     pub(in crate::game) fn from_checkpoint_grids(
         size: u32,
         grids: BTreeMap<u32, Vec<bool>>,
+        mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
+        // Normalize legacy/malformed state to keep visible tiles explored.
+        for (&player, visible_grid) in &grids {
+            let explored_grid = explored_grids
+                .entry(player)
+                .or_insert_with(|| vec![false; visible_grid.len()]);
+            for (explored, visible) in explored_grid.iter_mut().zip(visible_grid) {
+                *explored = *explored || *visible;
+            }
+        }
         Fog {
             size,
             grids: grids.into_iter().collect(),
+            explored_grids: explored_grids.into_iter().collect(),
             firing_reveal_visibility,
         }
     }
@@ -111,6 +125,13 @@ impl Fog {
 
     pub(in crate::game) fn checkpoint_grids(&self) -> BTreeMap<u32, Vec<bool>> {
         self.grids
+            .iter()
+            .map(|(&player, grid)| (player, grid.clone()))
+            .collect()
+    }
+
+    pub(in crate::game) fn checkpoint_explored_grids(&self) -> BTreeMap<u32, Vec<bool>> {
+        self.explored_grids
             .iter()
             .map(|(&player, grid)| (player, grid.clone()))
             .collect()
@@ -186,6 +207,7 @@ impl Fog {
             stamp_sight(grid, size, e, map, &los);
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
+        self.accumulate_explored_for_players(players);
     }
 
     /// Add temporary death-vision sight sources to already-recomputed grids.
@@ -324,18 +346,61 @@ impl Fog {
     pub fn union_for(&self, viewer: u32, players: &[u32]) -> Self {
         let cells = (self.size * self.size) as usize;
         let mut union = vec![false; cells];
+        let mut explored_union = vec![false; cells];
         for player in players {
-            let Some(grid) = self.grids.get(player) else {
-                continue;
-            };
-            for (dst, src) in union.iter_mut().zip(grid.iter()) {
-                *dst = *dst || *src;
+            if let Some(grid) = self.grids.get(player) {
+                for (dst, src) in union.iter_mut().zip(grid.iter()) {
+                    *dst = *dst || *src;
+                }
+            }
+            if let Some(grid) = self.explored_grids.get(player) {
+                for (dst, src) in explored_union.iter_mut().zip(grid.iter()) {
+                    *dst = *dst || *src;
+                }
             }
         }
 
         let mut fog = Fog::new(self.size);
         fog.grids.insert(viewer, union);
+        fog.explored_grids.insert(viewer, explored_union);
         fog
+    }
+
+    /// Accumulate the current fog unions into each viewer's durable exploration history.
+    pub(in crate::game) fn accumulate_explored_for_viewers(
+        &mut self,
+        viewer_sources: &[(u32, Vec<u32>)],
+    ) {
+        let cells = self.size.saturating_mul(self.size) as usize;
+        for (viewer, sources) in viewer_sources {
+            let mut current_union = vec![false; cells];
+            for source in sources {
+                let Some(grid) = self.grids.get(source) else {
+                    continue;
+                };
+                for (dst, src) in current_union.iter_mut().zip(grid.iter()) {
+                    *dst = *dst || *src;
+                }
+            }
+            let explored = self
+                .explored_grids
+                .entry(*viewer)
+                .or_insert_with(|| vec![false; cells]);
+            if explored.len() != cells {
+                *explored = vec![false; cells];
+            }
+            for (dst, src) in explored.iter_mut().zip(current_union.iter()) {
+                *dst = *dst || *src;
+            }
+        }
+    }
+
+    fn accumulate_explored_for_players(&mut self, players: &[u32]) {
+        let viewer_sources = players
+            .iter()
+            .map(|player| (*player, vec![*player]))
+            .collect::<Vec<_>>();
+        self.accumulate_explored_for_viewers(&viewer_sources);
     }
 
     /// Whether a grid has been allocated for `player`.
@@ -347,6 +412,13 @@ impl Fog {
         self.grids
             .get(&player)
             .map(|grid| grid.iter().map(|visible| u8::from(*visible)).collect())
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn explored_tiles_for(&self, player: u32) -> Vec<u8> {
+        self.explored_grids
+            .get(&player)
+            .map(|grid| grid.iter().map(|explored| u8::from(*explored)).collect())
             .unwrap_or_default()
     }
 

@@ -34,7 +34,7 @@ mod stress_tests;
 mod wiki;
 
 use rts_server::db::Db;
-use rts_server::lab_scenarios::catalog_handler as lab_scenarios_handler;
+use rts_server::lab_scenarios::{catalog_handler, MAX_LAB_SCENARIO_IMPORT_JSON_BYTES};
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::protocol::{ClientMessage, ServerMessage};
 use rts_server::structured_log;
@@ -48,7 +48,7 @@ const DEFAULT_CLIENT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../client
 const DEFAULT_MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
 const RTS_CLIENT_DIR_ENV: &str = "RTS_CLIENT_DIR";
 const RTS_MAPS_DIR_ENV: &str = "RTS_MAPS_DIR";
-const MAX_CLIENT_MESSAGE_BYTES: usize = 1_000_000 + 64 * 1024; // lab scenario cap + envelope
+const MAX_CLIENT_MESSAGE_BYTES: usize = MAX_LAB_SCENARIO_IMPORT_JSON_BYTES + 64 * 1024;
 
 #[derive(Clone, Copy)]
 struct ClientMessageTiming {
@@ -263,7 +263,7 @@ async fn main() {
             "/dev/scenarios",
             get(dev_scenario_pages::dev_scenario_handler),
         )
-        .route("/api/lab-scenarios", get(lab_scenarios_handler))
+        .route("/api/lab-scenarios", get(catalog_handler))
         .route(
             "/api/map-handoffs",
             post(map_handoffs::create_handler).layer(DefaultBodyLimit::max(512 * 1024)),

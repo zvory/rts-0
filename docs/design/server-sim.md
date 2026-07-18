@@ -135,7 +135,8 @@ impl Game {
     pub fn tick(&mut self) -> Vec<(u32 /*player*/, Vec<Event>)>;
 
     /// Build the fog-filtered snapshot for one player at the current tick. Entity visibility and
-    /// visibleTiles use the union of living teammates' current fog; resources/upgrades stay local.
+    /// visibleTiles use living-team current fog and exploredTiles use server-owned team history;
+    /// resources/upgrades stay local.
     pub fn snapshot_for(&self, player: u32) -> Snapshot;
 
     /// Same projection as `snapshot_for`, with explicit room-projection diagnostic options such as
@@ -408,7 +409,9 @@ selected-unit ownership, production/research/cancel authority, build/gather owne
 control, supply, upgrades, and resource spending. Snapshot entity visibility and `visibleTiles`
 use the union of current fog from living teammates on the recipient's team. A defeated or
 disconnected teammate has no live entities and no longer contributes current sight; a defeated
-player whose team still has a living member still receives that surviving team vision. Allied
+player whose team still has a living member still receives that surviving team vision.
+`exploredTiles` is accumulated authoritatively from the effective team fog after all ordinary,
+Scout Plane, lingering-death, and firing-reveal stamps, then persisted in checkpoints. Allied
 visible entities project full read-only inspection details, but command authority, economy,
 resources/supply/upgrades, rally/order plans, ability controls, and debug path overlays remain
 exact-owner-only. Combat target ids and weapon facing for allied entities are projected only when

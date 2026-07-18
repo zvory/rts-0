@@ -252,15 +252,17 @@ pub(super) fn validate_fog(
     let cells = (map.size as usize)
         .checked_mul(map.size as usize)
         .ok_or(CheckpointPayloadError::InvalidValue { field: "fog.size" })?;
-    for (&player, grid) in &fog.grids {
-        if !player_ids.contains(&player) {
-            return Err(CheckpointPayloadError::InvalidReference {
-                field: "fog.grids",
-                id: player,
-            });
-        }
-        if grid.len() != cells {
-            return Err(CheckpointPayloadError::InvalidValue { field: "fog.grids" });
+    for (field, grids) in [
+        ("fog.grids", &fog.grids),
+        ("fog.exploredGrids", &fog.explored_grids),
+    ] {
+        for (&player, grid) in grids {
+            if !player_ids.contains(&player) {
+                return Err(CheckpointPayloadError::InvalidReference { field, id: player });
+            }
+            if grid.len() != cells {
+                return Err(CheckpointPayloadError::InvalidValue { field });
+            }
         }
     }
     validate_firing_reveal_visibility(fog, player_ids, entity_next_id, tick)?;

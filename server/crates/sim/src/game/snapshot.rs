@@ -236,6 +236,13 @@ impl Game {
             } else {
                 Vec::new()
             },
+            explored_tiles: if omniscient {
+                self.state.fog.all_visible_tiles()
+            } else if fogged {
+                fog.explored_tiles_for(player)
+            } else {
+                Vec::new()
+            },
             remembered_buildings,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
