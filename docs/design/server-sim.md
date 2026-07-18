@@ -1509,10 +1509,12 @@ Allocation rules:
   chosen idle caster's active order with an ability movement order. Abilities may also explicitly
   allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
   stops the mortar's current movement and clears future queued intents.
-- Support-weapon setup is a queueable facing intent for selected Anti-Tank Guns, Mortar Teams, and
-  Artillery. The stored point means "face toward this world point from wherever the weapon is when
-  the setup stage promotes"; mixed
-  selections ignore non-setup-capable units for setup but keep them for later compatible orders.
+- Support-weapon setup is queueable for selected Anti-Tank Guns, Mortar Teams, and Artillery. Anti-
+  Tank Guns and Artillery store a point meaning "face toward this world point from wherever the
+  weapon is when the setup stage promotes." Mortar Teams instead retain their current facing and
+  treat queued setup as terminal: they finish preceding orders, set up in place, and reject later
+  queued stages. Mixed selections ignore non-setup-capable units for setup but keep them for later
+  compatible orders.
 - Artillery Point Fire and Blanket Fire are queueable, terminal per-gun fire orders. Issue-time
   admission stores a locked effective fire point for Point Fire or locked blanket center for
   Blanket Fire, not the raw clicked point. Immediate fire commands can accept packed artillery and

@@ -538,7 +538,13 @@ fn order_plan(
         plan.push(marker);
     }
     plan.extend(entity.queued_orders().iter().filter_map(|intent| {
-        let marker = intent_plan_marker(intent, stage_position, entities, viewer, fog, smokes);
+        let marker = if entity.kind == EntityKind::MortarTeam
+            && matches!(intent, OrderIntent::SetupAntiTankGuns(_))
+        {
+            point_marker("setupAntiTankGuns", stage_position.0, stage_position.1)
+        } else {
+            intent_plan_marker(intent, stage_position, entities, viewer, fog, smokes)
+        };
         if let Some(marker) = marker.as_ref() {
             stage_position = (marker.x, marker.y);
         }

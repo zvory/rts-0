@@ -1,3 +1,5 @@
+import { KIND } from "./protocol.js";
+
 export function moveDescriptor(ctx, unitIds) {
   return {
     id: "unit:move",
@@ -53,5 +55,31 @@ export function stopDescriptor(unitIds) {
     label: "Stop",
     title: "Stop current orders",
     enabled: unitIds.length > 0,
+  };
+}
+
+export function setupSupportWeaponDescriptor(ctx, setupWeapons) {
+  const mortars = setupWeapons.filter((entity) => entity.kind === KIND.MORTAR_TEAM);
+  const mortarOnly = mortars.length > 0 && mortars.length === setupWeapons.length;
+  return {
+    id: "unit:setup",
+    commandId: "unit.setupSupportWeapon",
+    kind: "button",
+    action: "setupAntiTankGuns",
+    intent: mortarOnly
+      ? {
+          type: "setupMortars",
+          unitIds: mortars.map((entity) => entity.id),
+          x: Number.isFinite(mortars[0]?.x) ? mortars[0].x : 0,
+          y: Number.isFinite(mortars[0]?.y) ? mortars[0].y : 0,
+        }
+      : { type: "beginCommandTarget", target: "setupAntiTankGuns" },
+    icon: "SET",
+    label: "Set Up",
+    title: mortarOnly
+      ? "Set up selected mortars in place (hold Shift to queue)"
+      : "Set up selected support weapons toward a target point",
+    enabled: true,
+    cls: ctx.commandTarget === "setupAntiTankGuns" ? "active" : "",
   };
 }

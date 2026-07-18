@@ -1,5 +1,5 @@
 import { CommandComposer } from "./command_composer.js";
-import { ABILITY, CMD, ORDER_STAGE } from "./protocol.js";
+import { ABILITY, CMD, KIND, ORDER_STAGE } from "./protocol.js";
 
 const ARTILLERY_TERMINAL_STAGES = new Set([
   ORDER_STAGE.POINT_FIRE,
@@ -284,7 +284,7 @@ export class ClientIntent {
     const merged = [];
     for (const stage of base.concat(local)) {
       merged.push(publicOrderStage(stage));
-      if (QUEUE_TERMINAL_STAGES.has(stage.kind)) break;
+      if (stageIsTerminalForEntity(stage, entity)) break;
     }
     return merged;
   }
@@ -373,10 +373,10 @@ export class ClientIntent {
       : Array.isArray(entity?.orderPlan)
         ? entity.orderPlan
         : [];
-    if (planHasTerminal(authorityPlan)) return;
-    if (planHasTerminal(current)) return;
+    if (planHasTerminal(authorityPlan, entity)) return;
+    if (planHasTerminal(current, entity)) return;
     const next = replaceContradictoryLocalStages(current, stage);
-    next.push(cloneStage(stage));
+    next.push(queuedStageForEntity(stage, authorityPlan.concat(next), entity));
     this._plannedOrderStagesByUnit.set(unitId, next);
   }
 
@@ -509,8 +509,32 @@ function replaceContradictoryLocalStages(stages, nextStage) {
   return out;
 }
 
-function planHasTerminal(plan) {
-  return Array.isArray(plan) && plan.some((stage) => QUEUE_TERMINAL_STAGES.has(stage?.kind));
+function planHasTerminal(plan, entity = null) {
+  return Array.isArray(plan) && plan.some((stage) => stageIsTerminalForEntity(stage, entity));
+}
+
+function stageIsTerminalForEntity(stage, entity = null) {
+  return QUEUE_TERMINAL_STAGES.has(stage?.kind) ||
+    (entity?.kind === KIND.MORTAR_TEAM &&
+      stage?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
+      !stage?.replacesAuthority);
+}
+
+function queuedStageForEntity(stage, precedingStages, entity = null) {
+  if (
+    entity?.kind !== KIND.MORTAR_TEAM ||
+    stage?.kind !== ORDER_STAGE.SETUP_ANTI_TANK_GUNS
+  ) {
+    return cloneStage(stage);
+  }
+  const precedingPoint = [...precedingStages]
+    .reverse()
+    .find((candidate) => Number.isFinite(candidate?.x) && Number.isFinite(candidate?.y));
+  const x = Number.isFinite(precedingPoint?.x) ? precedingPoint.x : entity?.x;
+  const y = Number.isFinite(precedingPoint?.y) ? precedingPoint.y : entity?.y;
+  return Number.isFinite(x) && Number.isFinite(y)
+    ? cloneStage(stage, { x, y })
+    : cloneStage(stage);
 }
 
 function stageConfirmedByAuthority(stage, authorityPlan) {
