@@ -1133,7 +1133,7 @@ unattributed: it does not update `last_damage_owner`/position/tick, does not tri
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
 Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research plus a
 fully deployed Mortar Team. Acquisition and firing are restricted to the full 360-degree field of
-fire and the five-to-15-tile range band. Autocast targets each unit's current position without
+fire and the five-to-17-tile range band. Autocast targets each unit's current position without
 movement lead, then applies normal deterministic scatter. Before
 scheduling a shell, combat checks the deterministic scattered impact point against owned and allied
 units/buildings at their current positions and holds fire if any would be inside the damaging radius. Autocast

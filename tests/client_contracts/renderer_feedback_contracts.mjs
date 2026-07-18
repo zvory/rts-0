@@ -649,8 +649,8 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   const mortarCircles = mortarRangeGfx.calls.filter((call) => call[0] === "drawCircle");
   assert(
-    mortarCircles.some((call) => call[3] === 480) && mortarCircles.some((call) => call[3] === 160),
-    "selected deployed mortar draws its 15-tile outer circle and five-tile dead zone",
+    mortarCircles.some((call) => call[3] === 544) && mortarCircles.some((call) => call[3] === 160),
+    "selected deployed mortar draws its 17-tile outer circle and five-tile dead zone",
   );
   assert(
     mortarRangeGfx.calls.some((call) => call[0] === "beginHole") &&
