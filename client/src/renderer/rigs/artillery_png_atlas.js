@@ -10,13 +10,16 @@ function deepFreeze(value) {
   return value;
 }
 
-const CARRIAGE_PPU = 13.75;
-const TRAIL_PPU = 15;
-const PACKED_TRAIL_PPU = 30;
-const BARREL_PPU = 11.28;
-const TRAIL_ROOT_X = -3.024;
-const DEPLOYED_TRAIL_ROTATION = 0.54;
-const PACKED_TRAIL_ROTATION = 0.22;
+const CARRIAGE_PPU_X = 21.34;
+const CARRIAGE_PPU_Y = 9.72;
+const TRAIL_PPU = 26.4;
+const PACKED_TRAIL_PPU = 52.8;
+const BARREL_PPU = 13.3;
+const TRAIL_ROOT_X = 0;
+const LEFT_DEPLOYED_TRAIL_ROTATION = 2.1108;
+const RIGHT_DEPLOYED_TRAIL_ROTATION = 1.0308;
+const LEFT_PACKED_TRAIL_ROTATION = 1.7908;
+const RIGHT_PACKED_TRAIL_ROTATION = 1.3508;
 const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 82, saturation: 90 });
 
 const WHEEL_NAMES = Object.freeze([
@@ -75,23 +78,23 @@ function sprite(id, animationPart, sourceParts, drawOrder, frame, options = {}) 
 }
 
 const LEFT_TRAIL_FRAME = Object.freeze({
-  x: 112,
-  y: 244,
-  w: 539,
-  h: 203,
-  originX: 486,
-  originY: 81,
+  x: 108,
+  y: 38,
+  w: 169,
+  h: 949,
+  originX: 91,
+  originY: 33,
   pixelsPerUnitX: TRAIL_PPU,
   pixelsPerUnitY: TRAIL_PPU,
 });
 
 const RIGHT_TRAIL_FRAME = Object.freeze({
-  x: 112,
-  y: 590,
-  w: 539,
-  h: 205,
-  originX: 486,
-  originY: 82,
+  x: 332,
+  y: 38,
+  w: 168,
+  h: 949,
+  originX: 77,
+  originY: 32,
   pixelsPerUnitX: TRAIL_PPU,
   pixelsPerUnitY: TRAIL_PPU,
 });
@@ -109,23 +112,23 @@ const RIGHT_TRAIL_PACKED_FRAME = Object.freeze({
 });
 
 const CARRIAGE_FRAME = Object.freeze({
-  x: 743,
-  y: 134,
-  w: 440,
-  h: 437,
-  originX: 247,
-  originY: 216,
-  pixelsPerUnitX: CARRIAGE_PPU,
-  pixelsPerUnitY: CARRIAGE_PPU,
+  x: 600,
+  y: 138,
+  w: 683,
+  h: 311,
+  originX: 341,
+  originY: 162,
+  pixelsPerUnitX: CARRIAGE_PPU_X,
+  pixelsPerUnitY: CARRIAGE_PPU_Y,
 });
 
 const BARREL_ASSEMBLY_FRAME = Object.freeze({
-  x: 687,
-  y: 639,
-  w: 794,
-  h: 213,
-  originX: 254,
-  originY: 120,
+  x: 568,
+  y: 480,
+  w: 935,
+  h: 420,
+  originX: 346,
+  originY: 232,
   pixelsPerUnitX: BARREL_PPU,
   pixelsPerUnitY: BARREL_PPU,
 });
@@ -150,12 +153,12 @@ function trailSprite(side, suffix, frame, rotationOffset, tintSlot) {
 export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "artillery",
-  image: "/assets/rigs/artillery-a19-pass-01/generated/artillery-a19-components-pass-01-alpha-debug.png?v=a19-pass01-purple-left-frame-debug",
+  image: "/assets/rigs/artillery-a19-pass-02/generated/artillery-a19-components-pass-02-alpha-debug.png?v=a19-pass02-elevated-purple-left-frame-debug",
   grid: {
     profile: "semantic-components-debug",
-    sourceSheet: "client/assets/rigs/artillery-a19-pass-01/generated/artillery-a19-components-pass-01-alpha-debug.png",
-    generatedSource: "client/assets/rigs/artillery-a19-pass-01/generated/artillery-a19-components-pass-01-source.png",
-    imageVersion: "a19-pass01-purple-left-frame-debug",
+    sourceSheet: "client/assets/rigs/artillery-a19-pass-02/generated/artillery-a19-components-pass-02-alpha-debug.png",
+    generatedSource: "client/assets/rigs/artillery-a19-pass-02/generated/artillery-a19-components-pass-02-source.png",
+    imageVersion: "a19-pass02-elevated-purple-left-frame-debug",
     diagnostics: {
       leftTrailTint: "#a05cff",
       trailFrameStroke: "#000000",
@@ -169,10 +172,10 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
   },
   frames: {},
   sprites: [
-    trailSprite("left", "packed", LEFT_TRAIL_PACKED_FRAME, PACKED_TRAIL_ROTATION, "#a05cff"),
-    trailSprite("right", "packed", RIGHT_TRAIL_PACKED_FRAME, -PACKED_TRAIL_ROTATION, "fixed"),
-    trailSprite("left", "deployed", LEFT_TRAIL_FRAME, DEPLOYED_TRAIL_ROTATION, "#a05cff"),
-    trailSprite("right", "deployed", RIGHT_TRAIL_FRAME, -DEPLOYED_TRAIL_ROTATION, "fixed"),
+    trailSprite("left", "packed", LEFT_TRAIL_PACKED_FRAME, LEFT_PACKED_TRAIL_ROTATION, "#a05cff"),
+    trailSprite("right", "packed", RIGHT_TRAIL_PACKED_FRAME, RIGHT_PACKED_TRAIL_ROTATION, "fixed"),
+    trailSprite("left", "deployed", LEFT_TRAIL_FRAME, LEFT_DEPLOYED_TRAIL_ROTATION, "#a05cff"),
+    trailSprite("right", "deployed", RIGHT_TRAIL_FRAME, RIGHT_DEPLOYED_TRAIL_ROTATION, "fixed"),
     sprite(
       "sprite.art.carriage.packed",
       artilleryPart("axle", "packed"),

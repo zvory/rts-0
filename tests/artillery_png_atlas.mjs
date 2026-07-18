@@ -15,6 +15,7 @@ import { fakeAtlasTexture, makeRigRenderer } from "./helpers/rig_renderer_harnes
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 assert.equal(createLivePngRigAtlases().get(KIND.ARTILLERY), ARTILLERY_PNG_RIG_ATLAS);
+assert.match(ARTILLERY_PNG_RIG_ATLAS.image, /artillery-a19-pass-02/);
 const result = compileSvgRig(ARTILLERY_RIG_SVG, { expectedKind: KIND.ARTILLERY });
 assert.equal(result.ok, true, JSON.stringify(result.errors));
 const definition = result.definition;
@@ -34,7 +35,7 @@ for (const sprite of [deployedLeftTrail, deployedRightTrail, deployedCarriage, d
 }
 assert.deepEqual(
   [deployedLeftTrail.frame, deployedRightTrail.frame].map(({ x, y, w, h }) => [x, y, w, h]),
-  [[112, 244, 539, 203], [112, 590, 539, 205]],
+  [[108, 38, 169, 949], [332, 38, 168, 949]],
 );
 const atlasImageSize = readPngDimensions(`client${ARTILLERY_PNG_RIG_ATLAS.image.split("?")[0]}`);
 for (const sprite of ARTILLERY_PNG_RIG_ATLAS.sprites) {
@@ -90,9 +91,10 @@ for (const display of [leftTrail, rightTrail, carriage, barrel]) {
 assert.equal(leftTrail.tint, 0xa05cff);
 assert.equal(rightTrail.tint, 0xffffff);
 assert.ok(leftTrail.rotation > 0);
-assert.ok(rightTrail.rotation < 0);
-assert.ok(Math.abs(leftTrail.scaleX - 1 / 15) < 0.001);
-assert.ok(Math.abs(barrel.scaleX - 1 / 11.28) < 0.001);
+assert.ok(rightTrail.rotation > 0);
+assert.ok(leftTrail.rotation - rightTrail.rotation > 0.5);
+assert.ok(Math.abs(leftTrail.scaleX - 1 / 26.4) < 0.001);
+assert.ok(Math.abs(barrel.scaleX - 1 / 13.3) < 0.001);
 
 console.log("artillery PNG atlas contract passed");
 
