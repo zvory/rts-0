@@ -29,8 +29,8 @@ RUN test -s ./client/assets/snapshot-streams/supply-300-hellhole.rtsstream \
     && test -s ./client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png \
-    && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/rifleman-no-pack-white-review-strip.png \
-    && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png \
+    && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png \
+    && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png \
     && test -s ./client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png \
     && test -s ./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png \
     && test -s ./client/assets/rigs/tank-ps1/tank-atlas.png
