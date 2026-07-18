@@ -8,16 +8,20 @@ function deepFreeze(value) {
 export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "rifleman",
-  image: "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png?v=panzerfaust-composited-dim70-1",
-  imageVersion: "panzerfaust-composited-dim70-1",
+  image: "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png?v=recoil-review-1",
+  imageVersion: "recoil-review-1",
   frameWidth: 160,
   frameHeight: 112,
-  frameCount: 4,
+  frameCount: 5,
   idleFrame: 0,
   movementFrames: [1, 2, 3],
-  firingFrames: [],
+  firingFrames: [4],
+  firingWeaponKinds: ["rifleman_rifle"],
+  firingFrameHoldPhase: 0.2,
   fps: 8,
   worldScale: 0.34,
+  originForwardPx: 10,
+  firingRecoilPx: 4,
   tintSlot: "team-light",
   bakedColorAdjustment: {
     brightness: 100,
@@ -32,6 +36,6 @@ export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
   source: {
     launcherSource: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/idle-runtime.png",
     launcherLayer: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-layer.png",
-    runtimeStrip: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png",
+    runtimeStrip: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png",
   },
 });

@@ -1116,6 +1116,7 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   assert.equal(stripInstance.sprite.texture.frame.x, 0);
   assert.equal(stripInstance.container.rotation, entity.weaponFacing);
   assert.equal(stripInstance.sprite.scaleX, strip.worldScale);
+  assert.equal(stripInstance.sprite.x, 10);
   assert.equal(stripInstance.sprite.tint, 0x6194c7);
 
   renderNow = 1000 / strip.fps;

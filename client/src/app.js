@@ -123,6 +123,10 @@ export class App {
   } = {}) {
     /** @type {Net} connection opened on demand and retained across an active room + match. */
     this.net = net || new Net(wsUrl(), diagnostics);
+    // Install this capture listener before any app-owned keyboard listeners so
+    // the terminal transport overlay can actually block gameplay and menus.
+    this.onConnectionLostKeyDown = this.onConnectionLostKeyDown.bind(this);
+    window.addEventListener("keydown", this.onConnectionLostKeyDown, true);
     this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.stressTestLaunch = stressTestLaunch;
     this.stressTestRunner = stressTestLaunch
@@ -262,7 +266,7 @@ export class App {
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.stressTestRunner?.fail("The Hellhole workload could not be loaded.");
-      this.showConnectionWarning(
+      this.showConnectionLost(
         "Unable to connect after several attempts. Refresh to try again.",
       );
     }
@@ -575,7 +579,7 @@ export class App {
       ? "Server connection lost. Refresh when the server is available."
       : "Unable to connect to the server. Make sure it is running, then refresh.";
     this.labCatalog?.setConnected(false);
-    this.showConnectionWarning(text);
+    this.showConnectionLost(text);
   }
 
   /** Clear the heartbeat interval if one is running. Idempotent. */
@@ -1109,6 +1113,39 @@ export class App {
     this.showToast(text);
     if (this.lobby) this.lobby.setStatus(text, true);
     this.labCatalog?.setStatus(text, { error: true });
+  }
+
+  /**
+   * Block the application with a persistent transport warning. Unlike a toast,
+   * this remains visible for the rest of this application session. A new
+   * socket cannot resume the current server-side player or spectator seat, so
+   * recovery requires reloading the page.
+   * @param {string} text
+   */
+  showConnectionLost(text = "The game can no longer reach the server.") {
+    if (dom.connectionLostDetail) dom.connectionLostDetail.textContent = text;
+    if (dom.connectionLost) dom.connectionLost.hidden = false;
+    this.match?.input?.exitPointerLock?.();
+    dom.connectionLostReload?.focus();
+    if (this.lobby) this.lobby.setStatus(text, true);
+    this.labCatalog?.setStatus(text, { error: true });
+  }
+
+  /** Keep keyboard input inside the terminal connection-loss dialog. */
+  onConnectionLostKeyDown(ev) {
+    if (!dom.connectionLost || dom.connectionLost.hidden) return;
+    ev.stopImmediatePropagation();
+    if (
+      (ev.key === "Enter" || ev.key === " ") &&
+      ev.target === dom.connectionLostReload
+    ) {
+      ev.preventDefault();
+      dom.connectionLostReload.click();
+      return;
+    }
+    if (ev.key !== "Tab") return;
+    ev.preventDefault();
+    dom.connectionLostReload?.focus();
   }
 
   /** Fetch and display the build version in the shared top-left badge. */

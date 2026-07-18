@@ -22,6 +22,7 @@
     <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./apm.css" />
+    <link rel="stylesheet" href="./connection_lost.css" />
   </head>
   <body>
     <!--
@@ -40,7 +41,7 @@
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-observation, #game-over-scores,
                 #game-over-button
-        App:    #toast
+        App:    #toast, #connection-lost, #connection-lost-detail, #connection-lost-reload
     -->
     <div id="app">
       <div id="version" aria-label="game version"></div>
@@ -248,6 +249,29 @@
         <div id="settings-menu" class="hud-panel" role="dialog" aria-modal="false" aria-labelledby="settings-title" hidden></div>
       </div>
       <div id="toast" hidden></div>
+
+      <!-- Persistent, blocking transport failure notice -->
+      <div
+        id="connection-lost"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="connection-lost-title"
+        aria-describedby="connection-lost-detail"
+        hidden
+      >
+        <div class="connection-lost-box">
+          <div class="connection-lost-signal" aria-hidden="true">
+            <span></span>
+          </div>
+          <p class="connection-lost-kicker">Network status</p>
+          <h1 id="connection-lost-title">Server connection lost</h1>
+          <p id="connection-lost-detail">The game can no longer reach the server.</p>
+          <p class="connection-lost-persistence">
+            Reload the game when the server is available.
+          </p>
+          <a id="connection-lost-reload" href="">Reload game</a>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="./src/main.js"></script>

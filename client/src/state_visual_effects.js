@@ -21,6 +21,7 @@ const WEAPON_RECOIL_MS_BY_WEAPON_KIND = Object.freeze({
   [WEAPON_KIND.PANZERFAUST_LOADED_SHOT]: 620,
   [WEAPON_KIND.TANK_CANNON]: WEAPON_RECOIL_MS[KIND.TANK],
 });
+const WEAPON_KINDS = new Set(Object.values(WEAPON_KIND));
 
 export class VisualEffectBuffers {
   constructor() {
@@ -371,6 +372,10 @@ export class VisualEffectBuffers {
     return clamp01(sample.age / sample.ttlMs);
   }
 
+  weaponRecoilKind(id) {
+    return normalizedWeaponKind(this.weaponRecoilById.get(id)?.weaponKind);
+  }
+
   _weaponRecoilSample(id, kind, now, weaponKind) {
     if (typeof now !== "number") {
       now = kind;
@@ -513,6 +518,9 @@ export class VisualEffectBackedState {
   weaponRecoilPhase(id, kind, now, weaponKind) {
     return this.visualEffects.weaponRecoilPhase(id, kind, now, weaponKind);
   }
+  weaponRecoilKind(id) {
+    return this.visualEffects.weaponRecoilKind(id);
+  }
 }
 
 function recoilRecord(startedAt, weaponKind) {
@@ -521,7 +529,7 @@ function recoilRecord(startedAt, weaponKind) {
 }
 
 function normalizedWeaponKind(weaponKind) {
-  return Object.values(WEAPON_KIND).includes(weaponKind) ? weaponKind : undefined;
+  return WEAPON_KINDS.has(weaponKind) ? weaponKind : undefined;
 }
 
 function recoilMsFor(kind, weaponKind) {

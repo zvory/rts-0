@@ -35,7 +35,7 @@ for (const sprite of [deployedLeftTrail, deployedRightTrail, deployedCarriage, d
 }
 assert.deepEqual(
   [deployedLeftTrail.frame, deployedRightTrail.frame].map(({ x, y, w, h }) => [x, y, w, h]),
-  [[110, 190, 573, 228], [110, 574, 573, 228]],
+  [[88, 195, 541, 217], [87, 602, 541, 216]],
 );
 const atlasImageSize = readPngDimensions(`client${ARTILLERY_PNG_RIG_ATLAS.image.split("?")[0]}`);
 for (const sprite of ARTILLERY_PNG_RIG_ATLAS.sprites) {
@@ -49,9 +49,13 @@ assert.ok(deployedLeftTrail.sourceParts.includes("part.art.foot.left.deployed"))
 assert.ok(deployedRightTrail.sourceParts.includes("part.art.foot.right.deployed"));
 assert.ok(deployedBarrel.sourceParts.includes("part.art.cradle.deployed"));
 assert.equal(deployedCarriage.sourceParts.includes("part.art.cradle.deployed"), false);
-assert.equal(deployedLeftTrail.tintSlot, "#a05cff");
-assert.equal(deployedRightTrail.tintSlot, "fixed");
-assert.equal(ARTILLERY_PNG_RIG_ATLAS.grid.diagnostics.trailFrameStroke, "#000000");
+assert.equal(deployedLeftTrail.tintSlot, "team-light");
+assert.equal(deployedRightTrail.tintSlot, "team-light");
+assert.equal("diagnostics" in ARTILLERY_PNG_RIG_ATLAS.grid, false);
+assert.ok(Math.abs(deployedLeftTrail.positionOffsetX - (-3.024 - (541 / 15) * 0.5)) < 0.001);
+assert.ok(Math.abs(deployedRightTrail.positionOffsetX - (-3.024 - (541 / 15) * 0.5)) < 0.001);
+assert.ok(Math.abs(deployedLeftTrail.positionOffsetY - (-(217 / 15) * 0.1)) < 0.001);
+assert.ok(Math.abs(deployedRightTrail.positionOffsetY - ((216 / 15) * 0.1)) < 0.001);
 
 const entity = {
   id: 47,
@@ -88,14 +92,14 @@ for (const display of [leftTrail, rightTrail, carriage, barrel]) {
   assert.equal(display.visible, true);
   assert.equal(display.alpha, 1);
 }
-assert.equal(leftTrail.tint, 0xa05cff);
-assert.equal(rightTrail.tint, 0xffffff);
+assert.equal(leftTrail.tint, rightTrail.tint);
+assert.notEqual(leftTrail.tint, 0xffffff);
 assert.ok(leftTrail.rotation > 0);
 assert.ok(rightTrail.rotation < 0);
 assert.ok(Math.abs(leftTrail.scaleX - 1 / 15) < 0.001);
-assert.ok(Math.abs(barrel.scaleX - 1 / 10.4) < 0.001);
-assert.ok(Math.abs(barrel.scaleY - 1 / 12) < 0.001);
-assert.ok(Math.abs(barrel.rotation - 0.44) < 0.001);
+assert.ok(Math.abs(barrel.scaleX - 1 / 11.9) < 0.001);
+assert.ok(Math.abs(barrel.scaleY - 1 / 11.9) < 0.001);
+assert.ok(Math.abs(barrel.rotation) < 0.001);
 
 console.log("artillery PNG atlas contract passed");
 
