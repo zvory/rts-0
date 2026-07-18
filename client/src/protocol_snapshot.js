@@ -194,14 +194,15 @@ function decodeCompactNetStatus(record) {
 }
 
 function decodeCompactPlayerResource(record, index) {
-  const fields = readArray(record, `playerResource ${index}`, 5);
-  if (fields.length < 5) throw new Error(`playerResource ${index} is too short`);
+  const fields = readArray(record, `playerResource ${index}`, 6);
+  if (fields.length < 6) throw new Error(`playerResource ${index} is too short`);
   return {
     id: readU32(fields[0], "playerResource.id"),
     steel: readU32(fields[1], "playerResource.steel"),
     oil: readU32(fields[2], "playerResource.oil"),
     supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
     supplyCap: readU32(fields[4], "playerResource.supplyCap"),
+    apm: readU32(fields[5], "playerResource.apm"),
   };
 }
 

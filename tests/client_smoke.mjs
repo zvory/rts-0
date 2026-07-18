@@ -121,11 +121,13 @@ try {
     m: document.getElementById("res-steel")?.textContent,
     s: document.getElementById("res-supply")?.textContent,
     gameTime: document.getElementById("game-timer")?.textContent,
+    apm: document.getElementById("apm-counter")?.textContent,
   }));
   ok(parseInt(hud.m, 10) >= 50, `HUD shows steel (${hud.m})`);
   ok(/\d+\s*\/\s*\d+/.test(hud.s || ""), `HUD shows supply (${hud.s})`);
   ok(/^\d{2}:\d{2}$/.test(hud.gameTime || "") && hud.gameTime !== "00:00",
     `HUD game timer is visible and advancing (${hud.gameTime})`);
+  ok(/^\d+$/.test(hud.apm || ""), `HUD APM counter is visible as a raw number (${hud.apm})`);
 
   const own = await page.evaluate(() => {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);

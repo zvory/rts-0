@@ -294,6 +294,7 @@ export function assertScoreProtocol(ok, gameOver, { expectedPlayers } = {}) {
     ok(typeof score.teamId === "number" && score.teamId > 0,
       `SCORE: player teamId is nonzero for ${score.name} (${score.teamId})`);
     ok(typeof score.name === "string" && score.name.length > 0, `SCORE: player has name (${score.name})`);
+    ok(typeof score.apm === "number", `SCORE: apm is numeric for ${score.name}`);
     ok(typeof score.unitScore === "number", `SCORE: unitScore is numeric for ${score.name}`);
     ok(typeof score.structureScore === "number", `SCORE: structureScore is numeric for ${score.name}`);
     ok(typeof score.unitsLost === "number", `SCORE: unitsLost is numeric for ${score.name}`);

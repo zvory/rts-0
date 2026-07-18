@@ -824,6 +824,7 @@ export class App {
     const columns = [
       ["player", "Player"],
       ["teamId", "Team"],
+      ["apm", "APM"],
       ["unitScore", "Unit score"],
       ["structureScore", "Structure score"],
       ["unitsKilled", "Units killed"],

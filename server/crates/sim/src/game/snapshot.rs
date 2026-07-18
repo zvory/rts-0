@@ -344,6 +344,7 @@ impl Game {
                 oil: player.oil,
                 supply_used: player.supply_used,
                 supply_cap: config::PLAYER_SUPPLY_CAP,
+                apm: self.current_apm(player.id),
             })
             .collect()
     }

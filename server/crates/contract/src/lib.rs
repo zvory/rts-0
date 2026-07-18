@@ -294,6 +294,8 @@ pub struct PlayerScore {
     pub team_id: TeamId,
     pub name: String,
     pub color: String,
+    #[serde(default)]
+    pub apm: u32,
     pub unit_score: u32,
     pub structure_score: u32,
     pub units_killed: u32,
@@ -442,6 +444,8 @@ pub struct PlayerResourceSnapshot {
     pub oil: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
+    /// Rolling command-envelope rate over the last ten simulated seconds.
+    pub apm: u32,
 }
 
 /// Dynamic resource state the client is currently allowed to know.

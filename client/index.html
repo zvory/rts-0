@@ -21,6 +21,7 @@
     -->
     <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./apm.css" />
     <link rel="stylesheet" href="./connection_lost.css" />
   </head>
   <body>
@@ -33,9 +34,9 @@
                 pre-join product controls.
         Game:   #game-screen, #viewport (selected renderer canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
-                #game-timer, #idle-workers, #idle-workers-count, #minimap (canvas),
+                #game-timer, #apm-counter, #idle-workers, #idle-workers-count, #minimap (canvas),
                 #selection-area, #control-group-tabs,
-                #selected-panel, #command-card,
+                #selected-panel, #command-card-stack, #command-card,
                 #game-menu, #settings-button, #settings-menu, #pointer-lock-toggle,
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-observation, #game-over-scores,
@@ -195,8 +196,11 @@
           <div id="selected-panel"></div>
         </div>
 
-        <!-- Bottom-right command card -->
-        <div id="command-card"></div>
+        <!-- Bottom-right APM readout and command card -->
+        <div id="command-card-stack">
+          <div id="apm-counter" class="apm-counter" aria-label="Current actions per minute">0</div>
+          <div id="command-card"></div>
+        </div>
 
         <!-- Give-up confirmation -->
         <div id="give-up-confirm" hidden>

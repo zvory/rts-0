@@ -45,6 +45,7 @@ pub(super) fn entity_score_value(kind: EntityKind) -> u32 {
 
 impl Game {
     pub fn scores(&self) -> Vec<PlayerScore> {
+        let duration_ticks = self.state.tick;
         self.state
             .players
             .iter()
@@ -53,6 +54,14 @@ impl Game {
                 team_id: p.team_id,
                 name: p.name.clone(),
                 color: p.color.clone(),
+                apm: apm::average_after_opening(
+                    self.state
+                        .command_log
+                        .iter()
+                        .filter(|entry| entry.player_id == p.id)
+                        .map(|entry| entry.tick),
+                    duration_ticks,
+                ),
                 unit_score: p.score.unit_score,
                 structure_score: p.score.structure_score,
                 units_killed: p.score.units_killed,

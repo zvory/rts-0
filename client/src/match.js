@@ -8,6 +8,7 @@ import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { FrameProfiler } from "./frame_profiler.js";
 import { HUD } from "./hud.js";
+import { ApmTracker } from "./apm_tracker.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
@@ -149,6 +150,7 @@ export class Match {
       predictor: this.predictionAdapter,
       sendCommand: (command, clientSeq) => this.net.command(command, clientSeq),
     });
+    this.apmTracker = new ApmTracker();
     if (!!options.predictionEnabled && !this.prediction.enabled && this.predictionCompatibility.reason) {
       this.prediction.recordDisableReason(this.predictionCompatibility.reason);
     }
@@ -180,6 +182,7 @@ export class Match {
           : options;
         const issued = this.prediction.issueCommand(command, predictionOptions);
         if (issued?.sent) {
+          this.apmTracker.recordAction(this.state?.tick);
           const issuedAt = this.frameProfiler?.now?.() ?? performance.now();
           this.health.noteCommandIssued(issuedAt);
           this.frameProfiler?.recordDiagnosticCounter?.("commands.issued");
@@ -250,6 +253,7 @@ export class Match {
         this.clientIntent,
         this.controlPolicy,
         this.camera,
+        this.apmTracker,
       ),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));

@@ -1054,7 +1054,7 @@ mod tests {
             "nested ES modules must be versioned so browser clients do not run stale renderer code"
         );
         assert!(html.contains("./src/main.js?v=test-version\""));
-        assert_eq!(html.matches(".css?v=test-version\"").count(), 2);
+        assert_eq!(html.matches(".css?v=test-version\"").count(), 3);
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
     }
 
