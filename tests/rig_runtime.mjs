@@ -78,7 +78,6 @@ const machineGunnerPngManifestPath = path.join(
   "client/assets/rigs/machine-gunner-pass-01/metadata/manifest.json",
 );
 const fixedNow = 12_345;
-
 function main() {
 test("animation sampler applies game-state bindings without Pixi", () => {
   const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
