@@ -1,0 +1,49 @@
+{
+  "status": "live runtime art",
+  "source": "built-in image_gen",
+  "selectedIteration": 2,
+  "unit": "rifleman",
+  "frame": {
+    "count": 1,
+    "description": "single leaned-back rifle recoil pose with the rifle shifted rearward and a compact muzzle flare",
+    "shoulder": "right",
+    "hasBackpack": false,
+    "hasLegs": false
+  },
+  "normal": {
+    "source": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-source.png",
+    "alpha": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-alpha.png",
+    "runtimeFrame": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-runtime.png",
+    "reviewStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png",
+    "fourTimesReviewStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip-4x.png"
+  },
+  "panzerfaustOnBack": {
+    "method": "reuse the accepted launcher layer and mask over the normal recoil body",
+    "runtimeFrame": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-runtime.png",
+    "reviewStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png",
+    "fourTimesReviewStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip-4x.png"
+  },
+  "comparison": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-comparison-4x.png",
+  "runtimeGeometry": {
+    "frameWidth": 160,
+    "frameHeight": 112,
+    "normalOpaqueBounds": {"x": 18, "y": 27, "width": 136, "height": 53},
+    "panzerfaustOpaqueBounds": {"x": 2, "y": 6, "width": 152, "height": 92},
+    "transform": "rotate source 90 degrees counterclockwise, resize full canvas to 222x105, composite at -39,+2"
+  },
+  "reviewStripOrder": ["standing", "movement 1", "movement 2", "movement 3", "recoil"],
+  "runtimeAnimation": {
+    "firingFrame": 4,
+    "firingFrameHoldPhase": 0.2,
+    "rifleRecoilDurationMs": 84,
+    "originForwardPx": 10,
+    "firingRecoilPx": 4
+  },
+  "notes": [
+    "The second generation restores the approved brown-wood and dark-metal rifle palette.",
+    "The high-resolution alpha matte is contracted and thresholded before runtime downscaling to avoid magenta fringe.",
+    "The Panzerfaust recoil frame is deterministic: only the previously accepted launcher layer is composited over the new body frame.",
+    "Both five-frame strips are live runtime assets; the recoil frame appears only for the opening 20 percent of the recoil envelope.",
+    "The sprite origin shifts the torso 10 world pixels forward, then the firing frame kicks the whole sprite 4 world pixels backward."
+  ]
+}

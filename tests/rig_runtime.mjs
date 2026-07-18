@@ -27,6 +27,7 @@ import {
 } from "../client/src/renderer/rigs/runtime.js";
 import {
   frameStripFrameIndex,
+  frameStripSpriteOffset,
   frameStripVisualFacing,
   frameStripWorldScale,
 } from "../client/src/renderer/rigs/frame_strip_runtime.js";
@@ -1116,6 +1117,9 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   assert.equal(stripInstance.sprite.texture.frame.x, 0);
   assert.equal(stripInstance.container.rotation, entity.weaponFacing);
   assert.equal(stripInstance.sprite.scaleX, strip.worldScale);
+  assert.deepEqual(frameStripSpriteOffset(strip, strip.idleFrame), { x: 10, y: 0 });
+  assert.deepEqual(frameStripSpriteOffset(strip, strip.firingFrames[0]), { x: 6, y: 0 });
+  assert.equal(stripInstance.sprite.x, 10);
   assert.equal(stripInstance.sprite.tint, 0x6194c7);
 
   renderNow = 1000 / strip.fps;

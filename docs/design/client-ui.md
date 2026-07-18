@@ -1869,9 +1869,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled no-backpack PNG
-  frame strip with frame 0 idle and frames 1-3 moving; machine gunner: enabled PNG frame-strip
+  frame strip with frame 0 idle, frames 1-3 moving, and frame 4 firing; machine gunner: enabled PNG frame-strip
   experiment with carried movement frames and setup/deployed frames; Panzerfausts-upgraded Riflemen:
-  the matching four-frame Rifleman movement strip with an oversized launcher composited on the back
+  the matching five-frame Rifleman strip with an oversized launcher composited on the back
   until launch, then the normal no-backpack Rifleman strip; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
@@ -1881,7 +1881,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
   with a team-colored band and switch immediately to normal rifle art after launch. Both white-base
   Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine
-  Gunner's tonal weight. Rifleman and loaded-Panzerfaust recoil frames remain intentionally deferred.
+  Gunner's tonal weight. Their torso-centered sprite origin sits 10 world pixels ahead of the raw
+  frame center. Frame 4 is shown only for the opening 20% of the recoil envelope (about 84 ms for
+  a rifle shot) and shifts the whole sprite four world pixels backward before returning to the
+  standing or movement pose.
   Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during

@@ -125,6 +125,14 @@ export function frameStripWorldScale(strip, entity, renderContext = null) {
   return baseScale;
 }
 
+export function frameStripSpriteOffset(strip, frameIndex) {
+  const forwardPx = finite(strip?.originForwardPx, 0);
+  const lateralPx = finite(strip?.originLateralPx, 0);
+  const firingFrames = validFrameList(strip, strip?.firingFrames);
+  const recoilPx = firingFrames.includes(frameIndex) ? Math.max(0, finite(strip?.firingRecoilPx, 0)) : 0;
+  return { x: forwardPx - recoilPx, y: lateralPx };
+}
+
 function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
   return {
     createContainer: () => new pixi.Container(),
@@ -181,6 +189,8 @@ class FrameStripUnitInstance {
 
     const worldScale = frameStripWorldScale(this.strip, entity, renderContext);
     setPoint(this.sprite.scale, worldScale, worldScale);
+    const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex);
+    setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
     this.sprite.alpha = 1;
     this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;

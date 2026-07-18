@@ -71,8 +71,8 @@ const riflemanFrameDuringRecoil = frameStripFrameIndex(
   },
 );
 assert(
-  RIFLEMAN_PNG_FRAME_STRIP.movementFrames.includes(riflemanFrameDuringRecoil),
-  "new Rifleman art keeps its movement pose during recoil until firing frames are authored",
+  riflemanFrameDuringRecoil === RIFLEMAN_PNG_FRAME_STRIP.firingFrames[0],
+  "moving Rifleman uses the authored firing frame during the brief recoil impulse",
 );
 
 assert(
@@ -80,8 +80,26 @@ assert(
     RIFLEMAN_PNG_FRAME_STRIP,
     { id: 11, kind: KIND.RIFLEMAN, state: STATE.ATTACK },
     { now: 0, recoilProgress: 1, recoilPhase: 0.05 },
+  ) === RIFLEMAN_PNG_FRAME_STRIP.firingFrames[0],
+  "stationary Rifleman uses the authored firing frame during the brief recoil impulse",
+);
+
+assert(
+  RIFLEMAN_PNG_FRAME_STRIP.movementFrames.includes(frameStripFrameIndex(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.MOVE },
+    { now: 0, recoilProgress: 0.8, recoilPhase: RIFLEMAN_PNG_FRAME_STRIP.firingFrameHoldPhase },
+  )),
+  "moving Rifleman returns to its movement cycle after the recoil impulse",
+);
+
+assert(
+  frameStripFrameIndex(
+    RIFLEMAN_PNG_FRAME_STRIP,
+    { id: 11, kind: KIND.RIFLEMAN, state: STATE.ATTACK },
+    { now: 0, recoilProgress: 0.8, recoilPhase: RIFLEMAN_PNG_FRAME_STRIP.firingFrameHoldPhase },
   ) === RIFLEMAN_PNG_FRAME_STRIP.idleFrame,
-  "new stationary Rifleman art holds idle during recoil until firing frames are authored",
+  "stationary Rifleman returns to idle after the recoil impulse",
 );
 
 const stationaryMoveContext = { now: 1000, frameStripMoving: false };
