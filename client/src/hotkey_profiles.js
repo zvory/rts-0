@@ -14,6 +14,8 @@ export const HOTKEY_COMMAND_SELECT_IDLE_WORKERS = "hud.selectIdleWorkers";
 
 const VALID_HOTKEY_CODE_RE = /^Key[A-Z]$/;
 const DEFAULT_EXPORT_BUILD = "unknown";
+const LEGACY_HOTKEY_STORAGE_PROFILES_KEY = "rts.hotkeyProfiles.v1";
+const LEGACY_HOTKEY_STORAGE_ACTIVE_KEY = "rts.activeHotkeyProfile.v1";
 
 // Direct-profile bindings must not depend on a command card slot. Keep the
 // familiar action keys here, including the mnemonic conflict resolutions for
@@ -156,9 +158,15 @@ export class HotkeyProfileService {
   load() {
     const loaded = this._readStoredProfiles();
     this.customProfiles = loaded.profiles;
-    const active = this._storageGet(this.activeKey);
+    const active = this._storageGet(this.activeKey) || (loaded.migrated
+      ? this._storageGet(LEGACY_HOTKEY_STORAGE_ACTIVE_KEY)
+      : "");
     this.activeProfileId = this.hasProfile(active) ? active : HOTKEY_PRESET_GRID;
     this.diagnostics = { errors: loaded.errors, warnings: loaded.warnings };
+    if (loaded.migrated) {
+      this._writeCustomProfiles();
+      this._storageSet(this.activeKey, this.activeProfileId);
+    }
     this.revision += 1;
   }
 
@@ -327,9 +335,11 @@ export class HotkeyProfileService {
     const warnings = [];
     const raw = payload && typeof payload === "object" ? payload : {};
     const schemaVersion = raw.schemaVersion;
-    if (schemaVersion !== HOTKEY_PROFILE_SCHEMA_VERSION) {
+    const legacySchema = schemaVersion === 1;
+    if (schemaVersion !== HOTKEY_PROFILE_SCHEMA_VERSION && !legacySchema) {
       errors.push({ code: "unsupportedSchemaVersion", schemaVersion });
     }
+    if (legacySchema) warnings.push({ code: "legacySchemaMigrated", schemaVersion });
     const mode = raw.mode === "grid" || raw.mode === "direct" ? raw.mode : "";
     if (!mode) errors.push({ code: "invalidMode", mode: raw.mode });
     const idSource = typeof raw.id === "string" && raw.id.trim()
@@ -347,7 +357,7 @@ export class HotkeyProfileService {
     const bindingMaps = { bindings: {}, factionBindings: {} };
 
     for (const [commandId, value] of Object.entries(sourceBindings)) {
-      const code = normalizeHotkeyCode(value);
+      const code = normalizeHotkeyCode(value) || (legacySchema ? hotkeyCodeForLabel(value) : "");
       if (!code) {
         errors.push({ code: "invalidKey", commandId, key: value });
         continue;
@@ -363,7 +373,7 @@ export class HotkeyProfileService {
         continue;
       }
       for (const [commandId, value] of Object.entries(entries)) {
-        const code = normalizeHotkeyCode(value);
+        const code = normalizeHotkeyCode(value) || (legacySchema ? hotkeyCodeForLabel(value) : "");
         if (!code) {
           errors.push({ code: "invalidKey", commandId, key: value });
           continue;
@@ -457,13 +467,18 @@ export class HotkeyProfileService {
   _readStoredProfiles() {
     const errors = [];
     const warnings = [];
-    const text = this._storageGet(this.profilesKey);
-    if (!text) return { profiles: [], errors, warnings };
+    let text = this._storageGet(this.profilesKey);
+    let migrated = false;
+    if (!text && this.profilesKey === HOTKEY_STORAGE_PROFILES_KEY) {
+      text = this._storageGet(LEGACY_HOTKEY_STORAGE_PROFILES_KEY);
+      migrated = !!text;
+    }
+    if (!text) return { profiles: [], errors, warnings, migrated };
     let raw;
     try {
       raw = JSON.parse(text);
     } catch {
-      return { profiles: [], errors: [{ code: "storageParseFailed" }], warnings };
+      return { profiles: [], errors: [{ code: "storageParseFailed" }], warnings, migrated };
     }
     const entries = Array.isArray(raw?.profiles) ? raw.profiles : Array.isArray(raw) ? raw : [];
     const profiles = [];
@@ -476,7 +491,7 @@ export class HotkeyProfileService {
         errors.push(...parsed.errors.map((error) => ({ ...error, profileId: entry?.id || entry?.profileId || null })));
       }
     }
-    return { profiles, errors, warnings };
+    return { profiles, errors, warnings, migrated };
   }
 
   _replaceCustomProfile(profile) {

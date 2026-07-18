@@ -940,9 +940,11 @@ canonical QWERTY-position `hotkey` label; command buttons mirror those as `data-
 `data-hotkey`. Text entry remains layout-aware and never routes through gameplay bindings. The
 Map Editor's WASD camera controls likewise use physical `KeyW`/`KeyA`/`KeyS`/`KeyD` positions.
 
-Schema-v1 custom profiles and active-profile selections are intentionally reset rather than
-migrated: v2 uses new `rts.hotkeyProfiles.v2` and `rts.activeHotkeyProfile.v2` local-storage keys,
-and v1 imports are rejected. Exported hotkey JSON is intentionally client-local: `schemaVersion`,
+Schema-v1 custom profiles and active-profile selections migrate once into the new
+`rts.hotkeyProfiles.v2` and `rts.activeHotkeyProfile.v2` local-storage keys. Their single-letter
+bindings become the equivalent physical codes (`Q` becomes `KeyQ`), preserving the physical-key
+behavior schema v1 already provided at runtime. Schema-v1 exported profiles migrate the same way
+when imported. Exported hotkey JSON is intentionally client-local: `schemaVersion`,
 `profileId`, `mode`, `name`,
 `description`, `createdWithBuild`, `basePreset`, `bindings`, and `factionBindings`. Direct-mode
 `bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.holdPosition`,

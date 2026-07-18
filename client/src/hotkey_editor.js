@@ -443,7 +443,7 @@ export class HotkeyEditor {
   _diagnosticText(entry) {
     switch (entry?.code) {
       case "duplicateKey":
-        return `${entry.key} is used by ${entry.commandIds.map((id) => this._commandLabel(id)).join(" and ")} in ${this._contextLabel(entry.contextId)}.`;
+        return `${hotkeyLabelForCode(entry.key) || entry.key} is used by ${entry.commandIds.map((id) => this._commandLabel(id)).join(" and ")} in ${this._contextLabel(entry.contextId)}.`;
       case "invalidKey":
         return `${this._commandLabel(entry.commandId)} has unsupported key ${String(entry.key || "").toUpperCase() || "(blank)"}.`;
       case "unknownCommand":
@@ -461,6 +461,8 @@ export class HotkeyEditor {
         return "Stored hotkey profiles could not be read.";
       case "importParseFailed":
         return "Import file is not valid JSON.";
+      case "legacySchemaMigrated":
+        return "The profile was updated to physical key bindings.";
       default:
         return "Profile has unresolved hotkey issues.";
     }
