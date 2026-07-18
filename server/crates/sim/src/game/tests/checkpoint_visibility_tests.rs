@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use super::checkpoint_helpers::{
     assert_equivalent_games, checkpoint_payload_text_for, player_ids,
-    repair_after_authoritative_test_spawn,
-    restore_checkpoint_and_assert_equivalent, tick_pair_and_assert_equivalent, tick_pair_for,
+    repair_after_authoritative_test_spawn, restore_checkpoint_and_assert_equivalent,
+    tick_pair_and_assert_equivalent, tick_pair_for,
 };
 use super::fixtures::empty_flat_game;
 use super::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
