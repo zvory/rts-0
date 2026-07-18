@@ -1079,6 +1079,53 @@ async fn empty_persisted_replay_room_is_disposed_after_visible_staging_lobby() {
 }
 
 #[tokio::test]
+async fn persisted_replay_permalink_reuses_the_active_match_room() {
+    let lobby = Lobby::new();
+    let artifact = registry_test_replay_artifact();
+    let first = lobby
+        .get_or_create_persisted_replay_room(42, artifact.clone())
+        .await;
+    let repeated = lobby
+        .get_or_create_persisted_replay_room(42, artifact.clone())
+        .await;
+    let other = lobby
+        .get_or_create_persisted_replay_room(43, artifact.clone())
+        .await;
+
+    assert_eq!(first, "__match_replay__:000000000000002a");
+    assert_eq!(repeated, first);
+    assert_ne!(other, first);
+    assert_eq!(lobby.rooms.lock().await.len(), 2);
+
+    let first_identity = lobby
+        .rooms
+        .lock()
+        .await
+        .get(&first)
+        .expect("first permalink room should exist")
+        .identity;
+    assert!(
+        lobby
+            .request_room_disposal_for_test(&first, first_identity)
+            .await
+    );
+    let recreated = lobby
+        .get_or_create_persisted_replay_room(42, artifact)
+        .await;
+    assert_eq!(recreated, first);
+    assert_ne!(
+        lobby
+            .rooms
+            .lock()
+            .await
+            .get(&recreated)
+            .expect("recreated permalink room should exist")
+            .identity,
+        first_identity
+    );
+}
+
+#[tokio::test]
 async fn drain_waiter_releases_after_last_match_finishes() {
     let drain = DrainHandle::default();
     drain.match_started();

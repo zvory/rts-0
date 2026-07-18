@@ -983,6 +983,23 @@ impl Lobby {
         }
     }
 
+    /// Return the shared replay room for one persisted match, creating it when no viewer has an
+    /// active room for that match. The match id is immutable, so repeated permalink launches on
+    /// one server process converge on the same room and late viewers join its current tick.
+    pub async fn get_or_create_persisted_replay_room(
+        &self,
+        match_id: i64,
+        artifact: ReplayArtifactV1,
+    ) -> String {
+        let room = format!("{MATCH_REPLAY_ROOM_PREFIX}:{match_id:016x}");
+        let mut rooms = self.rooms.lock().await;
+        if rooms.contains_key(&room) {
+            return room;
+        }
+        self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Replay { artifact });
+        room
+    }
+
     /// Create an unguessable room holding frozen state for a future replay practice branch.
     pub async fn create_replay_branch_room(&self, seed: ReplayBranchSeed) -> String {
         let mut rooms = self.rooms.lock().await;

@@ -1622,8 +1622,12 @@ the table remains newest first; therefore the latest visible replay has the high
 debug or solo replays do not consume a number. It launches persisted match replays by POSTing
 `/api/matches/{id}/replay`, then hands the returned
 `__match_replay__:*` room to `App`/`Lobby.joinReplayLobby` instead of redirecting the page into
-replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact playback path;
-`replayRoom` URLs represent replay staging lobbies.
+replay playback. `App` replaces the address with `/replay/{id}` and retains that dedicated-launch
+state through playback, so the address is a durable, copyable match link rather than a transient
+room link. Opening or reloading the route resolves the stored match through the same POST: the
+server returns its existing active replay room or creates a fresh room after disposal/restart.
+Direct `replayArtifact` URLs still auto-join the saved artifact playback path; legacy `replayRoom`
+URLs represent transient replay staging lobbies.
 The replay lobby UI is group-watch only: future playable resume work needs separate seat-claim
 controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
