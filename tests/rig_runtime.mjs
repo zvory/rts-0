@@ -1045,8 +1045,8 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   assert.equal(basePlate.alpha, 1);
   assert.equal(basePlate.tint, 0x336699);
   assert.ok(Math.abs(Math.hypot(basePlate.x, basePlate.y) - 20) < 0.001);
-  assert.ok(Math.abs(basePlate.scaleX - 1 / 8) < 0.001);
-  assert.ok(Math.abs(basePlate.scaleY - 1 / 8) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleX - 1 / 4) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleY - 1 / 4) < 0.001);
   assert.notEqual(carriage.tint, 0xffffff);
   assert.notEqual(tube.tint, 0xffffff);
   assert.equal(leftTire.tint, 0xffffff);
@@ -1056,8 +1056,8 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0.5, frameProgress: 0.5, barrel: true });
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, selection: new Set(), weaponRecoil: () => 0 });
   assert.equal(basePlate.alpha, 0.5);
-  assert.ok(Math.abs(basePlate.scaleX - 1 / 16) < 0.001);
-  assert.ok(Math.abs(basePlate.scaleY - 1 / 16) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleX - 1 / 8) < 0.001);
+  assert.ok(Math.abs(basePlate.scaleY - 1 / 8) < 0.001);
 
   renderer._deployedWeaponSetupVisual = () => ({ prongFactor: 0, frameProgress: 0, barrel: false });
   renderer._drawUnit({ ...entity, setupState: SETUP.PACKED, state: STATE.IDLE }, new Map([[1, 0x336699]]), {
@@ -1273,8 +1273,8 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   assert.equal(runtimeStripSize.height, runtime.frameHeight);
 
   const recoilStripSize = readPngDimensions(manifest.sourceSheets.fireRecoilStrip);
-  assert.equal(recoilStripSize.width, runtime.frameWidth * runtime.firingFrames.length);
-  assert.equal(recoilStripSize.height, runtime.frameHeight);
+  assert.equal(recoilStripSize.width, runtime.frameWidth * 2 * runtime.firingFrames.length);
+  assert.equal(recoilStripSize.height, runtime.frameHeight * 2);
   assert.deepEqual(
     runtime.firingFrames,
     Array.from(

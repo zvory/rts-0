@@ -15,11 +15,11 @@
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-setup-15pct-shrink-recoil85-north5",
-    "imageVersion": "pass01-setup-15pct-shrink-recoil85-north5",
+    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-halfres-rgba8",
+    "imageVersion": "pass01-halfres-rgba8",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
-    "frameWidth": 128,
-    "frameHeight": 128,
+    "frameWidth": 64,
+    "frameHeight": 64,
     "frameCount": 15,
     "idleFrame": 0,
     "movementFrames": [0, 1, 2, 3, 4, 5],
@@ -27,8 +27,8 @@
     "deployedFrame": 11,
     "firingFrames": [12, 13, 14],
     "fps": 12,
-    "worldScale": 0.42,
-    "movementWorldScale": 0.306,
+    "worldScale": 0.84,
+    "movementWorldScale": 0.612,
     "movementFacingOffsetRadians": -1.5707963267948966,
     "tintSlot": "team-light",
     "bakedColorAdjustment": {
@@ -58,7 +58,7 @@
     "Frame 6 reuses a carry frame so setup starts from the same carried MG pose. The runtime strip scales frames 6-8 to 84% around the cell center to smooth the visual size transition into the deployed poses, then scales all setup frames 6-11 to 85% of that state so the setup animation matches the movement sprite scale more closely.",
     "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration. Frames 7 and 8 have isolated left-edge crop artifacts cleared from the runtime strip.",
     "The checked-in runtime strip keeps the raw generated color; the client applies a slightly dimmer per-unit frame-strip color target at texture load time.",
-    "Frames 12-14 are a three-frame no-muzzle-flare firing recoil strip transformed from the generated recoil sheet to 85% scale and shifted 5 px north in each 128x128 runtime cell.",
+    "Frames 12-14 are a three-frame no-muzzle-flare firing recoil strip transformed from the generated recoil sheet before the production strip is downsampled to 64x64 RGBA8 cells.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation."
   ]
 }

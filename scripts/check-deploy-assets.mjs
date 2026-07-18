@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const MAX_RUNTIME_RIG_TEXTURE_DIMENSION = 2048;
 
 function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
@@ -25,6 +26,18 @@ function assertMatches(text, pattern, message) {
   if (!pattern.test(text)) {
     throw new Error(message);
   }
+}
+
+function readPngHeader(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  if (buffer.length < 26 || buffer.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") {
+    return null;
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+    bitDepth: buffer[24],
+  };
 }
 
 const dockerfile = read("Dockerfile");
@@ -168,6 +181,21 @@ for (const asset of checkedInRuntimeAssets) {
     `Dockerfile must fail the image build when ${asset} is absent from the filtered context`,
   );
   if (asset.includes("/assets/rigs/")) {
+    const png = readPngHeader(localAsset);
+    if (
+      png &&
+      (png.width > MAX_RUNTIME_RIG_TEXTURE_DIMENSION || png.height > MAX_RUNTIME_RIG_TEXTURE_DIMENSION)
+    ) {
+      throw new Error(
+        `${asset} is ${png.width}x${png.height}; runtime rig textures must fit within ` +
+          `${MAX_RUNTIME_RIG_TEXTURE_DIMENSION}x${MAX_RUNTIME_RIG_TEXTURE_DIMENSION}`,
+      );
+    }
+    if (png && png.bitDepth > 8) {
+      throw new Error(
+        `${asset} uses ${png.bitDepth}-bit PNG channels; runtime rig textures must use 8-bit channels`,
+      );
+    }
     const allowlistEntry = `!${asset.slice(2)}`;
     if (!dockerignoreEntries.has(allowlistEntry)) {
       throw new Error(`.dockerignore must retain runtime rig texture ${allowlistEntry}`);

@@ -81,45 +81,45 @@ function sprite(id, animationPart, sourceParts, drawOrder, frame, options = {}) 
 }
 
 const ASSEMBLED_REFERENCE_FRAME = Object.freeze({
-  x: 74,
-  y: 164,
-  w: 612,
-  h: 391,
+  x: 37,
+  y: 82,
+  w: 306,
+  h: 196,
 });
 
 const CARRIAGE_FRAME = Object.freeze({
-  x: 870,
-  y: 164,
-  w: 413,
-  h: 391,
-  originX: 351,
-  originY: 195.5,
-  pixelsPerUnitX: PPU,
-  pixelsPerUnitY: PPU,
+  x: 435,
+  y: 82,
+  w: 207,
+  h: 196,
+  originX: 175.5,
+  originY: 97.75,
+  pixelsPerUnitX: PPU / 2,
+  pixelsPerUnitY: PPU / 2,
 });
 
 const TUBE_FRAME = Object.freeze({
-  x: 1613,
-  y: 292,
-  w: 490,
-  h: 132,
-  originX: 130,
-  originY: 66,
-  pixelsPerUnitX: PPU,
-  pixelsPerUnitY: PPU,
+  x: 806,
+  y: 146,
+  w: 246,
+  h: 66,
+  originX: 65.5,
+  originY: 33,
+  pixelsPerUnitX: PPU / 2,
+  pixelsPerUnitY: PPU / 2,
 });
 
-// The generated base plate is postprocessed to a tight 128px square and
+// The generated base plate is postprocessed to a tight 64px square and
 // deliberately mapped to 16 world pixels: exactly half of one 32px tile.
 const BASE_PLATE_FRAME = Object.freeze({
-  x: 2172,
+  x: 1086,
   y: 0,
-  w: 128,
-  h: 128,
-  originX: 64,
-  originY: 64,
-  pixelsPerUnitX: 8,
-  pixelsPerUnitY: 8,
+  w: 64,
+  h: 64,
+  originX: 32,
+  originY: 32,
+  pixelsPerUnitX: 4,
+  pixelsPerUnitY: 4,
 });
 
 function carriageCropFrame(x, y, w, h) {
@@ -135,19 +135,19 @@ function carriageCropFrame(x, y, w, h) {
   });
 }
 
-const LEFT_TIRE_FRAME = carriageCropFrame(1072, 164, 146, 52);
-const RIGHT_TIRE_FRAME = carriageCropFrame(1072, 472, 146, 56);
+const LEFT_TIRE_FRAME = carriageCropFrame(536, 82, 73, 26);
+const RIGHT_TIRE_FRAME = carriageCropFrame(536, 236, 73, 28);
 
 export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "mortar_team",
-  image: "/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png?v=m2-wheeled-baseplate-pass04-white-team-rearward",
+  image: "/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png?v=m2-wheeled-baseplate-pass04-halfres-rgba8",
   grid: {
     profile: "four-component-cells",
     sourceSheet: "client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png",
     generatedSource: "client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-source.png",
     basePlateGeneratedSource: "client/assets/rigs/mortar-png-pass-04/generated/mortar-baseplate-source-v3.png",
-    imageVersion: "m2-wheeled-baseplate-pass04-white-team-rearward",
+    imageVersion: "m2-wheeled-baseplate-pass04-halfres-rgba8",
     cells: [
       "reference.assembled",
       "sprite.carriage",

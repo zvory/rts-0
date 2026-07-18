@@ -351,6 +351,9 @@ Prototype raster rig workflow:
 - Keep the source sheet, generated pass, alpha atlas, prompt, and manifest together under
   `client/assets/rigs/tank-ps1/` so raster iterations remain reproducible. The renderer falls back
   to the SVG rig until the atlas texture loads or if the atlas load fails.
+- Browser-facing rig PNGs use 8-bit channels and fit within a 2048x2048 texture ceiling, enforced
+  by `scripts/check-deploy-assets.mjs`. Oversized generated sources may remain checked in beside a
+  downsampled production derivative; runtime frame geometry and scale preserve world-space size.
 
 `renderer/feedback_view_model.js`
 ```js

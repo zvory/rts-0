@@ -8,8 +8,8 @@ function deepFreeze(value) {
 export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "rifleman",
-  image: "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1",
-  imageVersion: "recoil-review-1",
+  image: "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1-rgba8",
+  imageVersion: "recoil-review-1-rgba8",
   frameWidth: 160,
   frameHeight: 112,
   frameCount: 5,
