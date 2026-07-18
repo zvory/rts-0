@@ -879,7 +879,8 @@ keeping the panel status and cancel affordance synchronized with keyboard, point
 box-selection, and teardown paths. Starting ordinary placement, command targeting, or command-card
 build menus cancels the active lab tool so setup tools do not share state with gameplay command
 modes. Unit and building spawning are lab panel palettes backed by the client faction catalog mirror
-and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
+and playable faction labels; the unit palette excludes ability-created units such as the Command
+Car's Scout Plane. Each palette arms a persistent completed `spawnEntity` lab tool and
 clicking or dragging sends the chosen world positions through `LabClient` until cancelled. Changing
 the target player while a spawn tool is armed immediately retargets that tool, including its cursor
 preview and subsequent placements, without requiring the operator to select the unit or building again.

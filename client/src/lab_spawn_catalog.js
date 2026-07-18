@@ -3,22 +3,18 @@
 // server-validated kinds without scraping rendered controls.
 
 import { PLAYABLE_FACTIONS } from "./lobby_view.js";
-import { DEFAULT_FACTION_ID, KIND } from "./protocol.js";
+import { KIND } from "./protocol.js";
 import { factionCatalog, STATS } from "./config.js";
 
-const LAB_ONLY_UNIT_SPAWNS_BY_FACTION = Object.freeze({
-  [DEFAULT_FACTION_ID]: Object.freeze([KIND.SCOUT_PLANE]),
-});
+const ABILITY_ONLY_UNIT_KINDS = Object.freeze(new Set([KIND.SCOUT_PLANE]));
 
 export function labSpawnFactionOptions() {
   return PLAYABLE_FACTIONS.filter((entry) => labSpawnUnitKindsForFaction(entry.id).length > 0);
 }
 
 export function labSpawnUnitKindsForFaction(factionId) {
-  const catalogUnits = factionCatalog(factionId).units;
-  const labOnlyUnits = LAB_ONLY_UNIT_SPAWNS_BY_FACTION[factionId] || [];
-  return [...catalogUnits, ...labOnlyUnits].filter((kind, index, units) =>
-    STATS[kind] && units.indexOf(kind) === index,
+  return factionCatalog(factionId).units.filter((kind) =>
+    STATS[kind] && !ABILITY_ONLY_UNIT_KINDS.has(kind)
   );
 }
 
