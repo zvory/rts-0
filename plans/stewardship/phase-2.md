@@ -1,6 +1,6 @@
 # Phase 2 - Make Documentation Stewardship Recoverable
 
-Status: Incomplete.
+Status: Done.
 
 ## Objective
 

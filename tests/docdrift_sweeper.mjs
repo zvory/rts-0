@@ -66,10 +66,29 @@ function generateDocs(args) {
   });
 }
 
-function fullSweep(args) {
+function fullSweep(args, options = {}) {
   return run("node", [script, "--full", "--repo", repo, ...args], {
     cwd: repoRoot,
+    env: options.env,
   });
+}
+
+function fullSweepFailure(args, options = {}) {
+  try {
+    fullSweep(args, options);
+    assert.fail("expected full sweep to fail");
+  } catch (error) {
+    return error.stderr.toString();
+  }
+}
+
+function writeRunState(runId, state) {
+  const dir = path.join(repo, ".docdrift", "runs", runId);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "run-state.json"),
+    `${JSON.stringify({ schemaVersion: 1, runId, lifecycle: {}, updatedAt: "2026-07-17T12:00:00Z", ...state }, null, 2)}\n`,
+  );
 }
 
 function classifyFailure(args) {
@@ -870,6 +889,166 @@ try {
   assert.equal(fullNoop.checkpoint.after.sha, docsOnlyHead);
   assert.match(fs.readFileSync(path.join(repo, ".docdrift/checkpoint.txt"), "utf8"), new RegExp(docsOnlyHead));
   assert.ok(fs.existsSync(path.join(fullNoopOutDir, "docdrift-full.json")));
+
+  const fakeWait = writeExecutable("fake-wait-pr", "#!/usr/bin/env bash\nset -euo pipefail\ngit push origin HEAD:main >/dev/null\n");
+  const fakeAgentPr = writeExecutable(
+    "fake-agent-pr",
+    "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'agent-pr: PR 900 ready: https://example.invalid/pr/900\\n'\n",
+  );
+  const writeFakeGh = (name, prs) =>
+    writeExecutable(name, `#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' '${JSON.stringify(prs)}'\n`);
+  const recoveryEnv = (ghCommand) => ({
+    DOC_DRIFT_GH_COMMAND: ghCommand,
+    DOC_DRIFT_AGENT_PR_COMMAND: fakeAgentPr,
+    DOC_DRIFT_WAIT_PR_COMMAND: fakeWait,
+  });
+  const createRecordedBranch = (runId, headSha, options = {}) => {
+    const branch = `zvorygin/docdrift-sweep-${runId}`;
+    const worktree = `.docdrift/worktrees/docdrift-sweep-${runId}`;
+    git(["branch", branch, headSha]);
+    if (options.remote !== false) git(["push", "origin", branch]);
+    if (options.worktree !== false) git(["worktree", "add", path.join(repo, worktree), branch]);
+    if (options.local === false) git(["branch", "-D", branch]);
+    writeRunState(runId, {
+      status: "pr_open",
+      baseSha: headSha,
+      headSha,
+      branch,
+      worktree,
+      generatedHeadSha: headSha,
+      pr: { number: options.prNumber ?? 700, url: "https://example.invalid/pr/700", state: "OPEN", headSha },
+      checkpointTarget: headSha,
+      recoveryAction: "created_fresh_run",
+    });
+    return { branch, worktree };
+  };
+
+  const initializedRunId = "initialized-before-branch";
+  const initializedBranch = `zvorygin/docdrift-sweep-${initializedRunId}`;
+  const initializedWorktree = `.docdrift/worktrees/docdrift-sweep-${initializedRunId}`;
+  writeRunState(initializedRunId, {
+    status: "initialized",
+    baseSha: simCommit,
+    headSha: docsOnlyHead,
+    branch: initializedBranch,
+    worktree: initializedWorktree,
+    generatedHeadSha: null,
+    pr: null,
+    checkpointTarget: null,
+    recoveryAction: "created_fresh_run",
+  });
+  const initializedGh = writeFakeGh("fake-gh-initialized", []);
+  const initializedReport = JSON.parse(
+    fullSweep(
+      ["--run-id", initializedRunId, "--no-codex", "--fixture", "classifier-basic", "--format", "json"],
+      { env: recoveryEnv(initializedGh) },
+    ),
+  );
+  assert.equal(initializedReport.sweep.recoveryAction, "resumed_recorded_pre_pr_run");
+  assert.equal(initializedReport.sweep.action, "noop_no_doc_changes");
+  assert.equal(git(["rev-parse", initializedBranch]), docsOnlyHead);
+  assert.ok(fs.existsSync(path.join(repo, initializedWorktree)));
+
+  const openRun = createRecordedBranch("open-run", docsOnlyHead);
+  const openGh = writeFakeGh("fake-gh-open", [
+    { number: 700, url: "https://example.invalid/pr/700", state: "OPEN", mergeStateStatus: "CLEAN", headRefOid: docsOnlyHead, headRefName: openRun.branch, mergedAt: null },
+  ]);
+  const openReport = JSON.parse(fullSweep(["--run-id", "open-run", "--format", "json"], { env: recoveryEnv(openGh) }));
+  assert.equal(openReport.sweep.action, "resumed_open_pr_merged");
+  assert.equal(openReport.sweep.recoveryAction, "resumed_open_pr");
+  assert.equal(git(["rev-parse", openRun.branch]), docsOnlyHead);
+
+  const remoteOnlyRun = createRecordedBranch("remote-only", docsOnlyHead, { worktree: false, local: false, prNumber: 701 });
+  const remoteOnlyGh = writeFakeGh("fake-gh-remote-only", [
+    { number: 701, url: "https://example.invalid/pr/701", state: "OPEN", mergeStateStatus: "CLEAN", headRefOid: docsOnlyHead, headRefName: remoteOnlyRun.branch, mergedAt: null },
+  ]);
+  JSON.parse(fullSweep(["--run-id", "remote-only", "--format", "json"], { env: recoveryEnv(remoteOnlyGh) }));
+  assert.equal(git(["rev-parse", remoteOnlyRun.branch]), docsOnlyHead);
+  assert.ok(fs.existsSync(path.join(repo, remoteOnlyRun.worktree)));
+
+  const localOnlyRun = createRecordedBranch("local-only", docsOnlyHead, { remote: false, worktree: false, prNumber: 708 });
+  const localOnlyGh = writeFakeGh("fake-gh-local-only", [
+    { number: 708, url: "https://example.invalid/pr/708", state: "OPEN", mergeStateStatus: "CLEAN", headRefOid: docsOnlyHead, headRefName: localOnlyRun.branch, mergedAt: null },
+  ]);
+  JSON.parse(fullSweep(["--run-id", "local-only", "--format", "json"], { env: recoveryEnv(localOnlyGh) }));
+  assert.equal(git(["rev-parse", localOnlyRun.branch]), docsOnlyHead);
+  assert.ok(fs.existsSync(path.join(repo, localOnlyRun.worktree)));
+
+  const conflictedRun = createRecordedBranch("conflicted", docsOnlyHead, { prNumber: 702 });
+  const conflictedGh = writeFakeGh("fake-gh-conflicted", [
+    { number: 702, url: "https://example.invalid/pr/702", state: "OPEN", mergeStateStatus: "DIRTY", headRefOid: docsOnlyHead, headRefName: conflictedRun.branch, mergedAt: null },
+  ]);
+  assert.match(
+    fullSweepFailure(["--run-id", "conflicted"], { env: recoveryEnv(conflictedGh) }),
+    /open PR is conflicted.*mergeStateStatus=DIRTY/,
+  );
+  assert.equal(git(["rev-parse", conflictedRun.branch]), docsOnlyHead);
+
+  const ambiguousRun = createRecordedBranch("ambiguous", docsOnlyHead, { prNumber: 703 });
+  const ambiguousGh = writeFakeGh("fake-gh-ambiguous", [
+    { number: 703, url: "https://example.invalid/pr/703", state: "OPEN", mergeStateStatus: "CLEAN", headRefOid: docsOnlyHead, headRefName: ambiguousRun.branch, mergedAt: null },
+    { number: 704, url: "https://example.invalid/pr/704", state: "CLOSED", mergeStateStatus: "DIRTY", headRefOid: docsOnlyHead, headRefName: ambiguousRun.branch, mergedAt: null },
+  ]);
+  assert.match(fullSweepFailure(["--run-id", "ambiguous"], { env: recoveryEnv(ambiguousGh) }), /ambiguous PR matches/);
+  assert.equal(git(["rev-parse", ambiguousRun.branch]), docsOnlyHead);
+
+  const dirtyRun = createRecordedBranch("dirty", docsOnlyHead, { prNumber: 705 });
+  fs.writeFileSync(path.join(repo, dirtyRun.worktree, "dirty.txt"), "do not touch\n");
+  const dirtyGh = writeFakeGh("fake-gh-dirty", [
+    { number: 705, url: "https://example.invalid/pr/705", state: "OPEN", mergeStateStatus: "CLEAN", headRefOid: docsOnlyHead, headRefName: dirtyRun.branch, mergedAt: null },
+  ]);
+  assert.match(fullSweepFailure(["--run-id", "dirty"], { env: recoveryEnv(dirtyGh) }), /unsafe sweep worktree.*dirty.txt/);
+  assert.equal(fs.readFileSync(path.join(repo, dirtyRun.worktree, "dirty.txt"), "utf8"), "do not touch\n");
+  const dirtyState = JSON.parse(fs.readFileSync(path.join(repo, ".docdrift/runs/dirty/run-state.json"), "utf8"));
+  assert.equal(dirtyState.lifecycle["fetch origin/main"], "completed");
+  assert.equal(dirtyState.recoveryAction, "stopped_for_operator_review");
+
+  const closedUpdateRepo = path.join(fixtureRoot, "closed-update");
+  run("git", ["clone", "--branch", "main", bareOrigin, closedUpdateRepo], { cwd: fixtureRoot });
+  run("git", ["config", "user.email", "agent@example.invalid"], { cwd: closedUpdateRepo });
+  run("git", ["config", "user.name", "Agent"], { cwd: closedUpdateRepo });
+  fs.mkdirSync(path.join(closedUpdateRepo, "server/crates/sim/src/game"), { recursive: true });
+  fs.writeFileSync(path.join(closedUpdateRepo, "server/crates/sim/src/game/recovery.rs"), "pub fn recovery_probe() {}\n");
+  run("git", ["add", "server/crates/sim/src/game/recovery.rs"], { cwd: closedUpdateRepo });
+  run("git", ["commit", "-m", "Change sim API"], { cwd: closedUpdateRepo });
+  run("git", ["push", "origin", "main"], { cwd: closedUpdateRepo });
+  const closedRun = createRecordedBranch("closed-run", docsOnlyHead, { prNumber: 706 });
+  const closedGh = writeFakeGh("fake-gh-closed", [
+    { number: 706, url: "https://example.invalid/pr/706", state: "CLOSED", mergeStateStatus: "DIRTY", headRefOid: docsOnlyHead, headRefName: closedRun.branch, mergedAt: null },
+  ]);
+  const closedReport = JSON.parse(fullSweep(["--run-id", "closed-run", "--no-codex", "--fixture", "classifier-basic", "--format", "json"], { env: recoveryEnv(closedGh) }));
+  assert.equal(closedReport.sweep.recoveryAction, "created_fresh_run_after_closed_unmerged");
+  assert.notEqual(closedReport.sweep.branch, closedRun.branch);
+  assert.equal(git(["rev-parse", closedRun.branch]), docsOnlyHead);
+
+  const recoveryUpdateRepo = path.join(fixtureRoot, "recovery-update");
+  run("git", ["clone", "--branch", "main", bareOrigin, recoveryUpdateRepo], { cwd: fixtureRoot });
+  run("git", ["config", "user.email", "agent@example.invalid"], { cwd: recoveryUpdateRepo });
+  run("git", ["config", "user.name", "Agent"], { cwd: recoveryUpdateRepo });
+  fs.mkdirSync(path.join(recoveryUpdateRepo, "tests"), { recursive: true });
+  fs.writeFileSync(path.join(recoveryUpdateRepo, "tests/recovery_contract.mjs"), "console.log('recovery');\n");
+  run("git", ["add", "tests/recovery_contract.mjs"], { cwd: recoveryUpdateRepo });
+  run("git", ["commit", "-m", "Add recovery integration coverage"], { cwd: recoveryUpdateRepo });
+  run("git", ["push", "origin", "main"], { cwd: recoveryUpdateRepo });
+  const mergedRun = createRecordedBranch("merged-run", docsOnlyHead, { prNumber: 707 });
+  const mergedGh = writeFakeGh("fake-gh-merged", [
+    { number: 707, url: "https://example.invalid/pr/707", state: "MERGED", mergeStateStatus: "UNKNOWN", headRefOid: docsOnlyHead, headRefName: mergedRun.branch, mergedAt: "2026-07-17T12:00:00Z" },
+  ]);
+  const mergedReport = JSON.parse(fullSweep(["--run-id", "merged-run", "--no-codex", "--fixture", "classifier-basic", "--format", "json"], { env: recoveryEnv(mergedGh) }));
+  assert.equal(mergedReport.sweep.recoveryAction, "created_fresh_run_after_merged");
+  assert.notEqual(mergedReport.sweep.branch, mergedRun.branch);
+  assert.equal(git(["rev-parse", mergedRun.branch]), docsOnlyHead);
+
+  git(["branch", "zvorygin/docdrift-sweep", docsOnlyHead]);
+  git(["push", "origin", "zvorygin/docdrift-sweep"]);
+  git(["worktree", "add", path.join(repo, ".docdrift/worktrees/docdrift-sweep"), "zvorygin/docdrift-sweep"]);
+  const legacyGh = writeFakeGh("fake-gh-legacy", [
+    { number: 627, url: "https://example.invalid/pr/627", state: "CLOSED", mergeStateStatus: "DIRTY", headRefOid: docsOnlyHead, headRefName: "zvorygin/docdrift-sweep", mergedAt: null },
+  ]);
+  const legacyReport = JSON.parse(fullSweep(["--run-id", "after-legacy", "--adopt-legacy", "--no-codex", "--fixture", "classifier-basic", "--format", "json"], { env: recoveryEnv(legacyGh) }));
+  assert.match(legacyReport.sweep.recoveryAction, /legacy/);
+  assert.equal(git(["rev-parse", "zvorygin/docdrift-sweep"]), docsOnlyHead);
+  assert.ok(fs.existsSync(path.join(repo, ".docdrift/runs", `legacy-docdrift-sweep-${docsOnlyHead.slice(0, 12)}`, "run-state.json")));
 
   const remoteUpdateRepo = path.join(fixtureRoot, "remote-update");
   run("git", ["clone", "--branch", "main", bareOrigin, remoteUpdateRepo], { cwd: fixtureRoot });
