@@ -716,7 +716,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 43. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 44. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -742,7 +742,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 43,
+  "v": 44,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [

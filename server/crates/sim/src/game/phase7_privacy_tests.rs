@@ -390,10 +390,7 @@ fn full_world_snapshot_exposes_private_planning_for_all_projected_owners() {
         .explored_tiles
         .iter()
         .all(|explored| *explored == 1));
-    assert!(selected_owner
-        .explored_tiles
-        .iter()
-        .any(|explored| *explored == 0));
+    assert!(selected_owner.explored_tiles.contains(&0));
     assert_eq!(full_world.player_resources.len(), phase7_players().len());
 }
 

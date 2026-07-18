@@ -237,7 +237,7 @@ impl Game {
                 Vec::new()
             },
             explored_tiles: if omniscient {
-                self.state.fog.all_explored_tiles()
+                self.state.fog.all_visible_tiles()
             } else if fogged {
                 fog.explored_tiles_for(player)
             } else {

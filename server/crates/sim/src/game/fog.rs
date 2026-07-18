@@ -418,10 +418,6 @@ impl Fog {
         vec![1; self.size.saturating_mul(self.size) as usize]
     }
 
-    pub(crate) fn all_explored_tiles(&self) -> Vec<u8> {
-        self.all_visible_tiles()
-    }
-
     /// Whether `player` can currently see the world-pixel point `(x, y)`.
     pub fn is_visible_world(&self, player: u32, x: f32, y: f32) -> bool {
         let ts = config::TILE_SIZE as f32;
