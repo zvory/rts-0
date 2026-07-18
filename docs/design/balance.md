@@ -387,7 +387,7 @@ folded into default targeting.
 - **Panzerfausts** (Training Centre research, protocol id `panzerfausts`): costs 100 steel / 100 oil
   and takes 600 ticks (~20s). Completion arms only Riflemen produced afterward with one lifetime
   disposable launcher shot. Existing and spent Riflemen are never automatically armed or rearmed.
-- **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 200 steel / 0 oil
+- **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
   and takes 900 ticks (~30s). The rules surface defines Riflemen and Machine Gunners
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
   Ekat-faction units, vehicles, buildings, support weapons other than Machine Gunners, and
