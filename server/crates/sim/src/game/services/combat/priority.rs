@@ -373,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_prioritizes_infantry_priority_targets() {
+    fn coax_policy_prioritizes_economy_units_over_fallback_targets() {
         let candidates = [
             candidate(10, EntityKind::Tank, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
@@ -422,6 +422,20 @@ mod tests {
             choose_target(&coax_context(), &[rifleman, worker]),
             Some(11)
         );
+    }
+
+    #[test]
+    fn coax_policy_uses_distance_then_id_within_economy_group() {
+        let farther_worker = candidate(10, EntityKind::Worker, 2_500.0, false);
+        let nearer_golem = candidate(11, EntityKind::Golem, 400.0, false);
+        assert_eq!(
+            choose_target(&coax_context(), &[farther_worker, nearer_golem]),
+            Some(11)
+        );
+
+        let worker = candidate(10, EntityKind::Worker, 900.0, false);
+        let golem = candidate(11, EntityKind::Golem, 900.0, false);
+        assert_eq!(choose_target(&coax_context(), &[golem, worker]), Some(10));
     }
 
     #[test]

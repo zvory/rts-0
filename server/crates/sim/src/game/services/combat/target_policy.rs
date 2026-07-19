@@ -5,11 +5,18 @@ use crate::rules::target::TargetFacts;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct TargetPriorityPolicy {
+    candidate_eligibility: CandidateEligibility,
     immediate_threats: ImmediateThreatPolicy,
     route_obstruction: RouteObstructionPolicy,
     target_group: TargetGroupPolicy,
     weapon_fit: WeaponFitPolicy,
     retention: RetentionPolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CandidateEligibility {
+    All,
+    ExcludeResourceNodes,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,9 +39,9 @@ enum TargetGroupPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WeaponFitPolicy {
+    None,
     DefaultWeapon,
     TankCannonDefaultWeapon,
-    TankCoaxMachineGun,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +54,7 @@ impl TargetPriorityPolicy {
     pub(super) fn for_id(id: combat_rules::TargetPriorityPolicyId) -> Self {
         match id {
             combat_rules::TargetPriorityPolicyId::DefaultWeapon => Self {
+                candidate_eligibility: CandidateEligibility::All,
                 immediate_threats: ImmediateThreatPolicy::None,
                 route_obstruction: RouteObstructionPolicy::None,
                 target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
@@ -54,6 +62,7 @@ impl TargetPriorityPolicy {
                 retention: RetentionPolicy::MovingFireEqualRank,
             },
             combat_rules::TargetPriorityPolicyId::VehicleDefaultWeapon => Self {
+                candidate_eligibility: CandidateEligibility::All,
                 immediate_threats: ImmediateThreatPolicy::None,
                 route_obstruction: RouteObstructionPolicy::VehicleTankTrap,
                 target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
@@ -61,6 +70,7 @@ impl TargetPriorityPolicy {
                 retention: RetentionPolicy::MovingFireEqualRank,
             },
             combat_rules::TargetPriorityPolicyId::TankCannon => Self {
+                candidate_eligibility: CandidateEligibility::All,
                 immediate_threats: ImmediateThreatPolicy::TankCannon,
                 route_obstruction: RouteObstructionPolicy::None,
                 target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
@@ -68,17 +78,21 @@ impl TargetPriorityPolicy {
                 retention: RetentionPolicy::MovingFireEqualRank,
             },
             combat_rules::TargetPriorityPolicyId::TankCoaxMachineGun => Self {
+                candidate_eligibility: CandidateEligibility::ExcludeResourceNodes,
                 immediate_threats: ImmediateThreatPolicy::None,
                 route_obstruction: RouteObstructionPolicy::None,
                 target_group: TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback,
-                weapon_fit: WeaponFitPolicy::TankCoaxMachineGun,
+                weapon_fit: WeaponFitPolicy::None,
                 retention: RetentionPolicy::None,
             },
         }
     }
 
     pub(super) fn allows_candidate(self, facts: TargetFacts) -> bool {
-        self.weapon_fit != WeaponFitPolicy::TankCoaxMachineGun || !facts.is_resource_node
+        match self.candidate_eligibility {
+            CandidateEligibility::All => true,
+            CandidateEligibility::ExcludeResourceNodes => !facts.is_resource_node,
+        }
     }
 
     pub(super) fn immediate_threat_order(
@@ -137,7 +151,7 @@ impl TargetPriorityPolicy {
             TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback
                 if attacker_is_unit =>
             {
-                if facts.is_coax_infantry_priority && !facts.is_economy_unit {
+                if facts.is_coax_infantry_priority {
                     0
                 } else if facts.is_economy_unit {
                     1
@@ -156,13 +170,7 @@ impl TargetPriorityPolicy {
         in_weapon_range: bool,
     ) -> u8 {
         match self.weapon_fit {
-            WeaponFitPolicy::TankCoaxMachineGun => {
-                if facts.is_coax_infantry_priority {
-                    0
-                } else {
-                    1
-                }
-            }
+            WeaponFitPolicy::None => 0,
             WeaponFitPolicy::TankCannonDefaultWeapon if !in_weapon_range => 3,
             WeaponFitPolicy::DefaultWeapon | WeaponFitPolicy::TankCannonDefaultWeapon => {
                 default_weapon_fit_order(attacker_weapon_class, facts)
