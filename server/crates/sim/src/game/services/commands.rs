@@ -22,7 +22,6 @@ use crate::game::services::ability_orders::{
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::movement::angle_delta;
 use crate::game::services::order_execution::targeting::{
     artillery_point_fire_target, queued_artillery_point_fire_target,
     stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
@@ -730,9 +729,7 @@ mod planned_actions {
                                 player,
                                 &[unit],
                                 target,
-                            )
-                            && !deployed_anti_tank_gun_target_outside_arc(entities, unit, target)
-                        {
+                            ) {
                             if let Some(e) = entities.get_mut(unit) {
                                 e.clear_queued_orders();
                             }
@@ -1616,32 +1613,6 @@ fn clear_staged_anti_tank_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
             e.set_pending_redeploy_facing(None);
         }
     }
-}
-
-fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
-    let Some(attacker) = entities.get(id) else {
-        return false;
-    };
-    if attacker.kind != EntityKind::AntiTankGun
-        || !matches!(attacker.weapon_setup(), WeaponSetup::Deployed)
-    {
-        return false;
-    }
-    let Some(center) = attacker
-        .emplacement_facing()
-        .or_else(|| attacker.weapon_facing())
-        .filter(|facing| facing.is_finite())
-    else {
-        return false;
-    };
-    let Some(target) = entities.get(target) else {
-        return false;
-    };
-    let target_angle = (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x);
-    if !target_angle.is_finite() {
-        return true;
-    }
-    angle_delta(center, target_angle).abs() > config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 /// Issue a build order under the "reserve on arrival" model. Validates intent, emits

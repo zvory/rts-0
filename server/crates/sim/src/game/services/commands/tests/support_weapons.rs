@@ -882,7 +882,7 @@ fn attack_move_order_tears_down_deployed_anti_tank_guns_before_moving() {
 }
 
 #[test]
-fn deployed_anti_tank_gun_rejects_explicit_attack_outside_field_of_fire() {
+fn deployed_anti_tank_gun_accepts_explicit_attack_outside_field_of_fire() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let at = entities
@@ -913,8 +913,8 @@ fn deployed_anti_tank_gun_rejects_explicit_attack_outside_field_of_fire() {
         )],
     );
     assert!(
-        !matches!(entities.get(at).unwrap().order(), Order::Attack(_)),
-        "out-of-arc attack should be ignored for the deployed anti-tank gun"
+        matches!(entities.get(at).unwrap().order(), Order::Attack(_)),
+        "out-of-arc attack should be accepted so the deployed anti-tank gun can traverse its cone"
     );
 
     apply(
