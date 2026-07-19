@@ -122,8 +122,7 @@ interface DriverOptions {
   scenario?: string;
   devScenario?: { id: string; unit: string; count: number; blocker: string; case: string };
   opponent?: string;
-  spectate?: string[] | null;
-  autoSpectator?: boolean;
+  spectate?: string[] | null; autoSpectator?: boolean;
   renderer?: string;
   viewport?: Viewport;
   timeoutMs?: number;
@@ -201,8 +200,7 @@ export class InteractDriver {
     scenario = "blank",
     devScenario = { id: "", unit: "", count: 1, blocker: "", case: "" },
     opponent = "ai_2_1",
-    spectate = null,
-    autoSpectator = false,
+    spectate = null, autoSpectator = false,
     renderer = "pixi",
     viewport = DEFAULT_VIEWPORT,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -222,8 +220,7 @@ export class InteractDriver {
       scenario,
       devScenario,
       opponent,
-      spectate,
-      autoSpectator,
+      spectate, autoSpectator,
       renderer,
       viewport,
       timeoutMs: boundedTimeout(timeoutMs, "timeoutMs", MAX_TIMEOUT_MS),
@@ -312,13 +309,8 @@ export class InteractDriver {
       await page.close().catch(() => {});
       throw new InteractDriverError("sessionClosed", "Interact driver was closed during page startup.");
     }
-    this.page = page;
-    this.attachPageDiagnostics();
-    if (this.options.autoSpectator) {
-      await this.openStep(this.page!.evaluateOnNewDocument(() => {
-        localStorage.setItem("rts.autoSpectator.enabled", "1");
-      }), "automatic spectator preference");
-    }
+    this.page = page; this.attachPageDiagnostics();
+    if (this.options.autoSpectator) await this.openStep(this.page!.evaluateOnNewDocument(() => localStorage.setItem("rts.autoSpectator.enabled", "1")), "automatic spectator preference");
     await this.openStep(
       this.page!.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
       "page navigation",
