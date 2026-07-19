@@ -118,6 +118,10 @@ export class PixiPresentationAdapter {
     this._renderer.resize(widthCssPx, heightCssPx);
   }
 
+  setRenderClock(renderClock) {
+    this._renderer.setRenderClock(renderClock);
+  }
+
   enterFixedCapture(renderClock) {
     this._renderer.enterFixedCapture(renderClock);
   }

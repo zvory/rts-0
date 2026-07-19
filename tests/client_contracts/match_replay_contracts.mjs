@@ -12,6 +12,7 @@ import {
   LAB_ROLE,
   MOVEMENT_PATH_DIAGNOSTICS,
   NOTICE_SEVERITY,
+  S,
   msg,
 } from "../../client/src/protocol.js";
 import { CameraNavigationInput } from "../../client/src/input/camera_navigation.js";
@@ -85,6 +86,100 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+  {
+    const handlers = new Map();
+    const net = {
+      on(type, handler) {
+        if (!handlers.has(type)) handlers.set(type, new Set());
+        handlers.get(type).add(handler);
+      },
+      off(type, handler) {
+        handlers.get(type)?.delete(handler);
+      },
+      emit(type, message) {
+        for (const handler of handlers.get(type) || []) handler(message);
+      },
+    };
+    let finishRenderer = null;
+    let installedClock = null;
+    const renderer = {
+      setRenderClock(clock) { installedClock = clock; },
+      destroy() {},
+    };
+    const backend = {
+      createRenderer() {
+        return new Promise((resolve) => { finishRenderer = () => resolve(renderer); });
+      },
+    };
+    class MatchFactoryProbe {
+      constructor() {
+        this.renderClock = { now: () => 123 };
+        this.received = [];
+        this.onSnapshot = (message) => this.received.push([S.SNAPSHOT, message.tick]);
+        this.onCommandReceipt = (message) => this.received.push([S.COMMAND_RECEIPT, message.clientSeq]);
+        this.onRoomTimeState = () => {};
+        this.onLivePauseState = () => {};
+        this.onObserverAnalysis = () => {};
+      }
+    }
+    const creating = Match.create.call(
+      MatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      { rendererBackendBundle: backend },
+    );
+    net.emit(S.SNAPSHOT, { tick: 7 });
+    net.emit(S.COMMAND_RECEIPT, { clientSeq: 9 });
+    finishRenderer();
+    const created = await creating;
+    assert(created.received.length === 2 &&
+      created.received[0][0] === S.SNAPSHOT && created.received[0][1] === 7 &&
+      created.received[1][0] === S.COMMAND_RECEIPT && created.received[1][1] === 9,
+      "Match.create replays opening events that arrive while Pixi initializes");
+    assert(installedClock === created.renderClock,
+      "Match.create installs the match clock through the renderer contract");
+    assert([...handlers.values()].every((set) => set.size === 0),
+      "Match.create removes temporary startup listeners after initialization");
+
+    let failedRendererDestroyed = false;
+    class FailingMatchFactoryProbe {
+      constructor() {
+        throw new Error("match construction failed");
+      }
+    }
+    try {
+      await Match.create.call(
+        FailingMatchFactoryProbe,
+        net,
+        {},
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          rendererBackendBundle: {
+            async createRenderer() {
+              return { destroy() { failedRendererDestroyed = true; } };
+            },
+          },
+        },
+      );
+      assert(false, "Match.create rejects when match construction fails");
+    } catch (error) {
+      assert(error.message === "match construction failed",
+        "Match.create preserves the match construction failure");
+    }
+    assert(failedRendererDestroyed,
+      "Match.create destroys an initialized renderer when match construction fails");
+    assert([...handlers.values()].every((set) => set.size === 0),
+      "Match.create removes temporary startup listeners after a failed initialization");
+  }
   {
     let synced = 0;
     const unitRangeMatch = Object.create(Match.prototype);

@@ -33,6 +33,8 @@ import { CAMERA, INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
+
+const MAX_PENDING_MATCH_START_EVENTS = 64;
 import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
 import { recordPointerLockDiagnostic } from "./match_pointer_lock_diagnostics.js";
@@ -87,20 +89,58 @@ function desktopCursorAggressiveLockEnabled(root = globalThis) {
 export class Match {
   static async create(net, payload, toast, devWatch, audio, statusBadge, diagnostics = null, options = {}) {
     const backendBundle = options.rendererBackendBundle || createPixiBackendBundle();
+    const pendingEvents = [];
+    let reportedPendingEventDrop = false;
+    const pendingHandlers = [
+      S.SNAPSHOT,
+      S.COMMAND_RECEIPT,
+      S.ROOM_TIME_STATE,
+      S.LIVE_PAUSE_STATE,
+      S.OBSERVER_ANALYSIS,
+    ].map((type) => {
+      const handler = (message) => {
+        if (pendingEvents.length >= MAX_PENDING_MATCH_START_EVENTS) {
+          pendingEvents.shift();
+          if (!reportedPendingEventDrop) {
+            diagnostics?.mark?.("match.create.pendingEventsDropped");
+            reportedPendingEventDrop = true;
+          }
+        }
+        pendingEvents.push([type, message]);
+      };
+      net.on(type, handler);
+      return [type, handler];
+    });
     let match = null;
-    const renderer = await backendBundle.createRenderer(dom.viewport, {
-      renderClock: null,
-      state: () => match?.state,
-      profiler: () => match?.frameProfiler,
-      visualProfile: () => match?.visualProfile,
-      staticMap: () => match?.presentationAssembler?.staticMap,
-    });
-    match = new this(net, payload, toast, devWatch, audio, statusBadge, diagnostics, {
-      ...options,
-      rendererBackendBundle: backendBundle,
-      rendererInstance: renderer,
-    });
-    if (renderer?._renderer) renderer._renderer._renderClock = match.renderClock;
+    let renderer = null;
+    try {
+      renderer = await backendBundle.createRenderer(dom.viewport, {
+        state: () => match?.state,
+        profiler: () => match?.frameProfiler,
+        visualProfile: () => match?.visualProfile,
+        staticMap: () => match?.presentationAssembler?.staticMap,
+      });
+      match = new this(net, payload, toast, devWatch, audio, statusBadge, diagnostics, {
+        ...options,
+        rendererBackendBundle: backendBundle,
+        rendererInstance: renderer,
+      });
+      renderer?.setRenderClock?.(match.renderClock);
+    } catch (error) {
+      renderer?.destroy?.();
+      throw error;
+    } finally {
+      for (const [type, handler] of pendingHandlers) net.off(type, handler);
+    }
+
+    const eventHandlers = new Map([
+      [S.SNAPSHOT, match.onSnapshot],
+      [S.COMMAND_RECEIPT, match.onCommandReceipt],
+      [S.ROOM_TIME_STATE, match.onRoomTimeState],
+      [S.LIVE_PAUSE_STATE, match.onLivePauseState],
+      [S.OBSERVER_ANALYSIS, match.onObserverAnalysis],
+    ]);
+    for (const [type, message] of pendingEvents) eventHandlers.get(type)?.(message);
     return match;
   }
 
