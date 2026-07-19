@@ -26,8 +26,8 @@ enum RouteObstructionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TargetGroupPolicy {
-    None,
     CombatUnitsThenEconomyUnitsThenNonUnits,
+    CoaxCombatInfantryThenEconomyUnitsThenFallback,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +70,7 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::TankCoaxMachineGun => Self {
                 immediate_threats: ImmediateThreatPolicy::None,
                 route_obstruction: RouteObstructionPolicy::None,
-                target_group: TargetGroupPolicy::None,
+                target_group: TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback,
                 weapon_fit: WeaponFitPolicy::TankCoaxMachineGun,
                 retention: RetentionPolicy::None,
             },
@@ -134,7 +134,18 @@ impl TargetPriorityPolicy {
                 }
             }
             TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits => 0,
-            TargetGroupPolicy::None => 0,
+            TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback
+                if attacker_is_unit =>
+            {
+                if facts.is_coax_infantry_priority && !facts.is_economy_unit {
+                    0
+                } else if facts.is_economy_unit {
+                    1
+                } else {
+                    2
+                }
+            }
+            TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback => 0,
         }
     }
 

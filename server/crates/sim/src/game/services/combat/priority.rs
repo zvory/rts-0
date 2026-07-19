@@ -408,14 +408,20 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_uses_distance_then_id_inside_priority_bucket() {
-        let farther = candidate(10, EntityKind::Worker, 2_500.0, false);
-        let nearer = candidate(11, EntityKind::MachineGunner, 400.0, false);
-        assert_eq!(choose_target(&coax_context(), &[farther, nearer]), Some(11));
+    fn coax_policy_prefers_combat_infantry_over_nearer_workers() {
+        let nearer_worker = candidate(10, EntityKind::Worker, 400.0, false);
+        let farther_machine_gunner = candidate(11, EntityKind::MachineGunner, 2_500.0, false);
+        assert_eq!(
+            choose_target(&coax_context(), &[nearer_worker, farther_machine_gunner]),
+            Some(11)
+        );
 
-        let first = candidate(10, EntityKind::Worker, 900.0, false);
-        let second = candidate(11, EntityKind::Rifleman, 900.0, false);
-        assert_eq!(choose_target(&coax_context(), &[second, first]), Some(10));
+        let worker = candidate(10, EntityKind::Worker, 900.0, false);
+        let rifleman = candidate(11, EntityKind::Rifleman, 900.0, false);
+        assert_eq!(
+            choose_target(&coax_context(), &[rifleman, worker]),
+            Some(11)
+        );
     }
 
     #[test]
