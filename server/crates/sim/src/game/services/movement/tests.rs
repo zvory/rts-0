@@ -5016,6 +5016,62 @@ fn static_building_blockage_queues_repath_after_debounce() {
     assert_eq!(e.path_goal(), Some((gx, gy)));
 }
 
+#[test]
+fn shallow_wall_slide_still_queues_static_repath_after_debounce() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(10, 10);
+    let (gx, gy) = map.tile_center(20, 10);
+    let unit = entities
+        .spawn_unit(1, EntityKind::Worker, sx, sy)
+        .expect("worker spawn");
+    let shallow_goal = (gx, gy + 4.0);
+    set_path_direct(&mut entities, unit, vec![shallow_goal]);
+    if let Some(entity) = entities.get_mut(unit) {
+        entity.set_order(Order::move_to(shallow_goal.0, shallow_goal.1));
+        entity.mark_move_phase(MovePhase::Moving);
+        entity.reset_stuck(sx, sy);
+    }
+
+    let (bx, by) = map.tile_center(15, 10);
+    entities
+        .spawn_building(1, EntityKind::Depot, bx, by, true)
+        .expect("building spawn");
+
+    let mut slid_sideways = false;
+    let mut queued_repath = false;
+    for tick in 0..300 {
+        let before = pos(&entities, unit);
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let after = pos(&entities, unit);
+        slid_sideways |= (after.0 - before.0).abs() <= 1e-4 && (after.1 - before.1).abs() > 0.0;
+        if entities.get(unit).and_then(|entity| entity.move_phase())
+            == Some(MovePhase::AwaitingPath)
+        {
+            queued_repath = true;
+            break;
+        }
+    }
+
+    let entity = entities.get(unit).expect("worker should remain alive");
+    assert!(
+        slid_sideways,
+        "fixture should exercise axis-only wall sliding"
+    );
+    assert!(
+        queued_repath,
+        "shallow wall slide should request a fresh path"
+    );
+    assert_eq!(entity.move_phase(), Some(MovePhase::AwaitingPath));
+    assert!(
+        entity.path_is_empty(),
+        "stale shallow path should be cleared"
+    );
+    assert_eq!(entity.path_goal(), Some(shallow_goal));
+}
+
 /// A unit pressed against a building wall must physically reach its goal, not freeze
 /// against the corner.
 ///

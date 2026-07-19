@@ -1,7 +1,34 @@
 use super::*;
 
+#[derive(Clone, Copy)]
+enum DynamicConstructionPathBlockCase {
+    HeadOn,
+    SlightAngle,
+    MajorAngle,
+}
+
+impl DynamicConstructionPathBlockCase {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "head_on" => Some(Self::HeadOn),
+            "slight_angle" => Some(Self::SlightAngle),
+            "major_angle" => Some(Self::MajorAngle),
+            _ => None,
+        }
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::HeadOn => "head_on",
+            Self::SlightAngle => "slight_angle",
+            Self::MajorAngle => "major_angle",
+        }
+    }
+}
+
 impl Game {
     pub fn new_dynamic_construction_path_block_scenario(
+        scenario_case: &str,
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
@@ -11,15 +38,41 @@ impl Game {
                 "unsupported dynamic-construction path-block launch {unit} x{unit_count}"
             ));
         }
+        let scenario_case =
+            DynamicConstructionPathBlockCase::parse(scenario_case).ok_or_else(|| {
+                format!("unsupported dynamic-construction path-block case {scenario_case}")
+            })?;
 
         let mut map = flat_dev_map(1);
         let center_y = map.size / 2;
-        let start_tile = (map.size / 2 - 20, center_y);
-        let mover_start = map.tile_center(start_tile.0, start_tile.1);
-        let goal = map.tile_center(start_tile.0 + 20, start_tile.1);
-        let build_tile = (start_tile.0 + 9, center_y - 1);
+        let start_x = map.size / 2 - 20;
+        let goal = map.tile_center(start_x + 20, center_y);
+        let (start_tile, mover_start, build_tile) = match scenario_case {
+            DynamicConstructionPathBlockCase::HeadOn => {
+                let tile = (start_x, center_y);
+                (
+                    tile,
+                    map.tile_center(tile.0, tile.1),
+                    (start_x + 9, center_y - 1),
+                )
+            }
+            DynamicConstructionPathBlockCase::SlightAngle => {
+                let tile = (start_x, center_y);
+                let mut start = map.tile_center(tile.0, tile.1);
+                start.1 -= 4.0;
+                (tile, start, (start_x + 9, center_y - 1))
+            }
+            DynamicConstructionPathBlockCase::MajorAngle => {
+                let tile = (start_x, center_y - 8);
+                (
+                    tile,
+                    map.tile_center(tile.0, tile.1),
+                    (start_x + 9, center_y - 5),
+                )
+            }
+        };
         let builder_start = map.tile_center(build_tile.0 + 1, build_tile.1 - 1);
-        let city_centre_pos = map.tile_center(start_tile.0, center_y - 8);
+        let city_centre_pos = map.tile_center(start_x, center_y + 10);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = start_tile;
         }
@@ -48,7 +101,7 @@ impl Game {
             player_id,
             start_tile,
             seed,
-            "dev:dynamic_construction_path_block",
+            &format!("dev:dynamic_construction_path_block:{}", scenario_case.id()),
         );
         if let Some(player) = game.state.players.iter_mut().find(|p| p.id == player_id) {
             player.refund_resources(1_000, 0);
@@ -82,6 +135,9 @@ impl Game {
             goal,
             issue_after_ticks: 0,
         }
-        .checkpoint_backed("dev:dynamic_construction_path_block")
+        .checkpoint_backed(&format!(
+            "dev:dynamic_construction_path_block:{}",
+            scenario_case.id()
+        ))
     }
 }

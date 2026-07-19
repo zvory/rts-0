@@ -331,11 +331,14 @@ pub(super) fn advance_moving_units(
                         x = nx;
                         y = ny;
                     } else {
+                        // The planned step was rejected by static geometry. Keep that signal even
+                        // when an axis-only fallback can wall-slide this tick: shallow approach
+                        // angles can otherwise make microscopic sideways progress forever and
+                        // reset the stale-route debounce without ever clearing the obstacle.
+                        static_blocked_this_tick = true;
                         // Wall-slide: try each axis independently so a unit pressed against a
                         // building edge can slide along it rather than freezing. Guard each axis
-                        // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
-                        // spuriously suppress static_blocked). Only mark static-blocked when
-                        // neither axis makes progress.
+                        // against zero movement (dy=0 ⟹ y-only slide is a no-op).
                         let slide_x = dx.abs() > 1e-4
                             && unit_static_standable(occ, map, kind, nx, y, body_facing);
                         let slide_y = dy.abs() > 1e-4
@@ -344,8 +347,6 @@ pub(super) fn advance_moving_units(
                             x = nx;
                         } else if slide_y {
                             y = ny;
-                        } else {
-                            static_blocked_this_tick = true;
                         }
                     }
                     break;

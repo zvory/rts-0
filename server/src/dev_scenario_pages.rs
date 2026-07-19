@@ -51,7 +51,7 @@ pub async fn dev_scenario_handler(
 fn dev_scenario_index_html() -> String {
     let mut items = String::new();
     for scenario in all_dev_scenarios() {
-        if scenario.id == "tank_trap_pathing_matrix" {
+        if scenario.launches.iter().any(|launch| launch.case.is_some()) {
             items.push_str(&dev_scenario_case_matrix_html(
                 scenario.title,
                 scenario.id,
@@ -284,6 +284,10 @@ mod tests {
         assert!(html.contains("Vehicle Wall Chokepoint"));
         assert!(html.contains("Vehicle Corner Wall"));
         assert!(html.contains("Vehicle Small-Unit Block Baseline"));
+        assert!(html.contains("Dynamic Construction Path Block"));
+        assert!(html.contains("<option value=\"head_on\">head-on</option>"));
+        assert!(html.contains("<option value=\"slight_angle\">slight angle</option>"));
+        assert!(html.contains("<option value=\"major_angle\">major angle</option>"));
         assert!(html.contains("<table class=\"scenario-table\">"));
         assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=worker&count=1"));
         assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=tank&count=4"));

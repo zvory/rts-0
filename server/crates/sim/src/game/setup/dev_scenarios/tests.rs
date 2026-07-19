@@ -78,68 +78,74 @@ fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
 
 #[test]
 fn dynamic_construction_path_block_repaths_around_new_building() {
-    let setup =
-        Game::new_dynamic_construction_path_block_scenario(EntityKind::Worker, 1, 0x5150_0718)
-            .expect("scenario setup should succeed");
-    let mut game = setup.game;
-    let mover = setup.units[0];
-    game.enqueue(
-        setup.player_id,
-        SimCommand::Move {
-            units: setup.units,
-            x: setup.goal.0,
-            y: setup.goal.1,
-            queued: false,
-        },
-    );
+    for scenario_case in ["head_on", "slight_angle", "major_angle"] {
+        let setup = Game::new_dynamic_construction_path_block_scenario(
+            scenario_case,
+            EntityKind::Worker,
+            1,
+            0x5150_0718,
+        )
+        .expect("scenario setup should succeed");
+        let mut game = setup.game;
+        let mover = setup.units[0];
+        game.enqueue(
+            setup.player_id,
+            SimCommand::Move {
+                units: setup.units,
+                x: setup.goal.0,
+                y: setup.goal.1,
+                queued: false,
+            },
+        );
 
-    let mut saw_construction = false;
-    let mut saw_static_block = false;
-    let mut saw_repath_request = false;
-    let mut arrived = false;
-    for _ in 0..900 {
-        game.tick();
-        saw_construction |= game
-            .state
-            .entities
-            .iter()
-            .any(|entity| entity.kind == EntityKind::Barracks);
-        let mover_state = game
-            .state
-            .entities
-            .get(mover)
-            .expect("mover should remain alive");
-        saw_static_block |= mover_state
-            .movement
-            .as_ref()
-            .is_some_and(|movement| movement.static_blocked_ticks > 0);
-        saw_repath_request |= mover_state.movement.as_ref().is_some_and(|movement| {
-            movement.last_repath_tick > config::STATIC_BLOCKED_REPATH_TICKS as u32
-        });
-        let dx = mover_state.pos_x - setup.goal.0;
-        let dy = mover_state.pos_y - setup.goal.1;
-        if (dx * dx + dy * dy).sqrt() <= config::TILE_SIZE as f32 {
-            arrived = true;
-            break;
+        let mut saw_construction = false;
+        let mut saw_static_block = false;
+        let mut saw_repath_request = false;
+        let mut arrived = false;
+        for _ in 0..900 {
+            game.tick();
+            saw_construction |= game
+                .state
+                .entities
+                .iter()
+                .any(|entity| entity.kind == EntityKind::Barracks);
+            let mover_state = game
+                .state
+                .entities
+                .get(mover)
+                .expect("mover should remain alive");
+            saw_static_block |= mover_state
+                .movement
+                .as_ref()
+                .is_some_and(|movement| movement.static_blocked_ticks > 0);
+            saw_repath_request |= mover_state.movement.as_ref().is_some_and(|movement| {
+                movement.last_repath_tick > config::STATIC_BLOCKED_REPATH_TICKS as u32
+            });
+            let dx = mover_state.pos_x - setup.goal.0;
+            let dy = mover_state.pos_y - setup.goal.1;
+            if (dx * dx + dy * dy).sqrt() <= config::TILE_SIZE as f32 {
+                arrived = true;
+                break;
+            }
         }
-    }
 
-    assert!(
-        saw_construction,
-        "the second worker should start the Barracks"
-    );
-    assert!(
-        saw_static_block,
-        "the moving worker should encounter the Barracks on its stale route"
-    );
-    assert!(
-        saw_repath_request,
-        "the static obstruction should invalidate the stale route and assign a fresh path"
-    );
-    assert!(
-        arrived,
-        "the moving worker should repath around the new Barracks"
-    );
+        assert!(
+            saw_construction,
+            "{scenario_case}: the second worker should start the Barracks"
+        );
+        assert!(
+            saw_static_block,
+            "{scenario_case}: the moving worker should encounter the Barracks on its stale route"
+        );
+        assert!(
+            saw_repath_request,
+            "{scenario_case}: the static obstruction should assign a fresh path"
+        );
+        assert!(
+            arrived,
+            "{scenario_case}: the moving worker should repath around the new Barracks"
+        );
+    }
 }
 
 #[derive(Debug)]
