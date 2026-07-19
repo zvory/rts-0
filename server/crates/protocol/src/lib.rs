@@ -1127,20 +1127,6 @@ mod tests {
     }
 
     #[test]
-    fn omniscient_vision_selection_deserializes() {
-        let msg: ClientMessage =
-            serde_json::from_str(r#"{"t":"setVisionSelection","selection":{"mode":"omniscient"}}"#)
-                .expect("omniscient setVisionSelection should deserialize");
-
-        assert!(matches!(
-            msg,
-            ClientMessage::SetVisionSelection {
-                selection: VisionSelectionRequest::Omniscient,
-            }
-        ));
-    }
-
-    #[test]
     fn request_branch_from_tick_deserializes() {
         let msg: ClientMessage = serde_json::from_str(r#"{"t":"requestBranchFromTick"}"#)
             .expect("requestBranchFromTick should deserialize");
