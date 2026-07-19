@@ -6,10 +6,18 @@ export function drawFormationMovePreview(g, preview) {
     : [];
   if (points.length < 2) return;
   const color = COLORS.selectOwn;
-  g.lineStyle(4, color, 0.3);
+  // A dark outside stroke keeps the freehand path readable over bright terrain,
+  // selection ranges, and fog; the saturated inner stroke shows the exact path.
+  g.lineStyle(7, 0x071018, 0.72);
   drawLine(g, points);
-  g.lineStyle(2, color, 0.95);
+  g.lineStyle(3, color, 1);
   drawLine(g, points);
+
+  g.lineStyle(2, 0x071018, 0.8);
+  g.beginFill(color, 1);
+  g.drawCircle(points[0].x, points[0].y, 4);
+  g.drawCircle(points[points.length - 1].x, points[points.length - 1].y, 4);
+  g.endFill();
 
   for (const slot of Array.isArray(preview?.slots) ? preview.slots : []) {
     if (!finitePoint(slot)) continue;

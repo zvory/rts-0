@@ -1,6 +1,8 @@
 import { cmd } from "../protocol.js";
 import { buildFormationLinePreview, appendFormationLinePoint } from "./formation_line.js";
-import { DRAG_THRESHOLD_PX } from "./constants.js";
+import { DEFAULT_TILE_SIZE } from "./constants.js";
+
+const FORMATION_LINE_MIN_TILES = 3;
 
 export function _beginFormationGesture(p, ev = {}) {
   const world = this._groundAtScreen(p.x, p.y);
@@ -12,7 +14,8 @@ export function _beginFormationGesture(p, ev = {}) {
     !intent?.placement &&
     !intent?.commandTarget;
   this._formationGesture = {
-    startScreen: { x: p.x, y: p.y },
+    startWorld: world ? { x: world.x, y: world.y } : null,
+    maxExtentWorld: 0,
     points: world ? [{ x: world.x, y: world.y }] : [],
     units: units.slice(),
     entities: eligible
@@ -30,13 +33,11 @@ export function _updateFormationGesture(p, ev = {}) {
   if (!gesture) return false;
   gesture.queued = !!ev.shiftKey;
   if (!gesture.eligible) return true;
-  if (!gesture.promoted) {
-    const distance = Math.hypot(p.x - gesture.startScreen.x, p.y - gesture.startScreen.y);
-    if (distance < DRAG_THRESHOLD_PX) return true;
-    gesture.promoted = true;
-  }
   const world = this._groundAtScreen(p.x, p.y);
-  if (world) appendFormationLinePoint(gesture.points, world);
+  if (world) {
+    appendFormationLinePoint(gesture.points, world);
+    updatePromotion(this, gesture, world);
+  }
   refreshPreview(this, gesture);
   return true;
 }
@@ -45,14 +46,21 @@ export function _finishFormationGesture(p, ev = {}) {
   const gesture = this._formationGesture;
   if (!gesture) return false;
   this._formationGesture = null;
+  if (!gesture.eligible) {
+    this._intent?.()?.clearFormationMovePreview?.();
+    this._onRightClick(p, ev);
+    return true;
+  }
+  const world = this._groundAtScreen(p.x, p.y);
+  if (world) {
+    appendFormationLinePoint(gesture.points, world, { force: true });
+    updatePromotion(this, gesture, world);
+  }
   if (!gesture.promoted) {
     this._intent?.()?.clearFormationMovePreview?.();
     this._onRightClick(p, ev);
     return true;
   }
-
-  const world = this._groundAtScreen(p.x, p.y);
-  if (world) appendFormationLinePoint(gesture.points, world, { force: true });
   const preview = buildFormationLinePreview(gesture.points, gesture.entities);
   this._intent?.()?.clearFormationMovePreview?.();
   if (preview.points.length < 2 || gesture.units.length === 0) return true;
@@ -81,6 +89,16 @@ export function _refreshFormationGesture() {
 
 function refreshPreview(input, gesture) {
   input._intent?.()?.updateFormationMovePreview?.(
-    buildFormationLinePreview(gesture.points, gesture.entities),
+    buildFormationLinePreview(gesture.points, gesture.promoted ? gesture.entities : []),
   );
+}
+
+function updatePromotion(input, gesture, world) {
+  if (!gesture.startWorld) return;
+  gesture.maxExtentWorld = Math.max(
+    gesture.maxExtentWorld,
+    Math.hypot(world.x - gesture.startWorld.x, world.y - gesture.startWorld.y),
+  );
+  const tileSize = input.state?.map?.tileSize || DEFAULT_TILE_SIZE;
+  if (gesture.maxExtentWorld >= tileSize * FORMATION_LINE_MIN_TILES) gesture.promoted = true;
 }
