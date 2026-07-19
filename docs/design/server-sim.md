@@ -1427,10 +1427,12 @@ General rules:
   has no target, immediately after a shot to prepare the next target during reload, or on the ready
   tick when that prepared target fails current hostile, visibility, smoke, range, line-of-sight,
   blocker, or weapon-specific legality. Cooldown, setup, and aiming ticks validate only the
-  committed target and never rank alternatives. If the prepared target remains fireable when the
-  weapon becomes ready, it receives the shot without a full rerank; the post-shot pass can then
-  choose a newly higher-priority threat for the following cycle. Explicit Attack orders retain
-  their commanded-target semantics.
+  committed target and never rank alternatives. A targetless travelling Attack Move is the narrow
+  exception: non-Mortar units may scan during reload so they stop when an enemy first enters weapon
+  range; after committing that target, the normal no-rerank reload policy applies. If the prepared
+  target remains fireable when the weapon becomes ready, it receives the shot without a full
+  rerank; the post-shot pass can then choose a newly higher-priority threat for the following cycle.
+  Explicit Attack orders retain their commanded-target semantics.
 - The auto-acquisition ranker chooses only for the current default attack profile. Future grenades,
   satchels, sticky bombs, melee demolition, or other special attacks must be represented as separate
   profiles with explicit activation policy; explicit-only special attacks can be added without

@@ -76,8 +76,47 @@ fn scenario_starts_on_the_failure_boundary() {
         .expect("scenario attacker should survive its first tick");
     assert!(matches!(attacker.order(), Order::AttackMove(_)));
     assert_eq!(
+        attacker.target_id(),
+        Some(target_id),
+        "attack-move should acquire the already in-range target while reloading"
+    );
+    assert!(
+        attacker.path_is_empty(),
+        "attack-move should stop instead of continuing through an acquired in-range target"
+    );
+    assert_eq!(
         attacker.weapon_cooldown(WeaponKind::TankCannon),
         cannon.cooldown - 1,
         "the real attack-move command should begin while the cannon remains reloading"
+    );
+
+    let stopped_at = (attacker.pos_x, attacker.pos_y);
+    let target_hp = game
+        .state
+        .entities
+        .get(target_id)
+        .expect("scenario target should survive acquisition")
+        .hp;
+    for _ in 0..10 {
+        game.tick();
+    }
+    let attacker = game
+        .state
+        .entities
+        .get(attacker_id)
+        .expect("scenario attacker should remain alive while reloading");
+    assert_eq!(
+        (attacker.pos_x, attacker.pos_y),
+        stopped_at,
+        "the reloading attacker should wait at the acquisition boundary"
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .get(target_id)
+            .expect("scenario target should remain alive while the attacker reloads")
+            .hp,
+        target_hp,
+        "waiting at range must not bypass the weapon cooldown"
     );
 }
