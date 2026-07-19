@@ -490,7 +490,7 @@ export function runFrameProfilerContracts() {
             viewport: { widthCssPx: 800, heightCssPx: 600 },
           }),
         },
-        renderer: { app: { canvas: { width: 1600, height: 1200 }, renderer: {} } },
+        renderer: { app: { view: { width: 1600, height: 1200 }, renderer: {} } },
         prediction: { debugSummary: () => ({ mode: "predicting" }) },
       });
       assert(context.matchMode === "live", "match frame context includes bounded mode");

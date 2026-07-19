@@ -1,4 +1,3 @@
-import { gfxLine, gfxMove, gfxStroke } from "./native_graphics.js";
 import {
   ABILITIES,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
@@ -55,10 +54,10 @@ export function _drawSelectedUnitRanges(state) {
         profile.minRadius,
       );
     } else {
-      gfxStroke(g, 1, UNIT_RANGE_COLOR, UNIT_RANGE_LINE_ALPHA);
+      g.lineStyle(1, UNIT_RANGE_COLOR, UNIT_RANGE_LINE_ALPHA);
       dottedCircle(g, e.x, e.y, profile.maxRadius);
       if (profile.minRadius > 0) {
-        gfxStroke(g, 1, UNIT_RANGE_MIN_COLOR, UNIT_RANGE_MIN_LINE_ALPHA);
+        g.lineStyle(1, UNIT_RANGE_MIN_COLOR, UNIT_RANGE_MIN_LINE_ALPHA);
         dottedCircle(g, e.x, e.y, profile.minRadius, UNIT_RANGE_DOT_SPACING_PX * 0.8);
       }
     }
@@ -188,8 +187,8 @@ function dottedCircle(g, cx, cy, radius, dotSpacing = UNIT_RANGE_DOT_SPACING_PX)
     const a = (i / count) * Math.PI * 2;
     const a0 = a - dotArc;
     const a1 = a + dotArc;
-    gfxMove(g, cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius);
-    gfxLine(g, cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius);
+    g.moveTo(cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius);
+    g.lineTo(cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius);
   }
 }
 

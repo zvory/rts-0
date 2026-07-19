@@ -52,7 +52,7 @@ import {
     },
   };
   runner.net = net;
-  const attempt = await runner.restartWorkloadAttempt();
+  const attempt = runner.restartWorkloadAttempt();
   assert(attempt.match === freshMatch && runner.isCurrentAttempt(attempt),
     "each stress attempt rewinds the stream and follows the rebuilt match shell");
   void runner.run({ match: { frameProfiler: {} }, net });

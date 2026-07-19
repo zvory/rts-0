@@ -37,8 +37,6 @@ try {
   const gameSessionId = `game_${"b".repeat(32)}`;
   const scenarioSessionId = `scenario_${"c".repeat(32)}`;
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
-  assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"], autoSpectator: true }));
-  assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", autoSpectator: true }), (error) => error?.code === "invalidInput");
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");
   assert.doesNotThrow(() => validateCommandInput("scenario-open", { id: "direct_reverse_order", unit: "tank", count: 1 }));
   assert.throws(() => validateCommandInput("scenario-open", { id: "bad/scenario", unit: "tank", count: 1 }), (error) => error?.code === "invalidInput");

@@ -16,8 +16,6 @@ export class ReplayViewer extends Match {
       cameraMaxZoom: options.cameraMaxZoom,
       observerAnalysisOverlayPreferences: options.observerAnalysisOverlayPreferences,
       aiDiagnosticsPanelPreferences: options.aiDiagnosticsPanelPreferences,
-      rendererBackendBundle: options.rendererBackendBundle,
-      rendererInstance: options.rendererInstance,
     });
   }
 }

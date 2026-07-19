@@ -1,4 +1,3 @@
-import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 // Renderer — PixiJS scene graph + per-frame drawing. See docs/design/client-ui.md §4.1 / §4.2.
 //
 // Owns a single PIXI.Application whose stage holds one `world` container that is
@@ -16,7 +15,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 // scene graph: each frame we touch the live ids, then hide any pooled object whose
 // id was not seen.
 //
-// PixiJS v8.19.0 is loaded globally as `PIXI`; we never import it.
+// PixiJS v7 is loaded globally as `PIXI`; we never import it.
 
 import { COLORS } from "../config.js";
 import { isUnit, isBuilding, isResource } from "../protocol.js";
@@ -101,53 +100,30 @@ const MISSING_TEXTURE_SIZE_PX = 26;
 const MISSING_TEXTURE_MAGENTA = 0xff00ff;
 const MISSING_TEXTURE_DARK = 0x141018;
 
-function applicationOptions(canvasParent) {
-  return {
-    autoStart: false,
-    antialias: false,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
-    backgroundColor: COLORS.bgVoid,
-    width: canvasParent.clientWidth || window.innerWidth,
-    height: canvasParent.clientHeight || window.innerHeight,
-    preference: "webgl",
-    roundPixels: false,
-  };
-}
-
 export class Renderer {
-  static async create(canvasParent, options = {}) {
-    const app = new PIXI.Application();
-    try {
-      await app.init(applicationOptions(canvasParent));
-      return new Renderer(canvasParent, { ...options, app });
-    } catch (error) {
-      // init() may have allocated a canvas or renderer before rejecting. Cleanup is
-      // best-effort because partially initialized Pixi applications can also throw here.
-      try {
-        app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
-      } catch {
-        // Preserve the initialization error, which is the actionable failure.
-      }
-      throw error;
-    }
-  }
-
   /**
    * @param {HTMLElement} canvasParent element the Pixi canvas is appended to
    */
-  constructor(canvasParent, { renderClock = null, app = null } = {}) {
+  constructor(canvasParent, { renderClock = null } = {}) {
     this._parent = canvasParent;
     this._renderClock = renderClock;
 
     /** The PIXI.Application. Exposed for the render loop / ticker. */
-    if (!app) throw new TypeError("Renderer.create() must initialize Pixi before construction.");
-    this.app = app;
-    PIXI.TextureStyle.defaultOptions.scaleMode = "nearest";
+    this.app = new PIXI.Application({
+      autoStart: false,
+      antialias: false,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+      backgroundColor: COLORS.bgVoid,
+      width: canvasParent.clientWidth || window.innerWidth,
+      height: canvasParent.clientHeight || window.innerHeight,
+    });
+    PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
     // Keep interpolated entity positions fractional. Nearest scaling preserves
     // the low-res look without snapping smooth server-snapshot interpolation.
-    this.app.canvas.style.imageRendering = "pixelated";
-    canvasParent.appendChild(this.app.canvas);
+    this.app.renderer.roundPixels = false;
+    this.app.view.style.imageRendering = "pixelated";
+    canvasParent.appendChild(this.app.view);
 
     // World container — moved/scaled by the camera every frame.
     this.world = new PIXI.Container();
@@ -198,15 +174,16 @@ export class Renderer {
     this._observerMapAnalysisLabels = new PIXI.Container();
     this._observerMapAnalysisLabelPool = new Map();
     this._observerMapAnalysisHitPool = new Map();
-    this._observerMapAnalysisTooltip = new PIXI.Text({ text: "", style: {
+    this._observerMapAnalysisTooltip = new PIXI.Text("", {
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: 13,
       fontWeight: "700",
       fill: 0xfff3c4,
-      stroke: { color: 0x0f1115, width: 4 },
+      stroke: 0x0f1115,
+      strokeThickness: 4,
       wordWrap: true,
       wordWrapWidth: 320,
-    } });
+    });
     this._observerMapAnalysisTooltip.visible = false;
     this._observerMapAnalysisTooltip.anchor?.set?.(0.5, 1);
     this.layers.feedback.addChild(this._observerMapAnalysisGfx);
@@ -611,10 +588,10 @@ export class Renderer {
     // Overlays.
     time("renderer.effectsOverlays", () => {
       this._recordRenderDiagnostic("renderer.graphics.clear.abilityObjects");
-      gfxReset(this._abilityObjectGfx.clear());
+      this._abilityObjectGfx.clear();
       this._drawSafely("abilityObjects", () => this._drawAbilityObjects(feedbackView));
       this._recordRenderDiagnostic("renderer.graphics.clear.smokes");
-      gfxReset(this._smokeGfx.clear());
+      this._smokeGfx.clear();
       this._drawSafely("smokes", () => this._drawSmokes(feedbackView));
     });
     time("renderer.fogDraw", () => this._drawSafely("fog", () => this._drawFog(fog)));
@@ -875,16 +852,16 @@ export class Renderer {
     const half = size / 2;
     const cell = size / 2;
     g.position.set(x, y);
-    gfxStroke(g, 2, 0x0b0710, 0.95);
-    gfxFill(g, MISSING_TEXTURE_MAGENTA, 1);
-    gfxRect(g, -half, -half, cell, cell);
-    gfxRect(g, 0, 0, cell, cell);
-    gfxFill(g, MISSING_TEXTURE_DARK, 1);
-    gfxRect(g, 0, -half, cell, cell);
-    gfxRect(g, -half, 0, cell, cell);
-    gfxNoFill(g);
-    gfxStroke(g, 2, 0xffffff, 0.85);
-    gfxRect(g, -half, -half, size, size);
+    g.lineStyle(2, 0x0b0710, 0.95);
+    g.beginFill(MISSING_TEXTURE_MAGENTA, 1);
+    g.drawRect(-half, -half, cell, cell);
+    g.drawRect(0, 0, cell, cell);
+    g.beginFill(MISSING_TEXTURE_DARK, 1);
+    g.drawRect(0, -half, cell, cell);
+    g.drawRect(-half, 0, cell, cell);
+    g.endFill();
+    g.lineStyle(2, 0xffffff, 0.85);
+    g.drawRect(-half, -half, size, size);
   }
 
   _recordRenderError(label, err) {
@@ -1134,9 +1111,9 @@ export class Renderer {
     this._setupVisuals.clear();
 
     // Detach the canvas from the DOM, then destroy the app + WebGL context.
-    const view = this.app.canvas;
+    const view = this.app.view;
     if (view && view.parentNode) view.parentNode.removeChild(view);
-    this.app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
+    this.app.destroy(true, { children: true, texture: true, baseTexture: true });
   }
 }
 
@@ -1150,7 +1127,7 @@ function destroyRendererOwnedTexture(texture) {
   if (!texture?.rtsRendererOwnedTexture) return;
   if (texture.destroyed) return;
   texture.destroy?.(true);
-  texture.source?.destroy?.();
+  texture.baseTexture?.destroy?.();
 }
 
 Object.assign(Renderer.prototype, {

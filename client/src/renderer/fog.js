@@ -1,4 +1,3 @@
-import { gfxNoFill, gfxRect, gfxReset, gfxFill } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -63,7 +62,7 @@ export function _drawFog(fog) {
   }
   this._recordRenderDiagnostic?.("renderer.cache.miss.fog");
   this._recordRenderDiagnostic?.("renderer.graphics.clear.fog");
-  gfxReset(g.clear());
+  g.clear();
   if (!fog || !this._map) {
     this._fogRenderFog = fog;
     this._fogRenderMap = this._map;
@@ -88,9 +87,9 @@ export function _drawFog(fog) {
             : runLevel === 3
               ? FOG_UNEXPLORED_ALPHA * 0.56
               : FOG_EXPLORED_ALPHA;
-          gfxFill(g, color, a);
-          gfxRect(g, runStart * ts, ty * ts, (tx - runStart) * ts, ts);
-          gfxNoFill(g);
+          g.beginFill(color, a);
+          g.drawRect(runStart * ts, ty * ts, (tx - runStart) * ts, ts);
+          g.endFill();
         }
         runStart = tx;
         runLevel = level;

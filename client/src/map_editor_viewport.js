@@ -1,4 +1,3 @@
-import { gfxCircle, gfxLine, gfxMove, gfxRect, gfxReset, gfxNoFill, gfxFill, gfxStroke } from "./renderer/native_graphics.js";
 import { Camera } from "./camera.js";
 import { TERRAIN } from "./protocol.js";
 import { Renderer } from "./renderer/index.js";
@@ -63,17 +62,11 @@ export function mapEditorSymmetryGuideCentre(size, symmetry) {
 }
 
 export class MapEditorViewport {
-  static async create(options) {
-    const renderer = await Renderer.create(options.root);
-    return new MapEditorViewport({ ...options, renderer });
-  }
-
-  constructor({ root, session, onStatus = () => {}, renderer }) {
+  constructor({ root, session, onStatus = () => {} }) {
     this.root = root;
     this.session = session;
     this.onStatus = onStatus;
-    if (!renderer) throw new TypeError("MapEditorViewport.create() must prepare the renderer.");
-    this.renderer = renderer;
+    this.renderer = new Renderer(root);
     this.camera = new Camera(root.clientWidth, root.clientHeight, {
       minZoom: 0.05,
       maxZoom: 4,
@@ -100,7 +93,7 @@ export class MapEditorViewport {
     this.onKeyDown = (event) => this.handleKey(event, true);
     this.onKeyUp = (event) => this.handleKey(event, false);
     this.onResize = () => this.resize();
-    const canvas = this.renderer.app.canvas;
+    const canvas = this.renderer.app.view;
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
@@ -168,31 +161,27 @@ export class MapEditorViewport {
   drawOverlay() {
     const draft = this.session.draft;
     if (!draft) return;
-    gfxReset(this.overlay.clear());
+    this.overlay.clear();
     for (const label of this.labels) label.destroy();
     this.labels = [];
     const size = draft.terrain.length;
-    gfxStroke(this.overlay, 1, 0xffffff, 0.08);
+    this.overlay.lineStyle(1, 0xffffff, 0.08);
     for (let tile = 0; tile <= size; tile += 8) {
       const p = tile * TILE_SIZE;
-      gfxMove(this.overlay, p, 0);
-      gfxLine(this.overlay, p, size * TILE_SIZE);
-      gfxMove(this.overlay, 0, p);
-      gfxLine(this.overlay, size * TILE_SIZE, p);
+      this.overlay.moveTo(p, 0).lineTo(p, size * TILE_SIZE);
+      this.overlay.moveTo(0, p).lineTo(size * TILE_SIZE, p);
     }
     const guides = mapEditorSymmetryGuideLines(size, this.symmetry);
     if (guides.length) {
-      gfxStroke(this.overlay, 2, 0xffd878, 0.82);
+      this.overlay.lineStyle(2, 0xffd878, 0.82);
       for (const guide of guides) {
-        gfxMove(this.overlay, guide.x0, guide.y0);
-        gfxLine(this.overlay, guide.x1, guide.y1);
+        this.overlay.moveTo(guide.x0, guide.y0).lineTo(guide.x1, guide.y1);
       }
     }
     const guideCentre = mapEditorSymmetryGuideCentre(size, this.symmetry);
     if (guideCentre) {
-      gfxStroke(this.overlay, 2, 0xffd878, 0.82);
-      gfxCircle(gfxFill(this.overlay, 0xffd878, 0.82), guideCentre.x, guideCentre.y, 5);
-      gfxNoFill(this.overlay);
+      this.overlay.lineStyle(2, 0xffd878, 0.82);
+      this.overlay.beginFill(0xffd878, 0.82).drawCircle(guideCentre.x, guideCentre.y, 5).endFill();
     }
     const locations = this.session.mapOverlay();
     for (const start of locations?.starts || []) this.drawSite(start, 0x4ec9ff, 11, `S${start.index + 1}`);
@@ -208,28 +197,27 @@ export class MapEditorViewport {
     const y0 = Math.min(this.paintStartTile.y, this.lastPaintTile.y) * TILE_SIZE;
     const width = (Math.abs(this.lastPaintTile.x - this.paintStartTile.x) + 1) * TILE_SIZE;
     const height = (Math.abs(this.lastPaintTile.y - this.paintStartTile.y) + 1) * TILE_SIZE;
-    gfxStroke(this.overlay, 2, terrainPreviewColor(this.tool.terrain), 0.9);
-    gfxRect(gfxFill(this.overlay, terrainPreviewColor(this.tool.terrain), 0.16), x0, y0, width, height);
-    gfxNoFill(this.overlay);
+    this.overlay.lineStyle(2, terrainPreviewColor(this.tool.terrain), 0.9);
+    this.overlay.beginFill(terrainPreviewColor(this.tool.terrain), 0.16).drawRect(x0, y0, width, height).endFill();
   }
 
   drawSite(site, color, radius, labelText, selected = false) {
     const x = (site.x + 0.5) * TILE_SIZE;
     const y = (site.y + 0.5) * TILE_SIZE;
     if (selected) {
-      gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
-      gfxCircle(this.overlay, x, y, radius + 6);
+      this.overlay.lineStyle(2, 0xfff4ba, 0.96);
+      this.overlay.drawCircle(x, y, radius + 6);
     }
-    gfxStroke(this.overlay, 3, 0x101418, 0.9);
-    gfxCircle(gfxFill(this.overlay, color, 0.82), x, y, radius);
-    gfxNoFill(this.overlay);
-    const label = new PIXI.Text({ text: labelText, style: {
+    this.overlay.lineStyle(3, 0x101418, 0.9);
+    this.overlay.beginFill(color, 0.82).drawCircle(x, y, radius).endFill();
+    const label = new PIXI.Text(labelText, {
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: 11,
       fontWeight: "700",
       fill: 0xffffff,
-      stroke: { color: 0x101418, width: 3 },
-    } });
+      stroke: 0x101418,
+      strokeThickness: 3,
+    });
     label.anchor.set(0.5, 1);
     label.position.set(x, y - radius - 3);
     this.renderer.layers.feedback.addChild(label);
@@ -353,7 +341,7 @@ export class MapEditorViewport {
   }
 
   eventTile(event, { kind = this.tool?.kind } = {}) {
-    const rect = this.renderer.app.canvas.getBoundingClientRect();
+    const rect = this.renderer.app.view.getBoundingClientRect();
     const world = this.camera.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
     const size = this.session.draft?.terrain?.length || 0;
     const radius = kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : kind === "base" ? MAP_EDITOR_BASE_SITE_CLEARANCE_TILES : 0;
@@ -365,7 +353,7 @@ export class MapEditorViewport {
   }
 
   handleWheel(event) {
-    const rect = this.renderer.app.canvas.getBoundingClientRect();
+    const rect = this.renderer.app.view.getBoundingClientRect();
     const factor = event.deltaY > 0 ? 0.88 : 1.14;
     this.camera.setZoom(
       this.camera.zoom * factor,
@@ -409,7 +397,7 @@ export class MapEditorViewport {
     this.destroyed = true;
     cancelAnimationFrame(this.frame);
     this.unsubscribe?.();
-    const canvas = this.renderer.app.canvas;
+    const canvas = this.renderer.app.view;
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     canvas.removeEventListener("pointermove", this.onPointerMove);
     canvas.removeEventListener("pointerup", this.onPointerUp);

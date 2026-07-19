@@ -15,11 +15,11 @@
     <link rel="manifest" href="/manifest.webmanifest" />
 
     <!--
-      PixiJS v8 (UMD) exposes the global `PIXI`. Loaded as a classic script so it is
+      PixiJS v7 (UMD) exposes the global `PIXI`. Loaded as a classic script so it is
       defined before the deferred ES module `main.js` runs. Pinned for reproducibility;
-      the exact renderer version is reproducible across local, beta, and production runs.
+      upgrading to v8 (async Application.init) is a tracked future task — see README.
     -->
-    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/pixi.js@8.19.0/dist/pixi.min.js"></script>
+    <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./apm.css" />
     <link rel="stylesheet" href="./connection_lost.css" />

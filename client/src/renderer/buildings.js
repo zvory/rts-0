@@ -1,4 +1,3 @@
-import { gfxNoFill, gfxCircle, gfxRect, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -77,9 +76,9 @@ export function _drawBuilding(e, colorByOwner, state) {
   ) || this._slot("buildingShadows", e.id);
   sh.position.set(0, 0);
   if (sh.rtsStaticRedraw !== false) {
-    gfxFill(sh, COLORS.shadow, 0.3);
-    gfxRect(sh, x0 + 4, y0 + 6, w, h);
-    gfxNoFill(sh);
+    sh.beginFill(COLORS.shadow, 0.3);
+    sh.drawRect(x0 + 4, y0 + 6, w, h);
+    sh.endFill();
     sh.rtsStaticRenderKey = shadowKey;
   }
 
@@ -110,34 +109,34 @@ export function _drawBuilding(e, colorByOwner, state) {
       });
       if (g.rtsStaticRedraw !== false) g.rtsStaticRenderKey = bodyKey;
     } else if (g.rtsStaticRedraw !== false) {
-      gfxStroke(g, 2, 0x1a1712, underConstruction ? 0.55 : 0.95);
-      gfxFill(g, 0x2b2a23, bodyAlpha);
-      gfxRect(g, x0, y0, w, h);
-      gfxNoFill(g);
+      g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
+      g.beginFill(0x2b2a23, bodyAlpha);
+      g.drawRect(x0, y0, w, h);
+      g.endFill();
 
       // Player-tinted roof/yard slabs, all neutral geometry.
-      gfxStroke(g, 0);
-      gfxFill(g, tint, bodyAlpha * 0.82);
+      g.lineStyle(0);
+      g.beginFill(tint, bodyAlpha * 0.82);
       if (e.kind === KIND.CITY_CENTRE) {
-        gfxRect(g, x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
-        gfxRect(g, x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
-        gfxFill(g, 0x1a1712, bodyAlpha * 0.7);
-        gfxRect(g, x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
+        g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
+        g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
+        g.beginFill(0x1a1712, bodyAlpha * 0.7);
+        g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
       } else if (e.kind === KIND.FACTORY) {
-        gfxRect(g, x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
-        gfxRect(g, x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
-        gfxFill(g, 0x1a1712, bodyAlpha * 0.55);
-        for (let i = 0; i < 3; i++) gfxRect(g, x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
+        g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
+        g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
+        g.beginFill(0x1a1712, bodyAlpha * 0.55);
+        for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
       } else if (e.kind === KIND.DEPOT) {
-        gfxRect(g, x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
-        gfxRect(g, x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+        g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
+        g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
       } else {
-        gfxRect(g, x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
-        gfxFill(g, 0x1a1712, bodyAlpha * 0.42);
-        gfxRect(g, x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
-        gfxRect(g, x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
+        g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
+        g.beginFill(0x1a1712, bodyAlpha * 0.42);
+        g.drawRect(x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
+        g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
       }
-      gfxNoFill(g);
+      g.endFill();
       g.rtsStaticRenderKey = bodyKey;
     }
 
@@ -163,12 +162,12 @@ export function _drawBuilding(e, colorByOwner, state) {
         const bw = w * 0.78;
         const bx = e.x - bw / 2;
         const by = y0 + 6;
-        gfxFill(overlay, COLORS.hpBack, 0.9);
-        gfxRect(overlay, bx, by, bw, 5);
-        gfxNoFill(overlay);
-        gfxFill(overlay, COLORS.hpGood);
-        gfxRect(overlay, bx, by, bw * clamp01(e.prodProgress), 5);
-        gfxNoFill(overlay);
+        overlay.beginFill(COLORS.hpBack, 0.9);
+        overlay.drawRect(bx, by, bw, 5);
+        overlay.endFill();
+        overlay.beginFill(COLORS.hpGood);
+        overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
+        overlay.endFill();
       }
       if (extractorInactive) {
         drawInactiveExtractorBadge(overlay, e.x, y0, ts);
@@ -187,16 +186,16 @@ function drawInactiveExtractorBadge(g, cx, buildingTop, tileSize) {
   const cy = buildingTop - radius * 0.55;
   const diagonal = radius * 0.68;
 
-  gfxStroke(g, 0);
-  gfxFill(g, 0x211715, 0.92);
-  gfxCircle(g, cx, cy, radius + 2.5);
-  gfxNoFill(g);
+  g.lineStyle(0);
+  g.beginFill(0x211715, 0.92);
+  g.drawCircle(cx, cy, radius + 2.5);
+  g.endFill();
 
-  gfxStroke(g, Math.max(2.5, radius * 0.34), 0xe34b3f, 1);
-  gfxCircle(g, cx, cy, radius);
-  gfxMove(g, cx - diagonal, cy - diagonal);
-  gfxLine(g, cx + diagonal, cy + diagonal);
-  gfxStroke(g, 0);
+  g.lineStyle(Math.max(2.5, radius * 0.34), 0xe34b3f, 1);
+  g.drawCircle(cx, cy, radius);
+  g.moveTo(cx - diagonal, cy - diagonal);
+  g.lineTo(cx + diagonal, cy + diagonal);
+  g.lineStyle(0);
 }
 
 function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
@@ -211,18 +210,18 @@ function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
     drawSteelBeam(g, cx, cy, base + a, length, beamW, lipW, bodyAlpha);
   }
 
-  gfxStroke(g, 1.2, 0x1a1712, bodyAlpha * 0.75);
-  gfxFill(g, 0x817b6f, bodyAlpha * 0.96);
-  gfxCircle(g, cx, cy, tileSize * 0.105 * visualScale);
-  gfxNoFill(g);
-  gfxStroke(g, 0);
-  gfxFill(g, 0xd7d2c1, bodyAlpha * 0.5);
-  gfxCircle(g,
+  g.lineStyle(1.2, 0x1a1712, bodyAlpha * 0.75);
+  g.beginFill(0x817b6f, bodyAlpha * 0.96);
+  g.drawCircle(cx, cy, tileSize * 0.105 * visualScale);
+  g.endFill();
+  g.lineStyle(0);
+  g.beginFill(0xd7d2c1, bodyAlpha * 0.5);
+  g.drawCircle(
     cx - tileSize * 0.025 * visualScale,
     cy - tileSize * 0.025 * visualScale,
     tileSize * 0.035 * visualScale,
   );
-  gfxNoFill(g);
+  g.endFill();
 }
 
 function tankTrapRotation(id) {
@@ -231,14 +230,14 @@ function tankTrapRotation(id) {
 }
 
 function drawSteelBeam(g, cx, cy, angle, length, width, lipWidth, alpha) {
-  gfxStroke(g, 1.6, 0x15130f, alpha * 0.95);
-  gfxFill(g, 0x4d5150, alpha * 0.98);
+  g.lineStyle(1.6, 0x15130f, alpha * 0.95);
+  g.beginFill(0x4d5150, alpha * 0.98);
   drawFreeRotatedRect(g, cx, cy, length, width, angle);
-  gfxNoFill(g);
+  g.endFill();
 
   const edgeOffset = width * 0.36;
-  gfxStroke(g, 0);
-  gfxFill(g, 0x222724, alpha * 0.68);
+  g.lineStyle(0);
+  g.beginFill(0x222724, alpha * 0.68);
   drawFreeRotatedRect(
     g,
     cx + Math.cos(angle + Math.PI / 2) * edgeOffset,
@@ -247,9 +246,9 @@ function drawSteelBeam(g, cx, cy, angle, length, width, lipWidth, alpha) {
     lipWidth,
     angle,
   );
-  gfxNoFill(g);
+  g.endFill();
 
-  gfxFill(g, 0xa8aaa3, alpha * 0.68);
+  g.beginFill(0xa8aaa3, alpha * 0.68);
   drawFreeRotatedRect(
     g,
     cx - Math.cos(angle + Math.PI / 2) * edgeOffset,
@@ -258,9 +257,9 @@ function drawSteelBeam(g, cx, cy, angle, length, width, lipWidth, alpha) {
     lipWidth,
     angle,
   );
-  gfxNoFill(g);
+  g.endFill();
 
-  gfxFill(g, 0x343937, alpha * 0.9);
+  g.beginFill(0x343937, alpha * 0.9);
   drawFreeRotatedRect(g, cx, cy, width * 1.05, width * 1.05, angle + Math.PI / 4);
-  gfxNoFill(g);
+  g.endFill();
 }

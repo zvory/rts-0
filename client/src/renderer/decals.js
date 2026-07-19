@@ -83,7 +83,9 @@ export class GroundDecalLayer {
       return false;
     }
     this.ctx.imageSmoothingEnabled = false;
-    this.texture = this.pixi.Texture.from(this.canvas);
+    this.texture = this.pixi.Texture.from(this.canvas, {
+      scaleMode: this.pixi.SCALE_MODES?.NEAREST,
+    });
     this.sprite = new this.pixi.Sprite(this.texture);
     this.sprite.scale.set(this.downsample);
     this.layer.addChild(this.sprite);
@@ -224,11 +226,11 @@ export class GroundDecalLayer {
       if (this.sprite.parent && typeof this.sprite.parent.removeChild === "function") {
         this.sprite.parent.removeChild(this.sprite);
       }
-      this.sprite.destroy?.({ texture: true, textureSource: true });
+      this.sprite.destroy?.({ texture: true, baseTexture: true });
       this.sprite = null;
     } else if (this.texture) {
       this.texture.destroy?.(true);
-      this.texture.source?.destroy?.();
+      this.texture.baseTexture?.destroy?.();
     }
     this.texture = null;
     if (this.ctx && this.canvas) {
@@ -728,7 +730,7 @@ function drawEllipse(ctx, x, y, rx, ry, rotation, fillStyle) {
 
 function updateTexture(texture) {
   if (typeof texture?.update === "function") texture.update();
-  else texture?.source?.update?.();
+  else texture?.baseTexture?.update?.();
 }
 
 function isBlastDecalClass(decalClass) {

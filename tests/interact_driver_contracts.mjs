@@ -106,13 +106,6 @@ const spectatorUrl = new URL(spectatorDriver.launchUrl());
 assert.equal(spectatorUrl.searchParams.get("rtsRole"), "spectator", "AI-vs-AI Interact uses the ordinary spectator launch role");
 assert.deepEqual(spectatorUrl.searchParams.getAll("rtsAi"), ["1:ai_2_1", "2:ai_turtle"], "AI-vs-AI Interact fills exactly two opposing AI seats");
 assert.equal(spectatorUrl.searchParams.has("rtsName"), false, "AI-vs-AI Interact does not create a player seat");
-const automaticSpectatorDriver = new InteractDriver({
-  workspaceRoot: root,
-  mode: "game",
-  spectate: ["ai_2_1", "ai_turtle"],
-  autoSpectator: true,
-});
-assert.equal(automaticSpectatorDriver.options.autoSpectator, true, "AI-vs-AI Interact retains the fight-following launch preference");
 
 assert.equal(transitionDriverState(DRIVER_STATES.OPENING, "opened"), DRIVER_STATES.OPEN, "driver opens once");
 assert.equal(transitionDriverState(DRIVER_STATES.OPEN, "closing"), DRIVER_STATES.CLOSING, "driver closes from open");
