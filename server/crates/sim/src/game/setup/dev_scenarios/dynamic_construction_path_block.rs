@@ -28,7 +28,7 @@ impl DynamicConstructionPathBlockCase {
 
 impl Game {
     pub fn new_dynamic_construction_path_block_scenario(
-        scenario_case: &str,
+        scenario_case: Option<&str>,
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
@@ -38,9 +38,10 @@ impl Game {
                 "unsupported dynamic-construction path-block launch {unit} x{unit_count}"
             ));
         }
-        let scenario_case =
-            DynamicConstructionPathBlockCase::parse(scenario_case).ok_or_else(|| {
-                format!("unsupported dynamic-construction path-block case {scenario_case}")
+        let scenario_case = scenario_case
+            .and_then(DynamicConstructionPathBlockCase::parse)
+            .ok_or_else(|| {
+                "missing or unsupported dynamic-construction path-block case".to_string()
             })?;
 
         let mut map = flat_dev_map(1);

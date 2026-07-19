@@ -137,21 +137,14 @@ impl RoomTask {
                             issue_after_ticks: setup.issue_after_ticks,
                             issued: false,
                         };
-                        Ok::<(Game, DevDriver, u32), String>((
-                            setup.game,
-                            DevDriver::Scenario(driver),
-                            player_id,
-                        ))
+                        Ok((setup.game, DevDriver::Scenario(driver), player_id))
                     }};
                 }
 
                 match &config.id {
                     DevScenarioId::DynamicConstructionPathBlock => {
-                        let scenario_case = config.case.ok_or_else(|| {
-                            "missing dynamic construction path-block case".to_string()
-                        })?;
                         session_from_setup!(Game::new_dynamic_construction_path_block_scenario(
-                            scenario_case,
+                            config.case,
                             config.unit,
                             config.count,
                             seed,

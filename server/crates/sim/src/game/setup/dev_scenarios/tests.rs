@@ -80,7 +80,7 @@ fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
 fn dynamic_construction_path_block_repaths_around_new_building() {
     for scenario_case in ["head_on", "slight_angle", "major_angle"] {
         let setup = Game::new_dynamic_construction_path_block_scenario(
-            scenario_case,
+            Some(scenario_case),
             EntityKind::Worker,
             1,
             0x5150_0718,
