@@ -479,7 +479,7 @@ impl RoomTask {
                 self.send_error_to(player_id, "Invalid vision selection");
                 return;
             }
-            let view = observer_view_from_selection(selection);
+            let view = observer_view_from_selection(selection, &valid_ids);
             self.observer_views.insert(player_id, view);
             self.clear_pending_snapshots_for([player_id]);
             self.fanout_current_observer_snapshots_to([player_id]);
@@ -508,7 +508,7 @@ impl RoomTask {
             return;
         }
 
-        let view = observer_view_from_selection(selection);
+        let view = observer_view_from_selection(selection, &valid_ids);
         self.observer_views.insert(player_id, view.clone());
         self.clear_pending_snapshots_for([player_id]);
         self.fanout_replay_snapshots_to(&session, [player_id], HashMap::new(), context, None);

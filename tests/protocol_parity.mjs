@@ -582,6 +582,11 @@ assert(
   "setVisionSelection builder must emit the exact wire shape",
 );
 assert(
+  JSON.stringify(msg.visionSelectionOmniscient()) ===
+    JSON.stringify({ t: "setVisionSelection", selection: { mode: "omniscient" } }),
+  "omniscient vision builder must emit the exact wire shape",
+);
+assert(
   C.REQUEST_BRANCH_FROM_TICK === "requestBranchFromTick",
   "requestBranchFromTick client message tag must match Rust",
 );

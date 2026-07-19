@@ -17,7 +17,7 @@ pub(super) fn validate_vision_selection_request(
 ) -> Result<(), &'static str> {
     let valid: HashSet<u32> = valid_player_ids.iter().copied().collect();
     match vision {
-        VisionSelectionRequest::All => {
+        VisionSelectionRequest::All | VisionSelectionRequest::Omniscient => {
             if valid.is_empty() {
                 Err("no replay players")
             } else {
@@ -640,6 +640,9 @@ mod tests {
         let valid = [1, 2, 3];
 
         assert!(validate_vision_selection_request(&VisionSelectionRequest::All, &valid).is_ok());
+        assert!(
+            validate_vision_selection_request(&VisionSelectionRequest::Omniscient, &valid).is_ok()
+        );
         assert!(validate_vision_selection_request(
             &VisionSelectionRequest::Player { player_id: 2 },
             &valid,

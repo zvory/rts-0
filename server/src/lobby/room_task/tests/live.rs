@@ -790,9 +790,39 @@ fn paused_live_vision_selection_sends_current_snapshot_immediately() {
     };
     let mut expected = game.snapshot_for_observer(&ObserverView::Players(vec![1]));
     compact_snapshot_for_wire(&mut expected);
+    let all_player_ids = game
+        .player_inits()
+        .iter()
+        .map(|player| player.id)
+        .collect::<Vec<_>>();
+    let mut all_expected = game.snapshot_for_observer(&ObserverView::Players(all_player_ids));
+    compact_snapshot_for_wire(&mut all_expected);
+    let mut omniscient_expected = game.snapshot_for_observer(&ObserverView::Omniscient);
+    compact_snapshot_for_wire(&mut omniscient_expected);
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert_eq!(snapshot.player_resources, expected.player_resources);
+
+    task.on_set_vision_selection(99, VisionSelectionRequest::All);
+    let all_snapshot = writer_spectator
+        .snapshots
+        .take()
+        .expect("all-player perspective change should enqueue a current snapshot");
+    assert_eq!(all_snapshot.visible_tiles, all_expected.visible_tiles);
+
+    task.on_set_vision_selection(99, VisionSelectionRequest::Omniscient);
+    let omniscient_snapshot = writer_spectator
+        .snapshots
+        .take()
+        .expect("omniscient perspective change should enqueue a current snapshot");
+    assert_eq!(
+        omniscient_snapshot.visible_tiles,
+        omniscient_expected.visible_tiles
+    );
+    assert_ne!(
+        all_snapshot.visible_tiles, omniscient_snapshot.visible_tiles,
+        "all-player union must remain fog-limited rather than becoming omniscient"
+    );
 }
 
 #[test]

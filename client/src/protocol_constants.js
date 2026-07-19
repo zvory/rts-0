@@ -274,6 +274,7 @@ export const VISION_SELECTION = Object.freeze({
   ALL: "all",
   PLAYER: "player",
   PLAYERS: "players",
+  OMNISCIENT: "omniscient",
 });
 
 export const LAB_ROLE = Object.freeze({ OPERATOR: "operator", READ_ONLY: "readOnly" });

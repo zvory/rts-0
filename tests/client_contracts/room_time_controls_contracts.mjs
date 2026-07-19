@@ -276,7 +276,8 @@ const initialVisionButtons = replayControls.querySelectorAll(".vision-btn");
 assert(
   !initialVisionButtons[0].classList.contains("active") &&
     initialVisionButtons[1].classList.contains("active") &&
-    initialVisionButtons[2].classList.contains("active"),
+    initialVisionButtons[2].classList.contains("active") &&
+    !initialVisionButtons[3].classList.contains("active"),
   "vision controls restore the current observer selection instead of assuming omniscient view",
 );
 assert(
@@ -437,7 +438,11 @@ assert(
 );
 Date.now = actualDateNow;
 const visionButtons = replayControls.querySelectorAll(".vision-btn");
-assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
+assert(visionButtons.length === 4, "replay viewer builds all-player, per-player, and omniscient controls");
+assert(
+  visionButtons.map((button) => button.textContent).join(",") === "All,Alpha,Bravo,Omniscient",
+  "vision controls order the all-player union first and omniscient last",
+);
 assert(branchReplay._listeners.has("pointerdown"), "branch action installs the scoped pointer activation path");
 assert(visionButtons[1]._listeners.has("pointerdown"), "vision controls install the scoped pointer activation path");
 branchReplay._listeners.get("pointerdown")({ button: 0, isPrimary: true, pointerId: 24, pointerType: "touch" });
@@ -465,6 +470,11 @@ assert(
 );
 visionButtons[0]._listeners.get("click")({});
 assert(replayNet.selections.at(-1).mode === "all", "all replay fog control restores union vision");
+visionButtons[3]._listeners.get("click")({});
+assert(
+  replayNet.selections.at(-1).mode === "omniscient" && visionButtons[3].classList.contains("active"),
+  "last replay fog control requests and marks true omniscient vision",
+);
 replayUi.applyRoomTimeState({
   currentTick: 100,
   durationTicks: 1_000,

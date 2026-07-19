@@ -39,8 +39,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - Lab start metadata carries room/role identity, compatibility vision, initial camera, dirty state,
   and operation count.
 - Start `capabilities` declares room-time, vision-selection, and command affordances; never infer
-  them from replay/dev/Lab mode names. Privileged viewers share one per-connection selector for
-  omniscient or selected-player views, independent of command authority. Lab timeline controls use
+  them from replay/dev/Lab modes. Privileged viewers choose all-player union, omniscient, or
+  player views per connection, independent of command authority. Lab timeline controls use
   neutral room-time messages rather than `LabClientOp`.
 - Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
   to render the shared controls; do not reconstruct it from legacy Lab metadata.

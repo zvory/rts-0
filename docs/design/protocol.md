@@ -1201,12 +1201,15 @@ reliable message.
 { mode: "all" }
 { mode: "player", playerId: u32 }
 { mode: "players", playerIds: u32[] }
+{ mode: "omniscient" }
 ```
 The server rejects unknown player ids, empty subsets, duplicate subset ids, active-player requests,
 and requests outside a privileged observer surface. Selection is per connection. `mode: "all"`
-means omniscient; it is the default for live spectators, replay, dev-watch, and Lab. A selected
-single/multi-player view uses the real selected owners and their effective team fog. Owner-only
-details remain limited to explicitly selected owners, even when team fog reveals an ally.
+uses the union of every active player's effective team fog, while `mode: "omniscient"` exposes the
+complete world and every owner's private details. Omniscient remains the default for live
+spectators, replay, dev-watch, and Lab. A selected single/multi-player view uses the real selected
+owners and their effective team fog. Owner-only details remain limited to explicitly selected
+owners, even when team fog reveals an ally.
 
 `LabClientOp` is tagged by `op`:
 ```

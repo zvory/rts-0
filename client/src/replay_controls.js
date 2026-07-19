@@ -25,6 +25,7 @@ export class RoomTimeControls {
     this.actions = this.capabilities.actions || {};
     this.label = label || (this.replayViewer ? "Replay" : "Room time");
     this.visionSelection = visionSelectionIds(initialVisionSelection, this.state?.players);
+    this.omniscientVision = initialVisionSelection?.mode === VISION_SELECTION.OMNISCIENT;
     this.roomTimeState = null;
     this.roomTimeSeekPending = false;
     this.roomTimeSeekTargetTick = null;
@@ -74,6 +75,7 @@ export class RoomTimeControls {
   }
 
   visionSelectionRequest() {
+    if (this.omniscientVision) return { mode: VISION_SELECTION.OMNISCIENT };
     const playerIds = [...this.visionSelection].sort((a, b) => a - b);
     if (playerIds.length === 0) return { mode: VISION_SELECTION.ALL };
     if (playerIds.length === 1) {
@@ -363,8 +365,8 @@ export class RoomTimeControls {
     all.type = "button";
     all.className = "spd-btn vision-btn";
     all.dataset.vision = "all";
-    all.textContent = "Omniscient";
-    all.title = "Show the complete world and every owner's private details.";
+    all.textContent = "All";
+    all.title = "Show the union of all players' vision.";
     this.bindRoomTimeActivation(all, (event) => this.onVisionSelectionClick({
       target: all,
       shiftKey: event?.shiftKey,
@@ -389,6 +391,20 @@ export class RoomTimeControls {
       }));
       group.appendChild(btn);
     }
+
+    const omniscient = document.createElement("button");
+    omniscient.type = "button";
+    omniscient.className = "spd-btn vision-btn";
+    omniscient.dataset.vision = "omniscient";
+    omniscient.textContent = "Omniscient";
+    omniscient.title = "Show the complete world and every owner's private details.";
+    this.bindRoomTimeActivation(omniscient, (event) => this.onVisionSelectionClick({
+      target: omniscient,
+      shiftKey: event?.shiftKey,
+      metaKey: event?.metaKey,
+      ctrlKey: event?.ctrlKey,
+    }));
+    group.appendChild(omniscient);
 
     surface.appendChild(group);
     this.syncVisionSelectionButtons();
@@ -562,6 +578,14 @@ export class RoomTimeControls {
     const btn = ev.target.closest(".vision-btn");
     if (!btn || btn.hidden || btn.disabled) return;
     if (btn.dataset.vision === "all") {
+      this.omniscientVision = false;
+      this.visionSelection.clear();
+      this.net.setVisionSelection(this.visionSelectionRequest());
+      this.syncVisionSelectionButtons();
+      return;
+    }
+    if (btn.dataset.vision === "omniscient") {
+      this.omniscientVision = true;
       this.visionSelection.clear();
       this.net.setVisionSelection(this.visionSelectionRequest());
       this.syncVisionSelectionButtons();
@@ -570,6 +594,7 @@ export class RoomTimeControls {
 
     const id = Number(btn.dataset.playerId);
     if (!Number.isFinite(id)) return;
+    this.omniscientVision = false;
     if (ev.shiftKey || ev.metaKey || ev.ctrlKey) {
       if (this.visionSelection.has(id)) this.visionSelection.delete(id);
       else this.visionSelection.add(id);
@@ -583,10 +608,14 @@ export class RoomTimeControls {
 
   syncVisionSelectionButtons() {
     if (!dom.roomTimeControls) return;
-    const allActive = this.visionSelection.size === 0;
+    const allActive = !this.omniscientVision && this.visionSelection.size === 0;
     for (const btn of dom.roomTimeControls.querySelectorAll(".vision-btn")) {
       if (btn.dataset.vision === "all") {
         btn.classList.toggle("active", allActive);
+        continue;
+      }
+      if (btn.dataset.vision === "omniscient") {
+        btn.classList.toggle("active", this.omniscientVision);
         continue;
       }
       const id = Number(btn.dataset.playerId);

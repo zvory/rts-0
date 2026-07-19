@@ -33,6 +33,20 @@ use rts_protocol::{LabMapDraft, LabMapTile};
 fn assert_type<T>() {}
 
 #[test]
+fn omniscient_vision_selection_deserializes() {
+    let msg: ClientMessage =
+        serde_json::from_str(r#"{"t":"setVisionSelection","selection":{"mode":"omniscient"}}"#)
+            .expect("omniscient setVisionSelection should deserialize");
+
+    assert!(matches!(
+        msg,
+        ClientMessage::SetVisionSelection {
+            selection: VisionSelectionRequest::Omniscient,
+        }
+    ));
+}
+
+#[test]
 fn stable_rust_public_surface_compiles() {
     assert_type::<AbilityCooldownView>();
     assert_type::<AbilityObjectOwnerStateView>();

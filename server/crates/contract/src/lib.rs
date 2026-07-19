@@ -61,6 +61,7 @@ pub enum ObserverViewSelection {
     All,
     Player { player_id: u32 },
     Players { player_ids: Vec<u32> },
+    Omniscient,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
