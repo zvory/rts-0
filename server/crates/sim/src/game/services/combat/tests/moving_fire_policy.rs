@@ -158,7 +158,7 @@ fn non_moving_fire_attack_move_resumes_commanded_path_without_pursuit() {
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("rifleman should spawn");
     entities
-        .spawn_unit(2, EntityKind::Rifleman, 260.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
         .expect("enemy should spawn");
     if let Some(rifleman) = entities.get_mut(rifleman_id) {
         rifleman.set_order(Order::attack_move_to(400.0, 100.0));

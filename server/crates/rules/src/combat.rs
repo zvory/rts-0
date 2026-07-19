@@ -145,7 +145,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::RiflemanRifle,
-        range_tiles: 4,
+        range_tiles: 5,
         dmg: 5,
         cooldown: 16,
         weapon_class: WeaponClass::SmallArms,
