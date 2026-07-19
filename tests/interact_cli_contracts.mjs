@@ -207,8 +207,12 @@ try {
   assert.equal(surrendered.result.phase, "concluded", "game give-up reaches the concluded score state");
   assert.equal(callNamespaceFailure("lab", "open").error.code, "sessionKindMismatch", "an active game session cannot be mistaken for Lab");
   callNamespace("game", "close", { sessionId: gameSessionId });
-  const spectatorOpened = callNamespace("game", "open", { spectate: ["ai_2_1", "ai_turtle"] }).result;
+  const spectatorOpened = callNamespace("game", "open", {
+    spectate: ["ai_2_1", "ai_turtle"],
+    autoSpectator: true,
+  }).result;
   assert.equal(spectatorOpened.capabilities.role, "spectator", "AI-vs-AI open reports the spectator role");
+  assert.equal(spectatorOpened.status.autoSpectatorEnabled, true, "AI-vs-AI open proves fight-following mode is active");
   assert.deepEqual(spectatorOpened.capabilities.orders, [], "AI-vs-AI spectators receive no gameplay orders");
   assert.deepEqual(spectatorOpened.capabilities.media, ["screenshot", "recording", "timelapse"], "spectator capabilities advertise time-lapse capture");
   const spectatorInspection = callNamespace("game", "inspect", { sessionId: spectatorOpened.sessionId }).result;

@@ -235,7 +235,7 @@ function validateScenarioNamespaceInput(command: string, value: CommandInput, se
 
 function validateGameNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
   if (command === "game-open") {
-    exact(value, ["workspaceRoot", "map", "opponent", "spectate", "renderer", "viewport"], "game open");
+    exact(value, ["workspaceRoot", "map", "opponent", "spectate", "autoSpectator", "renderer", "viewport"], "game open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("game open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) displayName(value.map, "game open.map", 64);
     if (value.opponent != null && !["ai_2_1", "ai_turtle"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1 or ai_turtle");
@@ -246,6 +246,8 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
       if (value.opponent != null) invalid("game open", "cannot combine opponent with spectate");
     }
     if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("game open.renderer", "must be pixi or babylon");
+    if (value.autoSpectator != null && typeof value.autoSpectator !== "boolean") invalid("game open.autoSpectator", "must be a boolean");
+    if (value.autoSpectator && value.spectate == null) invalid("game open.autoSpectator", "requires spectate:[ai,ai]");
     if (value.viewport != null) viewport(value.viewport, 4096, "game open.viewport");
     return value;
   }

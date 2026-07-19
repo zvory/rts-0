@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxCircle, gfxPaint, gfxPoly, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, TANK_BODY } from "../config.js";
 import { KIND } from "../protocol.js";
 import { WEAPON_RECOIL_PX, ZERO_OFFSET } from "./palette.js";
@@ -49,8 +50,8 @@ export function dashedLine(g, x1, y1, x2, y2, dash, gap) {
   let cursor = 0;
   while (cursor < len) {
     const end = Math.min(cursor + dash, len);
-    g.moveTo(x1 + ux * cursor, y1 + uy * cursor);
-    g.lineTo(x1 + ux * end, y1 + uy * end);
+    gfxMove(g, x1 + ux * cursor, y1 + uy * cursor);
+    gfxLine(g, x1 + ux * end, y1 + uy * end);
     cursor = end + gap;
   }
 }
@@ -135,7 +136,7 @@ export function drawFreeRotatedRect(g, cx, cy, w, h, a) {
     const p = rotatePoint(x, y, a);
     polygon.push(cx + p.x, cy + p.y);
   }
-  g.drawPolygon(polygon);
+  gfxPoly(g, polygon);
 }
 
 export function drawRotatedRectOffset(g, cx, cy, w, h, a, offset) {
@@ -152,7 +153,7 @@ export function drawRotatedRectOffset(g, cx, cy, w, h, a, offset) {
     const p = rotatePoint(x, y, a);
     polygon.push(p.x + offset.x, p.y + offset.y);
   }
-  g.drawPolygon(polygon);
+  gfxPoly(g, polygon);
 }
 
 export function tankBodyVisual(stat = {}) {
@@ -180,11 +181,11 @@ export function drawTankTracks(g, body, facing, motion) {
   const trackW = 5;
   const trackY = body.halfWidth - trackW * 0.5;
   const trackLen = body.halfLen * 2;
-  g.lineStyle(1.5, 0x100d0a, 0.95);
-  g.beginFill(0x15120f, 0.96);
+  gfxStroke(g, 1.5, 0x100d0a, 0.95);
+  gfxFill(g, 0x15120f, 0.96);
   drawRotatedRect(g, 0, -trackY, trackLen, trackW, facing);
   drawRotatedRect(g, 0, trackY, trackLen, trackW, facing);
-  g.endFill();
+  gfxNoFill(g);
 
   drawTrackTreads(g, body, facing, -trackY, motion.leftPhase, motion.leftDir, motion.activity);
   drawTrackTreads(g, body, facing, trackY, motion.rightPhase, motion.rightDir, motion.activity);
@@ -196,19 +197,19 @@ export function drawTrackTreads(g, body, facing, y, phase, dir, activity) {
   const treadH = 4.4;
   const alpha = lerp(0.35, 0.82, clamp01(activity));
   const offset = positiveMod(phase * 0.85, spacing);
-  g.beginFill(dir < 0 ? 0x8f7f5e : 0xd8d0b0, alpha);
+  gfxFill(g, dir < 0 ? 0x8f7f5e : 0xd8d0b0, alpha);
   for (let x = -body.halfLen - spacing; x <= body.halfLen + spacing; x += spacing) {
     const treadX = x + offset;
     if (treadX < -body.halfLen || treadX > body.halfLen) continue;
     drawRotatedRect(g, treadX, y, treadW, treadH, facing);
   }
-  g.endFill();
+  gfxNoFill(g);
 }
 
 export function drawTankHull(g, body, tint, facing) {
   const inset = 2;
-  g.beginFill(tint);
-  g.drawPolygon(rotatedPolygon([
+  gfxFill(g, tint);
+  gfxPoly(g, rotatedPolygon([
     -body.halfLen + inset, -body.halfWidth + 3,
     body.halfLen - 6, -body.halfWidth + 3,
     body.halfLen, -body.halfWidth + 7,
@@ -218,19 +219,19 @@ export function drawTankHull(g, body, tint, facing) {
     -body.halfLen, body.halfWidth - 7,
     -body.halfLen, -body.halfWidth + 7,
   ], facing));
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0x1a1712, 0.24);
+  gfxFill(g, 0x1a1712, 0.24);
   drawRotatedRect(g, -2, 0, body.halfLen * 1.15, body.halfWidth * 0.82, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(lightenColor(tint, 0.06), 0.95);
+  gfxFill(g, lightenColor(tint, 0.06), 0.95);
   drawRotatedRect(g, body.halfLen - 7, 0, 7, body.halfWidth * 1.35, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0x1a1712, 0.22);
+  gfxFill(g, 0x1a1712, 0.22);
   drawRotatedRect(g, body.halfLen - 3, 0, 3, body.halfWidth * 1.2, facing);
-  g.endFill();
+  gfxNoFill(g);
 }
 
 export function drawTankFuelCue(g, body, facing, motion) {
@@ -238,7 +239,7 @@ export function drawTankFuelCue(g, body, facing, motion) {
   const x = -body.halfLen + 6;
   const y = -body.halfWidth - 4;
   const color = motion.oilStarved ? 0xd47a5f : 0xc9b56a;
-  g.lineStyle(2, color, motion.oilStarved ? 0.95 : 0.75);
+  gfxStroke(g, 2, color, motion.oilStarved ? 0.95 : 0.75);
   drawRotatedRectOutline(g, x, y, 8, 5, facing);
   if (motion.oilStarved) {
     const a = facing;
@@ -246,10 +247,10 @@ export function drawTankFuelCue(g, body, facing, motion) {
     const p2 = rotatePoint(x + 3, y + 1.5, a);
     const p3 = rotatePoint(x + 3, y - 1.5, a);
     const p4 = rotatePoint(x - 3, y + 1.5, a);
-    g.moveTo(p1.x, p1.y);
-    g.lineTo(p2.x, p2.y);
-    g.moveTo(p3.x, p3.y);
-    g.lineTo(p4.x, p4.y);
+    gfxMove(g, p1.x, p1.y);
+    gfxLine(g, p2.x, p2.y);
+    gfxMove(g, p3.x, p3.y);
+    gfxLine(g, p4.x, p4.y);
   }
 }
 
@@ -259,8 +260,8 @@ export function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil
   // Single blocky truck hull with enclosed side running gear; nothing protrudes past the body.
   const noseShoulderX = body.halfLen * 0.4;
   const noseHalfWidth = body.halfWidth * 0.62;
-  g.beginFill(tint);
-  g.drawPolygon(rotatedPolygon([
+  gfxFill(g, tint);
+  gfxPoly(g, rotatedPolygon([
     -body.halfLen, -body.halfWidth,
     noseShoulderX, -body.halfWidth,
     body.halfLen, -noseHalfWidth,
@@ -268,19 +269,19 @@ export function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil
     noseShoulderX, body.halfWidth,
     -body.halfLen, body.halfWidth,
   ], facing));
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0x15120f, sideAlpha);
+  gfxFill(g, 0x15120f, sideAlpha);
   drawRotatedRect(g, -body.halfLen * 0.08, -body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.22, facing);
   drawRotatedRect(g, -body.halfLen * 0.08, body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.22, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(lightenColor(tint, 0.08), 0.96);
+  gfxFill(g, lightenColor(tint, 0.08), 0.96);
   drawRotatedRect(g, -body.halfLen * 0.32, 0, body.halfLen * 0.96, body.halfWidth * 1.44, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(lightenColor(tint, 0.14), 0.95);
-  g.drawPolygon(rotatedPolygon([
+  gfxFill(g, lightenColor(tint, 0.14), 0.95);
+  gfxPoly(g, rotatedPolygon([
     body.halfLen * 0.1, -body.halfWidth * 0.68,
     body.halfLen * 0.58, -body.halfWidth * 0.56,
     body.halfLen * 0.9, -body.halfWidth * 0.4,
@@ -288,54 +289,54 @@ export function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil
     body.halfLen * 0.58, body.halfWidth * 0.56,
     body.halfLen * 0.1, body.halfWidth * 0.68,
   ], facing));
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0x211b14, 0.82);
+  gfxFill(g, 0x211b14, 0.82);
   drawRotatedRect(g, body.halfLen * 0.68, 0, body.halfLen * 0.2, body.halfWidth * 0.88, facing);
   drawRotatedRect(g, body.halfLen * 0.24, -body.halfWidth * 0.36, body.halfLen * 0.18, body.halfWidth * 0.34, facing);
   drawRotatedRect(g, body.halfLen * 0.24, body.halfWidth * 0.36, body.halfLen * 0.18, body.halfWidth * 0.34, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.lineStyle(2, 0xd8d0b0, 0.6);
+  gfxStroke(g, 2, 0xd8d0b0, 0.6);
   const hoodA = rotatePoint(body.halfLen * 0.48, -body.halfWidth * 0.45, facing);
   const hoodB = rotatePoint(body.halfLen * 0.48, body.halfWidth * 0.45, facing);
-  g.moveTo(hoodA.x, hoodA.y);
-  g.lineTo(hoodB.x, hoodB.y);
+  gfxMove(g, hoodA.x, hoodA.y);
+  gfxLine(g, hoodB.x, hoodB.y);
 
   const gunnerAnchor = rotatePoint(-body.halfLen * 0.42, 0, facing);
   const gunner = offsetPoint(gunnerAnchor, recoilVector(weaponFacing, recoil));
   const mount = rotatePoint(-body.halfLen * 0.32, 0, facing);
-  g.beginFill(0x1a1712, 0.9);
-  g.drawCircle(mount.x, mount.y, body.halfWidth * 0.32);
-  g.endFill();
+  gfxFill(g, 0x1a1712, 0.9);
+  gfxCircle(g, mount.x, mount.y, body.halfWidth * 0.32);
+  gfxNoFill(g);
 
   const a = weaponFacing;
   const gunnerTorso = offsetPoint(gunner, {
     x: Math.cos(a + Math.PI) * body.halfWidth * 0.1,
     y: Math.sin(a + Math.PI) * body.halfWidth * 0.1,
   });
-  g.beginFill(lightenColor(tint, 0.14), 0.98);
+  gfxFill(g, lightenColor(tint, 0.14), 0.98);
   drawFreeRotatedRect(g, gunnerTorso.x, gunnerTorso.y, body.halfWidth * 0.5, body.halfWidth * 0.64, a);
-  g.endFill();
+  gfxNoFill(g);
 
   const gunnerHead = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.2,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.2,
   };
-  g.beginFill(lightenColor(tint, 0.24), 0.98);
-  g.drawCircle(gunnerHead.x, gunnerHead.y, body.halfWidth * 0.18);
-  g.endFill();
+  gfxFill(g, lightenColor(tint, 0.24), 0.98);
+  gfxCircle(g, gunnerHead.x, gunnerHead.y, body.halfWidth * 0.18);
+  gfxNoFill(g);
 
   const handSpan = body.halfWidth * 0.32;
   const grip = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.2,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.2,
   };
-  g.lineStyle(2, 0xd8d0b0, 0.86);
-  g.moveTo(gunner.x - Math.sin(a) * handSpan, gunner.y + Math.cos(a) * handSpan);
-  g.lineTo(grip.x, grip.y);
-  g.moveTo(gunner.x + Math.sin(a) * handSpan, gunner.y - Math.cos(a) * handSpan);
-  g.lineTo(grip.x, grip.y);
+  gfxStroke(g, 2, 0xd8d0b0, 0.86);
+  gfxMove(g, gunner.x - Math.sin(a) * handSpan, gunner.y + Math.cos(a) * handSpan);
+  gfxLine(g, grip.x, grip.y);
+  gfxMove(g, gunner.x + Math.sin(a) * handSpan, gunner.y - Math.cos(a) * handSpan);
+  gfxLine(g, grip.x, grip.y);
 
   const stock = {
     x: gunner.x + Math.cos(a + Math.PI) * body.halfWidth * 0.34,
@@ -345,29 +346,29 @@ export function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil
     x: gunner.x + Math.cos(a) * (body.halfLen * 0.78),
     y: gunner.y + Math.sin(a) * (body.halfLen * 0.78),
   };
-  g.lineStyle(3, 0x17130f, 0.98);
-  g.moveTo(stock.x, stock.y);
-  g.lineTo(muzzle.x, muzzle.y);
-  g.beginFill(0x32291f, 0.98);
+  gfxStroke(g, 3, 0x17130f, 0.98);
+  gfxMove(g, stock.x, stock.y);
+  gfxLine(g, muzzle.x, muzzle.y);
+  gfxFill(g, 0x32291f, 0.98);
   const receiver = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.42,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.42,
   };
   drawFreeRotatedRect(g, receiver.x, receiver.y, body.halfWidth * 0.58, body.halfWidth * 0.3, a);
-  g.endFill();
+  gfxNoFill(g);
 
   const shroud = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.9,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.9,
   };
-  g.beginFill(0x241d17, 0.98);
+  gfxFill(g, 0x241d17, 0.98);
   drawFreeRotatedRect(g, shroud.x, shroud.y, body.halfWidth * 0.82, body.halfWidth * 0.18, a);
-  g.endFill();
+  gfxNoFill(g);
 
   const nose = polar(facing, body.halfLen - 2);
-  g.lineStyle(2, 0xd8d0b0, 0.72);
-  g.moveTo(nose.x - Math.cos(facing) * 4, nose.y - Math.sin(facing) * 4);
-  g.lineTo(nose.x, nose.y);
+  gfxStroke(g, 2, 0xd8d0b0, 0.72);
+  gfxMove(g, nose.x - Math.cos(facing) * 4, nose.y - Math.sin(facing) * 4);
+  gfxLine(g, nose.x, nose.y);
 }
 
 export function drawCommandCar(g, body, tint, facing, motion) {
@@ -375,8 +376,8 @@ export function drawCommandCar(g, body, tint, facing, motion) {
   const noseShoulderX = body.halfLen * 0.2;
   const noseHalfWidth = body.halfWidth * 0.58;
 
-  g.beginFill(tint);
-  g.drawPolygon(rotatedPolygon([
+  gfxFill(g, tint);
+  gfxPoly(g, rotatedPolygon([
     -body.halfLen, -body.halfWidth * 0.82,
     noseShoulderX, -body.halfWidth * 0.82,
     body.halfLen, -noseHalfWidth,
@@ -384,33 +385,33 @@ export function drawCommandCar(g, body, tint, facing, motion) {
     noseShoulderX, body.halfWidth * 0.82,
     -body.halfLen, body.halfWidth * 0.82,
   ], facing));
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0x15120f, sideAlpha);
+  gfxFill(g, 0x15120f, sideAlpha);
   drawRotatedRect(g, -body.halfLen * 0.08, -body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.18, facing);
   drawRotatedRect(g, -body.halfLen * 0.08, body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.18, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(lightenColor(tint, 0.1), 0.98);
+  gfxFill(g, lightenColor(tint, 0.1), 0.98);
   drawRotatedRect(g, -body.halfLen * 0.25, 0, body.halfLen * 0.72, body.halfWidth * 1.18, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0x211b14, 0.78);
+  gfxFill(g, 0x211b14, 0.78);
   drawRotatedRect(g, body.halfLen * 0.52, 0, body.halfLen * 0.24, body.halfWidth * 0.78, facing);
   drawRotatedRect(g, -body.halfLen * 0.34, -body.halfWidth * 0.28, body.halfLen * 0.2, body.halfWidth * 0.26, facing);
   drawRotatedRect(g, -body.halfLen * 0.34, body.halfWidth * 0.28, body.halfLen * 0.2, body.halfWidth * 0.26, facing);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.lineStyle(2, 0xd8d0b0, 0.62);
+  gfxStroke(g, 2, 0xd8d0b0, 0.62);
   const windshieldA = rotatePoint(body.halfLen * 0.16, -body.halfWidth * 0.48, facing);
   const windshieldB = rotatePoint(body.halfLen * 0.16, body.halfWidth * 0.48, facing);
-  g.moveTo(windshieldA.x, windshieldA.y);
-  g.lineTo(windshieldB.x, windshieldB.y);
+  gfxMove(g, windshieldA.x, windshieldA.y);
+  gfxLine(g, windshieldB.x, windshieldB.y);
 
   const nose = polar(facing, body.halfLen - 1.5);
-  g.lineStyle(2, 0xd8d0b0, 0.74);
-  g.moveTo(nose.x - Math.cos(facing) * 3.5, nose.y - Math.sin(facing) * 3.5);
-  g.lineTo(nose.x, nose.y);
+  gfxStroke(g, 2, 0xd8d0b0, 0.74);
+  gfxMove(g, nose.x - Math.cos(facing) * 3.5, nose.y - Math.sin(facing) * 3.5);
+  gfxLine(g, nose.x, nose.y);
 }
 
 export function drawRotatedRectOutline(g, cx, cy, w, h, a) {
@@ -422,16 +423,16 @@ export function drawRotatedRectOutline(g, cx, cy, w, h, a) {
     rotatePoint(cx + hw, cy + hh, a),
     rotatePoint(cx - hw, cy + hh, a),
   ];
-  g.moveTo(corners[0].x, corners[0].y);
-  for (let i = 1; i < corners.length; i += 1) g.lineTo(corners[i].x, corners[i].y);
-  g.lineTo(corners[0].x, corners[0].y);
+  gfxMove(g, corners[0].x, corners[0].y);
+  for (let i = 1; i < corners.length; i += 1) gfxLine(g, corners[i].x, corners[i].y);
+  gfxLine(g, corners[0].x, corners[0].y);
 }
 
 export function drawInfantryBase(g, r, tint, facing) {
   // Shared combat-infantry body: same soldier, different oversized weapon.
-  g.lineStyle(2, 0x1a1712, 0.95);
-  g.beginFill(tint);
-  g.drawPolygon(rotatedPolygon([
+  gfxStroke(g, 2, 0x1a1712, 0.95);
+  gfxFill(g, tint);
+  gfxPoly(g, rotatedPolygon([
     r * 0.72, 0,
     r * 0.22, -r * 0.62,
     -r * 0.58, -r * 0.48,
@@ -439,21 +440,21 @@ export function drawInfantryBase(g, r, tint, facing) {
     -r * 0.58, r * 0.48,
     r * 0.22, r * 0.62,
   ], facing));
-  g.endFill();
+  gfxNoFill(g);
 
   const head = polar(facing, r * 0.72);
-  g.beginFill(lightenColor(tint, 0.16));
-  g.drawCircle(head.x, head.y, r * 0.34);
-  g.endFill();
+  gfxFill(g, lightenColor(tint, 0.16));
+  gfxCircle(g, head.x, head.y, r * 0.34);
+  gfxNoFill(g);
 
   const rear = polar(facing + Math.PI, r * 0.68);
   const shoulderL = polar(facing - 1.42, r * 0.48);
   const shoulderR = polar(facing + 1.42, r * 0.48);
-  g.lineStyle(2, 0x1a1712, 0.5);
-  g.moveTo(rear.x, rear.y);
-  g.lineTo(shoulderL.x, shoulderL.y);
-  g.moveTo(rear.x, rear.y);
-  g.lineTo(shoulderR.x, shoulderR.y);
+  gfxStroke(g, 2, 0x1a1712, 0.5);
+  gfxMove(g, rear.x, rear.y);
+  gfxLine(g, shoulderL.x, shoulderL.y);
+  gfxMove(g, rear.x, rear.y);
+  gfxLine(g, shoulderR.x, shoulderR.y);
 }
 
 export function drawInfantryRifle(g, r, facing, recoil) {
@@ -463,12 +464,12 @@ export function drawInfantryRifle(g, r, facing, recoil) {
   const muzzle = offsetPoint(polar(a, r * 1.82), kick);
   const hand = offsetPoint(polar(a, r * 0.55), kick);
 
-  g.lineStyle(3, 0x2a2119, 0.96);
-  g.moveTo(stock.x, stock.y);
-  g.lineTo(muzzle.x, muzzle.y);
-  g.lineStyle(2, 0xd8d0b0, 0.85);
-  g.moveTo(hand.x - Math.sin(a) * r * 0.32, hand.y + Math.cos(a) * r * 0.32);
-  g.lineTo(hand.x + Math.sin(a) * r * 0.32, hand.y - Math.cos(a) * r * 0.32);
+  gfxStroke(g, 3, 0x2a2119, 0.96);
+  gfxMove(g, stock.x, stock.y);
+  gfxLine(g, muzzle.x, muzzle.y);
+  gfxStroke(g, 2, 0xd8d0b0, 0.85);
+  gfxMove(g, hand.x - Math.sin(a) * r * 0.32, hand.y + Math.cos(a) * r * 0.32);
+  gfxLine(g, hand.x + Math.sin(a) * r * 0.32, hand.y - Math.cos(a) * r * 0.32);
 }
 
 export function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
@@ -483,31 +484,31 @@ export function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil
   const muzzle = offsetPoint(polar(a, muzzleDist), kick);
 
   // MG42-inspired profile: shoulder stock, box receiver, long perforated shroud, no rotary barrels.
-  g.lineStyle(3, 0x17130f, 0.98);
-  g.moveTo(stockRear.x, stockRear.y);
-  g.lineTo(muzzle.x, muzzle.y);
+  gfxStroke(g, 3, 0x17130f, 0.98);
+  gfxMove(g, stockRear.x, stockRear.y);
+  gfxLine(g, muzzle.x, muzzle.y);
 
   const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy);
-  g.beginFill(0x4a3420, 0.96);
+  gfxFill(g, 0x4a3420, 0.96);
   drawRotatedRectOffset(g, stockCenterX, 0, r * 0.62, r * 0.38, a, kick);
-  g.endFill();
+  gfxNoFill(g);
 
   const receiverX = lerp(r * 0.04, r * 0.2, deploy);
-  g.beginFill(0x32291f, 0.98);
+  gfxFill(g, 0x32291f, 0.98);
   drawRotatedRectOffset(g, receiverX, 0, r * 0.72, r * 0.48, a, kick);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0xd8d0b0, 0.82);
+  gfxFill(g, 0xd8d0b0, 0.82);
   drawRotatedRectOffset(g, receiverX + r * 0.08, -r * 0.2, r * 0.56, r * 0.12, a, kick);
-  g.endFill();
+  gfxNoFill(g);
 
   const shroudX = lerp(r * 0.62, r * 1.08, deploy);
   const shroudW = lerp(r * 0.72, r * 1.22, deploy);
-  g.beginFill(0x241d17, 0.98);
+  gfxFill(g, 0x241d17, 0.98);
   drawRotatedRectOffset(g, shroudX, 0, shroudW, r * 0.24, a, kick);
-  g.endFill();
+  gfxNoFill(g);
 
-  g.beginFill(0xd8d0b0, 0.72);
+  gfxFill(g, 0xd8d0b0, 0.72);
   const slotCount = deploy > 0.55 ? 4 : 3;
   for (let i = 0; i < slotCount; i += 1) {
     const t = slotCount === 1 ? 0.5 : i / (slotCount - 1);
@@ -521,17 +522,17 @@ export function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil
       kick,
     );
   }
-  g.endFill();
+  gfxNoFill(g);
 
   const muzzleBase = offsetPoint(polar(a, muzzleDist - r * 0.18), kick);
-  g.lineStyle(2, 0xd8d0b0, 0.78);
-  g.moveTo(muzzleBase.x - Math.sin(a) * r * 0.22, muzzleBase.y + Math.cos(a) * r * 0.22);
-  g.lineTo(muzzleBase.x + Math.sin(a) * r * 0.22, muzzleBase.y - Math.cos(a) * r * 0.22);
+  gfxStroke(g, 2, 0xd8d0b0, 0.78);
+  gfxMove(g, muzzleBase.x - Math.sin(a) * r * 0.22, muzzleBase.y + Math.cos(a) * r * 0.22);
+  gfxLine(g, muzzleBase.x + Math.sin(a) * r * 0.22, muzzleBase.y - Math.cos(a) * r * 0.22);
 
   const grip = offsetPoint(polar(a + Math.PI, r * 0.02), kick);
-  g.lineStyle(3, 0xd8d0b0, 0.86);
-  g.moveTo(grip.x - Math.sin(a) * r * 0.34, grip.y + Math.cos(a) * r * 0.34);
-  g.lineTo(grip.x + Math.sin(a) * r * 0.34, grip.y - Math.cos(a) * r * 0.34);
+  gfxStroke(g, 3, 0xd8d0b0, 0.86);
+  gfxMove(g, grip.x - Math.sin(a) * r * 0.34, grip.y + Math.cos(a) * r * 0.34);
+  gfxLine(g, grip.x + Math.sin(a) * r * 0.34, grip.y - Math.cos(a) * r * 0.34);
 
   if (deploy > 0.02) {
     const bipodRoot = offsetPoint(polar(a, lerp(r * 0.9, r * 1.72, deploy)), kick);
@@ -545,17 +546,17 @@ export function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil
       x: bipodRoot.x + Math.cos(a - spread) * legLen,
       y: bipodRoot.y + Math.sin(a - spread) * legLen,
     };
-    g.lineStyle(3, 0xd8d0b0, 0.9);
-    g.moveTo(bipodRoot.x, bipodRoot.y);
-    g.lineTo(left.x, left.y);
-    g.moveTo(bipodRoot.x, bipodRoot.y);
-    g.lineTo(right.x, right.y);
+    gfxStroke(g, 3, 0xd8d0b0, 0.9);
+    gfxMove(g, bipodRoot.x, bipodRoot.y);
+    gfxLine(g, left.x, left.y);
+    gfxMove(g, bipodRoot.x, bipodRoot.y);
+    gfxLine(g, right.x, right.y);
   }
 
   if (setup.barrel || deploy > 0.75) {
-    g.beginFill(0x241d17, 0.96);
+    gfxFill(g, 0x241d17, 0.96);
     drawRotatedRectOffset(g, muzzleDist, 0, r * 0.22, r * 0.16, a, kick);
-    g.endFill();
+    gfxNoFill(g);
   }
 }
 
@@ -574,11 +575,11 @@ export function drawAntiTankGun(g, r, tint, facing, weaponFacing, setup, recoil)
   const muzzleX = r * 1.9;
   const breechX = -r * 0.28;
 
-  g.lineStyle(4, 0x1a1712, 0.9);
+  gfxStroke(g, 4, 0x1a1712, 0.9);
   const axleL = rotatePoint(axleX, -wheelY, a);
   const axleR = rotatePoint(axleX, wheelY, a);
-  g.moveTo(axleL.x + carriageKick.x, axleL.y + carriageKick.y);
-  g.lineTo(axleR.x + carriageKick.x, axleR.y + carriageKick.y);
+  gfxMove(g, axleL.x + carriageKick.x, axleL.y + carriageKick.y);
+  gfxLine(g, axleR.x + carriageKick.x, axleR.y + carriageKick.y);
 
   const leftWheel = rotatePoint(axleX, -wheelY, a);
   const rightWheel = rotatePoint(axleX, wheelY, a);
@@ -586,10 +587,10 @@ export function drawAntiTankGun(g, r, tint, facing, weaponFacing, setup, recoil)
   drawGunTire(g, rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, tireLength, tireWidth, a);
 
   const shield = rotatePoint(r * 0.12, 0, a);
-  g.beginFill(tint, 0.96);
+  gfxFill(g, tint, 0.96);
   drawRotatedRectOffset(g, shield.x, shield.y, r * 0.46, r * 1.18, a, carriageKick);
-  g.endFill();
-  g.beginFill(0x1a1712, 0.28);
+  gfxNoFill(g);
+  gfxFill(g, 0x1a1712, 0.28);
   drawRotatedRectOffset(
     g,
     shield.x + Math.cos(a) * r * 0.1,
@@ -599,16 +600,16 @@ export function drawAntiTankGun(g, r, tint, facing, weaponFacing, setup, recoil)
     a,
     carriageKick,
   );
-  g.endFill();
+  gfxNoFill(g);
 
   const trailRoot = offsetPoint(rotatePoint(trailRootX, 0, a), carriageKick);
   const trailL = offsetPoint(rotatePoint(trailRear, -trailSpread, a), carriageKick);
   const trailR = offsetPoint(rotatePoint(trailRear, trailSpread, a), carriageKick);
-  g.lineStyle(4, 0xd8d0b0, 0.9);
-  g.moveTo(trailRoot.x, trailRoot.y);
-  g.lineTo(trailL.x, trailL.y);
-  g.moveTo(trailRoot.x, trailRoot.y);
-  g.lineTo(trailR.x, trailR.y);
+  gfxStroke(g, 4, 0xd8d0b0, 0.9);
+  gfxMove(g, trailRoot.x, trailRoot.y);
+  gfxLine(g, trailL.x, trailL.y);
+  gfxMove(g, trailRoot.x, trailRoot.y);
+  gfxLine(g, trailR.x, trailR.y);
   if (deploy > 0.05) {
     const braceL = offsetPoint(
       rotatePoint(lerp(-r * 0.2, -r * 0.95, deploy), -trailSpread * 0.72, a),
@@ -618,52 +619,52 @@ export function drawAntiTankGun(g, r, tint, facing, weaponFacing, setup, recoil)
       rotatePoint(lerp(-r * 0.2, -r * 0.95, deploy), trailSpread * 0.72, a),
       carriageKick,
     );
-    g.lineStyle(3, 0x2a2119, 0.96);
-    g.moveTo(trailRoot.x, trailRoot.y);
-    g.lineTo(braceL.x, braceL.y);
-    g.moveTo(trailRoot.x, trailRoot.y);
-    g.lineTo(braceR.x, braceR.y);
+    gfxStroke(g, 3, 0x2a2119, 0.96);
+    gfxMove(g, trailRoot.x, trailRoot.y);
+    gfxLine(g, braceL.x, braceL.y);
+    gfxMove(g, trailRoot.x, trailRoot.y);
+    gfxLine(g, braceR.x, braceR.y);
   }
 
   const breech = offsetPoint(rotatePoint(breechX, 0, a), barrelKick);
   const muzzle = offsetPoint(rotatePoint(muzzleX, 0, a), barrelKick);
-  g.lineStyle(r * 0.22, 0x241d17, 0.98);
-  g.moveTo(breech.x, breech.y);
-  g.lineTo(muzzle.x, muzzle.y);
-  g.lineStyle(r * 0.07, 0xd8d0b0, 0.58);
-  g.moveTo(breech.x + Math.sin(a) * r * 0.07, breech.y - Math.cos(a) * r * 0.07);
-  g.lineTo(muzzle.x + Math.sin(a) * r * 0.07, muzzle.y - Math.cos(a) * r * 0.07);
-  g.lineStyle(r * 0.1, 0xd8d0b0, 0.75);
-  g.moveTo(muzzle.x - Math.cos(a) * r * 0.32, muzzle.y - Math.sin(a) * r * 0.32);
-  g.lineTo(muzzle.x, muzzle.y);
-  g.beginFill(0x3d3528, 0.98);
+  gfxStroke(g, r * 0.22, 0x241d17, 0.98);
+  gfxMove(g, breech.x, breech.y);
+  gfxLine(g, muzzle.x, muzzle.y);
+  gfxStroke(g, r * 0.07, 0xd8d0b0, 0.58);
+  gfxMove(g, breech.x + Math.sin(a) * r * 0.07, breech.y - Math.cos(a) * r * 0.07);
+  gfxLine(g, muzzle.x + Math.sin(a) * r * 0.07, muzzle.y - Math.cos(a) * r * 0.07);
+  gfxStroke(g, r * 0.1, 0xd8d0b0, 0.75);
+  gfxMove(g, muzzle.x - Math.cos(a) * r * 0.32, muzzle.y - Math.sin(a) * r * 0.32);
+  gfxLine(g, muzzle.x, muzzle.y);
+  gfxFill(g, 0x3d3528, 0.98);
   drawRotatedRectOffset(g, breechX - r * 0.1, 0, r * 0.52, r * 0.42, a, barrelKick);
-  g.endFill();
+  gfxNoFill(g);
 }
 
 export function drawGunTire(g, cx, cy, length, width, a) {
-  g.lineStyle(2.4, 0x17130f, 0.98);
-  g.beginFill(0x26221b, 0.98);
-  g.drawPolygon(orientedCapsulePolygon(cx, cy, length, width, a));
-  g.endFill();
+  gfxStroke(g, 2.4, 0x17130f, 0.98);
+  gfxFill(g, 0x26221b, 0.98);
+  gfxPoly(g, orientedCapsulePolygon(cx, cy, length, width, a));
+  gfxNoFill(g);
 
-  g.lineStyle(1.5, 0xd8d0b0, 0.5);
+  gfxStroke(g, 1.5, 0xd8d0b0, 0.5);
   const treadOffset = width * 0.32;
   const treadInset = length * 0.26;
   const sideTreadLength = length - treadInset * 2;
   drawRotatedLine(g, cx, cy, -sideTreadLength / 2, -treadOffset, sideTreadLength / 2, -treadOffset, a);
   drawRotatedLine(g, cx, cy, -sideTreadLength / 2, treadOffset, sideTreadLength / 2, treadOffset, a);
 
-  g.lineStyle(1.2, 0x4a4031, 0.9);
+  gfxStroke(g, 1.2, 0x4a4031, 0.9);
   for (let i = -1; i <= 1; i += 1) {
     const x = i * length * 0.2;
     drawRotatedLine(g, cx, cy, x, -width * 0.42, x, width * 0.42, a);
   }
 
-  g.lineStyle(1.4, 0x17130f, 0.9);
-  g.beginFill(0xd8d0b0, 0.76);
-  g.drawCircle(cx, cy, width * 0.32);
-  g.endFill();
+  gfxStroke(g, 1.4, 0x17130f, 0.9);
+  gfxFill(g, 0xd8d0b0, 0.76);
+  gfxCircle(g, cx, cy, width * 0.32);
+  gfxNoFill(g);
 }
 
 export function orientedCapsulePolygon(cx, cy, length, width, a) {
@@ -687,8 +688,8 @@ export function orientedCapsulePolygon(cx, cy, length, width, a) {
 export function drawRotatedLine(g, cx, cy, x1, y1, x2, y2, a) {
   const p1 = rotatePoint(x1, y1, a);
   const p2 = rotatePoint(x2, y2, a);
-  g.moveTo(cx + p1.x, cy + p1.y);
-  g.lineTo(cx + p2.x, cy + p2.y);
+  gfxMove(g, cx + p1.x, cy + p1.y);
+  gfxLine(g, cx + p2.x, cy + p2.y);
 }
 
 export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha, lineAlpha, innerRadius = 0) {
@@ -698,23 +699,20 @@ export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha
   const inner = Math.max(0, Math.min(innerRadius || 0, radius));
 
   if (width >= Math.PI * 2) {
-    g.lineStyle(1.5, color, lineAlpha);
-    g.beginFill(color, fillAlpha);
-    g.drawCircle(x, y, radius);
-    if (inner > 0) {
-      g.beginHole();
-      g.drawCircle(x, y, inner);
-      g.endHole();
-    }
-    g.endFill();
+    gfxStroke(g, 1.5, color, lineAlpha);
+    gfxFill(g, color, fillAlpha);
+    g.circle(x, y, radius);
+    if (inner > 0) g.circle(x, y, inner).cut();
+    gfxPaint(g);
+    gfxNoFill(g);
     return;
   }
 
   const sx = x + Math.cos(start) * radius;
   const sy = y + Math.sin(start) * radius;
 
-  g.lineStyle(1.5, color, lineAlpha);
-  g.beginFill(color, fillAlpha);
+  gfxStroke(g, 1.5, color, lineAlpha);
+  gfxFill(g, color, fillAlpha);
   if (inner > 0) {
     const exInner = x + Math.cos(end) * inner;
     const eyInner = y + Math.sin(end) * inner;
@@ -729,7 +727,8 @@ export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha
     g.arc(x, y, radius, start, end);
     g.lineTo(x, y);
   }
-  g.endFill();
+  gfxPaint(g);
+  gfxNoFill(g);
 }
 
 export function finiteNumber(value) {

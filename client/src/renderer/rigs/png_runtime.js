@@ -119,7 +119,7 @@ function createDefaultPngPixiFactory(pixi = globalThis.PIXI) {
   return {
     createContainer: () => new pixi.Container(),
     createRectangle: (x, y, width, height) => new pixi.Rectangle(x, y, width, height),
-    createTexture: (baseTexture, rectangle) => new pixi.Texture(baseTexture, rectangle),
+    createTexture: (source, rectangle) => new pixi.Texture({ source, frame: rectangle }),
     createSprite: (texture) => new pixi.Sprite(texture),
   };
 }
@@ -138,7 +138,7 @@ class PngAtlasRigInstance {
     this._routePartKey = partSelectionKey(this._routeParts);
     this._destroyed = false;
 
-    const baseTexture = atlasTexture.baseTexture ?? atlasTexture;
+    const baseTexture = atlasTexture.source;
     for (const sprite of atlasSprites(definition, atlas)) {
       if (!spriteMatchesRoute(sprite, this._routeParts)) continue;
       const frame = sprite.frame;
@@ -209,7 +209,7 @@ class PngAtlasRigInstance {
     this._destroyed = true;
     this.container.parent?.removeChild?.(this.container);
     for (const rec of this.parts.values()) {
-      rec.display.destroy?.({ texture: false, baseTexture: false });
+      rec.display.destroy?.({ texture: false, textureSource: false });
       rec.baseFrame.texture?.destroy?.(false);
       for (const frame of rec.paletteFrames?.values?.() || []) frame.texture?.destroy?.(false);
     }

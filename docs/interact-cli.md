@@ -51,7 +51,7 @@ The bounded normal-match surface is separate from Lab authoring:
 
 ```bash
 node scripts/interact/cli.mjs game open '{"opponent":"ai_2_1","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
-node scripts/interact/cli.mjs game open '{"spectate":["ai_2_1","ai_turtle"],"viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs game open '{"spectate":["ai_2_1","ai_turtle"],"autoSpectator":true,"viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs game inspect '{"sessionId":"<id>","ownership":"owned","limit":100}'
 node scripts/interact/cli.mjs game select '{"sessionId":"<id>","ids":[42]}'
 node scripts/interact/cli.mjs game camera '{"sessionId":"<id>","camera":{"action":"focus","entities":[42]}}'
@@ -104,6 +104,9 @@ ability, input-event, DOM-selector, or browser-evaluation surface. `give-up` use
 surrender flow and returns only after the score screen appears. Spectator sessions expose neither
 move nor surrender; their only mutation is the AI-only room's existing bounded speed control used
 internally by time-lapse capture.
+For AI-vs-AI launches, `autoSpectator:true` seeds the ordinary persisted **Follow active fights**
+preference before application startup. The returned game status projects `autoSpectatorEnabled`,
+so media capture can prove the director is active rather than inferring it from camera motion.
 `select` replaces browser-local selection with up to 400 ids from the recipient's normal
 fog-filtered snapshot; an empty list clears it. Player and spectator sessions may use selection to
 drive the authentic renderer overlays and HUD, but selection itself sends no gameplay command.

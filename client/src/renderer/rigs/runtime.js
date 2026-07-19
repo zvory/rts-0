@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxCircle, gfxEllipse, gfxPaint, gfxPoly, gfxLine, gfxMove, gfxFill, gfxStroke } from "../native_graphics.js";
 import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { flushRigDiagnosticCounts } from "./diagnostics.js";
@@ -244,25 +245,25 @@ function nearly(a, b) {
 function drawPart(g, geometry, paint, tintFill, tintStroke, geometryScaleX = 1, geometryScaleY = 1) {
   const fill = paint.fill == null ? null : tintFill ?? hexToInt(paint.fill);
   const stroke = paint.stroke == null ? null : tintStroke ?? hexToInt(paint.stroke);
-  if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
-  else g.lineStyle?.(0, 0, 0);
-  if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
+  if (stroke !== null) gfxStroke(g, paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
+  else gfxStroke(g, 0, 0, 0);
+  if (fill !== null) gfxFill(g, fill, paint.fillOpacity ?? 1);
   drawGeometry(g, geometry, geometryScaleX, geometryScaleY);
-  if (fill !== null) g.endFill?.();
+  if (fill !== null) gfxNoFill(g);
 }
 
 function drawGeometry(g, geometry, sx = 1, sy = 1) {
   if (geometry.type === "rect") drawRectAsPolygon(g, geometry, sx, sy);
   else if (geometry.type === "circle") {
-    if (nearly(sx, sy)) g.drawCircle(geometry.cx * sx, geometry.cy * sy, geometry.r * sx);
-    else g.drawEllipse(geometry.cx * sx, geometry.cy * sy, Math.abs(geometry.r * sx), Math.abs(geometry.r * sy));
-  } else if (geometry.type === "ellipse") g.drawEllipse(geometry.cx * sx, geometry.cy * sy, Math.abs(geometry.rx * sx), Math.abs(geometry.ry * sy));
+    if (nearly(sx, sy)) gfxCircle(g, geometry.cx * sx, geometry.cy * sy, geometry.r * sx);
+    else gfxEllipse(g, geometry.cx * sx, geometry.cy * sy, Math.abs(geometry.r * sx), Math.abs(geometry.r * sy));
+  } else if (geometry.type === "ellipse") gfxEllipse(g, geometry.cx * sx, geometry.cy * sy, Math.abs(geometry.rx * sx), Math.abs(geometry.ry * sy));
   else if (geometry.type === "line") {
-    g.moveTo(geometry.from.x * sx, geometry.from.y * sy);
-    g.lineTo(geometry.to.x * sx, geometry.to.y * sy);
+    gfxMove(g, geometry.from.x * sx, geometry.from.y * sy);
+    gfxLine(g, geometry.to.x * sx, geometry.to.y * sy);
   } else if (geometry.type === "polygon" || geometry.type === "polyline") {
     const points = geometry.points.flatMap((point) => [point.x * sx, point.y * sy]);
-    if (geometry.type === "polygon") g.drawPolygon(points);
+    if (geometry.type === "polygon") gfxPoly(g, points);
     else drawPolyline(g, points);
   } else if (geometry.type === "path") {
     drawPath(g, geometry.commands, sx, sy);
@@ -270,7 +271,7 @@ function drawGeometry(g, geometry, sx = 1, sy = 1) {
 }
 
 function drawRectAsPolygon(g, geometry, sx = 1, sy = 1) {
-  g.drawPolygon([
+  gfxPoly(g, [
     geometry.x * sx, geometry.y * sy,
     (geometry.x + geometry.width) * sx, geometry.y * sy,
     (geometry.x + geometry.width) * sx, (geometry.y + geometry.height) * sy,
@@ -280,8 +281,8 @@ function drawRectAsPolygon(g, geometry, sx = 1, sy = 1) {
 
 function drawPolyline(g, points) {
   if (points.length < 4) return;
-  g.moveTo(points[0], points[1]);
-  for (let i = 2; i < points.length; i += 2) g.lineTo(points[i], points[i + 1]);
+  gfxMove(g, points[0], points[1]);
+  for (let i = 2; i < points.length; i += 2) gfxLine(g, points[i], points[i + 1]);
 }
 
 function drawPath(g, commands, sx = 1, sy = 1) {
@@ -293,6 +294,7 @@ function drawPath(g, commands, sx = 1, sy = 1) {
     else if (command.command === "Q") g.quadraticCurveTo?.(v[0], v[1], v[2], v[3]);
     else if (command.command === "Z") g.closePath?.();
   }
+  gfxPaint(g);
 }
 
 function scalePathValues(values, sx, sy) {

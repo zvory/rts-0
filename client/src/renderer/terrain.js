@@ -161,14 +161,14 @@ export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
 
   const layer = this.layers.terrain;
   if (reusable) {
-    this._terrainSprite.texture.baseTexture.update();
+    this._terrainSprite.texture.source.update();
     this._terrainSprite.scale.set(ts / textureTileSize);
   } else {
     if (this._terrainSprite) {
       this._terrainSprite.destroy(true);
       layer.removeChildren();
     }
-    const tex = PIXI.Texture.from(canvas, { scaleMode: PIXI.SCALE_MODES.NEAREST });
+    const tex = PIXI.Texture.from(canvas);
     this._terrainSprite = new PIXI.Sprite(tex);
     this._terrainSprite.scale.set(ts / textureTileSize);
     layer.addChild(this._terrainSprite);
@@ -207,6 +207,6 @@ export function updateStaticTerrainTiles(changes) {
     const [x, y] = key.split(",").map(Number);
     drawTerrainTile(ctx, map, x, y, textureTileSize);
   }
-  if (dirty.size) this._terrainSprite.texture.baseTexture.update();
+  if (dirty.size) this._terrainSprite.texture.source.update();
   return dirty.size;
 }

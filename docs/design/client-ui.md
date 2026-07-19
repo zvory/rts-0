@@ -1,7 +1,8 @@
 ## 4. JS client — modules & exported APIs
 
 `client/` (ES modules, no bundler; `index.html` imports `src/main.js` as a module).
-PixiJS is loaded globally from CDN as `PIXI`. The default backend bundle creates the existing
+PixiJS v8.19.0 is pinned on the CDN and loaded globally as `PIXI`. Pixi applications use the native
+async `Application.init({preference:"webgl"})` lifecycle. The default backend bundle creates the existing
 orthographic semantic camera and Pixi presentation adapter. The explicit live-player/Lab
 `rtsRenderer=babylon` selector lazily loads the pinned Babylon dependency and creates the fixed
 perspective camera before its renderer; ordinary spectators and replays remain on Pixi, and
@@ -824,7 +825,7 @@ Editor status stays above the scrolling controls; failures use a high-contrast a
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
 edge-sharing neighbours into the existing canvas texture and calls
-`baseTexture.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
+`texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.

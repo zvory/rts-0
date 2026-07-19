@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxPoly, gfxLine, gfxMove, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
 import { drawOccupiedTrenchLip, drawOccupiedTrenchShadow } from "./trenches.js";
@@ -14,8 +15,7 @@ const LABEL_STYLE = Object.freeze({
   fontSize: 12,
   fontWeight: "700",
   fill: 0xf2dfae,
-  stroke: 0x16110c,
-  strokeThickness: 3,
+  stroke: { color: 0x16110c, width: 3 },
   align: "center",
 });
 
@@ -160,48 +160,48 @@ export class VisualSampleLayer {
     const variant = TRENCH_VARIANTS[sample.variant] || TRENCH_VARIANTS[DEFAULT_TRENCH_VARIANT];
     const seed = hashString(`${sample.id}:${sample.variant}`);
     const rng = mulberry32(seed);
-    g.clear();
+    gfxReset(g.clear());
     g.visible = true;
     g.alpha = sample.alpha;
     g.position?.set?.(sample.x, sample.y);
 
-    g.beginFill(COLORS.shadow, 0.2);
-    g.drawPolygon(irregularPolygon(sample.radius * variant.outerScale, {
+    gfxFill(g, COLORS.shadow, 0.2);
+    gfxPoly(g, irregularPolygon(sample.radius * variant.outerScale, {
       points: variant.points,
       jitter: variant.jitter,
       rng,
       offsetX: sample.radius * 0.08,
       offsetY: sample.radius * 0.14,
     }));
-    g.endFill();
+    gfxNoFill(g);
 
-    g.beginFill(COLORS.trenchRim, variant.rimAlpha);
-    g.drawPolygon(irregularPolygon(sample.radius * variant.outerScale, {
+    gfxFill(g, COLORS.trenchRim, variant.rimAlpha);
+    gfxPoly(g, irregularPolygon(sample.radius * variant.outerScale, {
       points: variant.points,
       jitter: variant.jitter,
       rng,
     }));
-    g.endFill();
+    gfxNoFill(g);
 
-    g.beginFill(COLORS.trenchDirt, variant.dirtAlpha);
-    g.drawPolygon(irregularPolygon(sample.radius * variant.midScale, {
+    gfxFill(g, COLORS.trenchDirt, variant.dirtAlpha);
+    gfxPoly(g, irregularPolygon(sample.radius * variant.midScale, {
       points: Math.max(14, variant.points - 3),
       jitter: variant.jitter * 0.75,
       rng,
       offsetX: sample.radius * -0.02,
       offsetY: sample.radius * 0.02,
     }));
-    g.endFill();
+    gfxNoFill(g);
 
-    g.beginFill(COLORS.trenchShadow, variant.shadowAlpha);
-    g.drawPolygon(irregularPolygon(sample.radius * variant.innerScale, {
+    gfxFill(g, COLORS.trenchShadow, variant.shadowAlpha);
+    gfxPoly(g, irregularPolygon(sample.radius * variant.innerScale, {
       points: Math.max(12, variant.points - 6),
       jitter: variant.jitter,
       rng,
       offsetX: sample.radius * 0.05,
       offsetY: sample.radius * 0.08,
     }));
-    g.endFill();
+    gfxNoFill(g);
 
     drawFacets(g, sample.radius, variant, rng);
     if (sample.occupied) {
@@ -236,7 +236,7 @@ export class VisualSampleLayer {
     if (!this.pixi?.Text || !this.labelLayer) return null;
     let text = this.labelPool.get(id);
     if (!text) {
-      text = new this.pixi.Text("", LABEL_STYLE);
+      text = new this.pixi.Text({ text: "", style: LABEL_STYLE });
       text.anchor?.set?.(0.5, 1);
       this.labelPool.set(id, text);
       this.labelLayer.addChild?.(text);
@@ -392,13 +392,13 @@ function labelScaleForCamera(camera, x, y) {
 }
 
 function drawFacets(g, radius, variant, rng) {
-  g.lineStyle(2, COLORS.trenchDirtLight, variant.lightAlpha);
+  gfxStroke(g, 2, COLORS.trenchDirtLight, variant.lightAlpha);
   for (let i = 0; i < variant.facets; i += 1) {
     const angle = rng() * Math.PI * 2;
     const inner = radius * (0.38 + rng() * 0.16);
     const outer = radius * (0.74 + rng() * 0.18);
-    g.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
-    g.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+    gfxMove(g, Math.cos(angle) * inner, Math.sin(angle) * inner);
+    gfxLine(g, Math.cos(angle) * outer, Math.sin(angle) * outer);
   }
 }
 
