@@ -293,6 +293,12 @@ pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle
     angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
+/// Automatic retention only keeps an AT gun target when it is already inside the deployed field.
+/// Explicit attack orders are handled separately and intentionally keep their commanded target.
+pub(super) fn auto_retention_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+    e.kind != EntityKind::AntiTankGun || anti_tank_gun_target_inside_field_of_fire(e, target_angle)
+}
+
 pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
     if e.kind != EntityKind::MortarTeam
         || !matches!(e.weapon_setup(), WeaponSetup::Deployed)
