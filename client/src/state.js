@@ -44,6 +44,22 @@ function lerpAngle(from, to, t) {
   return normalizeAngle(from + shortestAngleDelta(from, to) * t);
 }
 
+function interpolateEntity(entity, prior, alpha) {
+  if (!prior) return { ...entity };
+  const next = {
+    ...entity,
+    x: prior.x + (entity.x - prior.x) * alpha,
+    y: prior.y + (entity.y - prior.y) * alpha,
+  };
+  if (typeof prior.facing === "number" && typeof entity.facing === "number") {
+    next.facing = lerpAngle(prior.facing, entity.facing, alpha);
+  }
+  if (typeof prior.weaponFacing === "number" && typeof entity.weaponFacing === "number") {
+    next.weaponFacing = lerpAngle(prior.weaponFacing, entity.weaponFacing, alpha);
+  }
+  return next;
+}
+
 export class GameState extends VisualEffectBackedState {
   /**
    * @param {object} startInfo the §2.3 `start` payload.
@@ -353,28 +369,45 @@ export class GameState extends VisualEffectBackedState {
     const now = this.visualNow();
     const out = [];
     for (const e of this._cur.entities || []) {
-      const prior = this._prevById.get(e.id);
-      if (prior) {
-        const next = {
-          ...e,
-          x: prior.x + (e.x - prior.x) * t,
-          y: prior.y + (e.y - prior.y) * t,
-        };
-        if (typeof prior.facing === "number" && typeof e.facing === "number") {
-          next.facing = lerpAngle(prior.facing, e.facing, t);
-        }
-        if (typeof prior.weaponFacing === "number" && typeof e.weaponFacing === "number") {
-          next.weaponFacing = lerpAngle(prior.weaponFacing, e.weaponFacing, t);
-        }
-        out.push(includePrediction ? this._applyDisplayEntity(this._applyPredictedEntity(next, now), now) : next);
-      } else {
-        // No previous sample: render at the current position (a shallow copy
-        // keeps callers from mutating the live snapshot entity).
-        const next = { ...e };
-        out.push(includePrediction ? this._applyDisplayEntity(this._applyPredictedEntity(next, now), now) : next);
-      }
+      const next = interpolateEntity(e, this._prevById.get(e.id), t);
+      out.push(includePrediction ? this._applyDisplayEntity(this._applyPredictedEntity(next, now), now) : next);
     }
     return out;
+  }
+
+  entityVariants(alpha) {
+    if (!this._cur) {
+      return { interpolatedEntities: [], currentEntities: [], authoritativeEntities: [], entityTraversals: 0 };
+    }
+    const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
+    const renderNow = this.visualNow();
+    const currentNow = t === 1 ? renderNow : this.visualNow();
+    // The authoritative legacy call sampled the clock even though it did not
+    // apply prediction. Preserve that observable ordering for injected clocks.
+    this.visualNow();
+    const interpolatedEntities = [];
+    const currentEntities = t === 1 ? interpolatedEntities : [];
+    const authoritativeEntities = [];
+    for (const entity of this._cur.entities || []) {
+      const prior = this._prevById.get(entity.id);
+      const interpolated = interpolateEntity(entity, prior, t);
+      interpolatedEntities.push(
+        this._applyDisplayEntity(this._applyPredictedEntity(interpolated, renderNow), renderNow),
+      );
+      if (t !== 1) {
+        const current = interpolateEntity(entity, prior, 1);
+        currentEntities.push(
+          this._applyDisplayEntity(this._applyPredictedEntity(current, currentNow), currentNow),
+        );
+      }
+      authoritativeEntities.push(interpolateEntity(entity, prior, 1));
+    }
+    return {
+      interpolatedEntities,
+      currentEntities,
+      authoritativeEntities,
+      entityTraversals: 1,
+    };
   }
 
   /**

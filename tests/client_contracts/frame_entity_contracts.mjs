@@ -5,6 +5,7 @@ import { assert } from "./assertions.mjs";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
 import { MatchHealth } from "../../client/src/match_health.js";
 import { KIND } from "../../client/src/protocol.js";
+import { GameState } from "../../client/src/state.js";
 
 // Frame entity views
 // ---------------------------------------------------------------------------
@@ -43,6 +44,8 @@ import { KIND } from "../../client/src/protocol.js";
     "frame entity views filter fog sources to own non-shot-reveal non-vision entries",
   );
   assert(frameViews.debug.entitiesInterpolatedCalls === 3, "frame entity views cap interpolation calls for a mixed-alpha frame");
+  assert(frameViews.debug.entityVariantBuildCalls === 0, "generic states retain the legacy interpolation fallback");
+  assert(frameViews.debug.entityTraversals === 0, "fallback diagnostics do not claim a production entity traversal");
   assert(frameViews.debug.selectedEntitiesCalls === 1, "frame entity views resolve selection once");
   assert(
     calls.map((call) => `${call.alpha}:${call.includePrediction}`).join("|") === "0.5:true|1:true|1:false",
@@ -63,6 +66,51 @@ import { KIND } from "../../client/src/protocol.js";
     spectatorViews.fogSourceEntities.map((entity) => entity.id).join(",") === "1,2",
     "spectator fog sources include non-neutral visible entities from the authoritative union",
   );
+}
+
+{
+  const clockSamples = [];
+  const state = Object.create(GameState.prototype);
+  state._cur = { entities: [
+    { id: 1, owner: 1, kind: KIND.WORKER, x: 30, y: 50, facing: -3, weaponFacing: 3, nested: { value: 1 } },
+    { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 90, y: 120 },
+  ] };
+  state._prevById = new Map([[
+    1,
+    { id: 1, owner: 1, kind: KIND.WORKER, x: 10, y: 20, facing: 3, weaponFacing: -3 },
+  ]]);
+  state.visualNow = () => {
+    const value = 100 + clockSamples.length;
+    clockSamples.push(value);
+    return value;
+  };
+  state._applyPredictedEntity = (entity, now) => ({ ...entity, predictionClock: now });
+  state._applyDisplayEntity = (entity, now) => ({ ...entity, displayClock: now });
+  state.selectedEntities = () => [];
+
+  const legacyInterpolated = state.entitiesInterpolated(0.5);
+  const legacyCurrent = state.entitiesInterpolated(1);
+  const legacyAuthoritative = state.entitiesInterpolated(1, { includePrediction: false });
+  clockSamples.length = 0;
+  const batch = state.entityVariants(0.5);
+  assert(
+    JSON.stringify(batch.interpolatedEntities) === JSON.stringify(legacyInterpolated)
+      && JSON.stringify(batch.currentEntities) === JSON.stringify(legacyCurrent)
+      && JSON.stringify(batch.authoritativeEntities) === JSON.stringify(legacyAuthoritative),
+    "batched entity variants match the legacy three-call output for interpolation, wraparound, and missing prior data",
+  );
+  assert(clockSamples.join(",") === "100,101,102", "batched variants preserve legacy visual-clock sampling order");
+  assert(batch.entityTraversals === 1, "batched variants report one source traversal");
+  assert(
+    batch.interpolatedEntities[0] !== batch.currentEntities[0]
+      && batch.currentEntities[0] !== batch.authoritativeEntities[0],
+    "batched variants retain independent records across distinct views",
+  );
+
+  const frameViews = buildFrameEntityViews(state, { alpha: 0.5 });
+  assert(frameViews.debug.entityVariantBuildCalls === 1, "production frame views invoke one entity variant build");
+  assert(frameViews.debug.entityTraversals === 1, "production frame views traverse current entities once");
+  assert(frameViews.debug.entitiesInterpolatedCalls === 0, "production frame views bypass legacy interpolation calls");
 }
 
 // ---------------------------------------------------------------------------

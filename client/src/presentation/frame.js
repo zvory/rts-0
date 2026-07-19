@@ -1,23 +1,12 @@
 import { GridSnapshotCache } from "./grid_snapshot.js";
 import { PRESENTATION_LAYER_IDS, createEmptyLayerRecords } from "./layers.js";
+import {
+  PRESENTATION_ENTITY_FIELDS,
+  preparedPresentationEntityRecord,
+} from "./entity_snapshot.js";
 
 export const PRESENTATION_FRAME_VERSION = 1;
 export const STATIC_MAP_PRESENTATION_VERSION = 1;
-
-const ENTITY_FIELDS = Object.freeze([
-  "id", "kind", "owner", "x", "y", "facing", "weaponFacing", "state",
-  "hp", "maxHp", "remaining", "latchedNode", "occupiedTrenchId",
-  "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodRepeatKinds",
-  "setupState", "setupFacing", "recoilPhase", "recoilProgress",
-  "panzerfaustLoaded", "breakthroughTicks", "breakthroughAuraTicks", "abilities",
-  "extractorActive",
-  "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",
-  "attackArcRad", "attackMinRangePx", "attackMinRangeTiles", "attackRangePx",
-  "attackRangeTiles", "attackRangeProfile", "firingArcRad", "firingMinRangePx",
-  "firingMinRangeTiles", "firingRangePx", "firingRangeTiles", "firingRangeProfile",
-  "weaponArcRad", "weaponMinRangePx", "weaponMinRangeTiles", "weaponRangePx",
-  "weaponRangeTiles", "weaponRangeProfile", "shotRevealCreatedAt", "shotRevealExpiresAt",
-]);
 
 const FEEDBACK_ARRAYS = Object.freeze([
   ["commandFeedback", "command"],
@@ -112,7 +101,9 @@ export class PresentationFrameAssembler {
       ? frameContext.interpolatedEntities
       : [];
 
-    for (const entity of entities) {
+    for (let entityIndex = 0; entityIndex < entities.length; entityIndex += 1) {
+      const entity = entities[entityIndex];
+      const prepared = frameContext?.preparedEntities?.[entityIndex];
       const layerId = entity?.shotReveal
         ? "aboveFogReveal"
         : entity?.visionOnly
@@ -120,6 +111,7 @@ export class PresentationFrameAssembler {
           : "fogGatedWorld";
       safePush(layers, layerId, "entity", diagnostics, () =>
         entityRecord(entity, {
+          prepared,
           selected: selected.has(entity?.id),
           context,
           tileSizePx: this._staticMap.tileSizePx,
@@ -269,6 +261,7 @@ export class PresentationFrameAssembler {
 }
 
 function entityRecord(entity, {
+  prepared = null,
   selected,
   context,
   tileSizePx,
@@ -286,22 +279,27 @@ function entityRecord(entity, {
   const owner = Number.isFinite(Number(entity.owner)) ? Number(entity.owner) : 0;
   const stat = entityStats?.[entity.kind] || null;
   const semanticHeight = entitySemanticHeight(stat, tileSizePx);
+  const derived = {
+    type: presentationKind,
+    x,
+    y,
+    owner,
+    relationship: relationshipForOwner(owner, context),
+    teamColor: context.colors[owner] || "#9aa0a8",
+    selected: !!selected,
+    visualBounds: entityVisualBounds(stat, tileSizePx),
+    anchors: {
+      ground: { x, y, heightPx: 0 },
+      selection: { x, y, heightPx: 0 },
+      hp: { x, y, heightPx: semanticHeight },
+    },
+  };
+  if (prepared?.source === entity) return preparedPresentationEntityRecord(prepared, derived);
   const record = { type: presentationKind };
-  for (const field of ENTITY_FIELDS) {
+  for (const field of PRESENTATION_ENTITY_FIELDS) {
     if (entity[field] !== undefined) record[field] = entity[field];
   }
-  record.x = x;
-  record.y = y;
-  record.owner = owner;
-  record.relationship = relationshipForOwner(owner, context);
-  record.teamColor = context.colors[owner] || "#9aa0a8";
-  record.selected = !!selected;
-  record.visualBounds = entityVisualBounds(stat, tileSizePx);
-  record.anchors = {
-    ground: { x, y, heightPx: 0 },
-    selection: { x, y, heightPx: 0 },
-    hp: { x, y, heightPx: semanticHeight },
-  };
+  Object.assign(record, derived);
   return detachedRecord(record);
 }
 

@@ -7,6 +7,7 @@ import {
   detachedRecord,
 } from "../../client/src/presentation/frame.js";
 import { createGridSnapshot } from "../../client/src/presentation/grid_snapshot.js";
+import { prepareEntitySnapshots } from "../../client/src/presentation/entity_snapshot.js";
 import {
   PRESENTATION_LAYER_DESCRIPTORS,
   PRESENTATION_LAYER_IDS,
@@ -113,6 +114,41 @@ const frame = assembler.assemble({
   visualTimeMs: 1500,
   sourceTick: 22,
 });
+
+const preparedEntities = prepareEntitySnapshots([normal, invalid, intel, reveal]);
+const preparedFrame = new PresentationFrameAssembler({
+  map,
+  entityStats: { rifleman: { size: 10 }, barracks: { footW: 3, footH: 2 } },
+}).assemble({
+  map,
+  frameContext: {
+    version: 1,
+    alpha: 0.5,
+    interpolatedEntities: [normal, invalid, intel, reveal],
+    preparedEntities: preparedEntities.entries,
+  },
+  projection,
+  fog: { visibleGrid, exploredGrid, visibleRevision: 4, exploredRevision: 7 },
+  selectionIds: new Set([1]),
+  players: [
+    { id: 1, teamId: 1, color: "#123456" },
+    { id: 2, teamId: 2, color: "#654321" },
+  ],
+  playerId: 1,
+  visualTimeMs: 1500,
+  sourceTick: 22,
+});
+for (const layer of ["fogGatedWorld", "belowFogIntel", "aboveFogReveal"]) {
+  const legacyRecords = frame.layers[layer].filter((record) => record.type.includes("Entity") || record.type === "entity");
+  assert(
+    JSON.stringify(preparedFrame.layers[layer]) === JSON.stringify(legacyRecords),
+    `prepared ${layer} entity records serialize identically to legacy presentation detachment`,
+  );
+}
+assert(
+  preparedFrame.diagnosticsContext.droppedByCategory.entity === 1,
+  "prepared malformed admitted data follows the existing bounded entity-drop diagnostic",
+);
 
 assert(Object.isFrozen(frame), "presentation frame is frozen");
 assert(Object.keys(frame.layers).join(",") === EXPECTED_LAYERS.join(","), "frame exposes exactly the locked layer keys");

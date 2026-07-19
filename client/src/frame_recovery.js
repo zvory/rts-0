@@ -1,6 +1,7 @@
 import { collectMatchFrameContext } from "./frame_profiler.js";
 import { buildFrameEntityViews } from "./frame_entity_views.js";
 import { buildSelectionScene } from "./input/selection_projection.js";
+import { prepareEntitySnapshots } from "./presentation/entity_snapshot.js";
 import { buildRendererFeedbackView } from "./renderer/feedback_view_model.js";
 import { PresentationFrameAssembler } from "./presentation/frame.js";
 import { STATS } from "./config.js";
@@ -57,14 +58,29 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       () => match.minimap.updateCommandTargetPreview?.(match.input?.isShiftHeld?.()),
     );
     time("match.predictionVisual", () => match.advancePredictionVisual());
-    const frameViews = time(
-      "match.frameEntityViews",
-      () => buildFrameEntityViews(match.state, { alpha }),
-    );
+    const frameViews = time("match.frameEntityViews", () => {
+      const views = buildFrameEntityViews(match.state, { alpha });
+      const prepared = prepareEntitySnapshots(views.interpolatedEntities);
+      return Object.freeze({
+        ...views,
+        preparedEntities: prepared.entries,
+        preparationDebug: prepared.debug,
+      });
+    });
     match.frameProfiler?.setContext({
+      frameEntityVariantBuildCalls: frameViews.debug.entityVariantBuildCalls,
+      frameEntityTraversals: frameViews.debug.entityTraversals,
       frameEntityViewCalls: frameViews.debug.entitiesInterpolatedCalls,
       frameSelectedEntityCalls: frameViews.debug.selectedEntitiesCalls,
     });
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "entityViews.state.entityVariantBuildCalls",
+      frameViews.debug.entityVariantBuildCalls,
+    );
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "entityViews.state.entityTraversals",
+      frameViews.debug.entityTraversals,
+    );
     match.frameProfiler?.recordDiagnosticCounter?.(
       "entityViews.state.entitiesInterpolatedCalls",
       frameViews.debug.entitiesInterpolatedCalls,
@@ -72,6 +88,14 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     match.frameProfiler?.recordDiagnosticCounter?.(
       "entityViews.state.selectedEntitiesCalls",
       frameViews.debug.selectedEntitiesCalls,
+    );
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "entityViews.preparation.interactionContainers",
+      frameViews.preparationDebug.interactionObjects + frameViews.preparationDebug.interactionArrays,
+    );
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "entityViews.preparation.admittedNestedReuses",
+      frameViews.preparationDebug.admittedNestedReuses,
     );
     time("match.fog", () => {
       match.fog.update(
@@ -136,6 +160,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
 
     const selectionScene = time("match.selectionScene", () => buildSelectionScene({
       entities: frameViews.interpolatedEntities,
+      preparedEntities: frameViews.preparedEntities,
       projection,
       tileSize: match.state.map?.tileSize,
       generation: presentationFrame.generation,

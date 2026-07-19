@@ -493,16 +493,28 @@ entity pools, minimap blips, local fog sources, or game state.
 `frame_entity_views.js`
 ```js
 buildFrameEntityViews(state, { alpha }) // frozen SharedFrameContextV1 outer record with frame-local entity arrays
+state.entityVariants(alpha)             // render/current/authoritative arrays in one source traversal
 ```
 `frame_recovery.js` builds this object once per requestAnimationFrame after prediction display has
 advanced and before fog, renderer, HUD, minimap, and observer analysis run. The object is not
 authoritative state and must not be retained after the frame; it exists only to share common
-`GameState.entitiesInterpolated()` and `selectedEntities()` results across frame consumers.
+entity variants and `selectedEntities()` results across frame consumers. Production `GameState`
+builds the render-alpha predicted view, alpha-1 predicted view, and alpha-1 authoritative view in
+one `_cur.entities` traversal; GameState-compatible test doubles retain the truthful
+`entitiesInterpolated()` fallback.
 `interpolatedEntities` uses the render alpha and prediction display for the Pixi renderer,
 `currentEntities` uses the latest predicted display positions for minimap blips and HUD tech
 checks, `authoritativeEntities` uses latest no-prediction positions for local fog-source filtering
 and observer Army Value rows, and `fogSourceEntities` removes shot-reveal/vision-only entries plus
 non-vision neutral resources.
+
+`presentation/entity_snapshot.js` prepares an aligned, frame-local entry for each interpolated
+entity. Each entry contains the complete detached/frozen selection interaction and a narrower
+admitted presentation sidecar certified against the renderer schema during the same graph walk.
+Presentation and selection consume entries by array position, never by id, so duplicate order is
+preserved. The sidecar and source reference die with the frame; only the interaction may outlive
+it through the last successfully published selection scene. Standalone callers and remembered
+buildings keep their legacy detachment fallback.
 
 `presentation/layers.js`, `presentation/grid_snapshot.js`, and `presentation/frame.js`
 ```js

@@ -428,6 +428,14 @@ added latency and the deterministic pixel-parity gate remains exact. Use average
 gaps, and RAF-dispatch evidence together so an infrequent expensive path cannot masquerade as a
 four-times throughput improvement.
 
+Run cross-worktree renderer parity with `node scripts/client-render-parity.mjs`. The driver reads
+the canvas in the same browser task as the fixed render because Pixi's default WebGL drawing buffer
+is not preserved. It first warms required visual assets, destroys that warm-up match, restarts the
+snapshot stream from frame zero, and captures only from the rebuilt match. Each revision uses a
+fresh browser process. Content canaries reject visually empty frames and repeated identical frames
+before decoded RGBA hashes can count as evidence; do not replace this sequence with delayed
+`canvas.toDataURL()` or treat all-black equality as parity.
+
 Use `frame.work` average, p95, and max instead of literal local `requestAnimationFrame` FPS for
 branch comparisons. Local RAF FPS is constrained by display refresh rate, browser scheduling,
 visibility, throttling, and frame gaps outside measured JS work; `frame.work` isolates the measured

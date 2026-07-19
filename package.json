@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "pngjs": "^7.0.0",
     "puppeteer-core": "^23",
     "typescript": "^5.8"
   }
