@@ -84,6 +84,21 @@ fn long_polyline_spreads_one_rank_across_full_stroke() {
 }
 
 #[test]
+fn polyline_slots_keep_nearby_units_from_crossing() {
+    let map = flat_map(64);
+    let units = vec![
+        formation_unit(1, &map, (20, 4)),
+        formation_unit(2, &map, (4, 4)),
+    ];
+    let left = map.tile_center(4, 4).0;
+    let right = map.tile_center(20, 4).0;
+    let y = map.tile_center(4, 4).1;
+    let slots = polyline_slots(&units, &[(left, y), (right, y)]);
+    assert_close(slots.iter().find(|(id, _)| *id == 1).unwrap().1.0, right);
+    assert_close(slots.iter().find(|(id, _)| *id == 2).unwrap().1.0, left);
+}
+
+#[test]
 fn short_polyline_adds_parallel_ranks() {
     let map = flat_map(64);
     let units = (0..6)

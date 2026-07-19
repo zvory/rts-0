@@ -28,8 +28,7 @@ export function buildFormationLinePreview(points, entities = []) {
     .sort((a, b) => a.id - b.id);
   if (line.length < 2 || units.length === 0) return { points: line, slots: [] };
 
-  const radii = units.map(unitRadius);
-  const maxRadius = Math.max(...radii, MIN_SLOT_SPACING_PX / 2);
+  const maxRadius = Math.max(...units.map(unitRadius), MIN_SLOT_SPACING_PX / 2);
   const spacing = Math.max(MIN_SLOT_SPACING_PX, maxRadius * 2 + RANK_GAP_PX);
   const metrics = lineMetrics(line);
   const columns = metrics.length >= spacing * (units.length - 1)
@@ -46,15 +45,41 @@ export function buildFormationLinePreview(points, entities = []) {
       const distance = count === 1 ? metrics.length / 2 : metrics.length * column / (count - 1);
       const sample = sampleLine(metrics, distance);
       slots.push({
-        unitId: units[unitIndex].id,
         x: sample.x + sample.nx * rankOffset,
         y: sample.y + sample.ny * rankOffset,
-        radius: radii[unitIndex],
       });
       unitIndex += 1;
     }
   }
-  return { points: line, slots };
+  return { points: line, slots: assignNearestSlots(units, slots) };
+}
+
+// Mirror the server's deterministic greedy assignment so the provisional rings identify the
+// units that will actually occupy them. Terrain and reachability can still adjust final goals.
+function assignNearestSlots(units, slots) {
+  const available = slots.map((_, index) => index);
+  const assigned = [];
+  for (const unit of units) {
+    let nearestAvailable = 0;
+    let nearestDistance = Infinity;
+    for (let index = 0; index < available.length; index += 1) {
+      const slotIndex = available[index];
+      const slot = slots[slotIndex];
+      const distance = distanceSq(unit, slot);
+      if (distance < nearestDistance || (distance === nearestDistance && slotIndex < available[nearestAvailable])) {
+        nearestAvailable = index;
+        nearestDistance = distance;
+      }
+    }
+    const [slotIndex] = available.splice(nearestAvailable, 1);
+    assigned.push({
+      unitId: unit.id,
+      x: slots[slotIndex].x,
+      y: slots[slotIndex].y,
+      radius: unitRadius(unit),
+    });
+  }
+  return assigned;
 }
 
 function normalizeLine(points) {
@@ -102,6 +127,12 @@ function sampleLine(metrics, distance) {
 function unitRadius(entity) {
   const size = Number(STATS[entity?.kind]?.size);
   return Number.isFinite(size) && size > 0 ? size : 10;
+}
+
+function distanceSq(from, to) {
+  const dx = Number(from?.x) - to.x;
+  const dy = Number(from?.y) - to.y;
+  return Number.isFinite(dx) && Number.isFinite(dy) ? dx * dx + dy * dy : Infinity;
 }
 
 function finitePoint(point) {

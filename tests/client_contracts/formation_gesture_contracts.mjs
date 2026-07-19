@@ -3,6 +3,7 @@ import {
   _finishFormationGesture,
   _updateFormationGesture,
 } from "../../client/src/input/formation_gesture.js";
+import { buildFormationLinePreview } from "../../client/src/input/formation_line.js";
 import { drawFormationMovePreview } from "../../client/src/renderer/formation_line_preview.js";
 
 function assert(condition, message) {
@@ -34,6 +35,20 @@ function harness() {
     commandInteraction: { issueCommand: (command) => commands.push(command) },
   };
   return { input, commands, rightClicks, previews };
+}
+
+{
+  const preview = buildFormationLinePreview(
+    [{ x: 100, y: 100 }, { x: 300, y: 100 }],
+    [
+      { id: 1, kind: "rifleman", x: 290, y: 100 },
+      { id: 2, kind: "rifleman", x: 110, y: 100 },
+    ],
+  );
+  assert(preview.slots.find((slot) => slot.unitId === 1)?.x === 300,
+    "preview assigns the rightmost unit to the rightmost slot like the server");
+  assert(preview.slots.find((slot) => slot.unitId === 2)?.x === 100,
+    "preview assigns the leftmost unit to the leftmost slot like the server");
 }
 
 {
