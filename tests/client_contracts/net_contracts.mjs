@@ -452,6 +452,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.visionSelectionAll().t === "setVisionSelection", "replay all-vision builder tag");
   assert(msg.visionSelectionAll().selection.mode === "all", "replay all-vision builder payload");
   assert(
+    msg.visionSelectionOmniscient().selection.mode === "omniscient",
+    "replay omniscient-vision builder payload",
+  );
+  assert(
     msg.visionSelectionPlayer(7).selection.playerId === 7,
     "replay single-player vision builder payload",
   );

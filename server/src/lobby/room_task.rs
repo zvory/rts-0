@@ -348,7 +348,12 @@ impl RoomTask {
         &self,
         connection_id: u32,
     ) -> crate::protocol::VisionSelectionRequest {
-        selection_from_observer_view(&self.observer_view_for(connection_id))
+        let valid_player_ids = match &self.phase {
+            Phase::InGame(game) => game.player_inits().iter().map(|player| player.id).collect(),
+            Phase::ReplayViewer(session) => session.active_player_ids(),
+            Phase::Lobby | Phase::BranchStaging(_) => Vec::new(),
+        };
+        selection_from_observer_view(&self.observer_view_for(connection_id), &valid_player_ids)
     }
 
     fn is_dev_watch(&self) -> bool {

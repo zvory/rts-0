@@ -50,7 +50,7 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     assert!(payload.replay.is_none());
     assert_eq!(
         payload.observer_view,
-        Some(crate::protocol::VisionSelectionRequest::All)
+        Some(crate::protocol::VisionSelectionRequest::Omniscient)
     );
     assert_eq!(payload.players.len(), 2);
     assert_eq!(payload.players[0].team_id, 1);

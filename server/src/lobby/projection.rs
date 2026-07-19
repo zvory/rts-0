@@ -270,18 +270,31 @@ pub(super) fn scope_observer_analysis(
     analysis
 }
 
-pub(super) fn observer_view_from_selection(selection: VisionSelectionRequest) -> ObserverView {
+pub(super) fn observer_view_from_selection(
+    selection: VisionSelectionRequest,
+    valid_player_ids: &[u32],
+) -> ObserverView {
     match selection {
-        VisionSelectionRequest::All => ObserverView::Omniscient,
+        VisionSelectionRequest::All => ObserverView::Players(valid_player_ids.to_vec()),
         VisionSelectionRequest::Player { player_id } => ObserverView::Players(vec![player_id]),
         VisionSelectionRequest::Players { player_ids } => ObserverView::Players(player_ids),
+        VisionSelectionRequest::Omniscient => ObserverView::Omniscient,
     }
 }
 
-pub(super) fn selection_from_observer_view(view: &ObserverView) -> VisionSelectionRequest {
+pub(super) fn selection_from_observer_view(
+    view: &ObserverView,
+    valid_player_ids: &[u32],
+) -> VisionSelectionRequest {
     match view {
-        ObserverView::Omniscient => VisionSelectionRequest::All,
+        ObserverView::Omniscient => VisionSelectionRequest::Omniscient,
         ObserverView::Players(player_ids) if player_ids.is_empty() => VisionSelectionRequest::All,
+        ObserverView::Players(player_ids)
+            if player_ids.len() == valid_player_ids.len()
+                && valid_player_ids.iter().all(|id| player_ids.contains(id)) =>
+        {
+            VisionSelectionRequest::All
+        }
         ObserverView::Players(player_ids) if player_ids.len() == 1 => {
             VisionSelectionRequest::Player {
                 player_id: player_ids[0],
@@ -296,6 +309,31 @@ pub(super) fn selection_from_observer_view(view: &ObserverView) -> VisionSelecti
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn all_selection_maps_to_player_union_and_omniscient_remains_distinct() {
+        let valid_player_ids = [1, 2, 3];
+
+        assert_eq!(
+            observer_view_from_selection(VisionSelectionRequest::All, &valid_player_ids),
+            ObserverView::Players(valid_player_ids.to_vec())
+        );
+        assert_eq!(
+            observer_view_from_selection(VisionSelectionRequest::Omniscient, &valid_player_ids),
+            ObserverView::Omniscient
+        );
+        assert_eq!(
+            selection_from_observer_view(
+                &ObserverView::Players(valid_player_ids.to_vec()),
+                &valid_player_ids,
+            ),
+            VisionSelectionRequest::All
+        );
+        assert_eq!(
+            selection_from_observer_view(&ObserverView::Omniscient, &valid_player_ids),
+            VisionSelectionRequest::Omniscient
+        );
+    }
 
     #[test]
     fn projection_policy_classifies_live_players_spectators_and_branch_aliases() {

@@ -256,6 +256,10 @@ export const msg = Object.freeze({
     t: C.SET_VISION_SELECTION,
     selection: { mode: VISION_SELECTION.PLAYERS, playerIds },
   }),
+  visionSelectionOmniscient: () => ({
+    t: C.SET_VISION_SELECTION,
+    selection: { mode: VISION_SELECTION.OMNISCIENT },
+  }),
   labVisionAll: () => ({ mode: LAB_VISION.ALL }),
   labVisionTeam: (teamId) => ({ mode: LAB_VISION.TEAM, teamId }),
   // Lobby map catalog rows are {name, description, minPlayers, maxPlayers}.
