@@ -227,7 +227,7 @@ fn non_entrenched_idle_rifleman_also_ignores_out_of_range_enemy() {
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("rifleman should spawn");
     let enemy = entities
-        .spawn_unit(2, EntityKind::Rifleman, 260.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
         .expect("enemy should spawn");
 
     run_combat_tick_on_map(
