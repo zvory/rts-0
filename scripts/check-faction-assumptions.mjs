@@ -315,6 +315,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/systems/occupancy_phase_cache.rs",
   "server/crates/sim/src/game/setup.rs",
   "server/crates/sim/src/game/setup/dev_scenarios.rs",
+  // Attack-move reload acquisition deliberately reproduces current Tank behavior; public faction
+  // admission remains routed through the catalog-aware dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/attack_move_reload.rs",
   // Dynamic construction path-block is an intentionally Kriegsia-specific worker/building
   // fixture; public faction admission remains routed through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/dynamic_construction_path_block.rs",
