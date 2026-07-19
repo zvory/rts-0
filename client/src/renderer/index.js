@@ -118,8 +118,19 @@ function applicationOptions(canvasParent) {
 export class Renderer {
   static async create(canvasParent, options = {}) {
     const app = new PIXI.Application();
-    await app.init(applicationOptions(canvasParent));
-    return new Renderer(canvasParent, { ...options, app });
+    try {
+      await app.init(applicationOptions(canvasParent));
+      return new Renderer(canvasParent, { ...options, app });
+    } catch (error) {
+      // init() may have allocated a canvas or renderer before rejecting. Cleanup is
+      // best-effort because partially initialized Pixi applications can also throw here.
+      try {
+        app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
+      } catch {
+        // Preserve the initialization error, which is the actionable failure.
+      }
+      throw error;
+    }
   }
 
   /**

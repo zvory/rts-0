@@ -244,6 +244,21 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 {
   const restorePixi = installFakePixi();
   try {
+    const WorkingApplication = PIXI.Application;
+    let failedApplicationDestroyed = false;
+    PIXI.Application = class extends WorkingApplication {
+      async init() { throw new Error("webgl init failed"); }
+      destroy() { failedApplicationDestroyed = true; }
+    };
+    try {
+      await Renderer.create({ clientWidth: 640, clientHeight: 480 });
+      assert(false, "renderer creation rejects when Pixi initialization fails");
+    } catch (error) {
+      assert(error.message === "webgl init failed", "renderer creation preserves the Pixi initialization error");
+    }
+    assert(failedApplicationDestroyed, "failed Pixi initialization releases partial application resources");
+    PIXI.Application = WorkingApplication;
+
     const parent = {
       clientWidth: 640,
       clientHeight: 480,

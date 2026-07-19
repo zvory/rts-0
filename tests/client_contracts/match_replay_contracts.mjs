@@ -146,6 +146,34 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert([...handlers.values()].every((set) => set.size === 0),
       "Match.create removes temporary startup listeners after initialization");
 
+    let staleRendererDestroyed = false;
+    let staleMatchConstructed = false;
+    class StaleMatchFactoryProbe {
+      constructor() { staleMatchConstructed = true; }
+    }
+    const staleResult = await Match.create.call(
+      StaleMatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        isStartCurrent: () => false,
+        rendererBackendBundle: {
+          async createRenderer() {
+            return { destroy() { staleRendererDestroyed = true; } };
+          },
+        },
+      },
+    );
+    assert(staleResult === null && staleRendererDestroyed && !staleMatchConstructed,
+      "Match.create discards a stale renderer before constructing match modules");
+    assert([...handlers.values()].every((set) => set.size === 0),
+      "Match.create removes temporary startup listeners when a start becomes stale");
+
     let failedRendererDestroyed = false;
     class FailingMatchFactoryProbe {
       constructor() {
@@ -576,6 +604,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     const app = Object.create(App.prototype);
     const starts = [];
     app.matchStartGeneration = 0;
+    app.matchEndedGeneration = 0;
     app.startMatch = (payload, generation) => {
       starts.push({ payload, generation });
       return Promise.resolve();
@@ -588,6 +617,26 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(app.matchStartPromise !== firstPromise,
       "the app observes the newest async match-start promise instead of returning it to Net dispatch");
     await app.matchStartPromise;
+  }
+  {
+    const app = Object.create(App.prototype);
+    app.matchStartGeneration = 4;
+    app.invalidatePendingMatchStart();
+    assert(app.matchStartGeneration === 5,
+      "returning to the lobby invalidates an in-flight asynchronous match start");
+  }
+  {
+    const app = Object.create(App.prototype);
+    app.matchStartGeneration = 3;
+    app.matchEndedGeneration = 3;
+    let stopped = 0;
+    let destroyed = 0;
+    const endedMatch = { stop() { stopped += 1; }, destroy() { destroyed += 1; } };
+    assert(app.completeMatchStart(endedMatch, 3) && app.match === endedMatch && stopped === 1,
+      "a match that ends during renderer startup attaches in a stopped state");
+    const staleMatch = { stop() { stopped += 1; }, destroy() { destroyed += 1; } };
+    assert(!app.completeMatchStart(staleMatch, 2) && destroyed === 1 && app.match === endedMatch,
+      "a stale renderer startup destroys its match without replacing the current match");
   }
   {
     const app = Object.create(App.prototype);

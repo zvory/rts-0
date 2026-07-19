@@ -120,6 +120,11 @@ export class Match {
         visualProfile: () => match?.visualProfile,
         staticMap: () => match?.presentationAssembler?.staticMap,
       });
+      if (options.isStartCurrent?.() === false) {
+        renderer?.destroy?.();
+        renderer = null;
+        return null;
+      }
       match = new this(net, payload, toast, devWatch, audio, statusBadge, diagnostics, {
         ...options,
         rendererBackendBundle: backendBundle,
