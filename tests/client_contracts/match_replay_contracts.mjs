@@ -146,6 +146,37 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert([...handlers.values()].every((set) => set.size === 0),
       "Match.create removes temporary startup listeners after initialization");
 
+    const protectedControlEvents = [];
+    class SlowMatchFactoryProbe {
+      constructor() {
+        this.renderClock = { now: () => 456 };
+        this.onSnapshot = (message) => protectedControlEvents.push([S.SNAPSHOT, message.tick]);
+        this.onCommandReceipt = () => {};
+        this.onRoomTimeState = (message) => protectedControlEvents.push([S.ROOM_TIME_STATE, message.cursor]);
+        this.onLivePauseState = () => {};
+        this.onObserverAnalysis = () => {};
+      }
+    }
+    const slowCreating = Match.create.call(
+      SlowMatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      { rendererBackendBundle: backend },
+    );
+    net.emit(S.ROOM_TIME_STATE, { cursor: 11 });
+    for (let tick = 1; tick <= 80; tick += 1) net.emit(S.SNAPSHOT, { tick });
+    finishRenderer();
+    await slowCreating;
+    assert(protectedControlEvents.some(([type, cursor]) => type === S.ROOM_TIME_STATE && cursor === 11),
+      "snapshot traffic cannot evict one-shot room state during slow renderer startup");
+    assert(protectedControlEvents.at(-1)?.[1] === 80,
+      "startup overflow retains the newest authoritative snapshot");
+
     let staleRendererDestroyed = false;
     let staleMatchConstructed = false;
     class StaleMatchFactoryProbe {

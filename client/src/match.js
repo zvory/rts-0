@@ -99,14 +99,25 @@ export class Match {
       S.OBSERVER_ANALYSIS,
     ].map((type) => {
       const handler = (message) => {
+        let dropped = false;
+        let shouldBuffer = true;
         if (pendingEvents.length >= MAX_PENDING_MATCH_START_EVENTS) {
-          pendingEvents.shift();
-          if (!reportedPendingEventDrop) {
-            diagnostics?.mark?.("match.create.pendingEventsDropped");
-            reportedPendingEventDrop = true;
-          }
+          // Snapshot traffic is the only startup event frequent enough to fill this
+          // buffer. Prefer losing an older snapshot over one-shot control state that
+          // may not be sent again until it changes.
+          const snapshotIndex = pendingEvents.findIndex(([pendingType]) => pendingType === S.SNAPSHOT);
+          if (snapshotIndex >= 0) pendingEvents.splice(snapshotIndex, 1);
+          else if (type === S.SNAPSHOT) {
+            dropped = true;
+            shouldBuffer = false;
+          } else pendingEvents.shift();
+          dropped = true;
         }
-        pendingEvents.push([type, message]);
+        if (shouldBuffer) pendingEvents.push([type, message]);
+        if (dropped && !reportedPendingEventDrop) {
+          diagnostics?.mark?.("match.create.pendingEventsDropped");
+          reportedPendingEventDrop = true;
+        }
       };
       net.on(type, handler);
       return [type, handler];
