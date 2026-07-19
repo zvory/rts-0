@@ -11,6 +11,7 @@ perspective camera before its renderer; ordinary spectators and replays remain o
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
 styles.css        # HUD, lobby, menus, command card
+live_pause.css    # live-match pause overlay and actions
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
