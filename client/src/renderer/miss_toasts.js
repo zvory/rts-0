@@ -24,15 +24,14 @@ export function _drawMissToasts(state) {
 
     let label = this._missToastPool.get(key);
     if (!label) {
-      label = new PIXI.Text(MISS_TOAST_TEXT, {
+      label = new PIXI.Text({ text: MISS_TOAST_TEXT, style: {
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         fontSize: MISS_TOAST_FONT_SIZE,
         fill: 0xfff1a8,
         align: "center",
         fontWeight: "700",
-        stroke: 0x20160c,
-        strokeThickness: MISS_TOAST_STROKE_THICKNESS,
-      });
+        stroke: { color: 0x20160c, width: MISS_TOAST_STROKE_THICKNESS },
+      } });
       label.anchor.set(0, 0.5);
       this._missToastPool.set(key, label);
       this.layers.feedback.addChild(label);

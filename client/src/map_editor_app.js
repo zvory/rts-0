@@ -63,7 +63,7 @@ export class MapEditorApp {
     }
 
     let panel = null;
-    this.viewport = new MapEditorViewport({
+    this.viewport = await MapEditorViewport.create({
       root: dom.viewport,
       session: this.session,
       onStatus: (message, error) => panel?.setStatus(message, error),

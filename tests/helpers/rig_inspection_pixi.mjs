@@ -9,7 +9,7 @@ export function createInspectionPngPixiFactory() {
   return {
     ...createInspectionPixiFactory(),
     createRectangle: (x, y, width, height) => ({ x, y, width, height, w: width, h: height }),
-    createTexture: (baseTexture, rectangle) => ({ baseTexture, frame: rectangle }),
+    createTexture: (source, rectangle) => ({ source, frame: rectangle }),
     createSprite: (texture) => new FakeSprite(texture),
   };
 }
@@ -74,44 +74,53 @@ export class FakeGraphics extends FakeContainer {
     this.clearCount += 1;
     this.commands = [];
     this.lineWidth = 0;
+    return this;
   }
 
-  beginFill(color, alpha = 1) {
+  fill({ color, alpha = 1 } = {}) {
     this.commands.push({ op: "beginFill", color, alpha });
+    return this;
   }
 
-  endFill() {
-    this.commands.push({ op: "endFill" });
-  }
-
-  lineStyle(width = 0, color = 0, alpha = 1) {
+  stroke({ width = 0, color = 0, alpha = 1 } = {}) {
     this.lineWidth = width;
     this.commands.push({ op: "lineStyle", width, color, alpha });
+    return this;
   }
 
   moveTo(x, y) {
     this.commands.push({ op: "moveTo", x, y });
+    return this;
   }
 
   lineTo(x, y) {
     this.commands.push({ op: "lineTo", x, y });
+    return this;
   }
 
-  drawPolygon(points) {
+  poly(points) {
     this.commands.push({ op: "drawPolygon", points });
+    return this;
   }
 
-  drawCircle(x, y, radius) {
+  circle(x, y, radius) {
     this.commands.push({ op: "drawCircle", x, y, radius });
+    return this;
   }
 
-  drawEllipse(x, y, rx, ry) {
+  ellipse(x, y, rx, ry) {
     this.commands.push({ op: "drawEllipse", x, y, rx, ry });
+    return this;
   }
 
-  drawRect(x, y, width, height) {
+  rect(x, y, width, height) {
     this.commands.push({ op: "drawRect", x, y, width, height });
+    return this;
   }
+
+  bezierCurveTo(...values) { this.commands.push({ op: "bezierCurveTo", values }); return this; }
+  quadraticCurveTo(...values) { this.commands.push({ op: "quadraticCurveTo", values }); return this; }
+  closePath() { this.commands.push({ op: "closePath" }); return this; }
 }
 
 function makePointSetter(target, xKey, yKey) {

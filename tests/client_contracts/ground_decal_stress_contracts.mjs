@@ -81,7 +81,7 @@ class RecordingCanvasContext {
   };
 
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     muteRenderOverlays(renderer);
     const map = {
       width: CURRENT_MAP_TILES,

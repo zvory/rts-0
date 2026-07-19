@@ -144,7 +144,7 @@ function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
   return {
     createContainer: () => new pixi.Container(),
     createRectangle: (x, y, width, height) => new pixi.Rectangle(x, y, width, height),
-    createTexture: (baseTexture, rectangle) => new pixi.Texture(baseTexture, rectangle),
+    createTexture: (source, rectangle) => new pixi.Texture({ source, frame: rectangle }),
     createSprite: (spriteTexture) => new pixi.Sprite(spriteTexture),
   };
 }
@@ -163,7 +163,7 @@ class FrameStripUnitInstance {
     const frameWidth = Math.max(1, finite(strip.frameWidth, 1));
     const frameHeight = Math.max(1, finite(strip.frameHeight, 1));
     const frameCount = Math.max(1, Math.trunc(finite(strip.frameCount, 1)));
-    const baseTexture = texture.baseTexture ?? texture;
+    const baseTexture = texture.source;
     for (let i = 0; i < frameCount; i += 1) {
       const rectangle = pixiFactory.createRectangle(i * frameWidth, 0, frameWidth, frameHeight);
       this.frameTextures.push(pixiFactory.createTexture(baseTexture, rectangle));
@@ -208,7 +208,7 @@ class FrameStripUnitInstance {
     if (this._destroyed) return;
     this._destroyed = true;
     this.container.parent?.removeChild?.(this.container);
-    this.sprite?.destroy?.({ texture: false, baseTexture: false });
+    this.sprite?.destroy?.({ texture: false, textureSource: false });
     for (const texture of this.frameTextures) texture?.destroy?.(false);
     this.frameTextures = [];
     this.container.destroy?.({ children: true });

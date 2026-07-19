@@ -176,6 +176,9 @@ export class App {
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
     this.match = null;
+    this.matchStartGeneration = 0;
+    this.matchEndedGeneration = 0;
+    this.matchStartPromise = Promise.resolve();
     this.labCatalog = null;
     this.labClient = null;
     this.labPanel = null;
@@ -609,6 +612,20 @@ export class App {
    * @param {object} payload §2.3 start payload
    */
   onStart(payload) {
+    const generation = ++this.matchStartGeneration;
+    const startPromise = this.startMatch(payload, generation);
+    this.matchStartPromise = startPromise;
+    void startPromise.catch((error) => {
+      if (generation !== this.matchStartGeneration) return;
+      this.destroyLabShell();
+      this.matchLaunchFailed = true;
+      diagnostics.mark("app.onStart.failed", { message: error?.message || String(error) });
+      console.error("[rts-app] match start failed", error);
+      this.showToast("The match renderer could not start.");
+    });
+  }
+
+  async startMatch(payload, generation) {
     diagnostics.mark("app.onStart.begin", {
       map: payload?.map ? `${payload.map.width}x${payload.map.height}` : undefined,
       terrain: payload?.map?.terrain?.length,
@@ -678,7 +695,7 @@ export class App {
     } else {
       this.labControlPolicy = createDefaultControlPolicy();
     }
-    this.match = new MatchClass(
+    const nextMatch = await MatchClass.create(
       this.net,
       payload,
       (msg) => this.showToast(msg),
@@ -714,9 +731,12 @@ export class App {
           replay: startsReplay,
           lab: !!labMetadata,
         }),
+        isStartCurrent: () => generation === this.matchStartGeneration,
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );
+    if (!nextMatch) return;
+    if (!this.completeMatchStart(nextMatch, generation)) return;
     if (this.stressTestRunner) {
       void this.stressTestRunner.run({ match: this.match, net: this.net });
     }
@@ -736,6 +756,16 @@ export class App {
       });
     }
     diagnostics.mark("app.onStart.end");
+  }
+
+  completeMatchStart(nextMatch, generation) {
+    if (generation !== this.matchStartGeneration) {
+      nextMatch.destroy();
+      return false;
+    }
+    this.match = nextMatch;
+    if (this.matchEndedGeneration === generation) nextMatch.stop();
+    return true;
   }
 
   async openCurrentLabMapInEditor() {
@@ -802,6 +832,7 @@ export class App {
    * @param {{winnerId: number|null, winnerTeamId?: number|null, you: "won"|"lost"|"draw"}} m
    */
   onGameOver(m) {
+    this.matchEndedGeneration = this.matchStartGeneration;
     const verdict = m && m.you ? m.you : "draw";
     const text =
       verdict === "won" ? "Victory" : verdict === "lost" ? "Defeat" : "Draw";
@@ -818,6 +849,10 @@ export class App {
     dom.gameOver.hidden = false;
     // Freeze the loop but keep the final frame visible behind the overlay.
     if (this.match) this.match.stop();
+  }
+
+  invalidatePendingMatchStart() {
+    this.matchStartGeneration += 1;
   }
 
   onObservationReady(m) {
@@ -920,6 +955,9 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
+    // Renderer creation is asynchronous. Make any in-flight start stale before changing
+    // screens so it can only destroy its completed Match, never attach it to the lobby.
+    this.invalidatePendingMatchStart();
     if (this.replayLaunch || this.labLaunch || this.matchLaunch || this.snapshotStreamLaunch) {
       if (this.match) {
         this.match.destroy();

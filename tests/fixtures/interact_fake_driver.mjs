@@ -115,6 +115,7 @@ export async function openInteractDriver(options) {
         snapshotTick: tick, room: options.mode === "game" ? "interact-game-fixture" : "interact-lab-fixture",
         phase: options.mode === "game" ? gamePhase : undefined,
         role: options.spectate ? "spectator" : "player",
+        autoSpectatorEnabled: options.autoSpectator === true,
         roomTime: options.spectate ? { currentTick: tick, speed: 1, paused: false } : null,
         selection: selection.slice(),
       };

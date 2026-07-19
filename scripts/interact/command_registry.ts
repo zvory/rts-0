@@ -177,12 +177,12 @@ const COMMAND_RECORDS = Object.freeze({
     lane: "cancellation", recordable: false,
     bounds: ["an active fixed or time-lapse capture is required"], example: { sessionId: "<session-id>" },
   }),
-  "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
+  "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],autoSpectator?:boolean,renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
-    variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats"],
+    variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats", "autoSpectator=true enables Follow active fights before the first match frame"],
     defaults: ["workspaceRoot=current worktree", "map=Chokes", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab, game, and dev-scenario", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
-    example: { spectate: ["ai_2_1", "ai_turtle"], viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
+    bounds: ["one session across Lab, game, and dev-scenario", "autoSpectator=true requires spectate", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    example: { spectate: ["ai_2_1", "ai_turtle"], autoSpectator: true, viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
     lane: "observation",

@@ -1,3 +1,4 @@
+import { gfxCircle, gfxStroke } from "./native_graphics.js";
 import { ABILITIES } from "../config.js";
 import { ABILITY, KIND } from "../protocol.js";
 import { finiteNumber } from "./shared.js";
@@ -34,8 +35,8 @@ export function _drawBreakthroughAuras(view, entities = []) {
 }
 
 export function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
-  g.lineStyle(2.5, 0xf2d16b, alpha);
-  g.drawCircle(x, y, radiusPx);
+  gfxStroke(g, 2.5, 0xf2d16b, alpha);
+  gfxCircle(g, x, y, radiusPx);
 }
 
 function auraExpiresIn(entity) {

@@ -512,7 +512,7 @@ export function collectMatchFrameContext(match) {
   const projection = camera.projectionSnapshot?.() || null;
   const cameraSnapshot = projection?.camera || camera.snapshot?.() || null;
   const renderer = match?.renderer?.app?.renderer || {};
-  const canvas = match?.renderer?.app?.view || {};
+  const canvas = match?.renderer?.app?.canvas || {};
   const prediction = match?.prediction?.debugSummary?.() || {};
   const mode = match?.devWatch?.kind === "scenario"
     ? "dev-scenario"
