@@ -156,7 +156,9 @@ PresentationFrameV1 = {
 
 Presented entity records include backend-neutral `visualBounds` (`class`, `widthPx`, `depthPx`,
 `heightPx`) derived from the mirrored entity stats. Placement feedback includes a detached
-tile-footprint descriptor. These are presentation hints only: `SelectionSceneV1` remains the sole
+tile-footprint descriptor. Freehand formation feedback crosses `tacticalFeedback` as one detached
+`formationMovePreview` record containing the sampled world-space `points` and provisional unit
+`slots`; every backend renders both the stroke and admitted slots. These are presentation hints only: `SelectionSceneV1` remains the sole
 entity/ground interaction authority.
 
 The backend owns any mutable staging buffers. Frame objects, arrays, and ordinary records are

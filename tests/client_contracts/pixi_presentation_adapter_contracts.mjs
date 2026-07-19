@@ -69,6 +69,10 @@ const frameInputs = {
     feedbackOwnerIds: [1],
     showUnitRangesEnabled: true,
     commandFeedback: [{ kind: "move", x: 30, y: 30 }],
+    formationMovePreview: {
+      points: [{ x: 8, y: 10 }, { x: 40, y: 42 }],
+      slots: [{ unitId: 7, x: 30, y: 32, radius: 14 }],
+    },
   },
   groundDecals: [{ id: 71, kind: "tank", decalClass: "scorch", x: 20, y: 24 }],
   screenOverlay: { marquee: { x: 4, y: 5, w: 10, h: 12 } },
@@ -131,6 +135,11 @@ assert(engine.renders[0].state.weaponRecoil(7) === 0.25, "allowlisted recoil is 
 assert(engine.renders[0].state.weaponRecoilKind(7) === "rifleman_rifle", "weapon-specific recoil art receives the sampled weapon kind");
 assert(engine.renders[0].fog.isVisible(0, 0) && !engine.renders[0].fog.isVisible(1, 0), "Pixi fog facade reads backend-owned grid copies");
 assert(engine.marquees[0].w === 10 && engine.marquees[0].h === 12, "screen marquee is drawn from the assembled screenOverlay layer");
+assert(
+  engine.renders[0].options.feedbackView.formationMovePreview?.points.length === 2
+    && engine.renders[0].options.feedbackView.formationMovePreview?.slots.length === 1,
+  "Pixi receives formation stroke and destination slots from the immutable presentation frame",
+);
 
 const nextFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 516, sourceTick: 10, groundDecals: [] });
 engine.failNext = true;

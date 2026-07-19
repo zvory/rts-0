@@ -33,6 +33,7 @@ const FEEDBACK_ARRAY_TYPES = Object.freeze({
 
 const FEEDBACK_SINGLETON_TYPES = Object.freeze({
   placement: "placement",
+  formationMovePreview: "formationMovePreview",
   labToolPreview: "labToolPreview",
   attackTargetPreview: "attackTargetPreview",
   supportWeaponSetupPreview: "antiTankGunSetupPreview",
