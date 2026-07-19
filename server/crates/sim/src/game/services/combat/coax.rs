@@ -241,7 +241,7 @@ fn tank_coax_target_candidates(
                 facing_rad: snapshot.weapon_facing,
                 half_arc_rad: TANK_COAX_HALF_ARC_RAD,
                 range_px: effective_weapon_range_px,
-                direct_fire_legality: DirectFireLegality::intended_target(),
+                direct_fire_legality: DirectFireLegality::IntendedTarget,
             },
         ) {
             continue;

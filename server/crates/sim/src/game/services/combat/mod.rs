@@ -356,7 +356,7 @@ pub(in crate::game) fn combat_system(
                 owner,
                 (px, py),
                 tid,
-                DirectFireLegality::intended_target(),
+                DirectFireLegality::IntendedTarget,
             )
         } else {
             direct_fire_target_legal(
@@ -371,7 +371,7 @@ pub(in crate::game) fn combat_system(
                 owner,
                 (px, py),
                 tid,
-                DirectFireLegality::auto_acquire(),
+                DirectFireLegality::AutoAcquire,
             )
         };
         let mut fired = false;

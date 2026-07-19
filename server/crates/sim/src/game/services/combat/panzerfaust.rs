@@ -320,7 +320,7 @@ fn panzerfaust_target_fireable(
         owner,
         (attacker.pos_x, attacker.pos_y),
         target_id,
-        DirectFireLegality::intended_target(),
+        DirectFireLegality::IntendedTarget,
     )
 }
 
