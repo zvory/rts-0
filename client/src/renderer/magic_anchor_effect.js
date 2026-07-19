@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxCircle, gfxFillStrokePath, gfxStrokeLine, gfxFill, gfxStroke } from "./native_graphics.js";
 import { hash2 } from "./shared.js";
 
 export const MAGIC_ANCHOR_COLOR = 0xc7d07a;
@@ -6,23 +7,27 @@ const PARTICLE_SPOKES = 18;
 
 export function drawMagicAnchor(g, object, radius) {
   const coreRadius = Math.max(8, Math.min(18, radius * 0.16));
-  g.lineStyle(1.8, MAGIC_ANCHOR_COLOR, 0.6);
-  g.beginFill(MAGIC_ANCHOR_COLOR, 0.055);
-  g.drawCircle(object.x, object.y, radius);
-  g.endFill();
-  g.lineStyle(1.2, MAGIC_ANCHOR_COLOR, 0.28);
-  g.drawCircle(object.x, object.y, radius * 0.66);
+  gfxStroke(g, 1.8, MAGIC_ANCHOR_COLOR, 0.6);
+  gfxFill(g, MAGIC_ANCHOR_COLOR, 0.055);
+  gfxCircle(g, object.x, object.y, radius);
+  gfxNoFill(g);
+  gfxStroke(g, 1.2, MAGIC_ANCHOR_COLOR, 0.28);
+  gfxCircle(g, object.x, object.y, radius * 0.66);
   drawMagicAnchorParticles(g, object, radius, coreRadius);
-  g.lineStyle(2.2, MAGIC_ANCHOR_COLOR, 0.88);
-  g.beginFill(MAGIC_ANCHOR_COLOR, 0.18);
-  g.moveTo(object.x, object.y - coreRadius);
-  g.lineTo(object.x + coreRadius * 0.8, object.y);
-  g.lineTo(object.x, object.y + coreRadius);
-  g.lineTo(object.x - coreRadius * 0.8, object.y);
-  g.lineTo(object.x, object.y - coreRadius);
-  g.endFill();
-  g.lineStyle(1.3, 0x11110f, 0.42);
-  g.drawCircle(object.x, object.y, coreRadius * 0.48);
+  gfxStroke(g, 2.2, MAGIC_ANCHOR_COLOR, 0.88);
+  gfxFill(g, MAGIC_ANCHOR_COLOR, 0.18);
+  gfxFillStrokePath(g, [
+    [object.x, object.y - coreRadius],
+    [object.x + coreRadius * 0.8, object.y],
+    [object.x, object.y + coreRadius],
+    [object.x - coreRadius * 0.8, object.y],
+  ], {
+    fill: { color: MAGIC_ANCHOR_COLOR, alpha: 0.18 },
+    stroke: { width: 2.2, color: MAGIC_ANCHOR_COLOR, alpha: 0.88 },
+  });
+  gfxNoFill(g);
+  gfxStroke(g, 1.3, 0x11110f, 0.42);
+  gfxCircle(g, object.x, object.y, coreRadius * 0.48);
 }
 
 function drawMagicAnchorParticles(g, object, radius, coreRadius) {
@@ -42,13 +47,21 @@ function drawMagicAnchorParticles(g, object, radius, coreRadius) {
       const py = object.y + Math.sin(angle) * distance + Math.sin(angle + Math.PI / 2) * tangent;
       const size = 1.2 + density * 3.2;
       const alpha = 0.16 + density * 0.42;
-      g.beginFill(PARTICLE_COLOR, alpha);
-      g.drawCircle(px, py, size);
-      g.endFill();
+      gfxFill(g, PARTICLE_COLOR, alpha);
+      gfxCircle(g, px, py, size);
+      gfxNoFill(g);
       if (density > 0.52) {
-        g.lineStyle(1.1 + density * 1.2, PARTICLE_COLOR, alpha * 0.55);
-        g.moveTo(px + Math.cos(angle) * size * 2.8, py + Math.sin(angle) * size * 2.8);
-        g.lineTo(px - Math.cos(angle) * size * 2.0, py - Math.sin(angle) * size * 2.0);
+        gfxStroke(g, 1.1 + density * 1.2, PARTICLE_COLOR, alpha * 0.55);
+        gfxStrokeLine(
+          g,
+          px + Math.cos(angle) * size * 2.8,
+          py + Math.sin(angle) * size * 2.8,
+          px - Math.cos(angle) * size * 2.0,
+          py - Math.sin(angle) * size * 2.0,
+          1.1 + density * 1.2,
+          PARTICLE_COLOR,
+          alpha * 0.55,
+        );
       }
     }
   }

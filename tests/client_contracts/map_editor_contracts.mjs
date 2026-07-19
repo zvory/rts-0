@@ -91,7 +91,7 @@ import {
       frame: 73,
       unsubscribe() {},
       renderer: {
-        app: { view: { removeEventListener() {} } },
+        app: { canvas: { removeEventListener() {} } },
         destroyed: 0,
         destroy() { this.destroyed += 1; },
       },
@@ -269,16 +269,31 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   try {
     const overlay = {
       calls: [],
-      lineStyle(...args) { this.calls.push(["lineStyle", ...args]); return this; },
-      drawCircle(...args) { this.calls.push(["drawCircle", ...args]); return this; },
-      beginFill(...args) { this.calls.push(["beginFill", ...args]); return this; },
-      endFill(...args) { this.calls.push(["endFill", ...args]); return this; },
+      stroke(style) { this.calls.push(["stroke", style]); return this; },
+      circle(...args) { this.calls.push(["drawCircle", ...args]); return this; },
+      fill(style) { this.calls.push(["fill", style]); return this; },
     };
     const feedback = new PIXI.Container();
     const siteViewport = { overlay, labels: [], renderer: { layers: { feedback } } };
     MapEditorViewport.prototype.drawSite.call(siteViewport, { x: 10, y: 12 }, 0xf4c542, 7, "B1", true);
     assert(overlay.calls.some((call) => call[0] === "drawCircle" && call[3] === 13),
       "the selected base gets a larger map highlight ring");
+
+    const gridOverlay = new PIXI.Graphics();
+    MapEditorViewport.prototype.drawOverlay.call({
+      session: {
+        draft: { terrain: Array(16) },
+        mapOverlay: () => ({ starts: [], bases: [] }),
+      },
+      symmetry: MAP_EDITOR_SYMMETRY.NONE,
+      overlay: gridOverlay,
+      labels: [],
+      drawSite() {},
+      drawPaintPreview() {},
+    });
+    assert(gridOverlay.calls.some((call) => call[0] === "lineTo") &&
+      gridOverlay.calls.some((call) => call[0] === "lineStyle"),
+    "Map Editor grid lines execute native v8 strokes instead of leaving an unpainted path");
   } finally {
     restorePixi();
   }

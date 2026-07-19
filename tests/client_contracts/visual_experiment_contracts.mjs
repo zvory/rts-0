@@ -360,7 +360,7 @@ const NOOP_RENDERER_OVERLAYS = [
 {
   const restorePixi = installFakePixi();
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
@@ -426,7 +426,7 @@ const NOOP_RENDERER_OVERLAYS = [
 {
   const restorePixi = installFakePixi();
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
@@ -605,7 +605,7 @@ const NOOP_RENDERER_OVERLAYS = [
   const consoleErrors = [];
   console.error = (...args) => consoleErrors.push(args);
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
@@ -705,7 +705,7 @@ const NOOP_RENDERER_OVERLAYS = [
 {
   const restorePixi = installFakePixi();
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
@@ -765,7 +765,7 @@ const NOOP_RENDERER_OVERLAYS = [
   const priorConsoleError = console.error;
   console.error = () => {};
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
@@ -830,7 +830,7 @@ const NOOP_RENDERER_OVERLAYS = [
 {
   const restorePixi = installFakePixi();
   try {
-    const renderer = new Renderer(fakeParent());
+    const renderer = await Renderer.create(fakeParent());
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;

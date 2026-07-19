@@ -82,6 +82,33 @@ One canonical flame graph from the same audit measured 10.6 ms average frame wor
 unit phase, and 1.3 ms in presentation-frame assembly. Nested and self CPU percentages overlap; do
 not add them together as independent savings.
 
+The first 2026-07-19 Pixi v8.19.0 cutover mechanically preserved v7 immediate-mode drawing and
+introduced a repeatable regression on this same workload. Two v7 baseline runs measured 9.2-9.6 ms
+average and 12 ms p95 frame work. Four unoptimized v8 runs measured 10.4-11.2 ms average and 16 ms
+p95. The cause was not extra scene work: per-primitive `fill`/`stroke` calls and per-frame HP-bar
+`Graphics` clears dirtied v8 contexts and repeatedly rebuilt retained render instructions.
+
+The corrected local port uses explicit native v8 paths for every continuous line, subpath, filled
+outline, and joined polyline. A four-cell control on current main separated migration correctness
+from general retained-geometry work. Three alternating runs per cell measured:
+
+- stock v7 (`6cfb35a4`): 9.20 ms average, 12 ms p95;
+- v7 plus equivalent retained HP/coalesced fog (`3be60d92`): 8.43 ms average, 12 ms p95;
+- correctness-only v8 (`7928ac70`): 10.43 ms average, 16 ms p95; and
+- v8 plus the same general optimizations (`a6f7df7c`): 9.23 ms average, 12 ms p95.
+
+Therefore the native correctness-only migration cost remained 13.4% average with a 33% p95
+increase. The final optimized comparison remained 9.5% slower than equivalently optimized v7,
+although p95 returned to 12 ms. Do not use the 9.23-versus-9.20 unoptimized comparison as evidence
+of parity. The general optimization pairs matched exactly across the same 16 deterministic decoded
+RGBA ticks; v7 versus v8 changed 11.83% of pixels on average from engine rasterization and was
+manually reviewed on nonblank battle frames.
+
+Render groups were measured rather than assumed: a world group measured 9.8 ms average, an HP-only
+group 10.2 ms, and grouping the volatile layers 10.5 ms with a 26.7 ms maximum. All were rejected.
+Shared `GraphicsContext` resources remain a separate follow-up experiment; retain one only if
+complete frame work improves without changing frame state, timing, or reviewed pixels.
+
 ## Experiment ledger
 
 ### Retained HP/status geometry: rejected and reverted

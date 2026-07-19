@@ -1,20 +1,23 @@
 class FakeGraphics {
   constructor() {
     this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+    this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
   }
-  clear() {}
-  lineStyle() {}
-  beginFill() {}
+  clear() { return this; }
+  stroke() { return this; }
+  fill() { return this; }
+  cut() { this.calls?.push?.(["cut"]); return this; }
   beginHole() {}
   endHole() {}
   endFill() {}
-  drawPolygon() {}
-  drawCircle() {}
-  drawEllipse() {}
-  drawRect() {}
-  drawRoundedRect() {}
-  moveTo() {}
-  lineTo() {}
+  poly() { return this; }
+  circle() { return this; }
+  ellipse() { return this; }
+  rect() { return this; }
+  roundRect() { return this; }
+  moveTo() { return this; }
+  lineTo() { return this; }
+  closePath() { return this; }
   arc() {}
 }
 
@@ -23,17 +26,25 @@ export class RecordingGraphics extends FakeGraphics {
     super();
     this.calls = [];
   }
-  lineStyle(width, color, alpha) {
-    this.calls.push(["lineStyle", width, color, alpha]);
+  stroke(style) {
+    this.calls.push(["lineStyle", style?.width, style?.color, style?.alpha]);
+    return this;
   }
   moveTo(x, y) {
     this.calls.push(["moveTo", x, y]);
+    return this;
   }
   lineTo(x, y) {
     this.calls.push(["lineTo", x, y]);
+    return this;
   }
-  beginFill(color, alpha) {
-    this.calls.push(["beginFill", color, alpha]);
+  closePath() {
+    this.calls.push(["closePath"]);
+    return this;
+  }
+  fill(style) {
+    this.calls.push(["beginFill", style?.color, style?.alpha]);
+    return this;
   }
   beginHole() {
     this.calls.push(["beginHole"]);
@@ -43,24 +54,30 @@ export class RecordingGraphics extends FakeGraphics {
   }
   clear() {
     this.calls.push(["clear"]);
+    return this;
   }
-  drawCircle(x, y, radius) {
+  circle(x, y, radius) {
     this.calls.push(["drawCircle", x, y, radius]);
+    return this;
   }
-  drawEllipse(x, y, rx, ry) {
+  ellipse(x, y, rx, ry) {
     this.calls.push(["drawEllipse", x, y, rx, ry]);
+    return this;
   }
   arc(x, y, radius, start, end, anticlockwise) {
     this.calls.push(["arc", x, y, radius, start, end, anticlockwise]);
   }
-  drawRect(x, y, width, height) {
+  rect(x, y, width, height) {
     this.calls.push(["drawRect", x, y, width, height]);
+    return this;
   }
-  drawPolygon(points) {
+  poly(points) {
     this.calls.push(["drawPolygon", points]);
+    return this;
   }
-  drawRoundedRect(x, y, width, height, radius) {
+  roundRect(x, y, width, height, radius) {
     this.calls.push(["drawRoundedRect", x, y, width, height, radius]);
+    return this;
   }
 }
 
@@ -75,10 +92,12 @@ export function installFakePixi() {
       this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
       this.visible = true;
     }
-    addChild(child) {
-      this.children.push(child);
-      child.parent = this;
-      return child;
+    addChild(...children) {
+      for (const child of children) {
+        this.children.push(child);
+        child.parent = this;
+      }
+      return children[0];
     }
     removeChild(child) {
       this.children = this.children.filter((item) => item !== child);
@@ -105,9 +124,9 @@ export function installFakePixi() {
   }
 
   class FakeText {
-    constructor(text = "", style = {}) {
-      this.text = text;
-      this.style = style;
+    constructor(options = {}) {
+      this.text = options.text || "";
+      this.style = options.style || {};
       this.visible = true;
       this.alpha = 1;
       this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
@@ -137,7 +156,7 @@ export function installFakePixi() {
         },
       };
       this.stage = new FakeContainer();
-      this.view = { style: {}, parentNode: null };
+      this.canvas = { style: {}, parentNode: null };
       this.renderer = {
         roundPixels: false,
         resize: (w, h) => {
@@ -145,6 +164,9 @@ export function installFakePixi() {
           this.height = h;
         },
       };
+    }
+    async init(options = {}) {
+      this.options = options;
     }
     render() {
       this.renderCalls += 1;
@@ -160,12 +182,12 @@ export function installFakePixi() {
       this.options = options;
       this.updateCount = 0;
       this.destroyed = false;
-      this.baseTexture = {
+      this.source = {
         update: () => {
           this.updateCount += 1;
         },
         destroy: () => {
-          this.baseTextureDestroyed = true;
+          this.textureSourceDestroyed = true;
         },
       };
     }
@@ -222,7 +244,7 @@ export function installFakePixi() {
     Rectangle: FakeRectangle,
     Sprite: FakeSprite,
     SCALE_MODES: { NEAREST: "nearest" },
-    settings: {},
+    TextureStyle: { defaultOptions: {} },
   };
 
   return () => {

@@ -1,6 +1,3 @@
-// tests/client_contracts/renderer_contracts.mjs
-// Domain contract assertions imported by ../client_contracts.mjs.
-
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
@@ -25,9 +22,7 @@ import {
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
-
 import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
-
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");
   const bareRoad = terrainColor(TERRAIN.ROAD_BARE, 2, 3);
@@ -53,7 +48,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(!isImpassableTerrain(code), `${orientation} road renders as passable terrain`);
     assert(roadMarkingOrientation(code) === orientation, `${orientation} road keeps its yellow-line direction`);
   }
-
   const roadMap = {
     width: 3,
     height: 3,
@@ -76,7 +70,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     "non-road terrain never receives a road shoulder",
   );
 }
-
 {
   const priorDocument = globalThis.document;
   const priorImage = globalThis.Image;
@@ -244,6 +237,21 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 {
   const restorePixi = installFakePixi();
   try {
+    const WorkingApplication = PIXI.Application;
+    let failedApplicationDestroyed = false;
+    PIXI.Application = class extends WorkingApplication {
+      async init() { throw new Error("webgl init failed"); }
+      destroy() { failedApplicationDestroyed = true; }
+    };
+    try {
+      await Renderer.create({ clientWidth: 640, clientHeight: 480 });
+      assert(false, "renderer creation rejects when Pixi initialization fails");
+    } catch (error) {
+      assert(error.message === "webgl init failed", "renderer creation preserves the Pixi initialization error");
+    }
+    assert(failedApplicationDestroyed, "failed Pixi initialization releases partial application resources");
+    PIXI.Application = WorkingApplication;
+
     const parent = {
       clientWidth: 640,
       clientHeight: 480,
@@ -254,7 +262,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     assert(renderer.app.options.autoStart === false, "Pixi application construction disables the automatic ticker");
     assert(renderer.app.ticker.started === false && renderer.app.ticker.startCalls === 0, "Pixi ticker never starts during construction");
     renderer.present();
@@ -298,7 +306,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       appendChild(view) { view.parentNode = this; },
       removeChild(view) { view.parentNode = null; },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const inactivePumpJack = {
       id: 503,
@@ -368,7 +376,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     const profiler = new FrameProfiler();
     renderer._drawUnit = () => {
       throw new Error("broken worker art");
@@ -504,7 +512,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
     let decalLayerResets = 0;
     let trenchLayerResets = 0;
@@ -690,7 +698,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
     assert(renderer.layers.decals.children.length === 1, "renderer creates exactly one permanent decal sprite");
     assert(renderer._groundDecals.downsample === GROUND_DECAL_TEXTURE_WORLD_SCALE, "decal texture uses the configured downsample");
@@ -747,7 +755,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const scaffold = {
       id: 503,
@@ -786,19 +794,33 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     renderer._drawSelectionAndHp(completed, new Set(), { playerId: 1 });
     renderer._drawSelectionAndHp(entrenched, new Set(), { playerId: 1 });
 
-    const scaffoldHpRects = renderer._pools.hpBars.get(scaffold.id)?.calls.filter((call) => call[0] === "drawRect") || [];
-    const scaffoldBarW = scaffoldHpRects[0]?.[3] - 2;
+    const scaffoldHp = renderer._pools.hpBars.get(scaffold.id);
+    const scaffoldBackRects = scaffoldHp?.rtsBackground?.calls.filter((call) => call[0] === "drawRect") || [];
+    const scaffoldFillRects = scaffoldHp?.rtsFill?.calls.filter((call) => call[0] === "drawRect") || [];
     assert(
       renderer._pools.selectionRings.has(scaffold.id),
       "selected under-construction building still draws a selection ring",
     );
     assert(
-      scaffoldHpRects.length === 2,
-      "under-construction building draws construction status on the HP bar layer",
+      scaffoldBackRects.length === 1 && scaffoldFillRects.length === 1,
+      "under-construction building keeps immutable background and fill geometry on the HP bar layer",
     );
     assert(
-      Math.abs(scaffoldHpRects[1][3] - scaffoldBarW * (scaffold.hp / scaffold.maxHp)) < 0.001,
-      "under-construction HP-layer status bar reflects remaining HP instead of build progress",
+      Math.abs(scaffoldHp.rtsFill.scaleX - (scaffold.hp / scaffold.maxHp)) < 0.001,
+      "under-construction HP-layer status scales the stable fill to remaining HP instead of build progress",
+    );
+    const backgroundCallCount = scaffoldHp.rtsBackground.calls.length;
+    const fillCallCount = scaffoldHp.rtsFill.calls.length;
+    scaffold.hp = 20;
+    renderer._drawSelectionAndHp(scaffold, new Set([scaffold.id]), { playerId: 1 });
+    assert(
+      scaffoldHp.rtsBackground.calls.length === backgroundCallCount
+        && scaffoldHp.rtsFill.calls.length === fillCallCount,
+      "HP changes reuse immutable bar geometry without clearing or rebuilding either Graphics context",
+    );
+    assert(
+      Math.abs(scaffoldHp.rtsFill.scaleX - 0.2) < 0.001,
+      "HP changes update the retained fill transform",
     );
     assert(
       renderer._pools.hpBars.has(completed.id),
@@ -826,7 +848,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const stripTexture = PIXI.Texture.from("scout-plane-strip-test-texture");
     renderer._liveFrameStripTextures.set(KIND.SCOUT_PLANE, stripTexture);
@@ -888,7 +910,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
       id: 506,
@@ -1037,7 +1059,7 @@ function polygonAxisValues(points, offset) {
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
       id: 501,
@@ -1059,7 +1081,9 @@ function polygonAxisValues(points, offset) {
     renderer._drawSelectionAndHp(entity, new Set(), { playerId: 99 });
 
     const rig = renderer._liveRigPools.buildingRigs.get(entity.id)?.container;
-    const hpRects = renderer._pools.hpBars.get(entity.id)?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpBar = renderer._pools.hpBars.get(entity.id);
+    const hpBackRects = hpBar?.rtsBackground?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpFillRects = hpBar?.rtsFill?.calls.filter((call) => call[0] === "drawRect") || [];
     const buildingsIndex = renderer.world.children.indexOf(renderer.layers.buildings);
     const hpIndex = renderer.world.children.indexOf(renderer.layers.hpBars);
     assert(rig && renderer.layers.buildings.children.includes(rig), "SVG building rig renders on the buildings layer");
@@ -1067,7 +1091,7 @@ function polygonAxisValues(points, offset) {
       !renderer._pools.buildingOverlays.has(entity.id),
       "under-construction building does not draw a separate building overlay progress bar",
     );
-    assert(hpRects.length === 2, "under-construction building draws construction status on the HP bar layer");
+    assert(hpBackRects.length === 1 && hpFillRects.length === 1, "under-construction building keeps stable construction status geometry on the HP bar layer");
     assert(hpIndex > buildingsIndex, "HP-layer construction status renders above SVG building bodies");
   } finally {
     restorePixi();
@@ -1087,7 +1111,7 @@ function polygonAxisValues(points, offset) {
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
       id: 502,
@@ -1108,16 +1132,17 @@ function polygonAxisValues(points, offset) {
     });
     renderer._drawSelectionAndHp(entity, new Set(), { playerId: 99 });
 
-    const hpRects = renderer._pools.hpBars.get(entity.id)?.calls.filter((call) => call[0] === "drawRect") || [];
-    const hpBarW = hpRects[0]?.[3] - 2;
+    const hpBar = renderer._pools.hpBars.get(entity.id);
+    const hpBackRects = hpBar?.rtsBackground?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpFillRects = hpBar?.rtsFill?.calls.filter((call) => call[0] === "drawRect") || [];
     assert(
       !renderer._pools.buildingOverlays.has(entity.id),
       "deconstructing Tank Trap does not draw a separate building overlay progress bar",
     );
-    assert(hpRects.length === 2, "deconstructing Tank Trap draws reverse status on the HP bar layer");
+    assert(hpBackRects.length === 1 && hpFillRects.length === 1, "deconstructing Tank Trap keeps stable reverse-status geometry on the HP bar layer");
     assert(
-      Math.abs(hpRects[1][3] - hpBarW * entity.deconstructProgress) < 0.001,
-      "deconstructing Tank Trap HP-layer status drains according to deconstructProgress",
+      Math.abs(hpBar.rtsFill.scaleX - entity.deconstructProgress) < 0.001,
+      "deconstructing Tank Trap HP-layer status drains by scaling according to deconstructProgress",
     );
   } finally {
     restorePixi();
@@ -1133,7 +1158,7 @@ function polygonAxisValues(points, offset) {
     removeChild(view) { view.parentNode = null; },
   };
   try {
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { width: 4, height: 4, tileSize: 32, terrain: new Array(16).fill(0) };
     const diagnostics = [];
     renderer._profiler = {
@@ -1172,9 +1197,9 @@ function polygonAxisValues(points, offset) {
     const warmResourceKey = retryGfx.rtsStaticRenderKey;
     const warmResourceCalls = retryGfx.calls.length;
     retryResource.remaining = 400;
-    const retryDrawRect = retryGfx.drawRect.bind(retryGfx);
+    const retryDrawRect = retryGfx.rect.bind(retryGfx);
     let throwResourceOnce = true;
-    retryGfx.drawRect = (...args) => {
+    retryGfx.rect = (...args) => {
       if (throwResourceOnce) {
         throwResourceOnce = false;
         throw new Error("transient resource draw failure");
@@ -1357,9 +1382,9 @@ function polygonAxisValues(points, offset) {
     const priorFogKey = renderer._fogRenderKey;
     const priorFog = renderer._fogRenderFog;
     const priorFogMap = renderer._fogRenderMap;
-    const retryFogDrawRect = renderer._fogGfx.drawRect.bind(renderer._fogGfx);
+    const retryFogDrawRect = renderer._fogGfx.rect.bind(renderer._fogGfx);
     let throwFogOnce = true;
-    renderer._fogGfx.drawRect = (...args) => {
+    renderer._fogGfx.rect = (...args) => {
       if (throwFogOnce) {
         throwFogOnce = false;
         throw new Error("transient fog draw failure");

@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxCircle, gfxRoundRect, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, PLAYER_PALETTE, STATS } from "../config.js";
 import { isBuilding, isUnit } from "../protocol.js";
 import {
@@ -31,44 +32,41 @@ function drawLabSpawnPreview(g, x, y, payload, tileSize) {
     const y0 = tileY * tileSize;
     const w = footW * tileSize;
     const h = footH * tileSize;
-    g.lineStyle(2, color, 0.95);
-    g.beginFill(color, 0.28);
-    g.drawRoundedRect(x0, y0, w, h, 5);
-    g.endFill();
-    g.lineStyle(1, color, 0.45);
+    gfxStroke(g, 2, color, 0.95);
+    gfxFill(g, color, 0.28);
+    gfxRoundRect(g, x0, y0, w, h, 5);
+    gfxNoFill(g);
+    const gridPaths = [];
     for (let tile = 1; tile < footW; tile++) {
-      g.moveTo(x0 + tile * tileSize, y0);
-      g.lineTo(x0 + tile * tileSize, y0 + h);
+      gridPaths.push([[x0 + tile * tileSize, y0], [x0 + tile * tileSize, y0 + h]]);
     }
     for (let tile = 1; tile < footH; tile++) {
-      g.moveTo(x0, y0 + tile * tileSize);
-      g.lineTo(x0 + w, y0 + tile * tileSize);
+      gridPaths.push([[x0, y0 + tile * tileSize], [x0 + w, y0 + tile * tileSize]]);
     }
+    gfxStrokePaths(g, gridPaths, 1, color, 0.45);
     return;
   }
   if (!isUnit(kind)) return;
   const stat = STATS[kind] || {};
   const radius = Math.max(7, Math.min(tileSize * 0.34, Number(stat.size) || tileSize * 0.27));
-  g.lineStyle(2, color, 0.95);
-  g.beginFill(color, 0.32);
-  g.drawCircle(x, y, radius);
-  g.endFill();
-  g.lineStyle(1.5, color, 0.82);
-  g.moveTo(x - radius * 0.7, y);
-  g.lineTo(x + radius * 0.7, y);
-  g.moveTo(x, y - radius * 0.7);
-  g.lineTo(x, y + radius * 0.7);
+  gfxStroke(g, 2, color, 0.95);
+  gfxFill(g, color, 0.32);
+  gfxCircle(g, x, y, radius);
+  gfxNoFill(g);
+  gfxStrokePaths(g, [
+    [[x - radius * 0.7, y], [x + radius * 0.7, y]],
+    [[x, y - radius * 0.7], [x, y + radius * 0.7]],
+  ], 1.5, color, 0.82);
 }
 
 
 function drawLabRemovePreview(g, x, y, tileSize) {
   const arm = Math.max(14, tileSize * 0.48);
   const color = 0xe35c54;
-  g.lineStyle(4, color, 0.95);
-  g.moveTo(x - arm, y - arm);
-  g.lineTo(x + arm, y + arm);
-  g.moveTo(x + arm, y - arm);
-  g.lineTo(x - arm, y + arm);
+  gfxStrokePaths(g, [
+    [[x - arm, y - arm], [x + arm, y + arm]],
+    [[x + arm, y - arm], [x - arm, y + arm]],
+  ], 4, color, 0.95);
 }
 
 function labPreviewOwnerColor(owner) {

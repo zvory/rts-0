@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxRect, gfxFill } from "./native_graphics.js";
 import { COLORS } from "../config.js";
 import { PASSABLE, TERRAIN, isRoadTerrain } from "../protocol.js";
 import { hash2 } from "./shared.js";
@@ -46,12 +47,12 @@ export function drawImpassableEdge(g, map, tx, ty, code, ts) {
   const x = tx * ts;
   const y = ty * ts;
 
-  g.beginFill(color, 0.72);
-  if (!isImpassableAt(map, tx, ty - 1)) g.drawRect(x, y, ts, edge);
-  if (!isImpassableAt(map, tx, ty + 1)) g.drawRect(x, y + ts - edge, ts, edge);
-  if (!isImpassableAt(map, tx - 1, ty)) g.drawRect(x, y, edge, ts);
-  if (!isImpassableAt(map, tx + 1, ty)) g.drawRect(x + ts - edge, y, edge, ts);
-  g.endFill();
+  gfxFill(g, color, 0.72);
+  if (!isImpassableAt(map, tx, ty - 1)) gfxRect(g, x, y, ts, edge);
+  if (!isImpassableAt(map, tx, ty + 1)) gfxRect(g, x, y + ts - edge, ts, edge);
+  if (!isImpassableAt(map, tx - 1, ty)) gfxRect(g, x, y, edge, ts);
+  if (!isImpassableAt(map, tx + 1, ty)) gfxRect(g, x + ts - edge, y, edge, ts);
+  gfxNoFill(g);
 }
 
 export function isImpassableAt(map, tx, ty) {

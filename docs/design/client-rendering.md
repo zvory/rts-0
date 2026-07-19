@@ -10,7 +10,8 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 - There is one JavaScript client, one `Match`, one state/interpolation pipeline, and one active
   world renderer per match. Pixi is the default.
 - During a match, `Match` owns the only `requestAnimationFrame` loop and visual clock. Pixi is
-  constructed with `autoStart:false`; no normal, capture, or teardown path starts its ticker. A
+  pinned at v8.19.0 and initialized asynchronously with `autoStart:false` and an initial WebGL
+  preference; no normal, capture, or teardown path starts its ticker. A
   backend updates and presents only when Match calls it; Babylon never calls `runRenderLoop()`.
 - Server/application coordinates remain two-dimensional world pixels. Scene axes, scale, height,
   and facing are backend-private presentation conversions.
@@ -257,6 +258,8 @@ deterministic effect-capture tooling are separate future features.
 
 ## 6. Explicitly deferred
 
+The Pixi v8 version cutover does not require render groups or shared `GraphicsContext` resources;
+both remain follow-up performance experiments that need workload evidence and visual review.
 The current foundations do not require replay/spectator Babylon routes, default rollout, hostile
 asset validation, checksums/decoder policy, retained event history, generalized registries/pools,
 benchmark schemas/budgets, vegetation, required shadows, quality tiers, full rig/animation parity,
@@ -267,6 +270,15 @@ The deleted proof-of-concept remains historical only. Its observations may motiv
 after the corresponding real resource/effect exists, but they are not requirements or baselines.
 
 ## 7. Executable evidence
+
+The Pixi v8.19.0 cutover was reviewed with the deterministic 16-tick decoded-RGBA gate using the
+same stream, state, camera, viewport, DPR, visual clock, and ready assets on both versions. Exact
+equality failed on all 16 frames because the native v8 renderer rasterizes differently: changed
+pixels ranged from 4.654% to 14.911% per frame (12.022% average), with average RGB MAE 1.753/255
+and maximum RMSE 11.736. The capture-health, input, nonblank, and changing-frame canaries all
+passed, and early/mid/late manual review found the same terrain, units, and fight effects without
+missing or black scenes. This is an explicitly reviewed, accepted rasterization difference—not a
+claim of exact pixel parity.
 
 The code and focused contracts are the executable specification:
 

@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxCircle, gfxPoly, gfxStrokeLine, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   clamp01,
   drawFreeRotatedRect,
@@ -29,9 +30,9 @@ export function _drawPanzerfaustShots(state) {
     const launchFade = 1 - clamp01(age / 180);
 
     if (launchFade > 0) {
-      g.lineStyle(0, 0x000000, 0);
-      g.beginFill(0xfff1a8, 0.86 * launchFade);
-      g.drawPolygon([
+      gfxStroke(g, 0, 0x000000, 0);
+      gfxFill(g, 0xfff1a8, 0.86 * launchFade);
+      gfxPoly(g, [
         shot.fromX + ux * 3 - uy * 3.2,
         shot.fromY + uy * 3 + ux * 3.2,
         shot.fromX + ux * 20,
@@ -39,27 +40,25 @@ export function _drawPanzerfaustShots(state) {
         shot.fromX + ux * 4 + uy * 5.2,
         shot.fromY + uy * 4 - ux * 5.2,
       ]);
-      g.endFill();
-      g.beginFill(0x6f5c45, 0.22 * launchFade);
-      g.drawCircle(shot.fromX - ux * 2, shot.fromY - uy * 2, 7);
-      g.endFill();
+      gfxNoFill(g);
+      gfxFill(g, 0x6f5c45, 0.22 * launchFade);
+      gfxCircle(g, shot.fromX - ux * 2, shot.fromY - uy * 2, 7);
+      gfxNoFill(g);
     }
 
     if (age <= duration + 80) {
       const tail = Math.min(34, Math.max(14, len * 0.22));
-      g.lineStyle(3.2, 0x1d1812, 0.56 * travelFade);
-      g.moveTo(x - ux * tail, y - uy * tail);
-      g.lineTo(x, y);
-      g.lineStyle(1.7, 0xffd65a, 0.86 * travelFade);
-      g.moveTo(x - ux * tail * 0.72, y - uy * tail * 0.72);
-      g.lineTo(x, y);
-      g.lineStyle(0, 0x000000, 0);
-      g.beginFill(0x19130d, 0.98 * travelFade);
+      gfxStrokeLine(g, x - ux * tail, y - uy * tail, x, y,
+        3.2, 0x1d1812, 0.56 * travelFade);
+      gfxStrokeLine(g, x - ux * tail * 0.72, y - uy * tail * 0.72, x, y,
+        1.7, 0xffd65a, 0.86 * travelFade);
+      gfxStroke(g, 0, 0x000000, 0);
+      gfxFill(g, 0x19130d, 0.98 * travelFade);
       drawFreeRotatedRect(g, x, y, 9.5, 3.2, angle);
-      g.endFill();
-      g.beginFill(0xd8d0b0, 0.72 * travelFade);
+      gfxNoFill(g);
+      gfxFill(g, 0xd8d0b0, 0.72 * travelFade);
       drawFreeRotatedRect(g, x + ux * 3.2, y + uy * 3.2, 3.2, 2.2, angle);
-      g.endFill();
+      gfxNoFill(g);
     }
   }
 }
@@ -77,18 +76,18 @@ export function _drawPanzerfaustImpacts(state) {
     const flashFade = 1 - smoothstep01(Math.max(0, t - 0.18) / 0.32);
     const dustFade = 1 - smoothstep01(Math.max(0, t - 0.32) / 0.68);
     const radius = 11 + t * 12;
-    g.lineStyle(3, 0xfff2d0, 0.92 * flashFade);
-    drawJaggedRing(g, impact.x, impact.y, radius * 0.72, 10, impact.seed + 3, 0.72, 1.18);
-    g.lineStyle(0, 0x000000, 0);
-    g.beginFill(0xffb22e, 0.26 * flashFade);
+    drawJaggedRing(g, impact.x, impact.y, radius * 0.72, 10, impact.seed + 3, 0.72, 1.18,
+      3, 0xfff2d0, 0.92 * flashFade);
+    gfxStroke(g, 0, 0x000000, 0);
+    gfxFill(g, 0xffb22e, 0.26 * flashFade);
     drawJaggedBlob(g, impact.x, impact.y, radius * 1.25, 13, impact.seed + 11, 0.62, 1.0);
-    g.endFill();
-    g.beginFill(0x5f5141, 0.28 * dustFade);
+    gfxNoFill(g);
+    gfxFill(g, 0x5f5141, 0.28 * dustFade);
     drawJaggedBlob(g, impact.x, impact.y, radius * 1.85, 17, impact.seed + 23, 0.58, 1.0);
-    g.endFill();
-    g.beginFill(0x201912, 0.18 * dustFade);
+    gfxNoFill(g);
+    gfxFill(g, 0x201912, 0.18 * dustFade);
     drawJaggedBlob(g, impact.x, impact.y, radius * 0.9, 9, impact.seed + 31, 0.7, 1.0);
-    g.endFill();
+    gfxNoFill(g);
   }
 }
 
@@ -100,10 +99,11 @@ function drawJaggedBlob(g, cx, cy, radius, points, seed, minScale, maxScale) {
     const r = radius * (minScale + (maxScale - minScale) * n);
     poly.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
   }
-  g.drawPolygon(poly);
+  gfxPoly(g, poly);
 }
 
-function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
+function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale, width, color, alpha) {
+  const path = [];
   for (let i = 0; i <= points; i += 1) {
     const j = i % points;
     const a = (j / points) * Math.PI * 2;
@@ -111,7 +111,7 @@ function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
     const r = radius * (minScale + (maxScale - minScale) * n);
     const x = cx + Math.cos(a) * r;
     const y = cy + Math.sin(a) * r;
-    if (i === 0) g.moveTo(x, y);
-    else g.lineTo(x, y);
+    path.push([x, y]);
   }
+  gfxStrokePaths(g, [path], width, color, alpha);
 }

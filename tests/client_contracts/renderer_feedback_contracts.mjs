@@ -135,7 +135,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     const label = context.layers.feedback.children[0];
     assert(label?.text === "Miss!", "miss toast renders the Miss! label");
     assertApprox(label.style.fontSize, 6.75, 0.001, "miss toast text is 1.5x larger than the prior tiny size");
-    assertApprox(label.style.strokeThickness, 1.5, 0.001, "miss toast stroke scales with the text");
+    assertApprox(label.style.stroke.width, 1.5, 0.001, "miss toast stroke scales with the text");
     assertApprox(label.x, target.x + 14, 0.001, "miss toast sits close to the receiving unit's right edge");
     assertApprox(label.y, target.y - 8, 0.001, "miss toast sits close to the receiving unit's top edge");
     assert(label.x > target.x, "miss toast appears to the right of the receiving unit");
@@ -701,9 +701,14 @@ function nearPoint(call, point, epsilon = 0.001) {
     "selected deployed mortar draws its 17-tile outer circle and five-tile dead zone",
   );
   assert(
-    mortarRangeGfx.calls.some((call) => call[0] === "beginHole") &&
+    mortarRangeGfx.calls.some((call) => call[0] === "cut") &&
       !mortarRangeGfx.calls.some((call) => call[0] === "lineTo"),
     "selected deployed mortar draws a seamless full-circle range band without requiring facing metadata",
+  );
+  assert(
+    mortarRangeGfx.calls.findIndex((call) => call[0] === "cut") <
+      mortarRangeGfx.calls.findIndex((call) => call[0] === "beginFill"),
+    "the v8 hole cut is recorded on the path before the range band is filled",
   );
 
   const workerRangeGfx = new RecordingGraphics();
@@ -783,6 +788,9 @@ function nearPoint(call, point, epsilon = 0.001) {
       },
       _ringRadius() {
         return { rx: 12, ry: 8, cy: 0 };
+      },
+      _hpBarSlot() {
+        return {};
       },
       _hpBar() {},
     },
@@ -890,6 +898,9 @@ function nearPoint(call, point, epsilon = 0.001) {
         },
         _ringRadius() {
           return { rx: 12, ry: 8, cy: 0 };
+        },
+        _hpBarSlot() {
+          return {};
         },
         _hpBar() {},
       },

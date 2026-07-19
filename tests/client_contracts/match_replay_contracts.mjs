@@ -12,6 +12,7 @@ import {
   LAB_ROLE,
   MOVEMENT_PATH_DIAGNOSTICS,
   NOTICE_SEVERITY,
+  S,
   msg,
 } from "../../client/src/protocol.js";
 import { CameraNavigationInput } from "../../client/src/input/camera_navigation.js";
@@ -85,6 +86,159 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+  {
+    const handlers = new Map();
+    const net = {
+      on(type, handler) {
+        if (!handlers.has(type)) handlers.set(type, new Set());
+        handlers.get(type).add(handler);
+      },
+      off(type, handler) {
+        handlers.get(type)?.delete(handler);
+      },
+      emit(type, message) {
+        for (const handler of handlers.get(type) || []) handler(message);
+      },
+    };
+    let finishRenderer = null;
+    let installedClock = null;
+    const renderer = {
+      setRenderClock(clock) { installedClock = clock; },
+      destroy() {},
+    };
+    const backend = {
+      createRenderer() {
+        return new Promise((resolve) => { finishRenderer = () => resolve(renderer); });
+      },
+    };
+    class MatchFactoryProbe {
+      constructor() {
+        this.renderClock = { now: () => 123 };
+        this.received = [];
+        this.onSnapshot = (message) => this.received.push([S.SNAPSHOT, message.tick]);
+        this.onCommandReceipt = (message) => this.received.push([S.COMMAND_RECEIPT, message.clientSeq]);
+        this.onRoomTimeState = () => {};
+        this.onLivePauseState = () => {};
+        this.onObserverAnalysis = () => {};
+      }
+    }
+    const creating = Match.create.call(
+      MatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      { rendererBackendBundle: backend },
+    );
+    net.emit(S.SNAPSHOT, { tick: 7 });
+    net.emit(S.COMMAND_RECEIPT, { clientSeq: 9 });
+    finishRenderer();
+    const created = await creating;
+    assert(created.received.length === 2 &&
+      created.received[0][0] === S.SNAPSHOT && created.received[0][1] === 7 &&
+      created.received[1][0] === S.COMMAND_RECEIPT && created.received[1][1] === 9,
+      "Match.create replays opening events that arrive while Pixi initializes");
+    assert(installedClock === created.renderClock,
+      "Match.create installs the match clock through the renderer contract");
+    assert([...handlers.values()].every((set) => set.size === 0),
+      "Match.create removes temporary startup listeners after initialization");
+
+    const protectedControlEvents = [];
+    class SlowMatchFactoryProbe {
+      constructor() {
+        this.renderClock = { now: () => 456 };
+        this.onSnapshot = (message) => protectedControlEvents.push([S.SNAPSHOT, message.tick]);
+        this.onCommandReceipt = () => {};
+        this.onRoomTimeState = (message) => protectedControlEvents.push([S.ROOM_TIME_STATE, message.cursor]);
+        this.onLivePauseState = () => {};
+        this.onObserverAnalysis = () => {};
+      }
+    }
+    const slowCreating = Match.create.call(
+      SlowMatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      { rendererBackendBundle: backend },
+    );
+    net.emit(S.ROOM_TIME_STATE, { cursor: 11 });
+    for (let tick = 1; tick <= 80; tick += 1) net.emit(S.SNAPSHOT, { tick });
+    finishRenderer();
+    await slowCreating;
+    assert(protectedControlEvents.some(([type, cursor]) => type === S.ROOM_TIME_STATE && cursor === 11),
+      "snapshot traffic cannot evict one-shot room state during slow renderer startup");
+    assert(protectedControlEvents.at(-1)?.[1] === 80,
+      "startup overflow retains the newest authoritative snapshot");
+
+    let staleRendererDestroyed = false;
+    let staleMatchConstructed = false;
+    class StaleMatchFactoryProbe {
+      constructor() { staleMatchConstructed = true; }
+    }
+    const staleResult = await Match.create.call(
+      StaleMatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        isStartCurrent: () => false,
+        rendererBackendBundle: {
+          async createRenderer() {
+            return { destroy() { staleRendererDestroyed = true; } };
+          },
+        },
+      },
+    );
+    assert(staleResult === null && staleRendererDestroyed && !staleMatchConstructed,
+      "Match.create discards a stale renderer before constructing match modules");
+    assert([...handlers.values()].every((set) => set.size === 0),
+      "Match.create removes temporary startup listeners when a start becomes stale");
+
+    let failedRendererDestroyed = false;
+    class FailingMatchFactoryProbe {
+      constructor() {
+        throw new Error("match construction failed");
+      }
+    }
+    try {
+      await Match.create.call(
+        FailingMatchFactoryProbe,
+        net,
+        {},
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          rendererBackendBundle: {
+            async createRenderer() {
+              return { destroy() { failedRendererDestroyed = true; } };
+            },
+          },
+        },
+      );
+      assert(false, "Match.create rejects when match construction fails");
+    } catch (error) {
+      assert(error.message === "match construction failed",
+        "Match.create preserves the match construction failure");
+    }
+    assert(failedRendererDestroyed,
+      "Match.create destroys an initialized renderer when match construction fails");
+    assert([...handlers.values()].every((set) => set.size === 0),
+      "Match.create removes temporary startup listeners after a failed initialization");
+  }
   {
     let synced = 0;
     const unitRangeMatch = Object.create(Match.prototype);
@@ -476,6 +630,44 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(app.reportPlayerActivity(30000), "eligible human input sends an activity notice");
     assert(!app.reportPlayerActivity(30001), "a sent activity notice re-arms the throttle");
     assert(activityCount === 1, "throttled activity emits one wire message");
+  }
+  {
+    const app = Object.create(App.prototype);
+    const starts = [];
+    app.matchStartGeneration = 0;
+    app.matchEndedGeneration = 0;
+    app.startMatch = (payload, generation) => {
+      starts.push({ payload, generation });
+      return Promise.resolve();
+    };
+    app.onStart({ id: "first" });
+    const firstPromise = app.matchStartPromise;
+    app.onStart({ id: "second" });
+    assert(starts[0].generation === 1 && starts[1].generation === 2,
+      "overlapping async match starts receive monotonically increasing generations");
+    assert(app.matchStartPromise !== firstPromise,
+      "the app observes the newest async match-start promise instead of returning it to Net dispatch");
+    await app.matchStartPromise;
+  }
+  {
+    const app = Object.create(App.prototype);
+    app.matchStartGeneration = 4;
+    app.invalidatePendingMatchStart();
+    assert(app.matchStartGeneration === 5,
+      "returning to the lobby invalidates an in-flight asynchronous match start");
+  }
+  {
+    const app = Object.create(App.prototype);
+    app.matchStartGeneration = 3;
+    app.matchEndedGeneration = 3;
+    let stopped = 0;
+    let destroyed = 0;
+    const endedMatch = { stop() { stopped += 1; }, destroy() { destroyed += 1; } };
+    assert(app.completeMatchStart(endedMatch, 3) && app.match === endedMatch && stopped === 1,
+      "a match that ends during renderer startup attaches in a stopped state");
+    const staleMatch = { stop() { stopped += 1; }, destroy() { destroyed += 1; } };
+    assert(!app.completeMatchStart(staleMatch, 2) && destroyed === 1 && app.match === endedMatch,
+      "a stale renderer startup destroys its match without replacing the current match");
   }
   {
     const app = Object.create(App.prototype);

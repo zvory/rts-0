@@ -1,3 +1,4 @@
+import { gfxFillCurrentPath, gfxReset } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -62,7 +63,7 @@ export function _drawFog(fog) {
   }
   this._recordRenderDiagnostic?.("renderer.cache.miss.fog");
   this._recordRenderDiagnostic?.("renderer.graphics.clear.fog");
-  g.clear();
+  gfxReset(g.clear());
   if (!fog || !this._map) {
     this._fogRenderFog = fog;
     this._fogRenderMap = this._map;
@@ -72,6 +73,7 @@ export function _drawFog(fog) {
   const ts = this._map.tileSize;
   const w = fog.width;
   const h = fog.height;
+  const runsByLevel = [[], [], [], []];
 
   for (let ty = 0; ty < h; ty++) {
     // Run-length merge contiguous tiles sharing a fog level (0=clear,1=dim,2=dark,3=impassable-dim).
@@ -81,20 +83,24 @@ export function _drawFog(fog) {
       const level = tx < w ? this._fogLevel(fog, tx, ty) : -1;
       if (level !== runLevel) {
         if (runLevel > 0) {
-          const color = runLevel === 2 ? COLORS.fogUnexplored : COLORS.fogExplored;
-          const a = runLevel === 2
-            ? FOG_UNEXPLORED_ALPHA
-            : runLevel === 3
-              ? FOG_UNEXPLORED_ALPHA * 0.56
-              : FOG_EXPLORED_ALPHA;
-          g.beginFill(color, a);
-          g.drawRect(runStart * ts, ty * ts, (tx - runStart) * ts, ts);
-          g.endFill();
+          runsByLevel[runLevel].push([runStart * ts, ty * ts, (tx - runStart) * ts, ts]);
         }
         runStart = tx;
         runLevel = level;
       }
     }
+  }
+  for (let level = 1; level <= 3; level += 1) {
+    const runs = runsByLevel[level];
+    if (runs.length === 0) continue;
+    const color = level === 2 ? COLORS.fogUnexplored : COLORS.fogExplored;
+    const alpha = level === 2
+      ? FOG_UNEXPLORED_ALPHA
+      : level === 3
+        ? FOG_UNEXPLORED_ALPHA * 0.56
+        : FOG_EXPLORED_ALPHA;
+    for (const [x, y, width, height] of runs) g.rect(x, y, width, height);
+    gfxFillCurrentPath(g, color, alpha);
   }
   this._fogRenderFog = fog;
   this._fogRenderMap = this._map;
