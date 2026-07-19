@@ -1,3 +1,4 @@
+import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -82,7 +83,7 @@ export function _slot(poolName, id) {
   g.rtsStaticRedraw = true;
   delete g.rtsStaticRenderKey;
   this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
-  g.clear();
+  gfxReset(g.clear());
   return g;
 }
 
@@ -104,7 +105,7 @@ export function _staticSlot(poolName, id, renderKey) {
     delete g.rtsStaticRenderKey;
     this._recordRenderDiagnostic?.(`renderer.cache.miss.${poolName}`);
     this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
-    g.clear();
+    gfxReset(g.clear());
   } else {
     this._recordRenderDiagnostic?.(`renderer.cache.hit.${poolName}`);
   }
@@ -112,9 +113,9 @@ export function _staticSlot(poolName, id, renderKey) {
 }
 
 export function _shadow(g, cx, cy, radius) {
-  g.beginFill(COLORS.shadow, 0.28);
-  g.drawEllipse(cx, cy + radius * 0.35, radius, radius * 0.6);
-  g.endFill();
+  gfxFill(g, COLORS.shadow, 0.28);
+  gfxEllipse(g, cx, cy + radius * 0.35, radius, radius * 0.6);
+  gfxNoFill(g);
 }
 
 export function _vehicleShadow(g, cx, cy, body, facing) {
@@ -130,9 +131,9 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
     const y = Math.sin(a) * ry;
     points.push(cx + x * c - y * s, cy + drop + x * s + y * c);
   }
-  g.beginFill(COLORS.shadow, 0.28);
-  g.drawPolygon(points);
-  g.endFill();
+  gfxFill(g, COLORS.shadow, 0.28);
+  gfxPoly(g, points);
+  gfxNoFill(g);
 }
 
 export function _drawSelectionAndHp(e, selection, state) {
@@ -150,10 +151,10 @@ export function _drawSelectionAndHp(e, selection, state) {
     else if (neutralOwner(state, e.owner)) color = COLORS.selectNeutral;
     else color = COLORS.selectEnemy;
     // Glow + crisp ring.
-    g.lineStyle(4, color, 0.25);
-    g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
-    g.lineStyle(2, color, 0.95);
-    g.drawEllipse(0, ring.cy, ring.rx, ring.ry);
+    gfxStroke(g, 4, color, 0.25);
+    gfxEllipse(g, 0, ring.cy, ring.rx, ring.ry);
+    gfxStroke(g, 2, color, 0.95);
+    gfxEllipse(g, 0, ring.cy, ring.rx, ring.ry);
   }
 
   if (progressStatus || damaged || selected) {
@@ -227,9 +228,9 @@ export function _hpBar(g, e, status = null) {
   const barW = halfW * 2;
   const barH = 4;
 
-  g.beginFill(COLORS.hpBack, 0.9);
-  g.drawRect(x0 - 1, topY - 1, barW + 2, barH + 2);
-  g.endFill();
+  gfxFill(g, COLORS.hpBack, 0.9);
+  gfxRect(g, x0 - 1, topY - 1, barW + 2, barH + 2);
+  gfxNoFill(g);
 
   let color = COLORS.hpGood;
   if (status?.kind === "deconstruction") {
@@ -238,9 +239,9 @@ export function _hpBar(g, e, status = null) {
     if (frac <= 0.33) color = COLORS.hpLow;
     else if (frac <= 0.66) color = COLORS.hpMid;
   }
-  g.beginFill(color);
-  g.drawRect(x0, topY, barW * frac, barH);
-  g.endFill();
+  gfxFill(g, color);
+  gfxRect(g, x0, topY, barW * frac, barH);
+  gfxNoFill(g);
 }
 
 export function _icon(e, cx, cy, size, alpha) {
@@ -248,13 +249,13 @@ export function _icon(e, cx, cy, size, alpha) {
   let t = this._iconPool.get(e.id);
   const glyph = (STATS[e.kind] && STATS[e.kind].icon) || "?";
   if (!t) {
-    t = new PIXI.Text(glyph, {
+    t = new PIXI.Text({ text: glyph, style: {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       fontSize: 24,
       fill: 0xd8d0b0,
       align: "center",
       fontWeight: "700",
-    });
+    } });
     t.anchor.set(0.5);
     this._iconPool.set(e.id, t);
     this.layers.buildings.addChild(t);
@@ -277,15 +278,14 @@ export function _queueLabel(e, cx, cy, count, bodyAlpha) {
   if (!this._queueLabelPool) this._queueLabelPool = new Map();
   let t = this._queueLabelPool.get(e.id);
   if (!t) {
-    t = new PIXI.Text("", {
+    t = new PIXI.Text({ text: "", style: {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       fontSize: 11,
       fill: 0xffe080,
       align: "center",
       fontWeight: "700",
-      stroke: 0x000000,
-      strokeThickness: 3,
-    });
+      stroke: { color: 0x000000, width: 3 },
+    } });
     t.anchor.set(0.5, 0);
     this._queueLabelPool.set(e.id, t);
     this.layers.buildings.addChild(t);

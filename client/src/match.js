@@ -85,6 +85,25 @@ function desktopCursorAggressiveLockEnabled(root = globalThis) {
 }
 
 export class Match {
+  static async create(net, payload, toast, devWatch, audio, statusBadge, diagnostics = null, options = {}) {
+    const backendBundle = options.rendererBackendBundle || createPixiBackendBundle();
+    let match = null;
+    const renderer = await backendBundle.createRenderer(dom.viewport, {
+      renderClock: null,
+      state: () => match?.state,
+      profiler: () => match?.frameProfiler,
+      visualProfile: () => match?.visualProfile,
+      staticMap: () => match?.presentationAssembler?.staticMap,
+    });
+    match = new this(net, payload, toast, devWatch, audio, statusBadge, diagnostics, {
+      ...options,
+      rendererBackendBundle: backendBundle,
+      rendererInstance: renderer,
+    });
+    if (renderer?._renderer) renderer._renderer._renderClock = match.renderClock;
+    return match;
+  }
+
   /**
    * @param {Net} net live connection (shared, not owned)
    * @param {object} payload §2.3 start payload
@@ -230,13 +249,8 @@ export class Match {
       "match.autoSpectator",
       () => createMatchAutoSpectator(this, payload, options, dom.gameScreen),
     );
-    this.renderer = this._timeInit("match.renderer", () => this.rendererBackendBundle.createRenderer(dom.viewport, {
-      renderClock: this.renderClock,
-      state: () => this.state,
-      profiler: () => this.frameProfiler,
-      visualProfile: () => this.visualProfile,
-      staticMap: () => this.presentationAssembler?.staticMap,
-    }));
+    if (!options.rendererInstance) throw new TypeError("Match.create() must prepare the renderer.");
+    this.renderer = options.rendererInstance;
     this.fog = this._timeInit(
       "match.fog",
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),

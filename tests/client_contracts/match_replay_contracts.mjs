@@ -479,6 +479,23 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   }
   {
     const app = Object.create(App.prototype);
+    const starts = [];
+    app.matchStartGeneration = 0;
+    app.startMatch = (payload, generation) => {
+      starts.push({ payload, generation });
+      return Promise.resolve();
+    };
+    app.onStart({ id: "first" });
+    const firstPromise = app.matchStartPromise;
+    app.onStart({ id: "second" });
+    assert(starts[0].generation === 1 && starts[1].generation === 2,
+      "overlapping async match starts receive monotonically increasing generations");
+    assert(app.matchStartPromise !== firstPromise,
+      "the app observes the newest async match-start promise instead of returning it to Net dispatch");
+    await app.matchStartPromise;
+  }
+  {
+    const app = Object.create(App.prototype);
     let resetCount = 0;
     let showCount = 0;
     let warningCount = 0;

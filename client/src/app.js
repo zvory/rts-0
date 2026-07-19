@@ -176,6 +176,8 @@ export class App {
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
     this.match = null;
+    this.matchStartGeneration = 0;
+    this.matchStartPromise = Promise.resolve();
     this.labCatalog = null;
     this.labClient = null;
     this.labPanel = null;
@@ -609,6 +611,19 @@ export class App {
    * @param {object} payload §2.3 start payload
    */
   onStart(payload) {
+    const generation = ++this.matchStartGeneration;
+    const startPromise = this.startMatch(payload, generation);
+    this.matchStartPromise = startPromise;
+    void startPromise.catch((error) => {
+      if (generation !== this.matchStartGeneration) return;
+      this.matchLaunchFailed = true;
+      diagnostics.mark("app.onStart.failed", { message: error?.message || String(error) });
+      console.error("[rts-app] match start failed", error);
+      this.showToast("The match renderer could not start.");
+    });
+  }
+
+  async startMatch(payload, generation) {
     diagnostics.mark("app.onStart.begin", {
       map: payload?.map ? `${payload.map.width}x${payload.map.height}` : undefined,
       terrain: payload?.map?.terrain?.length,
@@ -678,7 +693,7 @@ export class App {
     } else {
       this.labControlPolicy = createDefaultControlPolicy();
     }
-    this.match = new MatchClass(
+    const nextMatch = await MatchClass.create(
       this.net,
       payload,
       (msg) => this.showToast(msg),
@@ -717,6 +732,11 @@ export class App {
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );
+    if (generation !== this.matchStartGeneration) {
+      nextMatch.destroy();
+      return;
+    }
+    this.match = nextMatch;
     if (this.stressTestRunner) {
       void this.stressTestRunner.run({ match: this.match, net: this.net });
     }

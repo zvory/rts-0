@@ -131,6 +131,7 @@ export class InteractService {
           blocker: input.blocker || "", case: input.case || "" },
         opponent: input.opponent || "ai_2_1",
         spectate: input.spectate || null,
+        autoSpectator: input.autoSpectator === true,
         renderer: input.renderer || "pixi",
         viewport: input.viewport,
         baseUrl: process.env.RTS_INTERACT_BASE_URL || process.env.RTS_INTERACT_LAB_BASE_URL || "",
@@ -148,6 +149,7 @@ export class InteractService {
           map, seed: kind === "lab" ? input.seed ?? null : null,
           opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
           spectate: kind === "game" ? input.spectate || null : null,
+          autoSpectator: kind === "game" ? input.autoSpectator === true : false,
           role: kind === "game" ? (input.spectate ? "spectator" : "player") : kind === "scenario" ? "observer" : null,
           devScenario: kind === "scenario"
             ? { id: input.id, unit: input.unit, count: input.count, blocker: input.blocker || null, case: input.case || null }

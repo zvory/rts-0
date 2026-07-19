@@ -7,8 +7,8 @@ export function createPixiBackendBundle() {
     createCamera(options = {}) {
       return new Camera(0, 0, options);
     },
-    createRenderer(canvasParent, sources) {
-      return new PixiPresentationAdapter(canvasParent, sources);
+    async createRenderer(canvasParent, sources) {
+      return PixiPresentationAdapter.create(canvasParent, sources);
     },
   });
 }

@@ -254,7 +254,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     assert(renderer.app.options.autoStart === false, "Pixi application construction disables the automatic ticker");
     assert(renderer.app.ticker.started === false && renderer.app.ticker.startCalls === 0, "Pixi ticker never starts during construction");
     renderer.present();
@@ -298,7 +298,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       appendChild(view) { view.parentNode = this; },
       removeChild(view) { view.parentNode = null; },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const inactivePumpJack = {
       id: 503,
@@ -368,7 +368,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     const profiler = new FrameProfiler();
     renderer._drawUnit = () => {
       throw new Error("broken worker art");
@@ -504,7 +504,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
     let decalLayerResets = 0;
     let trenchLayerResets = 0;
@@ -690,7 +690,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
     assert(renderer.layers.decals.children.length === 1, "renderer creates exactly one permanent decal sprite");
     assert(renderer._groundDecals.downsample === GROUND_DECAL_TEXTURE_WORLD_SCALE, "decal texture uses the configured downsample");
@@ -747,7 +747,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const scaffold = {
       id: 503,
@@ -826,7 +826,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const stripTexture = PIXI.Texture.from("scout-plane-strip-test-texture");
     renderer._liveFrameStripTextures.set(KIND.SCOUT_PLANE, stripTexture);
@@ -888,7 +888,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
       id: 506,
@@ -1037,7 +1037,7 @@ function polygonAxisValues(points, offset) {
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
       id: 501,
@@ -1087,7 +1087,7 @@ function polygonAxisValues(points, offset) {
         view.parentNode = null;
       },
     };
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
     const entity = {
       id: 502,
@@ -1133,7 +1133,7 @@ function polygonAxisValues(points, offset) {
     removeChild(view) { view.parentNode = null; },
   };
   try {
-    const renderer = new Renderer(parent);
+    const renderer = await Renderer.create(parent);
     renderer._map = { width: 4, height: 4, tileSize: 32, terrain: new Array(16).fill(0) };
     const diagnostics = [];
     renderer._profiler = {
@@ -1172,9 +1172,9 @@ function polygonAxisValues(points, offset) {
     const warmResourceKey = retryGfx.rtsStaticRenderKey;
     const warmResourceCalls = retryGfx.calls.length;
     retryResource.remaining = 400;
-    const retryDrawRect = retryGfx.drawRect.bind(retryGfx);
+    const retryDrawRect = retryGfx.rect.bind(retryGfx);
     let throwResourceOnce = true;
-    retryGfx.drawRect = (...args) => {
+    retryGfx.rect = (...args) => {
       if (throwResourceOnce) {
         throwResourceOnce = false;
         throw new Error("transient resource draw failure");
@@ -1357,9 +1357,9 @@ function polygonAxisValues(points, offset) {
     const priorFogKey = renderer._fogRenderKey;
     const priorFog = renderer._fogRenderFog;
     const priorFogMap = renderer._fogRenderMap;
-    const retryFogDrawRect = renderer._fogGfx.drawRect.bind(renderer._fogGfx);
+    const retryFogDrawRect = renderer._fogGfx.rect.bind(renderer._fogGfx);
     let throwFogOnce = true;
-    renderer._fogGfx.drawRect = (...args) => {
+    renderer._fogGfx.rect = (...args) => {
       if (throwFogOnce) {
         throwFogOnce = false;
         throw new Error("transient fog draw failure");
