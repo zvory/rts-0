@@ -252,7 +252,20 @@ mod tests {
     }
 
     #[test]
-    fn unit_attackers_prefer_units_over_armored_buildings() {
+    fn default_weapon_prefers_combat_units_over_nearer_workers() {
+        let candidates = [
+            candidate(10, EntityKind::Worker, 400.0, false),
+            candidate(11, EntityKind::Rifleman, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::MachineGunner), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn unit_attackers_prefer_workers_over_armored_buildings() {
         let candidates = [
             candidate(10, EntityKind::CityCentre, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
@@ -260,6 +273,19 @@ mod tests {
 
         assert_eq!(
             choose_target(&context(EntityKind::Tank), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn worker_group_beats_weapon_fit_for_building_cleanup() {
+        let candidates = [
+            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(11, EntityKind::Worker, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::AntiTankGun), &candidates),
             Some(11)
         );
     }

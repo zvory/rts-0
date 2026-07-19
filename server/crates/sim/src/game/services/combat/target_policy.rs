@@ -27,7 +27,7 @@ enum RouteObstructionPolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TargetGroupPolicy {
     None,
-    UnitFirst,
+    CombatUnitsThenEconomyUnitsThenNonUnits,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,21 +49,21 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::DefaultWeapon => Self {
                 immediate_threats: ImmediateThreatPolicy::None,
                 route_obstruction: RouteObstructionPolicy::None,
-                target_group: TargetGroupPolicy::UnitFirst,
+                target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
                 weapon_fit: WeaponFitPolicy::DefaultWeapon,
                 retention: RetentionPolicy::MovingFireEqualRank,
             },
             combat_rules::TargetPriorityPolicyId::VehicleDefaultWeapon => Self {
                 immediate_threats: ImmediateThreatPolicy::None,
                 route_obstruction: RouteObstructionPolicy::VehicleTankTrap,
-                target_group: TargetGroupPolicy::UnitFirst,
+                target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
                 weapon_fit: WeaponFitPolicy::DefaultWeapon,
                 retention: RetentionPolicy::MovingFireEqualRank,
             },
             combat_rules::TargetPriorityPolicyId::TankCannon => Self {
                 immediate_threats: ImmediateThreatPolicy::TankCannon,
                 route_obstruction: RouteObstructionPolicy::None,
-                target_group: TargetGroupPolicy::UnitFirst,
+                target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
                 weapon_fit: WeaponFitPolicy::TankCannonDefaultWeapon,
                 retention: RetentionPolicy::MovingFireEqualRank,
             },
@@ -124,8 +124,16 @@ impl TargetPriorityPolicy {
 
     pub(super) fn target_group_order(self, attacker_is_unit: bool, facts: TargetFacts) -> u8 {
         match self.target_group {
-            TargetGroupPolicy::UnitFirst if attacker_is_unit && facts.is_unit => 0,
-            TargetGroupPolicy::UnitFirst => 1,
+            TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits if attacker_is_unit => {
+                if facts.is_unit && !facts.is_economy_unit {
+                    0
+                } else if facts.is_economy_unit {
+                    1
+                } else {
+                    2
+                }
+            }
+            TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits => 0,
             TargetGroupPolicy::None => 0,
         }
     }

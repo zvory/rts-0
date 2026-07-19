@@ -268,9 +268,10 @@ Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
-Default auto-acquisition ranks already-legal targets by weapon fit before distance, but unit
-attackers treat buildings as last-resort cleanup targets after legal unit targets. Small-arms
-default weapons prefer soft targets (`ArmorClass::Small`) over armored targets, but they
+Default auto-acquisition groups already-legal targets before applying weapon fit or distance:
+unit attackers prefer non-economy combat units, then economy workers (`Worker` and `Golem`),
+then buildings and other non-unit cleanup targets. Small-arms default weapons prefer soft targets
+(`ArmorClass::Small`) over armored targets within the same target group, but they
 still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
 units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
 prefer anti-armor threats and armored units over ordinary soft units. Tanks keep a narrower
