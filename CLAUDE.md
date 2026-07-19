@@ -28,6 +28,7 @@ Refresh a capsule's section pointers when the design document's structure change
 - Require confirmation for destructive actions, direct pushes to `main`, or material scope
   expansion. Normal task-branch pushes, owned PR creation, and auto-merge do not require a separate
   request or confirmation.
+- This repository's authorization rules override generic skill requirements to seek approval before editing.
 
 ## Editing and Git workflow
 
