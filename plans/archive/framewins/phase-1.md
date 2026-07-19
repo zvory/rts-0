@@ -2,7 +2,13 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Closed as a measured no-go on 2026-07-18.
+
+The retained-geometry experiment reduced HP graphics clears by 96.1%, but improved complete
+`frame.work` by only 1.8% and renderer update plus present by only 2.3%, missing the phase's
+end-to-end acceptance gates. Exact pixel parity passed, but the runtime cache was reverted because
+the measured player-frame benefit did not justify its complexity. The preserved evidence and
+future reconsideration gate live in `docs/client-performance-optimization-lessons.md`.
 
 ## Objective
 

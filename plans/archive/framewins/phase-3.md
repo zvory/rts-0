@@ -2,7 +2,12 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Skipped on 2026-07-18 because the measured ceiling is too low.
+
+The latest evidence puts client fog drawing at roughly 0.3 ms per frame. That remains a valid exact
+work-reduction opportunity, but it is not large enough to justify row objects, staging state, and
+their invalidation and teardown surface in the current optimization campaign. Re-profile from
+current `origin/main` before reconsidering this idea in a new plan.
 
 ## Objective
 

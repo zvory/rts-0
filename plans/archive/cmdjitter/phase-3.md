@@ -2,7 +2,10 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Archived as stale and not completed on 2026-07-18.
+
+This harness phase depended on evidence that Phase 2 never collected. Do not implement it from this
+document; define any future reproduction signature and tooling from a fresh incident investigation.
 
 ## Objective
 
