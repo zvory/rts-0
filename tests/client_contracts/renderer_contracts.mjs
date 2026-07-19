@@ -1,6 +1,3 @@
-// tests/client_contracts/renderer_contracts.mjs
-// Domain contract assertions imported by ../client_contracts.mjs.
-
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
@@ -25,9 +22,7 @@ import {
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
-
 import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
-
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");
   const bareRoad = terrainColor(TERRAIN.ROAD_BARE, 2, 3);
@@ -53,7 +48,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(!isImpassableTerrain(code), `${orientation} road renders as passable terrain`);
     assert(roadMarkingOrientation(code) === orientation, `${orientation} road keeps its yellow-line direction`);
   }
-
   const roadMap = {
     width: 3,
     height: 3,
@@ -76,7 +70,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     "non-road terrain never receives a road shoulder",
   );
 }
-
 {
   const priorDocument = globalThis.document;
   const priorImage = globalThis.Image;
