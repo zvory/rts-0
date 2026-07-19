@@ -1,7 +1,7 @@
 use super::super::MoveCoordinator;
 use super::{
     formation_goal_facing, formation_goals, formation_goals_with_known_trenches, is_free_goal,
-    tile_chebyshev_distance, FormationAssignment, FormationUnit, KnownTrench,
+    polyline_slots, tile_chebyshev_distance, FormationAssignment, FormationUnit, KnownTrench,
     VEHICLE_BODY_FORMATION_GAP_TILES,
 };
 use crate::config;
@@ -66,6 +66,38 @@ fn flat_map(size: u32) -> Map {
 
 fn set_passable(map: &mut Map, tx: u32, ty: u32) {
     map.terrain[(ty * map.size + tx) as usize] = terrain::GRASS;
+}
+
+#[test]
+fn long_polyline_spreads_one_rank_across_full_stroke() {
+    let map = flat_map(64);
+    let units = (0..4)
+        .map(|index| formation_unit(index + 1, &map, (4, 4 + index)))
+        .collect::<Vec<_>>();
+    let y = map.tile_center(20, 20).1;
+    let slots = polyline_slots(&units, &[(100.0, y), (700.0, y)]);
+    let mut xs = slots.iter().map(|(_, point)| point.0).collect::<Vec<_>>();
+    xs.sort_by(f32::total_cmp);
+    assert_close(xs[0], 100.0);
+    assert_close(xs[3], 700.0);
+    assert!(slots.iter().all(|(_, point)| (point.1 - y).abs() <= 0.01));
+}
+
+#[test]
+fn short_polyline_adds_parallel_ranks() {
+    let map = flat_map(64);
+    let units = (0..6)
+        .map(|index| formation_unit(index + 1, &map, (4, 4 + index)))
+        .collect::<Vec<_>>();
+    let slots = polyline_slots(&units, &[(300.0, 300.0), (332.0, 300.0)]);
+    let distinct_y = slots
+        .iter()
+        .map(|(_, point)| point.1.round() as i32)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(
+        distinct_y.len() >= 3,
+        "short strokes should grow multiple ranks"
+    );
 }
 
 #[test]

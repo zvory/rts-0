@@ -77,6 +77,23 @@ enum PathAttempt<T = ()> {
     Deferred,
 }
 
+fn formation_units(
+    entities: &EntityStore,
+    player: u32,
+    ids: &[u32],
+) -> Vec<formation::FormationUnit> {
+    ids.iter()
+        .filter_map(|&id| {
+            let entity = entities.get(id)?;
+            (entity.is_unit() && entity.owner == player).then_some(formation::FormationUnit {
+                id,
+                kind: entity.kind,
+                pos: (entity.pos_x, entity.pos_y),
+            })
+        })
+        .collect()
+}
+
 /// The movement/pathing coordinator for one tick.
 pub struct MoveCoordinator<'a> {
     pathing: &'a mut PathingService,
@@ -253,17 +270,7 @@ impl<'a> MoveCoordinator<'a> {
         if ids.is_empty() {
             return;
         }
-        let units: Vec<formation::FormationUnit> = ids
-            .iter()
-            .filter_map(|&id| {
-                let e = entities.get(id)?;
-                (e.is_unit() && e.owner == player).then_some(formation::FormationUnit {
-                    id,
-                    kind: e.kind,
-                    pos: (e.pos_x, e.pos_y),
-                })
-            })
-            .collect();
+        let units = formation_units(entities, player, ids);
         if units.is_empty() {
             return;
         }
@@ -312,6 +319,63 @@ impl<'a> MoveCoordinator<'a> {
             e.begin_weapon_teardown_for_movement();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
+        }
+    }
+
+    pub(in crate::game) fn formation_line_slots(
+        &self,
+        entities: &EntityStore,
+        player: u32,
+        ids: &[u32],
+        points: &[(f32, f32)],
+    ) -> Vec<(u32, (f32, f32))> {
+        let units = formation_units(entities, player, ids);
+        formation::polyline_slots(&units, points)
+    }
+
+    pub(in crate::game) fn order_group_formation_move(
+        &mut self,
+        entities: &mut EntityStore,
+        player: u32,
+        ids: &[u32],
+        requested: &[(u32, (f32, f32))],
+    ) {
+        let units = formation_units(entities, player, ids);
+        if units.is_empty() {
+            return;
+        }
+        self.record_group_queued_for_path(PathingRequestSource::Move, units.len());
+        let selected = units.iter().map(|unit| unit.id).collect::<BTreeSet<_>>();
+        let mut occupied_trenches = self
+            .known_trench_entry_for_player(player)
+            .map(|entry| entry.occupied_trenches.clone())
+            .unwrap_or_default();
+        for trench_id in occupied_trench_ids_for_units(entities, &selected) {
+            occupied_trenches.remove(&trench_id);
+        }
+        let known_trenches = self.known_trenches_for_player(player).to_vec();
+        let mut reachability = formation::FormationReachability::new(self.map, self.occ);
+        let goals = formation::polyline_formation_goals_with_reachability(
+            self.map,
+            self.occ,
+            &units,
+            requested,
+            &known_trenches,
+            &occupied_trenches,
+            |unit, tile| reachability.can_reach(unit, tile),
+        );
+        for (id, goal) in goals {
+            entities.release_miner(id);
+            let Some(entity) = entities.get_mut(id) else {
+                continue;
+            };
+            entity.replace_active_order(Order::move_to(goal.0, goal.1));
+            entity.set_path_goal(Some(goal));
+            entity.mark_move_phase(MovePhase::AwaitingPath);
+            entity.reset_gather_state();
+            entity.begin_weapon_teardown_for_movement();
+            let (x, y) = (entity.pos_x, entity.pos_y);
+            entity.reset_stuck(x, y);
         }
     }
 

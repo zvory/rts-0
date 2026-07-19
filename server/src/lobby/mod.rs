@@ -151,7 +151,8 @@ pub enum CommandLifecycleFamily {
 impl CommandLifecycleFamily {
     pub fn from_protocol_command(cmd: &crate::protocol::Command) -> Self {
         match cmd {
-            crate::protocol::Command::Move { .. } => Self::Move,
+            crate::protocol::Command::Move { .. }
+            | crate::protocol::Command::FormationMove { .. } => Self::Move,
             crate::protocol::Command::AttackMove { .. } => Self::AttackMove,
             crate::protocol::Command::Build { .. } => Self::Build,
             crate::protocol::Command::Train { .. } => Self::Train,

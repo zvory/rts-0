@@ -449,6 +449,7 @@ fn validate_allocated_entity_ref(
 fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadError> {
     let units = match command {
         SimCommand::Move { units, .. }
+        | SimCommand::FormationMove { units, .. }
         | SimCommand::AttackMove { units, .. }
         | SimCommand::Attack { units, .. }
         | SimCommand::Deconstruct { units, .. }

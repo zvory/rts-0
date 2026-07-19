@@ -1,6 +1,19 @@
 use super::*;
 
 #[test]
+fn formation_move_uses_object_points_and_defaults_queue_false() {
+    let command: Command = serde_json::from_str(
+        r#"{"c":"formationMove","units":[3,4],"points":[{"x":10.0,"y":20.0},{"x":30.0,"y":40.0}]}"#,
+    )
+    .expect("formation move should deserialize");
+    assert!(matches!(
+        command,
+        Command::FormationMove { units, points, queued: false }
+            if units == vec![3, 4] && points.len() == 2
+    ));
+}
+
+#[test]
 fn command_messages_require_client_sequence_envelope() {
     let msg: ClientMessage = serde_json::from_str(
         r#"{"t":"command","clientSeq":7,"cmd":{"c":"move","units":[1,2],"x":10.0,"y":20.0}}"#,

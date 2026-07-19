@@ -43,6 +43,7 @@ use crate::rules::{self, combat::WeaponKind};
 use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 use std::collections::HashMap;
 const MAX_RALLY_STAGES: usize = 4;
+const MIN_FORMATION_POINT_DISTANCE_PX: f32 = 2.0;
 mod artillery_scatter;
 mod cancel;
 mod guards;
@@ -184,6 +185,58 @@ pub(in crate::game) fn apply_commands(
                     &request,
                     command_admission
                 );
+            }
+            SimCommand::FormationMove {
+                units,
+                points,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                let Some(points) = sanitize_formation_points(map, points) else {
+                    continue;
+                };
+                let facts = admission_facts!(player, &faction_id, command_admission, units, None);
+                let endpoint = points.last().copied().unwrap_or((0.0, 0.0));
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Move {
+                        to: planner::Point::new(endpoint.0, endpoint.1),
+                    },
+                };
+                let output = planner::plan_order(
+                    planner_config(command_admission.max_units_per_command),
+                    &facts,
+                    &request,
+                );
+                let accepted = output
+                    .actions
+                    .iter()
+                    .map(|action| match action {
+                        planner::PlannedAction::ReplaceActive { unit, .. }
+                        | planner::PlannedAction::AppendQueued { unit, .. }
+                        | planner::PlannedAction::ExecuteAbilityNow { unit, .. } => *unit,
+                    })
+                    .collect::<Vec<_>>();
+                let requested =
+                    coordinator.formation_line_slots(entities, player, &accepted, &points);
+                if queued {
+                    for (unit, point) in requested {
+                        if let Some(entity) = entities.get_mut(unit) {
+                            entity.append_queued_order(OrderIntent::move_to(point.0, point.1));
+                        }
+                    }
+                    if !output.notices.is_empty() {
+                        notice(events, player, "Command queue full");
+                    }
+                } else {
+                    clear_queued_orders(entities, &accepted);
+                    coordinator.order_group_formation_move(entities, player, &accepted, &requested);
+                }
             }
             SimCommand::AttackMove {
                 units,
@@ -619,6 +672,30 @@ fn validate_command_units(
         return None;
     }
     Some(units)
+}
+
+fn sanitize_formation_points(map: &Map, points: Vec<(f32, f32)>) -> Option<Vec<(f32, f32)>> {
+    if points.len() < 2 || points.len() > protocol::MAX_FORMATION_POINTS {
+        return None;
+    }
+    let max = map.world_size_px() - 1.0;
+    let min_distance_sq = MIN_FORMATION_POINT_DISTANCE_PX * MIN_FORMATION_POINT_DISTANCE_PX;
+    let mut sanitized = Vec::with_capacity(points.len());
+    for (x, y) in points {
+        if !x.is_finite() || !y.is_finite() {
+            continue;
+        }
+        let point = (x.clamp(0.0, max), y.clamp(0.0, max));
+        if sanitized.last().is_some_and(|last: &(f32, f32)| {
+            let dx = point.0 - last.0;
+            let dy = point.1 - last.1;
+            dx * dx + dy * dy < min_distance_sq
+        }) {
+            continue;
+        }
+        sanitized.push(point);
+    }
+    (sanitized.len() >= 2).then_some(sanitized)
 }
 
 fn command_admission_for(

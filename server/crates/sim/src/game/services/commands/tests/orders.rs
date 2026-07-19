@@ -1,6 +1,75 @@
 use super::*;
 
 #[test]
+fn formation_move_assigns_distinct_authoritative_goals() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let units = (0..4)
+        .map(|index| {
+            entities
+                .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0 + index as f32 * 32.0)
+                .expect("rifleman should spawn")
+        })
+        .collect::<Vec<_>>();
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::FormationMove {
+                units: units.clone(),
+                points: vec![(320.0, 320.0), (704.0, 320.0)],
+                queued: false,
+            },
+        )],
+    );
+
+    let goals = units
+        .iter()
+        .filter_map(|id| entities.get(*id).and_then(|entity| entity.path_goal()))
+        .map(|(x, y)| (x.round() as i32, y.round() as i32))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(goals.len(), units.len());
+    assert!(units
+        .iter()
+        .all(|id| matches!(entities.get(*id).unwrap().order(), Order::Move(_))));
+}
+
+#[test]
+fn queued_formation_stores_one_resolved_point_per_unit() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let units = (0..3)
+        .map(|index| {
+            entities
+                .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0 + index as f32 * 32.0)
+                .expect("rifleman should spawn")
+        })
+        .collect::<Vec<_>>();
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::FormationMove {
+                units: units.clone(),
+                points: vec![(320.0, 320.0), (352.0, 320.0)],
+                queued: true,
+            },
+        )],
+    );
+
+    for id in units {
+        let entity = entities.get(id).unwrap();
+        assert!(matches!(entity.order(), Order::Idle));
+        assert_eq!(entity.queued_orders().len(), 1);
+        assert!(matches!(entity.queued_orders()[0], OrderIntent::Move(_)));
+    }
+}
+
+#[test]
 fn queued_move_appends_until_cap_and_normal_move_clears_queue() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

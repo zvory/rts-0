@@ -529,6 +529,18 @@ fn validate_command(
         MAX_UNITS_PER_COMMAND
     };
     match command {
+        Command::FormationMove { units, points, .. } => {
+            validate_unit_list(units, unit_cap, "command.units", state)?;
+            if !(2..=crate::MAX_FORMATION_POINTS).contains(&points.len()) {
+                return Err(invalid(format!(
+                    "command formationMove points must contain 2..={} entries",
+                    crate::MAX_FORMATION_POINTS
+                )));
+            }
+            for point in points {
+                validate_finite_point(point.x, point.y, "command.formationMove")?;
+            }
+        }
         Command::Move { units, x, y, .. }
         | Command::AttackMove { units, x, y, .. }
         | Command::SetupAntiTankGuns { units, x, y, .. } => {

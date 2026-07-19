@@ -29,6 +29,12 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Raw-cap rejection drops
   the whole malformed command without trimming; command-budget rejection also emits a private
   "Command supply exceeded" notice.
+- **Formation stroke cap** (`rts-protocol::MAX_FORMATION_POINTS = 64`): `formationMove` requires
+  2–64 submitted points. Live application drops non-finite points, clamps finite coordinates to the
+  map, collapses adjacent samples within two world pixels, and ignores a stroke with fewer than two
+  useful points. Lab/replay artifact validation rejects malformed point counts and non-finite
+  coordinates before enqueue. Resolved queued formations store only per-unit point intents, so a
+  long stroke cannot multiply durable queue state.
 - **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 8`): each mobile unit stores at most
   eight future intents. Queued command application still validates the raw cap and dedupes first, and
   queued promotion drains invalid stale intents instead of retrying them forever.
