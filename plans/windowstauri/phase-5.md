@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Complete on 2026-07-18 (shipped to Windows playtesters; no reported complaints).
 
 ## Objective
 
@@ -42,12 +42,12 @@ Rehearse the first external Windows playtester experience and produce the final 
 
 ## Implementation Checklist
 
-- [ ] Install/open the Phase 4 artifact on a clean Windows profile or machine.
-- [ ] Complete startup, beta lobby, and one match flow.
-- [ ] Verify logs and uninstall.
-- [ ] Update playtester instructions.
-- [ ] Decide go/no-go for first Windows playtesters.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Install/open the Phase 4 artifact on a clean Windows profile or machine.
+- [x] Complete startup, beta lobby, and one match flow.
+- [x] Verify logs and uninstall.
+- [x] Update playtester instructions.
+- [x] Decide go/no-go for first Windows playtesters.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 
@@ -72,3 +72,11 @@ pick Beta, and play a match.
 Give a go/no-go recommendation. Include the artifact path/checksum to send, the exact user
 instructions, known unsigned-app warnings, known limitations, and the next highest-value follow-up
 after first playtesters.
+
+## Implementation Handoff
+
+- **Go:** the unsigned Windows shell is shipped and active playtesters have reported no complaints.
+- This archive records the rollout outcome supplied by the product owner; it does not assert a new
+  clean-machine run or artifact checksum beyond the Phase 4 evidence.
+- Continue to treat signing, notarization, timestamping, and auto-update as deferred work rather
+  than a prerequisite for this successful first-playtester rollout.
