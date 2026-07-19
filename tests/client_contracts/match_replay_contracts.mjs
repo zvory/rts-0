@@ -756,11 +756,24 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
   withFakeOverlayDocument(({ FakeElement }) => {
     const root = new FakeElement("section");
+    const settingsRoot = new FakeElement("div");
     let unpaused = false;
-    const overlay = new LivePauseOverlay({ root, onUnpause: () => { unpaused = true; } });
+    const openedTabs = [];
+    const overlay = new LivePauseOverlay({
+      root,
+      settingsRoot,
+      onUnpause: () => { unpaused = true; },
+      onOpenSettings: (tabId) => openedTabs.push(tabId),
+      playerNameForId: (playerId) => playerId === 2 ? "Alex" : "",
+    });
     overlay.applyLivePauseState({ paused: true, pausedBy: 2, pauseLimit: 3, canUnpause: true });
     assert(root.children.length === 1, "live pause overlay mounts generated DOM");
     assert(!root.children[0].hidden, "live pause overlay shows when paused");
+    assert(root.querySelector(".live-pause-meta")?.textContent === "Paused by Alex", "live pause overlay resolves the pausing player's roster name");
+    assert(settingsRoot.classList.contains("live-pause-active"), "live pause overlay raises settings above its screen blocker");
+    root.querySelector("#live-pause-settings").listeners.click();
+    root.querySelector("#live-pause-hotkeys").listeners.click();
+    assert(openedTabs.join(",") === "game,hotkeys", "live pause overlay opens game settings and hotkey editing");
     const button = root.querySelector("#live-pause-unpause");
     assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for pause-authorized viewers");
     button.listeners.click();
@@ -769,6 +782,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(button.hidden && button.disabled, "live pause overlay hides unpause without authority");
     overlay.applyLivePauseState({ paused: false });
     assert(root.children[0].hidden, "live pause overlay hides when running");
+    assert(!settingsRoot.classList.contains("live-pause-active"), "live pause overlay restores normal settings stacking after unpause");
     overlay.destroy();
     assert(root.children.length === 0, "live pause overlay tears down DOM");
   });

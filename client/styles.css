@@ -2501,6 +2501,9 @@ input[type="text"]:focus {
   z-index: 20;
   pointer-events: auto;
 }
+#game-menu.live-pause-active {
+  z-index: calc(var(--overlay-z) + 2);
+}
 #game-menu[data-settings-context="match"],
 #game-menu[data-settings-context="lab"],
 #game-menu[data-settings-context="spectator"],
@@ -2873,6 +2876,12 @@ input[type="text"]:focus {
   margin: 0 0 16px;
   color: var(--ink-dim);
   line-height: 1.4;
+}
+.live-pause-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
 /* --- Top resource bar --- */
