@@ -115,8 +115,18 @@ fn entrenched_idle_rifleman_fires_at_bonus_range_without_chasing() {
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("rifleman should spawn");
     mark_entrenched(&mut entities, rifleman);
+    let rifleman_entity = entities.get(rifleman).expect("rifleman should exist");
+    let base_range_px = combat_rules::attack_profile(rifleman_entity.kind).range_tiles as f32
+        * config::TILE_SIZE as f32
+        + rifleman_entity.radius()
+        + RANGE_SLACK;
+    let bonus_range_px =
+        base_range_px + config::ENTRENCHMENT_RANGE_BONUS_TILES as f32 * config::TILE_SIZE as f32;
+    let enemy_x = 100.0 + (base_range_px + bonus_range_px) * 0.5;
+    assert!(enemy_x - 100.0 > base_range_px);
+    assert!(enemy_x - 100.0 < bonus_range_px);
     let enemy = entities
-        .spawn_unit(2, EntityKind::Rifleman, 258.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, enemy_x, 100.0)
         .expect("enemy should spawn");
     let enemy_hp = entities.get(enemy).expect("enemy should exist").hp;
 
