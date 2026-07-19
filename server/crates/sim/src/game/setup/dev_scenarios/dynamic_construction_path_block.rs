@@ -53,21 +53,21 @@ impl Game {
                 (
                     tile,
                     map.tile_center(tile.0, tile.1),
-                    (start_x + 9, center_y - 1),
+                    (start_x + 6, center_y - 1),
                 )
             }
             DynamicConstructionPathBlockCase::SlightAngle => {
                 let tile = (start_x, center_y);
                 let mut start = map.tile_center(tile.0, tile.1);
                 start.1 -= 4.0;
-                (tile, start, (start_x + 9, center_y - 1))
+                (tile, start, (start_x + 6, center_y - 1))
             }
             DynamicConstructionPathBlockCase::MajorAngle => {
                 let tile = (start_x, center_y - 8);
                 (
                     tile,
                     map.tile_center(tile.0, tile.1),
-                    (start_x + 9, center_y - 5),
+                    (start_x + 6, center_y - 5),
                 )
             }
         };
