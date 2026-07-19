@@ -338,43 +338,13 @@ impl RoomTask {
         ProjectionPolicy::new(policy.visibility, policy.diagnostics)
     }
 
-    #[allow(dead_code)]
-    fn observer_view_for(&self, connection_id: u32) -> ObserverView {
-        self.observer_views
-            .get(&connection_id)
-            .cloned()
-            .unwrap_or_else(|| {
-                let player_ids = match &self.phase {
-                    Phase::InGame(game) => {
-                        game.player_inits().iter().map(|player| player.id).collect()
-                    }
-                    Phase::ReplayViewer(session) => session.active_player_ids(),
-                    Phase::Lobby | Phase::BranchStaging(_) => Vec::new(),
-                };
-                ObserverView::Players(player_ids)
-            })
-    }
-
     fn observer_view_selection_for(&self, connection_id: u32) -> VisionSelectionRequest {
         let valid_player_ids = match &self.phase {
             Phase::InGame(game) => game.player_inits().iter().map(|player| player.id).collect(),
             Phase::ReplayViewer(session) => session.active_player_ids(),
             Phase::Lobby | Phase::BranchStaging(_) => Vec::new(),
         };
-        self.observer_view_selection_for_player_ids(connection_id, &valid_player_ids)
-    }
-
-    fn observer_view_selection_for_player_ids(
-        &self,
-        connection_id: u32,
-        valid_player_ids: &[u32],
-    ) -> VisionSelectionRequest {
-        let view = self
-            .observer_views
-            .get(&connection_id)
-            .cloned()
-            .unwrap_or_else(|| ObserverView::Players(valid_player_ids.to_vec()));
-        selection_from_observer_view(&view, valid_player_ids)
+        selection_from_observer_view(self.observer_views.get(&connection_id), &valid_player_ids)
     }
 
     fn is_dev_watch(&self) -> bool {

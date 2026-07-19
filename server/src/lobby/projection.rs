@@ -9,6 +9,12 @@ use crate::protocol::{
 use rts_sim::game::{Game, ObserverView, SnapshotOptions};
 use std::collections::HashMap;
 
+pub(super) fn observer_view_or_all(view: Option<&ObserverView>, game: &Game) -> ObserverView {
+    view.cloned().unwrap_or_else(|| {
+        ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect())
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RecipientRole {
     ActivePlayer,
@@ -283,9 +289,12 @@ pub(super) fn observer_view_from_selection(
 }
 
 pub(super) fn selection_from_observer_view(
-    view: &ObserverView,
+    view: Option<&ObserverView>,
     valid_player_ids: &[u32],
 ) -> VisionSelectionRequest {
+    let Some(view) = view else {
+        return VisionSelectionRequest::All;
+    };
     match view {
         ObserverView::Omniscient => VisionSelectionRequest::Omniscient,
         ObserverView::Players(player_ids) if player_ids.is_empty() => VisionSelectionRequest::All,
@@ -324,13 +333,13 @@ mod tests {
         );
         assert_eq!(
             selection_from_observer_view(
-                &ObserverView::Players(valid_player_ids.to_vec()),
+                Some(&ObserverView::Players(valid_player_ids.to_vec())),
                 &valid_player_ids,
             ),
             VisionSelectionRequest::All
         );
         assert_eq!(
-            selection_from_observer_view(&ObserverView::Omniscient, &valid_player_ids),
+            selection_from_observer_view(Some(&ObserverView::Omniscient), &valid_player_ids),
             VisionSelectionRequest::Omniscient
         );
     }

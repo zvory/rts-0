@@ -900,8 +900,8 @@ fn saved_artifact_replay_join_uses_replay_viewer_runtime() {
     };
     assert_eq!(session.artifact.command_log, artifact.command_log);
     assert_eq!(
-        task.observer_view_for(99),
-        rts_sim::game::ObserverView::Players(session.active_player_ids())
+        task.observer_view_selection_for(99),
+        VisionSelectionRequest::All
     );
     assert!(task.players.get(&99).is_some_and(|p| p.spectator));
     assert!(matches!(

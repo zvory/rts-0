@@ -3,13 +3,12 @@ use std::time::Instant as StdInstant;
 
 use super::super::connection::send_or_log;
 use super::super::live_tick::fanout_current_observer_snapshots;
-use super::super::projection::scope_observer_analysis;
+use super::super::projection::{observer_view_or_all, scope_observer_analysis};
 use super::super::replay_session::ReplaySession;
 use super::super::snapshot_fanout::fanout_replay_snapshots;
 use super::types::{Phase, ReplayTickContext};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
-use rts_sim::game::ObserverView;
 
 impl RoomTask {
     pub(super) fn fanout_current_observer_snapshots_to(
@@ -74,11 +73,7 @@ impl RoomTask {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
-            let view = self
-                .observer_views
-                .get(&id)
-                .cloned()
-                .unwrap_or_else(|| ObserverView::Players(session.active_player_ids()));
+            let view = observer_view_or_all(self.observer_views.get(&id), session.game());
             send_or_log(
                 &self.room,
                 id,

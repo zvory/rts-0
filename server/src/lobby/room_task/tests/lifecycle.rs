@@ -279,8 +279,8 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     assert_eq!(session.current_tick(), 0);
     assert_eq!(session.speed(), ReplaySession::DEFAULT_SPEED);
     assert_eq!(
-        task.observer_view_for(players[0].id),
-        rts_sim::game::ObserverView::Players(session.active_player_ids())
+        task.observer_view_selection_for(players[0].id),
+        VisionSelectionRequest::All
     );
     assert!(writer_a.snapshots.take().is_none());
     assert!(writer_b.snapshots.take().is_none());
@@ -292,8 +292,10 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
         },
     );
     assert_eq!(
-        task.observer_view_for(players[0].id),
-        rts_sim::game::ObserverView::Players(vec![players[1].id]),
+        task.observer_view_selection_for(players[0].id),
+        VisionSelectionRequest::Player {
+            player_id: players[1].id
+        },
         "former active players should gain replay-view selection without changing command authority"
     );
     let selected_snapshot = writer_a

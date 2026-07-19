@@ -8,13 +8,13 @@ use super::super::dev_replay::match_seed;
 use super::super::dev_scenario_id::DevScenarioId;
 use super::super::faction_validation::{default_faction_id_for, FactionRequestContext};
 use super::super::launch::{LaunchRecipient, StartPayloadBuilder};
-use super::super::projection::RecipientRole;
+use super::super::projection::{observer_view_or_all, RecipientRole};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::snapshots::union_events;
 use super::types::{Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
-use rts_sim::game::{command::SimCommand, Game, ObserverView};
+use rts_sim::game::{command::SimCommand, Game};
 
 pub(super) enum DevDriver {
     Scenario(DevScenarioDriver),
@@ -337,8 +337,6 @@ impl RoomTask {
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
         let observer_views = self.observer_views.clone();
-        let default_observer_view =
-            ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect());
         let full_vision_events = rts_sim::perf::timed(perf.as_mut(), "event_union", || {
             union_events(per_player_events.values())
         });
@@ -358,12 +356,10 @@ impl RoomTask {
                 RecipientRole::ActivePlayer
             };
             let projection = if role == RecipientRole::Spectator {
-                projection_policy.selected_perspective_snapshot_for(
-                    observer_views
-                        .get(&id)
-                        .cloned()
-                        .unwrap_or_else(|| default_observer_view.clone()),
-                )
+                projection_policy.selected_perspective_snapshot_for(observer_view_or_all(
+                    observer_views.get(&id),
+                    &game,
+                ))
             } else {
                 projection_policy.dev_watch_snapshot_for(role, view_player_id)
             };

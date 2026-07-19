@@ -14,7 +14,7 @@ use super::super::dev_replay::match_seed;
 use super::super::lab_replay_operations::lab_op_to_replay_operation;
 use super::super::lab_timeline::LabTimeline;
 use super::super::launch::{LaunchRecipient, StartPayloadBuilder};
-use super::super::projection::RecipientRole;
+use super::super::projection::{selection_from_observer_view, RecipientRole};
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::{normalize_start_team_id, MAX_PLAYERS, PLAYER_PALETTE};
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
@@ -642,7 +642,10 @@ impl RoomTask {
                         self.lab_session.as_ref().map(|session| {
                             session.metadata_for(id, launch_god_mode_players.clone())
                         }),
-                        self.observer_view_selection_for_player_ids(id, &valid_player_ids),
+                        selection_from_observer_view(
+                            self.observer_views.get(&id),
+                            &valid_player_ids,
+                        ),
                         player.msg_tx.clone(),
                     )
                 })

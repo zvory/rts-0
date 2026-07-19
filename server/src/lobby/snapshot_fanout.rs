@@ -1,5 +1,5 @@
 use super::connection::{send_or_log, SnapshotSendStatus};
-use super::projection::ProjectionPolicy;
+use super::projection::{observer_view_or_all, ProjectionPolicy};
 use super::replay_session::ReplaySession;
 use super::room_task::RoomPlayer;
 use super::snapshots::compact_snapshot_for_wire;
@@ -156,7 +156,6 @@ pub(super) fn fanout_replay_snapshots(
     perf: Option<&mut rts_sim::perf::TickPerf>,
 ) {
     let full_vision_events = union_events(per_player_events.values());
-    let default_view = ObserverView::Players(session.active_player_ids());
     SnapshotFanout::new(
         room,
         scheduler_lag,
@@ -166,12 +165,10 @@ pub(super) fn fanout_replay_snapshots(
         perf,
     )
     .send_to_recipients(players, recipients, |id, _player| {
-        let projection = projection_policy.selected_perspective_snapshot_for(
-            observer_views
-                .get(&id)
-                .cloned()
-                .unwrap_or_else(|| default_view.clone()),
-        );
+        let projection = projection_policy.selected_perspective_snapshot_for(observer_view_or_all(
+            observer_views.get(&id),
+            session.game(),
+        ));
         let snapshot =
             projection.snapshot_with_events(session.game(), per_player_events, &full_vision_events);
         Some(SnapshotFanoutPayload::new(snapshot, true))
