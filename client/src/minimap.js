@@ -33,6 +33,9 @@ import {
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
 import {
+  supportWeaponsWithSetupTargets,
+} from "./input/support_weapon_setup_targeting.js";
+import {
   commandTargetsMatch,
   plannedEntityForIntent,
   resourceRallyTargetAt,
@@ -1284,11 +1287,16 @@ export class Minimap {
       this._clearMinimapSetupPreview();
       return false;
     }
+    const previewGuns = supportWeaponsWithSetupTargets(
+      guns,
+      { x: wx, y: wy },
+      this.state.map?.tileSize || 32,
+    );
     intent.updateAntiTankGunSetupPreview?.({
       source: "minimap",
       mouseX: wx,
       mouseY: wy,
-      guns,
+      guns: previewGuns,
     });
     return true;
   }
@@ -1324,9 +1332,15 @@ export class Minimap {
     const commandTarget = this._intent()?.commandTarget;
     const sel = this.state.selectedEntities() || [];
     if (commandTarget === "setupAntiTankGuns") {
-      const supportWeapons = this._selectedOwnSupportWeapons().map((e) => e.id);
+      const supportWeaponEntities = this._selectedOwnSupportWeapons();
+      const supportWeapons = supportWeaponEntities.map((e) => e.id);
       if (supportWeapons.length > 0) {
-        this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(supportWeapons, wx, wy, queued));
+        this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
+          supportWeapons,
+          wx,
+          wy,
+          queued,
+        ));
         this._addCommandFeedback("move", wx, wy, queued);
       }
       return;

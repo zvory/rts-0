@@ -895,13 +895,13 @@ function pointerEvent(canvas, clientX, clientY, {
   ];
   const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
   assert(h.router.pointerDown(lockedEvent(200, 300, 0)), "setup minimap click is consumed");
-  assert(h.net.sent.length === 1, "setup minimap click sends one command");
+  assert(h.net.sent.length === 1, "setup minimap click remains one budgeted command");
   assert(h.net.sent[0].c === "setupAntiTankGuns", "setup minimap click sends setupAntiTankGuns");
   assert(
     h.net.sent[0].units.includes(31) &&
       h.net.sent[0].units.includes(32) &&
       h.net.sent[0].units.includes(33),
-    "setup minimap click includes support weapons",
+    "setup minimap click includes all support weapons in one admission unit list",
   );
   assertApprox(h.net.sent[0].x, 100, 0.001, "setup minimap command x");
   assertApprox(h.net.sent[0].y, 100, 0.001, "setup minimap command y");

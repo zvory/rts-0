@@ -164,6 +164,10 @@ pub fn supports_manual_emplacement(kind: EntityKind) -> bool {
     )
 }
 
+pub fn is_anti_tank_gun(kind: EntityKind) -> bool {
+    kind == EntityKind::AntiTankGun
+}
+
 pub fn is_rifle_infantry(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
 }

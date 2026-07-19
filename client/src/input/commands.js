@@ -27,6 +27,9 @@ import {
   pumpJackBuildIntentForResource,
 } from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
+import {
+  supportWeaponsWithSetupTargets,
+} from "./support_weapon_setup_targeting.js";
 
 export function _onRightClick(p, ev = {}) {
   const intent = clientIntent(this);
@@ -77,10 +80,15 @@ export function _issueTargetedCommand(p, ev = {}) {
   }
   if (commandTarget === "setupAntiTankGuns") {
     if (!world) return false;
-    const antiTankGuns = this._selectedOwnAntiTankGunIds();
-    if (antiTankGuns.length > 0) {
+    const supportWeapons = selectedOwnSupportWeaponEntities(this);
+    if (supportWeapons.length > 0) {
       const queued = !!ev.shiftKey;
-      this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(antiTankGuns, world.x, world.y, queued));
+      this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
+        supportWeapons.map((e) => e.id),
+        world.x,
+        world.y,
+        queued,
+      ));
       this._addCommandFeedback("move", world.x, world.y, queued);
     }
     return true;
@@ -398,12 +406,15 @@ export function _selectedGathererIds() {
 }
 
 export function _selectedOwnAntiTankGunIds() {
-  return selectedEntities(this.state)
-    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && (
+  return selectedOwnSupportWeaponEntities(this).map((e) => e.id);
+}
+
+function selectedOwnSupportWeaponEntities(input) {
+  return selectedEntities(input.state)
+    .filter((e) => ownOwner(input.state, e.owner, input.controlPolicy) && (
       e.kind === KIND.ANTI_TANK_GUN ||
       e.kind === KIND.MORTAR_TEAM ||
-      e.kind === KIND.ARTILLERY))
-    .map((e) => e.id);
+      e.kind === KIND.ARTILLERY));
 }
 
 function selectedEntities(state) {
@@ -602,7 +613,16 @@ export function _refreshAntiTankGunSetupPreview() {
     intent?.updateAntiTankGunSetupPreview?.(null);
     return;
   }
-  intent?.updateAntiTankGunSetupPreview?.({ mouseX: world.x, mouseY: world.y, guns });
+  const previewGuns = supportWeaponsWithSetupTargets(
+    guns,
+    world,
+    this.state.map?.tileSize || DEFAULT_TILE_SIZE,
+  );
+  intent?.updateAntiTankGunSetupPreview?.({
+    mouseX: world.x,
+    mouseY: world.y,
+    guns: previewGuns,
+  });
 }
 
 function cursorPreviewGroundAtScreen(input, screen) {
