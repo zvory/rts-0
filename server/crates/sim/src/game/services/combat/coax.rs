@@ -20,7 +20,7 @@ use super::activation::{
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::shot_blocker_index::ShotBlockerIndex;
-use super::target_legality::{DirectFireLegality, DirectFireVisibility};
+use super::target_legality::DirectFireLegality;
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
 
 const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;
@@ -81,7 +81,7 @@ pub(super) fn fire_tank_coax_system(
             Some(target) => (target.pos_x, target.pos_y),
             None => continue,
         };
-        if let Some(episode) = fog.firing_reveal_only_source_at_world(snapshot.owner, tx, ty) {
+        if let Some(episode) = fog.team_firing_reveal_only_source(snapshot.owner, (tx, ty), teams) {
             let reaction_ready = entities.get_mut(id).is_some_and(|e| {
                 e.weapon_firing_reveal_reaction_ready(
                     weapon_profile.id,
@@ -241,9 +241,7 @@ fn tank_coax_target_candidates(
                 facing_rad: snapshot.weapon_facing,
                 half_arc_rad: TANK_COAX_HALF_ARC_RAD,
                 range_px: effective_weapon_range_px,
-                direct_fire_legality: DirectFireLegality::intended_target(
-                    DirectFireVisibility::Owner,
-                ),
+                direct_fire_legality: DirectFireLegality::IntendedTarget,
             },
         ) {
             continue;

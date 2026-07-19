@@ -47,7 +47,7 @@ use acquisition::{combat_mode, resolve_target as resolve_target_with_obstruction
 use acquisition::{combat_mode_with_moving_fire, CombatMode};
 use damage::apply_damage;
 use shot_blocker_index::ShotBlockerIndex;
-use target_legality::{direct_fire_target_legal, DirectFireLegality, DirectFireVisibility};
+use target_legality::{direct_fire_target_legal, DirectFireLegality};
 use weapons::{
     begin_idle_deployed_weapon_setup, can_fire_while_moving, deployed_weapon_ready_to_fire,
     effective_attack_profile, mirror_weapon_to_body, mortar_target_inside_field_of_fire,
@@ -376,7 +376,7 @@ pub(in crate::game) fn combat_system(
                 owner,
                 (px, py),
                 tid,
-                DirectFireLegality::intended_target(DirectFireVisibility::Team),
+                DirectFireLegality::IntendedTarget,
             )
         } else {
             direct_fire_target_legal(
@@ -391,7 +391,7 @@ pub(in crate::game) fn combat_system(
                 owner,
                 (px, py),
                 tid,
-                DirectFireLegality::auto_acquire(),
+                DirectFireLegality::AutoAcquire,
             )
         };
         let mut fired = false;
@@ -423,11 +423,7 @@ pub(in crate::game) fn combat_system(
             if !deployed_weapon_ready_to_fire(entities, id) {
                 continue;
             }
-            let reveal_only_source = if mode == CombatMode::Ordered {
-                fog.team_firing_reveal_only_source(owner, (tx, ty), teams)
-            } else {
-                fog.firing_reveal_only_source_at_world(owner, tx, ty)
-            };
+            let reveal_only_source = fog.team_firing_reveal_only_source(owner, (tx, ty), teams);
             if let Some(episode) = reveal_only_source {
                 let reaction_ready = entities.get_mut(id).is_some_and(|e| {
                     e.weapon_firing_reveal_reaction_ready(

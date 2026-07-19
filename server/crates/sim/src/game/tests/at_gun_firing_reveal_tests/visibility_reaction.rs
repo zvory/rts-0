@@ -104,8 +104,7 @@ fn ordinary_sight_bypasses_an_in_progress_firing_reveal_reaction_gate() {
         .is_none_or(|entity| entity.hp < hp_after_reveal));
 }
 
-#[test]
-fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
+fn allied_reveal_reaction_fixture() -> (Game, u32, u32, (f32, f32), u32) {
     let mut game = empty_flat_game(&allied_three_players());
     let victim_pos = game.state.map.tile_center(10, 10);
     let enemy_pos = (victim_pos.0 + config::TILE_SIZE as f32 * 5.0, victim_pos.1);
@@ -127,7 +126,6 @@ fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
     deploy_anti_tank_gun_toward(&mut game, counter, enemy_pos);
     deploy_anti_tank_gun_toward(&mut game, enemy, victim_pos);
     refresh_visibility_for_test(&mut game);
-
     game.tick();
     let hp_after_reveal = game.state.entities.get(enemy).expect("enemy AT gun").hp;
     game.state
@@ -140,7 +138,10 @@ fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
         game.state.entities.get(enemy).expect("enemy AT gun").hp,
         hp_after_reveal
     );
+    (game, counter, enemy, enemy_pos, hp_after_reveal)
+}
 
+fn grant_allied_ordinary_sight(game: &mut Game, enemy: u32, enemy_pos: (f32, f32)) {
     game.state
         .entities
         .spawn_unit(
@@ -150,13 +151,19 @@ fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
             enemy_pos.1,
         )
         .expect("allied spotter");
-    refresh_visibility_for_test(&mut game);
+    refresh_visibility_for_test(game);
     assert!(game
         .state
         .fog
         .firing_reveal_only_episode(1, enemy)
         .is_some());
     assert_eq!(game.state.fog.firing_reveal_only_episode(2, enemy), None);
+}
+
+#[test]
+fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
+    let (mut game, counter, enemy, enemy_pos, hp_after_reveal) = allied_reveal_reaction_fixture();
+    grant_allied_ordinary_sight(&mut game, enemy, enemy_pos);
     game.enqueue(
         1,
         Command::Attack {
@@ -165,6 +172,18 @@ fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
             queued: false,
         },
     );
+    game.tick();
+    assert!(game
+        .state
+        .entities
+        .get(enemy)
+        .is_none_or(|entity| entity.hp < hp_after_reveal));
+}
+
+#[test]
+fn allied_ordinary_sight_bypasses_reaction_for_team_visible_auto_acquisition() {
+    let (mut game, _counter, enemy, enemy_pos, hp_after_reveal) = allied_reveal_reaction_fixture();
+    grant_allied_ordinary_sight(&mut game, enemy, enemy_pos);
     game.tick();
 
     assert!(game
