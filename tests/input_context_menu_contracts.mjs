@@ -48,6 +48,8 @@ function inputHarness() {
   input._eventScreenPos = () => ({ x: 100, y: 120 });
   input._trackMouse = () => {};
   input._routeLockedPointerDown = () => false;
+  input._routeLockedPointerUp = () => false;
+  input.cameraNavigation = null;
   input._onRightClick = (p, ev) => rightClicks.push({ p, shiftKey: !!ev.shiftKey });
   return { input, rightClicks };
 }
@@ -59,8 +61,12 @@ function inputHarness() {
 
   assert(down.prevented, "Shift+right mousedown suppresses native default");
   assert(down.stopped, "Shift+right mousedown stops propagation");
-  assert(rightClicks.length === 1, "Shift+right mousedown issues one order immediately");
-  assert(rightClicks[0].shiftKey === true, "Shift+right mousedown preserves queued modifier");
+  assert(rightClicks.length === 0, "Shift+right mousedown waits for click-or-drag resolution");
+
+  const up = mouseEvent({ button: 2, shiftKey: true });
+  input._handleMouseUp(up);
+  assert(rightClicks.length === 1, "Shift+right mouseup issues one click order when no drag was promoted");
+  assert(rightClicks[0].shiftKey === true, "Shift+right mouseup preserves queued modifier");
 
   const menu = mouseEvent({ button: 2, shiftKey: true });
   input._handleContextMenu(menu);
@@ -83,8 +89,7 @@ withNavigator({ platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel 
     placement: null,
     commandTarget: null,
   };
-  input._worldAt = (x, y) => ({ x, y });
-  input._entityAtWorld = () => ({ id: 7, owner: 1, kind: KIND.WORKER, x: 100, y: 120 });
+  input._entityAtScreen = () => ({ id: 7, owner: 1, kind: KIND.WORKER, x: 100, y: 120 });
   input._commitClickSelection = (p, additive, ctrl) => selectionClicks.push({ p, additive, ctrl });
 
   const menu = mouseEvent({ button: 2, ctrlKey: true });
@@ -105,8 +110,7 @@ withNavigator({ platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win
     placement: null,
     commandTarget: null,
   };
-  input._worldAt = (x, y) => ({ x, y });
-  input._entityAtWorld = () => ({ id: 7, owner: 1, kind: KIND.WORKER, x: 100, y: 120 });
+  input._entityAtScreen = () => ({ id: 7, owner: 1, kind: KIND.WORKER, x: 100, y: 120 });
   input._commitClickSelection = (p, additive, ctrl) => selectionClicks.push({ p, additive, ctrl });
 
   const menu = mouseEvent({ button: 2, ctrlKey: true });
