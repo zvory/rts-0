@@ -126,7 +126,6 @@ fn allied_reveal_reaction_fixture() -> (Game, u32, u32, (f32, f32), u32) {
     deploy_anti_tank_gun_toward(&mut game, counter, enemy_pos);
     deploy_anti_tank_gun_toward(&mut game, enemy, victim_pos);
     refresh_visibility_for_test(&mut game);
-
     game.tick();
     let hp_after_reveal = game.state.entities.get(enemy).expect("enemy AT gun").hp;
     game.state
@@ -139,7 +138,6 @@ fn allied_reveal_reaction_fixture() -> (Game, u32, u32, (f32, f32), u32) {
         game.state.entities.get(enemy).expect("enemy AT gun").hp,
         hp_after_reveal
     );
-
     (game, counter, enemy, enemy_pos, hp_after_reveal)
 }
 
@@ -175,7 +173,6 @@ fn allied_ordinary_sight_bypasses_reaction_for_explicit_team_visible_fire() {
         },
     );
     game.tick();
-
     assert!(game
         .state
         .entities
