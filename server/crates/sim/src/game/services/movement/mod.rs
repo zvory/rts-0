@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::EntityStore;
-use crate::game::entity::{EntityKind, Order, WeaponSetup};
+use crate::game::entity::{EntityKind, WeaponSetup};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::scout_plane;
@@ -92,12 +92,6 @@ pub(crate) fn movement_system_with_events(
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.set_movement_delta(0.0, 0.0);
-            // Attack orders are stationary intent. Clear any legacy/checkpoint path before the
-            // movement pass so no previously authored pursuit state can translate the unit.
-            if matches!(e.order(), Order::Attack(_)) {
-                e.clear_path();
-                e.set_path_goal(None);
-            }
         }
     }
     for id in entities.ids() {

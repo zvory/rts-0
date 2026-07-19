@@ -34,7 +34,7 @@ pub enum Order {
     Move(MoveOrder),
     /// Move to a world point while engaging enemies encountered along the way.
     AttackMove(MoveOrder),
-    /// Chase and attack a specific entity until it dies, then go idle.
+    /// Pursue and attack a specific entity until it dies, then go idle.
     Attack(AttackOrder),
     /// Harvest from a resource node, depositing each completed load directly into the economy.
     Gather(GatherOrder),
@@ -337,6 +337,10 @@ pub struct AttackExecution {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AttackPhase {
+    /// The commanded target is out of the current weapon range band, so the unit is following
+    /// a target-relative path to a firing position.
+    Pursuing,
+    /// The commanded target cannot currently be fired on and no pursuit path is active.
     Waiting,
     Firing,
 }

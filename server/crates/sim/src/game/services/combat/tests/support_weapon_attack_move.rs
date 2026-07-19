@@ -37,7 +37,7 @@ fn idle_machine_gunner_holds_position_once_setup_begins() {
 }
 
 #[test]
-fn explicit_attack_keeps_out_of_range_machine_gunner_deployed_and_stationary() {
+fn explicit_attack_tears_down_and_pursues_an_out_of_range_machine_gunner_target() {
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 330.0, 100.0)
@@ -64,8 +64,8 @@ fn explicit_attack_keeps_out_of_range_machine_gunner_deployed_and_stationary() {
 
     let mg = entities.get(mg_id).expect("mg should exist");
     assert!(matches!(mg.order(), Order::Attack(_)));
-    assert_eq!(mg.weapon_setup(), WeaponSetup::Deployed);
-    assert!(mg.path_is_empty());
+    assert!(matches!(mg.weapon_setup(), WeaponSetup::TearingDown { .. }));
+    assert!(!mg.path_is_empty());
 }
 
 #[test]

@@ -71,12 +71,8 @@ fn automatic_acquisition_considers_only_targets_in_weapon_range() {
 }
 
 #[test]
-fn out_of_range_direct_attacks_do_not_create_or_refresh_paths() {
-    for kind in [
-        EntityKind::Rifleman,
-        EntityKind::MachineGunner,
-        EntityKind::AntiTankGun,
-    ] {
+fn out_of_range_direct_attacks_create_and_refresh_pursuit_paths() {
+    for kind in [EntityKind::Rifleman, EntityKind::MachineGunner] {
         let map = open_map(32);
         let mut entities = EntityStore::new();
         let attacker_id = entities
@@ -100,9 +96,6 @@ fn out_of_range_direct_attacks_do_not_create_or_refresh_paths() {
         if let Some(attacker) = entities.get_mut(attacker_id) {
             attacker.set_order(Order::attack(target_id));
             attacker.set_target_id(Some(target_id));
-            if kind == EntityKind::AntiTankGun {
-                attacker.set_weapon_setup(WeaponSetup::Packed);
-            }
         }
 
         run_combat_tick_on_map(
@@ -118,18 +111,48 @@ fn out_of_range_direct_attacks_do_not_create_or_refresh_paths() {
             attacker.order(),
             Order::Attack(crate::game::entity::AttackOrder {
                 execution: crate::game::entity::AttackExecution {
-                    phase: crate::game::entity::AttackPhase::Waiting,
+                    phase: crate::game::entity::AttackPhase::Pursuing,
                 },
                 ..
             })
         ));
         assert_eq!(attacker.target_id(), Some(target_id), "{kind:?}");
-        assert!(attacker.path_is_empty(), "{kind:?} should stay put");
+        assert!(!attacker.path_is_empty(), "{kind:?} should pursue");
+        assert!(
+            attacker.path_goal().is_some(),
+            "{kind:?} should have a pursuit goal"
+        );
+
+        if let Some(target) = entities.get_mut(target_id) {
+            target.set_position(100.0 + range_px * 0.5, target.pos_y);
+        }
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+        let attacker = entities
+            .get(attacker_id)
+            .expect("attacker should still exist");
+        assert!(attacker.path_is_empty(), "{kind:?} should stop in range");
         assert_eq!(
             attacker.path_goal(),
             None,
-            "{kind:?} should have no pursuit goal"
+            "{kind:?} should stop pursuing in range"
         );
+
+        if let Some(target) = entities.get_mut(target_id) {
+            target.set_position(target_x, target.pos_y);
+        }
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+        let attacker = entities
+            .get(attacker_id)
+            .expect("attacker should still exist");
+        assert!(!attacker.path_is_empty(), "{kind:?} should resume pursuit");
     }
 }
 

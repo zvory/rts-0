@@ -235,10 +235,10 @@ fn out_of_range_vehicle_does_not_suppress_normal_rifle_fire() {
 }
 
 #[test]
-fn out_of_range_launcher_and_explicit_attack_never_create_pursuit_movement() {
+fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
     let mut game = empty_flat_game(&players());
     let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
-    let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 18, 8);
+    let tank = spawn_on_tile(&mut game, 1, EntityKind::Tank, 18, 8);
     unlock_panzerfausts(&mut game, 1);
     arm_newly_spawned_rifleman(&mut game, 1, rifleman);
     refresh_world(&mut game);
@@ -275,11 +275,11 @@ fn out_of_range_launcher_and_explicit_attack_never_create_pursuit_movement() {
     );
     for _ in 0..300 {
         launches += launch_count(&game.tick(), 1, rifleman);
+        if launches > 0 {
+            break;
+        }
     }
     let attacker = game.state.entities.get(rifleman).expect("rifleman");
-    assert_eq!((attacker.pos_x, attacker.pos_y), start);
-    assert!(attacker.path_is_empty());
-    assert_eq!(attacker.path_goal(), None);
-    assert_eq!(launches, 0);
-    assert!(game.state.entities.get(tank).is_some());
+    assert_ne!((attacker.pos_x, attacker.pos_y), start);
+    assert_eq!(launches, 1);
 }

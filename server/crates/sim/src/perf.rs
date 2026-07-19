@@ -39,6 +39,7 @@ pub struct EntityCounts {
 pub(crate) enum PathingRequestSource {
     Move,
     AttackMove,
+    DirectAttack,
     Gather,
     Build,
     Deconstruct,
@@ -50,6 +51,7 @@ pub(crate) enum PathingRequestSource {
 pub(crate) struct PathingSourceCounts {
     pub(crate) move_orders: u32,
     pub(crate) attack_move: u32,
+    pub(crate) direct_attack: u32,
     pub(crate) gather: u32,
     pub(crate) build: u32,
     pub(crate) deconstruct: u32,
@@ -64,6 +66,9 @@ impl PathingSourceCounts {
             PathingRequestSource::AttackMove => {
                 self.attack_move = self.attack_move.saturating_add(count);
             }
+            PathingRequestSource::DirectAttack => {
+                self.direct_attack = self.direct_attack.saturating_add(count);
+            }
             PathingRequestSource::Gather => self.gather = self.gather.saturating_add(count),
             PathingRequestSource::Build => self.build = self.build.saturating_add(count),
             PathingRequestSource::Deconstruct => {
@@ -77,6 +82,7 @@ impl PathingSourceCounts {
     fn add(&mut self, other: Self) {
         self.move_orders = self.move_orders.saturating_add(other.move_orders);
         self.attack_move = self.attack_move.saturating_add(other.attack_move);
+        self.direct_attack = self.direct_attack.saturating_add(other.direct_attack);
         self.gather = self.gather.saturating_add(other.gather);
         self.build = self.build.saturating_add(other.build);
         self.deconstruct = self.deconstruct.saturating_add(other.deconstruct);
@@ -88,6 +94,7 @@ impl PathingSourceCounts {
         let (label, count) = [
             ("move", self.move_orders),
             ("attackMove", self.attack_move),
+            ("attack", self.direct_attack),
             ("gather", self.gather),
             ("build", self.build),
             ("deconstruct", self.deconstruct),
@@ -108,6 +115,7 @@ impl PathingSourceCounts {
         compact_counts([
             ("move", self.move_orders),
             ("attackMove", self.attack_move),
+            ("attack", self.direct_attack),
             ("gather", self.gather),
             ("build", self.build),
             ("deconstruct", self.deconstruct),

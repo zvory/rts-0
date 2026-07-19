@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
-    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity,
-    EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
+    AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -91,7 +91,7 @@ pub(super) fn advance_moving_units(
                 e.pos_x,
                 e.pos_y,
                 !uses_oriented_vehicle_body(e.kind)
-                    && matches!(e.order(), Order::Move(_))
+                    && matches!(e.order(), Order::Move(_) | Order::Attack(_))
                     && footing_profile(e) != FootingProfile::Ghost,
                 e.next_waypoint(),
             )
@@ -466,7 +466,9 @@ pub(super) fn advance_moving_units(
                 if matches!(e.order(), Order::Move(_)) {
                     e.set_order(Order::Idle);
                 }
-            } else if matches!(e.move_phase(), Some(MovePhase::Moving)) {
+            } else if matches!(e.move_phase(), Some(MovePhase::Moving))
+                || matches!(e.order(), Order::Attack(_))
+            {
                 // Decrement local recovery cooldowns each tick.
                 if let Some(m) = e.movement.as_mut() {
                     m.sidestep_cooldown = m.sidestep_cooldown.saturating_sub(1);
@@ -489,11 +491,18 @@ pub(super) fn advance_moving_units(
                 if static_blocked_ticks >= config::STATIC_BLOCKED_REPATH_TICKS
                     && matches!(
                         e.order(),
-                        Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
+                        Order::Move(_)
+                            | Order::AttackMove(_)
+                            | Order::Ability(_)
+                            | Order::Attack(_)
                     )
                 {
                     e.set_path(Vec::new());
-                    e.mark_move_phase(MovePhase::AwaitingPath);
+                    if matches!(e.order(), Order::Attack(_)) {
+                        e.mark_attack_phase(AttackPhase::Pursuing);
+                    } else {
+                        e.mark_move_phase(MovePhase::AwaitingPath);
+                    }
                     let (px, py) = (e.pos_x, e.pos_y);
                     e.reset_stuck(px, py);
                     continue;
@@ -539,7 +548,10 @@ pub(super) fn advance_moving_units(
                     && stuck_ticks >= config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS
                     && matches!(
                         e.order(),
-                        Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
+                        Order::Move(_)
+                            | Order::AttackMove(_)
+                            | Order::Ability(_)
+                            | Order::Attack(_)
                     )
                 {
                     inject_scout_car_reverse_recovery(e, map, occ);
@@ -551,7 +563,10 @@ pub(super) fn advance_moving_units(
                 if !uses_oriented_vehicle_body(kind)
                     && stuck_ticks >= trigger_threshold
                     && static_blocked_ticks == 0
-                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                    && matches!(
+                        e.order(),
+                        Order::Move(_) | Order::AttackMove(_) | Order::Attack(_)
+                    )
                 {
                     let far_from_goal = e.path_goal().is_some_and(|(gx, gy)| {
                         let dx = x - gx;
