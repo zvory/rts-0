@@ -398,7 +398,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   and takes 600 ticks (~20s). Completion unlocks Panzerfaust training at the Barracks. Riflemen are
   never automatically armed or rearmed.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
-  and takes 900 ticks (~30s). The rules surface defines Riflemen, Panzerfausts, and Machine Gunners
+  and takes 600 ticks (~20s). The rules surface defines Riflemen, Panzerfausts, and Machine Gunners
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
   Ekat-faction units, vehicles, buildings, support weapons other than Machine Gunners, and
   non-infantry entities are excluded.

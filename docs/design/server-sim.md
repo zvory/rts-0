@@ -1203,7 +1203,7 @@ spatial indexes across later mutations.
 
 ### 3.5 Command planning and queued order semantics
 
-Entrenchment research takes 30 seconds.
+Entrenchment research takes 20 seconds.
 
 Deployed anti-tank guns rank in-field automatic target candidates ahead of out-of-arc candidates. If no in-field candidate exists, acquisition retains the out-of-arc target so the weapon clamps toward the fixed field edge without firing.
 
