@@ -1376,14 +1376,14 @@ General rules:
   snapshot so ranking consumes explicit facts instead of re-classifying kind-specific fields. The
   ranker selects one named `rules::combat::TargetPriorityPolicyId` and applies that policy's
   declarative terms: default-weapon fit, Tank cannon immediate-threat order, vehicle Tank Trap route
-  obstruction, shoot-while-moving target retention, unit-over-building preference, and nearest/id
+  obstruction, shoot-while-moving target retention, target-group preference, and nearest/id
   tie-breaks. Auto-acquisition only ranks candidates already inside current weapon range. Explicit
   `Attack` orders keep their commanded target while it remains hostile and visible without moving
   toward it. The
-  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks
-  Worker, Rifleman, and Machine Gunner targets before all other legal non-resource fallbacks, then
-  uses distance/id ties without Tank cannon threat ordering. The ranker does not decide fog, smoke,
-  line-of-sight, blocker, ownership, or acquisition-radius legality.
+  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Rifleman and
+  Machine Gunner targets first, Worker and Golem targets second, and all other legal non-resource
+  fallbacks last, then uses distance/id ties without Tank cannon threat ordering. The ranker does
+  not decide fog, smoke, line-of-sight, blocker, ownership, or acquisition-radius legality.
   Tanks run the coax pass after their normal cannon aim/fire/relax work for the tick. The pass reads
   the current authoritative turret facing, accepts only targets within a 10-degree half arc and the
   6-tile coax range, uses intended-target direct-fire legality so enemy hard blockers can reject a
@@ -1404,10 +1404,11 @@ General rules:
   a stricter mode that requires the shot to hit the intended target. Secondary-weapon acquisition
   should use `services::combat::activation::secondary_weapon_target_passes_activation` to pre-filter
   candidates by current weapon facing arc, weapon range, and intended-target direct-fire legality
-  without rotating, chasing, or mutating movement state. Unit attackers rank legal unit targets above
-  buildings, so buildings remain last-resort cleanup targets unless explicitly ordered or covered by
-  a special obstruction policy. Default small-arms weapons prefer soft targets while keeping
-  armored targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
+  without rotating, chasing, or mutating movement state. Default-weapon unit attackers rank
+  non-economy combat units first, economy workers (`Worker` and `Golem`) second, and buildings or
+  other non-unit cleanup targets last unless explicitly ordered or covered by a special obstruction
+  policy. Within a target group, small-arms weapons prefer soft targets while keeping armored
+  targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
   armored units, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
   Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
   `services::occupancy` reports that the trap is on the current bounded route segment or forms a

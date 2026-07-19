@@ -56,12 +56,9 @@ pub fn is_economy_unit(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Worker | EntityKind::Golem)
 }
 
-/// Future Tank coax infantry-priority group locked by the coax requirements.
+/// Infantry that Tank coax fire ranks ahead of economy workers and fallback targets.
 pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
-    )
+    matches!(kind, EntityKind::Rifleman | EntityKind::MachineGunner)
 }
 
 #[cfg(test)]
@@ -95,7 +92,7 @@ mod tests {
                     threat_role: TargetThreatRole::Ordinary,
                     is_vehicle_body: false,
                     is_economy_unit: true,
-                    is_coax_infantry_priority: true,
+                    is_coax_infantry_priority: false,
                 },
             ),
             (

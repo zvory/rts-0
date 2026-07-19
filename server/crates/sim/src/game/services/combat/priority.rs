@@ -252,7 +252,20 @@ mod tests {
     }
 
     #[test]
-    fn unit_attackers_prefer_units_over_armored_buildings() {
+    fn default_weapon_prefers_combat_units_over_nearer_workers() {
+        let candidates = [
+            candidate(10, EntityKind::Worker, 400.0, false),
+            candidate(11, EntityKind::Rifleman, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::MachineGunner), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn unit_attackers_prefer_workers_over_armored_buildings() {
         let candidates = [
             candidate(10, EntityKind::CityCentre, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
@@ -260,6 +273,19 @@ mod tests {
 
         assert_eq!(
             choose_target(&context(EntityKind::Tank), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn worker_group_beats_weapon_fit_for_building_cleanup() {
+        let candidates = [
+            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(11, EntityKind::Worker, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::AntiTankGun), &candidates),
             Some(11)
         );
     }
@@ -347,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_prioritizes_infantry_priority_targets() {
+    fn coax_policy_prioritizes_economy_units_over_fallback_targets() {
         let candidates = [
             candidate(10, EntityKind::Tank, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
@@ -382,14 +408,34 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_uses_distance_then_id_inside_priority_bucket() {
-        let farther = candidate(10, EntityKind::Worker, 2_500.0, false);
-        let nearer = candidate(11, EntityKind::MachineGunner, 400.0, false);
-        assert_eq!(choose_target(&coax_context(), &[farther, nearer]), Some(11));
+    fn coax_policy_prefers_combat_infantry_over_nearer_workers() {
+        let nearer_worker = candidate(10, EntityKind::Worker, 400.0, false);
+        let farther_machine_gunner = candidate(11, EntityKind::MachineGunner, 2_500.0, false);
+        assert_eq!(
+            choose_target(&coax_context(), &[nearer_worker, farther_machine_gunner]),
+            Some(11)
+        );
 
-        let first = candidate(10, EntityKind::Worker, 900.0, false);
-        let second = candidate(11, EntityKind::Rifleman, 900.0, false);
-        assert_eq!(choose_target(&coax_context(), &[second, first]), Some(10));
+        let worker = candidate(10, EntityKind::Worker, 900.0, false);
+        let rifleman = candidate(11, EntityKind::Rifleman, 900.0, false);
+        assert_eq!(
+            choose_target(&coax_context(), &[rifleman, worker]),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn coax_policy_uses_distance_then_id_within_economy_group() {
+        let farther_worker = candidate(10, EntityKind::Worker, 2_500.0, false);
+        let nearer_golem = candidate(11, EntityKind::Golem, 400.0, false);
+        assert_eq!(
+            choose_target(&coax_context(), &[farther_worker, nearer_golem]),
+            Some(11)
+        );
+
+        let worker = candidate(10, EntityKind::Worker, 900.0, false);
+        let golem = candidate(11, EntityKind::Golem, 900.0, false);
+        assert_eq!(choose_target(&coax_context(), &[golem, worker]), Some(10));
     }
 
     #[test]

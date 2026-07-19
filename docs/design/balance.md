@@ -268,9 +268,10 @@ Forest-specific rules are future work.
 The unit, building, and resource-node tables below are the human-readable form of the authoritative
 `rules::defs` records.
 
-Default auto-acquisition ranks already-legal targets by weapon fit before distance, but unit
-attackers treat buildings as last-resort cleanup targets after legal unit targets. Small-arms
-default weapons prefer soft targets (`ArmorClass::Small`) over armored targets, but they
+Default auto-acquisition groups already-legal targets before applying weapon fit or distance:
+unit attackers prefer non-economy combat units, then economy workers (`Worker` and `Golem`),
+then buildings and other non-unit cleanup targets. Small-arms default weapons prefer soft targets
+(`ArmorClass::Small`) over armored targets within the same target group, but they
 still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
 units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
 prefer anti-armor threats and armored units over ordinary soft units. Tanks keep a narrower
@@ -280,10 +281,10 @@ Vehicle-body units treat enemy Tank Traps as high-priority breach targets only w
 the unit's current short route window or helps close a vehicle-body gap across that route; nearby
 irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
-`EntityKind`, including the Tank coax infantry-priority group: Worker, Rifleman, and Machine Gunner
-only. The live coax policy ranks those infantry-priority targets before fallback legal targets such
-as vehicles, buildings, support weapons, and field obstacles; resource nodes are not legal coax
-targets.
+`EntityKind`, including the Tank coax infantry-priority group. The live coax policy ranks Riflemen
+and Machine Gunners first, economy workers (`Worker` and `Golem`) second, and fallback legal
+targets such as vehicles, buildings, support weapons, and field obstacles last; resource nodes are
+not legal coax targets.
 Default weapons perform a full acquisition pass when ready and targetless, immediately after each
 shot to prepare the next engagement during reload, or when the prepared target is no longer
 fireable on the ready tick. Reload, setup, and aiming ticks revalidate only that committed target;
