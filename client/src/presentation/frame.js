@@ -26,6 +26,7 @@ const FEEDBACK_ARRAYS = Object.freeze([
 
 const FEEDBACK_SINGLETONS = Object.freeze([
   ["placement", "placement"],
+  ["formationMovePreview", "formationMovePreview"],
   ["labToolPreview", "labToolPreview"],
   ["attackTargetPreview", "attackTargetPreview"],
   ["antiTankGunSetupPreview", "supportWeaponSetupPreview"],

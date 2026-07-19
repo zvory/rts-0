@@ -274,6 +274,8 @@ function withQueued(command, queued) {
 
 export const cmd = Object.freeze({
   move: (units, x, y, queued = false) => withQueued({ c: CMD.MOVE, units, x, y }, queued),
+  formationMove: (units, points, queued = false) =>
+    withQueued({ c: CMD.FORMATION_MOVE, units, points }, queued),
   attackMove: (units, x, y, queued = false) =>
     withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
   attack: (units, target, queued = false) =>

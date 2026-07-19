@@ -20,37 +20,37 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2471,
+      "lines": 2457,
       "reason": "Checkpoint policy and simulation-architecture enforcement remain concentrated in this oversized checker; keep ratcheting until scanners and tests are split into modules."
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1697,
-      "reason": "Command-envelope tests were split from the existing oversized protocol module; compact snapshot contract fixtures cover the global combat and production-waiting bits; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1705,
+      "reason": "The authoritative FormationMove wire DTO adds a bounded polyline command and point type beside the existing command envelope; keep ratcheting until remaining protocol DTO groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
-      "lines": 3493,
+      "lines": 3436,
       "reason": "Panzerfaust shot persistence adds detached shot-store plumbing to the existing oversized sim combat test harness; keep ratcheting until combat tests are split."
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1897,
-      "reason": "Planner-intent conversion was split from the existing oversized command dispatcher; keep ratcheting until more command families are extracted."
+      "lines": 1946,
+      "reason": "FormationMove admission, point sanitization, queue handling, and authoritative dispatch stay together in the command boundary for this prototype; keep ratcheting by extracting command families as their contracts stabilize."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1753,
-      "reason": "Spawn-test extraction lowered the existing oversized movement coordinator; keep ratcheting until coordinator policy is split."
+      "lines": 1794,
+      "reason": "Freehand formation moves add coordinator entry points for slot assignment and reachable path goals while the geometry remains split into the formation module; keep ratcheting until coordinator policy is split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
-      "lines": 5176,
+      "lines": 5124,
       "reason": "Existing oversized movement test module before repo-wide source-size gate."
     },
     {
       "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1513,
+      "lines": 1506,
       "reason": "Ready-order and hold-position promotion tests were split from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
     },
     {
@@ -70,7 +70,7 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1916,
+      "lines": 1915,
       "reason": "Input-command coverage remains in the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]

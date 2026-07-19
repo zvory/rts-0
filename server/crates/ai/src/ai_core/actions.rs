@@ -213,6 +213,16 @@ fn command_trace_label(command: &Command) -> String {
             y,
             queued
         ),
+        Command::FormationMove {
+            units,
+            points,
+            queued,
+        } => format!(
+            "formationMove units={} points={} queued={}",
+            id_list(units),
+            points.len(),
+            queued
+        ),
         Command::Attack {
             units,
             target,

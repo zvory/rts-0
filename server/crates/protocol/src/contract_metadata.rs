@@ -528,6 +528,7 @@ pub fn protocol_contract() -> ProtocolContract {
         },
         command_tags: string_map(&[
             ("MOVE", "move"),
+            ("FORMATION_MOVE", "formationMove"),
             ("ATTACK_MOVE", "attackMove"),
             ("ATTACK", "attack"),
             ("DECONSTRUCT", "deconstruct"),

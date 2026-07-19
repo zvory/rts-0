@@ -5,6 +5,8 @@
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
 use serde::{Deserialize, Serialize};
+
+pub const MAX_FORMATION_POINTS: usize = 64;
 mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
@@ -178,6 +180,12 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    FormationMove {
+        units: Vec<u32>,
+        points: Vec<FormationPoint>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     AttackMove {
         units: Vec<u32>,
         x: f32,
@@ -287,6 +295,13 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FormationPoint {
+    pub x: f32,
+    pub y: f32,
 }
 
 pub type VisionSelectionRequest = ObserverViewSelection;

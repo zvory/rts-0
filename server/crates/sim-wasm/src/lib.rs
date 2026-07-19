@@ -360,6 +360,17 @@ impl CorePredictor {
                 y,
                 queued,
             } => self.apply_move(units, *x, *y, *queued, MoveOrderKind::Move),
+            Command::FormationMove {
+                units,
+                points,
+                queued,
+            } => {
+                if let Some(point) = points.last() {
+                    self.apply_move(units, point.x, point.y, *queued, MoveOrderKind::Move);
+                } else {
+                    self.note_disabled("invalidFormationMoveTarget");
+                }
+            }
             Command::AttackMove {
                 units,
                 x,
@@ -773,6 +784,7 @@ fn unsupported_fields() -> Vec<String> {
 fn command_kind(command: &Command) -> &'static str {
     match command {
         Command::Move { .. } => "move",
+        Command::FormationMove { .. } => "formationMove",
         Command::AttackMove { .. } => "attackMove",
         Command::Attack { .. } => "attack",
         Command::Deconstruct { .. } => "deconstruct",

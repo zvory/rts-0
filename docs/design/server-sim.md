@@ -1213,6 +1213,14 @@ Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Ac
 
 Group move formation assignment checks cached reachability components before issuing per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. When a preserved offset is locally passable but unreachable, the affected unit searches inward toward the formation center for a reachable replacement; if no useful route exists, its old goal is preserved so normal path processing can report `PathFailed`.
 
+`FormationMove` accepts a bounded, sanitized world-space polyline and assigns deterministic slots
+by arc length. A stroke with enough length uses a single rank across the complete stroke; a shorter
+stroke grows parallel ranks at body-aware spacing. Stable entity-id and nearest-slot tie-breaking
+reduce crossing. Requested slots then pass through the same standability, uniqueness, known-trench,
+and cached-reachability goal search as ordinary formations. Immediate commands replace active
+orders as a group. Queued commands resolve the slots at issue time and store one ordinary point
+move intent per accepted unit, keeping each unit's bounded queue independent of stroke complexity.
+
 The authoritative command model is: clients compose intent; the server validates and plans it.
 Keyboard latching, double-tap quick-cast, Shift lifetime, cursor previews, and rejecting
 pointer-captured touch releases outside their originating controls are client UX. The simulation

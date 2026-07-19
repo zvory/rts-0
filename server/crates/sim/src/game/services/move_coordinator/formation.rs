@@ -7,10 +7,15 @@ use crate::game::map::Map;
 use crate::protocol::TrenchView;
 
 mod goal_search;
+mod polyline;
 mod reachability;
 #[cfg(test)]
 mod tests;
 
+pub(super) use polyline::{
+    formation_goals_with_reachability as polyline_formation_goals_with_reachability,
+    slots as polyline_slots,
+};
 pub(super) use reachability::FormationReachability;
 
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;

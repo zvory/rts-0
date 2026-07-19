@@ -30,6 +30,8 @@ export class BabylonFeedbackLayer {
         this._ring(record.x, record.y, record.kind === "attack" ? "#ff6b5f" : "#73ddff", 13);
       } else if (record?.type === "attackTargetPreview" && finitePoint(record)) {
         this._ring(record.x, record.y, "#ff6b5f", 18);
+      } else if (record?.type === "formationMovePreview") {
+        this._formationMovePreview(record);
       } else if (record?.type === "placement") {
         this._placement(record, tileSizePx);
       }
@@ -76,6 +78,15 @@ export class BabylonFeedbackLayer {
       this._line([
         { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }, { x: x0, y: y0 },
       ], (site.valid ?? record.valid) ? "#71e69a" : "#ff665c");
+    }
+  }
+
+  _formationMovePreview(record) {
+    const points = Array.isArray(record?.points) ? record.points.filter(finitePoint) : [];
+    if (points.length >= 2) this._line(points, "#73ddff");
+    for (const slot of Array.isArray(record?.slots) ? record.slots : []) {
+      if (this._meshes.length >= MAX_FEEDBACK_MESHES || !finitePoint(slot)) break;
+      this._ring(slot.x, slot.y, "#73ddff", positive(slot.radius, 10));
     }
   }
 

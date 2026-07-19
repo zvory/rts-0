@@ -114,6 +114,13 @@ import {
 } from "./native_cursor.js";
 import { nativeDesktopCursorBridge } from "./cursor_lock.js";
 import {
+  _beginFormationGesture,
+  _cancelFormationGesture,
+  _finishFormationGesture,
+  _refreshFormationGesture,
+  _updateFormationGesture,
+} from "./formation_gesture.js";
+import {
   _prepareCursorLock,
   _setCursorLockState,
   exitPointerLock,
@@ -225,6 +232,7 @@ export class Input {
     // { x0, y0, x1, y1 } where (x0,y0) is the press anchor.
     this._drag = null;
     this._placementDrag = null;
+    this._formationGesture = null;
     // Whether the current left press has moved far enough to count as a box drag.
     this._dragging = false;
     // Last completed single click: { x, y, t } in screen pixels + timestamp ms.
@@ -310,6 +318,7 @@ export class Input {
 
   /** Remove all installed listeners (e.g. on game teardown / screen change). */
   destroy() {
+    this._cancelFormationGesture();
     this.exitPointerLock();
     this.screenOverlay?.destroy?.();
     this.clientIntent?.clearPlannedOrders?.();
@@ -390,7 +399,14 @@ export class Input {
   update(dt) {
     void dt;
     this._flushPointerLockCursor();
-    if (this.inputRouter?.activePreviewSurface?.()) return;
+    if (this.inputRouter?.activePreviewSurface?.()) {
+      this._cancelFormationGesture();
+      return;
+    }
+    if (this._formationGesture?.promoted) {
+      this._refreshFormationGesture();
+      return;
+    }
     if (this._labTool()) {
       this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
@@ -555,20 +571,10 @@ export class Input {
     if (this.cameraNavigation?.shouldSuppressMouseEvent?.(ev)) return;
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
-    if (this.pointerLocked && ev.button === 2) {
+    if (ev.button === 2) {
       clearPostQuickCastSelectionGuard(this);
       this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
-      if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._onRightClick(p, ev);
-      ev.preventDefault();
-      ev.stopPropagation();
-      return;
-    }
-    if (!this.pointerLocked && ev.button === 2 && ev.shiftKey) {
-      clearPostQuickCastSelectionGuard(this);
-      // Some browsers/OS combinations show Shift+right-click menus without a
-      // normal contextmenu event, so queue orders on mousedown for that chord.
-      this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
-      if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._onRightClick(p, ev);
+      if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._beginFormationGesture(p, ev);
       ev.preventDefault();
       ev.stopPropagation();
       return;
@@ -592,7 +598,7 @@ export class Input {
     let p;
     if (this.pointerLocked) {
       const delta = this._lockedMovementDelta(ev);
-      if (delta.x === 0 && delta.y === 0 && !this._panDrag && !this._drag) return;
+      if (delta.x === 0 && delta.y === 0 && !this._panDrag && !this._drag && !this._formationGesture) return;
       p = this._moveLockedCursor(delta);
     } else {
       p = this._screenPos(ev);
@@ -608,6 +614,12 @@ export class Input {
     }
 
     if (this.cameraNavigation ? this.cameraNavigation.handleMouseMove(ev, p) : this._handleCameraPanMouseMoveFallback(ev, p)) {
+      return;
+    }
+
+    if (this._formationGesture) {
+      this._updateFormationGesture(p, ev);
+      ev.preventDefault?.();
       return;
     }
 
@@ -641,6 +653,14 @@ export class Input {
   _handleMouseUp(ev) {
     if (this.cameraNavigation?.shouldSuppressMouseEvent?.(ev)) return;
     if (this.cameraNavigation ? this.cameraNavigation.handleMouseUp(ev) : this._handleCameraPanMouseUpFallback(ev)) {
+      return;
+    }
+    if (ev.button === 2) {
+      const p = this._eventScreenPos(ev);
+      if (!this.pointerLocked) this._trackMouse(p);
+      if (this._routeLockedPointerUp(ev, p)) this._cancelFormationGesture();
+      else this._finishFormationGesture(p, ev);
+      ev.preventDefault?.();
       return;
     }
     if (ev.button !== 0 && this.pointerLocked) {
@@ -700,6 +720,7 @@ export class Input {
       this._suppressNextContextMenuUntil = 0;
       return;
     }
+    if (this._formationGesture) return;
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
     if (this._routeLockedPointerDown(ev, { ...p, button: 2 })) return;
@@ -730,6 +751,7 @@ export class Input {
   }
 
   _cancelTouchGameplayState() {
+    this._cancelFormationGesture();
     if (this._drag) {
       this._drag = null;
       this._dragging = false;
@@ -996,4 +1018,9 @@ Object.assign(Input.prototype, {
   _activateCommandHotkey,
   _cancel,
   _handleWheel,
+  _beginFormationGesture,
+  _updateFormationGesture,
+  _finishFormationGesture,
+  _cancelFormationGesture,
+  _refreshFormationGesture,
 });

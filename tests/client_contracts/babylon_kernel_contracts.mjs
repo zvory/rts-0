@@ -222,6 +222,13 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
       feedback: {
         commandFeedback: [{ kind: "move", x: 1200, y: 760 }],
         attackTargetPreview: { x: 1300, y: 820 },
+        formationMovePreview: {
+          points: [{ x: 900, y: 700 }, { x: 1200, y: 760 }, { x: 1450, y: 900 }],
+          slots: [
+            { unitId: 7, x: 1000, y: 730, radius: 24 },
+            { unitId: 8, x: 1350, y: 850, radius: 18 },
+          ],
+        },
         placement: { building: "barracks", tileX: 1, tileY: 0, valid: true },
       },
       screenOverlay: { marquee: { x0: 20, y0: 30, x1: 140, y1: 110 } },
@@ -250,7 +257,7 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
       { visibleRevision: 4, exploredRevision: 7, visibleTiles: 1, exploredTiles: 1, unknownTiles: 2 },
       "revisioned current/explored grids drive authoritative fog categories",
     );
-    assert.ok(sceneDiagnostics.feedback.worldMarkers >= 4, "basic move, target, path, and placement feedback reaches Babylon");
+    assert.ok(sceneDiagnostics.feedback.worldMarkers >= 7, "move, target, formation path/slots, order path, and placement feedback reach Babylon");
     assert.equal(sceneDiagnostics.feedback.marquee, true, "the screen-space marquee is presented by Babylon");
     assert.equal(
       renderer._scene.meshes.find((mesh) => mesh.name === "placeholder-reveal:9")?.renderingGroupId,

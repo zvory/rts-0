@@ -3,7 +3,6 @@
 //! Wire commands are decoded in `protocol.rs` and translated into this domain shape at the
 //! networking/replay boundary. Simulation services consume `SimCommand` so they can work with
 //! typed entity kinds instead of JSON-facing strings.
-
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{EntityKind, RallyKind};
 use crate::game::upgrade::UpgradeKind;
@@ -16,6 +15,11 @@ pub enum SimCommand {
         units: Vec<u32>,
         x: f32,
         y: f32,
+        queued: bool,
+    },
+    FormationMove {
+        units: Vec<u32>,
+        points: Vec<(f32, f32)>,
         queued: bool,
     },
     AttackMove {
@@ -141,6 +145,15 @@ impl SimCommand {
                 units,
                 x,
                 y,
+                queued,
+            },
+            protocol::Command::FormationMove {
+                units,
+                points,
+                queued,
+            } => SimCommand::FormationMove {
+                units,
+                points: points.into_iter().map(|point| (point.x, point.y)).collect(),
                 queued,
             },
             protocol::Command::AttackMove {
@@ -339,6 +352,18 @@ impl SimCommand {
                 units: units.clone(),
                 x: *x,
                 y: *y,
+                queued: *queued,
+            },
+            SimCommand::FormationMove {
+                units,
+                points,
+                queued,
+            } => protocol::Command::FormationMove {
+                units: units.clone(),
+                points: points
+                    .iter()
+                    .map(|&(x, y)| protocol::FormationPoint { x, y })
+                    .collect(),
                 queued: *queued,
             },
             SimCommand::AttackMove {
