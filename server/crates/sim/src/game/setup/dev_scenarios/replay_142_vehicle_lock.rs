@@ -75,6 +75,7 @@ impl Game {
             units,
             goal: (anchor.0 + 1_015.082, anchor.1 - 1_880.655_8),
             issue_after_ticks: config::TICK_HZ,
+            attack_move: false,
         }
         .checkpoint_backed("dev:replay_142_vehicle_lock")
     }

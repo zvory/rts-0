@@ -33,6 +33,7 @@ pub(super) struct DevScenarioDriver {
     units: Vec<u32>,
     goal: (f32, f32),
     issue_after_ticks: u32,
+    attack_move: bool,
     issued: bool,
 }
 
@@ -45,15 +46,22 @@ impl DevScenarioDriver {
             return;
         }
         self.issued = true;
-        game.enqueue(
-            self.player_id,
+        let command = if self.attack_move {
+            SimCommand::AttackMove {
+                units: self.units.clone(),
+                x: self.goal.0,
+                y: self.goal.1,
+                queued: false,
+            }
+        } else {
             SimCommand::Move {
                 units: self.units.clone(),
                 x: self.goal.0,
                 y: self.goal.1,
                 queued: false,
-            },
-        );
+            }
+        };
+        game.enqueue(self.player_id, command);
     }
 }
 
@@ -135,6 +143,7 @@ impl RoomTask {
                             units: setup.units,
                             goal: setup.goal,
                             issue_after_ticks: setup.issue_after_ticks,
+                            attack_move: setup.attack_move,
                             issued: false,
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), player_id))
@@ -235,6 +244,13 @@ impl RoomTask {
                     }
                     DevScenarioId::TankCoaxInspection => {
                         session_from_setup!(Game::new_tank_coax_inspection_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
+                    DevScenarioId::AttackMoveReloadAcquisition => {
+                        session_from_setup!(Game::new_attack_move_reload_acquisition_scenario(
                             config.unit,
                             config.count,
                             seed,

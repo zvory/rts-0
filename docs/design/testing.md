@@ -172,6 +172,11 @@ Current scenario ids:
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
   and buildings around the coax arc for secondary-machine-gun inspection.
+- `attack_move_reload_acquisition` — one Tank begins with its cannon and coax reloading, then after
+  a ten-second inspection pause receives a real attack-move through an invulnerable enemy Tank
+  already inside its current moving-range boundary. On the known failure, it keeps advancing until
+  reload permits fresh acquisition; after a fix, the same scene should stop at the initial boundary
+  and wait there to fire.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

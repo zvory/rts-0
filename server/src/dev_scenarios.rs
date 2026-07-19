@@ -756,7 +756,15 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
+const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "attack_move_reload_acquisition",
+    unit: EntityKind::Tank,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -849,6 +857,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
         title: "Tank Coax Inspection",
         description: "One held Tank faces infantry-priority targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke, and buildings around the coax arc so the secondary machine gun can be inspected without immediate cannon fire.",
         launches: &TANK_COAX_INSPECTION_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "attack_move_reload_acquisition",
+        title: "Attack-Move Reload Acquisition",
+        description: "After a ten-second inspection pause, a reloading Tank receives an attack-move through an invulnerable enemy Tank already inside its moving weapon range. The current bug lets it close to near-contact before acquiring the target; a corrected build should stop at the initial range boundary and wait for reload.",
+        launches: &ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES,
     },
 ];
 
@@ -1029,6 +1043,16 @@ mod tests {
             Some(DevScenarioLaunch {
                 id: "scout_car_snaking_corridor",
                 unit: EntityKind::Worker,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("attack_move_reload_acquisition:unit=tank:count=1"),
+            Some(DevScenarioLaunch {
+                id: "attack_move_reload_acquisition",
+                unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
                 case: None,
@@ -1450,6 +1474,10 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("tank_coax_inspection", "tank", "2", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("attack_move_reload_acquisition", "rifleman", "1", None),
             None
         );
         assert_eq!(
