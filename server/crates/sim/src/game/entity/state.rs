@@ -244,7 +244,7 @@ pub struct CombatState {
     /// The first direct-AP source this Tank committed to during the current reaction window.
     #[serde(default)]
     pub(in crate::game) tank_armor_reaction_lock: Option<TankArmorReactionLock>,
-    /// Disposable Panzerfaust runtime for Riflemen whose owner completed the Panzerfausts upgrade.
+    /// Disposable launcher state carried by the dedicated Panzerfaust unit.
     pub panzerfaust: Option<PanzerfaustState>,
 }
 

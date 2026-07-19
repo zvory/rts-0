@@ -239,6 +239,7 @@ pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
 const DEFAULT_UNITS: &[EntityKind] = &[
     EntityKind::Worker,
     EntityKind::Rifleman,
+    EntityKind::Panzerfaust,
     EntityKind::MachineGunner,
     EntityKind::AntiTankGun,
     EntityKind::MortarTeam,
@@ -897,7 +898,11 @@ mod tests {
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::Barracks),
-            vec![EntityKind::Rifleman, EntityKind::MachineGunner]
+            vec![
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::Panzerfaust
+            ]
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::Factory),

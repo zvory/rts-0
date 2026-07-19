@@ -1861,7 +1861,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remains perceptible and broadly directional without preserving exact event location or
   composition. Non-combat spatial behavior and the global 48-voice pool remain unchanged.
   Panzerfaust launch and impact events use dedicated low-gain spatial cues with coarse cooldown
-  buckets; generic Rifleman Panzerfaust attack events and projectile travel stay silent so the
+  buckets; generic Panzerfaust loaded-shot attack events and projectile travel stay silent so the
   weapon does not reuse Tank/Rifleman/artillery sounds or spam clustered
   fights.
   Existing spoken server notices explicitly duck ambient and combat buses while they play; nested
@@ -1916,7 +1916,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled no-backpack PNG
   frame strip with frame 0 idle, frames 1-3 moving, and frame 4 firing; machine gunner: enabled PNG frame-strip
-  experiment with carried movement frames and setup/deployed frames; Panzerfausts-upgraded Riflemen:
+  experiment with carried movement frames and setup/deployed frames; Panzerfaust:
   the matching five-frame Rifleman strip with an oversized launcher composited on the back
   until launch, then the normal no-backpack Rifleman strip; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
@@ -1924,7 +1924,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
   A-19 PNG components animated from the SVG-authored support-weapon rig).
-  Riflemen normally carry a rifle; Riflemen with `panzerfaustLoaded: true` carry a tube launcher
+  Riflemen normally carry a rifle; Panzerfausts with `panzerfaustLoaded: true` carry a tube launcher
   with a team-colored band and switch immediately to normal rifle art after launch. Both white-base
   Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine
   Gunner's tonal weight. Their torso-centered sprite origin sits 10 world pixels ahead of the raw
@@ -2008,7 +2008,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   profile/candidate registries rather than URL-provided assets.
 - Local lab visual profiles may pass checked-in frame-strip overrides by unit kind or by the live
   rig key derived from authoritative entity state. Rig-key overrides apply only while that route is
-  active—for example, a loaded Panzerfaust Rifleman override stops matching as soon as
+  active—for example, a loaded Panzerfaust override stops matching as soon as
   `panzerfaustLoaded` flips false at launch—then normal live frame-strip routing resumes for the same
   entity id. These swaps remain local to that lab session; server state, selection, fog, HP bars,
   and the fallback SVG shadow route remain unchanged.

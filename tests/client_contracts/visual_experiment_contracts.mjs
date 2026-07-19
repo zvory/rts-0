@@ -120,10 +120,10 @@ const NOOP_RENDERER_OVERLAYS = [
   assert(profile.frameStripOverrides.length === 1, "composited Panzerfaust Rifleman profile has one frame-strip override");
   const override = profile.frameStripOverrides[0];
   const strip = override.strip;
-  assert(override.kind === KIND.RIFLEMAN, "composited Panzerfaust profile targets Rifleman units");
+  assert(override.kind === KIND.PANZERFAUST, "composited Panzerfaust profile targets Panzerfaust units");
   assert(
     override.rigKey === LOADED_RIFLEMAN_RIG_KEY,
-    "composited Panzerfaust profile targets only Riflemen whose disposable launcher is still loaded",
+    "composited Panzerfaust profile targets only units whose disposable launcher is still loaded",
   );
   assert(
     strip.image.includes("/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png"),
@@ -142,15 +142,15 @@ const NOOP_RENDERER_OVERLAYS = [
 {
   const profile = getVisualProfile("rifleman-panzerfaust-composite-1");
   const override = profile.frameStripOverrides[0];
-  const loaded = { kind: KIND.RIFLEMAN, panzerfaustLoaded: true };
-  const spent = { kind: KIND.RIFLEMAN, panzerfaustLoaded: false };
+  const loaded = { kind: KIND.PANZERFAUST, panzerfaustLoaded: true };
+  const spent = { kind: KIND.PANZERFAUST, panzerfaustLoaded: false };
   assert(
     liveRigKeyForEntity(loaded) === override.rigKey,
-    "loaded Rifleman resolves to the composited Panzerfaust frame-strip route",
+    "loaded Panzerfaust resolves to the composited frame-strip route",
   );
   assert(
     liveRigKeyForEntity(spent) !== override.rigKey,
-    "spent Rifleman resolves away from the composited Panzerfaust frame-strip route",
+    "spent Panzerfaust resolves away from the composited frame-strip route",
   );
 }
 
@@ -437,7 +437,7 @@ const NOOP_RENDERER_OVERLAYS = [
       "loaded Panzerfaust strip readiness is reported for Rifleman capture subjects",
     );
     renderer._visualFrameStripTextures.set(
-      `${KIND.RIFLEMAN}:${override.strip.imageVersion}`,
+      `${KIND.PANZERFAUST}:${override.strip.imageVersion}`,
       PIXI.Texture.from("panzerfaust-composite-test-texture"),
     );
     renderer._liveFrameStripTextures.set(
@@ -447,7 +447,7 @@ const NOOP_RENDERER_OVERLAYS = [
     const rifleman = {
       id: 116,
       owner: 1,
-      kind: KIND.RIFLEMAN,
+      kind: KIND.PANZERFAUST,
       x: 2003.97,
       y: 1837.91,
       hp: 45,
@@ -483,7 +483,7 @@ const NOOP_RENDERER_OVERLAYS = [
     const loadedInstance = renderer._liveRigPools.liveUnitRigs.get(rifleman.id);
     assert(
       loadedInstance?.strip?.imageVersion === override.strip.imageVersion,
-      "loaded Rifleman renders through the composited Panzerfaust strip",
+      "loaded Panzerfaust renders through the composited strip",
     );
 
     rifleman.panzerfaustLoaded = false;
@@ -495,7 +495,7 @@ const NOOP_RENDERER_OVERLAYS = [
     assert(loadedInstance._destroyed === true, "launch-time loadout change destroys the loaded carrier instance");
     assert(
       spentInstance?.strip?.imageVersion === RIFLEMAN_PNG_FRAME_STRIP.imageVersion,
-      "spent Rifleman immediately renders through the normal firing-capable Rifleman strip",
+      "spent Panzerfaust immediately renders through the normal firing-capable Rifleman strip",
     );
 
     renderer.destroy();

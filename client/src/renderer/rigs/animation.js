@@ -347,7 +347,7 @@ function defaultVehicleMotion() {
 
 function visualWeaponFacing(kind, facing, weaponFacing, deploy) {
   const t = smoothstep01(deploy);
-  if (kind === KIND.RIFLEMAN) return facing - 0.2;
+  if (kind === KIND.RIFLEMAN || kind === KIND.PANZERFAUST) return facing - 0.2;
   if (kind === KIND.MACHINE_GUNNER) return angleLerp(facing + 0.86, weaponFacing, t);
   if (kind === KIND.ANTI_TANK_GUN) return angleLerp(facing, weaponFacing, t);
   if (kind === KIND.MORTAR_TEAM) return angleLerp(facing, weaponFacing + Math.PI / 4 - Math.PI * 0.22, t);

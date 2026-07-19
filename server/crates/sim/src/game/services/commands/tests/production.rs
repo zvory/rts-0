@@ -5,6 +5,12 @@ fn support_weapon_and_vehicle_training_require_finished_unlock_upgrades() {
     let map = flat_map(24);
     for (producer, unit, upgrade, setup_extra) in [
         (
+            EntityKind::Barracks,
+            EntityKind::Panzerfaust,
+            UpgradeKind::Panzerfausts,
+            None,
+        ),
+        (
             EntityKind::Steelworks,
             EntityKind::AntiTankGun,
             UpgradeKind::AntiTankGunUnlock,

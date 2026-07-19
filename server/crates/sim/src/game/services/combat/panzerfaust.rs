@@ -32,7 +32,7 @@ pub(super) fn handle_combat_if_panzerfaust(
     id: u32,
 ) -> bool {
     match entities.get(id).and_then(|entity| {
-        (entity.kind == EntityKind::Rifleman)
+        (entity.kind == EntityKind::Panzerfaust)
             .then(|| entity.combat.as_ref().and_then(|combat| combat.panzerfaust))
             .flatten()
     }) {
@@ -153,7 +153,7 @@ fn panzerfaust_combat_context(
     id: u32,
 ) -> Option<(u32, f32, f32, f32, f32, CombatMode)> {
     let attacker = entities.get(id)?;
-    if attacker.hp == 0 || attacker.kind != EntityKind::Rifleman || !attacker.can_attack() {
+    if attacker.hp == 0 || attacker.kind != EntityKind::Panzerfaust || !attacker.can_attack() {
         return None;
     }
     let range_px = panzerfaust_range_tiles(attacker) * config::TILE_SIZE as f32

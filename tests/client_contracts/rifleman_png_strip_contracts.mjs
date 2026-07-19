@@ -19,7 +19,7 @@ assert(runtime.loadedModule === "client/src/renderer/rigs/rifleman_panzerfaust_p
 
 for (const [label, strip, variant] of [
   ["normal Rifleman", RIFLEMAN_PNG_FRAME_STRIP, runtime.normal],
-  ["loaded Panzerfaust Rifleman", RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP, runtime.panzerfaustLoaded],
+  ["loaded Panzerfaust unit", RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP, runtime.panzerfaustLoaded],
 ]) {
   assert(strip.unit === manifest.unit, `${label} strip unit matches the manifest unit`);
   assert(strip.image === variant.stripImageUrl, `${label} strip URL matches the manifest runtime URL`);
@@ -51,7 +51,7 @@ const liveStrips = createLiveFrameStrips();
 assert(liveFrameStripFor(liveStrips, KIND.RIFLEMAN) === RIFLEMAN_PNG_FRAME_STRIP,
   "ordinary and spent Riflemen use the new no-pack live strip");
 assert(liveFrameStripFor(liveStrips, LOADED_RIFLEMAN_RIG_KEY) === RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP,
-  "loaded Riflemen use the composited Panzerfaust live strip");
+  "loaded Panzerfaust units use the composited Panzerfaust live strip");
 
 function repoPathFromClientAssetUrl(assetUrl) {
   const assetPath = assetUrl.split("?")[0];

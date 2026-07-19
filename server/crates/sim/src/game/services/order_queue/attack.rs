@@ -1,7 +1,7 @@
 use crate::game::entity::{Entity, EntityKind, EntityStore, PanzerfaustState};
 
 pub(super) fn panzerfaust_attack_cycle_active(attacker: &Entity) -> bool {
-    attacker.kind == EntityKind::Rifleman
+    attacker.kind == EntityKind::Panzerfaust
         && matches!(
             attacker
                 .combat
@@ -18,7 +18,7 @@ pub(super) fn direct_panzerfaust_shot_spent(
     attacker: &Entity,
     target: u32,
 ) -> bool {
-    attacker.kind == EntityKind::Rifleman
+    attacker.kind == EntityKind::Panzerfaust
         && matches!(
             attacker
                 .combat

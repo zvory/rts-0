@@ -289,7 +289,7 @@ architecture failures.
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
-| `panzerfaust_shots` | `authoritative/serialized` | Serialize all launched Panzerfaust loaded shots with owner/source facts, locked target id, launch-safe impact point, and impact tick. | `PanzerfaustShotStore::schedule` records detached loaded-shot impacts; later ticks resolve the direct damage/event even if the firing Rifleman dies before impact. |
+| `panzerfaust_shots` | `authoritative/serialized` | Serialize all launched Panzerfaust loaded shots with owner/source facts, locked target id, launch-safe impact point, and impact tick. | `PanzerfaustShotStore::schedule` records detached loaded-shot impacts; later ticks resolve the direct damage/event even if the firing Panzerfaust dies before impact. |
 | `seed` | `compatibility metadata` | Serialize the original match seed as setup/replay metadata. Do not use it as a substitute for `rng`. | Constructors and replay artifacts expose `seed`; the current map is stored separately and the current random stream lives in `rng`. |
 | `starting_loadouts` | `compatibility metadata` | Serialize per-player starting loadout records for replay/setup compatibility. | Replay constructors and artifacts persist these records so mixed faction/resource starts can be reconstructed without a global resource pair. |
 | `map_metadata` | `compatibility metadata` | Serialize stable authored map identity/version metadata alongside the map. | Replay/lab setup paths expose map metadata; it identifies the authored map but is not the live terrain grid used by systems. |
@@ -627,7 +627,7 @@ live Lab server and Pixi client may be run together only through the explicit `-
 for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
 The churn driver runs before every tick. Players 1 and 2 are mortal; the driver tracks their
-authoritative unit ids and original kinds, reconciles same-id Panzerfaust conversion, and restores
+authoritative unit ids and original kinds, preserves spent Panzerfaust kinds, and restores
 each owner's canonical 85-unit roster. A replacement that dies during its first tick is recovered by
 the owner-count backstop even though the driver never observed its id. Placement considers at most
 504 nearest-center candidates, builds body occupancy once per missing request, accounts for earlier
@@ -971,7 +971,7 @@ firing player; allied teammate and neutral targets remain non-damageable. Delibe
 hits do not emit under-attack notices or receive enemy kill attribution. Impact feedback uses the
 stored launch endpoint when a damageable target has moved outside the firing team's current
 visibility; enemy victim under-attack notices use the victim's actual position.
-Dead loaded Riflemen do not advance pending Panzerfaust windup state, so they cannot launch before
+Dead loaded Panzerfausts do not advance pending windup state, so they cannot launch before
 normal death cleanup. The reserved Blanket Fire hook returns before
 command planning, so commands do not spend resources, start cooldowns, or replace artillery
 orders. The hook receives the owning player's faction id at execution time through the
@@ -1075,9 +1075,9 @@ occupied units project `occupiedTrenchId`; remembered trench terrain never expos
 occupants.
 
 Entrenched combat benefits consume only active occupation through
-`entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen and Machine Gunners gain
+`entrenchment_combat::is_actively_entrenched`. Active entrenched Riflemen, Panzerfausts, and Machine Gunners gain
 one tile of weapon range through `entrenchment_combat::attack_range_tiles`, including the loaded
-Rifleman's Panzerfaust shot. Combat target acquisition treats actively entrenched units, including
+Panzerfaust launcher shot. Combat target acquisition treats actively entrenched units, including
 units retaining an arrived Attack Move stance, and Machine Gunners that are setting up or deployed
 like Hold Position: they can acquire and fire at legal targets inside current weapon range but do
 not request enemy-directed paths or tear down the weapon to pursue. A fresh Move, Attack Move, or
@@ -1287,7 +1287,7 @@ rotation resets the ramp to base range; turret aiming and external pushes do not
 
 Team-current visibility, including an ally's lingering death vision, permits explicit immediate and
 queued attack targeting, but death-vision-only targets remain ineligible for general combat
-auto-acquisition. A consumed direct Panzerfaust attack spends the Rifleman's launcher immediately
+auto-acquisition. A consumed direct Panzerfaust attack spends the unit's launcher immediately
 at launch, allowing queued movement to promote while the detached projectile continues travelling.
 
 Combat weapon cooldowns and firing-reveal reaction gates are independently keyed by
@@ -1428,19 +1428,19 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
-- Riflemen produced after their owner completes Panzerfausts research use a hidden server-only
-  one-shot state in combat state: `Loaded -> Windup -> Spent`. Research completion does not change
-  existing Riflemen; later Rifleman production spawns loaded, and spent Riflemen are not rearmed.
+- Panzerfausts research unlocks the separate Barracks-trained Panzerfaust unit. Panzerfausts use a
+  hidden server-only one-shot state in combat state: `Loaded -> Windup -> Spent`; Riflemen never
+  receive that state, and spent Panzerfausts are not rearmed.
   Direct `Attack`, idle, Hold Position, and Attack Move all fire the launcher only when a valid
   target is already inside the current 5-tile launcher range; none creates pursuit movement. The exact
   target whitelist is Scout Car, Tank, and Command Car; buildings, Mortar Teams, Artillery, and
-  infantry are excluded. Targeting is intentionally independent per Rifleman with no overkill
+  infantry are excluded. Targeting is intentionally independent per Panzerfaust with no overkill
   coordination. Windup cancels without spending the shot if the order changes or the target stops
-  being legal, visible, in range, or fireable. At launch the Rifleman becomes `Spent`, resumes
+  being legal, visible, in range, or fireable. At launch the Panzerfaust becomes `Spent`, resumes
   normal movement and rifle combat immediately, and records a detached `panzerfaust_shots` impact
   that survives the firing entity's death. Impact applies 100 base damage with 50% armor
   penetration only to the locked live vehicle. Snapshots project `panzerfaustLoaded = true` while
-  loaded/winding up and `false` after launch; unupgraded Riflemen omit the field.
+  loaded/winding up and `false` after launch; Riflemen omit the field.
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,

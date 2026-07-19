@@ -1079,7 +1079,8 @@ withFakeHudDocument(({ FakeElement }) => {
       trainCard.slots[1].title.includes("Shift+hotkey removes one"),
     "train locked tooltip should name its requirement and allocation controls",
   );
-  assert(trainCard.slots[2] == null, "Barracks should no longer expose a standalone Panzerfaust unit");
+  assert(trainCard.slots[2].label === "Panzerfaust" && trainCard.slots[2].hotkey === "E", "Barracks third train slot should be Panzerfaust on hotkey E");
+  assert(!trainCard.slots[2].enabled && trainCard.slots[2].title.startsWith("Requires Panzerfausts"), "Panzerfaust should be research-locked");
 
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({

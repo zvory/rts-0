@@ -63,7 +63,11 @@ impl TechRequirement {
 
 const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
-const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
+const BARRACKS_UNITS: &[EntityKind] = &[
+    EntityKind::Rifleman,
+    EntityKind::MachineGunner,
+    EntityKind::Panzerfaust,
+];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -134,8 +138,28 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: 16,
             speed: 1.6,
             sight_tiles: 11,
-            cost_steel: 60,
-            cost_oil: 10,
+            cost_steel: 50,
+            cost_oil: 0,
+            supply: 1,
+            build_ticks: 300,
+            radius: 9.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        trained_at: Some(EntityKind::Barracks),
+        train_requirement: TechRequirement::All(&[]),
+    },
+    UnitDef {
+        kind: EntityKind::Panzerfaust,
+        stats: balance::UnitStats {
+            hp: 45,
+            dmg: 5,
+            range_tiles: 5,
+            cooldown: 16,
+            speed: 1.6,
+            sight_tiles: 11,
+            cost_steel: 55,
+            cost_oil: 5,
             supply: 1,
             build_ticks: 300,
             radius: 9.0,
@@ -599,6 +623,7 @@ mod tests {
                 EntityKind::Worker,
                 EntityKind::Golem,
                 EntityKind::Rifleman,
+                EntityKind::Panzerfaust,
                 EntityKind::MachineGunner,
                 EntityKind::AntiTankGun,
                 EntityKind::MortarTeam,

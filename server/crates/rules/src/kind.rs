@@ -8,6 +8,7 @@ pub enum EntityKind {
     Worker,
     Golem,
     Rifleman,
+    Panzerfaust,
     MachineGunner,
     AntiTankGun,
     MortarTeam,
@@ -32,10 +33,11 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 24] = [
+    pub const ALL: [EntityKind; 25] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Rifleman,
+        EntityKind::Panzerfaust,
         EntityKind::MachineGunner,
         EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
@@ -76,6 +78,7 @@ impl EntityKind {
             EntityKind::Worker => "worker",
             EntityKind::Golem => "golem",
             EntityKind::Rifleman => "rifleman",
+            EntityKind::Panzerfaust => "panzerfaust",
             EntityKind::MachineGunner => "machine_gunner",
             EntityKind::AntiTankGun => "anti_tank_gun",
             EntityKind::MortarTeam => "mortar_team",
@@ -109,6 +112,7 @@ impl FromStr for EntityKind {
             "worker" => Ok(EntityKind::Worker),
             "golem" => Ok(EntityKind::Golem),
             "rifleman" => Ok(EntityKind::Rifleman),
+            "panzerfaust" => Ok(EntityKind::Panzerfaust),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
             "anti_tank_gun" => Ok(EntityKind::AntiTankGun),
             "mortar_team" => Ok(EntityKind::MortarTeam),
@@ -158,6 +162,10 @@ pub fn supports_manual_emplacement(kind: EntityKind) -> bool {
         kind,
         EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
     )
+}
+
+pub fn is_rifle_infantry(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

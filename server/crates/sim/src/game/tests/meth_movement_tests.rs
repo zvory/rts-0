@@ -76,29 +76,31 @@ fn next_moving_step(game: &mut Game, id: u32) -> f32 {
 }
 
 #[test]
-fn removed_methamphetamines_immediately_clears_rifleman_speed_boost() {
-    let (mut game, rifleman, _goal) = meth_movement_fixture(EntityKind::Rifleman);
-    let base_speed = config::unit_stats(EntityKind::Rifleman)
-        .expect("rifleman stats")
-        .speed;
+fn removed_methamphetamines_immediately_clears_rifle_infantry_speed_boost() {
+    for kind in [EntityKind::Rifleman, EntityKind::Panzerfaust] {
+        let (mut game, unit, _goal) = meth_movement_fixture(kind);
+        let base_speed = config::unit_stats(kind)
+            .expect("rifle infantry stats")
+            .speed;
 
-    game.state.players[0]
-        .upgrades
-        .insert(UpgradeKind::Methamphetamines);
-    let boosted_step = next_moving_step(&mut game, rifleman);
-    assert!(
-        (boosted_step - base_speed * config::METHAMPHETAMINES_SPEED_MULTIPLIER).abs() < 0.01,
-        "researched Methamphetamines should boost rifleman speed, moved {boosted_step:.3}px"
-    );
+        game.state.players[0]
+            .upgrades
+            .insert(UpgradeKind::Methamphetamines);
+        let boosted_step = next_moving_step(&mut game, unit);
+        assert!(
+            (boosted_step - base_speed * config::METHAMPHETAMINES_SPEED_MULTIPLIER).abs() < 0.01,
+            "researched Methamphetamines should boost {kind:?} speed, moved {boosted_step:.3}px"
+        );
 
-    game.state.players[0]
-        .upgrades
-        .remove(&UpgradeKind::Methamphetamines);
-    let normal_step = next_moving_step(&mut game, rifleman);
-    assert!(
-        (normal_step - base_speed).abs() < 0.01,
-        "removed Methamphetamines should immediately return riflemen to base speed, moved {normal_step:.3}px"
-    );
+        game.state.players[0]
+            .upgrades
+            .remove(&UpgradeKind::Methamphetamines);
+        let normal_step = next_moving_step(&mut game, unit);
+        assert!(
+            (normal_step - base_speed).abs() < 0.01,
+            "removed Methamphetamines should return {kind:?} to base speed, moved {normal_step:.3}px"
+        );
+    }
 }
 
 #[test]

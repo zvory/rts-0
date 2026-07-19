@@ -192,7 +192,11 @@ mod tests {
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
             trainable_units(barracks),
-            &[EntityKind::Rifleman, EntityKind::MachineGunner]
+            &[
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::Panzerfaust
+            ]
         );
         assert_eq!(
             trainable_units(EntityKind::Factory),
@@ -213,6 +217,7 @@ mod tests {
         );
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
+        assert!(train_requirement_met(EntityKind::Panzerfaust, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
         assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
         assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
@@ -302,7 +307,8 @@ mod tests {
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
         assert_eq!(cost(EntityKind::Golem), (0, 0));
-        assert_eq!(cost(EntityKind::Rifleman), (60, 10));
+        assert_eq!(cost(EntityKind::Rifleman), (50, 0));
+        assert_eq!(cost(EntityKind::Panzerfaust), (55, 5));
         assert_eq!(cost(EntityKind::ScoutCar), (125, 50));
         assert_eq!(cost(EntityKind::ScoutPlane), (50, 75));
         assert_eq!(cost(EntityKind::Tank), (425, 150));

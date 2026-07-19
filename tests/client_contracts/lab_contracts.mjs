@@ -400,8 +400,9 @@ await withFakeDocument(() => {
     "LabPanel spawn palette excludes the ability-only Kriegsia Scout Plane",
   );
   assert(
-    STATS[KIND.BARRACKS].trains.length === 2,
-    "LabPanel uses the Barracks catalog without a standalone Panzerfaust unit",
+    STATS[KIND.BARRACKS].trains.length === 3 &&
+      labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.PANZERFAUST),
+    "LabPanel exposes the standalone Panzerfaust unit from the Barracks catalog",
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),

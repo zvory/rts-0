@@ -517,7 +517,7 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.get(KIND.MACHINE_GUNNER).id, "machine-gunner.authored");
   assert.equal(definitions.has(KIND.MORTAR_TEAM), true);
   assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.authored");
-  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true });
+  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true });
   assert.equal(definitions.has(loadedRiflemanKey), true);
   assert.equal(definitions.get(loadedRiflemanKey).id, "rifleman.panzerfaust-loaded.authored");
   assert.equal(definitions.has(KIND.SCOUT_CAR), true);
@@ -547,7 +547,7 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(riflemanRoutes[1].parts.includes("part.rifle.barrel"), true);
 
   const panzerfaustRoutes = liveRigRoutesFor(
-    liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true }),
+    liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true }),
   );
   assert.deepEqual(panzerfaustRoutes[0].parts, ["part.shadow"]);
   assert.equal(panzerfaustRoutes[1].parts.includes("part.body"), true);
@@ -1327,14 +1327,14 @@ test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it",
   assert.equal(workerRig.parts.has("part.body"), true);
 });
 
-test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loadout changes", () => {
+test("live rig renderer rebuilds same-id Panzerfaust instances when its loadout changes", () => {
   const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
   const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
   assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
   assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
 
   const renderer = makeRigRenderer();
-  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true });
+  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true });
   renderer._liveRigDefinitionsByKind = new Map([
     [loadedRiflemanKey, panzerfaust.definition],
     [KIND.RIFLEMAN, rifleman.definition],
@@ -1345,7 +1345,7 @@ test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loa
 
   renderer._drawUnit({
     id,
-    kind: KIND.RIFLEMAN,
+    kind: KIND.PANZERFAUST,
     panzerfaustLoaded: true,
     owner: 1,
     x: 32,
@@ -1355,13 +1355,13 @@ test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loa
   }, colorByOwner, state);
   const panzerfaustRig = renderer._liveRigPools.liveUnitRigs.get(id);
   const panzerfaustContainer = panzerfaustRig.container;
-  assert.equal(panzerfaustRig.kind, KIND.RIFLEMAN);
+  assert.equal(panzerfaustRig.kind, KIND.PANZERFAUST);
   assert.equal(panzerfaustRig.parts.has("part.pzf.tube"), true);
   assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), true);
 
   renderer._drawUnit({
     id,
-    kind: KIND.RIFLEMAN,
+    kind: KIND.PANZERFAUST,
     panzerfaustLoaded: false,
     owner: 1,
     x: 32,
@@ -1373,27 +1373,27 @@ test("live rig renderer rebuilds same-id Rifleman instances when Panzerfaust loa
   assert.equal(panzerfaustRig._destroyed, true);
   assert.equal(panzerfaustContainer.parent, null);
   assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), false);
-  assert.equal(riflemanRig.kind, KIND.RIFLEMAN);
+  assert.equal(riflemanRig.kind, KIND.PANZERFAUST);
   assert.equal(riflemanRig.parts.has("part.rifle.barrel"), true);
   assert.equal(riflemanRig.parts.has("part.pzf.tube"), false);
   assert.equal(renderer.layers.units.children.includes(riflemanRig.container), true);
   riflemanRig.destroy();
 });
 
-test("Rifleman PNG frame strips switch with the Panzerfaust loadout", () => {
+test("Panzerfaust PNG frame strips switch with the launcher loadout", () => {
   const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
   const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
   assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
   assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
   const renderer = makeRigRenderer();
-  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.RIFLEMAN, panzerfaustLoaded: true });
+  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true });
   const [panzerfaustTexture, riflemanTexture] = [fakeFrameStripTexture(), fakeFrameStripTexture()];
   renderer._liveRigDefinitionsByKind = new Map([[loadedRiflemanKey, panzerfaust.definition], [KIND.RIFLEMAN, rifleman.definition]]);
   renderer._liveFrameStripsByKind = new Map([[loadedRiflemanKey, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP], [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP]]);
   renderer._liveFrameStripTextures = new Map([[loadedRiflemanKey, panzerfaustTexture], [KIND.RIFLEMAN, riflemanTexture]]);
   const colorByOwner = new Map([[1, 0x336699]]);
   const state = { playerId: 1, selection: new Set(), weaponRecoil: () => 0 };
-  const entity = { id: 94, kind: KIND.RIFLEMAN, panzerfaustLoaded: true, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  const entity = { id: 94, kind: KIND.PANZERFAUST, panzerfaustLoaded: true, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
   renderer._drawUnit(entity, colorByOwner, state);
   const panzerfaustUnit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   assert.equal(panzerfaustUnit.strip, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP);
