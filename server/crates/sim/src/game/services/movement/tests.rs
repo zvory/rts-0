@@ -26,6 +26,7 @@ use super::pivot_drive::{
 use super::scout_car::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
 };
+mod static_repath;
 mod vehicle_traffic;
 
 /// Distance (px) between two entity centers.
@@ -4961,59 +4962,6 @@ fn pass_by_waypoint_pops_when_overshooting_sideways() {
         1,
         "intermediate waypoint must be popped via pass-by when unit is geometrically past it"
     );
-}
-
-/// A path that becomes invalid because a building appeared on it should not sidestep
-/// forever against the old route. After a one-second static-block debounce, movement
-/// queues the unit for the existing path coordinator to compute a fresh route.
-#[test]
-fn static_building_blockage_queues_repath_after_debounce() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let (w0x, w0y) = map.tile_center(11, 10);
-    let (gx, gy) = map.tile_center(20, 10);
-    let unit = entities
-        .spawn_unit(1, EntityKind::Rifleman, w0x - 16.5, w0y)
-        .unwrap();
-    set_path_direct(&mut entities, unit, vec![(w0x, w0y), (gx, gy)]);
-    if let Some(e) = entities.get_mut(unit) {
-        e.set_order(Order::move_to(gx, gy));
-        e.mark_move_phase(MovePhase::Moving);
-    }
-
-    // Depot centered on tile (12,10) covers (11,9),(12,9),(11,10),(12,10),
-    // so the next waypoint tile became blocked after the path was assigned.
-    let (bx, by) = map.tile_center(12, 10);
-    entities
-        .spawn_building(1, EntityKind::Depot, bx, by, true)
-        .expect("building spawn");
-
-    for tick in 0..config::STATIC_BLOCKED_REPATH_TICKS as u32 - 1 {
-        let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        assert_eq!(
-            entities.get(unit).and_then(|e| e.move_phase()),
-            Some(MovePhase::Moving),
-            "unit should debounce static blockage before repathing"
-        );
-    }
-
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(
-        &map,
-        &mut entities,
-        &mut [],
-        &occ,
-        &spatial,
-        config::STATIC_BLOCKED_REPATH_TICKS as u32,
-    );
-
-    let e = entities.get(unit).unwrap();
-    assert_eq!(e.move_phase(), Some(MovePhase::AwaitingPath));
-    assert!(e.path_is_empty(), "stale blocked path should be cleared");
-    assert_eq!(e.path_goal(), Some((gx, gy)));
 }
 
 /// A unit pressed against a building wall must physically reach its goal, not freeze

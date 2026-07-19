@@ -22,6 +22,34 @@ pub struct DevScenarioSpec {
     pub launches: &'static [DevScenarioLaunch],
 }
 
+pub const DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_HEAD_ON: &str = "head_on";
+pub const DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE: &str = "slight_angle";
+pub const DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE: &str = "major_angle";
+
+const DYNAMIC_CONSTRUCTION_PATH_BLOCK_LAUNCHES: [DevScenarioLaunch; 3] = [
+    DevScenarioLaunch {
+        id: "dynamic_construction_path_block",
+        unit: EntityKind::Worker,
+        count: 1,
+        blocker: None,
+        case: Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_HEAD_ON),
+    },
+    DevScenarioLaunch {
+        id: "dynamic_construction_path_block",
+        unit: EntityKind::Worker,
+        count: 1,
+        blocker: None,
+        case: Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE),
+    },
+    DevScenarioLaunch {
+        id: "dynamic_construction_path_block",
+        unit: EntityKind::Worker,
+        count: 1,
+        blocker: None,
+        case: Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE),
+    },
+];
+
 const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
@@ -728,7 +756,13 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 16] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
+    DevScenarioSpec {
+        id: "dynamic_construction_path_block",
+        title: "Dynamic Construction Path Block",
+        description: "Two workers receive simultaneous orders: one moves 20 tiles while the other starts a Barracks across its already-planned route. Select a head-on, slight-angle, or major-angle approach.",
+        launches: &DYNAMIC_CONSTRUCTION_PATH_BLOCK_LAUNCHES,
+    },
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -903,6 +937,18 @@ pub fn parse_dev_scenario_blocker(id: &str, blocker: Option<&str>) -> Option<Opt
 
 pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'static str>> {
     match (id, case) {
+        ("dynamic_construction_path_block", Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_HEAD_ON)) => {
+            Some(Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_HEAD_ON))
+        }
+        (
+            "dynamic_construction_path_block",
+            Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE),
+        ) => Some(Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE)),
+        (
+            "dynamic_construction_path_block",
+            Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE),
+        ) => Some(Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE)),
+        ("dynamic_construction_path_block", _) => None,
         ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE)) => {
             Some(Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE))
         }
@@ -923,6 +969,9 @@ pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'
 
 pub fn dev_scenario_case_label(case: &str) -> &'static str {
     match case {
+        DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_HEAD_ON => "head-on",
+        DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE => "slight angle",
+        DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE => "major angle",
         TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE => "friendly vehicle reroute",
         TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE => "enemy vehicle reroute",
         TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH => "infantry pass-through",
@@ -963,6 +1012,18 @@ mod tests {
 
     #[test]
     fn parses_supported_launches() {
+        assert_eq!(
+            parse_dev_scenario_room(
+                "dynamic_construction_path_block:unit=worker:count=1:case=slight_angle"
+            ),
+            Some(DevScenarioLaunch {
+                id: "dynamic_construction_path_block",
+                unit: EntityKind::Worker,
+                count: 1,
+                blocker: None,
+                case: Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE),
+            })
+        );
         assert_eq!(
             parse_dev_scenario_launch("scout_car_snaking_corridor", "worker", "1", None),
             Some(DevScenarioLaunch {

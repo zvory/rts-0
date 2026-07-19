@@ -137,15 +137,19 @@ impl RoomTask {
                             issue_after_ticks: setup.issue_after_ticks,
                             issued: false,
                         };
-                        Ok::<(Game, DevDriver, u32), String>((
-                            setup.game,
-                            DevDriver::Scenario(driver),
-                            player_id,
-                        ))
+                        Ok((setup.game, DevDriver::Scenario(driver), player_id))
                     }};
                 }
 
                 match &config.id {
+                    DevScenarioId::DynamicConstructionPathBlock => {
+                        session_from_setup!(Game::new_dynamic_construction_path_block_scenario(
+                            config.case,
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?,)
+                    }
                     DevScenarioId::ScoutCarSnakingCorridor => session_from_setup!(
                         Game::new_snaking_corridor_scenario(config.unit, config.count, seed)?,
                     ),

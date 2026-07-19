@@ -138,6 +138,9 @@ __dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>][:
 
 Current scenario ids:
 
+- `dynamic_construction_path_block` — two workers receive simultaneous orders: one moves 20 tiles
+  while the other starts a Barracks across its already-planned route; selectable `head_on`,
+  `slight_angle`, and `major_angle` cases cover static-obstruction recovery across approach angles.
 - `scout_car_snaking_corridor` — movement/pathing through the snaking stone corridor.
 - `direct_reverse_order` — one vehicle ordered directly behind its current facing.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
