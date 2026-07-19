@@ -63,7 +63,7 @@ impl Game {
                 (tile, start, (start_x + 6, center_y - 1))
             }
             DynamicConstructionPathBlockCase::MajorAngle => {
-                let tile = (start_x, center_y - 8);
+                let tile = (start_x, center_y - 6);
                 (
                     tile,
                     map.tile_center(tile.0, tile.1),
