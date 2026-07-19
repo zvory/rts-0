@@ -5,6 +5,7 @@ import {
 } from "../../client/src/input/formation_gesture.js";
 import { buildFormationLinePreview } from "../../client/src/input/formation_line.js";
 import { drawFormationMovePreview } from "../../client/src/renderer/formation_line_preview.js";
+import { RecordingGraphics } from "./pixi_fakes.mjs";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message || "Assertion failed");
@@ -79,18 +80,13 @@ function harness() {
 }
 
 {
-  const calls = [];
-  const graphics = new Proxy({}, {
-    get(_target, property) {
-      return (...args) => calls.push([property, ...args]);
-    },
-  });
+  const graphics = new RecordingGraphics();
   drawFormationMovePreview(graphics, {
     points: [{ x: 0, y: 0 }, { x: 96, y: 0 }],
     slots: [],
   });
-  const lineStyles = calls.filter(([name]) => name === "lineStyle");
-  const circles = calls.filter(([name]) => name === "drawCircle");
+  const lineStyles = graphics.calls.filter(([name]) => name === "lineStyle");
+  const circles = graphics.calls.filter(([name]) => name === "drawCircle");
   assert(lineStyles.some(([, width, color, alpha]) => width === 7 && color === 0x071018 && alpha === 0.72), "preview has a contrasting outer stroke");
   assert(lineStyles.some(([, width, , alpha]) => width === 3 && alpha === 1), "preview has an opaque colored inner stroke");
   assert(circles.length === 2, "preview marks both stroke endpoints");
