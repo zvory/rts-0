@@ -8,28 +8,19 @@ use super::shot_blocker_index::ShotBlockerIndex;
 use super::{Fog, LineOfSight, Map, SmokeCloudStore, TeamRelations};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DirectFireVisibility {
-    Owner,
-    Team,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct DirectFireLegality {
-    visibility: DirectFireVisibility,
     requires_intended_target: bool,
 }
 
 impl DirectFireLegality {
     pub(super) fn auto_acquire() -> Self {
         Self {
-            visibility: DirectFireVisibility::Owner,
             requires_intended_target: false,
         }
     }
 
-    pub(super) fn intended_target(visibility: DirectFireVisibility) -> Self {
+    pub(super) fn intended_target() -> Self {
         Self {
-            visibility,
             requires_intended_target: true,
         }
     }
@@ -75,12 +66,8 @@ pub(super) fn direct_fire_target_legal(
     if smokes.point_inside(start.0, start.1) || smokes.point_inside(end.0, end.1) {
         return false;
     }
-    let visible = match legality.visibility {
-        DirectFireVisibility::Owner => fog.is_visible_world(attacker_owner, end.0, end.1),
-        DirectFireVisibility::Team => {
-            crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams)
-        }
-    };
+    let visible =
+        crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams);
     if !visible || !los.clear_between_world_points(start, end) {
         return false;
     }
@@ -178,7 +165,13 @@ fn target_has_legal_shot(
 ) -> bool {
     !smokes.point_inside(px, py)
         && !smokes.point_inside(target.pos_x, target.pos_y)
-        && fog.is_visible_world(owner, target.pos_x, target.pos_y)
+        && crate::rules::projection::team_visible_world(
+            owner,
+            target.pos_x,
+            target.pos_y,
+            fog,
+            teams,
+        )
         && (entities
             .get(self_id)
             .is_some_and(|entity| entity.kind == EntityKind::MortarTeam)

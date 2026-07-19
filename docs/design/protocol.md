@@ -694,8 +694,8 @@ The expiration is calculated from the firing tick plus that gun's firing-cycle c
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
 actionable sight;
 ordinary live vision takes precedence and bypasses that reaction gate without changing weapon
-reload timing. Explicit attacks use team-current ordinary sight for both legality and reaction
-bypass, while autonomous acquisition remains owner-local. Repeated shots extend one stable reveal
+reload timing. Explicit attacks and autonomous acquisition use team-current ordinary sight for
+both legality and reaction bypass. Repeated shots extend one stable reveal
 episode, so move orders or transient target switches cannot restart the same episode's reaction
 deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
 the firing entity moves before the next fog rebuild.

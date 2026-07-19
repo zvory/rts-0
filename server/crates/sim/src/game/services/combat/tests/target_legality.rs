@@ -1,9 +1,7 @@
 use super::super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
-use super::super::target_legality::{
-    direct_fire_target_legal, DirectFireLegality, DirectFireVisibility,
-};
+use super::super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 use super::*;
 
 fn direct_fire_legal(
@@ -253,7 +251,7 @@ fn intended_target_mode_rejects_enemy_hard_blockers_before_target() {
         &smokes,
         attacker,
         target,
-        DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+        DirectFireLegality::intended_target(),
     ));
 }
 
@@ -283,7 +281,7 @@ fn intended_target_mode_keeps_tank_traps_and_pump_jacks_non_blocking() {
                 &smokes,
                 attacker,
                 target,
-                DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+                DirectFireLegality::intended_target(),
             ),
             "{blocker_kind:?} should not block intended direct fire",
         );
@@ -320,7 +318,7 @@ fn secondary_weapon_activation_requires_range_and_turret_arc() {
         facing_rad: 0.0,
         half_arc_rad: std::f32::consts::FRAC_PI_4,
         range_px: config::TILE_SIZE as f32 * 3.0,
-        direct_fire_legality: DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+        direct_fire_legality: DirectFireLegality::intended_target(),
     };
 
     assert!(secondary_weapon_activation_legal(
@@ -370,7 +368,7 @@ fn secondary_weapon_activation_requires_intended_direct_fire_hit() {
         facing_rad: 0.0,
         half_arc_rad: std::f32::consts::FRAC_PI_4,
         range_px: config::TILE_SIZE as f32 * 6.0,
-        direct_fire_legality: DirectFireLegality::intended_target(DirectFireVisibility::Owner),
+        direct_fire_legality: DirectFireLegality::intended_target(),
     };
 
     assert!(

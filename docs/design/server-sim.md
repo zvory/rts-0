@@ -1296,8 +1296,8 @@ and the stable reveal source/episode, so transient target clears and switching b
 episode do not restart it. Its absolute readiness deadline includes any reload remaining when the
 gate begins, preserving the prior additive timing without mixing reaction time into reload state.
 Ordinary sight bypasses the gate immediately while leaving the real reload unchanged; explicit
-ordered fire uses the same team-current ordinary-sight scope as its target-legality check, while
-auto-acquisition remains owner-local. Each weapon retains at most 64 active reaction gates and
+ordered fire and auto-acquisition use the same team-current ordinary-sight scope as their
+target-legality checks. Each weapon retains at most 64 active reaction gates and
 deterministically evicts the oldest if that defensive bound is reached. The legacy `Entity::attack_cd()`,
 `set_attack_cd()`, and `tick_attack_cd()` shims operate only on an entity kind's default weapon;
 new multi-weapon code should use `weapon_cooldown`, `set_weapon_cooldown`,
@@ -1625,9 +1625,9 @@ the next tick. Combatants that first engage a target
 through reveal-only sight spend a one-second response delay before their first counter-shot, so
 firing-reveal counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
 An active reveal does not delay a combatant that has ordinary sight, and gaining ordinary sight
-bypasses an in-progress reaction gate without changing the weapon's reload. For explicit attacks,
-ordinary allied sight counts because the firing legality and reaction provenance queries share the
-same team-current scope; autonomous target acquisition remains owner-local.
+bypasses an in-progress reaction gate without changing the weapon's reload. Explicit attacks and
+autonomous target acquisition both count ordinary allied sight because firing legality and reaction
+provenance share the same team-current scope.
 Lingering death sight is stamped into live fog as ordinary temporary team sight for five seconds.
 The invisible source stays at the dead unit/building's final position, uses that entity's sight
 radius, respects smoke and line-of-sight blockers, and is stamped into every tracked teammate fog
