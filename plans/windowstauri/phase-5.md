@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Complete on 2026-07-18 (shipped to Windows playtesters; no reported complaints).
+- [x] Done. Completed on 2026-07-18 (shipped to Windows playtesters; no reported complaints).
 
 ## Objective
 
