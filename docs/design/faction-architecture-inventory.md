@@ -48,14 +48,14 @@ Lifecycle status is explicit and separate from catalog existence:
 
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 24 global kinds: 12 units,
+Runtime identity is still global `EntityKind`. The current roster has 25 global kinds: 13 units,
 10 buildings, and 2 resource nodes. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 
 The current production catalog is in `server/crates/rules/src/defs.rs`:
 
-- Units: Worker, Golem, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team,
+- Units: Worker, Golem, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
 - Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
   Works, Tank Trap, and Pump Jack. Tank Trap construction is server-authoritative after Training
