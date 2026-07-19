@@ -30,10 +30,8 @@ impl DevDriver {
 
 pub(super) struct DevScenarioDriver {
     player_id: u32,
-    units: Vec<u32>,
-    goal: (f32, f32),
+    command: SimCommand,
     issue_after_ticks: u32,
-    attack_move: bool,
     issued: bool,
 }
 
@@ -46,22 +44,7 @@ impl DevScenarioDriver {
             return;
         }
         self.issued = true;
-        let command = if self.attack_move {
-            SimCommand::AttackMove {
-                units: self.units.clone(),
-                x: self.goal.0,
-                y: self.goal.1,
-                queued: false,
-            }
-        } else {
-            SimCommand::Move {
-                units: self.units.clone(),
-                x: self.goal.0,
-                y: self.goal.1,
-                queued: false,
-            }
-        };
-        game.enqueue(self.player_id, command);
+        game.enqueue(self.player_id, self.command.clone());
     }
 }
 
@@ -138,12 +121,11 @@ impl RoomTask {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
                         let player_id = setup.player_id;
+                        let command = setup.command();
                         let driver = DevScenarioDriver {
                             player_id,
-                            units: setup.units,
-                            goal: setup.goal,
+                            command,
                             issue_after_ticks: setup.issue_after_ticks,
-                            attack_move: setup.attack_move,
                             issued: false,
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), player_id))

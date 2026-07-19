@@ -7,11 +7,18 @@ fn scenario_starts_on_the_failure_boundary() {
     let setup = Game::new_attack_move_reload_acquisition_scenario(EntityKind::Tank, 1, 0x5150_0719)
         .expect("attack-move reload acquisition scenario setup should succeed");
     assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 10);
-    assert!(setup.attack_move);
-    assert_eq!(setup.units.len(), 2);
+    assert!(matches!(setup.command(), SimCommand::AttackMove { .. }));
+    assert_eq!(setup.units.len(), 1);
 
     let attacker_id = setup.units[0];
-    let target_id = setup.units[1];
+    let target_id = setup
+        .game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 2 && entity.kind == EntityKind::Tank)
+        .expect("scenario target should exist")
+        .id;
     let attacker = setup
         .game
         .state
@@ -36,7 +43,7 @@ fn scenario_starts_on_the_failure_boundary() {
     assert_eq!(attacker.target_id(), None);
     assert_eq!(
         attacker.weapon_cooldown(WeaponKind::TankCannon),
-        cannon.cooldown
+        setup.issue_after_ticks + cannon.cooldown
     );
     assert!(matches!(target.order(), Order::HoldPosition));
     assert!(
@@ -44,16 +51,23 @@ fn scenario_starts_on_the_failure_boundary() {
         "inspection target should survive the demonstration"
     );
 
+    let command = setup.command();
     let mut game = setup.game;
-    game.enqueue(
-        setup.player_id,
-        SimCommand::AttackMove {
-            units: vec![attacker_id],
-            x: setup.goal.0,
-            y: setup.goal.1,
-            queued: false,
-        },
+    for _ in 0..setup.issue_after_ticks {
+        game.tick();
+    }
+    let attacker = game
+        .state
+        .entities
+        .get(attacker_id)
+        .expect("scenario attacker should survive the inspection pause");
+    assert_eq!(attacker.target_id(), None);
+    assert_eq!(
+        attacker.weapon_cooldown(WeaponKind::TankCannon),
+        cannon.cooldown,
+        "the cannon must still have a full reload remaining when attack-move is issued"
     );
+    game.enqueue(setup.player_id, command);
     game.tick();
     let attacker = game
         .state

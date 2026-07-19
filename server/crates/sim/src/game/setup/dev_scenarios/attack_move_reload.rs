@@ -41,11 +41,13 @@ impl Game {
         let reload_ticks = combat::weapon_profile(WeaponKind::TankCannon)
             .ok_or_else(|| "missing Tank cannon profile".to_string())?
             .cooldown;
+        let issue_after_ticks = config::TICK_HZ * 10;
+        let initial_cooldown = issue_after_ticks.saturating_add(reload_ticks);
         if let Some(entity) = entities.get_mut(attacker) {
             entity.set_facing(0.0);
             entity.set_weapon_facing(0.0);
-            entity.set_weapon_cooldown(WeaponKind::TankCannon, reload_ticks);
-            entity.set_weapon_cooldown(WeaponKind::TankCoax, reload_ticks);
+            entity.set_weapon_cooldown(WeaponKind::TankCannon, initial_cooldown);
+            entity.set_weapon_cooldown(WeaponKind::TankCoax, initial_cooldown);
         }
         if let Some(entity) = entities.get_mut(target) {
             entity.hold_position();
@@ -88,10 +90,10 @@ impl Game {
         DevScenarioSetup {
             game,
             player_id,
-            units: vec![attacker, target],
+            units: vec![attacker],
             goal,
-            issue_after_ticks: config::TICK_HZ * 10,
-            attack_move: true,
+            issue_after_ticks,
+            order: DevScenarioOrder::AttackMove,
         }
         .checkpoint_backed("dev:attack_move_reload_acquisition")
     }

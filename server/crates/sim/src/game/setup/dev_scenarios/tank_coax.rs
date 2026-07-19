@@ -74,7 +74,7 @@ impl Game {
             units,
             goal: tank_pos,
             issue_after_ticks: u32::MAX,
-            attack_move: false,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:tank_coax_inspection")
     }
