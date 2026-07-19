@@ -213,13 +213,14 @@ fn attack_move_prefers_in_range_armored_fallback_over_out_of_range_soft_target()
 }
 
 #[test]
-fn out_of_range_direct_tank_attack_does_not_change_position_or_path() {
+fn out_of_range_direct_tank_attack_creates_a_pursuit_path() {
     let mut entities = EntityStore::new();
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
         .expect("tank should spawn");
+    let enemy_x = visible_target_x_outside_weapon_range(&entities, tank_id);
     let enemy_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, enemy_x, 100.0)
         .expect("enemy should spawn");
     if let Some(tank) = entities.get_mut(tank_id) {
         tank.set_order(Order::attack(enemy_id));
@@ -235,8 +236,8 @@ fn out_of_range_direct_tank_attack_does_not_change_position_or_path() {
 
     let tank = entities.get(tank_id).expect("tank should exist");
     assert_eq!((tank.pos_x, tank.pos_y), (100.0, 100.0));
-    assert!(tank.path_is_empty());
-    assert_eq!(tank.path_goal(), None);
+    assert!(!tank.path_is_empty());
+    assert!(tank.path_goal().is_some());
     assert_eq!(tank.target_id(), None);
 }
 

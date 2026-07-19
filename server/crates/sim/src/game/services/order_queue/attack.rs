@@ -1,10 +1,4 @@
-use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, PanzerfaustState};
-use crate::game::entrenchment_combat;
-use crate::game::map::Map;
-use crate::game::services::dist2;
-
-const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
 
 pub(super) fn panzerfaust_attack_cycle_active(attacker: &Entity) -> bool {
     attacker.kind == EntityKind::Rifleman
@@ -17,47 +11,22 @@ pub(super) fn panzerfaust_attack_cycle_active(attacker: &Entity) -> bool {
         )
 }
 
-pub(super) fn attack_can_fire_now(
-    map: &Map,
+/// A direct Panzerfaust order finishes as soon as its one-use launcher has fired, allowing a
+/// queued movement order to promote while the detached projectile resolves.
+pub(super) fn direct_panzerfaust_shot_spent(
     entities: &EntityStore,
     attacker: &Entity,
     target: u32,
 ) -> bool {
-    let Some(target) = entities.get(target) else {
-        return false;
-    };
-    let Some(stats) = config::unit_stats(attacker.kind) else {
-        return false;
-    };
-    let uses_loaded_panzerfaust = attacker.kind == EntityKind::Rifleman
-        && crate::rules::combat::is_panzerfaust_loaded_shot_target(target.kind)
+    attacker.kind == EntityKind::Rifleman
         && matches!(
             attacker
                 .combat
                 .as_ref()
                 .and_then(|combat| combat.panzerfaust),
-            Some(PanzerfaustState::Loaded | PanzerfaustState::Windup { .. })
-        );
-    let dmg = if uses_loaded_panzerfaust {
-        config::PANZERFAUST_DAMAGE
-    } else {
-        stats.dmg
-    };
-    if dmg == 0 {
-        return false;
-    }
-    let range_tiles = if uses_loaded_panzerfaust {
-        entrenchment_combat::attack_range_tiles(attacker, config::PANZERFAUST_RANGE_TILES as f32)
-    } else {
-        stats.range_tiles as f32
-    };
-    let range_px =
-        range_tiles * config::TILE_SIZE as f32 + attacker.radius() + ATTACK_RANGE_SLACK_PX;
-    if dist2(attacker.pos_x, attacker.pos_y, target.pos_x, target.pos_y) > range_px * range_px {
-        return false;
-    }
-    crate::game::services::line_of_sight::LineOfSight::new(map).clear_between_world_points(
-        (attacker.pos_x, attacker.pos_y),
-        (target.pos_x, target.pos_y),
-    )
+            Some(PanzerfaustState::Spent)
+        )
+        && entities.get(target).is_some_and(|target| {
+            crate::rules::combat::is_panzerfaust_loaded_shot_target(target.kind)
+        })
 }

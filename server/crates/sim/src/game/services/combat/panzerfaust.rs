@@ -26,6 +26,7 @@ pub(super) fn handle_combat_if_panzerfaust(
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    request_direct_attack_path: &mut dyn FnMut(&mut EntityStore, u32, u32, f32, f32),
     fog: &Fog,
     smokes: &SmokeCloudStore,
     id: u32,
@@ -44,6 +45,7 @@ pub(super) fn handle_combat_if_panzerfaust(
             methamphetamines_researched,
             occ,
             spatial,
+            request_direct_attack_path,
             fog,
             smokes,
             id,
@@ -61,6 +63,7 @@ fn handle_loaded_combat(
     methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    request_direct_attack_path: &mut dyn FnMut(&mut EntityStore, u32, u32, f32, f32),
     fog: &Fog,
     smokes: &SmokeCloudStore,
     id: u32,
@@ -98,6 +101,17 @@ fn handle_loaded_combat(
     }
 
     let distance = dist2(px, py, tx, ty).sqrt();
+    let commanded_direct_target = mode == CombatMode::Ordered
+        && entities
+            .get(id)
+            .and_then(|attacker| attacker.order().attack_target())
+            == Some(target);
+    if commanded_direct_target && distance <= range_px {
+        if let Some(attacker) = entities.get_mut(id) {
+            attacker.clear_path();
+            attacker.set_path_goal(None);
+        }
+    }
     let target_angle = (ty - py).atan2(tx - px);
     let fire_context =
         PanzerfaustFireContext::new(map, entities, blockers, teams, &los, fog, smokes);
@@ -125,6 +139,9 @@ fn handle_loaded_combat(
     if mode == CombatMode::Ordered {
         if let Some(attacker) = entities.get_mut(id) {
             attacker.mark_attack_phase(AttackPhase::Waiting);
+        }
+        if commanded_direct_target {
+            request_direct_attack_path(entities, id, target, 0.0, range_px);
         }
     }
 

@@ -30,7 +30,7 @@ use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 use std::collections::BTreeMap;
 
-use self::attack::{attack_can_fire_now, panzerfaust_attack_cycle_active};
+use self::attack::{direct_panzerfaust_shot_spent, panzerfaust_attack_cycle_active};
 
 mod attack;
 
@@ -571,7 +571,7 @@ fn attack_intent_valid(
 }
 
 fn attack_order_complete(
-    map: &Map,
+    _map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -593,7 +593,7 @@ fn attack_order_complete(
     if panzerfaust_attack_cycle_active(attacker) {
         return false;
     }
-    !attack_can_fire_now(map, entities, attacker, target)
+    direct_panzerfaust_shot_spent(entities, attacker, target)
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
@@ -1265,6 +1265,34 @@ mod tests {
             "dead attack target should be skipped and next move promoted"
         );
         assert!(unit.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn live_out_of_range_attack_does_not_promote_its_following_order() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
+            .expect("target should spawn");
+        {
+            let unit = entities.get_mut(attacker).expect("attacker should exist");
+            unit.set_order(Order::attack(target));
+            unit.set_target_id(Some(target));
+            unit.append_queued_order(OrderIntent::attack_move_to(400.0, 100.0));
+        }
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let unit = entities.get(attacker).expect("attacker should exist");
+        assert!(matches!(unit.order(), Order::Attack(_)));
+        assert_eq!(
+            unit.queued_orders(),
+            &[OrderIntent::attack_move_to(400.0, 100.0)]
+        );
     }
 
     #[test]

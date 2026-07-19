@@ -160,6 +160,15 @@ pub(in crate::game) fn combat_system(
             methamphetamines_researched,
             occ,
             spatial,
+            &mut |entities, attacker, target, min_range_px, max_range_px| {
+                coordinator.request_direct_attack_path(
+                    entities,
+                    attacker,
+                    target,
+                    min_range_px,
+                    max_range_px,
+                );
+            },
             fog,
             smokes,
             id,
@@ -219,9 +228,8 @@ pub(in crate::game) fn combat_system(
                 };
             let min_range_px = profile.min_range_tiles * config::TILE_SIZE as f32;
             let mode = combat_mode_with_moving_fire(e, can_move_fire);
-            // Combat acquisition is weapon-range-only. Movement comes exclusively from a
-            // player-issued movement order; seeing or explicitly targeting an enemy never
-            // creates an enemy-directed path.
+            // Automatic acquisition remains weapon-range-only. A player-issued direct Attack
+            // order is separately allowed to create a target-relative pursuit path below.
             let acquire_px = range_px;
             (
                 e.owner,
@@ -331,6 +339,18 @@ pub(in crate::game) fn combat_system(
             continue; // auto-acquisition stays hostile-only; explicit self-attacks are ordered.
         }
         let dist = dist2(px, py, tx, ty).sqrt();
+        let commanded_direct_target = mode == CombatMode::Ordered
+            && entities
+                .get(id)
+                .and_then(|entity| entity.order().attack_target())
+                == Some(tid);
+        let target_in_weapon_range = dist >= min_range_px && dist <= range_px;
+        if commanded_direct_target && target_in_weapon_range {
+            if let Some(e) = entities.get_mut(id) {
+                e.clear_path();
+                e.set_path_goal(None);
+            }
+        }
         let target_angle = (ty - py).atan2(tx - px);
         if is_mortar_team
             && !mortar_autocast_target_eligible(entities, id, tid, min_range_px, range_px)
@@ -376,7 +396,7 @@ pub(in crate::game) fn combat_system(
         };
         let mut fired = false;
 
-        if dist >= min_range_px && dist <= range_px && clear_shot {
+        if target_in_weapon_range && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
             let mut weapon_aligned = true;
             if let Some(e) = entities.get_mut(id) {
@@ -503,31 +523,38 @@ pub(in crate::game) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 e.mark_attack_phase(AttackPhase::Waiting);
             }
+            if commanded_direct_target {
+                coordinator.request_direct_attack_path(entities, id, tid, min_range_px, range_px);
+            }
         }
         if fired {
-            let next_target = acquisition_pass::acquire(
-                map,
-                entities,
-                &blockers,
-                teams,
-                occ,
-                spatial,
-                &los,
-                fog,
-                smokes,
-                id,
-                owner,
-                px,
-                py,
-                acquire_px,
-                mode,
-                can_move_fire,
-                is_mortar_team,
-                min_range_px,
-                range_px,
-                require_safe_mortar_autocast_target,
-                tick,
-            );
+            let direct_target_survived =
+                commanded_direct_target && entities.get(tid).is_some_and(|target| target.hp > 0);
+            let next_target = direct_target_survived.then_some(tid).or_else(|| {
+                acquisition_pass::acquire(
+                    map,
+                    entities,
+                    &blockers,
+                    teams,
+                    occ,
+                    spatial,
+                    &los,
+                    fog,
+                    smokes,
+                    id,
+                    owner,
+                    px,
+                    py,
+                    acquire_px,
+                    mode,
+                    can_move_fire,
+                    is_mortar_team,
+                    min_range_px,
+                    range_px,
+                    require_safe_mortar_autocast_target,
+                    tick,
+                )
+            });
             if let Some(e) = entities.get_mut(id) {
                 e.set_target_id(next_target);
             }

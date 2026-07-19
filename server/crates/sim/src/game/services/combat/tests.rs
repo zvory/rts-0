@@ -3271,7 +3271,7 @@ fn enemy_building_between_attacker_and_target_leaves_direct_attacker_stationary(
 }
 
 #[test]
-fn direct_attack_on_out_of_range_building_does_not_create_a_path() {
+fn direct_attack_on_out_of_range_building_creates_a_pursuit_path() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -3293,8 +3293,8 @@ fn direct_attack_on_out_of_range_building_does_not_create_a_path() {
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
     assert_eq!(attacker_entity.target_id(), None);
-    assert_eq!(attacker_entity.path_goal(), None);
-    assert!(attacker_entity.path_is_empty());
+    assert!(attacker_entity.path_goal().is_some());
+    assert!(!attacker_entity.path_is_empty());
 }
 
 #[test]

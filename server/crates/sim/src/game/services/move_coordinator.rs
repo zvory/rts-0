@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
-    active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, BuildPhase,
-    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
+    active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, AttackPhase,
+    BuildPhase, DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -385,8 +385,8 @@ impl<'a> MoveCoordinator<'a> {
             .find(|entry| entry.player == player)
     }
 
-    /// Issue an attack order against a specific target without creating movement intent.
-    /// The unit fires only if the target is within range from its current position.
+    /// Issue a direct-target attack order. Combat owns pursuit planning because it has the
+    /// authoritative current weapon range and target legality for each tick.
     pub fn order_attack(&mut self, entities: &mut EntityStore, id: u32, target: u32) {
         if entities.get(target).is_none() {
             return;
@@ -608,6 +608,57 @@ impl<'a> MoveCoordinator<'a> {
         self.request_path(entities, id, goal, false, PathingRequestSource::AttackMove)
     }
 
+    /// Repath an explicit attack toward the current target-relative firing position. Direct
+    /// attacks keep their target lock; unlike attack-move, this route is never used for
+    /// automatic target acquisition.
+    pub fn request_direct_attack_path(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        target: u32,
+        min_range_px: f32,
+        max_range_px: f32,
+    ) -> bool {
+        let Some((attacker_pos, target_pos)) = entities.get(id).and_then(|attacker| {
+            entities.get(target).map(|target| {
+                (
+                    (attacker.pos_x, attacker.pos_y),
+                    (target.pos_x, target.pos_y),
+                )
+            })
+        }) else {
+            return false;
+        };
+        let Some(goal) = direct_attack_staging_goal(
+            self.map,
+            attacker_pos,
+            target_pos,
+            min_range_px,
+            max_range_px,
+        ) else {
+            return false;
+        };
+        let needs_initial_path = entities
+            .get(id)
+            .is_some_and(|entity| entity.path_goal().is_none());
+        if !needs_initial_path && !self.can_repath(entities, id, goal) {
+            return false;
+        }
+        if let Some(entity) = entities.get_mut(id) {
+            entity.begin_weapon_teardown_for_movement();
+            entity.mark_attack_phase(AttackPhase::Pursuing);
+            let (px, py) = (entity.pos_x, entity.pos_y);
+            entity.reset_stuck(px, py);
+        }
+        self.request_path(
+            entities,
+            id,
+            goal,
+            false,
+            PathingRequestSource::DirectAttack,
+        )
+    }
+
     /// Request a path for a gatherer, respecting throttle and budget.
     /// Returns `true` if a path was actually requested this call.
     pub fn request_gather_path(
@@ -784,21 +835,41 @@ impl<'a> MoveCoordinator<'a> {
             None => return false,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
-        if sx == gx && sy == gy {
+        if sx == gx && sy == gy && source != PathingRequestSource::DirectAttack {
             let gather_goal = (source == PathingRequestSource::Gather).then_some(goal);
             if let Some(e) = entities.get_mut(id) {
                 e.set_path(gather_goal.into_iter().collect());
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
-                if matches!(
-                    e.order(),
-                    Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
-                ) {
-                    e.mark_move_phase(MovePhase::Arrived);
-                    if matches!(e.order(), Order::Move(_)) {
-                        e.set_order(Order::Idle);
+                match e.order() {
+                    Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
+                        e.mark_move_phase(MovePhase::Arrived);
+                        if matches!(e.order(), Order::Move(_)) {
+                            e.set_order(Order::Idle);
+                        }
                     }
+                    Order::Attack(_) => e.mark_attack_phase(AttackPhase::Pursuing),
+                    _ => {}
                 }
+            }
+            self.consume_request_budget(None);
+            self.record_path_request(
+                source,
+                true,
+                true,
+                None,
+                request_start
+                    .map(|start| start.elapsed())
+                    .unwrap_or_default(),
+            );
+            return true;
+        }
+        if sx == gx && sy == gy {
+            if let Some(e) = entities.get_mut(id) {
+                e.set_path(vec![goal]);
+                e.set_last_repath_tick(self.tick);
+                e.set_path_goal(Some(goal));
+                e.mark_attack_phase(AttackPhase::Pursuing);
             }
             self.consume_request_budget(None);
             self.record_path_request(
@@ -822,7 +893,9 @@ impl<'a> MoveCoordinator<'a> {
             && !uses_oriented_vehicle_body(kind)
             && matches!(
                 source,
-                PathingRequestSource::Move | PathingRequestSource::AttackMove
+                PathingRequestSource::Move
+                    | PathingRequestSource::AttackMove
+                    | PathingRequestSource::DirectAttack
             ))
         .then_some((start_pos, goal));
         let req = PathRequest {
@@ -867,15 +940,20 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path(waypoints);
             e.set_last_repath_tick(self.tick);
             e.set_path_goal(Some(goal));
-            if matches!(
-                e.order(),
-                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
-            ) {
-                e.mark_move_phase(if path_ok {
-                    MovePhase::Moving
+            match e.order() {
+                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
+                    e.mark_move_phase(if path_ok {
+                        MovePhase::Moving
+                    } else {
+                        MovePhase::PathFailed
+                    });
+                }
+                Order::Attack(_) => e.mark_attack_phase(if path_ok {
+                    AttackPhase::Pursuing
                 } else {
-                    MovePhase::PathFailed
-                });
+                    AttackPhase::Waiting
+                }),
+                _ => {}
             }
         }
         self.consume_request_budget(Some(request_diagnostics));
@@ -960,16 +1038,58 @@ fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
     match order {
         Order::Move(_) => PathingRequestSource::Move,
         Order::AttackMove(_) => PathingRequestSource::AttackMove,
+        Order::Attack(_) => PathingRequestSource::DirectAttack,
         Order::Gather(_) => PathingRequestSource::Gather,
         Order::Build(_) => PathingRequestSource::Build,
         Order::Deconstruct(_) => PathingRequestSource::Deconstruct,
         Order::Ability(_) => PathingRequestSource::Ability,
         Order::Idle
         | Order::HoldPosition
-        | Order::Attack(_)
         | Order::ArtilleryPointFire(_)
         | Order::ArtilleryBlanketFire(_) => PathingRequestSource::Other,
     }
+}
+
+fn direct_attack_staging_goal(
+    map: &Map,
+    attacker: (f32, f32),
+    target: (f32, f32),
+    min_range_px: f32,
+    max_range_px: f32,
+) -> Option<(f32, f32)> {
+    if !attacker.0.is_finite()
+        || !attacker.1.is_finite()
+        || !target.0.is_finite()
+        || !target.1.is_finite()
+        || !min_range_px.is_finite()
+        || !max_range_px.is_finite()
+        || min_range_px < 0.0
+        || max_range_px < min_range_px
+    {
+        return None;
+    }
+    let dx = attacker.0 - target.0;
+    let dy = attacker.1 - target.1;
+    let distance = dx.hypot(dy);
+    if distance >= min_range_px && distance <= max_range_px {
+        return None;
+    }
+    let margin = 4.0;
+    let desired_distance = if distance > max_range_px {
+        (max_range_px - margin).max(min_range_px)
+    } else {
+        (min_range_px + margin).min(max_range_px)
+    };
+    let (dir_x, dir_y) = if distance > f32::EPSILON {
+        (dx / distance, dy / distance)
+    } else {
+        (1.0, 0.0)
+    };
+    let world_max = map.world_size_px() - 0.01;
+    Some((
+        (target.0 + dir_x * desired_distance).clamp(0.0, world_max),
+        (target.1 + dir_y * desired_distance).clamp(0.0, world_max),
+    ))
 }
 
 fn spawn_gap_from_building(
@@ -1417,7 +1537,7 @@ mod tests {
     }
 
     #[test]
-    fn attack_order_never_requests_a_path_even_with_an_exhausted_budget() {
+    fn direct_attack_pursuit_requests_a_target_relative_path() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let start = map.tile_center(3, 3);
@@ -1432,15 +1552,13 @@ mod tests {
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-        coordinator.budget = 0;
-
         coordinator.order_attack(&mut entities, unit, target);
+        assert!(coordinator.request_direct_attack_path(&mut entities, unit, target, 0.0, 128.0));
 
         let attacker = entities.get(unit).expect("attacker should remain");
         assert!(matches!(attacker.order(), Order::Attack(_)));
-        assert!(attacker.path_is_empty());
-        assert_eq!(attacker.path_goal(), None);
-        assert_eq!(coordinator.budget, 0);
+        assert!(!attacker.path_is_empty());
+        assert!(attacker.path_goal().is_some());
     }
 
     #[test]

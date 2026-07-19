@@ -1080,9 +1080,9 @@ one tile of weapon range through `entrenchment_combat::attack_range_tiles`, incl
 Rifleman's Panzerfaust shot. Combat target acquisition treats actively entrenched units, including
 units retaining an arrived Attack Move stance, and Machine Gunners that are setting up or deployed
 like Hold Position: they can acquire and fire at legal targets inside current weapon range but do
-not request enemy-directed paths or tear down the weapon to pursue. A fresh Move or Attack Move
-order may move the unit out of the trench or emplacement; Attack remains stationary;
-command application and lab moves clear active occupation before later combat decisions use it.
+not request enemy-directed paths or tear down the weapon to pursue. A fresh Move, Attack Move, or
+direct Attack order clears active occupation before later combat decisions use it; direct Attack
+then follows its normal target-pursuit rule and may tear down a Machine Gunner to close range.
 
 Incoming direct-fire accuracy is weapon-specific: Anti-Tank Gun and Tank cannon shots give each
 infantry body they intersect an independent 50% chance to dodge, while entrenchment adds no miss
@@ -1207,7 +1207,7 @@ Entrenchment research takes 30 seconds.
 
 Deployed anti-tank guns rank in-field automatic target candidates ahead of out-of-arc candidates. If no in-field candidate exists, acquisition retains the out-of-arc target so the weapon clamps toward the fixed field edge without firing.
 
-Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible; they never create movement toward it. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
+Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, stops to fire, and repaths if the same target moves out of range; it never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
 
 Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a City Centre requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 20-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
