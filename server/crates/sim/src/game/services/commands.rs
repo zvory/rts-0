@@ -1,10 +1,11 @@
-use crate::command_budget::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 use crate::config;
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
-use crate::game::commands::{CommandAdmission, PendingCommand};
+#[cfg(test)]
+use crate::game::commands::CommandAdmission;
+use crate::game::commands::PendingCommand;
 use crate::game::entity::{
     supports_manual_emplacement, EntityKind, EntityStore, Order, OrderIntent, ProdItem,
     RallyIntent, ResearchItem, WeaponSetup,
@@ -40,6 +41,7 @@ use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules::{self, combat::WeaponKind};
+#[cfg(test)]
 use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 use std::collections::HashMap;
 const MAX_RALLY_STAGES: usize = 4;
@@ -55,11 +57,12 @@ mod support_weapon_setup;
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
 use self::guards::{
-    dedupe_cap_units, dedupe_units, is_constructing, player_is_ai, rally_intent_for_map,
-    unit_can_accept_ground_command, unit_can_accept_player_command,
+    command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
+    rally_intent_for_map, unit_can_accept_ground_command, unit_can_accept_player_command,
+    CommandAdmissionPolicy,
 };
 use self::planner_facts::{
-    entity_order_intent_from_planner, planner_config, planner_facts, AbilityFactInput,
+    entity_order_intent_from_planner, issue_mode, planner_config, planner_facts, AbilityFactInput,
 };
 struct CommandExecutionContext<'a, 'pathing> {
     map: &'a Map,
@@ -75,11 +78,6 @@ struct CommandExecutionContext<'a, 'pathing> {
     events: &'a mut HashMap<u32, Vec<Event>>,
     teams: TeamRelations,
     tick: u32,
-}
-#[derive(Clone, Copy)]
-struct CommandAdmissionPolicy {
-    enforce_budget: bool,
-    max_units_per_command: usize,
 }
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
 #[allow(clippy::too_many_arguments)]
@@ -707,30 +705,6 @@ fn sanitize_formation_points(map: &Map, points: Vec<(f32, f32)>) -> Option<Vec<(
         sanitized.push(point);
     }
     (sanitized.len() >= 2).then_some(sanitized)
-}
-
-fn command_admission_for(
-    admission: CommandAdmission,
-    player_is_ai: bool,
-) -> CommandAdmissionPolicy {
-    match admission {
-        CommandAdmission::Normal => CommandAdmissionPolicy {
-            enforce_budget: !player_is_ai,
-            max_units_per_command: MAX_UNITS_PER_COMMAND,
-        },
-        CommandAdmission::LabIgnoreCommandLimits => CommandAdmissionPolicy {
-            enforce_budget: false,
-            max_units_per_command: LAB_MAX_UNITS_PER_COMMAND,
-        },
-    }
-}
-
-fn issue_mode(queued: bool) -> planner::IssueMode {
-    if queued {
-        planner::IssueMode::Queue
-    } else {
-        planner::IssueMode::Immediate
-    }
 }
 
 fn faction_id_for<'a>(mut players: impl Iterator<Item = (u32, &'a str)>, player: u32) -> String {

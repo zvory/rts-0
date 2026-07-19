@@ -20,6 +20,14 @@ pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerCo
     }
 }
 
+pub(super) fn issue_mode(queued: bool) -> planner::IssueMode {
+    if queued {
+        planner::IssueMode::Queue
+    } else {
+        planner::IssueMode::Immediate
+    }
+}
+
 pub(super) fn entity_order_intent_from_planner(
     intent: planner::OrderIntent,
 ) -> Option<OrderIntent> {
