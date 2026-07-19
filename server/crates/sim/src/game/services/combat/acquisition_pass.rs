@@ -100,13 +100,11 @@ pub(super) fn select(
         .is_some_and(|entity| entity.weapon_cooldown(weapon) == 0);
     let travelling_attack_move = !is_mortar_team
         && mode == CombatMode::Aggressive
-        && entities
-            .get(id)
-            .is_some_and(|entity| {
-                matches!(entity.order(), Order::AttackMove(_))
-                    && entity.target_id().is_none()
-                    && !entity.path_is_empty()
-            });
+        && entities.get(id).is_some_and(|entity| {
+            matches!(entity.order(), Order::AttackMove(_))
+                && entity.target_id().is_none()
+                && !entity.path_is_empty()
+        });
     let target_filter = |target_id| {
         (!is_mortar_team
             || super::mortar_autocast_target_eligible(
