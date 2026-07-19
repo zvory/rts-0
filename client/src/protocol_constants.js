@@ -82,6 +82,7 @@ export const LAB_REPLAY = Object.freeze({
 // --- Command discriminators (the `c` field) ---
 export const CMD = Object.freeze({
   MOVE: "move",
+  FORMATION_MOVE: "formationMove",
   ATTACK_MOVE: "attackMove",
   ATTACK: "attack",
   DECONSTRUCT: "deconstruct",

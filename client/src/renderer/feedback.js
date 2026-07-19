@@ -73,6 +73,7 @@ import {
   weaponRecoilOffset,
 } from "./shared.js";
 import { drawImpassableEdge, isImpassableAt } from "./terrain_palette.js";
+import { drawFormationMovePreview } from "./formation_line_preview.js";
 
 export { _drawBreakthroughAuras } from "./breakthrough_aura.js";
 
@@ -211,6 +212,7 @@ export function _drawCommandFeedback(view) {
       g.lineTo(sx, sy + 4);
     }
   }
+  drawFormationMovePreview(g, view.formationMovePreview);
 }
 
 export function _drawAttackTargetPreview(view) {

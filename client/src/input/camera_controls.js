@@ -122,6 +122,7 @@ export function _handleKeyUp(ev) {
 }
 
 export function _handleBlur() {
+  this._cancelFormationGesture?.();
   if (this.pointerLocked) this.exitPointerLock();
   this._shiftKeysDown?.clear();
   this._shiftKeyDown = false;

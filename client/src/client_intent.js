@@ -36,6 +36,8 @@ export class ClientIntent {
     this.lastCommandTargetArm = null;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,radiusTiles:number|null,createdAt:number,ownerId:number|null}>} */
     this.commandFeedback = [];
+    /** @type {null | {points:Array<{x:number,y:number}>,slots:Array<{unitId:number,x:number,y:number,radius:number}>}} */
+    this.formationMovePreview = null;
     /** @type {null | {targetId:number, kind:string, x:number, y:number}} */
     this.attackTargetPreview = null;
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
@@ -198,6 +200,23 @@ export class ClientIntent {
     const ttlMs = 650;
     this.commandFeedback = this.commandFeedback.filter((f) => now - f.createdAt <= ttlMs);
     return this.commandFeedback;
+  }
+
+  /** Set or clear the live freehand formation line and provisional unit slots. */
+  updateFormationMovePreview(preview) {
+    if (!preview || !Array.isArray(preview.points) || preview.points.length < 2) {
+      this.formationMovePreview = null;
+      return null;
+    }
+    this.formationMovePreview = {
+      points: preview.points.map((point) => ({ x: point.x, y: point.y })),
+      slots: (Array.isArray(preview.slots) ? preview.slots : []).map((slot) => ({ ...slot })),
+    };
+    return this.formationMovePreview;
+  }
+
+  clearFormationMovePreview() {
+    this.formationMovePreview = null;
   }
 
   /**
@@ -460,6 +479,8 @@ function commandOrderStage(command, clientSeq, createdAt) {
   switch (command.c) {
     case CMD.MOVE:
       return finitePointStage(ORDER_STAGE.MOVE, command, base);
+    case CMD.FORMATION_MOVE:
+      return finiteFormationStage(command, base);
     case CMD.ATTACK_MOVE:
       return finitePointStage(ORDER_STAGE.ATTACK_MOVE, command, base);
     case CMD.SETUP_ANTI_TANK_GUNS:
@@ -477,6 +498,12 @@ function commandOrderStage(command, clientSeq, createdAt) {
     default:
       return null;
   }
+}
+
+function finiteFormationStage(command, base) {
+  const points = Array.isArray(command.points) ? command.points : [];
+  const point = points[points.length - 1];
+  return finitePointStage(ORDER_STAGE.MOVE, point || {}, base);
 }
 
 function finitePointStage(kind, command, base) {

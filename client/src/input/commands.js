@@ -890,6 +890,7 @@ export function _quickCastCommandTarget(ev = {}) {
 }
 
 export function _cancel() {
+  if (this._cancelFormationGesture?.()) return;
   const intent = clientIntent(this);
   if (typeof intent?.closeCommandCardMenu === "function" && intent.closeCommandCardMenu()) {
     return;

@@ -53,6 +53,7 @@ export function buildRendererFeedbackView(
     issueAsOwnerId: controlOwner.issueAsOwnerId,
     map: state?.map || null,
     placement: previewSurface ? null : intent?.placement || null,
+    formationMovePreview: previewSurface ? null : intent?.formationMovePreview || null,
     labToolPreview: previewSurface ? null : intent?.labToolPreview || null,
     commandFeedback,
     attackTargetPreview: previewSurface ? null : intent?.attackTargetPreview || null,

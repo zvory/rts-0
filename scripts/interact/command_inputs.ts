@@ -32,6 +32,7 @@ const SESSION_RE = /^(?:lab|game|scenario)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
+  formationMove: ["c", "units", "points", "queued"],
   attackMove: ["c", "units", "x", "y", "queued"],
   attack: ["c", "units", "target", "queued"],
   deconstruct: ["c", "units", "target", "queued"],
@@ -424,6 +425,14 @@ function validateGameCommand(value: unknown) {
   if (allowed.includes("buildings")) refs(value.buildings, "order.command.buildings", 1, INTERACT_LIMITS.maxCommandUnits);
   for (const field of ["x", "y"]) {
     if (allowed.includes(field) && (value.c !== "useAbility" || value[field] != null)) finite(value[field], `order.command.${field}`);
+  }
+  if (allowed.includes("points")) {
+    array(value.points, "order.command.points", 2, 64, (point, index) => {
+      record(point, `order.command.points[${index}]`);
+      exact(point, ["x", "y"], `order.command.points[${index}]`);
+      finite(point.x, `order.command.points[${index}].x`);
+      finite(point.y, `order.command.points[${index}].y`);
+    });
   }
   for (const field of ["target", "node", "building"]) {
     if (allowed.includes(field) && !(field === "building" && value.c === "build")) entityRef(value[field], `order.command.${field}`);
