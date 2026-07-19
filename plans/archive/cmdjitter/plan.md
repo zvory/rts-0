@@ -1,5 +1,12 @@
 # Command-Density Jitter Investigation Plan
 
+## Archive Status
+
+Archived on 2026-07-18. Phase 1 diagnostics shipped, but the evidence-gathering and reproduction
+phases were never completed and their assumptions are now stale. Do not resume this phase sequence
+or treat it as a current diagnosis; begin any renewed command-jitter investigation from fresh beta,
+runtime, protocol, and client evidence.
+
 ## Purpose
 
 Diagnose and make repeatable the player-visible stutter where high-density command input appears to

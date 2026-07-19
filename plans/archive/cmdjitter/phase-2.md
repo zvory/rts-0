@@ -2,7 +2,11 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Archived as stale and not completed on 2026-07-18.
+
+The proposed evidence window and incident assumptions are no longer trusted as a current
+investigation basis. A future investigation may reuse individual diagnostic ideas only after
+validating them against fresh deployed behavior and current protocol/reporting code.
 
 ## Objective
 

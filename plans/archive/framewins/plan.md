@@ -1,5 +1,13 @@
 # Frame Wins Plan
 
+## Archive Status
+
+Archived on 2026-07-18. Phase 1 is closed as a measured no-go, Phase 2 is intentionally left as
+historical planning material because related work was retried or shipped separately, and Phase 3 is
+skipped because its measured ceiling is too low to justify the added production complexity. This
+plan is no longer an executable implementation sequence; use current profiling evidence and
+`docs/client-performance-optimization-lessons.md` before proposing follow-up renderer work.
+
 ## Purpose
 
 Remove three measured sources of redundant client-frame work while preserving every frame's state,
