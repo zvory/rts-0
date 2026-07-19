@@ -281,8 +281,9 @@ function drawRectAsPolygon(g, geometry, sx = 1, sy = 1) {
 
 function drawPolyline(g, points) {
   if (points.length < 4) return;
-  gfxMove(g, points[0], points[1]);
-  for (let i = 2; i < points.length; i += 2) gfxLine(g, points[i], points[i + 1]);
+  g.moveTo(points[0], points[1]);
+  for (let i = 2; i < points.length; i += 2) g.lineTo(points[i], points[i + 1]);
+  gfxPaint(g);
 }
 
 function drawPath(g, commands, sx = 1, sy = 1) {

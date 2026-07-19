@@ -82,14 +82,22 @@ One canonical flame graph from the same audit measured 10.6 ms average frame wor
 unit phase, and 1.3 ms in presentation-frame assembly. Nested and self CPU percentages overlap; do
 not add them together as independent savings.
 
-The 2026-07-19 Pixi v8.19.0 cutover introduced a repeatable regression on this same workload. Two
-v7 baseline runs measured 9.2-9.6 ms average and 12 ms p95 frame work. Four successful v8 runs
-measured 10.4-11.2 ms average and 16 ms p95; the frozen final candidate measured 11.2/16/23.2 ms
-average/p95/max across 1,302 frames. Treat the p95 increase from 12 to 16 ms (33%) and the average
-range as a real upgrade cost, not as noise or an optimization win. Render groups and shared
-`GraphicsContext` resources remain separate follow-up experiments; measure each against this v8
-baseline and retain it only if complete frame work improves without changing frame state, timing,
-or reviewed pixels.
+The first 2026-07-19 Pixi v8.19.0 cutover mechanically preserved v7 immediate-mode drawing and
+introduced a repeatable regression on this same workload. Two v7 baseline runs measured 9.2-9.6 ms
+average and 12 ms p95 frame work. Four unoptimized v8 runs measured 10.4-11.2 ms average and 16 ms
+p95. The cause was not extra scene work: per-primitive `fill`/`stroke` calls and per-frame HP-bar
+`Graphics` clears dirtied v8 contexts and repeatedly rebuilt retained render instructions.
+
+The corrected local port coalesces non-overlapping fog rectangles by style, strokes rig polylines
+once per path, and retains immutable HP-bar background/fill geometry while updating only transform
+and tint. Three runs measured 9.0, 9.0, and 9.3 ms average with 12 ms p95, versus the paired current
+v7 run at 9.6/12 ms. Optimized v8 matched unoptimized v8 exactly across all 16 deterministic decoded
+RGBA ticks. Graphics clears fell from about 244,000 to 64,000-66,000 per run.
+
+Render groups were measured rather than assumed: a world group measured 9.8 ms average, an HP-only
+group 10.2 ms, and grouping the volatile layers 10.5 ms with a 26.7 ms maximum. All were rejected.
+Shared `GraphicsContext` resources remain a separate follow-up experiment; retain one only if
+complete frame work improves without changing frame state, timing, or reviewed pixels.
 
 ## Experiment ledger
 

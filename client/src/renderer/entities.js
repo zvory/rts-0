@@ -158,10 +158,29 @@ export function _drawSelectionAndHp(e, selection, state) {
   }
 
   if (progressStatus || damaged || selected) {
-    const g = this._slot("hpBars", e.id);
-    g.position.set(0, 0);
+    const g = this._hpBarSlot(e.id);
     this._hpBar(g, e, progressStatus);
   }
+}
+
+export function _hpBarSlot(id) {
+  const pool = this._pools.hpBars;
+  let container = pool.get(id);
+  if (!container) {
+    container = new PIXI.Container();
+    container.rtsBackground = new PIXI.Graphics();
+    container.rtsFill = new PIXI.Graphics();
+    container.addChild(container.rtsBackground, container.rtsFill);
+    pool.set(id, container);
+    this.layers.hpBars.addChild(container);
+    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.hpBars");
+  } else {
+    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.reused.hpBars");
+  }
+  this._seen.hpBars.add(id);
+  container.visible = true;
+  container.alpha = 1;
+  return container;
 }
 
 function ownOwner(state, owner) {
@@ -224,13 +243,16 @@ export function _hpBar(g, e, status = null) {
       topY = e.y - r - 8;
     }
   }
-  const x0 = e.x - halfW;
   const barW = halfW * 2;
   const barH = 4;
-
-  gfxFill(g, COLORS.hpBack, 0.9);
-  gfxRect(g, x0 - 1, topY - 1, barW + 2, barH + 2);
-  gfxNoFill(g);
+  const geometryKey = `${halfW}|${barH}`;
+  if (g.rtsGeometryKey !== geometryKey) {
+    g.rtsGeometryKey = geometryKey;
+    g.rtsBackground.clear().rect(-halfW - 1, -1, barW + 2, barH + 2).fill({ color: COLORS.hpBack, alpha: 0.9 });
+    g.rtsFill.clear().rect(0, 0, barW, barH).fill(0xffffff);
+    g.rtsFill.position.x = -halfW;
+  }
+  g.position.set(e.x, topY);
 
   let color = COLORS.hpGood;
   if (status?.kind === "deconstruction") {
@@ -239,9 +261,8 @@ export function _hpBar(g, e, status = null) {
     if (frac <= 0.33) color = COLORS.hpLow;
     else if (frac <= 0.66) color = COLORS.hpMid;
   }
-  gfxFill(g, color);
-  gfxRect(g, x0, topY, barW * frac, barH);
-  gfxNoFill(g);
+  g.rtsFill.tint = color;
+  g.rtsFill.scale.set(frac, 1);
 }
 
 export function _icon(e, cx, cy, size, alpha) {

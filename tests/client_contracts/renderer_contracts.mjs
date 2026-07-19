@@ -801,19 +801,33 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     renderer._drawSelectionAndHp(completed, new Set(), { playerId: 1 });
     renderer._drawSelectionAndHp(entrenched, new Set(), { playerId: 1 });
 
-    const scaffoldHpRects = renderer._pools.hpBars.get(scaffold.id)?.calls.filter((call) => call[0] === "drawRect") || [];
-    const scaffoldBarW = scaffoldHpRects[0]?.[3] - 2;
+    const scaffoldHp = renderer._pools.hpBars.get(scaffold.id);
+    const scaffoldBackRects = scaffoldHp?.rtsBackground?.calls.filter((call) => call[0] === "drawRect") || [];
+    const scaffoldFillRects = scaffoldHp?.rtsFill?.calls.filter((call) => call[0] === "drawRect") || [];
     assert(
       renderer._pools.selectionRings.has(scaffold.id),
       "selected under-construction building still draws a selection ring",
     );
     assert(
-      scaffoldHpRects.length === 2,
-      "under-construction building draws construction status on the HP bar layer",
+      scaffoldBackRects.length === 1 && scaffoldFillRects.length === 1,
+      "under-construction building keeps immutable background and fill geometry on the HP bar layer",
     );
     assert(
-      Math.abs(scaffoldHpRects[1][3] - scaffoldBarW * (scaffold.hp / scaffold.maxHp)) < 0.001,
-      "under-construction HP-layer status bar reflects remaining HP instead of build progress",
+      Math.abs(scaffoldHp.rtsFill.scaleX - (scaffold.hp / scaffold.maxHp)) < 0.001,
+      "under-construction HP-layer status scales the stable fill to remaining HP instead of build progress",
+    );
+    const backgroundCallCount = scaffoldHp.rtsBackground.calls.length;
+    const fillCallCount = scaffoldHp.rtsFill.calls.length;
+    scaffold.hp = 20;
+    renderer._drawSelectionAndHp(scaffold, new Set([scaffold.id]), { playerId: 1 });
+    assert(
+      scaffoldHp.rtsBackground.calls.length === backgroundCallCount
+        && scaffoldHp.rtsFill.calls.length === fillCallCount,
+      "HP changes reuse immutable bar geometry without clearing or rebuilding either Graphics context",
+    );
+    assert(
+      Math.abs(scaffoldHp.rtsFill.scaleX - 0.2) < 0.001,
+      "HP changes update the retained fill transform",
     );
     assert(
       renderer._pools.hpBars.has(completed.id),
@@ -1074,7 +1088,9 @@ function polygonAxisValues(points, offset) {
     renderer._drawSelectionAndHp(entity, new Set(), { playerId: 99 });
 
     const rig = renderer._liveRigPools.buildingRigs.get(entity.id)?.container;
-    const hpRects = renderer._pools.hpBars.get(entity.id)?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpBar = renderer._pools.hpBars.get(entity.id);
+    const hpBackRects = hpBar?.rtsBackground?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpFillRects = hpBar?.rtsFill?.calls.filter((call) => call[0] === "drawRect") || [];
     const buildingsIndex = renderer.world.children.indexOf(renderer.layers.buildings);
     const hpIndex = renderer.world.children.indexOf(renderer.layers.hpBars);
     assert(rig && renderer.layers.buildings.children.includes(rig), "SVG building rig renders on the buildings layer");
@@ -1082,7 +1098,7 @@ function polygonAxisValues(points, offset) {
       !renderer._pools.buildingOverlays.has(entity.id),
       "under-construction building does not draw a separate building overlay progress bar",
     );
-    assert(hpRects.length === 2, "under-construction building draws construction status on the HP bar layer");
+    assert(hpBackRects.length === 1 && hpFillRects.length === 1, "under-construction building keeps stable construction status geometry on the HP bar layer");
     assert(hpIndex > buildingsIndex, "HP-layer construction status renders above SVG building bodies");
   } finally {
     restorePixi();
@@ -1123,16 +1139,17 @@ function polygonAxisValues(points, offset) {
     });
     renderer._drawSelectionAndHp(entity, new Set(), { playerId: 99 });
 
-    const hpRects = renderer._pools.hpBars.get(entity.id)?.calls.filter((call) => call[0] === "drawRect") || [];
-    const hpBarW = hpRects[0]?.[3] - 2;
+    const hpBar = renderer._pools.hpBars.get(entity.id);
+    const hpBackRects = hpBar?.rtsBackground?.calls.filter((call) => call[0] === "drawRect") || [];
+    const hpFillRects = hpBar?.rtsFill?.calls.filter((call) => call[0] === "drawRect") || [];
     assert(
       !renderer._pools.buildingOverlays.has(entity.id),
       "deconstructing Tank Trap does not draw a separate building overlay progress bar",
     );
-    assert(hpRects.length === 2, "deconstructing Tank Trap draws reverse status on the HP bar layer");
+    assert(hpBackRects.length === 1 && hpFillRects.length === 1, "deconstructing Tank Trap keeps stable reverse-status geometry on the HP bar layer");
     assert(
-      Math.abs(hpRects[1][3] - hpBarW * entity.deconstructProgress) < 0.001,
-      "deconstructing Tank Trap HP-layer status drains according to deconstructProgress",
+      Math.abs(hpBar.rtsFill.scaleX - entity.deconstructProgress) < 0.001,
+      "deconstructing Tank Trap HP-layer status drains by scaling according to deconstructProgress",
     );
   } finally {
     restorePixi();

@@ -1,6 +1,7 @@
 class FakeGraphics {
   constructor() {
     this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+    this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
   }
   clear() { return this; }
   stroke() { return this; }
@@ -86,10 +87,12 @@ export function installFakePixi() {
       this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
       this.visible = true;
     }
-    addChild(child) {
-      this.children.push(child);
-      child.parent = this;
-      return child;
+    addChild(...children) {
+      for (const child of children) {
+        this.children.push(child);
+        child.parent = this;
+      }
+      return children[0];
     }
     removeChild(child) {
       this.children = this.children.filter((item) => item !== child);

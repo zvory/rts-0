@@ -789,6 +789,9 @@ function nearPoint(call, point, epsilon = 0.001) {
       _ringRadius() {
         return { rx: 12, ry: 8, cy: 0 };
       },
+      _hpBarSlot() {
+        return {};
+      },
       _hpBar() {},
     },
     selected[0],
@@ -895,6 +898,9 @@ function nearPoint(call, point, epsilon = 0.001) {
         },
         _ringRadius() {
           return { rx: 12, ry: 8, cy: 0 };
+        },
+        _hpBarSlot() {
+          return {};
         },
         _hpBar() {},
       },

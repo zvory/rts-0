@@ -24,6 +24,7 @@ import { _drawBuilding } from "./buildings.js";
 import {
   _drawSelectionAndHp,
   _hpBar,
+  _hpBarSlot,
   _icon,
   _ownerColors,
   _queueLabel,
@@ -1067,10 +1068,11 @@ export class Renderer {
     this._destroyed = true;
     this.app?.ticker?.stop?.();
 
-    // Per-id pooled Graphics across every layer.
+    // Per-id pooled display objects across every layer. HP bars are containers
+    // whose two immutable Graphics children must be released with the pool entry.
     for (const key of Object.keys(this._pools)) {
       const pool = this._pools[key];
-      for (const g of pool.values()) g.destroy();
+      for (const g of pool.values()) g.destroy(key === "hpBars" ? { children: true } : undefined);
       pool.clear();
     }
     // Pooled icon Text objects.
@@ -1184,6 +1186,7 @@ Object.assign(Renderer.prototype, {
   _drawSelectionAndHp,
   _ringRadius,
   _hpBar,
+  _hpBarSlot,
   _icon,
   _queueLabel,
   _drawFog,
