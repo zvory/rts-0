@@ -102,7 +102,11 @@ pub(super) fn select(
         && mode == CombatMode::Aggressive
         && entities
             .get(id)
-            .is_some_and(|entity| matches!(entity.order(), Order::AttackMove(_)));
+            .is_some_and(|entity| {
+                matches!(entity.order(), Order::AttackMove(_))
+                    && entity.target_id().is_none()
+                    && !entity.path_is_empty()
+            });
     let target_filter = |target_id| {
         (!is_mortar_team
             || super::mortar_autocast_target_eligible(
