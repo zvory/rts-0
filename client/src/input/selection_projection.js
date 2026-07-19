@@ -7,6 +7,7 @@ const EPSILON = 1e-7;
 
 export function buildSelectionScene({
   entities,
+  preparedEntities = null,
   projection,
   tileSize = DEFAULT_TILE_SIZE,
   generation = 1,
@@ -16,8 +17,9 @@ export function buildSelectionScene({
     throw new TypeError("SelectionSceneV1 requires a ProjectionSnapshotV1");
   }
   const proxies = [];
-  for (const entity of Array.isArray(entities) ? entities : []) {
-    const proxy = selectionProxyForEntity(entity, tileSize);
+  const sourceEntities = Array.isArray(entities) ? entities : [];
+  for (let index = 0; index < sourceEntities.length; index += 1) {
+    const proxy = selectionProxyForEntity(sourceEntities[index], tileSize, preparedEntities?.[index]);
     if (proxy) proxies.push(proxy);
   }
   return Object.freeze({
@@ -29,7 +31,7 @@ export function buildSelectionScene({
   });
 }
 
-export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE) {
+export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, prepared = null) {
   if (
     !entity ||
     entity.shotReveal ||
@@ -80,7 +82,9 @@ export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE) {
     anchor: Object.freeze({ x: entity.x, y: entity.y, heightPx }),
     footprint,
     minScreenRadiusCssPx: 6,
-    interaction: detachPlainRecord(entity),
+    interaction: prepared?.source === entity && prepared.interaction
+      ? prepared.interaction
+      : detachPlainRecord(entity),
   });
 }
 

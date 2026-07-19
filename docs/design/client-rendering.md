@@ -163,6 +163,15 @@ The backend owns any mutable staging buffers. Frame objects, arrays, and ordinar
 detached and frozen. Malformed individual records are dropped with bounded category diagnostics;
 they do not abort the whole frame.
 
+For received interpolated entities, Match creates one aligned frame-local preparation entry per
+source record. Its complete graph-aware detached interaction feeds `SelectionSceneV1`; its
+separately admitted presentation fields feed the entity layer without repeating nested clones.
+Unadmitted fields can neither reach nor invalidate presentation, while cycles, mutable collection
+views, unsupported prototypes, excessive depth, and non-finite values in admitted fields retain
+the existing bounded entity-drop behavior. These entries are positional and frame-local—there is
+no cross-frame cache or id lookup. A failed render never publishes or retains that frame's
+interaction; the prior successful selection scene remains authoritative for input.
+
 Back-to-front layer ids are exact:
 
 1. `staticGround`

@@ -111,8 +111,11 @@ preparation across presentation and interaction consumers. Its five-sample media
 - target phases from 2.027 to 1.598 ms/frame (-21.2%, -0.429 ms); and
 - complete frame work from 11.283 to 10.537 ms (-6.6%, -0.746 ms).
 
-It also passed exact 16-tick pixel parity, reduced sampled allocation by 3.8%, and kept retained heap
-within the parent spread. However, the implementation and acceptance note were never committed,
+The original exact-parity claim was invalid because the stranded driver read a cleared WebGL
+framebuffer and compared black images. After repairing the driver to read pixels in the render task,
+warm assets, rebuild the match, and replay from frame zero, the recovered implementation passed a
+fresh 16-tick exact decoded-RGBA comparison. It also reduced sampled allocation by 3.8% and kept
+retained heap within the parent spread. However, the implementation and acceptance note were never committed,
 pushed, or opened as a PR. The old worktree was already 207 commits behind `origin/main` at the
 2026-07-18 audit. Recover the design and tests deliberately; do not blindly merge the stale files.
 

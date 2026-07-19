@@ -14,6 +14,7 @@ import { KIND } from "../../client/src/protocol.js";
 import { runMatchCaptureFrame } from "../../client/src/frame_recovery.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { admitSelectionIds } from "../../client/src/command_budget.js";
+import { prepareEntitySnapshots } from "../../client/src/presentation/entity_snapshot.js";
 
 function orthographic({ x = 0, y = 0, zoom = 1, width = 400, height = 300 } = {}) {
   return createOrthographicProjectionSnapshot({
@@ -25,6 +26,68 @@ function orthographic({ x = 0, y = 0, zoom = 1, width = 400, height = 300 } = {}
     viewW: width,
     viewH: height,
   }, width / zoom);
+}
+
+{
+  const source = {
+    id: 13,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 80,
+    y: 70,
+    orderPlan: [{ kind: "move", x: 120, y: 100 }],
+    hiddenMetadata: { typed: new Uint8Array([1, 2]), value: 4 },
+  };
+  const prepared = prepareEntitySnapshots([source]);
+  const legacy = scene([source]);
+  const fast = buildSelectionScene({
+    entities: [source],
+    preparedEntities: prepared.entries,
+    projection: orthographic(),
+    tileSize: 32,
+    generation: 1,
+    frameId: 1,
+  });
+  assert(
+    JSON.stringify(fast) === JSON.stringify(legacy),
+    "prepared selection interactions serialize identically to legacy detached interactions",
+  );
+  source.orderPlan[0].x = 999;
+  assert(fast.proxies[0].interaction.orderPlan[0].x === 120, "prepared selection interactions detach from source mutation");
+  assert(prepared.entries[0].presentationError === null, "unsupported unadmitted metadata does not drop presentation");
+
+  const cyclic = { id: 14, owner: 1, kind: KIND.RIFLEMAN, x: 30, y: 30 };
+  cyclic.hiddenCycle = cyclic;
+  const cyclicPrepared = prepareEntitySnapshots([cyclic]);
+  assert(
+    cyclicPrepared.entries[0].interaction.hiddenCycle === cyclicPrepared.entries[0].interaction,
+    "prepared selection interactions preserve graph back-edges",
+  );
+  assert(Object.isFrozen(cyclicPrepared.entries[0].interaction), "prepared cyclic interactions stay frozen");
+
+  const admittedCycle = { id: 15, owner: 1, kind: KIND.RIFLEMAN, x: 30, y: 30, orderPlan: [] };
+  admittedCycle.orderPlan.push(admittedCycle.orderPlan);
+  assert(
+    prepareEntitySnapshots([admittedCycle]).entries[0].presentationError !== null,
+    "cycles in admitted fields retain the bounded presentation-drop path",
+  );
+  const admittedTypedArray = {
+    id: 16, owner: 1, kind: KIND.RIFLEMAN, x: 30, y: 30, orderPlan: new Uint8Array([1]),
+  };
+  assert(
+    prepareEntitySnapshots([admittedTypedArray]).entries[0].presentationError !== null,
+    "typed arrays in admitted fields retain the bounded presentation-drop path",
+  );
+  const sharedInvalid = { value: Number.NaN };
+  const sharedAcrossAdmission = {
+    id: 17, owner: 1, kind: KIND.RIFLEMAN, x: 30, y: 30,
+    hiddenMetadata: sharedInvalid,
+    orderPlan: sharedInvalid,
+  };
+  assert(
+    prepareEntitySnapshots([sharedAcrossAdmission]).entries[0].presentationError !== null,
+    "admitted aliases are validated even when an unadmitted field cloned the object first",
+  );
 }
 
 function fakePerspective({ groundAtScreen = true } = {}) {

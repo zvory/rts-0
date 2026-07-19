@@ -15,22 +15,19 @@ const EMPTY_ARRAY = Object.freeze([]);
  *   authoritativeEntities:Array<object>,
  *   fogSourceEntities:Array<object>,
  *   selectedEntities:Array<object>,
- *   debug:{entitiesInterpolatedCalls:number,selectedEntitiesCalls:number}
+ *   debug:{entityVariantBuildCalls:number,entityTraversals:number,entitiesInterpolatedCalls:number,selectedEntitiesCalls:number}
  * }}
  */
 export function buildFrameEntityViews(state, { alpha = 1 } = {}) {
-  const calls = { entitiesInterpolated: 0, selectedEntities: 0 };
+  const calls = {
+    entityVariantBuilds: 0,
+    entityTraversals: 0,
+    entitiesInterpolated: 0,
+    selectedEntities: 0,
+  };
   const frameAlpha = normalizeAlpha(alpha);
-  const interpolatedEntities = entitiesInterpolated(state, frameAlpha, undefined, calls);
-  const currentEntities = frameAlpha === 1
-    ? interpolatedEntities
-    : entitiesInterpolated(state, 1, undefined, calls);
-  const authoritativeEntities = entitiesInterpolated(
-    state,
-    1,
-    { includePrediction: false },
-    calls,
-  );
+  const variants = entityVariants(state, frameAlpha, calls);
+  const { interpolatedEntities, currentEntities, authoritativeEntities } = variants;
   const selectedEntities = selectedEntitiesForFrame(state, calls);
   return Object.freeze({
     version: 1,
@@ -41,10 +38,42 @@ export function buildFrameEntityViews(state, { alpha = 1 } = {}) {
     fogSourceEntities: fogSourceEntitiesForState(state, authoritativeEntities),
     selectedEntities,
     debug: Object.freeze({
+      entityVariantBuildCalls: calls.entityVariantBuilds,
+      entityTraversals: calls.entityTraversals,
       entitiesInterpolatedCalls: calls.entitiesInterpolated,
       selectedEntitiesCalls: calls.selectedEntities,
     }),
   });
+}
+
+function entityVariants(state, alpha, calls) {
+  if (typeof state?.entityVariants === "function") {
+    calls.entityVariantBuilds += 1;
+    const value = state.entityVariants(alpha) || {};
+    calls.entityTraversals += Number.isInteger(value.entityTraversals)
+      ? Math.max(0, value.entityTraversals)
+      : 0;
+    return {
+      interpolatedEntities: arrayOrEmpty(value.interpolatedEntities),
+      currentEntities: arrayOrEmpty(value.currentEntities),
+      authoritativeEntities: arrayOrEmpty(value.authoritativeEntities),
+    };
+  }
+  const interpolatedEntities = entitiesInterpolated(state, alpha, undefined, calls);
+  const currentEntities = alpha === 1
+    ? interpolatedEntities
+    : entitiesInterpolated(state, 1, undefined, calls);
+  const authoritativeEntities = entitiesInterpolated(
+    state,
+    1,
+    { includePrediction: false },
+    calls,
+  );
+  return { interpolatedEntities, currentEntities, authoritativeEntities };
+}
+
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : EMPTY_ARRAY;
 }
 
 function entitiesInterpolated(state, alpha, options, calls) {
