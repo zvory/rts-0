@@ -5122,6 +5122,10 @@ input[type="text"]:focus {
     z-index: 40;
   }
 
+  #game-menu.live-pause-active {
+    z-index: calc(var(--overlay-z) + 2);
+  }
+
   #settings-button {
     width: 40px;
     height: 40px;
