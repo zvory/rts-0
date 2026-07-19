@@ -1,5 +1,6 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, OrderIntent};
+use crate::game::entity::{Entity, EntityStore, OrderIntent};
+use crate::rules::is_anti_tank_gun;
 
 const CONVERGENCE_END_TILES: f32 = 14.0;
 const PARALLEL_DISTANCE_TILES: f32 = 20.0;
@@ -32,7 +33,7 @@ pub(super) fn target_groups(
         .iter()
         .filter_map(|id| {
             let entity = entities.get(*id)?;
-            (entity.owner == player && entity.kind == EntityKind::AntiTankGun).then(|| {
+            (entity.owner == player && is_anti_tank_gun(entity.kind)).then(|| {
                 let (x, y) = setup_origin(entity, queued);
                 (*id, x, y)
             })
