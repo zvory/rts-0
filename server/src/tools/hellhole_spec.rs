@@ -31,7 +31,7 @@ pub fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
         EntityKind::Golem,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
-        EntityKind::Rifleman,
+        EntityKind::Panzerfaust,
         EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
         EntityKind::Artillery,
@@ -48,7 +48,7 @@ pub fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
         EntityKind::MortarTeam,
         EntityKind::AntiTankGun,
         EntityKind::Rifleman,
-        EntityKind::Rifleman,
+        EntityKind::Panzerfaust,
     ];
     let catalog = catalog_for(DEFAULT_FACTION_ID)
         .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;

@@ -1,6 +1,5 @@
 use super::fixtures::empty_flat_game;
 use super::*;
-use crate::game::upgrade::UpgradeKind;
 
 fn players() -> [PlayerInit; 2] {
     [
@@ -42,15 +41,13 @@ fn refresh_world(game: &mut Game) {
 
 pub(super) fn panzerfaust_fixture() -> (Game, u32, u32) {
     let mut game = empty_flat_game(&players());
-    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
+    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
     let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 11, 8);
     game.state
         .entities
         .get_mut(rifleman)
         .expect("rifleman")
         .set_invulnerable(true);
-    unlock_panzerfausts(&mut game, 1);
-    arm_newly_spawned_rifleman(&mut game, 1, rifleman);
     refresh_world(&mut game);
     (game, rifleman, tank)
 }
@@ -74,25 +71,6 @@ pub(super) fn player_events(events: &[(u32, Vec<Event>)], player_id: u32) -> &[E
         .unwrap_or(&[])
 }
 
-fn unlock_panzerfausts(game: &mut Game, player_id: u32) {
-    game.state
-        .players
-        .iter_mut()
-        .find(|player| player.id == player_id)
-        .expect("player should exist")
-        .upgrades
-        .insert(UpgradeKind::Panzerfausts);
-}
-
-fn arm_newly_spawned_rifleman(game: &mut Game, player_id: u32, rifleman: u32) {
-    crate::game::services::production::sync_spawned_upgrade_effects(
-        &mut game.state.entities,
-        &game.state.players,
-        player_id,
-        rifleman,
-    );
-}
-
 fn launch_count(events: &[(u32, Vec<Event>)], player_id: u32, rifleman: u32) -> usize {
     events
         .iter()
@@ -109,7 +87,7 @@ fn launch_count(events: &[(u32, Vec<Event>)], player_id: u32, rifleman: u32) -> 
 }
 
 #[test]
-fn upgrade_does_not_arm_existing_riflemen() {
+fn riflemen_never_receive_panzerfaust_state() {
     let mut game = empty_flat_game(&players());
     let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
     let machine_gunner = spawn_on_tile(&mut game, 1, EntityKind::MachineGunner, 9, 8);
@@ -123,8 +101,6 @@ fn upgrade_does_not_arm_existing_riflemen() {
             .and_then(|entity| entity.panzerfaust_loaded),
         None
     );
-
-    unlock_panzerfausts(&mut game, 1);
 
     let snapshot = game.snapshot_for(1);
     assert_eq!(
@@ -146,7 +122,7 @@ fn upgrade_does_not_arm_existing_riflemen() {
 }
 
 #[test]
-fn loaded_rifleman_fires_once_at_a_tank_and_stays_a_rifleman() {
+fn panzerfaust_fires_once_at_a_tank_and_stays_the_same_unit() {
     let (mut game, rifleman, tank) = panzerfaust_fixture();
     let starting_hp = game.state.entities.get(tank).expect("tank").hp;
 
@@ -165,7 +141,7 @@ fn loaded_rifleman_fires_once_at_a_tank_and_stays_a_rifleman() {
     }
 
     let attacker = game.state.entities.get(rifleman).expect("rifleman remains");
-    assert_eq!(attacker.kind, EntityKind::Rifleman);
+    assert_eq!(attacker.kind, EntityKind::Panzerfaust);
     assert_eq!(launches, 1);
     assert_eq!(
         game.snapshot_for(1)
@@ -181,18 +157,16 @@ fn loaded_rifleman_fires_once_at_a_tank_and_stays_a_rifleman() {
                 EntityKind::Tank,
                 Some(crate::rules::terrain::TerrainKind::Open),
             ),),
-        "the detached Panzerfaust impact should land while the spent Rifleman resumes rifle fire"
+        "the detached Panzerfaust impact should land while the spent unit resumes rifle fire"
     );
 }
 
 #[test]
 fn automatic_panzerfaust_fire_only_targets_real_vehicles_in_range() {
     let mut game = empty_flat_game(&players());
-    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
+    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
     let infantry = spawn_on_tile(&mut game, 2, EntityKind::Rifleman, 10, 8);
     let mortar = spawn_on_tile(&mut game, 2, EntityKind::MortarTeam, 11, 8);
-    unlock_panzerfausts(&mut game, 1);
-    arm_newly_spawned_rifleman(&mut game, 1, rifleman);
     refresh_world(&mut game);
 
     let mut launches = 0;
@@ -215,11 +189,9 @@ fn automatic_panzerfaust_fire_only_targets_real_vehicles_in_range() {
 #[test]
 fn out_of_range_vehicle_does_not_suppress_normal_rifle_fire() {
     let mut game = empty_flat_game(&players());
-    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
+    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
     let infantry = spawn_on_tile(&mut game, 2, EntityKind::Rifleman, 10, 8);
     let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 14, 8);
-    unlock_panzerfausts(&mut game, 1);
-    arm_newly_spawned_rifleman(&mut game, 1, rifleman);
     refresh_world(&mut game);
     let infantry_hp = game.state.entities.get(infantry).expect("infantry").hp;
     let tank_hp = game.state.entities.get(tank).expect("tank").hp;
@@ -237,10 +209,8 @@ fn out_of_range_vehicle_does_not_suppress_normal_rifle_fire() {
 #[test]
 fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
     let mut game = empty_flat_game(&players());
-    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Rifleman, 8, 8);
-    let tank = spawn_on_tile(&mut game, 1, EntityKind::Tank, 18, 8);
-    unlock_panzerfausts(&mut game, 1);
-    arm_newly_spawned_rifleman(&mut game, 1, rifleman);
+    let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
+    let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 18, 8);
     refresh_world(&mut game);
     let start = game
         .state
@@ -262,7 +232,7 @@ fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
     assert_eq!(launches, 0);
     assert_eq!(
         idle_pos, start,
-        "idle Riflemen should not pursue visible enemies"
+        "idle Panzerfausts should not pursue visible enemies"
     );
 
     game.enqueue(

@@ -153,7 +153,7 @@ const RIFLEMAN_PANZERFAUST_COMPOSITED_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   Object.freeze({
     id: "rifleman-panzerfaust-composited-strip",
     label: "Rifleman Panzerfaust composited strip",
-    kind: KIND.RIFLEMAN,
+    kind: KIND.PANZERFAUST,
     rigKey: LOADED_RIFLEMAN_RIG_KEY,
     strip: RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP,
   }),

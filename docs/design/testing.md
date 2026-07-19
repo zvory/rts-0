@@ -161,10 +161,10 @@ Current scenario ids:
   `explicit_infantry_attack`.
 - `entrenchment_inspection` — seeded neutral trenches, researched friendly infantry, friendly and
   enemy eligible trench reusers, and a Machine Gunner for crowded slotting/rendering checks.
-- Rifleman Panzerfaust inspection is composed in Lab: enable `panzerfausts` research for the owner,
-  spawn Riflemen plus Scout Car/Tank/Command Car targets, and compare loaded versus spent art,
+- Panzerfaust inspection is composed in Lab: enable `panzerfausts` research for the owner,
+  spawn Panzerfausts plus Scout Car/Tank/Command Car targets, and compare loaded versus spent art,
   cancellable windup, detached impact, exact target filtering, and explicit-Attack pursuit behavior.
-  The bundled `render-preview` and `supply-300-hellhole` scenarios include loaded Riflemen for
+  The bundled `render-preview` and `supply-300-hellhole` scenarios include loaded Panzerfausts for
   renderer and high-density coverage.
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,

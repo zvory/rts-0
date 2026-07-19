@@ -1317,24 +1317,8 @@ impl Entity {
         }
     }
 
-    pub(in crate::game) fn set_panzerfaust_upgrade(&mut self, enabled: bool) {
-        if self.kind != EntityKind::Rifleman {
-            return;
-        }
-        let Some(combat) = self.combat.as_mut() else {
-            return;
-        };
-        if enabled {
-            if combat.panzerfaust.is_none() {
-                combat.panzerfaust = Some(PanzerfaustState::Loaded);
-            }
-        } else {
-            combat.panzerfaust = None;
-        }
-    }
-
     pub(in crate::game) fn spend_panzerfaust(&mut self) {
-        if self.kind == EntityKind::Rifleman {
+        if self.kind == EntityKind::Panzerfaust {
             if let Some(combat) = self.combat.as_mut() {
                 combat.panzerfaust = Some(PanzerfaustState::Spent);
             }
@@ -1381,6 +1365,9 @@ fn initial_combat_state(kind: EntityKind) -> CombatState {
     let mut combat = CombatState::default();
     if kind == EntityKind::MortarTeam {
         combat.autocast_enabled = false;
+    }
+    if kind == EntityKind::Panzerfaust {
+        combat.panzerfaust = Some(PanzerfaustState::Loaded);
     }
     combat
 }

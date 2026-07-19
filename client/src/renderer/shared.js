@@ -15,7 +15,7 @@ export function muzzleFlashRadius(kind) {
   if (kind === KIND.ANTI_TANK_GUN) return 15;
   if (kind === KIND.SCOUT_CAR || kind === KIND.COMMAND_CAR) return 9;
   if (kind === KIND.MACHINE_GUNNER) return 9;
-  if (kind === KIND.RIFLEMAN) return 7;
+  if (kind === KIND.RIFLEMAN || kind === KIND.PANZERFAUST) return 7;
   return 0;
 }
 

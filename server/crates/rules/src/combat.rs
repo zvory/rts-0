@@ -294,7 +294,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
-        EntityKind::Rifleman => Some(WeaponKind::RiflemanRifle),
+        EntityKind::Rifleman | EntityKind::Panzerfaust => Some(WeaponKind::RiflemanRifle),
         EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
         EntityKind::MortarTeam => Some(WeaponKind::MortarTeamMortar),
@@ -480,7 +480,11 @@ pub fn area_damage_after_entrenchment(
 fn direct_anti_tank_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker | EntityKind::Golem | EntityKind::Rifleman | EntityKind::MachineGunner
+        EntityKind::Worker
+            | EntityKind::Golem
+            | EntityKind::Rifleman
+            | EntityKind::Panzerfaust
+            | EntityKind::MachineGunner
     )
 }
 
@@ -792,6 +796,7 @@ mod tests {
             (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
+            (EntityKind::Panzerfaust, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
             (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),

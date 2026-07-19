@@ -213,15 +213,17 @@ export function createLiveRigDefinitions() {
 }
 
 export function liveRigKinds() {
-  return LIVE_RIG_SOURCES
-    .map(([kind]) => kind)
-    .filter((kind) => kind !== LOADED_RIFLEMAN_RIG_KEY);
+  return [
+    KIND.PANZERFAUST,
+    ...LIVE_RIG_SOURCES
+      .map(([kind]) => kind)
+      .filter((kind) => kind !== LOADED_RIFLEMAN_RIG_KEY),
+  ];
 }
 
 export function liveRigKeyForEntity(entity) {
-  return entity?.kind === KIND.RIFLEMAN && entity?.panzerfaustLoaded === true
-    ? LOADED_RIFLEMAN_RIG_KEY
-    : entity?.kind;
+  if (entity?.kind !== KIND.PANZERFAUST) return entity?.kind;
+  return entity?.panzerfaustLoaded === true ? LOADED_RIFLEMAN_RIG_KEY : KIND.RIFLEMAN;
 }
 
 export function liveRigDefinitionFor(definitions, kind) {

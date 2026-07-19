@@ -105,7 +105,7 @@ pub(super) fn advance_moving_units(
             breakthrough_ticks,
             recent_smoke_ticks,
         );
-        let speed_multiplier = if kind == EntityKind::Rifleman && has_meth {
+        let speed_multiplier = if crate::rules::is_rifle_infantry(kind) && has_meth {
             config::METHAMPHETAMINES_SPEED_MULTIPLIER
         } else if breakthrough_multiplier > 1.0 {
             breakthrough_multiplier

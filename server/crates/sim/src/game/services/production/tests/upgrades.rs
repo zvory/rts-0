@@ -1,8 +1,7 @@
 use super::*;
 use crate::game::entity::PanzerfaustState;
-
 #[test]
-fn panzerfausts_research_does_not_arm_existing_riflemen() {
+fn panzerfausts_research_unlocks_without_mutating_existing_riflemen() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let rifleman = entities
@@ -36,7 +35,42 @@ fn panzerfausts_research_does_not_arm_existing_riflemen() {
 }
 
 #[test]
-fn riflemen_produced_after_panzerfausts_research_spawn_loaded() {
+fn panzerfaust_produced_after_research_spawns_loaded() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let barracks = spawn_building_training(
+        &map,
+        &mut entities,
+        10,
+        10,
+        EntityKind::Barracks,
+        EntityKind::Panzerfaust,
+    );
+    let mut players = vec![player(1)];
+    players[0].upgrades.insert(UpgradeKind::Panzerfausts);
+
+    tick_production(&map, &mut entities, &mut players);
+
+    assert!(entities
+        .get(barracks)
+        .expect("barracks")
+        .prod_queue()
+        .is_empty());
+    let panzerfaust = entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Panzerfaust)
+        .expect("panzerfaust should spawn");
+    assert_eq!(
+        panzerfaust
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.panzerfaust),
+        Some(PanzerfaustState::Loaded)
+    );
+}
+
+#[test]
+fn riflemen_produced_after_panzerfausts_research_remain_unarmed() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let barracks = spawn_building_training(
@@ -66,6 +100,6 @@ fn riflemen_produced_after_panzerfausts_research_spawn_loaded() {
             .combat
             .as_ref()
             .and_then(|combat| combat.panzerfaust),
-        Some(PanzerfaustState::Loaded)
+        None
     );
 }

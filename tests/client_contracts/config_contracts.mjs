@@ -304,6 +304,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.SMOKE_PLUS] === 9, "Smoke Plus compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.PANZERFAUSTS] === 10, "Panzerfausts compact upgrade code should be reserved");
+  assert(KIND_CODE[KIND.PANZERFAUST] === 24, "Panzerfaust compact entity-kind code should be restored");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
@@ -329,17 +330,21 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       PANZERFAUST_WINDUP_TICKS === 15 &&
       PANZERFAUST_TRAVEL_TICKS === 15 &&
       METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS === 12,
-    "Rifleman Panzerfaust shot stats and timing mirror server",
+    "Panzerfaust shot stats and timing mirror server",
   );
   assert(
-    STATS[KIND.BARRACKS].trains.length === 2 &&
-      configExports.trainableUnitsForFaction("kriegsia", KIND.BARRACKS).length === 2,
-    "Barracks no longer exposes a standalone Panzerfaust unit",
+    STATS[KIND.BARRACKS].trains.length === 3 &&
+      STATS[KIND.BARRACKS].trains.includes(KIND.PANZERFAUST) &&
+      configExports.trainableUnitsForFaction("kriegsia", KIND.BARRACKS).includes(KIND.PANZERFAUST),
+    "Barracks exposes the standalone Panzerfaust unit",
   );
   assert(
-    STATS[KIND.RIFLEMAN].cost.steel === 60 &&
-      STATS[KIND.RIFLEMAN].cost.oil === 10,
-    "Rifleman cost mirrors server",
+    STATS[KIND.RIFLEMAN].cost.steel === 50 &&
+      STATS[KIND.RIFLEMAN].cost.oil === 0 &&
+      STATS[KIND.PANZERFAUST].cost.steel === 55 &&
+      STATS[KIND.PANZERFAUST].cost.oil === 5 &&
+      STATS[KIND.PANZERFAUST].upgradeRequires === UPGRADE.PANZERFAUSTS,
+    "Rifleman and Panzerfaust costs and unlock mirror server",
   );
   assert(
     UPGRADES[UPGRADE.PANZERFAUSTS].researchedAt === KIND.TRAINING_CENTRE &&
@@ -347,9 +352,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADES[UPGRADE.PANZERFAUSTS].cost.oil === 100 &&
       UPGRADES[UPGRADE.PANZERFAUSTS].researchTicks === PANZERFAUSTS_RESEARCH_TICKS &&
       PANZERFAUSTS_RESEARCH_TICKS === TICK_HZ * 20 &&
-      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("newly produced Riflemen") &&
-      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("one disposable 5-tile anti-vehicle shot"),
-    "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and Rifleman effect",
+      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("Unlock Panzerfaust"),
+    "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and unit unlock",
   );
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&

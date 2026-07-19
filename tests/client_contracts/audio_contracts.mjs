@@ -574,12 +574,12 @@ assert(
     "tank coax attack events play machine-gun combat sound",
   );
   assert(
-    attackFeedbackKind(KIND.RIFLEMAN, WEAPON_KIND.PANZERFAUST_LOADED_SHOT) === KIND.RIFLEMAN,
-    "Panzerfaust loaded-shot weapon hint preserves Rifleman feedback",
+    attackFeedbackKind(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT) === KIND.RIFLEMAN,
+    "Panzerfaust loaded-shot weapon hint selects Rifleman-derived feedback",
   );
   assert(
-    !attackKindHasCombatSound(KIND.RIFLEMAN, WEAPON_KIND.PANZERFAUST_LOADED_SHOT),
-    "generic Rifleman Panzerfaust attack events stay silent instead of reusing rifle or tank sounds",
+    !attackKindHasCombatSound(KIND.PANZERFAUST, WEAPON_KIND.PANZERFAUST_LOADED_SHOT),
+    "generic Panzerfaust attack events stay silent instead of reusing rifle or tank sounds",
   );
   assert(
     panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH) === PANZERFAUST_LAUNCH_SOUND_ID,

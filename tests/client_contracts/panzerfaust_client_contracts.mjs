@@ -1,5 +1,5 @@
 // tests/client_contracts/panzerfaust_client_contracts.mjs
-// Client-side Rifleman Panzerfaust visual/event contracts imported by ../client_contracts.mjs.
+// Client-side Panzerfaust visual/event contracts imported by ../client_contracts.mjs.
 
 import { assert } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
@@ -28,7 +28,7 @@ const start = {
     entities: [{
       id: 31,
       owner: 1,
-      kind: KIND.RIFLEMAN,
+      kind: KIND.PANZERFAUST,
       x: 300,
       y: 340,
       hp: 45,
@@ -46,7 +46,7 @@ const start = {
 
   assert(state.livePanzerfaustShots(performance.now()).length === 0, "Panzerfaust impact clears matching in-flight tracer");
   assert(state.livePanzerfaustImpacts(performance.now()).length === 1, "Panzerfaust impact event creates a live impact cue");
-  assert(state.weaponRecoil(31, KIND.RIFLEMAN, performance.now()) > 0, "Rifleman Panzerfaust launch starts loaded-weapon recoil");
+  assert(state.weaponRecoil(31, KIND.PANZERFAUST, performance.now()) > 0, "Panzerfaust launch starts loaded-weapon recoil");
   assert(state.visibleTiles.length === 0, "Panzerfaust visual events do not stamp or extend client fog visibility");
 
   state.addPanzerfaustShot({
@@ -69,7 +69,7 @@ const start = {
     oil: 0,
     supplyUsed: 1,
     supplyCap: 10,
-    entities: [{ id: 41, owner: 1, kind: KIND.RIFLEMAN, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE, panzerfaustLoaded: true }],
+    entities: [{ id: 41, owner: 1, kind: KIND.PANZERFAUST, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE, panzerfaustLoaded: true }],
     events: [],
   });
   state.setSelection([41]);
@@ -80,15 +80,15 @@ const start = {
     oil: 0,
     supplyUsed: 1,
     supplyCap: 10,
-    entities: [{ id: 41, owner: 1, kind: KIND.RIFLEMAN, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE, panzerfaustLoaded: false }],
+    entities: [{ id: 41, owner: 1, kind: KIND.PANZERFAUST, x: 96, y: 96, hp: 30, maxHp: 45, state: STATE.IDLE, panzerfaustLoaded: false }],
     events: [],
   });
 
-  assert(state.selection.has(41), "firing a Panzerfaust preserves Rifleman selection");
-  assert(state.selectedEntities()[0]?.kind === KIND.RIFLEMAN, "the attacker remains a Rifleman after firing");
-  assert(state.selectedEntities()[0]?.panzerfaustLoaded === false, "spent Rifleman reports its launcher as unloaded");
+  assert(state.selection.has(41), "firing preserves Panzerfaust selection");
+  assert(state.selectedEntities()[0]?.kind === KIND.PANZERFAUST, "the attacker remains a Panzerfaust after firing");
+  assert(state.selectedEntities()[0]?.panzerfaustLoaded === false, "spent Panzerfaust reports its launcher as unloaded");
   assert(state.controlGroups[0].join(",") === "41", "firing preserves local control groups");
-  assert(state.controlGroupEntities(0)[0]?.kind === KIND.RIFLEMAN, "control-group recall resolves the same Rifleman in place");
+  assert(state.controlGroupEntities(0)[0]?.kind === KIND.PANZERFAUST, "control-group recall resolves the same Panzerfaust in place");
 }
 
 {
@@ -96,7 +96,7 @@ const start = {
   const loadedEntity = {
     id: 51,
     owner: 1,
-    kind: KIND.RIFLEMAN,
+    kind: KIND.PANZERFAUST,
     x: 100,
     y: 100,
     hp: 45,
@@ -120,7 +120,7 @@ const start = {
     createRigRenderContext(spentEntity),
   );
 
-  assert(loadedKey !== spentKey, "loaded and spent Riflemen route to different live rigs");
-  assert(loaded.parts["part.pzf.warhead"].visible === true, "loaded Rifleman rig shows the Panzerfaust warhead");
-  assert(spent.parts["part.pzf.warhead"] === undefined, "spent Rifleman immediately returns to normal Rifleman art");
+  assert(loadedKey !== spentKey, "loaded and spent Panzerfausts route to different live rigs");
+  assert(loaded.parts["part.pzf.warhead"].visible === true, "loaded Panzerfaust rig shows the warhead");
+  assert(spent.parts["part.pzf.warhead"] === undefined, "spent Panzerfaust immediately returns to normal Rifleman art");
 }

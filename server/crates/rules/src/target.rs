@@ -58,7 +58,10 @@ pub fn is_economy_unit(kind: EntityKind) -> bool {
 
 /// Infantry that Tank coax fire ranks ahead of economy workers and fallback targets.
 pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Rifleman | EntityKind::MachineGunner)
+    matches!(
+        kind,
+        EntityKind::Rifleman | EntityKind::Panzerfaust | EntityKind::MachineGunner
+    )
 }
 
 #[cfg(test)]
@@ -111,6 +114,20 @@ mod tests {
             ),
             (
                 EntityKind::Rifleman,
+                ExpectedTargetFacts {
+                    is_unit: true,
+                    is_building: false,
+                    is_resource_node: false,
+                    armor_class: Some(ArmorClass::Small),
+                    weapon_class: WeaponClass::SmallArms,
+                    threat_role: TargetThreatRole::Ordinary,
+                    is_vehicle_body: false,
+                    is_economy_unit: false,
+                    is_coax_infantry_priority: true,
+                },
+            ),
+            (
+                EntityKind::Panzerfaust,
                 ExpectedTargetFacts {
                     is_unit: true,
                     is_building: false,

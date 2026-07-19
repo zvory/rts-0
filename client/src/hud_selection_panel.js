@@ -403,7 +403,7 @@ function formatResourceRemaining(value) {
 }
 
 function isEntrenchmentEligibleKind(kind) {
-  return kind === KIND.RIFLEMAN || kind === KIND.MACHINE_GUNNER;
+  return kind === KIND.RIFLEMAN || kind === KIND.PANZERFAUST || kind === KIND.MACHINE_GUNNER;
 }
 
 function canReportOwnResearch(entity, state) {

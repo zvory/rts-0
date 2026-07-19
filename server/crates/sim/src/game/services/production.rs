@@ -309,7 +309,6 @@ pub(crate) fn sync_spawned_upgrade_effects(
     };
     if let Some(entity) = entities.get_mut(entity_id) {
         sync_owner_dependent_upgrade_effects(entity, upgrades);
-        entity.set_panzerfaust_upgrade(upgrades.contains(&UpgradeKind::Panzerfausts));
     }
 }
 

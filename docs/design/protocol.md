@@ -121,7 +121,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node; when its builder arrives, owned and allied units on that footprint are moved to nearby clear positions before placement is revalidated, while enemy units remain blockers. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a manual unit at a production building. A legal manual request is accepted without current Steel, Oil, or supply; an unpaid front item waits at zero progress until it can pay and reserve supply. Later FIFO items do not prepay. Standing repeat production remains separate and creates no queue item until it can pay. |
 | `adjustProductionRepeat` | `buildings: u32[]`, `unit: string`, `delta: -1\|1` | Atomically adjust `unit` across the selected owned completed compatible producers. `+1` enables it on one producer that does not already repeat it, preferring the producer with the fewest standing repeat units; `-1` removes it from one producer that repeats it, preferring the producer with the most standing repeat units so another automatic order survives when possible. Stable opposite entity-id tie-breaks make repeated additions followed by removals reversible. Other delta values are ignored. When a producer's ordinary unit queue is empty, it silently retries the ordered list's current entry. Each successful automatic enqueue advances to the next enabled unit, so two active units alternate. Once inserted, a repeated unit is an ordinary FIFO item, so later manual production queues behind it. Any production cancel clears the affected producer's whole repeat list. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available; prerequisite research must still already be complete when the command is accepted. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `panzerfausts` gives Riflemen produced after research completes one disposable launcher shot without changing existing Riflemen. `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available; prerequisite research must still already be complete when the command is accepted. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
 | `cancel`     | `building: u32`, `construction?: bool` | With `construction: true`, cancel an owned unfinished building for a full construction-cost refund; otherwise cancel the latest item in a completed building's production queue. The explicit construction scope prevents a delayed scaffold action from cancelling production after the building completes. Attached builders return to ordinary order handling when a construction site is canceled. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]`, `queued?: bool` | Stand ground. Without `queued`, clear active and queued unit orders immediately. With `queued: true`, append a terminal hold-position intent so units complete earlier queued stages before standing ground. Held units still fire at enemies already in weapon range and can still be pushed by collision resolution. |
@@ -774,7 +774,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 25 `scout_plane` (24 removed with the standalone Panzerfaust unit) |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition` |
@@ -860,10 +860,9 @@ range remains the fallback for render-only range overlays.
 `occupiedTrenchId` is present while a visible eligible infantry unit is actively stopped in a
 trench. It names the neutral trench terrain id already projected through `trenches`; it is omitted
 while the unit is digging in, slotting is unavailable, merely near a trench, or moving out.
-`panzerfaustLoaded` is present for visible Riflemen produced after their owner completed
-Panzerfausts research. It is `true` until launch and `false` for the rest of that Rifleman's
-lifetime after launch, so the client swaps from loaded launcher art to normal Rifleman art. It is
-omitted for Riflemen produced before research completed and all other entities.
+`panzerfaustLoaded` is present for visible Panzerfaust units. It is `true` until launch and `false`
+for the rest of that unit's lifetime after launch, so the client swaps from loaded launcher art to
+normal Rifleman art. It is omitted for Riflemen and all other entities.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center and source Command Car id; enemy projections that can see the plane omit
 this state. Scout Plane
@@ -940,7 +939,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","golem","rifleman","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","scout_plane","tank","command_car","ekat","city_centre","zamok","depot","barracks","training_centre","research_complex","factory","steelworks","tank_trap","pump_jack"
+  kind: string,                  // EntityKind: "worker","golem","rifleman","panzerfaust","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","scout_plane","tank","command_car","ekat","city_centre","zamok","depot","barracks","training_centre","research_complex","factory","steelworks","tank_trap","pump_jack"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -965,7 +964,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
-  panzerfaustLoaded?: bool,       // upgraded Riflemen only; false after disposable launch
+  panzerfaustLoaded?: bool,       // Panzerfaust units only; false after disposable launch
   scoutPlane?: {                 // owner/full-world diagnostics only; enemies omit this private state
     orbitCenter?: [f32, f32],
     sourceCommandCar?: u32
@@ -1101,7 +1100,7 @@ team-current fog can see the shooter or launch point; the endpoint must be withh
 visible to that recipient or otherwise already safe through the recipient's projection. Panzerfaust
 impact events carry only the impact point and are sent to the firing team and to enemy recipients
 whose team-current fog can see that point; they do not imply damage, target identity, terrain
-reveal, or exploration. The firing entity remains a Rifleman throughout; `panzerfaustLoaded` flips
+reveal, or exploration. The firing entity remains a Panzerfaust throughout; `panzerfaustLoaded` flips
 to false at launch while the detached projectile resolves through the launch/impact events.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 

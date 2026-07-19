@@ -707,14 +707,8 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
 }
 
 #[test]
-fn lab_owner_change_preserves_rifleman_panzerfaust_state() {
+fn lab_owner_change_preserves_unit_panzerfaust_state() {
     let mut game = new_game();
-    game.apply_lab_op(LabOp::SetCompletedResearch(LabSetCompletedResearch {
-        player_id: 1,
-        upgrade: UpgradeKind::Panzerfausts,
-        completed: true,
-    }))
-    .expect("research should be accepted");
 
     let (loaded_x, loaded_y) = tile_center(&game, 30, 30);
     let LabOpOutcome::Spawned {
@@ -722,12 +716,12 @@ fn lab_owner_change_preserves_rifleman_panzerfaust_state() {
     } = game
         .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
             owner: 1,
-            kind: EntityKind::Rifleman,
+            kind: EntityKind::Panzerfaust,
             x: loaded_x,
             y: loaded_y,
             completed: true,
         }))
-        .expect("upgraded Rifleman should spawn")
+        .expect("Panzerfaust should spawn")
     else {
         panic!("unexpected outcome");
     };
@@ -743,7 +737,7 @@ fn lab_owner_change_preserves_rifleman_panzerfaust_state() {
             y: unloaded_y,
             completed: true,
         }))
-        .expect("unupgraded Rifleman should spawn")
+        .expect("Rifleman should spawn")
     else {
         panic!("unexpected outcome");
     };
@@ -752,12 +746,12 @@ fn lab_owner_change_preserves_rifleman_panzerfaust_state() {
         entity_id: loaded_rifleman,
         owner: 2,
     }))
-    .expect("loaded Rifleman transfer should be accepted");
+    .expect("loaded Panzerfaust transfer should be accepted");
     game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
         entity_id: unloaded_rifleman,
         owner: 1,
     }))
-    .expect("unloaded Rifleman transfer should be accepted");
+    .expect("Rifleman transfer should be accepted");
 
     let panzerfaust_state = |entity_id| {
         game.state
@@ -769,12 +763,12 @@ fn lab_owner_change_preserves_rifleman_panzerfaust_state() {
     assert_eq!(
         panzerfaust_state(loaded_rifleman),
         Some(PanzerfaustState::Loaded),
-        "transferring to an unupgraded owner must not remove a launcher"
+        "transferring owners must not remove a Panzerfaust launcher"
     );
     assert_eq!(
         panzerfaust_state(unloaded_rifleman),
         None,
-        "transferring to an upgraded owner must not grant a launcher"
+        "transferring a Rifleman must not grant a launcher"
     );
 }
 

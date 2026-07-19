@@ -15,11 +15,11 @@ Default attack range, damage, cooldown, weapon class, and weapon-policy metadata
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
 selected weapon profile instead of inferring those behaviors only from the firing entity kind.
-The Panzerfausts Training Centre upgrade arms every Rifleman produced after research completes
-with one disposable anti-armor shot that deals 100 base damage with 50% armor penetration and no
-tank-facing modifier.
-The shot is detached at launch; the same Rifleman immediately returns to normal movement and rifle
-combat while the projectile travels, preserving its orders, HP, control-group identity, and trench.
+The Panzerfausts Training Centre upgrade unlocks a separate Barracks-trained Panzerfaust unit. It
+inherits Rifleman combat and movement but carries one disposable anti-armor shot that deals 100
+base damage with 50% armor penetration and no tank-facing modifier. The shot is detached at launch;
+the same Panzerfaust immediately returns to normal movement and rifle combat while the projectile
+travels, preserving its kind, orders, HP, control-group identity, and trench.
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
 damage, 6-tick cooldown, no Tank armor-facing multiplier, and direct-fire overpenetration.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
@@ -194,9 +194,9 @@ Core unit roles:
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
-- **Panzerfausts** is a Training Centre upgrade for Riflemen, not a standalone unit. It gives every
-  Rifleman produced after research completes one disposable 5-tile, 50%-armor-penetrating shot;
-  Riflemen already on the field when research completes remain unchanged. Automatic use is
+- **Panzerfaust** is a Barracks-trained Rifleman variant unlocked by Panzerfausts research. It carries
+  one disposable 5-tile, 50%-armor-penetrating shot while ordinary Riflemen remain unchanged and
+  oil-free. Automatic use is
   limited to visible Scout Cars, Tanks, and Command Cars already in range; Mortar Teams, Artillery,
   infantry, buildings, and obstacles are not launcher targets. Explicit Attack orders remain
   stationary, so the vehicle must already be within launcher range. There is no salvo coordination
@@ -247,13 +247,13 @@ after it expires, the next qualifying hit may establish a new lock. Active movem
 oil prevent this response, while Hold Position explicitly allows it. Riflemen upgraded with
 Methamphetamines gain
 permanent moving fire, keep advancing while firing with normal accuracy, and move at tank speed.
-Loaded Riflemen upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
+Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
 movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
 mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
 moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
 receive armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
-Plain `Move` tanks, scout cars, and upgraded Riflemen only fire at enemies already in
+Plain `Move` tanks, scout cars, and Methamphetamines-upgraded Riflemen and Panzerfausts only fire at enemies already in
 weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
 following the player-issued path: auto-acquisition can aim and fire only at targets that are
 currently inside weapon range and pass hostile, visibility, smoke, line-of-sight, and blocker
@@ -333,15 +333,15 @@ profiles and explicit activation/autocast policy instead of being folded into de
   guns cannot fire. A deployed gun fires immediately at any target already inside its current cone.
   If its selected visible, in-range target is outside the cone, it turns the cone at that rate
   until the target enters it, then fires without further target tracking.
-- Panzerfausts research gives Riflemen a one-shot 5-tile loaded weapon that targets only visible
+- Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
   `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,
-  `PANZERFAUST_WINDUP_TICKS = 15`, and `PANZERFAUST_TRAVEL_TICKS = 15`. The Rifleman becomes spent
+  `PANZERFAUST_WINDUP_TICKS = 15`, and `PANZERFAUST_TRAVEL_TICKS = 15`. The Panzerfaust becomes spent
   immediately at launch and can move and use its rifle while the detached projectile travels.
   Against Armored Tanks, the 50% penetration lands as 63
   effective damage; unarmored Scout Cars take the full 100 damage. Methamphetamines reduces the
   windup constant to 12 ticks; travel stays 15 ticks. The dedicated runtime owns only the one-shot
-  launcher, exact vehicle whitelist, and disposable state; the entity remains a Rifleman throughout.
+  launcher, exact vehicle whitelist, and disposable state; the entity remains a Panzerfaust throughout.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 25`, `ARTILLERY_MAX_RANGE_TILES = 55`,
@@ -392,13 +392,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 25%
   faster attacks (16 tick cooldown becomes 12). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
-  their setup and teardown timers from 30 ticks to 15. Loaded Riflemen also use the reduced
+  their setup and teardown timers from 30 ticks to 15. Panzerfausts also use the reduced
   12-tick Panzerfaust windup.
 - **Panzerfausts** (Training Centre research, protocol id `panzerfausts`): costs 100 steel / 100 oil
-  and takes 600 ticks (~20s). Completion arms only Riflemen produced afterward with one lifetime
-  disposable launcher shot. Existing and spent Riflemen are never automatically armed or rearmed.
+  and takes 600 ticks (~20s). Completion unlocks Panzerfaust training at the Barracks. Riflemen are
+  never automatically armed or rearmed.
 - **Entrenchment** (Training Centre research, protocol id `entrenchment`): costs 100 steel / 0 oil
-  and takes 900 ticks (~30s). The rules surface defines Riflemen and Machine Gunners
+  and takes 900 ticks (~30s). The rules surface defines Riflemen, Panzerfausts, and Machine Gunners
   as eligible entrenchment infantry; Engineers/Workers, Mortar Teams, Ekat, Golems,
   Ekat-faction units, vehicles, buildings, support weapons other than Machine Gunners, and
   non-infantry entities are excluded.
@@ -558,7 +558,8 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 60  | 10  | 1   | 300 (~10s) |
+| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
+| panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
@@ -578,7 +579,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | city_centre                | City Centre        | 600 | 1     | 450 steel + 150 oil | 3x3  | 750       | trains workers; no supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
-| barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; Machine Gunner requires completed Training Centre; requires a City Centre |
+| barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a City Centre and Barracks |
 | research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
