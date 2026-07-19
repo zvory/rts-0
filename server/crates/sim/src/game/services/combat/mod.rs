@@ -107,8 +107,6 @@ fn resolve_target(
 pub(super) const RANGE_SLACK: f32 = 4.0;
 pub(super) const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 pub(super) const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
-pub(super) const ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK: f32 =
-    config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK;
 pub(super) const ANTI_TANK_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
 const FIRING_REVEAL_RESPONSE_DELAY_TICKS: u32 = config::TICK_HZ;
 

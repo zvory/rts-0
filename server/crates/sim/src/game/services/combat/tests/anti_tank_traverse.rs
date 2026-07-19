@@ -188,13 +188,13 @@ fn deployed_anti_tank_gun_traverses_until_an_outside_target_enters_its_cone() {
     let at = entities.get(at_id).expect("at should exist");
     assert!(
         (at.facing() - turn_to_cone_entry).abs()
-            <= ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK + 0.001,
+            <= config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK + 0.001,
         "anti-tank gun should traverse its cone until the target reaches the edge, got {:.4}",
         at.facing()
     );
     assert!(
         (at.emplacement_facing().unwrap_or_default() - turn_to_cone_entry).abs()
-            <= ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK + 0.001,
+            <= config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK + 0.001,
         "the firing cone should traverse with the anti-tank gun"
     );
     assert!(

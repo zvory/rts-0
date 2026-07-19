@@ -9,8 +9,8 @@ use crate::rules::combat as combat_rules;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::tank_effective_range_tiles;
 use super::{
-    ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK, ANTI_TANK_GUN_FIRE_TOLERANCE_RAD,
-    TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
+    ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, TANK_TURRET_FIRE_TOLERANCE_RAD,
+    TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
 const SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS: u16 = config::TICK_HZ as u16;
@@ -100,7 +100,7 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
     let rotated = rotate_toward(
         current,
         target_angle,
-        ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK,
+        config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK,
     );
     if rotated.is_finite() {
         e.set_facing(rotated);
@@ -361,7 +361,7 @@ fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
     let turn_rate = if e.kind == EntityKind::MortarTeam {
         crate::game::mortar::TURN_RATE_RAD_PER_TICK
     } else {
-        config::ANTI_TANK_GUN_PACKED_TURN_RATE_RAD_PER_TICK
+        config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK
     };
     let rotated = rotate_toward(current, target, turn_rate);
     if rotated.is_finite() {

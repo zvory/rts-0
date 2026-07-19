@@ -2250,13 +2250,14 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
         let unit = entities.get(id).expect("support weapon should exist");
         assert!(
             unit.facing() > 0.0
-                && unit.facing() <= config::ANTI_TANK_GUN_PACKED_TURN_RATE_RAD_PER_TICK + 0.001,
+                && unit.facing()
+                    <= config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK + 0.001,
             "{label} should start rotating only after it is packed, got {:.4}",
             unit.facing()
         );
 
         let turn_ticks =
-            (target / config::ANTI_TANK_GUN_PACKED_TURN_RATE_RAD_PER_TICK).ceil() as u32;
+            (target / config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK).ceil() as u32;
         for _ in 0..turn_ticks.saturating_add(u32::from(setup_ticks)) {
             run_combat_tick(&mut entities);
         }
@@ -2265,7 +2266,7 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
         assert_eq!(unit.weapon_setup(), WeaponSetup::Deployed);
         assert!(
             (unit.facing() - target).abs()
-                <= config::ANTI_TANK_GUN_PACKED_TURN_RATE_RAD_PER_TICK + 0.001,
+                <= config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK + 0.001,
             "{label} should finish redeploy facing the requested direction, got {:.4}",
             unit.facing()
         );
@@ -2302,7 +2303,7 @@ fn packed_anti_tank_gun_rotates_before_setup_animation_begins() {
     );
 
     let setup_alignment_ticks = ((target - ANTI_TANK_GUN_FIRE_TOLERANCE_RAD)
-        / config::ANTI_TANK_GUN_PACKED_TURN_RATE_RAD_PER_TICK)
+        / config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK)
         .ceil() as u32;
     let mut saw_setting_up = false;
     for _ in 0..=setup_alignment_ticks {

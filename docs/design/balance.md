@@ -326,7 +326,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   while manual fire remains unrestricted.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`. Packed or setting-up guns retain their
-  original `ANTI_TANK_GUN_PACKED_TURN_RATE_RAD_PER_TICK = 0.035` alignment speed (about 60.2°/s),
+  shared `MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK = 0.035` alignment speed (about 60.2°/s),
   while an emplaced gun turns its cone at
   `ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND = 5`; packed, setting-up, and tearing-down
   guns cannot fire. A deployed gun fires immediately at any target already inside its current cone.
