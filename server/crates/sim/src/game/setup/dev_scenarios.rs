@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::state::TrackedRng;
 
+mod dynamic_construction_path_block;
 mod factory_wall_rally_spawn;
 mod layouts;
 mod replay_142_vehicle_lock;

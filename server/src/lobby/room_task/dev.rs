@@ -146,6 +146,13 @@ impl RoomTask {
                 }
 
                 match &config.id {
+                    DevScenarioId::DynamicConstructionPathBlock => {
+                        session_from_setup!(Game::new_dynamic_construction_path_block_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?,)
+                    }
                     DevScenarioId::ScoutCarSnakingCorridor => session_from_setup!(
                         Game::new_snaking_corridor_scenario(config.unit, config.count, seed)?,
                     ),

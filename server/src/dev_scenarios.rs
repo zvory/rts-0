@@ -22,6 +22,14 @@ pub struct DevScenarioSpec {
     pub launches: &'static [DevScenarioLaunch],
 }
 
+const DYNAMIC_CONSTRUCTION_PATH_BLOCK_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "dynamic_construction_path_block",
+    unit: EntityKind::Worker,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
 const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
@@ -728,7 +736,13 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 16] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 17] = [
+    DevScenarioSpec {
+        id: "dynamic_construction_path_block",
+        title: "Dynamic Construction Path Block",
+        description: "Two workers receive simultaneous orders: one moves 20 tiles east while the other starts a Barracks across its already-planned horizontal route.",
+        launches: &DYNAMIC_CONSTRUCTION_PATH_BLOCK_LAUNCHES,
+    },
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -963,6 +977,16 @@ mod tests {
 
     #[test]
     fn parses_supported_launches() {
+        assert_eq!(
+            parse_dev_scenario_room("dynamic_construction_path_block:unit=worker:count=1"),
+            Some(DevScenarioLaunch {
+                id: "dynamic_construction_path_block",
+                unit: EntityKind::Worker,
+                count: 1,
+                blocker: None,
+                case: None,
+            })
+        );
         assert_eq!(
             parse_dev_scenario_launch("scout_car_snaking_corridor", "worker", "1", None),
             Some(DevScenarioLaunch {

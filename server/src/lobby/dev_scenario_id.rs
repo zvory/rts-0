@@ -1,5 +1,6 @@
 #[derive(Clone)]
 pub(in crate::lobby) enum DevScenarioId {
+    DynamicConstructionPathBlock,
     ScoutCarSnakingCorridor,
     DirectReverseOrder,
     Replay142VehicleLock,
@@ -21,6 +22,7 @@ pub(in crate::lobby) enum DevScenarioId {
 impl DevScenarioId {
     pub(in crate::lobby) fn from_room_id(id: &str) -> Option<Self> {
         match id {
+            "dynamic_construction_path_block" => Some(Self::DynamicConstructionPathBlock),
             "scout_car_snaking_corridor" => Some(Self::ScoutCarSnakingCorridor),
             "direct_reverse_order" => Some(Self::DirectReverseOrder),
             "replay_142_vehicle_lock" => Some(Self::Replay142VehicleLock),
@@ -45,6 +47,7 @@ impl DevScenarioId {
 
     pub(in crate::lobby) fn room_id(&self) -> &'static str {
         match self {
+            Self::DynamicConstructionPathBlock => "dynamic_construction_path_block",
             Self::ScoutCarSnakingCorridor => "scout_car_snaking_corridor",
             Self::DirectReverseOrder => "direct_reverse_order",
             Self::Replay142VehicleLock => "replay_142_vehicle_lock",
