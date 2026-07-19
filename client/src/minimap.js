@@ -33,8 +33,6 @@ import {
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
 import {
-  supportWeaponSetupTargetGroups,
-  supportWeaponSetupTargets,
   supportWeaponsWithSetupTargets,
 } from "./input/support_weapon_setup_targeting.js";
 import {
@@ -1337,22 +1335,12 @@ export class Minimap {
       const supportWeaponEntities = this._selectedOwnSupportWeapons();
       const supportWeapons = supportWeaponEntities.map((e) => e.id);
       if (supportWeapons.length > 0) {
-        const setupOrigins = supportWeaponEntities
-          .map((e) => plannedEntityForIntent(this._intent(), e))
-          .map((e) => queued ? supportWeaponSetupPreviewEntity(e) : e);
-        const targets = supportWeaponSetupTargets(
-          setupOrigins,
-          { x: wx, y: wy },
-          this.state.map?.tileSize || 32,
-        );
-        for (const group of supportWeaponSetupTargetGroups(targets)) {
-          this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
-            group.units,
-            group.x,
-            group.y,
-            queued,
-          ));
-        }
+        this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
+          supportWeapons,
+          wx,
+          wy,
+          queued,
+        ));
         this._addCommandFeedback("move", wx, wy, queued);
       }
       return;

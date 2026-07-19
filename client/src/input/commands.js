@@ -28,8 +28,6 @@ import {
 } from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 import {
-  supportWeaponSetupTargetGroups,
-  supportWeaponSetupTargets,
   supportWeaponsWithSetupTargets,
 } from "./support_weapon_setup_targeting.js";
 
@@ -85,22 +83,12 @@ export function _issueTargetedCommand(p, ev = {}) {
     const supportWeapons = selectedOwnSupportWeaponEntities(this);
     if (supportWeapons.length > 0) {
       const queued = !!ev.shiftKey;
-      const setupOrigins = supportWeapons
-        .map((e) => plannedEntityForIntent(intent, e))
-        .map((e) => queued ? supportWeaponSetupPreviewEntity(e, true) : e);
-      const targets = supportWeaponSetupTargets(
-        setupOrigins,
-        world,
-        this.state.map?.tileSize || DEFAULT_TILE_SIZE,
-      );
-      for (const group of supportWeaponSetupTargetGroups(targets)) {
-        this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
-          group.units,
-          group.x,
-          group.y,
-          queued,
-        ));
-      }
+      this.commandInteraction.issueCommand(cmd.setupAntiTankGuns(
+        supportWeapons.map((e) => e.id),
+        world.x,
+        world.y,
+        queued,
+      ));
       this._addCommandFeedback("move", world.x, world.y, queued);
     }
     return true;

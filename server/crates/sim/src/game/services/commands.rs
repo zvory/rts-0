@@ -50,6 +50,7 @@ mod guards;
 mod planner_facts;
 mod production_repeat;
 mod scout_plane_ability;
+mod support_weapon_setup;
 #[cfg(test)]
 use self::artillery_scatter::artillery_error_tiles;
 use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
@@ -333,15 +334,25 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
-                let request = planner::OrderRequest {
-                    units: units.clone(),
-                    mode: issue_mode(queued),
-                    order: planner::RequestedOrder::SetupAntiTankGuns {
-                        face_toward: planner::Point::new(x, y),
-                    },
-                };
-                let facts = admission_facts!(player, &faction_id, command_admission, units, None);
-                apply_planned!(player, facts, &request, command_admission);
+                let targets =
+                    support_weapon_setup::target_groups(entities, player, &units, x, y, queued);
+                for target in targets {
+                    let request = planner::OrderRequest {
+                        units: target.units.clone(),
+                        mode: issue_mode(queued),
+                        order: planner::RequestedOrder::SetupAntiTankGuns {
+                            face_toward: planner::Point::new(target.x, target.y),
+                        },
+                    };
+                    let facts = admission_facts!(
+                        player,
+                        &faction_id,
+                        command_admission,
+                        target.units,
+                        None
+                    );
+                    apply_planned!(player, facts, &request, command_admission);
+                }
             }
             SimCommand::TearDownAntiTankGuns { units } => {
                 let Some(units) =

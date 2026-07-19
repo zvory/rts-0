@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 
 import { KIND } from "../../client/src/protocol.js";
 import {
-  supportWeaponSetupTargetGroups,
   supportWeaponSetupTargets,
 } from "../../client/src/input/support_weapon_setup_targeting.js";
 
@@ -20,11 +19,6 @@ assert.ok(
   closeTargets.every((target) => target.x === close.x && target.y === close.y),
   "setup clicks inside 14 tiles remain one literal convergence point",
 );
-assert.deepEqual(
-  supportWeaponSetupTargetGroups(closeTargets),
-  [{ units: [1, 2, 3, 4, 5], x: close.x, y: close.y }],
-  "literal convergence remains one batched setup command",
-);
 
 const parallelTargets = supportWeaponSetupTargets(
   guns,
@@ -34,11 +28,6 @@ const parallelTargets = supportWeaponSetupTargets(
 assert.ok(
   parallelTargets.every((target) => Math.abs(target.facing) < 0.000001),
   "at 20 tiles every AT gun faces exactly parallel toward the cursor ray",
-);
-assert.equal(
-  supportWeaponSetupTargetGroups(parallelTargets).length,
-  guns.length,
-  "parallel facing uses individualized authoritative setup rays",
 );
 
 const halfFanTargets = supportWeaponSetupTargets(

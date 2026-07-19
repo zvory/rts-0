@@ -58,21 +58,6 @@ export function supportWeaponSetupTargets(weapons, rawTarget, tileSize = 32) {
   });
 }
 
-export function supportWeaponSetupTargetGroups(targets) {
-  const groups = new Map();
-  for (const target of Array.isArray(targets) ? targets : []) {
-    if (!Number.isFinite(target?.id) || !finitePoint(target)) continue;
-    const key = `${target.x},${target.y}`;
-    let group = groups.get(key);
-    if (!group) {
-      group = { units: [], x: target.x, y: target.y };
-      groups.set(key, group);
-    }
-    group.units.push(target.id);
-  }
-  return [...groups.values()];
-}
-
 export function supportWeaponsWithSetupTargets(weapons, rawTarget, tileSize = 32) {
   const targets = supportWeaponSetupTargets(weapons, rawTarget, tileSize);
   const byId = new Map(targets.map((target) => [target.id, target]));
