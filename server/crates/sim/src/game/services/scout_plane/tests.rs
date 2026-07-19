@@ -50,7 +50,7 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     assert_eq!(def.stats.cost_oil, 75);
     assert_eq!(def.stats.supply, 0);
     assert_eq!(def.stats.build_ticks, 0);
-    assert_eq!(config::SCOUT_PLANE_ORBIT_RADIUS_TILES, 4);
+    assert_eq!(config::SCOUT_PLANE_ORBIT_RADIUS_TILES, 2);
     assert_eq!(config::SCOUT_PLANE_LIFETIME_TICKS, 600);
     assert_eq!(config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS, 900);
 }
