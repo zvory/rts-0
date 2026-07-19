@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Complete on 2026-07-14 (Windows x64 NSIS build and install smoke).
+- [x] Done. Completed on 2026-07-14 (Windows x64 NSIS build and install smoke).
 
 ## Objective
 
