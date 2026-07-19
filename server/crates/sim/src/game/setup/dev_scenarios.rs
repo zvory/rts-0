@@ -1,11 +1,15 @@
 use super::*;
 use crate::game::state::TrackedRng;
 
+mod attack_move_reload;
+mod dev_scenario_setup;
 mod dynamic_construction_path_block;
 mod factory_wall_rally_spawn;
 mod layouts;
 mod replay_142_vehicle_lock;
 mod tank_coax;
+
+use dev_scenario_setup::{DevScenarioOrder, DevScenarioSetup};
 
 use layouts::*;
 
@@ -43,6 +47,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:scout_car_snaking_corridor")
     }
@@ -96,6 +101,7 @@ impl Game {
             units: vec![unit_id],
             goal,
             issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:direct_reverse_order")
     }
@@ -136,6 +142,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:scout_car_wall_chokepoint")
     }
@@ -176,6 +183,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:vehicle_corner_wall")
     }
@@ -232,6 +240,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:vehicle_small_block_baseline")
     }
@@ -276,6 +285,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: config::TICK_HZ / 2,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:factory_zero_gap_perpendicular")
     }
@@ -347,6 +357,7 @@ impl Game {
             units: vec![unit_id],
             goal,
             issue_after_ticks: config::TICK_HZ,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed(checkpoint_name)
     }
@@ -419,6 +430,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: config::TICK_HZ * 30,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed(layout.scenario_id())
     }
@@ -489,6 +501,7 @@ impl Game {
             units,
             goal,
             issue_after_ticks: config::TICK_HZ,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed(&format!(
             "dev:tank_trap_pathing_matrix:{}",
@@ -606,24 +619,9 @@ impl Game {
             units: vec![digger, reuse_rifleman, crowded_machine_gunner, enemy_reuser],
             goal: dig_start,
             issue_after_ticks: u32::MAX,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:entrenchment_inspection")
-    }
-}
-
-pub struct DevScenarioSetup {
-    pub game: Game,
-    pub player_id: u32,
-    pub units: Vec<u32>,
-    pub goal: (f32, f32),
-    pub issue_after_ticks: u32,
-}
-
-impl DevScenarioSetup {
-    fn checkpoint_backed(mut self, label: &str) -> Result<Self, String> {
-        self.game = Game::checkpoint_backed_start_from_direct_for_setup(self.game, label)
-            .map_err(|err| format!("failed to build checkpoint-backed {label} start: {err}"))?;
-        Ok(self)
     }
 }
 
@@ -714,6 +712,8 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
 
 /// Spawn the steel and oil clusters for a base site. The clusters point inward toward the map
 /// center so the layout is the same regardless of whether a player occupies the site.
+#[cfg(test)]
+mod attack_move_reload_tests;
 #[cfg(test)]
 mod command_car_corner_tests;
 #[cfg(test)]

@@ -30,8 +30,7 @@ impl DevDriver {
 
 pub(super) struct DevScenarioDriver {
     player_id: u32,
-    units: Vec<u32>,
-    goal: (f32, f32),
+    command: SimCommand,
     issue_after_ticks: u32,
     issued: bool,
 }
@@ -45,15 +44,7 @@ impl DevScenarioDriver {
             return;
         }
         self.issued = true;
-        game.enqueue(
-            self.player_id,
-            SimCommand::Move {
-                units: self.units.clone(),
-                x: self.goal.0,
-                y: self.goal.1,
-                queued: false,
-            },
-        );
+        game.enqueue(self.player_id, self.command.clone());
     }
 }
 
@@ -130,10 +121,10 @@ impl RoomTask {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
                         let player_id = setup.player_id;
+                        let command = setup.command();
                         let driver = DevScenarioDriver {
                             player_id,
-                            units: setup.units,
-                            goal: setup.goal,
+                            command,
                             issue_after_ticks: setup.issue_after_ticks,
                             issued: false,
                         };
@@ -235,6 +226,13 @@ impl RoomTask {
                     }
                     DevScenarioId::TankCoaxInspection => {
                         session_from_setup!(Game::new_tank_coax_inspection_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
+                    DevScenarioId::AttackMoveReloadAcquisition => {
+                        session_from_setup!(Game::new_attack_move_reload_acquisition_scenario(
                             config.unit,
                             config.count,
                             seed,

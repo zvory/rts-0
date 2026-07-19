@@ -51,6 +51,7 @@ impl Game {
             units: Vec::new(),
             goal: rally,
             issue_after_ticks: u32::MAX,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:factory_wall_rally_spawn")
     }

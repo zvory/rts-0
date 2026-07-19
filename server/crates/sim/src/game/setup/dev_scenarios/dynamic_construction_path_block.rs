@@ -135,6 +135,7 @@ impl Game {
             units: vec![mover],
             goal,
             issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed(&format!(
             "dev:dynamic_construction_path_block:{}",

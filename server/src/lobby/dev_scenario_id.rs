@@ -17,6 +17,7 @@ pub(in crate::lobby) enum DevScenarioId {
     TankTrapPathingMatrix,
     EntrenchmentInspection,
     TankCoaxInspection,
+    AttackMoveReloadAcquisition,
 }
 
 impl DevScenarioId {
@@ -41,6 +42,7 @@ impl DevScenarioId {
             "tank_trap_pathing_matrix" => Some(Self::TankTrapPathingMatrix),
             "entrenchment_inspection" => Some(Self::EntrenchmentInspection),
             "tank_coax_inspection" => Some(Self::TankCoaxInspection),
+            "attack_move_reload_acquisition" => Some(Self::AttackMoveReloadAcquisition),
             _ => None,
         }
     }
@@ -66,6 +68,7 @@ impl DevScenarioId {
             Self::TankTrapPathingMatrix => "tank_trap_pathing_matrix",
             Self::EntrenchmentInspection => "entrenchment_inspection",
             Self::TankCoaxInspection => "tank_coax_inspection",
+            Self::AttackMoveReloadAcquisition => "attack_move_reload_acquisition",
         }
     }
 }
