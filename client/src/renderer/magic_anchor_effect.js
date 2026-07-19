@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxCircle, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxFillStrokePath, gfxStrokeLine, gfxFill, gfxStroke } from "./native_graphics.js";
 import { hash2 } from "./shared.js";
 
 export const MAGIC_ANCHOR_COLOR = 0xc7d07a;
@@ -16,11 +16,15 @@ export function drawMagicAnchor(g, object, radius) {
   drawMagicAnchorParticles(g, object, radius, coreRadius);
   gfxStroke(g, 2.2, MAGIC_ANCHOR_COLOR, 0.88);
   gfxFill(g, MAGIC_ANCHOR_COLOR, 0.18);
-  gfxMove(g, object.x, object.y - coreRadius);
-  gfxLine(g, object.x + coreRadius * 0.8, object.y);
-  gfxLine(g, object.x, object.y + coreRadius);
-  gfxLine(g, object.x - coreRadius * 0.8, object.y);
-  gfxLine(g, object.x, object.y - coreRadius);
+  gfxFillStrokePath(g, [
+    [object.x, object.y - coreRadius],
+    [object.x + coreRadius * 0.8, object.y],
+    [object.x, object.y + coreRadius],
+    [object.x - coreRadius * 0.8, object.y],
+  ], {
+    fill: { color: MAGIC_ANCHOR_COLOR, alpha: 0.18 },
+    stroke: { width: 2.2, color: MAGIC_ANCHOR_COLOR, alpha: 0.88 },
+  });
   gfxNoFill(g);
   gfxStroke(g, 1.3, 0x11110f, 0.42);
   gfxCircle(g, object.x, object.y, coreRadius * 0.48);
@@ -48,8 +52,16 @@ function drawMagicAnchorParticles(g, object, radius, coreRadius) {
       gfxNoFill(g);
       if (density > 0.52) {
         gfxStroke(g, 1.1 + density * 1.2, PARTICLE_COLOR, alpha * 0.55);
-        gfxMove(g, px + Math.cos(angle) * size * 2.8, py + Math.sin(angle) * size * 2.8);
-        gfxLine(g, px - Math.cos(angle) * size * 2.0, py - Math.sin(angle) * size * 2.0);
+        gfxStrokeLine(
+          g,
+          px + Math.cos(angle) * size * 2.8,
+          py + Math.sin(angle) * size * 2.8,
+          px - Math.cos(angle) * size * 2.0,
+          py - Math.sin(angle) * size * 2.0,
+          1.1 + density * 1.2,
+          PARTICLE_COLOR,
+          alpha * 0.55,
+        );
       }
     }
   }

@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxCircle, gfxRect, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxRect, gfxStrokeLine, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -194,8 +194,8 @@ function drawInactiveExtractorBadge(g, cx, buildingTop, tileSize) {
 
   gfxStroke(g, Math.max(2.5, radius * 0.34), 0xe34b3f, 1);
   gfxCircle(g, cx, cy, radius);
-  gfxMove(g, cx - diagonal, cy - diagonal);
-  gfxLine(g, cx + diagonal, cy + diagonal);
+  gfxStrokeLine(g, cx - diagonal, cy - diagonal, cx + diagonal, cy + diagonal,
+    Math.max(2.5, radius * 0.34), 0xe34b3f, 1);
   gfxStroke(g, 0);
 }
 

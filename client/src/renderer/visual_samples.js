@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxPoly, gfxLine, gfxMove, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxPoly, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
 import { drawOccupiedTrenchLip, drawOccupiedTrenchShadow } from "./trenches.js";
@@ -392,14 +392,17 @@ function labelScaleForCamera(camera, x, y) {
 }
 
 function drawFacets(g, radius, variant, rng) {
-  gfxStroke(g, 2, COLORS.trenchDirtLight, variant.lightAlpha);
+  const paths = [];
   for (let i = 0; i < variant.facets; i += 1) {
     const angle = rng() * Math.PI * 2;
     const inner = radius * (0.38 + rng() * 0.16);
     const outer = radius * (0.74 + rng() * 0.18);
-    gfxMove(g, Math.cos(angle) * inner, Math.sin(angle) * inner);
-    gfxLine(g, Math.cos(angle) * outer, Math.sin(angle) * outer);
+    paths.push([
+      [Math.cos(angle) * inner, Math.sin(angle) * inner],
+      [Math.cos(angle) * outer, Math.sin(angle) * outer],
+    ]);
   }
+  gfxStrokePaths(g, paths, 2, COLORS.trenchDirtLight, variant.lightAlpha);
 }
 
 function irregularPolygon(radius, { points, jitter, rng, offsetX = 0, offsetY = 0 }) {

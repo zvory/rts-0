@@ -1,4 +1,4 @@
-import { gfxPaint, gfxReset, gfxFill } from "./native_graphics.js";
+import { gfxFillCurrentPath, gfxReset } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -99,9 +99,8 @@ export function _drawFog(fog) {
       : level === 3
         ? FOG_UNEXPLORED_ALPHA * 0.56
         : FOG_EXPLORED_ALPHA;
-    gfxFill(g, color, alpha);
     for (const [x, y, width, height] of runs) g.rect(x, y, width, height);
-    gfxPaint(g);
+    gfxFillCurrentPath(g, color, alpha);
   }
   this._fogRenderFog = fog;
   this._fogRenderMap = this._map;

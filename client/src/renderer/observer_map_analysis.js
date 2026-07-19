@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxCircle, gfxPoly, gfxRect, gfxLine, gfxMove, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxPoly, gfxRect, gfxStrokeLine, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import { finiteNumber } from "./shared.js";
 
 const LABEL_MAX_LENGTH = 36;
@@ -238,9 +238,8 @@ function drawHitArea(renderer, id, primitive, tileSize, lineWidth, camera, seen)
     gfxCircle(hit, primitive.x, primitive.y, radius);
     gfxNoFill(hit);
   } else if (primitive.kind === "line") {
-    gfxStroke(hit, Math.max(12, lineWidth * 8), color, 0.001);
-    gfxMove(hit, primitive.x1, primitive.y1);
-    gfxLine(hit, primitive.x2, primitive.y2);
+    gfxStrokeLine(hit, primitive.x1, primitive.y1, primitive.x2, primitive.y2,
+      Math.max(12, lineWidth * 8), color, 0.001);
   }
   seen.add(id);
 }

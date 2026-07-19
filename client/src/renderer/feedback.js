@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxLine, gfxMove, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -117,15 +117,14 @@ function drawBuildPlacementPreview(g, view, p, ts) {
     gfxNoFill(g);
 
     // Per-tile grid hint inside the footprint so the snap target is obvious.
-    gfxStroke(g, 1, color, 0.4);
+    const gridPaths = [];
     for (let i = 1; i < footW; i++) {
-      gfxMove(g, x0 + i * ts, y0);
-      gfxLine(g, x0 + i * ts, y0 + h);
+      gridPaths.push([[x0 + i * ts, y0], [x0 + i * ts, y0 + h]]);
     }
     for (let j = 1; j < footH; j++) {
-      gfxMove(g, x0, y0 + j * ts);
-      gfxLine(g, x0 + w, y0 + j * ts);
+      gridPaths.push([[x0, y0 + j * ts], [x0 + w, y0 + j * ts]]);
     }
+    gfxStrokePaths(g, gridPaths, 1, color, 0.4);
   }
 
   if (p.building !== KIND.CITY_CENTRE && p.building !== KIND.ZAMOK) return;
@@ -173,44 +172,38 @@ export function _drawCommandFeedback(view) {
         ? COLORS.selectEnemy
         : COLORS.selectOwn;
 
-    gfxStroke(g, 2, color, alpha);
     if (f.kind === "mortar" || f.kind === "artillery") {
       const tileSize = (this._map && this._map.tileSize) || 32;
       const splash = Number.isFinite(f.radiusTiles) ? f.radiusTiles * tileSize : 48;
-      drawDashedCircle(g, f.x, f.y, splash, 14);
+      drawDashedCircle(g, f.x, f.y, splash, 14, 2, color, alpha);
+      gfxStroke(g, 2, color, alpha);
       gfxCircle(g, f.x, f.y, r * 0.45);
-      gfxMove(g, f.x - r * 0.7, f.y);
-      gfxLine(g, f.x + r * 0.7, f.y);
-      gfxMove(g, f.x, f.y - r * 0.7);
-      gfxLine(g, f.x, f.y + r * 0.7);
+      gfxStrokePaths(g, [
+        [[f.x - r * 0.7, f.y], [f.x + r * 0.7, f.y]],
+        [[f.x, f.y - r * 0.7], [f.x, f.y + r * 0.7]],
+      ], 2, color, alpha);
       if (f.kind === "artillery") {
-        gfxStroke(g, 1.5, 0xffd15c, alpha * 0.82);
-        drawDashedCircle(g, f.x, f.y, splash * 0.45, 10);
+        drawDashedCircle(g, f.x, f.y, splash * 0.45, 10, 1.5, 0xffd15c, alpha * 0.82);
       }
     } else if (f.kind === "attack") {
-      gfxMove(g, f.x - r, f.y - r);
-      gfxLine(g, f.x + r, f.y + r);
-      gfxMove(g, f.x + r, f.y - r);
-      gfxLine(g, f.x - r, f.y + r);
+      gfxStrokePaths(g, [
+        [[f.x - r, f.y - r], [f.x + r, f.y + r]],
+        [[f.x + r, f.y - r], [f.x - r, f.y + r]],
+      ], 2, color, alpha);
+      gfxStroke(g, 2, color, alpha);
       gfxCircle(g, f.x, f.y, r * 0.72);
     } else {
+      gfxStroke(g, 2, color, alpha);
       gfxCircle(g, f.x, f.y, r * 0.72);
-      gfxMove(g, f.x, f.y - r);
-      gfxLine(g, f.x + r * 0.72, f.y);
-      gfxLine(g, f.x, f.y + r);
-      gfxLine(g, f.x - r * 0.72, f.y);
-      gfxLine(g, f.x, f.y - r);
+      gfxStrokePaths(g, [[[f.x, f.y - r], [f.x + r * 0.72, f.y], [f.x, f.y + r],
+        [f.x - r * 0.72, f.y], [f.x, f.y - r]]], 2, color, alpha);
     }
     if (f.append) {
-      gfxStroke(g, 1.5, color, alpha * 0.85);
-      drawDashedCircle(g, f.x, f.y, r + 7, 10);
+      drawDashedCircle(g, f.x, f.y, r + 7, 10, 1.5, color, alpha * 0.85);
       const sx = f.x + r * 0.7;
       const sy = f.y - r * 0.7;
-      gfxStroke(g, 2, color, alpha);
-      gfxMove(g, sx - 4, sy);
-      gfxLine(g, sx + 4, sy);
-      gfxMove(g, sx, sy - 4);
-      gfxLine(g, sx, sy + 4);
+      gfxStrokePaths(g, [[[sx - 4, sy], [sx + 4, sy]], [[sx, sy - 4], [sx, sy + 4]]],
+        2, color, alpha);
     }
   }
   drawFormationMovePreview(g, view.formationMovePreview);
@@ -255,12 +248,10 @@ export function _drawOrderPlan(state) {
       const attackMove = marker.kind === ORDER_STAGE.ATTACK_MOVE;
       const color = artilleryFire ? 0xffd15c : hostile ? attackColor : moveColor;
       const alpha = i === 0 ? 0.68 : 0.48;
-      gfxStroke(g, 2, color, alpha);
       if (attackMove || artilleryFire) {
-        dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8);
+        dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8, 2, color, alpha);
       } else {
-        gfxMove(g, fromX, fromY);
-        gfxLine(g, marker.x, marker.y);
+        gfxStrokeLine(g, fromX, fromY, marker.x, marker.y, 2, color, alpha);
       }
 
       if (artilleryFire) {
@@ -294,15 +285,10 @@ export function _drawDebugPathOverlay(state, entities = null) {
     if (waypoints.length === 0) continue;
 
     const current = waypoints[0];
-    gfxStroke(g, 3, currentColor, 0.9);
-    dashedLine(g, e.x, e.y, current.x, current.y, 10, 6);
+    dashedLine(g, e.x, e.y, current.x, current.y, 10, 6, 3, currentColor, 0.9);
 
     if (waypoints.length > 1) {
-      gfxStroke(g, 2, pathColor, 0.72);
-      gfxMove(g, current.x, current.y);
-      for (let i = 1; i < waypoints.length; i += 1) {
-        gfxLine(g, waypoints[i].x, waypoints[i].y);
-      }
+      gfxStrokePaths(g, [[...waypoints.map(({ x, y }) => [x, y])]], 2, pathColor, 0.72);
     }
 
     for (let i = 0; i < waypoints.length; i += 1) {
@@ -437,11 +423,9 @@ export function _drawAbilityTargetPreview(view) {
         preview.minRangePx,
       );
     } else {
-      gfxStroke(g, 1.5, rangeColor, 0.85);
-      dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64);
+      dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64, 1.5, rangeColor, 0.85);
       if (preview.minRangePx > 0) {
-        gfxStroke(g, 1.3, minRangeColor, 0.82);
-        dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42);
+        dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42, 1.3, minRangeColor, 0.82);
       }
     }
   }
@@ -450,8 +434,8 @@ export function _drawAbilityTargetPreview(view) {
     for (const marker of preview.returnMarkers) {
       if (!finiteNumber(marker.x) || !finiteNumber(marker.y)) continue;
       drawReturnMarker(g, marker.x, marker.y, marker.radiusPx || 13, ABILITY_RETURN_MARKER_COLOR, 0.72);
-      gfxStroke(g, 1.5, ABILITY_RETURN_MARKER_COLOR, 0.45);
-      dashedLine(g, marker.x, marker.y, preview.mouseX, preview.mouseY, 8, 6);
+      dashedLine(g, marker.x, marker.y, preview.mouseX, preview.mouseY, 8, 6,
+        1.5, ABILITY_RETURN_MARKER_COLOR, 0.45);
     }
   }
 
@@ -461,8 +445,8 @@ export function _drawAbilityTargetPreview(view) {
       const color = origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR
         ? MAGIC_ANCHOR_COLOR
         : FIELD_OF_FIRE_COLOR;
-      gfxStroke(g, 2, color, origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR ? 0.72 : 0.55);
-      dashedLine(g, origin.x, origin.y, preview.mouseX, preview.mouseY, 10, 5);
+      dashedLine(g, origin.x, origin.y, preview.mouseX, preview.mouseY, 10, 5,
+        2, color, origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR ? 0.72 : 0.55);
       gfxFill(g, color, 0.2);
       gfxCircle(g, origin.x, origin.y, origin.radiusPx || 6);
       gfxNoFill(g);
@@ -476,18 +460,17 @@ export function _drawAbilityTargetPreview(view) {
   gfxFill(g, cursorColor, 0.18);
   gfxCircle(g, preview.mouseX, preview.mouseY, radiusPx);
   gfxNoFill(g);
-  gfxStroke(g, 2, cursorColor, 0.85);
   if (cursorInvalid) {
     const arm = radiusPx * 0.44;
-    gfxMove(g, preview.mouseX - arm, preview.mouseY - arm);
-    gfxLine(g, preview.mouseX + arm, preview.mouseY + arm);
-    gfxMove(g, preview.mouseX + arm, preview.mouseY - arm);
-    gfxLine(g, preview.mouseX - arm, preview.mouseY + arm);
+    gfxStrokePaths(g, [
+      [[preview.mouseX - arm, preview.mouseY - arm], [preview.mouseX + arm, preview.mouseY + arm]],
+      [[preview.mouseX + arm, preview.mouseY - arm], [preview.mouseX - arm, preview.mouseY + arm]],
+    ], 2, cursorColor, 0.85);
   } else {
-    gfxMove(g, preview.mouseX - radiusPx * 0.45, preview.mouseY);
-    gfxLine(g, preview.mouseX + radiusPx * 0.45, preview.mouseY);
-    gfxMove(g, preview.mouseX, preview.mouseY - radiusPx * 0.45);
-    gfxLine(g, preview.mouseX, preview.mouseY + radiusPx * 0.45);
+    gfxStrokePaths(g, [
+      [[preview.mouseX - radiusPx * 0.45, preview.mouseY], [preview.mouseX + radiusPx * 0.45, preview.mouseY]],
+      [[preview.mouseX, preview.mouseY - radiusPx * 0.45], [preview.mouseX, preview.mouseY + radiusPx * 0.45]],
+    ], 2, cursorColor, 0.85);
   }
 }
 
@@ -527,11 +510,8 @@ function drawReturnMarker(g, x, y, radius, color, alpha) {
   gfxFill(g, color, 0.09);
   gfxCircle(g, x, y, radius);
   gfxNoFill(g);
-  gfxMove(g, x, y - radius * 0.7);
-  gfxLine(g, x + radius * 0.7, y);
-  gfxLine(g, x, y + radius * 0.7);
-  gfxLine(g, x - radius * 0.7, y);
-  gfxLine(g, x, y - radius * 0.7);
+  gfxStrokePaths(g, [[[x, y - radius * 0.7], [x + radius * 0.7, y], [x, y + radius * 0.7],
+    [x - radius * 0.7, y], [x, y - radius * 0.7]]], 2, color, alpha);
 }
 
 function drawLineProjectile(g, object, radius, trails) {
@@ -542,9 +522,8 @@ function drawLineProjectile(g, object, radius, trails) {
 
   const previous = points.length >= 2 ? points[points.length - 2] : null;
   if (previous) {
-    gfxStroke(g, Math.max(3.5, radius * 0.72), ABILITY_LINE_SHOT_COLOR, 0.95);
-    gfxMove(g, previous.x, previous.y);
-    gfxLine(g, object.x, object.y);
+    gfxStrokeLine(g, previous.x, previous.y, object.x, object.y,
+      Math.max(3.5, radius * 0.72), ABILITY_LINE_SHOT_COLOR, 0.95);
   }
 
   gfxStroke(g, 2, ABILITY_LINE_SHOT_COLOR, 0.96);
@@ -579,9 +558,8 @@ function drawLineProjectileTrail(g, points, radius) {
     const age = (maxSegment - i) / Math.max(1, maxSegment);
     const alpha = 0.14 + (1 - age) * 0.38;
     const width = Math.max(2, radius * (0.36 + (1 - age) * 0.42));
-    gfxStroke(g, width, ABILITY_LINE_SHOT_COLOR, alpha);
-    gfxMove(g, points[i - 1].x, points[i - 1].y);
-    gfxLine(g, points[i].x, points[i].y);
+    gfxStrokeLine(g, points[i - 1].x, points[i - 1].y, points[i].x, points[i].y,
+      width, ABILITY_LINE_SHOT_COLOR, alpha);
   }
 }
 
@@ -621,15 +599,17 @@ function pointInsideFieldOfFire(e, x, y, weapon, facing) {
   return Math.abs(angleDelta(facing, targetFacing)) <= weapon.arc / 2 + 0.001;
 }
 
-function dashedCircle(g, cx, cy, radius, segments) {
+function dashedCircle(g, cx, cy, radius, segments, width, color, alpha) {
   if (!(radius > 0)) return;
   const count = Math.max(12, segments | 0);
+  const paths = [];
   for (let i = 0; i < count; i += 2) {
     const a0 = (i / count) * Math.PI * 2;
     const a1 = ((i + 1) / count) * Math.PI * 2;
-    gfxMove(g, cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius);
-    gfxLine(g, cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius);
+    paths.push([[cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius],
+      [cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius]]);
   }
+  gfxStrokePaths(g, paths, width, color, alpha);
 }
 
 const SMOKE_RING_BILLOWS = [
@@ -754,9 +734,7 @@ export function _drawSmokeCanisters(state) {
     const tail = Math.min(28, Math.max(8, len * 0.08));
     const alpha = 0.95 - t * 0.25;
 
-    gfxStroke(g, 2, 0x111111, alpha * 0.45);
-    gfxMove(g, px - ux * tail, py - uy * tail);
-    gfxLine(g, px, py);
+    gfxStrokeLine(g, px - ux * tail, py - uy * tail, px, py, 2, 0x111111, alpha * 0.45);
     gfxStroke(g, 0, 0x000000, 0);
     gfxFill(g, 0x050505, alpha);
     gfxCircle(g, px, py, 2.7);
@@ -844,18 +822,16 @@ export function _drawMortarTargets(state) {
     const pulse = 1 + Math.sin(t * Math.PI * 5) * 0.035;
 
     if (finiteNumber(target.fromX) && finiteNumber(target.fromY)) {
-      gfxStroke(g, 1.8, MORTAR_WARNING_COLOR, 0.72 * fade);
-      dashedLine(g, target.fromX, target.fromY, target.x, target.y, 10, 7);
+      dashedLine(g, target.fromX, target.fromY, target.x, target.y, 10, 7,
+        1.8, MORTAR_WARNING_COLOR, 0.72 * fade);
     }
-    gfxStroke(g, 2.3, MORTAR_WARNING_COLOR, 0.9 * fade);
-    drawDashedCircle(g, target.x, target.y, radius * pulse, 24);
-    gfxStroke(g, 2, MORTAR_WARNING_COLOR, 0.86 * fade);
-    gfxMove(g, target.x - 14, target.y);
-    gfxLine(g, target.x + 14, target.y);
-    gfxMove(g, target.x, target.y - 14);
-    gfxLine(g, target.x, target.y + 14);
-    gfxStroke(g, 1.4, 0x421010, 0.52 * fade);
-    drawDashedCircle(g, target.x, target.y, radius * 0.45, 12);
+    drawDashedCircle(g, target.x, target.y, radius * pulse, 24,
+      2.3, MORTAR_WARNING_COLOR, 0.9 * fade);
+    gfxStrokePaths(g, [
+      [[target.x - 14, target.y], [target.x + 14, target.y]],
+      [[target.x, target.y - 14], [target.x, target.y + 14]],
+    ], 2, MORTAR_WARNING_COLOR, 0.86 * fade);
+    drawDashedCircle(g, target.x, target.y, radius * 0.45, 12, 1.4, 0x421010, 0.52 * fade);
   }
 }
 
@@ -937,10 +913,10 @@ export function _drawMortarImpacts(state) {
     gfxFill(g, 0x2a2119, 0.24 * dustFade);
     drawJaggedBlob(g, impact.x, impact.y, innerRadius * 1.55, 14, impact.seed + 37, 0.72, 1.0);
     gfxNoFill(g);
-    gfxStroke(g, 3, 0xffffff, 0.95 * blastFade);
-    drawJaggedRing(g, impact.x, impact.y, innerRadius, 12, impact.seed + 41, 0.72, 1.18);
-    gfxStroke(g, 1.8, 0xfff2d0, 0.7 * blastFade);
-    drawJaggedRing(g, impact.x, impact.y, innerRadius * 0.72, 9, impact.seed + 53, 0.78, 1.08);
+    drawJaggedRing(g, impact.x, impact.y, innerRadius, 12, impact.seed + 41, 0.72, 1.18,
+      3, 0xffffff, 0.95 * blastFade);
+    drawJaggedRing(g, impact.x, impact.y, innerRadius * 0.72, 9, impact.seed + 53, 0.78, 1.08,
+      1.8, 0xfff2d0, 0.7 * blastFade);
 
     drawShrapnel(g, impact.x, impact.y, innerRadius * 0.78, outerRadius, impact.seed, 0.56 * dustFade);
   }
@@ -962,18 +938,14 @@ export function _drawArtilleryTargets(state) {
     const descend = smoothstep01(t);
     const shellX = target.x - 26 + descend * 26;
     const shellY = target.y - 92 + descend * 92;
-    gfxStroke(g, 2.5, 0xffd15c, 0.9 * fade);
-    drawDashedCircle(g, target.x, target.y, radius, 28);
-    gfxStroke(g, 2, 0xfff2d0, 0.78 * fade);
-    gfxMove(g, target.x - 18, target.y);
-    gfxLine(g, target.x + 18, target.y);
-    gfxMove(g, target.x, target.y - 18);
-    gfxLine(g, target.x, target.y + 18);
-    gfxStroke(g, 1.5, 0x2a2119, 0.6 * fade);
-    drawDashedCircle(g, target.x, target.y, radius * (0.34 + 0.08 * Math.sin(t * Math.PI)), 12);
-    gfxStroke(g, 2, 0x2a2119, 0.58 * fade);
-    gfxMove(g, shellX - 12, shellY - 18);
-    gfxLine(g, shellX, shellY);
+    drawDashedCircle(g, target.x, target.y, radius, 28, 2.5, 0xffd15c, 0.9 * fade);
+    gfxStrokePaths(g, [
+      [[target.x - 18, target.y], [target.x + 18, target.y]],
+      [[target.x, target.y - 18], [target.x, target.y + 18]],
+    ], 2, 0xfff2d0, 0.78 * fade);
+    drawDashedCircle(g, target.x, target.y,
+      radius * (0.34 + 0.08 * Math.sin(t * Math.PI)), 12, 1.5, 0x2a2119, 0.6 * fade);
+    gfxStrokeLine(g, shellX - 12, shellY - 18, shellX, shellY, 2, 0x2a2119, 0.58 * fade);
     gfxStroke(g, 0, 0x000000, 0);
     gfxFill(g, 0xfff2d0, 0.9 * fade);
     gfxCircle(g, shellX, shellY, 3.5 + descend * 1.5);
@@ -1033,8 +1005,8 @@ export function _drawArtilleryImpacts(state) {
     const fade = 1 - clamp01(age / 850);
     const outerRadius = Math.max(48, impact.radiusTiles * ts);
     const shock = outerRadius * (1.0 + (1 - fade) * 0.34);
-    gfxStroke(g, 4, 0xfff2d0, 0.92 * fade);
-    drawJaggedRing(g, impact.x, impact.y, shock * 0.45, 16, impact.seed + 3, 0.78, 1.15);
+    drawJaggedRing(g, impact.x, impact.y, shock * 0.45, 16, impact.seed + 3, 0.78, 1.15,
+      4, 0xfff2d0, 0.92 * fade);
     gfxFill(g, 0xff7a28, 0.28 * fade);
     drawJaggedBlob(g, impact.x, impact.y, shock, 22, impact.seed + 11, 0.62, 1.0);
     gfxNoFill(g);
@@ -1056,7 +1028,8 @@ function drawJaggedBlob(g, cx, cy, radius, points, seed, minScale, maxScale) {
   gfxPoly(g, poly);
 }
 
-function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
+function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale, width, color, alpha) {
+  const path = [];
   for (let i = 0; i <= points; i += 1) {
     const j = i % points;
     const a = (j / points) * Math.PI * 2;
@@ -1064,22 +1037,23 @@ function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
     const r = radius * (minScale + (maxScale - minScale) * n);
     const x = cx + Math.cos(a) * r;
     const y = cy + Math.sin(a) * r;
-    if (i === 0) gfxMove(g, x, y);
-    else gfxLine(g, x, y);
+    path.push([x, y]);
   }
+  gfxStrokePaths(g, [path], width, color, alpha);
 }
 
 function drawShrapnel(g, cx, cy, innerRadius, outerRadius, seed, alpha = 0.56) {
-  gfxStroke(g, 1.5, 0x2b2119, alpha);
   const count = 18;
+  const paths = [];
   for (let i = 0; i < count; i += 1) {
     const a = (i / count) * Math.PI * 2 + hash2(seed + i * 5, seed + 99) * 0.18;
     const start = innerRadius + hash2(seed + i * 13, seed + 3) * innerRadius * 0.55;
     const len = 5 + hash2(seed + i * 29, seed + 77) * 11;
     const end = Math.min(outerRadius * 0.94, start + len);
-    gfxMove(g, cx + Math.cos(a) * start, cy + Math.sin(a) * start);
-    gfxLine(g, cx + Math.cos(a) * end, cy + Math.sin(a) * end);
+    paths.push([[cx + Math.cos(a) * start, cy + Math.sin(a) * start],
+      [cx + Math.cos(a) * end, cy + Math.sin(a) * end]]);
   }
+  gfxStrokePaths(g, paths, 1.5, 0x2b2119, alpha);
 }
 
 export function _drawRallyPoints(state) {
@@ -1100,14 +1074,11 @@ export function _drawRallyPoints(state) {
     for (let i = 0; i < plan.length; i += 1) {
       const stage = plan[i];
       const attackMove = stage.kind === "attackMove";
-      gfxStroke(g, e.optimisticRally ? 2.5 : 2, color, i === 0 ? 0.55 : 0.35);
-      gfxMove(g, fromX, fromY);
-      gfxLine(g, stage.x, stage.y);
+      gfxStrokeLine(g, fromX, fromY, stage.x, stage.y,
+        e.optimisticRally ? 2.5 : 2, color, i === 0 ? 0.55 : 0.35);
       if (i === 0 && !attackMove) {
         // Flag: pole + pennant + base dot for the active move rally.
-        gfxStroke(g, 2.5, color, 0.95);
-        gfxMove(g, stage.x, stage.y);
-        gfxLine(g, stage.x, stage.y - 20);
+        gfxStrokeLine(g, stage.x, stage.y, stage.x, stage.y - 20, 2.5, color, 0.95);
         gfxFill(g, color, 0.9);
         gfxPoly(g, [stage.x, stage.y - 20, stage.x + 13, stage.y - 16, stage.x, stage.y - 11]);
         gfxNoFill(g);
@@ -1128,10 +1099,8 @@ function drawQueuedPointMarker(g, x, y, color, attackMove) {
   if (attackMove) {
     gfxStroke(g, 2.5, color, 0.95);
     gfxCircle(g, x, y, 7);
-    gfxMove(g, x - 6, y - 6);
-    gfxLine(g, x + 6, y + 6);
-    gfxMove(g, x + 6, y - 6);
-    gfxLine(g, x - 6, y + 6);
+    gfxStrokePaths(g, [[[x - 6, y - 6], [x + 6, y + 6]], [[x + 6, y - 6], [x - 6, y + 6]]],
+      2.5, color, 0.95);
     return;
   }
 
@@ -1148,12 +1117,9 @@ function drawQueuedPointMarker(g, x, y, color, attackMove) {
 function drawPointFireMarker(g, x, y, color, alpha = 0.95) {
   gfxStroke(g, 2.5, color, alpha);
   gfxCircle(g, x, y, 10);
-  gfxMove(g, x - 13, y);
-  gfxLine(g, x + 13, y);
-  gfxMove(g, x, y - 13);
-  gfxLine(g, x, y + 13);
-  gfxStroke(g, 1.5, color, alpha * 0.78);
-  drawDashedCircle(g, x, y, 18, 12);
+  gfxStrokePaths(g, [[[x - 13, y], [x + 13, y]], [[x, y - 13], [x, y + 13]]],
+    2.5, color, alpha);
+  drawDashedCircle(g, x, y, 18, 12, 1.5, color, alpha * 0.78);
 }
 
 function drawDebugCurrentWaypoint(g, x, y, color) {
@@ -1163,10 +1129,8 @@ function drawDebugCurrentWaypoint(g, x, y, color) {
   gfxNoFill(g);
   gfxStroke(g, 1.5, color, 0.9);
   gfxCircle(g, x, y, 15);
-  gfxMove(g, x - 13, y);
-  gfxLine(g, x + 13, y);
-  gfxMove(g, x, y - 13);
-  gfxLine(g, x, y + 13);
+  gfxStrokePaths(g, [[[x - 13, y], [x + 13, y]], [[x, y - 13], [x, y + 13]]],
+    1.5, color, 0.9);
 }
 
 function drawDebugWaypoint(g, x, y, color, index) {
@@ -1180,27 +1144,24 @@ function drawDebugWaypoint(g, x, y, color, index) {
 function drawDebugGoal(g, x, y, color, alpha) {
   gfxStroke(g, 2.5, color, alpha);
   gfxRect(g, x - 8, y - 8, 16, 16);
-  gfxMove(g, x - 11, y);
-  gfxLine(g, x + 11, y);
-  gfxMove(g, x, y - 11);
-  gfxLine(g, x, y + 11);
+  gfxStrokePaths(g, [[[x - 11, y], [x + 11, y]], [[x, y - 11], [x, y + 11]]],
+    2.5, color, alpha);
 }
 
 function drawDebugTruncatedTail(g, x, y, color) {
-  gfxStroke(g, 2, color, 0.72);
-  gfxMove(g, x + 10, y - 6);
-  gfxLine(g, x + 16, y);
-  gfxLine(g, x + 10, y + 6);
+  gfxStrokePaths(g, [[[x + 10, y - 6], [x + 16, y], [x + 10, y + 6]]], 2, color, 0.72);
 }
 
-function drawDashedCircle(g, x, y, radius, segments) {
+function drawDashedCircle(g, x, y, radius, segments, width, color, alpha) {
   const count = Math.max(6, segments | 0);
+  const paths = [];
   for (let i = 0; i < count; i += 2) {
     const a0 = (i / count) * Math.PI * 2;
     const a1 = ((i + 1) / count) * Math.PI * 2;
-    gfxMove(g, x + Math.cos(a0) * radius, y + Math.sin(a0) * radius);
-    gfxLine(g, x + Math.cos(a1) * radius, y + Math.sin(a1) * radius);
+    paths.push([[x + Math.cos(a0) * radius, y + Math.sin(a0) * radius],
+      [x + Math.cos(a1) * radius, y + Math.sin(a1) * radius]]);
   }
+  gfxStrokePaths(g, paths, width, color, alpha);
 }
 
 export function _drawResourceMiningPreview(view) {
@@ -1226,8 +1187,7 @@ export function _drawResourceMiningPreview(view) {
     return;
   }
 
-  gfxStroke(g, 2.5, 0xd64d45, 0.9);
-  dashedLine(g, p.resourceX, p.resourceY, ccEndpoint.x, ccEndpoint.y, 14, 9);
+  dashedLine(g, p.resourceX, p.resourceY, ccEndpoint.x, ccEndpoint.y, 14, 9, 2.5, 0xd64d45, 0.9);
 }
 
 export function _drawMuzzleFlashes(state) {
@@ -1276,13 +1236,11 @@ export function _drawMuzzleFlashes(state) {
       const penFactor = target?.kind === KIND.TANK ? 0 : feedbackKind === KIND.ANTI_TANK_GUN ? 0.5 : 0.25;
       const tailLen = (stat.rangeTiles || 0) * tileSize * penFactor;
 
-      gfxStroke(g, style.tracerWidth, style.tracerColor, style.tracerAlpha * fade);
-      gfxMove(g, mx, my);
-      gfxLine(g, targetPos.x, targetPos.y);
+      gfxStrokeLine(g, mx, my, targetPos.x, targetPos.y,
+        style.tracerWidth, style.tracerColor, style.tracerAlpha * fade);
       if (style.tracerCoreWidth > 0) {
-        gfxStroke(g, style.tracerCoreWidth, style.tracerCoreColor, style.tracerCoreAlpha * fade);
-        gfxMove(g, mx, my);
-        gfxLine(g, targetPos.x, targetPos.y);
+        gfxStrokeLine(g, mx, my, targetPos.x, targetPos.y,
+          style.tracerCoreWidth, style.tracerCoreColor, style.tracerCoreAlpha * fade);
       }
 
       if (shotLen > 0.001 && tailLen > 0) {
@@ -1290,9 +1248,8 @@ export function _drawMuzzleFlashes(state) {
         const uy = dy / shotLen;
         const ex = targetPos.x + ux * tailLen;
         const ey = targetPos.y + uy * tailLen;
-        gfxStroke(g, style.tailWidth, style.tailColor, style.tailAlpha * fade);
-        gfxMove(g, targetPos.x, targetPos.y);
-        gfxLine(g, ex, ey);
+        gfxStrokeLine(g, targetPos.x, targetPos.y, ex, ey,
+          style.tailWidth, style.tailColor, style.tailAlpha * fade);
       }
     }
 

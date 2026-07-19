@@ -1,4 +1,4 @@
-import { gfxCircle, gfxLine, gfxMove, gfxRect, gfxReset, gfxNoFill, gfxFill, gfxStroke } from "./renderer/native_graphics.js";
+import { gfxCircle, gfxStrokePaths, gfxRect, gfxReset, gfxNoFill, gfxFill, gfxStroke } from "./renderer/native_graphics.js";
 import { Camera } from "./camera.js";
 import { TERRAIN } from "./protocol.js";
 import { Renderer } from "./renderer/index.js";
@@ -172,21 +172,17 @@ export class MapEditorViewport {
     for (const label of this.labels) label.destroy();
     this.labels = [];
     const size = draft.terrain.length;
-    gfxStroke(this.overlay, 1, 0xffffff, 0.08);
+    const gridPaths = [];
     for (let tile = 0; tile <= size; tile += 8) {
       const p = tile * TILE_SIZE;
-      gfxMove(this.overlay, p, 0);
-      gfxLine(this.overlay, p, size * TILE_SIZE);
-      gfxMove(this.overlay, 0, p);
-      gfxLine(this.overlay, size * TILE_SIZE, p);
+      gridPaths.push([[p, 0], [p, size * TILE_SIZE]], [[0, p], [size * TILE_SIZE, p]]);
     }
+    gfxStrokePaths(this.overlay, gridPaths, 1, 0xffffff, 0.08);
     const guides = mapEditorSymmetryGuideLines(size, this.symmetry);
     if (guides.length) {
-      gfxStroke(this.overlay, 2, 0xffd878, 0.82);
-      for (const guide of guides) {
-        gfxMove(this.overlay, guide.x0, guide.y0);
-        gfxLine(this.overlay, guide.x1, guide.y1);
-      }
+      gfxStrokePaths(this.overlay, guides.map((guide) => [
+        [guide.x0, guide.y0], [guide.x1, guide.y1],
+      ]), 2, 0xffd878, 0.82);
     }
     const guideCentre = mapEditorSymmetryGuideCentre(size, this.symmetry);
     if (guideCentre) {

@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxEllipse, gfxPoly, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxEllipse, gfxPoly, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
 
@@ -274,14 +274,17 @@ export function drawOccupiedTrenchLip(g, radius, seed = 1) {
   }));
   gfxNoFill(g);
 
-  gfxStroke(g, 2, COLORS.trenchDirtLight, 0.42);
+  const facetPaths = [];
   for (let i = 0; i < 4; i += 1) {
     const angle = Math.PI * (0.18 + rng() * 0.64);
     const inner = r * (0.6 + rng() * 0.08);
     const outer = r * (0.96 + rng() * 0.1);
-    gfxMove(g, Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08);
-    gfxLine(g, Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08);
+    facetPaths.push([
+      [Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08],
+      [Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08],
+    ]);
   }
+  gfxStrokePaths(g, facetPaths, 2, COLORS.trenchDirtLight, 0.42);
 }
 
 export function stampTrenchDecal(ctx, trench, downsample = TRENCH_DECAL_TEXTURE_WORLD_SCALE) {

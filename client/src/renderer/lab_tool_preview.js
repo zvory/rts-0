@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxCircle, gfxRoundRect, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxRoundRect, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, PLAYER_PALETTE, STATS } from "../config.js";
 import { isBuilding, isUnit } from "../protocol.js";
 import {
@@ -36,15 +36,14 @@ function drawLabSpawnPreview(g, x, y, payload, tileSize) {
     gfxFill(g, color, 0.28);
     gfxRoundRect(g, x0, y0, w, h, 5);
     gfxNoFill(g);
-    gfxStroke(g, 1, color, 0.45);
+    const gridPaths = [];
     for (let tile = 1; tile < footW; tile++) {
-      gfxMove(g, x0 + tile * tileSize, y0);
-      gfxLine(g, x0 + tile * tileSize, y0 + h);
+      gridPaths.push([[x0 + tile * tileSize, y0], [x0 + tile * tileSize, y0 + h]]);
     }
     for (let tile = 1; tile < footH; tile++) {
-      gfxMove(g, x0, y0 + tile * tileSize);
-      gfxLine(g, x0 + w, y0 + tile * tileSize);
+      gridPaths.push([[x0, y0 + tile * tileSize], [x0 + w, y0 + tile * tileSize]]);
     }
+    gfxStrokePaths(g, gridPaths, 1, color, 0.45);
     return;
   }
   if (!isUnit(kind)) return;
@@ -54,22 +53,20 @@ function drawLabSpawnPreview(g, x, y, payload, tileSize) {
   gfxFill(g, color, 0.32);
   gfxCircle(g, x, y, radius);
   gfxNoFill(g);
-  gfxStroke(g, 1.5, color, 0.82);
-  gfxMove(g, x - radius * 0.7, y);
-  gfxLine(g, x + radius * 0.7, y);
-  gfxMove(g, x, y - radius * 0.7);
-  gfxLine(g, x, y + radius * 0.7);
+  gfxStrokePaths(g, [
+    [[x - radius * 0.7, y], [x + radius * 0.7, y]],
+    [[x, y - radius * 0.7], [x, y + radius * 0.7]],
+  ], 1.5, color, 0.82);
 }
 
 
 function drawLabRemovePreview(g, x, y, tileSize) {
   const arm = Math.max(14, tileSize * 0.48);
   const color = 0xe35c54;
-  gfxStroke(g, 4, color, 0.95);
-  gfxMove(g, x - arm, y - arm);
-  gfxLine(g, x + arm, y + arm);
-  gfxMove(g, x + arm, y - arm);
-  gfxLine(g, x - arm, y + arm);
+  gfxStrokePaths(g, [
+    [[x - arm, y - arm], [x + arm, y + arm]],
+    [[x + arm, y - arm], [x - arm, y + arm]],
+  ], 4, color, 0.95);
 }
 
 function labPreviewOwnerColor(owner) {

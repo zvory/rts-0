@@ -17,6 +17,7 @@ class FakeGraphics {
   roundRect() { return this; }
   moveTo() { return this; }
   lineTo() { return this; }
+  closePath() { return this; }
   arc() {}
 }
 
@@ -35,6 +36,10 @@ export class RecordingGraphics extends FakeGraphics {
   }
   lineTo(x, y) {
     this.calls.push(["lineTo", x, y]);
+    return this;
+  }
+  closePath() {
+    this.calls.push(["closePath"]);
     return this;
   }
   fill(style) {

@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxRect, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxRect, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -106,11 +106,10 @@ export function _drawResource(e, fog) {
       gfxFill(g, COLORS.steel);
       gfxRect(g, c.dx - cs * 0.45, c.dy - cs * 0.35, cs * 0.9, cs * 0.7);
       gfxNoFill(g);
-      gfxStroke(g, 1, 0x5a5134, 0.8);
-      gfxMove(g, c.dx - cs * 0.38, c.dy);
-      gfxLine(g, c.dx + cs * 0.38, c.dy);
-      gfxMove(g, c.dx, c.dy - cs * 0.3);
-      gfxLine(g, c.dx, c.dy + cs * 0.3);
+      gfxStrokePaths(g, [
+        [[c.dx - cs * 0.38, c.dy], [c.dx + cs * 0.38, c.dy]],
+        [[c.dx, c.dy - cs * 0.3], [c.dx, c.dy + cs * 0.3]],
+      ], 1, 0x5a5134, 0.8);
       gfxStroke(g, 1.2, 0x1a1712, 0.85);
     }
   }
@@ -119,11 +118,10 @@ export function _drawResource(e, fog) {
   if (mined) {
     const xr = r * 0.45;
     const xColor = e.kind === KIND.OIL ? 0xffffff : 0x1a1712;
-    gfxStroke(g, 2.5, xColor, 0.95);
-    gfxMove(g, -xr, -xr);
-    gfxLine(g, xr, xr);
-    gfxMove(g, xr, -xr);
-    gfxLine(g, -xr, xr);
+    gfxStrokePaths(g, [
+      [[-xr, -xr], [xr, xr]],
+      [[xr, -xr], [-xr, xr]],
+    ], 2.5, xColor, 0.95);
   }
   g.rtsStaticRenderKey = renderKey;
 }

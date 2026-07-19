@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxCircle, gfxPoly, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxPoly, gfxStrokeLine, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   clamp01,
   drawFreeRotatedRect,
@@ -48,12 +48,10 @@ export function _drawPanzerfaustShots(state) {
 
     if (age <= duration + 80) {
       const tail = Math.min(34, Math.max(14, len * 0.22));
-      gfxStroke(g, 3.2, 0x1d1812, 0.56 * travelFade);
-      gfxMove(g, x - ux * tail, y - uy * tail);
-      gfxLine(g, x, y);
-      gfxStroke(g, 1.7, 0xffd65a, 0.86 * travelFade);
-      gfxMove(g, x - ux * tail * 0.72, y - uy * tail * 0.72);
-      gfxLine(g, x, y);
+      gfxStrokeLine(g, x - ux * tail, y - uy * tail, x, y,
+        3.2, 0x1d1812, 0.56 * travelFade);
+      gfxStrokeLine(g, x - ux * tail * 0.72, y - uy * tail * 0.72, x, y,
+        1.7, 0xffd65a, 0.86 * travelFade);
       gfxStroke(g, 0, 0x000000, 0);
       gfxFill(g, 0x19130d, 0.98 * travelFade);
       drawFreeRotatedRect(g, x, y, 9.5, 3.2, angle);
@@ -78,8 +76,8 @@ export function _drawPanzerfaustImpacts(state) {
     const flashFade = 1 - smoothstep01(Math.max(0, t - 0.18) / 0.32);
     const dustFade = 1 - smoothstep01(Math.max(0, t - 0.32) / 0.68);
     const radius = 11 + t * 12;
-    gfxStroke(g, 3, 0xfff2d0, 0.92 * flashFade);
-    drawJaggedRing(g, impact.x, impact.y, radius * 0.72, 10, impact.seed + 3, 0.72, 1.18);
+    drawJaggedRing(g, impact.x, impact.y, radius * 0.72, 10, impact.seed + 3, 0.72, 1.18,
+      3, 0xfff2d0, 0.92 * flashFade);
     gfxStroke(g, 0, 0x000000, 0);
     gfxFill(g, 0xffb22e, 0.26 * flashFade);
     drawJaggedBlob(g, impact.x, impact.y, radius * 1.25, 13, impact.seed + 11, 0.62, 1.0);
@@ -104,7 +102,8 @@ function drawJaggedBlob(g, cx, cy, radius, points, seed, minScale, maxScale) {
   gfxPoly(g, poly);
 }
 
-function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
+function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale, width, color, alpha) {
+  const path = [];
   for (let i = 0; i <= points; i += 1) {
     const j = i % points;
     const a = (j / points) * Math.PI * 2;
@@ -112,7 +111,7 @@ function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
     const r = radius * (minScale + (maxScale - minScale) * n);
     const x = cx + Math.cos(a) * r;
     const y = cy + Math.sin(a) * r;
-    if (i === 0) gfxMove(g, x, y);
-    else gfxLine(g, x, y);
+    path.push([x, y]);
   }
+  gfxStrokePaths(g, [path], width, color, alpha);
 }

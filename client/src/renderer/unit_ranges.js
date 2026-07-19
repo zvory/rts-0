@@ -1,4 +1,4 @@
-import { gfxLine, gfxMove, gfxStroke } from "./native_graphics.js";
+import { gfxStrokePaths } from "./native_graphics.js";
 import {
   ABILITIES,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
@@ -55,11 +55,11 @@ export function _drawSelectedUnitRanges(state) {
         profile.minRadius,
       );
     } else {
-      gfxStroke(g, 1, UNIT_RANGE_COLOR, UNIT_RANGE_LINE_ALPHA);
-      dottedCircle(g, e.x, e.y, profile.maxRadius);
+      dottedCircle(g, e.x, e.y, profile.maxRadius, UNIT_RANGE_DOT_SPACING_PX,
+        UNIT_RANGE_COLOR, UNIT_RANGE_LINE_ALPHA);
       if (profile.minRadius > 0) {
-        gfxStroke(g, 1, UNIT_RANGE_MIN_COLOR, UNIT_RANGE_MIN_LINE_ALPHA);
-        dottedCircle(g, e.x, e.y, profile.minRadius, UNIT_RANGE_DOT_SPACING_PX * 0.8);
+        dottedCircle(g, e.x, e.y, profile.minRadius, UNIT_RANGE_DOT_SPACING_PX * 0.8,
+          UNIT_RANGE_MIN_COLOR, UNIT_RANGE_MIN_LINE_ALPHA);
       }
     }
   }
@@ -179,18 +179,22 @@ function fieldOfFireProfile(kind, tileSize) {
   return null;
 }
 
-function dottedCircle(g, cx, cy, radius, dotSpacing = UNIT_RANGE_DOT_SPACING_PX) {
+function dottedCircle(g, cx, cy, radius, dotSpacing, color, alpha) {
   if (!(radius > 0)) return;
   const circumference = Math.PI * 2 * radius;
   const count = Math.max(18, Math.ceil(circumference / Math.max(6, dotSpacing)));
   const dotArc = Math.min(0.035, 2.2 / Math.max(1, radius));
+  const paths = [];
   for (let i = 0; i < count; i += 1) {
     const a = (i / count) * Math.PI * 2;
     const a0 = a - dotArc;
     const a1 = a + dotArc;
-    gfxMove(g, cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius);
-    gfxLine(g, cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius);
+    paths.push([
+      [cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius],
+      [cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius],
+    ]);
   }
+  gfxStrokePaths(g, paths, 1, color, alpha);
 }
 
 function firstFinite(...values) {
