@@ -88,6 +88,25 @@ function orthographic({ x = 0, y = 0, zoom = 1, width = 400, height = 300 } = {}
     prepareEntitySnapshots([sharedAcrossAdmission]).entries[0].presentationError !== null,
     "admitted aliases are validated even when an unadmitted field cloned the object first",
   );
+
+  const malformedReveal = {
+    id: 18, owner: 2, kind: KIND.RIFLEMAN, x: 30, y: 30, shotReveal: true,
+    get malformed() { throw new Error("malformed reveal metadata"); },
+  };
+  const malformedPrepared = prepareEntitySnapshots([malformedReveal]);
+  assert(
+    malformedPrepared.entries[0].interaction === null
+      && malformedPrepared.entries[0].presentationError === "malformed reveal metadata",
+    "preparation contains malformed entity failures instead of aborting the whole frame",
+  );
+  assert(
+    buildSelectionScene({
+      entities: [malformedReveal],
+      preparedEntities: malformedPrepared.entries,
+      projection: orthographic(),
+    }).proxies.length === 0,
+    "malformed reveal entities remain safely excluded from selection",
+  );
 }
 
 function fakePerspective({ groundAtScreen = true } = {}) {

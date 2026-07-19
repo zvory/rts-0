@@ -26,7 +26,14 @@ export function prepareEntitySnapshots(entities) {
       presentation: { valid: true, depth: 0, ancestors: new Set() },
       debug,
     };
-    const interaction = cloneRoot(source, state);
+    let interaction = null;
+    try {
+      interaction = cloneRoot(source, state);
+    } catch (error) {
+      state.presentationError = error instanceof Error
+        ? error.message
+        : "Prepared entity could not be detached.";
+    }
     const entry = Object.freeze({
       source,
       interaction,
