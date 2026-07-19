@@ -787,7 +787,7 @@ fn persisted_replay_room_host_start_begins_replay_viewer() {
     };
     let expected = session
         .game
-        .snapshot_for_observer(&ObserverView::Omniscient);
+        .snapshot_for_observer(&ObserverView::Players(session.active_player_ids()));
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     let tick_analysis = take_observer_analysis(&writer, "confirmed replay tick");
@@ -900,8 +900,8 @@ fn saved_artifact_replay_join_uses_replay_viewer_runtime() {
     };
     assert_eq!(session.artifact.command_log, artifact.command_log);
     assert_eq!(
-        task.observer_view_for(99),
-        rts_sim::game::ObserverView::Omniscient
+        task.observer_view_selection_for(99),
+        VisionSelectionRequest::All
     );
     assert!(task.players.get(&99).is_some_and(|p| p.spectator));
     assert!(matches!(

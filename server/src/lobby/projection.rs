@@ -9,6 +9,12 @@ use crate::protocol::{
 use rts_sim::game::{Game, ObserverView, SnapshotOptions};
 use std::collections::HashMap;
 
+pub(super) fn observer_view_or_all(view: Option<&ObserverView>, game: &Game) -> ObserverView {
+    view.cloned().unwrap_or_else(|| {
+        ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect())
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RecipientRole {
     ActivePlayer,
@@ -154,7 +160,7 @@ impl ProjectionPolicy {
         role: RecipientRole,
         connection_id: u32,
         seat_id: Option<u32>,
-        _spectator_visible_player_ids: &[u32],
+        spectator_visible_player_ids: &[u32],
     ) -> SnapshotProjection {
         if self.visibility == VisibilityPolicy::FullWorldProjection {
             return SnapshotProjection::observer(
@@ -169,7 +175,7 @@ impl ProjectionPolicy {
                 self.snapshot_options_for(role),
             ),
             RecipientRole::Spectator => SnapshotProjection::observer(
-                ObserverView::Omniscient,
+                ObserverView::Players(spectator_visible_player_ids.to_vec()),
                 self.snapshot_options_for(role),
                 false,
             ),
@@ -283,9 +289,12 @@ pub(super) fn observer_view_from_selection(
 }
 
 pub(super) fn selection_from_observer_view(
-    view: &ObserverView,
+    view: Option<&ObserverView>,
     valid_player_ids: &[u32],
 ) -> VisionSelectionRequest {
+    let Some(view) = view else {
+        return VisionSelectionRequest::All;
+    };
     match view {
         ObserverView::Omniscient => VisionSelectionRequest::Omniscient,
         ObserverView::Players(player_ids) if player_ids.is_empty() => VisionSelectionRequest::All,
@@ -324,13 +333,13 @@ mod tests {
         );
         assert_eq!(
             selection_from_observer_view(
-                &ObserverView::Players(valid_player_ids.to_vec()),
+                Some(&ObserverView::Players(valid_player_ids.to_vec())),
                 &valid_player_ids,
             ),
             VisionSelectionRequest::All
         );
         assert_eq!(
-            selection_from_observer_view(&ObserverView::Omniscient, &valid_player_ids),
+            selection_from_observer_view(Some(&ObserverView::Omniscient), &valid_player_ids),
             VisionSelectionRequest::Omniscient
         );
     }
@@ -353,7 +362,7 @@ mod tests {
         assert_eq!(
             policy.live_snapshot_for(RecipientRole::Spectator, 102, None, &[1, 2]),
             SnapshotProjection::observer(
-                ObserverView::Omniscient,
+                ObserverView::Players(vec![1, 2]),
                 SnapshotOptions::default(),
                 false,
             )
@@ -435,7 +444,7 @@ mod tests {
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
             SnapshotProjection::observer(
-                ObserverView::Omniscient,
+                ObserverView::Players(vec![1, 2]),
                 SnapshotOptions::default(),
                 false,
             )

@@ -3,7 +3,8 @@ use super::connection::CommandSimAckSample;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::participants::Participants;
 use super::projection::{
-    scope_observer_analysis, ObserverAnalysisAudience, ProjectionPolicy, RecipientRole,
+    observer_view_or_all, scope_observer_analysis, ObserverAnalysisAudience, ProjectionPolicy,
+    RecipientRole,
 };
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
@@ -74,12 +75,8 @@ pub(super) fn fanout_current_observer_snapshots(
         None,
     )
     .send_to_recipients(players, recipients, |id, player| {
-        let projection = projection_policy.selected_perspective_snapshot_for(
-            observer_views
-                .get(&id)
-                .cloned()
-                .unwrap_or(ObserverView::Omniscient),
-        );
+        let projection = projection_policy
+            .selected_perspective_snapshot_for(observer_view_or_all(observer_views.get(&id), game));
         let snapshot = projection.snapshot_with_events(game, &mut per_player_events, &[]);
         Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
     });
@@ -284,10 +281,7 @@ impl LiveTickDriver<'_> {
             };
             let projection = if role == RecipientRole::Spectator {
                 self.projection_policy.observer_snapshot_for(
-                    observer_views
-                        .get(&id)
-                        .cloned()
-                        .unwrap_or(ObserverView::Omniscient),
+                    observer_view_or_all(observer_views.get(&id), game),
                     self.observer_include_private_notices,
                 )
             } else {
@@ -332,11 +326,7 @@ impl LiveTickDriver<'_> {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
-            let view = self
-                .observer_views
-                .get(&id)
-                .cloned()
-                .unwrap_or(ObserverView::Omniscient);
+            let view = observer_view_or_all(self.observer_views.get(&id), game);
             send_or_log(
                 self.room,
                 id,

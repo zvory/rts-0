@@ -577,8 +577,10 @@ fn branch_live_commands_and_snapshots_use_mapped_original_seats() {
     );
     assert_eq!(
         snapshot_spectator.visible_tiles,
-        game.snapshot_for_observer(&ObserverView::Omniscient)
-            .visible_tiles
+        game.snapshot_for_observer(&ObserverView::Players(
+            game.player_inits().iter().map(|player| player.id).collect()
+        ))
+        .visible_tiles
     );
 }
 

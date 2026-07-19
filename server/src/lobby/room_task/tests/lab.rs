@@ -50,7 +50,7 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     assert!(payload.replay.is_none());
     assert_eq!(
         payload.observer_view,
-        Some(crate::protocol::VisionSelectionRequest::Omniscient)
+        Some(crate::protocol::VisionSelectionRequest::All)
     );
     assert_eq!(payload.players.len(), 2);
     assert_eq!(payload.players[0].team_id, 1);
@@ -453,7 +453,7 @@ fn running_lab_room_collaborator_can_join_during_drain() {
 }
 
 #[test]
-fn lab_room_defaults_to_omniscient_observer_view() {
+fn lab_room_defaults_to_all_player_union_observer_view() {
     let mut task = RoomTask::new(
         "__lab__:sandbox:map=Chokes".to_string(),
         RoomMode::Lab(lab_config()),
@@ -472,7 +472,13 @@ fn lab_room_defaults_to_omniscient_observer_view() {
     let Phase::InGame(game) = &task.phase else {
         panic!("lab should remain live");
     };
-    let mut expected = game.snapshot_for_observer(&rts_sim::game::ObserverView::Omniscient);
+    let player_ids = game
+        .player_inits()
+        .iter()
+        .map(|player| player.id)
+        .collect::<Vec<_>>();
+    let mut expected =
+        game.snapshot_for_observer(&rts_sim::game::ObserverView::Players(player_ids));
     compact_snapshot_for_wire(&mut expected);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert!(!snapshot.visible_tiles.is_empty());
