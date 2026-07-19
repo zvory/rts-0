@@ -94,8 +94,8 @@ fn polyline_slots_keep_nearby_units_from_crossing() {
     let right = map.tile_center(20, 4).0;
     let y = map.tile_center(4, 4).1;
     let slots = polyline_slots(&units, &[(left, y), (right, y)]);
-    assert_close(slots.iter().find(|(id, _)| *id == 1).unwrap().1.0, right);
-    assert_close(slots.iter().find(|(id, _)| *id == 2).unwrap().1.0, left);
+    assert_close(slots.iter().find(|(id, _)| *id == 1).unwrap().1 .0, right);
+    assert_close(slots.iter().find(|(id, _)| *id == 2).unwrap().1 .0, left);
 }
 
 #[test]
