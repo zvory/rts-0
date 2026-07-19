@@ -4,6 +4,7 @@ use super::projection::{selection_from_observer_view, ProjectionPolicy};
 use super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy, SessionPolicyContext};
 use super::tick_control::{RoomTimeClock, TickControl};
 use super::*;
+use crate::protocol::VisionSelectionRequest;
 #[cfg(test)]
 use crate::protocol::{
     Command, LabClientOp, LabResult, LabStartRole, LabVisionMode, MovementPathDiagnosticScope,
@@ -344,10 +345,7 @@ impl RoomTask {
             .unwrap_or(ObserverView::Omniscient)
     }
 
-    fn observer_view_selection_for(
-        &self,
-        connection_id: u32,
-    ) -> crate::protocol::VisionSelectionRequest {
+    fn observer_view_selection_for(&self, connection_id: u32) -> VisionSelectionRequest {
         let valid_player_ids = match &self.phase {
             Phase::InGame(game) => game.player_inits().iter().map(|player| player.id).collect(),
             Phase::ReplayViewer(session) => session.active_player_ids(),
