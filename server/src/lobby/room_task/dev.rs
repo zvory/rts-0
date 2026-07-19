@@ -337,6 +337,8 @@ impl RoomTask {
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
         let observer_views = self.observer_views.clone();
+        let default_observer_view =
+            ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect());
         let full_vision_events = rts_sim::perf::timed(perf.as_mut(), "event_union", || {
             union_events(per_player_events.values())
         });
@@ -360,7 +362,7 @@ impl RoomTask {
                     observer_views
                         .get(&id)
                         .cloned()
-                        .unwrap_or(ObserverView::Omniscient),
+                        .unwrap_or_else(|| default_observer_view.clone()),
                 )
             } else {
                 projection_policy.dev_watch_snapshot_for(role, view_player_id)

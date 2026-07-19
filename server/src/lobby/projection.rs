@@ -154,7 +154,7 @@ impl ProjectionPolicy {
         role: RecipientRole,
         connection_id: u32,
         seat_id: Option<u32>,
-        _spectator_visible_player_ids: &[u32],
+        spectator_visible_player_ids: &[u32],
     ) -> SnapshotProjection {
         if self.visibility == VisibilityPolicy::FullWorldProjection {
             return SnapshotProjection::observer(
@@ -169,7 +169,7 @@ impl ProjectionPolicy {
                 self.snapshot_options_for(role),
             ),
             RecipientRole::Spectator => SnapshotProjection::observer(
-                ObserverView::Omniscient,
+                ObserverView::Players(spectator_visible_player_ids.to_vec()),
                 self.snapshot_options_for(role),
                 false,
             ),
@@ -353,7 +353,7 @@ mod tests {
         assert_eq!(
             policy.live_snapshot_for(RecipientRole::Spectator, 102, None, &[1, 2]),
             SnapshotProjection::observer(
-                ObserverView::Omniscient,
+                ObserverView::Players(vec![1, 2]),
                 SnapshotOptions::default(),
                 false,
             )
@@ -435,7 +435,7 @@ mod tests {
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
             SnapshotProjection::observer(
-                ObserverView::Omniscient,
+                ObserverView::Players(vec![1, 2]),
                 SnapshotOptions::default(),
                 false,
             )

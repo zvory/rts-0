@@ -65,6 +65,8 @@ pub(super) fn fanout_current_observer_snapshots(
     game: &Game,
 ) {
     let mut per_player_events = HashMap::new();
+    let default_view =
+        ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect());
     SnapshotFanout::new(
         room,
         Duration::ZERO,
@@ -78,7 +80,7 @@ pub(super) fn fanout_current_observer_snapshots(
             observer_views
                 .get(&id)
                 .cloned()
-                .unwrap_or(ObserverView::Omniscient),
+                .unwrap_or_else(|| default_view.clone()),
         );
         let snapshot = projection.snapshot_with_events(game, &mut per_player_events, &[]);
         Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
@@ -266,6 +268,8 @@ impl LiveTickDriver<'_> {
             .collect();
         let branch_live_seat_by_connection = self.branch_live_seat_by_connection;
         let observer_views = self.observer_views.clone();
+        let default_observer_view =
+            ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect());
         let pending_recipient_notices = &*self.pending_recipient_notices;
 
         let delivered_recipients = SnapshotFanout::new(
@@ -287,7 +291,7 @@ impl LiveTickDriver<'_> {
                     observer_views
                         .get(&id)
                         .cloned()
-                        .unwrap_or(ObserverView::Omniscient),
+                        .unwrap_or_else(|| default_observer_view.clone()),
                     self.observer_include_private_notices,
                 )
             } else {
@@ -328,6 +332,8 @@ impl LiveTickDriver<'_> {
         }
 
         let full_analysis = self.observer_analysis_with_ai_diagnostics(game);
+        let default_view =
+            ObserverView::Players(game.player_inits().iter().map(|player| player.id).collect());
         for id in spectator_ids {
             let Some(player) = self.players.get(&id) else {
                 continue;
@@ -336,7 +342,7 @@ impl LiveTickDriver<'_> {
                 .observer_views
                 .get(&id)
                 .cloned()
-                .unwrap_or(ObserverView::Omniscient);
+                .unwrap_or_else(|| default_view.clone());
             send_or_log(
                 self.room,
                 id,

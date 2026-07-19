@@ -710,10 +710,10 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
   gameplay-read-only live spectator attach with shared pause controls. Spectators receive
   `StartPayload.spectator = true` and live
-  omniscient observer snapshots by default; they can select one or more real-player perspectives
-  through the same connection-scoped observer-view state used by replay, dev, and Lab. Normal live
-  observer event unions filter per-player position-free non-alert notices. Spectators are not
-  included in `PlayerInit`, command routing, elimination, or match-player counts.
+  all-player union observer snapshots by default; they can select one or more real-player
+  perspectives through the same connection-scoped observer-view state used by replay, dev, and
+  Lab. Normal live observer event unions filter per-player position-free non-alert notices.
+  Spectators are not included in `PlayerInit`, command routing, elimination, or match-player counts.
   `RoomTask` captures the existing connected recipient ids before inserting a late spectator and
   queues a room-owned
   position-free info notice for those recipients only: `<name> has joined the match as a

@@ -92,7 +92,12 @@ fn paused_dev_scenario_steps_one_tick_at_a_time() {
     let Phase::InGame(game) = &task.phase else {
         panic!("dev scenario should remain live");
     };
-    let expected = game.snapshot_full_for(task.dev_view_player_id.unwrap());
+    let player_ids = game
+        .player_inits()
+        .iter()
+        .map(|player| player.id)
+        .collect::<Vec<_>>();
+    let expected = game.snapshot_for_observer(&rts_sim::game::ObserverView::Players(player_ids));
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert_eq!(snapshot.net_status.prediction_version, 0);
     assert!(matches!(

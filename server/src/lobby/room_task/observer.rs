@@ -9,6 +9,7 @@ use super::super::snapshot_fanout::fanout_replay_snapshots;
 use super::types::{Phase, ReplayTickContext};
 use super::RoomTask;
 use crate::protocol::{Event, ServerMessage};
+use rts_sim::game::ObserverView;
 
 impl RoomTask {
     pub(super) fn fanout_current_observer_snapshots_to(
@@ -73,7 +74,11 @@ impl RoomTask {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
-            let view = self.observer_view_for(id);
+            let view = self
+                .observer_views
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| ObserverView::Players(session.active_player_ids()));
             send_or_log(
                 &self.room,
                 id,

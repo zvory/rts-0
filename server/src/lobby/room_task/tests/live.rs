@@ -522,7 +522,7 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
 }
 
 #[test]
-fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
+fn ai_only_live_spectator_all_view_scopes_omniscient_map_analysis() {
     let mut task = RoomTask::new(
         "ai-only-live-ai-diagnostics-test".to_string(),
         RoomMode::Normal,
@@ -545,28 +545,11 @@ fn ai_only_live_spectator_observer_analysis_includes_ai_decision_diagnostics() {
     }
 
     let analysis = take_observer_analysis(&writer, "AI-only spectator observer analysis");
-    let map_analysis = analysis
-        .map_analysis
-        .as_ref()
-        .expect("AI-only spectator analysis should include cached static map analysis");
-    for expected_layer_id in ["chokes", "bases", "resources"] {
-        assert!(
-            map_analysis
-                .layers
-                .iter()
-                .any(|layer| layer.id == expected_layer_id && !layer.primitives.is_empty()),
-            "map-analysis diagnostics should expose {expected_layer_id} primitives"
-        );
-    }
-    for retired_layer_id in ["regions", "voronoi"] {
-        assert!(
-            map_analysis
-                .layers
-                .iter()
-                .all(|layer| layer.id != retired_layer_id),
-            "map-analysis diagnostics should not expose retired {retired_layer_id} primitives"
-        );
-    }
+    assert_eq!(analysis.players.len(), 2);
+    assert!(
+        analysis.map_analysis.is_none(),
+        "all-player union should not expose omniscient-only map analysis"
+    );
     let ai_rows: Vec<_> = analysis
         .players
         .iter()
@@ -750,7 +733,12 @@ fn late_spectator_join_gets_pause_control_and_read_only_snapshot() {
     let Phase::InGame(game) = &task.phase else {
         panic!("normal live match should remain active");
     };
-    let mut expected = game.snapshot_for_observer(&ObserverView::Omniscient);
+    let player_ids = game
+        .player_inits()
+        .iter()
+        .map(|player| player.id)
+        .collect::<Vec<_>>();
+    let mut expected = game.snapshot_for_observer(&ObserverView::Players(player_ids));
     compact_snapshot_for_wire(&mut expected);
     assert_eq!(snapshot.tick, expected.tick);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);

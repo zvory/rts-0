@@ -1206,10 +1206,11 @@ reliable message.
 The server rejects unknown player ids, empty subsets, duplicate subset ids, active-player requests,
 and requests outside a privileged observer surface. Selection is per connection. `mode: "all"`
 uses the union of every active player's effective team fog, while `mode: "omniscient"` exposes the
-complete world and every owner's private details. Omniscient remains the default for live
-spectators, replay, dev-watch, and Lab. A selected single/multi-player view uses the real selected
-owners and their effective team fog. Owner-only details remain limited to explicitly selected
-owners, even when team fog reveals an ally.
+complete world and every owner's private details. The all-player union is the default for live
+spectators, replay, dev-watch, and Lab; omniscient remains available as an explicit selection. A
+selected single/multi-player view uses the real selected owners and their effective team fog.
+Owner-only details remain limited to explicitly selected owners, even when team fog reveals an
+ally.
 
 `LabClientOp` is tagged by `op`:
 ```
@@ -1238,7 +1239,7 @@ owners, even when team fog reveals an ally.
 { op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
 ```
 `LabVisionMode` remains compatibility metadata for authored Lab scenarios and the legacy
-`setVision` Lab operation. At runtime, `all` maps to the shared omniscient observer view and `team`
+`setVision` Lab operation. At runtime, `all` maps to the shared all-player union view and `team`
 maps to a shared selected-player view containing the current real players on that team. Unknown
 team selections are rejected. New UI selection uses `setVisionSelection`, just like live
 spectators, replay, and dev-watch. Each connection's shared observer view drives the snapshot body,

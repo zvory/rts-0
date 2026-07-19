@@ -156,6 +156,7 @@ pub(super) fn fanout_replay_snapshots(
     perf: Option<&mut rts_sim::perf::TickPerf>,
 ) {
     let full_vision_events = union_events(per_player_events.values());
+    let default_view = ObserverView::Players(session.active_player_ids());
     SnapshotFanout::new(
         room,
         scheduler_lag,
@@ -169,7 +170,7 @@ pub(super) fn fanout_replay_snapshots(
             observer_views
                 .get(&id)
                 .cloned()
-                .unwrap_or(ObserverView::Omniscient),
+                .unwrap_or_else(|| default_view.clone()),
         );
         let snapshot =
             projection.snapshot_with_events(session.game(), per_player_events, &full_vision_events);

@@ -280,7 +280,7 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     assert_eq!(session.speed(), ReplaySession::DEFAULT_SPEED);
     assert_eq!(
         task.observer_view_for(players[0].id),
-        rts_sim::game::ObserverView::Omniscient
+        rts_sim::game::ObserverView::Players(session.active_player_ids())
     );
     assert!(writer_a.snapshots.take().is_none());
     assert!(writer_b.snapshots.take().is_none());
