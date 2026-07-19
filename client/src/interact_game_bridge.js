@@ -110,7 +110,6 @@ export class InteractGameBridge {
       snapshotTick: snapshotApplied ? match.state.tick : null,
       playerId: match?.state?.playerId ?? null,
       role: match?.state?.spectator ? "spectator" : "player",
-      autoSpectatorEnabled: match?.autoSpectator?.enabled === true,
       phase,
       roomTime: projectRoomTime(match?.roomTimeControls?.roomTimeState),
       matchRunId: match?.matchRunId || "",

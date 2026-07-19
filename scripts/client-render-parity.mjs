@@ -337,25 +337,16 @@ async function captureWorktree({ browser, server, side, ticks, workload, options
       () => !!window.__rts?.match && window.__rts?.net?.frames?.length > 0,
       { timeout: 20_000 },
     );
-    await page.evaluate(() => {
+    const initialized = await page.evaluate(() => {
       const app = window.__rts;
       const net = app.net;
       if (net.timer !== null) net.clearTimeoutFn(net.timer);
       net.timer = null;
       window.__rtsParityLastSnapshot = null;
       net.on("snapshot", (snapshot) => { window.__rtsParityLastSnapshot = snapshot; });
-      window.__rtsParityPreviousMatch = app.match;
       net.restartFromBeginning();
       if (net.timer !== null) net.clearTimeoutFn(net.timer);
       net.timer = null;
-    });
-    await page.waitForFunction(
-      () => !!window.__rts?.match && window.__rts.match !== window.__rtsParityPreviousMatch,
-      { timeout: 20_000 },
-    );
-    const initialized = await page.evaluate(() => {
-      const app = window.__rts;
-      const net = app.net;
       const match = app.match;
       match.enterFixedCapture();
       match.captureClock.valueMs = 0;
@@ -437,24 +428,15 @@ async function captureWorktree({ browser, server, side, ticks, workload, options
 }
 
 async function resetCaptureFromBeginning(page) {
-  await page.evaluate(() => {
+  return page.evaluate(() => {
     const app = window.__rts;
     const net = app.net;
     app.match?.exitFixedCapture?.();
-    window.__rtsParityPreviousMatch = app.match;
     net.restartFromBeginning();
     if (net.timer !== null) net.clearTimeoutFn(net.timer);
     net.timer = null;
     window.__rtsParityLastSnapshot = null;
     window.__rtsParityNextFrame = 0;
-  });
-  await page.waitForFunction(
-    () => !!window.__rts?.match && window.__rts.match !== window.__rtsParityPreviousMatch,
-    { timeout: 20_000 },
-  );
-  return page.evaluate(() => {
-    const app = window.__rts;
-    const net = app.net;
     const match = app.match;
     match.enterFixedCapture();
     match.captureClock.valueMs = 0;

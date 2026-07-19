@@ -1,4 +1,3 @@
-import { gfxNoFill, gfxEllipse, gfxPoly, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
 
@@ -57,7 +56,9 @@ export class TrenchDecalLayer {
       return false;
     }
     this.ctx.imageSmoothingEnabled = false;
-    this.texture = this.pixi.Texture.from(this.canvas);
+    this.texture = this.pixi.Texture.from(this.canvas, {
+      scaleMode: this.pixi.SCALE_MODES?.NEAREST,
+    });
     this.sprite = new this.pixi.Sprite(this.texture);
     this.sprite.scale.set(this.downsample);
     this.layer.addChild(this.sprite);
@@ -120,11 +121,11 @@ export class TrenchDecalLayer {
       if (this.sprite.parent && typeof this.sprite.parent.removeChild === "function") {
         this.sprite.parent.removeChild(this.sprite);
       }
-      this.sprite.destroy?.({ texture: true, textureSource: true });
+      this.sprite.destroy?.({ texture: true, baseTexture: true });
       this.sprite = null;
     } else if (this.texture) {
       this.texture.destroy?.(true);
-      this.texture.source?.destroy?.();
+      this.texture.baseTexture?.destroy?.();
     }
     this.texture = null;
     if (this.ctx && this.canvas) {
@@ -211,30 +212,30 @@ export function drawOccupiedTrenchShadow(g, radius, seed = 1) {
   const rng = mulberry32(seed >>> 0);
   const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
 
-  gfxFill(g, COLORS.trenchShadow, 0.5);
-  gfxPoly(g, irregularLocalPolygon(r * 0.76, {
+  g.beginFill?.(COLORS.trenchShadow, 0.5);
+  g.drawPolygon?.(irregularLocalPolygon(r * 0.76, {
     points: 18,
     jitter: 0.18,
     rng,
     offsetX: r * 0.03,
     offsetY: r * 0.08,
   }));
-  gfxNoFill(g);
+  g.endFill?.();
 
-  gfxFill(g, COLORS.shadow, 0.2);
-  gfxEllipse(g, 0, r * 0.16, r * 0.68, r * 0.34);
-  gfxNoFill(g);
+  g.beginFill?.(COLORS.shadow, 0.2);
+  g.drawEllipse?.(0, r * 0.16, r * 0.68, r * 0.34);
+  g.endFill?.();
 
-  gfxStroke(g, Math.max(2, r * 0.22), COLORS.trenchRim, 0.6);
-  gfxPoly(g, irregularLocalPolygon(r * 0.96, {
+  g.lineStyle?.(Math.max(2, r * 0.22), COLORS.trenchRim, 0.6);
+  g.drawPolygon?.(irregularLocalPolygon(r * 0.96, {
     points: OCCUPIED_LIP_POINTS + 6,
     jitter: 0.1,
     rng,
     offsetY: r * 0.02,
   }));
 
-  gfxStroke(g, Math.max(1.5, r * 0.13), COLORS.trenchDirt, 0.54);
-  gfxPoly(g, irregularLocalPolygon(r * 0.86, {
+  g.lineStyle?.(Math.max(1.5, r * 0.13), COLORS.trenchDirt, 0.54);
+  g.drawPolygon?.(irregularLocalPolygon(r * 0.86, {
     points: OCCUPIED_LIP_POINTS + 4,
     jitter: 0.08,
     rng,
@@ -247,40 +248,40 @@ export function drawOccupiedTrenchLip(g, radius, seed = 1) {
   const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
   const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
 
-  gfxFill(g, COLORS.trenchRim, 0.94);
-  gfxPoly(g, arcBandPolygon(r * 1.1, r * 0.5, Math.PI * 0.06, Math.PI * 0.94, {
+  g.beginFill?.(COLORS.trenchRim, 0.94);
+  g.drawPolygon?.(arcBandPolygon(r * 1.1, r * 0.5, Math.PI * 0.06, Math.PI * 0.94, {
     points: OCCUPIED_LIP_POINTS,
     jitter: 0.12,
     rng,
     offsetY: r * 0.08,
   }));
-  gfxNoFill(g);
+  g.endFill?.();
 
-  gfxFill(g, COLORS.trenchDirt, 0.92);
-  gfxPoly(g, arcBandPolygon(r * 0.98, r * 0.58, Math.PI * 0.11, Math.PI * 0.89, {
+  g.beginFill?.(COLORS.trenchDirt, 0.92);
+  g.drawPolygon?.(arcBandPolygon(r * 0.98, r * 0.58, Math.PI * 0.11, Math.PI * 0.89, {
     points: OCCUPIED_LIP_POINTS - 2,
     jitter: 0.1,
     rng,
     offsetY: r * 0.09,
   }));
-  gfxNoFill(g);
+  g.endFill?.();
 
-  gfxFill(g, COLORS.trenchShadow, 0.34);
-  gfxPoly(g, arcBandPolygon(r * 0.7, r * 0.5, Math.PI * 0.12, Math.PI * 0.88, {
+  g.beginFill?.(COLORS.trenchShadow, 0.34);
+  g.drawPolygon?.(arcBandPolygon(r * 0.7, r * 0.5, Math.PI * 0.12, Math.PI * 0.88, {
     points: OCCUPIED_LIP_POINTS - 3,
     jitter: 0.08,
     rng,
     offsetY: r * 0.06,
   }));
-  gfxNoFill(g);
+  g.endFill?.();
 
-  gfxStroke(g, 2, COLORS.trenchDirtLight, 0.42);
+  g.lineStyle?.(2, COLORS.trenchDirtLight, 0.42);
   for (let i = 0; i < 4; i += 1) {
     const angle = Math.PI * (0.18 + rng() * 0.64);
     const inner = r * (0.6 + rng() * 0.08);
     const outer = r * (0.96 + rng() * 0.1);
-    gfxMove(g, Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08);
-    gfxLine(g, Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08);
+    g.moveTo?.(Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08);
+    g.lineTo?.(Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08);
   }
 }
 
@@ -490,5 +491,5 @@ function colorCss(color, alpha = 1) {
 
 function updateTexture(texture) {
   if (typeof texture?.update === "function") texture.update();
-  else texture?.source?.update?.();
+  else texture?.baseTexture?.update?.();
 }

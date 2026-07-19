@@ -71,7 +71,7 @@ export class StressTestRunner {
           await waitForForeground();
         }
 
-        const attempt = await this.restartWorkloadAttempt();
+        const attempt = this.restartWorkloadAttempt();
         this.setState("warmup");
         this.renderStatus(`Warming up for ${this.launch.warmupSeconds} seconds…`);
         const refreshPromise = estimateRefreshRate();
@@ -172,17 +172,11 @@ export class StressTestRunner {
     }
   }
 
-  async restartWorkloadAttempt() {
+  restartWorkloadAttempt() {
     if (typeof this.net?.restartFromBeginning !== "function") {
       throw new Error("The stress-test workload cannot be restarted.");
     }
-    const previousGeneration = this.matchGeneration;
     this.net.restartFromBeginning();
-    const restartDeadline = Date.now() + 20_000;
-    while (this.matchGeneration === previousGeneration && Date.now() < restartDeadline) await delay(0);
-    if (this.matchGeneration === previousGeneration) {
-      throw new Error("The stress-test match did not restart in time.");
-    }
     if (!this.match) throw new Error("The stress-test match could not be initialized.");
     return { match: this.match, generation: this.matchGeneration };
   }

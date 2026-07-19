@@ -46,16 +46,10 @@ const FEEDBACK_SINGLETON_TYPES = Object.freeze({
  * for each new immutable frame and are never exposed to another backend.
  */
 export class PixiPresentationAdapter {
-  static async create(canvasParent, sources) {
-    const renderer = await Renderer.create(canvasParent, { renderClock: sources?.renderClock });
-    return new PixiPresentationAdapter(canvasParent, sources, { renderer });
-  }
-
   constructor(canvasParent, sources, { renderer = null } = {}) {
     this.id = "pixi";
     this._sources = sources || {};
-    if (!renderer) throw new TypeError("PixiPresentationAdapter.create() must prepare the renderer.");
-    this._renderer = renderer;
+    this._renderer = renderer || new Renderer(canvasParent, { renderClock: this._sources.renderClock });
     this._lastFrame = null;
     this._lastView = null;
     this._staticMapRevision = null;
@@ -116,10 +110,6 @@ export class PixiPresentationAdapter {
 
   resize(widthCssPx, heightCssPx) {
     this._renderer.resize(widthCssPx, heightCssPx);
-  }
-
-  setRenderClock(renderClock) {
-    this._renderer.setRenderClock(renderClock);
   }
 
   enterFixedCapture(renderClock) {

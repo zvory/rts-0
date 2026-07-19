@@ -73,7 +73,9 @@ export function makeRigRenderer() {
       return graphic;
     },
     _shadow(g, cx, cy, radius) {
-      g.ellipse(cx, cy + radius * 0.35, radius, radius * 0.6).fill({ color: 0x000000, alpha: 0.28 });
+      g.beginFill(0x000000, 0.28);
+      g.drawEllipse(cx, cy + radius * 0.35, radius, radius * 0.6);
+      g.endFill();
     },
     _vehicleShadow() {
       throw new Error("worker comparison test should not draw vehicle shadow");
@@ -91,9 +93,9 @@ export function makeRigRenderer() {
 }
 
 export function fakeAtlasTexture() {
-  return { source: { id: "fake-tank-atlas" } };
+  return { baseTexture: { id: "fake-tank-atlas" } };
 }
 
 export function fakeFrameStripTexture() {
-  return { source: { id: "fake-rifleman-strip" } };
+  return { baseTexture: { id: "fake-rifleman-strip" } };
 }

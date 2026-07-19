@@ -140,9 +140,6 @@ try {
       },
     },
     setAutoSpectatorEnabled(enabled) { autoSpectatorEnabled = enabled; },
-    autoSpectator: {
-      get enabled() { return autoSpectatorEnabled; },
-    },
     camera: {
       snapshot: () => ({ version: 1, focus: { x: 0, y: 0 }, framingScale: 1, boundsPolicy: "mapOverscroll" }),
       projectionSnapshot: () => ({ viewport: { widthCssPx: 1000, heightCssPx: 700 } }),
@@ -167,7 +164,6 @@ try {
 
   assert.equal(bridge.status().ready, true, "an authoritative isolated match makes the game bridge ready");
   assert.equal(bridge.status().role, "player", "status identifies the controlled-player launch");
-  assert.equal(bridge.status().autoSpectatorEnabled, true, "status projects the active fight-following director state");
   const inspection = bridge.inspect();
   assert.deepEqual(inspection.entities.map(({ id }) => id), [10], "inspection defaults to locally owned entities");
   assert.equal(inspection.entities[0].controllable, true, "inspection labels movable local units");

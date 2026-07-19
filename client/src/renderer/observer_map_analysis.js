@@ -1,4 +1,3 @@
-import { gfxNoFill, gfxCircle, gfxPoly, gfxRect, gfxLine, gfxMove, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import { finiteNumber } from "./shared.js";
 
 const LABEL_MAX_LENGTH = 36;
@@ -7,7 +6,8 @@ const LABEL_STYLE = Object.freeze({
   fontSize: 12,
   fontWeight: "800",
   fill: 0xe7dfc5,
-  stroke: { color: 0x0f1115, width: 3 },
+  stroke: 0x0f1115,
+  strokeThickness: 3,
   align: "center",
 });
 const DEFAULT_COMPONENT_FILL = 0x3da5d9;
@@ -21,7 +21,7 @@ export function _drawObserverMapAnalysisOverlay(model, { camera = null } = {}) {
   const hitLayer = this._observerMapAnalysisHitLayer;
   if (!gfx || !labelLayer) return 0;
 
-  gfxReset(gfx.clear());
+  gfx.clear();
   const analysis = normalizeMapAnalysis(model?.analysis);
   if (!analysis) {
     sweepLabels(this._observerMapAnalysisLabelPool, labelLayer, new Set());
@@ -104,33 +104,33 @@ function drawTileRect(g, primitive, tileSize, lineWidth) {
   const h = primitive.tileH * tileSize;
   const fill = hexToInt(primitive.fill, DEFAULT_COMPONENT_FILL);
   const stroke = hexToInt(primitive.stroke, fill);
-  gfxStroke(g, lineWidth, stroke, 0.72);
-  gfxFill(g, fill, clamp(primitive.alpha, 0.04, 0.32));
-  gfxRect(g, x, y, w, h);
-  gfxNoFill(g);
+  g.lineStyle(lineWidth, stroke, 0.72);
+  g.beginFill(fill, clamp(primitive.alpha, 0.04, 0.32));
+  g.drawRect(x, y, w, h);
+  g.endFill();
 }
 
 function drawMarker(g, primitive, lineWidth) {
   const color = hexToInt(primitive.color, DEFAULT_MARKER_COLOR);
   const radius = clamp(primitive.radius, 4, 96);
   const stroke = Math.max(lineWidth, 2);
-  gfxStroke(g, stroke, 0x0f1115, 0.9);
-  gfxFill(g, color, 0.82);
+  g.lineStyle(stroke, 0x0f1115, 0.9);
+  g.beginFill(color, 0.82);
   if (primitive.shape === "diamond") {
-    gfxPoly(g, [
+    g.drawPolygon([
       primitive.x, primitive.y - radius,
       primitive.x + radius, primitive.y,
       primitive.x, primitive.y + radius,
       primitive.x - radius, primitive.y,
     ]);
   } else if (primitive.shape === "square") {
-    gfxRect(g, primitive.x - radius, primitive.y - radius, radius * 2, radius * 2);
+    g.drawRect(primitive.x - radius, primitive.y - radius, radius * 2, radius * 2);
   } else {
-    gfxCircle(g, primitive.x, primitive.y, radius);
+    g.drawCircle(primitive.x, primitive.y, radius);
   }
-  gfxNoFill(g);
-  gfxStroke(g, Math.max(1, lineWidth), color, 0.95);
-  gfxCircle(g, primitive.x, primitive.y, radius + 3);
+  g.endFill();
+  g.lineStyle(Math.max(1, lineWidth), color, 0.95);
+  g.drawCircle(primitive.x, primitive.y, radius + 3);
 }
 
 function drawLine(g, primitive, lineWidth) {
@@ -139,11 +139,11 @@ function drawLine(g, primitive, lineWidth) {
   drawLineBody(g, primitive, width + Math.max(4, lineWidth * 2), 0x0f1115, 0.74);
   drawLineBody(g, primitive, width, color, clamp(primitive.alpha, 0.08, 1.0));
   const endRadius = Math.max(3.5, lineWidth * 3);
-  gfxStroke(g, Math.max(1.5, lineWidth), 0x0f1115, 0.82);
-  gfxFill(g, color, clamp(primitive.alpha, 0.22, 1.0));
-  gfxCircle(g, primitive.x1, primitive.y1, endRadius);
-  gfxCircle(g, primitive.x2, primitive.y2, endRadius);
-  gfxNoFill(g);
+  g.lineStyle(Math.max(1.5, lineWidth), 0x0f1115, 0.82);
+  g.beginFill(color, clamp(primitive.alpha, 0.22, 1.0));
+  g.drawCircle(primitive.x1, primitive.y1, endRadius);
+  g.drawCircle(primitive.x2, primitive.y2, endRadius);
+  g.endFill();
 }
 
 function drawLineBody(g, primitive, width, color, alpha) {
@@ -151,23 +151,23 @@ function drawLineBody(g, primitive, width, color, alpha) {
   const dy = primitive.y2 - primitive.y1;
   const len = Math.hypot(dx, dy);
   if (!Number.isFinite(len) || len <= 0.01) {
-    gfxStroke(g, 0, 0x000000, 0);
-    gfxFill(g, color, alpha);
-    gfxCircle(g, primitive.x1, primitive.y1, Math.max(2, width * 0.5));
-    gfxNoFill(g);
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(color, alpha);
+    g.drawCircle(primitive.x1, primitive.y1, Math.max(2, width * 0.5));
+    g.endFill();
     return;
   }
   const nx = -dy / len * width * 0.5;
   const ny = dx / len * width * 0.5;
-  gfxStroke(g, 0, 0x000000, 0);
-  gfxFill(g, color, alpha);
-  gfxPoly(g, [
+  g.lineStyle(0, 0x000000, 0);
+  g.beginFill(color, alpha);
+  g.drawPolygon([
     primitive.x1 + nx, primitive.y1 + ny,
     primitive.x2 + nx, primitive.y2 + ny,
     primitive.x2 - nx, primitive.y2 - ny,
     primitive.x1 - nx, primitive.y1 - ny,
   ]);
-  gfxNoFill(g);
+  g.endFill();
 }
 
 function drawLabel(renderer, id, text, x, y, color, camera, seen) {
@@ -211,7 +211,7 @@ function drawHitArea(renderer, id, primitive, tileSize, lineWidth, camera, seen)
     renderer._recordRenderDiagnostic?.("renderer.observerMapAnalysis.hit.created");
   }
 
-  gfxReset(hit.clear());
+  hit.clear();
   hit.visible = true;
   hit._observerTooltip = primitive.tooltip;
   hit._observerTooltipX = tooltipX(primitive, tileSize);
@@ -229,18 +229,18 @@ function drawHitArea(renderer, id, primitive, tileSize, lineWidth, camera, seen)
     const y = primitive.tileY * tileSize;
     const w = primitive.tileW * tileSize;
     const h = primitive.tileH * tileSize;
-    gfxFill(hit, color, 0.001);
-    gfxRect(hit, x, y, w, h);
-    gfxNoFill(hit);
+    hit.beginFill(color, 0.001);
+    hit.drawRect(x, y, w, h);
+    hit.endFill();
   } else if (primitive.kind === "marker") {
     const radius = clamp(primitive.radius + 10 / Math.max(hit._observerTooltipScale, 0.5), 8, 112);
-    gfxFill(hit, color, 0.001);
-    gfxCircle(hit, primitive.x, primitive.y, radius);
-    gfxNoFill(hit);
+    hit.beginFill(color, 0.001);
+    hit.drawCircle(primitive.x, primitive.y, radius);
+    hit.endFill();
   } else if (primitive.kind === "line") {
-    gfxStroke(hit, Math.max(12, lineWidth * 8), color, 0.001);
-    gfxMove(hit, primitive.x1, primitive.y1);
-    gfxLine(hit, primitive.x2, primitive.y2);
+    hit.lineStyle(Math.max(12, lineWidth * 8), color, 0.001);
+    hit.moveTo(primitive.x1, primitive.y1);
+    hit.lineTo(primitive.x2, primitive.y2);
   }
   seen.add(id);
 }

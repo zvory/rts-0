@@ -1,4 +1,3 @@
-import { gfxNoFill, gfxCircle, gfxLine, gfxMove, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
@@ -46,7 +45,7 @@ export function drawArtilleryFireTargetPreview(g, preview, map) {
       finiteNumber(lock.rawY) &&
       Math.hypot(lock.rawX - lock.x, lock.rawY - lock.y) > 1
     ) {
-      gfxStroke(g, 1.5, 0xffd15c, 0.48);
+      g.lineStyle(1.5, 0xffd15c, 0.48);
       dashedLine(g, lock.rawX, lock.rawY, lock.x, lock.y, 8, 6);
     }
     drawLockedArtilleryTarget(g, lock.x, lock.y, radiusPx, targetColor, preview.ability);
@@ -66,17 +65,17 @@ function drawLockedArtilleryTarget(g, x, y, radiusPx, color, ability) {
   const markerRadius = ability === ABILITY.BLANKET_FIRE
     ? Math.max(18, radiusPx)
     : Math.max(18, radiusPx || 24);
-  gfxStroke(g, 2, color, 0.95);
+  g.lineStyle(2, color, 0.95);
   drawDashedCircle(g, x, y, markerRadius, ability === ABILITY.BLANKET_FIRE ? 36 : 18);
-  gfxFill(g, color, 0.14);
-  gfxCircle(g, x, y, ability === ABILITY.BLANKET_FIRE ? 7 : Math.min(18, markerRadius));
-  gfxNoFill(g);
-  gfxStroke(g, 2, color, 0.85);
+  g.beginFill(color, 0.14);
+  g.drawCircle(x, y, ability === ABILITY.BLANKET_FIRE ? 7 : Math.min(18, markerRadius));
+  g.endFill();
+  g.lineStyle(2, color, 0.85);
   const arm = ability === ABILITY.BLANKET_FIRE ? 13 : Math.min(18, markerRadius * 0.45);
-  gfxMove(g, x - arm, y);
-  gfxLine(g, x + arm, y);
-  gfxMove(g, x, y - arm);
-  gfxLine(g, x, y + arm);
+  g.moveTo(x - arm, y);
+  g.lineTo(x + arm, y);
+  g.moveTo(x, y - arm);
+  g.lineTo(x, y + arm);
 }
 
 function drawDashedCircle(g, x, y, radius, segments) {
@@ -85,7 +84,7 @@ function drawDashedCircle(g, x, y, radius, segments) {
   for (let i = 0; i < count; i += 1) {
     const a0 = (i / count) * Math.PI * 2;
     const a1 = ((i + 0.5) / count) * Math.PI * 2;
-    gfxMove(g, x + Math.cos(a0) * radius, y + Math.sin(a0) * radius);
-    gfxLine(g, x + Math.cos(a1) * radius, y + Math.sin(a1) * radius);
+    g.moveTo(x + Math.cos(a0) * radius, y + Math.sin(a0) * radius);
+    g.lineTo(x + Math.cos(a1) * radius, y + Math.sin(a1) * radius);
   }
 }
