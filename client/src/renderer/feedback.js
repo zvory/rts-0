@@ -362,7 +362,9 @@ export function _drawAntiTankGunSetupPreview(view) {
   if (!preview || !Array.isArray(preview.guns)) return;
   for (const e of preview.guns) {
     if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
-    const facing = Math.atan2(preview.mouseY - e.y, preview.mouseX - e.x);
+    const aimX = finiteNumber(e.setupAimX) ? e.setupAimX : preview.mouseX;
+    const aimY = finiteNumber(e.setupAimY) ? e.setupAimY : preview.mouseY;
+    const facing = Math.atan2(aimY - e.y, aimX - e.x);
     if (!Number.isFinite(facing)) continue;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
     if (!weapon) continue;

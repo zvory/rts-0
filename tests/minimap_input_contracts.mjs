@@ -2,6 +2,7 @@
 // These cover the pointer-lock virtual-cursor path without launching a browser.
 
 import { MatchInputRouter } from "../client/src/input/router.js";
+import { supportWeaponSetupTargets } from "../client/src/input/support_weapon_setup_targeting.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { CommandInteraction } from "../client/src/command_interaction.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
@@ -895,16 +896,21 @@ function pointerEvent(canvas, clientX, clientY, {
   ];
   const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
   assert(h.router.pointerDown(lockedEvent(200, 300, 0)), "setup minimap click is consumed");
-  assert(h.net.sent.length === 1, "setup minimap click sends one command");
-  assert(h.net.sent[0].c === "setupAntiTankGuns", "setup minimap click sends setupAntiTankGuns");
+  assert(h.net.sent.length === 2, "distant mixed setup sends an individualized AT ray and one shared support-weapon command");
+  assert(h.net.sent.every((command) => command.c === "setupAntiTankGuns"), "setup minimap click sends setupAntiTankGuns commands");
+  const antiTankCommand = h.net.sent.find((command) => command.units.includes(31));
+  const otherSupportCommand = h.net.sent.find((command) => command.units.includes(32));
   assert(
-    h.net.sent[0].units.includes(31) &&
-      h.net.sent[0].units.includes(32) &&
-      h.net.sent[0].units.includes(33),
-    "setup minimap click includes support weapons",
+    antiTankCommand?.units.length === 1 &&
+      otherSupportCommand?.units.includes(32) &&
+      otherSupportCommand?.units.includes(33),
+    "setup minimap click separates the AT gun from artillery and mortar setup",
   );
-  assertApprox(h.net.sent[0].x, 100, 0.001, "setup minimap command x");
-  assertApprox(h.net.sent[0].y, 100, 0.001, "setup minimap command y");
+  const effectiveTarget = supportWeaponSetupTargets(selected, { x: 100, y: 100 }, 1)[0];
+  assertApprox(antiTankCommand.x, effectiveTarget.x, 0.001, "setup minimap AT command x");
+  assertApprox(antiTankCommand.y, effectiveTarget.y, 0.001, "setup minimap AT command y");
+  assertApprox(otherSupportCommand.x, 100, 0.001, "other support weapons retain the literal setup x");
+  assertApprox(otherSupportCommand.y, 100, 0.001, "other support weapons retain the literal setup y");
   assert(h.clientIntent.commandTarget === null, "setup minimap click exits target mode");
   h.minimap.destroy();
 }

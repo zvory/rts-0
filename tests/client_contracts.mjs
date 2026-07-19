@@ -29,6 +29,7 @@ await import("./client_contracts/renderer_feedback_contracts.mjs");
 await import("./client_contracts/input_contracts.mjs");
 await import("./client_contracts/ability_hotkey_targeting_contracts.mjs");
 await import("./client_contracts/artillery_targeting_contracts.mjs");
+await import("./client_contracts/support_weapon_setup_targeting_contracts.mjs");
 await import("./client_contracts/match_shell_contracts.mjs");
 await import("./client_contracts/match_notice_presenter_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");

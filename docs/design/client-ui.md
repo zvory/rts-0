@@ -1136,7 +1136,15 @@ accepted move or attack-move order-plan endpoints as their field-of-fire origin,
 move/setup stages when the command has been sent but no owner-only `orderPlan` echo has arrived;
 unqueued setup previews use the current support-weapon position. Minimap hover and click targeting
 feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns,
-Mortar Teams, and Artillery. The input router owns the active preview surface: while the minimap is hovered it
+Mortar Teams, and Artillery. Anti-Tank Gun group setup interprets cursor distance from the selected
+guns' centroid as a formation-facing control: clicks through 14 tiles converge on the literal
+point; from 14 to 20 tiles a smoothstep interpolation straightens the guns until their facings are
+parallel; from 20 to 25 tiles a second smoothstep opens a lateral-rank fan that reaches 90 degrees
+total (leftmost −45 degrees, median straight ahead, rightmost +45 degrees). The client submits one
+individualized facing ray per Anti-Tank Gun whenever exact parallel or fan angles require it, while
+Mortar Teams and Artillery in a mixed selection retain the literal clicked setup point. Viewport and
+minimap previews use those same computed rays as the issued commands. The input router owns the
+active preview surface: while the minimap is hovered it
 suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
 hiding minimap-authored setup cones or issued-command feedback. HUD command-target arming preserves
 Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
