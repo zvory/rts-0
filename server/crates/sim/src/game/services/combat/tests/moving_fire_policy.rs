@@ -414,3 +414,84 @@ fn assert_range_near(actual: f32, expected: f32) {
         "expected range {expected}, got {actual}"
     );
 }
+
+#[test]
+fn reloading_attack_move_acquires_once_then_keeps_its_committed_target() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let committed = entities
+        .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
+        .expect("initial target should spawn");
+    let committed_hp = entities
+        .get(committed)
+        .expect("initial target should exist")
+        .hp;
+    if let Some(tank) = entities.get_mut(attacker) {
+        tank.set_order(Order::attack_move_to(600.0, 100.0));
+        tank.set_path(vec![(600.0, 100.0)]);
+        tank.set_path_goal(Some((600.0, 100.0)));
+        tank.mark_move_phase(MovePhase::Moving);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCannon, 10);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
+    }
+
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(attacker).and_then(|entity| entity.target_id()),
+        Some(committed),
+        "a travelling attack-move should notice an in-range target during reload"
+    );
+    assert_eq!(
+        entities.get(committed).map(|target| target.hp),
+        Some(committed_hp),
+        "acquisition during reload must not fire early"
+    );
+
+    entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 100.0)
+        .expect("higher-priority target should spawn");
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(attacker).and_then(|entity| entity.target_id()),
+        Some(committed),
+        "reload ticks should retain the committed target without reranking"
+    );
+}
+
+#[test]
+fn reloading_attack_move_resumes_instead_of_replacing_an_invalid_committed_target() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let stale = entities
+        .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
+        .expect("initial target should spawn");
+    entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 100.0)
+        .expect("replacement target should spawn");
+    if let Some(tank) = entities.get_mut(attacker) {
+        tank.set_order(Order::attack_move_to(600.0, 100.0));
+        tank.set_target_id(Some(stale));
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCannon, 10);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
+    }
+    entities.remove(stale);
+
+    run_combat_tick(&mut entities);
+
+    let attacker = entities.get(attacker).expect("tank should remain alive");
+    assert_eq!(
+        attacker.target_id(),
+        None,
+        "a stopped attack-move must not rerank during reload after losing its target"
+    );
+    assert!(
+        !attacker.path_is_empty(),
+        "losing the committed target should resume the attack-move route"
+    );
+}

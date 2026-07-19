@@ -1,4 +1,4 @@
-use crate::game::entity::{Entity, EntityStore};
+use crate::game::entity::{Entity, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
@@ -98,6 +98,13 @@ pub(super) fn select(
     let ready = entities
         .get(id)
         .is_some_and(|entity| entity.weapon_cooldown(weapon) == 0);
+    let travelling_attack_move = !is_mortar_team
+        && mode == CombatMode::Aggressive
+        && entities.get(id).is_some_and(|entity| {
+            matches!(entity.order(), Order::AttackMove(_))
+                && entity.target_id().is_none()
+                && !entity.path_is_empty()
+        });
     let target_filter = |target_id| {
         (!is_mortar_team
             || super::mortar_autocast_target_eligible(
@@ -131,7 +138,7 @@ pub(super) fn select(
         ready,
         &target_filter,
     );
-    if !ready || retained.is_some() {
+    if retained.is_some() || (!ready && !travelling_attack_move) {
         return retained;
     }
     acquire(
