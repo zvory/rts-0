@@ -1946,7 +1946,7 @@ fn deployed_anti_tank_gun_fires_inside_its_cone_without_slewing() {
 }
 
 #[test]
-fn deployed_anti_tank_gun_drops_an_outside_retained_tank_for_an_inside_scout_car() {
+fn deployed_anti_tank_gun_drops_an_outside_retained_tank_for_an_inside_command_car() {
     let map = open_map(16);
     let mut entities = EntityStore::new();
     let at_id = entities
@@ -1962,19 +1962,18 @@ fn deployed_anti_tank_gun_drops_an_outside_retained_tank_for_an_inside_scout_car
         )
         .expect("enemy tank should spawn");
     let scout_angle = 10.0_f32.to_radians();
-    let scout_car = entities
+    let command_car = entities
         .spawn_unit(
             2,
-            EntityKind::ScoutCar,
+            EntityKind::CommandCar,
             100.0 + 180.0 * scout_angle.cos(),
             100.0 + 180.0 * scout_angle.sin(),
         )
-        .expect("enemy scout car should spawn");
-    if let Some(scout) = entities.get_mut(scout_car) {
-        scout.hp = 101;
-        scout.max_hp = 101;
-    }
-    let scout_hp = entities.get(scout_car).expect("scout car should exist").hp;
+        .expect("enemy command car should spawn");
+    let command_car_hp = entities
+        .get(command_car)
+        .expect("command car should exist")
+        .hp;
     entities
         .get_mut(retained_tank)
         .expect("enemy tank should exist")
@@ -1996,12 +1995,16 @@ fn deployed_anti_tank_gun_drops_an_outside_retained_tank_for_an_inside_scout_car
     let at = entities.get(at_id).expect("anti-tank gun should exist");
     assert_eq!(
         at.target_id(),
-        Some(scout_car),
-        "an in-cone scout car should replace a retained tank outside the deployed cone"
+        Some(command_car),
+        "an in-cone command car should replace a retained tank outside the deployed cone"
     );
     assert!(
-        entities.get(scout_car).expect("scout car should exist").hp < scout_hp,
-        "the in-cone scout car should be fired on immediately"
+        entities
+            .get(command_car)
+            .expect("command car should exist")
+            .hp
+            < command_car_hp,
+        "the in-cone command car should be fired on immediately"
     );
     assert!(
         at.facing().abs() <= 0.001,
@@ -2365,8 +2368,7 @@ fn deployed_anti_tank_gun_traverses_until_an_outside_target_enters_its_cone() {
     let half_cone = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
     let turn_to_cone_entry = target_angle - half_cone;
     let ticks_to_cone_entry =
-        (turn_to_cone_entry / config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK).ceil()
-            as u32;
+        (turn_to_cone_entry / config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK).ceil() as u32;
     for _ in 0..=ticks_to_cone_entry {
         run_combat_tick_on_map(
             &mut entities,

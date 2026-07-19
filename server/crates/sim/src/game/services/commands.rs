@@ -729,7 +729,8 @@ mod planned_actions {
                                 player,
                                 &[unit],
                                 target,
-                            ) {
+                            )
+                        {
                             if let Some(e) = entities.get_mut(unit) {
                                 e.clear_queued_orders();
                             }
