@@ -35,7 +35,8 @@ fn scenario_starts_on_the_failure_boundary() {
         .expect("Tank cannon profile should exist");
     let dx = target.pos_x - attacker.pos_x;
     let dy = target.pos_y - attacker.pos_y;
-    let current_range = (cannon.range_tiles + 1) as f32 * config::TILE_SIZE as f32;
+    let current_range =
+        cannon.range_tiles as f32 * config::TILE_SIZE as f32 + attacker.radius();
     assert!(
         dx * dx + dy * dy < current_range * current_range,
         "target must begin inside the moving Tank's current cannon range"

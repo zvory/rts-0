@@ -25,22 +25,27 @@ impl Game {
 
         let tile_size = config::TILE_SIZE as f32;
         let attacker_pos = map.tile_center(start_tile.0, start_tile.1);
-        // The target begins inside the moving Tank's current 5-tile cannon range once the
-        // attacker's body-radius allowance is included, while still leaving a clear visual gap.
-        let target_pos = (attacker_pos.0 + tile_size * 5.25, attacker_pos.1);
         let goal = (attacker_pos.0 + tile_size * 12.0, attacker_pos.1);
 
         let mut entities = EntityStore::new();
         let attacker = entities
             .spawn_unit(1, EntityKind::Tank, attacker_pos.0, attacker_pos.1)
             .ok_or_else(|| "failed to spawn attack-move reload Tank".to_string())?;
+        let cannon = combat::weapon_profile(WeaponKind::TankCannon)
+            .ok_or_else(|| "missing Tank cannon profile".to_string())?;
+        let attacker_radius = entities
+            .get(attacker)
+            .ok_or_else(|| "attack-move reload Tank disappeared during setup".to_string())?
+            .radius();
+        // Stay inside the current moving-range boundary without relying on a duplicated balance
+        // value. Half the attacker's range allowance leaves a visible gap and a stable margin.
+        let target_distance = cannon.range_tiles as f32 * tile_size + attacker_radius * 0.5;
+        let target_pos = (attacker_pos.0 + target_distance, attacker_pos.1);
         let target = entities
             .spawn_unit(2, EntityKind::Tank, target_pos.0, target_pos.1)
             .ok_or_else(|| "failed to spawn attack-move reload target".to_string())?;
 
-        let reload_ticks = combat::weapon_profile(WeaponKind::TankCannon)
-            .ok_or_else(|| "missing Tank cannon profile".to_string())?
-            .cooldown;
+        let reload_ticks = cannon.cooldown;
         let issue_after_ticks = config::TICK_HZ * 10;
         let initial_cooldown = issue_after_ticks.saturating_add(reload_ticks);
         if let Some(entity) = entities.get_mut(attacker) {
@@ -68,22 +73,6 @@ impl Game {
             seed,
             "dev:attack_move_reload_acquisition",
         );
-        if let Some(player) = game
-            .state
-            .players
-            .iter_mut()
-            .find(|player| player.id == player_id)
-        {
-            player.refund_resources(0, 1_000);
-        }
-        if let Some(loadout) = game
-            .state
-            .starting_loadouts
-            .iter_mut()
-            .find(|loadout| loadout.player_id == player_id)
-        {
-            loadout.starting_oil = 1_000;
-        }
         game.state.lab_god_mode_players.insert(2);
         game.sync_lab_god_mode_flags();
 
