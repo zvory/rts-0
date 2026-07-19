@@ -751,7 +751,11 @@ fn is_attack_command(command: &rts_sim::game::command::SimCommand) -> bool {
 }
 
 fn is_harass_command(command: &rts_sim::game::command::SimCommand) -> bool {
-    matches!(command, rts_sim::game::command::SimCommand::Move { .. })
+    matches!(
+        command,
+        rts_sim::game::command::SimCommand::Move { .. }
+            | rts_sim::game::command::SimCommand::FormationMove { .. }
+    )
 }
 
 fn write_replay_artifact(
@@ -1006,10 +1010,9 @@ mod tests {
         collector.observe_command(
             125,
             1,
-            &SimCommand::Move {
+            &SimCommand::FormationMove {
                 units: vec![3],
-                x: 600.0,
-                y: 600.0,
+                points: vec![(500.0, 600.0), (600.0, 600.0)],
                 queued: false,
             },
             &snapshot,
