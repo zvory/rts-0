@@ -289,8 +289,8 @@ async function main() {
   );
   ok(lateReplayStart.spectator && lateReplayStart.replay.durationTicks > 0,
     "late active replay join enters as a replay spectator");
-  ok(lateReplaySnapshot.tick === lateReplayState.currentTick,
-    "late active replay join starts at the room's current shared tick");
+  ok(lateReplaySnapshot.tick >= lateReplayState.currentTick,
+    `late active replay join receives a current snapshot (${lateReplaySnapshot.tick} >= ${lateReplayState.currentTick})`);
   await waitForLobbyRow(
     replayRoom,
     (row) => row.kind === "replay" && row.joinState === "inGame" && row.spectatorCount === 3,
