@@ -7,7 +7,7 @@ use crate::game::teams::TeamRelations;
 use super::acquisition::{resolve_target, CombatMode};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::auto_target_legality;
-use super::weapons::anti_tank_gun_target_inside_field_of_fire;
+use super::weapons::auto_retention_target_inside_field_of_fire;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn acquire(
@@ -213,13 +213,11 @@ fn retained_target(
 
     let target_id = attacker.target_id()?;
     let target = entities.get(target_id)?;
-    if attacker.kind == crate::game::entity::EntityKind::AntiTankGun {
-        let target_angle = (target.pos_y - py).atan2(target.pos_x - px);
-        if !anti_tank_gun_target_inside_field_of_fire(attacker, target_angle) {
-            // A retained automatic target must not prevent acquisition of a new target that is
-            // still inside the gun's fixed deployed field.
-            return None;
-        }
+    let target_angle = (target.pos_y - py).atan2(target.pos_x - px);
+    if !auto_retention_target_inside_field_of_fire(attacker, target_angle) {
+        // A retained automatic target must not prevent acquisition of a new target that is still
+        // inside the gun's fixed deployed field.
+        return None;
     }
     let legality = auto_target_legality(
         map,

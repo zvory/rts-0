@@ -276,6 +276,11 @@ pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle
     angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
+/// Automatic retention only constrains deployed anti-tank guns to their fixed firing field.
+pub(super) fn auto_retention_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+    e.kind != EntityKind::AntiTankGun || anti_tank_gun_target_inside_field_of_fire(e, target_angle)
+}
+
 fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
     if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return target_angle;
