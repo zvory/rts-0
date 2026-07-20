@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn deployed_anti_tank_gun_clamps_to_field_edge_and_does_not_fire_outside_arc() {
+fn deployed_anti_tank_gun_does_not_turn_or_fire_at_target_outside_arc() {
     let mut entities = EntityStore::new();
     let at_id = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
@@ -22,10 +22,9 @@ fn deployed_anti_tank_gun_clamps_to_field_edge_and_does_not_fire_outside_arc() {
     }
 
     let at = entities.get(at_id).expect("at should exist");
-    let edge = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
     assert!(
-        (at.facing() - edge).abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "anti-tank gun should clamp to the nearest arc edge, got {:.4}",
+        at.facing().abs() <= 0.001,
+        "anti-tank gun should not turn toward a target outside its fixed arc, got {:.4}",
         at.facing()
     );
     assert_eq!(

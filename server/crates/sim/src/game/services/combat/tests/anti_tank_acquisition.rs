@@ -92,6 +92,39 @@ fn deployed_anti_tank_gun_auto_acquisition_skips_out_of_arc_priority_target() {
 }
 
 #[test]
+fn deployed_anti_tank_gun_does_not_acquire_when_only_target_is_outside_fixed_arc() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Tank, 100.0, 300.0)
+        .expect("enemy tank should spawn");
+    if let Some(at) = entities.get_mut(anti_tank_gun) {
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities
+            .get(anti_tank_gun)
+            .expect("anti-tank gun should exist")
+            .target_id(),
+        None,
+        "a fixed deployed gun must not acquire targets it cannot engage"
+    );
+}
+
+#[test]
 fn deployed_anti_tank_gun_drops_retained_target_that_leaves_fixed_arc() {
     let map = open_map(16);
     let mut entities = EntityStore::new();

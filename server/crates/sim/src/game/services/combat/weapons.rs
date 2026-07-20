@@ -313,7 +313,7 @@ pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) 
     angle_delta(center, target_angle).abs() <= config::MORTAR_FIELD_OF_FIRE_RAD * 0.5
 }
 
-pub(super) fn choose_target_preferring_anti_tank_field(
+pub(super) fn choose_target_inside_anti_tank_field(
     context: &AttackPriorityContext,
     attacker: &Entity,
     px: f32,
@@ -321,24 +321,16 @@ pub(super) fn choose_target_preferring_anti_tank_field(
     candidates: &[TargetCandidate],
     filter: impl Fn(&TargetCandidate) -> bool,
 ) -> Option<u32> {
-    if attacker.kind == EntityKind::AntiTankGun {
-        let in_field = priority::choose_target(
-            context,
-            candidates.iter().filter(|candidate| {
-                filter(candidate)
-                    && anti_tank_gun_target_inside_field_of_fire(
-                        attacker,
-                        (candidate.pos_y - py).atan2(candidate.pos_x - px),
-                    )
-            }),
-        );
-        if in_field.is_some() {
-            return in_field;
-        }
-    }
     priority::choose_target(
         context,
-        candidates.iter().filter(|candidate| filter(candidate)),
+        candidates.iter().filter(|candidate| {
+            filter(candidate)
+                && (attacker.kind != EntityKind::AntiTankGun
+                    || anti_tank_gun_target_inside_field_of_fire(
+                        attacker,
+                        (candidate.pos_y - py).atan2(candidate.pos_x - px),
+                    ))
+        }),
     )
 }
 
