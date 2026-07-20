@@ -127,6 +127,7 @@ mod tests {
             vec![
                 UpgradeKind::AntiTankGunUnlock,
                 UpgradeKind::ArtilleryUnlock,
+                UpgradeKind::BallisticTables,
                 UpgradeKind::TankUnlock,
                 UpgradeKind::MortarAutocast,
                 UpgradeKind::SmokePlus,
@@ -135,7 +136,7 @@ mod tests {
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
         assert!(researchable_upgrades(EntityKind::ResearchComplex)
             .contains(&UpgradeKind::ArtilleryUnlock));
-        assert!(!researchable_upgrades(EntityKind::ResearchComplex)
+        assert!(researchable_upgrades(EntityKind::ResearchComplex)
             .contains(&UpgradeKind::BallisticTables));
     }
 

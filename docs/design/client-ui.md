@@ -1761,9 +1761,11 @@ the input module enters targeted cursor mode:
   for renderer feedback. The Smoke preview radius uses the active command owner's completed
   upgrades, including during Lab control, so Smoke Plus previews the server-created 4-tile cloud.
 - Left-click normally builds a `useAbility` command with the ability name, filtered carrier ids,
-  world coords, and the `queued` flag (from Shift). Artillery Fire instead uses two clicks: the
-  first fixes the raw center, then pointer distance selects a radius from 4 to 15 tiles and the
-  second sends `artilleryFire`. The server owns center locking and radius clamping. The local
+  world coords, and the `queued` flag (from Shift). Artillery Fire accepts either click-click or
+  press-drag-release: the initial press/click fixes the raw center, pointer distance selects a
+  radius from 6 to 15 tiles (3 to 15 after Artillery Fire Control), and the second click or drag
+  release sends `artilleryFire`. The battlefield and minimap use the same gesture semantics. The
+  server owns center locking and radius clamping. The local
   feedback marker uses the client-computed locked point when available. Clear cursor mode unless the resolved
   command-card hotkey is still held for repeated world-point targeting.
 - Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
@@ -1813,8 +1815,8 @@ Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
 - Artillery Fire draws the current artillery cone when the locked point is inside a deployed gun's
   cone, otherwise it draws the future setup/redeploy cone toward the locked point. After the first
   click it draws a flat translucent light-blue target area, a dashed boundary, and a center-to-pointer
-  guide. The circle begins at four tiles and grows only when the pointer moves
-  farther than four tiles from the center, up to 15 tiles.
+  guide. The circle begins at six tiles, or three after Artillery Fire Control, and grows only when
+  the pointer moves farther than that minimum from the center, up to 15 tiles.
 - At the cursor position, draws the ability-specific target feedback: smoke uses a 2-tile cloud
   radius, Magic Anchor uses the configured anchor radius, and Ekat Line Shot draws projected path
   segments from every current origin. Feedback is colored green when in range of at least one

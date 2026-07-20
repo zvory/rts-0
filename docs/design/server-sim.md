@@ -1552,7 +1552,8 @@ Allocation rules:
   queued stages. Mixed selections ignore non-setup-capable units for setup but keep them for later
   compatible orders.
 - Artillery Fire is a queueable, terminal per-gun fire order. Issue-time admission stores a locked
-  effective center and a radius clamped from 4 to 15 tiles, not merely the raw clicks. Immediate
+  effective center and a radius clamped from 6 to 15 tiles, or 3 to 15 after Artillery Fire
+  Control, not merely the raw pointer gesture. Immediate
   fire commands can accept packed artillery and
   set it up in place, or redeploy already-deployed artillery when the effective point is outside the
   current cone. Queued fire commands lock from the active or queued future move destination when
@@ -1568,7 +1569,8 @@ Allocation rules:
   viewport targeting; there is no separate minimap simulation path.
 - Artillery Fire samples each impact deterministically and uniformly by area within the selected
   circle. There is no additional range-based error, accuracy sequence, or repeated-shot tightening;
-  every impact remains inside the selected circle. Artillery Fire Control is no longer researchable or applied.
+  every impact remains inside the selected circle. Artillery Fire Control is researched after Heavy
+  Guns and changes only the authoritative minimum selected radius from 6 tiles to 3.
   Every shot shares the existing ammunition cost, reload, shell delay, impact radius, damage,
   fog-gated impact events, global firing markers, and firing-reveal behavior.
 

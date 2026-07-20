@@ -1294,6 +1294,13 @@ fn use_ability(
         let Some(y) = request.y else {
             return;
         };
+        let min_fire_radius_tiles = players
+            .iter()
+            .find(|candidate| candidate.id == player)
+            .map(|candidate| {
+                artillery_min_fire_radius_tiles(candidate.has_upgrade(UpgradeKind::BallisticTables))
+            })
+            .unwrap_or(config::ARTILLERY_MIN_FIRE_RADIUS_TILES);
         let radius_tiles = match mode {
             ArtilleryFireMode::Point => 0.0,
             ArtilleryFireMode::Blanket => {
@@ -1304,7 +1311,7 @@ fn use_ability(
                     return;
                 }
                 radius.clamp(
-                    config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
+                    min_fire_radius_tiles,
                     config::ARTILLERY_BLANKET_RADIUS_TILES,
                 )
             }
@@ -1515,6 +1522,8 @@ fn try_fire_artillery(
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
+    let min_fire_radius_tiles =
+        artillery_min_fire_radius_tiles(ps.has_upgrade(UpgradeKind::BallisticTables));
     if !ps.can_afford(ammo_cost.steel, ammo_cost.oil) {
         notice(events, player, "Not enough steel");
         if let Some(e) = entities.get_mut(unit) {
@@ -1534,8 +1543,11 @@ fn try_fire_artillery(
         let shot_number = e.increment_artillery_blanket_shots_fired();
         e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
         let fire_radius_tiles = match mode {
-            ArtilleryFireMode::Point => config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
-            ArtilleryFireMode::Blanket => radius_tiles,
+            ArtilleryFireMode::Point => min_fire_radius_tiles,
+            ArtilleryFireMode::Blanket => radius_tiles.clamp(
+                min_fire_radius_tiles,
+                config::ARTILLERY_BLANKET_RADIUS_TILES,
+            ),
         };
         artillery_blanket_point(unit, player, tick, (x, y), shot_number, fire_radius_tiles)
     };
@@ -1602,6 +1614,15 @@ fn try_fire_artillery(
     }
     true
 }
+
+fn artillery_min_fire_radius_tiles(has_fire_control: bool) -> f32 {
+    if has_fire_control {
+        config::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES
+    } else {
+        config::ARTILLERY_MIN_FIRE_RADIUS_TILES
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(in crate::game) fn artillery_point_fire_system(
     map: &Map,

@@ -30,6 +30,7 @@ import {
 } from "./config.js";
 import {
   artilleryFireRadiusTiles,
+  artilleryMinFireRadiusTiles,
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
@@ -1109,8 +1110,16 @@ export class Minimap {
       ctrlKey: !!ev.ctrlKey,
       metaKey: !!ev.metaKey,
       altKey: !!ev.altKey,
+      artilleryRadiusSelection: false,
     };
     this._capturePointer(ev.pointerId);
+    const startsArtilleryRadiusSelection =
+      this._activePointerGesture.commandTarget?.ability === ABILITY.POINT_FIRE &&
+      !this._intent()?.artilleryFireCenter;
+    if (startsArtilleryRadiusSelection) {
+      this._activePointerGesture.artilleryRadiusSelection = true;
+      this._issuePrimaryTarget(world, this._routerEvent(ev, "dom"));
+    }
     // Unarmed primary presses retain the desktop recenter-on-press behavior.
     // Armed targets wait for an unambiguous release so an inspection drag cannot fire them.
     if (!this._activePointerGesture.commandTarget) {
@@ -1165,7 +1174,7 @@ export class Minimap {
     if (gesture.pointerId !== ev.pointerId) return;
     if (!gesture.moved && this._gestureMovedBeyondTapSlop(gesture, ev)) {
       gesture.moved = true;
-      this._dragging = true;
+      if (!gesture.artilleryRadiusSelection) this._dragging = true;
     }
     this._handlePointerMove(this._routerEvent(ev, "dom"));
     ev.preventDefault();
@@ -1189,10 +1198,24 @@ export class Minimap {
   _handleCanvasPointerUp(ev) {
     const gesture = this._activePointerGesture;
     if (!gesture || gesture.pointerId !== ev.pointerId) return;
+    const releasedInside = this._containsClientPoint(ev.clientX, ev.clientY);
     this._releasePointer(ev.pointerId);
     this._activePointerGesture = null;
     this._dragging = false;
     if (
+      gesture.artilleryRadiusSelection &&
+      gesture.moved &&
+      this._intent()?.artilleryFireCenter &&
+      commandTargetsMatch(this._intent()?.commandTarget, gesture.commandTarget) &&
+      this._ensureTransform() &&
+      releasedInside
+    ) {
+      const point = this._eventToCanvas(ev);
+      const actionEvent = this._routerEvent(ev, "dom");
+      actionEvent.shiftKey = gesture.shiftKey;
+      this._issuePrimaryTarget(this._canvasToWorld(point.x, point.y), actionEvent);
+    } else if (
+      !gesture.artilleryRadiusSelection &&
       !gesture.moved &&
       gesture.commandTarget &&
       commandTargetsMatch(this._intent()?.commandTarget, gesture.commandTarget)
@@ -1202,14 +1225,13 @@ export class Minimap {
       actionEvent.ctrlKey = gesture.ctrlKey;
       actionEvent.metaKey = gesture.metaKey;
       actionEvent.altKey = gesture.altKey;
-      if (this._ensureTransform() && this._containsClientPoint(ev.clientX, ev.clientY)) {
+      if (this._ensureTransform() && releasedInside) {
         const point = this._eventToCanvas(ev);
         this._issuePrimaryTarget(this._canvasToWorld(point.x, point.y), actionEvent);
       }
     }
-    if (!this._containsClientPoint(ev.clientX, ev.clientY)) {
-      this.inputRouter?.releaseSource?.("dom");
-    }
+    if (gesture.artilleryRadiusSelection && !releasedInside) this._intent()?.endArtilleryFireRadiusSelection?.();
+    if (!releasedInside) this.inputRouter?.releaseSource?.("dom");
     ev.preventDefault();
   }
 
@@ -1253,6 +1275,9 @@ export class Minimap {
   _cancelActivePointerGesture() {
     const gesture = this._activePointerGesture;
     if (gesture) this._releasePointer(gesture.pointerId);
+    if (gesture?.artilleryRadiusSelection) {
+      this._intent()?.endArtilleryFireRadiusSelection?.();
+    }
     this._activePointerGesture = null;
     this._dragging = false;
     this.inputRouter?.releaseSource?.("dom");
@@ -1407,7 +1432,12 @@ export class Minimap {
       }
       const fireCenter = ability === ABILITY.POINT_FIRE ? intent?.artilleryFireCenter : null;
       const fireRadiusTiles = fireCenter
-        ? artilleryFireRadiusTiles(fireCenter, { x: wx, y: wy }, this.state.map?.tileSize)
+        ? artilleryFireRadiusTiles(
+            fireCenter,
+            { x: wx, y: wy },
+            this.state.map?.tileSize,
+            artilleryMinFireRadiusTiles(commandUpgrades(this.state, this.controlPolicy)),
+          )
         : null;
       const resolvedAbility = fireCenter ? ABILITY.BLANKET_FIRE : ability;
       const target = fireCenter || { x: wx, y: wy };
@@ -1433,7 +1463,7 @@ export class Minimap {
         ? cmd.blanketFire(abilityUnits, target.x, target.y, fireRadiusTiles, queued)
         : cmd.useAbility(resolvedAbility, abilityUnits, target.x, target.y, queued);
       this.commandInteraction.issueCommand(command);
-      if (fireCenter) intent.artilleryFireCenter = null;
+      if (fireCenter) intent.endArtilleryFireRadiusSelection?.();
       if (isArtilleryFireAbility(resolvedAbility)) {
         for (const lock of artilleryLocks) {
           this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);

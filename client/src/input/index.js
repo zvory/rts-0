@@ -30,7 +30,7 @@
 // SelectionScene so input always targets the pixels the player can actually see.
 
 import { DRAG_THRESHOLD_PX } from "./constants.js";
-import { isBuilding, isUnit } from "../protocol.js";
+import { ABILITY, isBuilding, isUnit } from "../protocol.js";
 import {
   _browserExitPointerLockFn,
   _browserPointerLockElement,
@@ -233,6 +233,7 @@ export class Input {
     this._drag = null;
     this._placementDrag = null;
     this._formationGesture = null;
+    this._artilleryFireGesture = null;
     // Whether the current left press has moved far enough to count as a box drag.
     this._dragging = false;
     // Last completed single click: { x, y, t } in screen pixels + timestamp ms.
@@ -319,6 +320,7 @@ export class Input {
   /** Remove all installed listeners (e.g. on game teardown / screen change). */
   destroy() {
     this._cancelFormationGesture();
+    this._artilleryFireGesture = null;
     this.exitPointerLock();
     this.screenOverlay?.destroy?.();
     this.clientIntent?.clearPlannedOrders?.();
@@ -623,6 +625,22 @@ export class Input {
       return;
     }
 
+    if (this._artilleryFireGesture) {
+      const gesture = this._artilleryFireGesture;
+      if (
+        this._commandTarget()?.ability !== gesture.ability ||
+        !this._intent()?.artilleryFireCenter
+      ) {
+        this._artilleryFireGesture = null;
+        return;
+      }
+      if (!gesture.moved && Math.hypot(p.x - gesture.x0, p.y - gesture.y0) >= DRAG_THRESHOLD_PX) {
+        gesture.moved = true;
+      }
+      ev.preventDefault?.();
+      return;
+    }
+
     if (this._drag) {
       this._drag.x1 = p.x;
       this._drag.y1 = p.y;
@@ -681,6 +699,25 @@ export class Input {
     if (!this.pointerLocked) this._trackMouse(p);
     if (this._routeLockedPointerUp(ev, p)) {
       ev.preventDefault();
+      return;
+    }
+    if (this._artilleryFireGesture) {
+      const gesture = this._artilleryFireGesture;
+      this._artilleryFireGesture = null;
+      if (
+        gesture.moved &&
+        this._commandTarget()?.ability === gesture.ability &&
+        this._intent()?.artilleryFireCenter
+      ) {
+        const actionEvent = { shiftKey: gesture.shiftKey };
+        if (this._issueTargetedCommand(p, actionEvent) !== false) {
+          const issued = typeof this._intent()?.issueCommandTarget === "function"
+            ? this._intent().issueCommandTarget(actionEvent)
+            : { keepArmed: false };
+          if (!issued.keepArmed) this._intent()?.endCommandTarget?.();
+        }
+      }
+      ev.preventDefault?.();
       return;
     }
     if (!this._drag) return;
@@ -759,6 +796,7 @@ export class Input {
 
   _cancelTouchGameplayState() {
     this._cancelFormationGesture();
+    this._artilleryFireGesture = null;
     if (this._drag) {
       this._drag = null;
       this._dragging = false;
@@ -789,7 +827,20 @@ export class Input {
         this._beginFormationGesture(p, ev, "attackMove");
         return;
       }
-      if (this._issueTargetedCommand(p, ev) === false) return;
+      const firstArtilleryFirePress =
+        this._commandTarget()?.ability === ABILITY.POINT_FIRE && !this._intent()?.artilleryFireCenter;
+      if (this._issueTargetedCommand(p, ev) === false) {
+        if (firstArtilleryFirePress && this._intent()?.artilleryFireCenter) {
+          this._artilleryFireGesture = {
+            ability: this._commandTarget().ability,
+            x0: p.x,
+            y0: p.y,
+            moved: false,
+            shiftKey: !!ev.shiftKey,
+          };
+        }
+        return;
+      }
       const issued = typeof this._intent()?.issueCommandTarget === "function"
         ? this._intent().issueCommandTarget(ev)
         : { keepArmed: false };

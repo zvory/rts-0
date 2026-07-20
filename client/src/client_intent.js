@@ -263,6 +263,11 @@ export class ClientIntent {
     return this.artilleryFireCenter;
   }
 
+  /** Cancel or complete radius selection without disarming Artillery Fire. */
+  endArtilleryFireRadiusSelection() {
+    this.artilleryFireCenter = null;
+  }
+
   /**
    * Record the local queued-order shape of a command that was accepted for send.
    * This is intentionally small and client-only: it exists to keep previews stable

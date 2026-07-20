@@ -11,7 +11,7 @@ pub(super) fn artillery_blanket_point(
     fire_radius_tiles: f32,
 ) -> (f32, f32) {
     let radius_px = fire_radius_tiles.clamp(
-        config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
+        config::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
         config::ARTILLERY_BLANKET_RADIUS_TILES,
     ) * config::TILE_SIZE as f32;
     let seed = mix32(

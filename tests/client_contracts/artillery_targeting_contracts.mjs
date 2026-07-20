@@ -5,17 +5,24 @@ import { assert, assertApprox } from "./assertions.mjs";
 import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
+  ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
 } from "../../client/src/config.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
+import {
+  artilleryFireRadiusTiles,
+  artilleryMinFireRadiusTiles,
+} from "../../client/src/input/artillery_targeting.js";
 import {
   ABILITY,
   cmd,
   KIND,
   ORDER_STAGE,
   SETUP,
+  UPGRADE,
 } from "../../client/src/protocol.js";
 import {
   _drawAbilityTargetPreview,
@@ -23,6 +30,21 @@ import {
 import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
+
+{
+  const center = { x: 100, y: 100 };
+  const close = { x: 101, y: 100 };
+  assert(
+    artilleryFireRadiusTiles(center, close, 1) === ARTILLERY_MIN_FIRE_RADIUS_TILES &&
+      artilleryFireRadiusTiles(
+        center,
+        close,
+        1,
+        artilleryMinFireRadiusTiles([UPGRADE.BALLISTIC_TABLES]),
+      ) === ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
+    "Artillery Fire radius selection uses the six-tile base minimum and three-tile Fire Control minimum",
+  );
+}
 
 {
   const artilleryPreviewInput = Object.create(Input.prototype);
@@ -200,7 +222,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   assert(
     artilleryCommands[2]?.c === "artilleryFire" &&
       artilleryCommands[2].x === queuedRawPoint.x &&
-      artilleryCommands[2].radiusTiles === 4 &&
+      artilleryCommands[2].radiusTiles === 6 &&
       artilleryCommands[2].queued === true,
     "Queued Artillery Fire sends its raw center and selected radius to the server",
   );
@@ -518,5 +540,78 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
             ARTILLERY_BLANKET_RADIUS_TILES * 32 &&
         call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY),
     "Blanket Fire preview draws the 15-tile blanket radius around the locked center",
+  );
+}
+
+{
+  const commands = [];
+  const artillery = {
+    id: 81,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const input = Object.create(Input.prototype);
+  input.pointerLocked = false;
+  input._panDrag = null;
+  input._formationGesture = null;
+  input._placementDrag = null;
+  input.state = {
+    playerId: 1,
+    upgrades: [],
+    map: { tileSize: 32 },
+    selectedEntities: () => [artillery],
+  };
+  input.clientIntent = new ClientIntent();
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._selectedOwnUnitIds = () => [artillery.id];
+  input._addCommandFeedback = () => {};
+  input._routeLockedPointerMove = () => false;
+  input._routeLockedPointerUp = () => false;
+  input._finishTankTrapPlacementDrag = () => false;
+  input._eventScreenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
+  input._trackMouse = () => {};
+
+  input._onLeftDown({ x: 900, y: 100 }, { shiftKey: false });
+  assert(
+    commands.length === 0 && input._artilleryFireGesture && input.clientIntent.artilleryFireCenter?.x === 900,
+    "holding the first Artillery Fire press stores its center without firing",
+  );
+  input._shiftKeysDown = new Set();
+  input.cameraNavigation = { release() {} };
+  input._drag = null;
+  input._handleBlur();
+  assert(
+    input._artilleryFireGesture === null &&
+      input.clientIntent.artilleryFireCenter === null &&
+      input.clientIntent.commandTarget === null,
+    "window blur cancels an interrupted battlefield Artillery Fire drag",
+  );
+  input.cameraNavigation = null;
+
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input._onLeftDown({ x: 900, y: 100 }, { shiftKey: false });
+  input._handlePointerMoveAt(
+    { preventDefault() {} },
+    { x: 900 + 8 * 32, y: 100 },
+  );
+  input._handleMouseUp({
+    button: 0,
+    clientX: 900 + 8 * 32,
+    clientY: 100,
+    shiftKey: false,
+    preventDefault() {},
+  });
+  assert(
+    commands[0]?.c === "artilleryFire" &&
+      commands[0].x === 900 &&
+      commands[0].radiusTiles === 8 &&
+      input.clientIntent.commandTarget === null,
+    "dragging the first Artillery Fire press fires with the chosen radius on release",
   );
 }

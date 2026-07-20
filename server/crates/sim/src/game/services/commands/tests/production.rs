@@ -332,7 +332,7 @@ fn heavy_guns_research_requires_medium_guns() {
 }
 
 #[test]
-fn removed_ballistic_tables_research_is_always_rejected() {
+fn artillery_fire_control_requires_heavy_guns() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
@@ -370,11 +370,12 @@ fn removed_ballistic_tables_research_is_always_rejected() {
         .is_empty());
     players[0].upgrades.insert(UpgradeKind::ArtilleryUnlock);
     apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
-    assert!(entities
+    let queue = entities
         .get(research_complex)
         .expect("research complex")
-        .research_queue()
-        .is_empty());
+        .research_queue();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].upgrade, UpgradeKind::BallisticTables);
 }
 
 #[test]
