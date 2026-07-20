@@ -6,10 +6,10 @@
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
 use serde::{Deserialize, Serialize};
 
-pub const MAX_FORMATION_POINTS: usize = 64;
 mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
+mod formation_point;
 mod lab_replay;
 mod lab_scenario;
 mod messagepack_frame;
@@ -28,6 +28,8 @@ pub use contract_metadata::{
     SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION,
     SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
 };
+use formation_point::is_false;
+pub use formation_point::{FormationPoint, MAX_FORMATION_POINTS};
 pub use lab_replay::*;
 pub use lab_scenario::*;
 pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
@@ -43,10 +45,6 @@ pub use rts_contract::{
     TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
-
-fn is_false(value: &bool) -> bool {
-    !*value
-}
 
 // ---------------------------------------------------------------------------
 // Client -> Server
@@ -230,6 +228,14 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    ArtilleryFire {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     RecastAbility {
         ability: String,
         units: Vec<u32>,
@@ -297,13 +303,6 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FormationPoint {
-    pub x: f32,
-    pub y: f32,
 }
 
 pub type VisionSelectionRequest = ObserverViewSelection;

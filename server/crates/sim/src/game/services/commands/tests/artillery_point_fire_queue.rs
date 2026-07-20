@@ -89,7 +89,7 @@ fn queued_artillery_blanket_fire_locks_center_from_future_move_destination() {
     );
 
     let unit = entities.get(artillery).expect("artillery should exist");
-    let [OrderIntent::BlanketFire(point)] = unit.queued_orders() else {
+    let [OrderIntent::BlanketFire { point, .. }] = unit.queued_orders() else {
         panic!("queued Blanket Fire should be stored behind the move");
     };
     assert!(

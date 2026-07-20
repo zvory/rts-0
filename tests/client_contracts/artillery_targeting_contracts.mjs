@@ -61,6 +61,48 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
 }
 
 {
+  const commands = [];
+  const artillery = {
+    id: 49,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const input = Object.create(Input.prototype);
+  input.mouse = { x: 900, y: 100 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    selectedEntities: () => [artillery],
+  };
+  input.clientIntent = new ClientIntent();
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._selectedOwnUnitIds = () => [artillery.id];
+  input._addCommandFeedback = () => {};
+
+  input._quickCastCommandTarget({ shiftKey: false });
+  assert(
+    commands.length === 0 &&
+      input.clientIntent.artilleryFireCenter?.x === 900 &&
+      input.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
+    "quick-cast keeps unified Artillery Fire armed after selecting its center",
+  );
+  input.mouse = { x: 900 + 6 * 32, y: 100 };
+  input._quickCastCommandTarget({ shiftKey: false });
+  assert(
+    commands[0]?.c === "artilleryFire" &&
+      commands[0].radiusTiles === 6 &&
+      input.clientIntent.commandTarget === null,
+    "quick-cast issues Artillery Fire only after selecting its radius",
+  );
+}
+
+{
   const artilleryCommands = [];
   const artilleryFeedback = [];
   const selectedArtillery = {
@@ -91,21 +133,29 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8,
     y: selectedArtillery.y,
   };
-  pointFireInput._issueTargetedCommand(closeRawPoint, { shiftKey: true });
+  const firstClickResult = pointFireInput._issueTargetedCommand(closeRawPoint, { shiftKey: true });
   assert(
-    artilleryCommands[0]?.c === "useAbility" &&
-      artilleryCommands[0].ability === ABILITY.POINT_FIRE &&
+    firstClickResult === false &&
+      artilleryCommands.length === 0 &&
+      pointFireInput.clientIntent.artilleryFireCenter?.x === closeRawPoint.x,
+    "Artillery Fire first click stores the raw center without issuing a command",
+  );
+  const radiusPoint = { x: closeRawPoint.x + 6 * 32, y: closeRawPoint.y };
+  pointFireInput._issueTargetedCommand(radiusPoint, { shiftKey: true });
+  assert(
+    artilleryCommands[0]?.c === "artilleryFire" &&
       artilleryCommands[0].units[0] === selectedArtillery.id &&
       artilleryCommands[0].x === closeRawPoint.x &&
+      artilleryCommands[0].radiusTiles === 6 &&
       artilleryCommands[0].queued === true,
-    "Point Fire targeting sends the raw click in the dedicated ability command",
+    "Artillery Fire second click sends the raw center and selected radius",
   );
   assert(
     artilleryFeedback[0]?.kind === "artillery" &&
-      artilleryFeedback[0].radiusTiles === ABILITIES[ABILITY.POINT_FIRE].radiusTiles &&
+      artilleryFeedback[0].radiusTiles === 6 &&
       artilleryFeedback[0].x === selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 &&
       artilleryFeedback[0].y === selectedArtillery.y,
-    "Point Fire targeting shows command feedback at the locked effective point with splash radius",
+    "Artillery Fire targeting shows the selected circle at the locked effective center",
   );
 
   pointFireInput.clientIntent.endCommandTarget();
@@ -143,17 +193,22 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     y: futureOrigin.y,
   };
   pointFireInput._issueTargetedCommand(queuedRawPoint, { shiftKey: true });
+  pointFireInput._issueTargetedCommand(
+    { x: queuedRawPoint.x + 4 * 32, y: queuedRawPoint.y },
+    { shiftKey: true },
+  );
   assert(
-    artilleryCommands[2]?.ability === ABILITY.POINT_FIRE &&
+    artilleryCommands[2]?.c === "artilleryFire" &&
       artilleryCommands[2].x === queuedRawPoint.x &&
+      artilleryCommands[2].radiusTiles === 4 &&
       artilleryCommands[2].queued === true,
-    "Queued Point Fire targeting still sends the raw click to the server",
+    "Queued Artillery Fire sends its raw center and selected radius to the server",
   );
   assertApprox(
     artilleryFeedback[2]?.x,
     futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32,
     0.001,
-    "Queued Point Fire feedback locks from the projected movement endpoint",
+    "Queued Artillery Fire feedback locks from the projected movement endpoint",
   );
 
   pointFireInput.clientIntent.endCommandTarget();
@@ -244,7 +299,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     "Queued Point Fire preview uses the frozen setup facing for zero-length target rays",
   );
   pointFireInput.clientIntent.recordPlannedCommand(
-    cmd.pointFire([locallyPlannedArtillery.id], localMove.x, localMove.y, true),
+    cmd.blanketFire([locallyPlannedArtillery.id], localMove.x, localMove.y, 6, true),
     [locallyPlannedArtillery],
     { sent: true, clientSeq: 92 },
   );
@@ -255,9 +310,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
   const localPlanAfterTerminal = pointFireInput.clientIntent.plannedOrderPlanForEntity(locallyPlannedArtillery);
   assert(
-    localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.POINT_FIRE) &&
+    localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.BLANKET_FIRE) &&
       !localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.MOVE && stage.x === localMove.x + 64),
-    "Client planned order stages do not append behind terminal queued Point Fire",
+    "Client planned order stages do not append behind terminal queued Artillery Fire",
   );
   const rejectedSetupArtillery = { ...locallyPlannedArtillery, id: 47 };
   pointFireInput.clientIntent.recordPlannedCommand(
@@ -271,7 +326,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     { sent: true, clientSeq: 101 },
   );
   pointFireInput.clientIntent.recordPlannedCommand(
-    cmd.pointFire([rejectedSetupArtillery.id], localMove.x, localMove.y, true),
+    cmd.blanketFire([rejectedSetupArtillery.id], localMove.x, localMove.y, 6, true),
     [rejectedSetupArtillery],
     { sent: true, clientSeq: 102 },
   );

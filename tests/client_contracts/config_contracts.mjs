@@ -5,6 +5,7 @@ import { assert, assertDeepEqual } from "./assertions.mjs";
 import * as configExports from "../../client/src/config.js";
 import {
   ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
@@ -74,6 +75,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ARTILLERY_BODY",
   "ARTILLERY_FIELD_OF_FIRE_RAD",
   "ARTILLERY_MAX_RANGE_TILES",
+  "ARTILLERY_MIN_FIRE_RADIUS_TILES",
   "ARTILLERY_MIN_RANGE_TILES",
   "ARTILLERY_OUTER_RADIUS_TILES",
   "ARTILLERY_SETUP_TICKS",
@@ -371,8 +373,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.POINT_FIRE].rangeTiles === ARTILLERY_MAX_RANGE_TILES &&
       ABILITIES[ABILITY.POINT_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES &&
       ABILITIES[ABILITY.POINT_FIRE].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      ARTILLERY_MIN_FIRE_RADIUS_TILES === 4 &&
       ARTILLERY_SHELL_DELAY_TICKS === 150,
-    "Point Fire ability exposes Artillery carrier, max range, minimum range, and 5-second delay",
+    "Artillery Fire exposes its carrier, range band, four-tile minimum radius, and 5-second delay",
   );
   assert(
     ABILITIES[ABILITY.BLANKET_FIRE].carriers.includes(KIND.ARTILLERY) &&
@@ -384,11 +387,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.BLANKET_FIRE].queued === true &&
       ABILITIES[ABILITY.BLANKET_FIRE].hotkey === "C" &&
       ARTILLERY_BLANKET_RADIUS_TILES === 15,
-    "Blanket Fire descriptor exposes Artillery carrier, range band, radius, cost, cooldown, queueability, and hotkey",
+    "legacy Blanket Fire descriptor preserves wire-compatible artillery metadata",
   );
   assert(
-    configExports.commandCardAbilitiesForFaction().some((entry) => entry.ability === ABILITY.BLANKET_FIRE),
-    "Blanket Fire descriptor is exposed in command-card ability lists",
+    !configExports.commandCardAbilitiesForFaction().some((entry) => entry.ability === ABILITY.BLANKET_FIRE),
+    "legacy Blanket Fire stays out of command-card ability lists",
   );
   assert(
     ABILITIES[ABILITY.EKAT_TELEPORT].queued === true &&
@@ -438,12 +441,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
-      UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
     ],
-    "R&D Complex should expose the Medium Guns, Heavy Guns, and Fire Control chain before its independent research",
+    "R&D Complex should expose Medium Guns and Heavy Guns before its independent research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -517,22 +519,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADES[UPGRADE.ARTILLERY_UNLOCK].replacesUpgrade == null,
     "Heavy Guns research keeps a permanent slot and its prerequisite explicit",
   );
-  assert(
-    UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 300 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 200 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === 1200,
-    "Artillery Fire Control research cost and time mirror server",
-  );
-  assert(
-    UPGRADES[UPGRADE.BALLISTIC_TABLES].label === "Artillery Fire Control" &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].icon === "AFC",
-    "Artillery Fire Control research uses the renamed client label and icon",
-  );
-  assert(
-    UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ARTILLERY_UNLOCK &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresText === "Requires Heavy Guns",
-    "Artillery Fire Control research should mirror its Heavy Guns prerequisite",
-  );
+  assert(!UPGRADES[UPGRADE.BALLISTIC_TABLES], "Artillery Fire Control is removed from active upgrade metadata");
   assert(
     STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
     "Anti-Tank Gun training should explain the R&D Complex research requirement",
@@ -1218,20 +1205,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const rdMediumGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("MD+"));
     const rdHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
-    const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
-    assert(rdArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in R&D Complex");
     assert(rdMediumGunsResearchButton?.dataset.hotkey === "Q", "Medium Guns research should appear in R&D Complex");
     assert(rdHeavyGunsResearchButton?.dataset.hotkey === "W", "Heavy Guns research should keep the W slot before Medium Guns");
     assert(rdHeavyGunsResearchButton?.disabled, "Heavy Guns should be disabled before Medium Guns is complete or queued");
-    assert(rdTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in R&D Complex");
-    assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
-    assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
+    assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should occupy the freed E slot");
+    assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdSmokePlusButton?.dataset.hotkey === "S", "Smoke Plus research should appear in R&D Complex");
     assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "R&D Complex should not expose Command Car research");
-    assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control research should be disabled before Heavy Guns");
-    assert(rdArtilleryFireControlButton?.title === "Requires Heavy Guns", "Artillery Fire Control research should name Heavy Guns prerequisite");
+    assert(!renderedButtons.some((button) => button.innerHTML.includes("AFC")), "R&D Complex should not expose removed Artillery Fire Control research");
     assert(!rdArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
@@ -1239,10 +1223,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
-    const mediumUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedHeavyGunsResearchButton?.dataset.hotkey === "W", "Heavy Guns should retain the W slot");
     assert(unlockedHeavyGunsResearchButton && !unlockedHeavyGunsResearchButton.disabled, "Heavy Guns should enable when Medium Guns is queued");
-    assert(mediumUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Heavy Guns after Medium Guns is queued");
+    assert(!renderedButtons.some((button) => button.innerHTML.includes("AFC")), "removed Artillery Fire Control stays absent after Medium Guns is queued");
 
     renderedButtons.length = 0;
     selectedResearchComplex.prodUpgradeQueue = [
@@ -1251,8 +1234,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     ];
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
-    const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable when Heavy Guns is queued");
+    assert(!renderedButtons.some((button) => button.innerHTML.includes("AFC")), "removed Artillery Fire Control stays absent after Heavy Guns is queued");
 
     renderedButtons.length = 0;
     const playedNotices = [];

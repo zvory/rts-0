@@ -343,6 +343,20 @@ fn command_trace_label(command: &Command) -> String {
             y,
             queued
         ),
+        Command::ArtilleryFire {
+            units,
+            x,
+            y,
+            radius_tiles,
+            queued,
+        } => format!(
+            "artillery_fire units={} x={:.1} y={:.1} radius_tiles={:.1} queued={}",
+            id_list(units),
+            x,
+            y,
+            radius_tiles,
+            queued
+        ),
         Command::RecastAbility {
             units,
             ability,

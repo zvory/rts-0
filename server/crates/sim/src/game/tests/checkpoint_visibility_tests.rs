@@ -619,8 +619,6 @@ fn seed_combat_state(
             .expect("artillery should exist");
         artillery.set_weapon_setup(WeaponSetup::Deployed);
         artillery.set_order(Order::artillery_point_fire(640.0, 384.0));
-        artillery.increment_artillery_shots_fired();
-        artillery.increment_artillery_shots_fired();
     }
     {
         let mortar = game

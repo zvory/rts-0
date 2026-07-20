@@ -207,8 +207,6 @@ pub(in crate::game) struct TankArmorReactionLock {
 pub struct CombatState {
     /// Ticks until each weapon may attack again (missing or 0 = ready).
     pub weapon_cooldowns: BTreeMap<WeaponKind, u32>,
-    /// Artillery consecutive shots since its current deployment/move reset.
-    pub artillery_shots_fired: u16,
     /// Blanket Fire shots since the current blanket order began.
     pub artillery_blanket_shots_fired: u16,
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
@@ -252,7 +250,6 @@ impl Default for CombatState {
     fn default() -> Self {
         CombatState {
             weapon_cooldowns: BTreeMap::new(),
-            artillery_shots_fired: 0,
             artillery_blanket_shots_fired: 0,
             target_id: None,
             firing_reveal_reaction_gates: BTreeMap::new(),

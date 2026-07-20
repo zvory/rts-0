@@ -44,7 +44,11 @@ fn queued_artillery_blanket_fire_outside_arc_redeploys_on_promotion() {
         unit.set_weapon_setup(WeaponSetup::Deployed);
         unit.set_emplacement_facing(Some(0.0));
         unit.set_weapon_facing(0.0);
-        unit.append_queued_order(OrderIntent::blanket_fire(target.0, target.1));
+        unit.append_queued_order(OrderIntent::blanket_fire(
+            target.0,
+            target.1,
+            crate::config::ARTILLERY_BLANKET_RADIUS_TILES,
+        ));
     }
 
     promote(&map, &mut entities);
@@ -54,7 +58,7 @@ fn queued_artillery_blanket_fire_outside_arc_redeploys_on_promotion() {
         unit.weapon_setup(),
         WeaponSetup::TearingDownToRedeploy { .. }
     ));
-    assert!(matches!(unit.order(), Order::ArtilleryBlanketFire(_)));
+    assert!(matches!(unit.order(), Order::ArtilleryBlanketFire { .. }));
     assert!(
         (unit.pending_redeploy_facing().unwrap_or_default() - angle).abs() < 0.001,
         "queued outside-arc Blanket Fire should redeploy toward the stored center"

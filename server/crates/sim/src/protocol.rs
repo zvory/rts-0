@@ -92,12 +92,12 @@ mod tests {
     }
 
     #[test]
-    fn rules_upgrade_ids_match_protocol_vocabulary_and_compact_codes() {
+    fn active_rule_upgrade_ids_are_a_protocol_subset_with_legacy_codes_reserved() {
         let rule_ids = UpgradeKind::ALL
             .iter()
             .map(|kind| kind.stable_id())
             .collect::<Vec<_>>();
-        assert_eq!(rule_ids.len(), upgrades::ALL.len());
+        assert_eq!(rule_ids.len() + 1, upgrades::ALL.len());
         for id in rule_ids {
             assert!(
                 upgrades::ALL.contains(&id),
@@ -105,5 +105,11 @@ mod tests {
             );
             assert_ne!(upgrade_code(id), COMPACT_UNKNOWN_CODE);
         }
+        assert!(!UpgradeKind::ALL.contains(&UpgradeKind::BallisticTables));
+        assert!(upgrades::ALL.contains(&upgrades::BALLISTIC_TABLES));
+        assert_ne!(
+            upgrade_code(upgrades::BALLISTIC_TABLES),
+            COMPACT_UNKNOWN_CODE
+        );
     }
 }

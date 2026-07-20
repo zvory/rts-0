@@ -1122,7 +1122,7 @@ fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
         Order::Idle
         | Order::HoldPosition
         | Order::ArtilleryPointFire(_)
-        | Order::ArtilleryBlanketFire(_) => PathingRequestSource::Other,
+        | Order::ArtilleryBlanketFire { .. } => PathingRequestSource::Other,
     }
 }
 
