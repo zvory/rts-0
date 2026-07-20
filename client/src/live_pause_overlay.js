@@ -12,13 +12,14 @@ export class LivePauseOverlay {
     this.el = document.createElement("div");
     this.el.className = "live-pause-overlay";
     this.el.hidden = true;
-    this.el.setAttribute("role", "status");
-    this.el.setAttribute("aria-live", "polite");
+    this.el.setAttribute("role", "dialog");
+    this.el.setAttribute("aria-labelledby", "live-pause-title");
 
     this.panel = document.createElement("div");
     this.panel.className = "live-pause-panel";
 
     this.title = document.createElement("h2");
+    this.title.id = "live-pause-title";
     this.title.textContent = "Game Paused";
 
     this.meta = document.createElement("p");

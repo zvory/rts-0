@@ -769,6 +769,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     overlay.applyLivePauseState({ paused: true, pausedBy: 2, pauseLimit: 3, canUnpause: true });
     assert(root.children.length === 1, "live pause overlay mounts generated DOM");
     assert(!root.children[0].hidden, "live pause overlay shows when paused");
+    assert(root.children[0].attributes.get("role") === "dialog", "live pause actions use dialog semantics");
     assert(root.querySelector(".live-pause-meta")?.textContent === "Paused by Alex", "live pause overlay resolves the pausing player's roster name");
     assert(settingsRoot.classList.contains("live-pause-active"), "live pause overlay raises settings above its screen blocker");
     root.querySelector("#live-pause-settings").listeners.click();
