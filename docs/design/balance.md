@@ -414,8 +414,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   reduces incoming area damage by 25% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Entrenchment does not add a direct-shot
   miss chance. Tank cannon direct shots give Workers, Riflemen, Panzerfausts, and Machine Gunners a
-  90% dodge chance; Anti-Tank Gun direct shots retain their 50% dodge chance against infantry-sized
-  targets. Each roll happens before the entrenched direct-damage reduction, and the primary target
+  50% dodge chance; Anti-Tank Gun direct shots give infantry-sized targets a 90% dodge chance.
+  Each roll happens before the entrenched direct-damage reduction, and the primary target
   and every overpenetration candidate roll separately. The trench radius is 0.375 tile.
   The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
