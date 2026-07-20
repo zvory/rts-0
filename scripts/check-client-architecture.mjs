@@ -57,6 +57,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "clean_presentation.js": "app-shell",
   "map_editor_app.js": "app-shell",
   "map_editor_viewport.js": "app-shell",
+  "map_editor_presentation.js": "app-shell",
+  "map_editor_terrain_preview.js": "app-shell",
 
   "state.js": "model",
   "state_firing_reveal.js": "model",
@@ -156,7 +158,16 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "minimap.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
   "minimap.js -> input/support_weapon_setup_targeting.js": "Minimap and viewport setup targeting share the same pure AT-gun convergence, parallel, and fan curves so preview and issued facing agree.",
   "renderer/backend_bundle.js -> camera.js": "The selected Pixi bundle owns construction of its orthographic semantic camera.",
+  "renderer/pixi_compatibility_adapter.js -> presentation/submission.js": "The Pixi backend returns the renderer-neutral asynchronous presentation lifecycle result.",
+  "renderer/pixi_compatibility_adapter.js -> presentation/grid_snapshot.js": "The Pixi owner materializes cloneable revisioned grid records into private staging buffers.",
+  "renderer/pixi_compatibility_adapter.js -> presentation/projection_record.js": "The Pixi owner reconstructs private orthographic queries from the plain RendererProjectionV2 record.",
+  "renderer/babylon/fog_layer.js -> presentation/grid_snapshot.js": "The Babylon owner reads cloneable GridSnapshotV2 values through the shared bounds helper.",
+  "renderer/worker_messages.js -> presentation/frame.js": "The future worker wire pins and validates the renderer-neutral presentation and static-map versions.",
+  "renderer/map_editor_worker_renderer.js -> map_editor_presentation.js": "The worker-owned Pixi Map Editor renderer validates the detached editor record it consumes.",
+  "renderer/pixi_worker_host.js -> presentation/submission.js": "The sole main-thread Pixi host exposes the renderer-neutral asynchronous presentation lifecycle.",
+  "presentation/projection_record.js -> camera_projection.js": "RendererProjectionV2 reconstruction reuses the pure projection math used by the semantic camera.",
   "renderer/babylon/backend_bundle.js -> fixed_perspective_camera.js": "The selected Babylon bundle owns construction of its engine-independent semantic camera.",
+  "renderer/babylon/presentation_adapter.js -> presentation/submission.js": "The Babylon backend follows the same renderer-neutral presentation lifecycle contract.",
 }));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([
@@ -170,7 +181,12 @@ const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
 ]);
 
 const FORBIDDEN_PRESENTATION_IMPORT_AREAS = new Set(["transport", "ui", "renderer"]);
-const PIXI_COMPATIBILITY_ADAPTER = "renderer/pixi_compatibility_adapter.js";
+const PIXI_WORKER_PRIVATE_MODULES = new Set([
+  "renderer/index.js",
+  "renderer/pixi_compatibility_adapter.js",
+  "renderer/map_editor_worker_renderer.js",
+  "renderer/worker_environment.js",
+]);
 const forbiddenPresentationRuntimeRe = /\b(?:PIXI|BABYLON|WebSocket|GameState|ClientIntent)\b/;
 
 // Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
@@ -241,7 +257,10 @@ const PRIVATE_RAW_CAMERA_ADAPTERS = new Set([
   "camera.js",
   "camera_projection.js",
   "map_editor_viewport.js",
+  "map_editor_presentation.js",
   "renderer/index.js",
+  "renderer/map_editor_presentation_adapter.js",
+  "renderer/map_editor_worker_renderer.js",
 ]);
 
 const rawCameraRepresentationRe = /\b(?:(?:this|match)\.)?(?:camera|cam)(?:\?\.|\.)(?:x|y|zoom|viewW|viewH|worldW|worldH|centerOn|setZoom|setView|setBounds)\b/g;
@@ -279,6 +298,12 @@ for (const file of files) {
   checkRigOnlyUnitVisuals(file, source);
   checkPresentationBoundary(file, source);
   checkMatchRendererSeam(file, source);
+  checkPixiWorkerOwnership(file, source);
+}
+
+const clientIndexSource = fs.readFileSync(path.join(repoRoot, "client/index.html"), "utf8");
+if (/pixi(?:\.min)?\.js/i.test(clientIndexSource)) {
+  failures.push("client/index.html: Pixi must load only inside the module render worker");
 }
 
 for (const mod of modules.values()) {
@@ -483,6 +508,28 @@ function checkMatchRendererSeam(file, source) {
   }
 }
 
+function checkPixiWorkerOwnership(file, source) {
+  const workerOwned = file === "renderer/pixi_render_worker.js" || file === "renderer/index.js";
+  if (source.includes("Renderer.create(") && !["renderer/pixi_render_worker.js", "renderer/index.js"].includes(file)) {
+    failures.push(`${file}: only the module render worker may construct the Pixi Renderer`);
+  }
+  if (source.includes("new PIXI.Application") && file !== "renderer/index.js") {
+    failures.push(`${file}: Pixi Application allocation must stay in the worker-owned renderer module`);
+  }
+  if ((source.includes("WebGPU") || source.includes("webgpu")) && file.startsWith("renderer/pixi")) {
+    failures.push(`${file}: Pixi worker path must not initialize, probe, or fall back to WebGPU`);
+  }
+  if (file === "renderer/backend_bundle.js" && !source.includes("pixi_worker_host.js")) {
+    failures.push(`${file}: default Pixi backend must be the sole module-worker host`);
+  }
+  if (file === "renderer/pixi_compatibility_adapter.js" && source.includes("static async create")) {
+    failures.push(`${file}: compatibility adapter must not retain a main-thread construction path`);
+  }
+  if (workerOwned && source.includes('preference: "webgpu"')) {
+    failures.push(`${file}: worker-owned Pixi renderer must force WebGL`);
+  }
+}
+
 function resolveImport(fromFile, specifier) {
   const fromDir = path.dirname(fromFile);
   let resolved = path.normalize(path.join(fromDir, specifier)).split(path.sep).join("/");
@@ -496,8 +543,8 @@ function checkImport(fromFile, toFile) {
     failures.push(`${fromFile} -> ${toFile}: Match must receive lab UI/services through app-shell dependency injection`);
     return;
   }
-  if (toFile === PIXI_COMPATIBILITY_ADAPTER && fromFile !== "renderer/backend_bundle.js") {
-    failures.push(`${fromFile} -> ${toFile}: Pixi compatibility adapter is private to the Pixi backend bundle and unavailable to other backends`);
+  if (PIXI_WORKER_PRIVATE_MODULES.has(toFile) && fromFile !== "renderer/pixi_render_worker.js") {
+    failures.push(`${fromFile} -> ${toFile}: Pixi runtime modules are private to the module render worker`);
     return;
   }
 

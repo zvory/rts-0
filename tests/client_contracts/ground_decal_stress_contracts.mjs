@@ -25,6 +25,7 @@ class RecordingCanvasContext {
   scale(x, y) { this.calls.push(["scale", x, y]); }
   clearRect(x, y, w, h) { this.calls.push(["clearRect", x, y, w, h]); }
   fillRect(x, y, w, h) { this.calls.push(["fillRect", x, y, w, h]); }
+  drawImage(...args) { this.calls.push(["drawImage", ...args]); }
   beginPath() { this.calls.push(["beginPath"]); }
   moveTo(x, y) { this.calls.push(["moveTo", x, y]); }
   lineTo(x, y) { this.calls.push(["lineTo", x, y]); }
@@ -62,6 +63,8 @@ class RecordingCanvasContext {
   const restorePixi = installFakePixi();
   const priorDocument = globalThis.document;
   const priorImage = globalThis.Image;
+  const priorFetch = globalThis.fetch;
+  const priorCreateImageBitmap = globalThis.createImageBitmap;
   const canvasContexts = [];
   globalThis.Image = undefined;
   globalThis.document = {
@@ -79,6 +82,17 @@ class RecordingCanvasContext {
       };
     },
   };
+  globalThis.OffscreenCanvas = class RecordingOffscreenCanvas {
+    constructor(width, height) {
+      this.width = width;
+      this.height = height;
+      this.context = new RecordingCanvasContext();
+      canvasContexts.push(this.context);
+    }
+    getContext() { return this.context; }
+  };
+  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
+  globalThis.createImageBitmap = async () => ({ width: 1928, height: 216, close() {} });
 
   try {
     const renderer = await Renderer.create(fakeParent());
@@ -90,6 +104,7 @@ class RecordingCanvasContext {
       terrain: new Array(CURRENT_MAP_TILES * CURRENT_MAP_TILES).fill(0),
     };
     renderer.buildStaticMap(map);
+    await renderer._groundDecals.assetLoadPromise;
 
     const firstBatch = makeDecalBatch(20000, STRESS_DECAL_COUNT);
     const pendingBatches = [firstBatch];
@@ -130,6 +145,10 @@ class RecordingCanvasContext {
     else globalThis.document = priorDocument;
     if (priorImage === undefined) delete globalThis.Image;
     else globalThis.Image = priorImage;
+    if (priorFetch === undefined) delete globalThis.fetch;
+    else globalThis.fetch = priorFetch;
+    if (priorCreateImageBitmap === undefined) delete globalThis.createImageBitmap;
+    else globalThis.createImageBitmap = priorCreateImageBitmap;
     restorePixi();
   }
 }

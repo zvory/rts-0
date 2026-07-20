@@ -25,8 +25,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `platform`: bootstrap, audio, alerts, fog, camera, prediction settings, and reports.
 
 ## Invariants
-- **No framework, no JS build step.** ES2020 modules. PixiJS v8.19.0 is pinned global
-  `PIXI`; do not import it.
+- **Pixi worker only.** `pixi_render_worker.js` imports v8.19.0; main-thread code never constructs Pixi.
 - **Client architecture check.** Run `node scripts/check-client-architecture.mjs` for client changes.
 - **Cross-area imports are constrained.** `protocol.js` and `config.js` are shared mirrors,
   same-area imports are allowed, and `app-shell` may compose other areas. Non-shell cross-area

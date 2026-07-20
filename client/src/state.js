@@ -352,11 +352,11 @@ export class GameState extends VisualEffectBackedState {
   }
 
   reconcilePendingGroundDecals() {
-    return this.groundDecals.reconcilePending();
+    return this.groundDecals.reconcileBatch();
   }
 
-  acknowledgeReconciledGroundDecals() {
-    return this.groundDecals.acknowledgeReconciled();
+  acknowledgeReconciledGroundDecals(revision) {
+    return this.groundDecals.acknowledgeReconciled(revision);
   }
 
   /**

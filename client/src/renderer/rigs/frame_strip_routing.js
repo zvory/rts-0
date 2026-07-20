@@ -1,5 +1,6 @@
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
+import { loadWorkerSafeTexture } from "../raster_primitives.js";
 import { frameStripRuntimeColorAdjustment } from "./frame_strip_color_profile.js";
 import { LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "./machine_gunner_png_strip.js";
@@ -43,9 +44,7 @@ export function loadFrameStripTexture(pixi, strip) {
 }
 
 function loadRawFrameStripTexture(pixi, strip) {
-  if (pixi.Assets?.load) return pixi.Assets.load(strip.image);
-  const texture = pixi.Texture?.from?.(strip.image) ?? null;
-  return Promise.resolve(texture);
+  return loadWorkerSafeTexture(pixi, strip.image);
 }
 
 function positiveDimension(value, fallback) {

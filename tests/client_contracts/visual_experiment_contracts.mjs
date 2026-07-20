@@ -193,14 +193,17 @@ const NOOP_RENDERER_OVERLAYS = [
   const atlas = createLivePngRigAtlases().get(KIND.SCOUT_CAR);
   assert(atlas?.enabled, "scout car PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png"),
-    "scout car PNG atlas uses the checked-in pass-02 team-color asset",
+    atlas.image.includes("/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png"),
+    "scout car PNG atlas uses the checked-in worker-ready adjusted team-color asset",
   );
   assert(
-    atlas.runtimeColorAdjustment?.brightness === 90 &&
-      atlas.runtimeColorAdjustment?.saturation === 90 &&
+    atlas.bakedColorAdjustment?.brightness === 90 &&
+      atlas.bakedColorAdjustment?.saturation === 90 &&
+      atlas.bakedColorAdjustment?.hue === 100 &&
+      atlas.runtimeColorAdjustment?.brightness === 100 &&
+      atlas.runtimeColorAdjustment?.saturation === 100 &&
       atlas.runtimeColorAdjustment?.hue === 100,
-    "scout car PNG atlas applies a subtle global dampening pass over pre-colored team frames",
+    "scout car PNG atlas records its baked dampening and requires no runtime color pass",
   );
   assert(
     JSON.stringify(atlas.grid?.palette) === JSON.stringify(PLAYER_PALETTE),

@@ -2,6 +2,7 @@ import {
   applyColorAdjustmentToRgba,
   isNeutralColorAdjustment,
 } from "./color_adjustment.js";
+import { createWorkerSafeCanvas, fetchImageBitmap } from "../raster_primitives.js";
 
 export function loadColorAdjustedTexture(pixi, {
   image,
@@ -31,12 +32,12 @@ async function loadAdjustedTexture(pixi, {
   rawLoad,
   errorLabel,
 }) {
-  const doc = globalThis.document;
-  if (!doc?.createElement || !globalThis.Image || !pixi.Texture?.from) {
+  if (typeof globalThis.fetch !== "function" || typeof globalThis.createImageBitmap !== "function" || !pixi.Texture?.from) {
     return rawLoad();
   }
+  let loadedImage = null;
   try {
-    const loadedImage = await loadImage(image, errorLabel);
+    loadedImage = await loadImage(image, errorLabel);
     const width = firstPositiveDimension(
       loadedImage.naturalWidth,
       loadedImage.width,
@@ -49,18 +50,16 @@ async function loadAdjustedTexture(pixi, {
       ...heightFallbacks,
       1,
     );
-    const canvas = doc.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext?.("2d", { willReadFrequently: true });
-    if (!ctx) return rawLoad();
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(loadedImage, 0, 0, width, height);
-    const imageData = ctx.getImageData(0, 0, width, height);
+    const textureCanvas = createWorkerSafeCanvas(width, height);
+    const textureContext = textureCanvas.getContext?.("2d", { willReadFrequently: true });
+    if (!textureContext) return rawLoad();
+    textureContext.imageSmoothingEnabled = false;
+    textureContext.clearRect(0, 0, width, height);
+    textureContext.drawImage(loadedImage, 0, 0, width, height);
+    const imageData = textureContext.getImageData(0, 0, width, height);
     applyColorAdjustmentToRgba(imageData.data, adjustment);
-    ctx.putImageData(imageData, 0, 0);
-    const texture = pixi.Texture.from(canvas);
+    textureContext.putImageData(imageData, 0, 0);
+    const texture = pixi.Texture.from(textureCanvas);
     try {
       if (texture && typeof texture === "object") texture.rtsRendererOwnedTexture = true;
     } catch (_err) {
@@ -69,16 +68,14 @@ async function loadAdjustedTexture(pixi, {
     return texture;
   } catch (_err) {
     return rawLoad();
+  } finally {
+    loadedImage?.close?.();
   }
 }
 
 function loadImage(src, errorLabel) {
-  return new Promise((resolve, reject) => {
-    const image = new globalThis.Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`failed to load ${errorLabel} ${src}`));
-    image.src = src;
+  return fetchImageBitmap(src).catch((error) => {
+    throw new Error(`failed to load ${errorLabel} ${src}: ${error?.message || error}`);
   });
 }
 

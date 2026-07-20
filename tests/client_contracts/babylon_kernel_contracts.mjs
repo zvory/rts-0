@@ -240,7 +240,7 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
       playerId: 1,
     });
     assert.ok(Object.isFrozen(frame.projection.perspective), "presentation frame retains detached scene coefficients");
-    assert.equal(renderer.render(frame).presented, true);
+    assert.equal((await renderer.render(frame).settled).status, "presented");
     assert.equal(renderer._scene.renderCount, 1, "Match-driven render calls scene.render exactly once");
     assert.deepEqual(measuredPhases, ["renderer.update", "renderer.present"], "Babylon attributes scene update and actual present separately");
     assert.equal(renderer._engine.runRenderLoopCalls, 0, "Babylon never owns an engine render loop");
@@ -278,7 +278,7 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     assert.equal(dom.parent.children.length, 0, "idempotent teardown removes the one owned canvas");
     assert.equal(renderer._scene, null, "teardown releases the one owned scene");
     const reentered = bundle.createRenderer(dom.parent);
-    assert.equal(reentered.render(frame).presented, true, "one normal leave/re-enter creates a fresh scene");
+    assert.equal((await reentered.render(frame).settled).status, "presented", "one normal leave/re-enter creates a fresh scene");
     assert.equal(
       dom.parent.children.filter((child) => child.tag === "canvas").length,
       1,

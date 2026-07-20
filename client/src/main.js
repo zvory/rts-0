@@ -38,7 +38,12 @@ async function start() {
   // Debug/introspection handle. Harmless in production; lets dev tooling and the
   // integration tests inspect live match state (e.g. `__rts.match.state.selection`).
   if (typeof window !== "undefined") window.__rts = app;
-  await app.start();
+  try {
+    await app.start();
+  } catch (error) {
+    showRendererBootstrapError(error);
+    app.destroy?.();
+  }
 }
 
 void start();

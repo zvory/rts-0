@@ -1,6 +1,7 @@
 import { gfxNoFill, gfxEllipse, gfxPoly, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
+import { createWorkerSafeCanvas } from "./raster_primitives.js";
 
 export const TRENCH_DECAL_TEXTURE_WORLD_SCALE = 4;
 
@@ -13,13 +14,13 @@ export class TrenchDecalLayer {
   constructor({
     layer,
     pixi = globalThis.PIXI,
-    getDocument = () => (typeof document !== "undefined" ? document : null),
+    createCanvas = createWorkerSafeCanvas,
     downsample = TRENCH_DECAL_TEXTURE_WORLD_SCALE,
     recordDiagnostic = null,
   } = {}) {
     this.layer = layer;
     this.pixi = pixi;
-    this.getDocument = getDocument;
+    this.createCanvas = createCanvas;
     this.downsample = downsample;
     this.recordDiagnostic = recordDiagnostic;
     this.canvas = null;
@@ -43,12 +44,11 @@ export class TrenchDecalLayer {
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
 
-    const doc = this.getDocument?.();
-    if (!doc || !this.pixi?.Texture || !this.pixi?.Sprite || !this.layer) return false;
+    if (!this.pixi?.Texture || !this.pixi?.Sprite || !this.layer) return false;
     const tileSize = Number.isFinite(map?.tileSize) ? map.tileSize : 32;
     const worldWidth = Math.max(1, (map?.width || 1) * tileSize);
     const worldHeight = Math.max(1, (map?.height || 1) * tileSize);
-    this.canvas = doc.createElement("canvas");
+    this.canvas = this.createCanvas();
     this.canvas.width = Math.max(1, Math.ceil(worldWidth / this.downsample));
     this.canvas.height = Math.max(1, Math.ceil(worldHeight / this.downsample));
     this.ctx = this.canvas.getContext("2d", { alpha: true });

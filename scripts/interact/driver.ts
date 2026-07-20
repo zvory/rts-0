@@ -21,6 +21,7 @@ import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
 import { waitForInteractStartup } from "./bridge_startup.ts";
+import { evaluateInteractBridgeCall } from "./bridge_call.ts";
 import { performMouseDrag, type MouseDragInput } from "./mouse_drag.ts";
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
@@ -909,14 +910,10 @@ export class InteractDriver {
     if (this.state !== DRIVER_STATES.OPEN || !this.page) {
       throw new InteractDriverError("sessionClosed", "Interact driver session is not open.");
     }
-    const result = await withTimeout(
-      this.page!.evaluate(
-        ({ method: bridgeMethod, input: bridgeInput }: { method: string; input: JsonObject }) => window.__rtsInteract!.call(bridgeMethod, bridgeInput),
-        { method, input },
-      ),
-      this.options.timeoutMs,
-      `Interact ${method}`,
-    );
+    const result = await evaluateInteractBridgeCall({
+      page: this.page, method, input, timeoutMs: this.options.timeoutMs,
+      startupTimeoutMs: this.options.startupTimeoutMs, withTimeout,
+    });
     if (!result?.ok) {
       throw new InteractDriverError(
         result?.error?.code || "bridgeError",

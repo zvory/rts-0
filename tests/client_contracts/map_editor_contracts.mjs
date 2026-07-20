@@ -1,36 +1,98 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { installFakePixi } from "./pixi_fakes.mjs";
-
 {
   const savedRaf = globalThis.requestAnimationFrame;
-  let scheduled = 0;
-  globalThis.requestAnimationFrame = () => ++scheduled;
+  const scheduled = [];
+  globalThis.requestAnimationFrame = (callback) => {
+    scheduled.push(callback);
+    return scheduled.length;
+  };
   try {
+    const presentations = [];
+    let cameraUpdates = 0;
+    let paintCode = TERRAIN.WATER;
     const viewport = {
       destroyed: false,
+      presentationStopped: false,
+      presentationInFlight: null,
       lastFrameAt: 0,
       keys: {},
       camera: {
         x: 10,
         y: 20,
         zoom: 2,
-        update() {},
+        update() { cameraUpdates += 1; this.x += 1; },
       },
-      renderer: {
-        world: {
-          position: { set() {} },
-          scale: { set() {} },
+      presentationFrameId: 0,
+      terrainRevision: 0,
+      overlayRevision: 0,
+      pendingTerrainUpdate: null,
+      pendingOverlay: null,
+      symmetry: MAP_EDITOR_SYMMETRY.NONE,
+      selectedBaseIndex: null,
+      tool: { kind: "terrain", terrain: TERRAIN.WATER },
+      session: {
+        draft: { terrain: ["....", "....", "....", "...."] },
+        paintTerrainTiles() {
+          return [
+            { x: 1, y: 1, code: paintCode },
+            { x: 2, y: 2, code: paintCode },
+          ];
         },
-        presents: 0,
-        present() { this.presents += 1; },
+        mapOverlay() { return { starts: [], bases: [] }; },
+      },
+      siteRecord: MapEditorViewport.prototype.siteRecord,
+      paintPreviewRecord: () => null,
+      onStatus(message, error) { this.status = { message, error }; },
+      presentation: {
+        present(record) {
+          let resolve;
+          const settled = new Promise((done) => { resolve = done; });
+          presentations.push({ record, resolve });
+          return settled;
+        },
       },
       tick: MapEditorViewport.prototype.tick,
+      submitPresentation: MapEditorViewport.prototype.submitPresentation,
+      settlePresentation: MapEditorViewport.prototype.settlePresentation,
+      stopPresentation: MapEditorViewport.prototype.stopPresentation,
     };
+    MapEditorViewport.prototype.paintTiles.call(viewport, [{ x: 1, y: 1 }]);
+    MapEditorViewport.prototype.drawOverlay.call(viewport);
     viewport.tick(16);
-    assert.equal(viewport.renderer.presents, 1, "each Map Editor RAF explicitly presents once");
-    assert.equal(scheduled, 1, "Map Editor schedules one successor RAF");
+    assert.equal(presentations.length, 1, "the Map Editor submits one detached presentation record");
+    assert.equal(presentations[0].record.version, 1);
+    assert.equal(scheduled.length, 1, "the Map Editor keeps its camera/input RAF running during presentation");
+
+    for (let i = 0; i < 20; i += 1) {
+      paintCode = i % 2 === 0 ? TERRAIN.MUD : TERRAIN.WATER;
+      MapEditorViewport.prototype.paintTiles.call(viewport, [{ x: 1, y: 1 }]);
+    }
+    MapEditorViewport.prototype.drawOverlay.call(viewport);
+    scheduled.shift()(32);
+    assert.equal(cameraUpdates, 2, "camera state advances while the worker presentation remains deferred");
+    assert.equal(presentations.length, 1, "backpressure permits only one editor worker submission in flight");
+    assert.equal(viewport.pendingTerrainUpdate.changes.length, 2,
+      "repainting while the worker is slow remains bounded to unique changed tiles");
+    presentations[0].resolve({ status: "presented", frameId: 1 });
+    await Promise.resolve();
+    assert.equal(viewport.pendingTerrainUpdate.revision, 21,
+      "terrain painted during an in-flight frame remains pending after the older frame presents");
+    assert.equal(viewport.pendingOverlay.revision, 2,
+      "a newer editor overlay remains pending after the older frame presents");
+
+    scheduled.shift()(48);
+    assert.equal(presentations.length, 2);
+    assert.equal(presentations[1].record.camera.x, 13,
+      "the first post-acknowledgment submission carries the latest accumulated camera state");
+    assert.equal(presentations[1].record.terrainUpdate.revision, 21,
+      "the next acknowledged editor frame carries every accumulated terrain change");
+    presentations[1].resolve({ status: "presented", frameId: 2 });
+    await Promise.resolve();
+    assert.equal(viewport.pendingTerrainUpdate, null, "presented terrain changes clear after exact revision acknowledgment");
+    assert.equal(viewport.pendingOverlay, null, "presented overlay state clears after exact revision acknowledgment");
+    assert.equal(viewport.status, undefined, "serialized editor presentation completes without a false failure status");
   } finally {
     globalThis.requestAnimationFrame = savedRaf;
   }
@@ -90,18 +152,16 @@ import {
       destroyed: false,
       frame: 73,
       unsubscribe() {},
-      renderer: {
-        app: { canvas: { removeEventListener() {} } },
+      presentation: {
+        canvas: { removeEventListener() {} },
         destroyed: 0,
         destroy() { this.destroyed += 1; },
       },
-      labels: [],
-      overlay: { destroy() {} },
     };
     MapEditorViewport.prototype.destroy.call(viewport);
     MapEditorViewport.prototype.destroy.call(viewport);
     assert.deepEqual(cancelled, [73], "Map Editor teardown cancels its one owned RAF exactly once");
-    assert.equal(viewport.renderer.destroyed, 1, "Map Editor teardown destroys Pixi idempotently");
+    assert.equal(viewport.presentation.destroyed, 1, "Map Editor teardown destroys presentation idempotently");
   } finally {
     globalThis.cancelAnimationFrame = savedCancel;
     globalThis.window = savedWindow;
@@ -111,6 +171,12 @@ import {
 const repoRoot = new URL("../../", import.meta.url);
 const oneVOneNoTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1-no-terrain.json", repoRoot), "utf8"));
 const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
+const mainSource = fs.readFileSync(new URL("client/src/main.js", repoRoot), "utf8");
+
+assert(
+  /try\s*\{\s*await app\.start\(\);\s*\}\s*catch \(error\)\s*\{[\s\S]*showRendererBootstrapError\(error\)/.test(mainSource),
+  "application startup bounds Map Editor worker bootstrap rejection with the renderer error UI",
+);
 
 {
   const serverMainRadius = Number(serverMapSource.match(/BASE_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
@@ -265,38 +331,25 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   MapEditorViewport.prototype.setSelectedBase.call(viewport, null);
   assert.equal(viewport.redraws, 2, "base selection redraws the editor overlay only when it changes");
 
-  const restorePixi = installFakePixi();
-  try {
-    const overlay = {
-      calls: [],
-      stroke(style) { this.calls.push(["stroke", style]); return this; },
-      circle(...args) { this.calls.push(["drawCircle", ...args]); return this; },
-      fill(style) { this.calls.push(["fill", style]); return this; },
-    };
-    const feedback = new PIXI.Container();
-    const siteViewport = { overlay, labels: [], renderer: { layers: { feedback } } };
-    MapEditorViewport.prototype.drawSite.call(siteViewport, { x: 10, y: 12 }, 0xf4c542, 7, "B1", true);
-    assert(overlay.calls.some((call) => call[0] === "drawCircle" && call[3] === 13),
-      "the selected base gets a larger map highlight ring");
+  const site = MapEditorViewport.prototype.siteRecord.call({}, { x: 10, y: 12 }, 0xf4c542, 7, "B1", true);
+  assert.deepEqual(site, { x: 336, y: 400, color: 0xf4c542, radius: 7, label: "B1", selected: true },
+    "the selected base becomes a detached presentation marker");
 
-    const gridOverlay = new PIXI.Graphics();
-    MapEditorViewport.prototype.drawOverlay.call({
-      session: {
-        draft: { terrain: Array(16) },
-        mapOverlay: () => ({ starts: [], bases: [] }),
-      },
-      symmetry: MAP_EDITOR_SYMMETRY.NONE,
-      overlay: gridOverlay,
-      labels: [],
-      drawSite() {},
-      drawPaintPreview() {},
-    });
-    assert(gridOverlay.calls.some((call) => call[0] === "lineTo") &&
-      gridOverlay.calls.some((call) => call[0] === "lineStyle"),
-    "Map Editor grid lines execute native v8 strokes instead of leaving an unpainted path");
-  } finally {
-    restorePixi();
-  }
+  const recordViewport = {
+    session: {
+      draft: { terrain: Array(16) },
+      mapOverlay: () => ({ starts: [], bases: [] }),
+    },
+    symmetry: MAP_EDITOR_SYMMETRY.NONE,
+    overlayRevision: 0,
+    selectedBaseIndex: null,
+    siteRecord: MapEditorViewport.prototype.siteRecord,
+    paintPreviewRecord: () => null,
+  };
+  MapEditorViewport.prototype.drawOverlay.call(recordViewport);
+  assert.equal(recordViewport.pendingOverlay.revision, 1);
+  assert(Array.isArray(recordViewport.pendingOverlay.gridPaths),
+    "Map Editor grid lines cross as detached paths for the Pixi owner");
 }
 
 {

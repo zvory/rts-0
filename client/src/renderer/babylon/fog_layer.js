@@ -1,5 +1,7 @@
 import { worldPointToScene, worldScaleToScene } from "./coordinates.js";
 
+import { gridSnapshotValue } from "../../presentation/grid_snapshot.js";
+
 const FOG_ALPHA = Object.freeze({ visible: 0, explored: 0.48, unknown: 0.92 });
 
 export class BabylonFogLayer {
@@ -97,10 +99,10 @@ export class BabylonFogLayer {
     let unknownTiles = 0;
     for (let index = 0; index < visible.width * visible.height; index += 1) {
       let alpha;
-      if (visible.get(index)) {
+      if (gridSnapshotValue(visible, index)) {
         alpha = FOG_ALPHA.visible;
         visibleTiles += 1;
-      } else if (explored.get(index)) {
+      } else if (gridSnapshotValue(explored, index)) {
         alpha = FOG_ALPHA.explored;
         exploredTiles += 1;
       } else {
@@ -126,6 +128,6 @@ export class BabylonFogLayer {
 }
 
 function validGrid(grid) {
-  return grid?.version === 1 && Number.isInteger(grid.width) && Number.isInteger(grid.height)
-    && typeof grid.get === "function";
+  return grid?.version === 2 && Number.isInteger(grid.width) && Number.isInteger(grid.height)
+    && grid.values instanceof Uint8Array && grid.values.length === grid.width * grid.height;
 }

@@ -9,15 +9,15 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 
 - There is one JavaScript client, one `Match`, one state/interpolation pipeline, and one active
   world renderer per match. Pixi is the default.
-- During a match, `Match` owns the only `requestAnimationFrame` loop and visual clock. Pixi is
-  pinned at v8.19.0 and initialized asynchronously with `autoStart:false` and an initial WebGL
-  preference; no normal, capture, or teardown path starts its ticker. A
-  backend updates and presents only when Match calls it; Babylon never calls `runRenderLoop()`.
+- During a match, `Match` owns the only main-thread `requestAnimationFrame` loop and visual clock.
+  Pixi is pinned at v8.19.0 and initialized in one module worker with `autoStart:false` and an
+  explicit WebGL preference; no normal, capture, or teardown path starts its ticker. The worker
+  updates and presents only from submitted frames; Babylon never calls `runRenderLoop()`.
 - Server/application coordinates remain two-dimensional world pixels. Scene axes, scale, height,
   and facing are backend-private presentation conversions.
 - Input and commands use semantic projection and selection data. Meshes, asset bounds, LODs,
   shadow proxies, and GPU picking are never gameplay authority.
-- A backend consumes only detached `PresentationFrameV1` data. It never receives `GameState`,
+- A backend consumes only detached `PresentationFrameV2` data. It never receives `GameState`,
   `ClientIntent`, transport objects, hidden entity variants, or another backend's engine objects.
 - The backend root owns its canvas, engine/renderer, scene, and shared GPU resources. Entity/effect
   children own instances only and cannot dispose shared resources.
@@ -25,8 +25,9 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 - HUD, lobby, minimap, audio, diagnostics, and Lab panels remain shared external surfaces.
 
 Rendering work does not change the Rust server, protocol, simulation, fog authority, replay format,
-or command coordinates. A renderer failure is a bounded presentation failure and cannot stop later
-Match frames.
+or command coordinates. A Pixi worker failure is a visible bounded fatal presentation error for
+that match: it settles pending work, stops that match's animation-frame loop, and tears down without
+selecting another renderer.
 
 ## 2. Semantic camera and projection
 
@@ -129,27 +130,26 @@ bounds, shadow proxies, or fresh mutable state.
 ## 4. Presentation frame
 
 Static map presentation changes only with the static-map revision. Per-rAF data is assembled once
-by Match. Large grids cross the boundary as immutable accessors:
+by Match. Large grids cross the boundary as source-detached cloneable buffers:
 
 ```text
-GridSnapshotV1 = {
-  version: 1, revision, width, height,
-  get(index) -> number,
-  copyInto(targetTypedArray, targetOffset = 0) -> copiedCount
+GridSnapshotV2 = {
+  version: 2, revision, width, height,
+  values: Uint8Array
 }
 
-StaticMapPresentationV1 = {
-  version: 1, generation, revision,
+StaticMapPresentationV2 = {
+  version: 2, generation, revision,
   widthPx, heightPx, tileSizePx,
-  terrain: GridSnapshotV1,
+  terrain: GridSnapshotV2,
   resourceSites: readonly detached records[]
 }
 
-PresentationFrameV1 = {
-  version: 1, generation, frameId, visualTimeMs,
-  projection, staticMapRevision,
-  visible: GridSnapshotV1,
-  explored: GridSnapshotV1,
+PresentationFrameV2 = {
+  version: 2, generation, frameId, groundDecalRevision, visualTimeMs,
+  projection: RendererProjectionV2, staticMapRevision,
+  visible: GridSnapshotV2,
+  explored: GridSnapshotV2,
   layers: LayerRecordsV1,
   diagnosticsContext
 }
@@ -162,9 +162,17 @@ tile-footprint descriptor. Freehand formation feedback crosses `tacticalFeedback
 `slots`; every backend renders both the stroke and admitted slots. These are presentation hints only: `SelectionSceneV1` remains the sole
 entity/ground interaction authority.
 
-The backend owns any mutable staging buffers. Frame objects, arrays, and ordinary records are
-detached and frozen. Malformed individual records are dropped with bounded category diagnostics;
-they do not abort the whole frame.
+The main thread keeps this rich `ProjectionSnapshotV1` for input, audio, minimap, and selection.
+`PresentationFrameV2` instead carries a function-free `RendererProjectionV2` with `kind`, `camera`,
+`viewport`, `mapBounds`, and plain backend coefficients. Orthographic records preserve the sampled
+origin, framing scale, world size, and CSS viewport size exactly; perspective records carry their
+existing plain coefficients. The Pixi owner reconstructs private projection queries from that data;
+functions and camera instances never cross the renderer boundary.
+
+The backend owns mutable staging buffers. Frame objects, arrays, and ordinary records are detached
+and frozen; the explicitly revisioned grid `Uint8Array` values are copied from mutable game sources
+and are the only typed-array leaves. Malformed individual records are dropped with bounded category
+diagnostics; they do not abort the whole frame.
 
 For received interpolated entities, Match creates one aligned frame-local preparation entry per
 source record. Its complete graph-aware detached interaction feeds `SelectionSceneV1`; its
@@ -172,8 +180,9 @@ separately admitted presentation fields feed the entity layer without repeating 
 Unadmitted fields can neither reach nor invalidate presentation, while cycles, mutable collection
 views, unsupported prototypes, excessive depth, and non-finite values in admitted fields retain
 the existing bounded entity-drop behavior. These entries are positional and frame-local—there is
-no cross-frame cache or id lookup. A failed render never publishes or retains that frame's
-interaction; the prior successful selection scene remains authoritative for input.
+no cross-frame cache or id lookup. A failed or superseded frame never publishes or retains that
+frame's interaction; the prior successfully presented selection scene remains authoritative for
+input.
 
 Back-to-front layer ids are exact:
 
@@ -191,18 +200,69 @@ Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later wo
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
-pending ground decals, assembles one frame, and calls `renderer.render(frame)`. Only after a
-successful presentation does Match publish the matching `SelectionSceneV1` and acknowledge its
-reconciled ground decals. Each adapter call first updates backend scene state, then synchronously
-presents exactly once. Pixi presentation is one `PIXI.Application.render()` call; Babylon
-presentation is one `Scene.render()` call. Update or present failure returns `presented:false`, does
-not advance the successful renderer-frame count, and cannot prevent Match from scheduling its next
-RAF.
+one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.
+`PresentationCoordinator` owns the pending metadata for every accepted generation/frame id and is
+the only consumer of renderer lifecycle outcomes. A submission exposes an independent `retained`
+promise plus one terminal `presented`, `superseded`, `failed`, or `destroyed` promise. `retained`
+acknowledges only the exact durable decal revision and is independent of displayed pixels; a later
+failure cannot make Match resend and double-stamp that revision. Only `presented` advances the
+public displayed-frame counter and publishes the matching `SelectionSceneV1`. Superseded and failed
+frames discard their pending selection scene, while teardown settles pending work as destroyed and
+blocks late selection/decal/capture side effects.
+
+Babylon still updates scene state and synchronously presents exactly once inside `render(frame)`.
+Pixi's main-thread host returns asynchronous promise channels, while its module worker performs one
+`PIXI.Application.render()` for the accepted frame and acknowledges the exact generation/frame id.
+Duplicate, stale, unknown, impossibly
+ordered, or presented-after-destroy outcomes are bounded protocol diagnostics and cannot change the
+newest visible selection scene.
 
 The `PixiPresentationAdapter` is the sole bridge to existing Pixi helpers. Its exact private-read
 allowlist uses `{id, reviewTrigger}` records: a trigger is a concrete reason to reconsider a read,
 not a promised cleanup phase. New reads fail the contract, and Babylon cannot import the adapter or
 receive its sources.
+
+### 4.1 Render-worker message boundary
+
+`RenderWorkerMessageV1` is the only Phase 3 worker vocabulary. Every request has
+`{version:1,type,generation,payload}` and is validated for known type, matching presentation/static
+versions, safe integer ids, finite bounded dimensions/DPR/timings, and shape-matched typed arrays.
+Its payload lifetimes are explicit:
+
+- initialization: transferred canvas, CSS size, DPR, PresentationFrameV2/StaticMapPresentationV2
+  versions, and immutable configuration;
+- map generation: one static-map payload and transferred terrain copy per generation;
+- durable update: monotonic ground-decal revision plus its detached records;
+- revisioned data: transferred visible/explored copies only when each revision changes;
+- frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
+- control: resize, capture/flush, generation reset, and destroy.
+
+Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
+update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
+transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
+usable and unchanged.
+
+The production `PixiWorkerPresentationAdapter` transfers the sole visible canvas during
+construction. It admits one in-flight frame plus one latest pending frame. Replacing the pending
+frame settles its exact id as `superseded`; durable decal messages have an independent retained
+lifetime. Only a current-generation `presented` acknowledgment publishes that frame's stored
+`SelectionSceneV1`. Fixed capture cancels ordinary pending work, waits for its exact frame, and
+reads decoded RGBA from that same worker render task. Resize is held behind an in-flight frame and
+ordered before the next frame; reset and idempotent destroy discard every pending frame, selection,
+decal, capture, and resize record. Live, replay, spectator, Lab, stress, fixed capture, and Map
+Editor all use this same worker host. There is no Pixi flag, synchronous canvas, hidden renderer,
+WebGPU probe, or fallback renderer.
+
+Worker display age starts when the host accepts the frame, before host-pending time, message
+construction, cloning, and dispatch. Queue age uses that same boundary through worker task start;
+main-submit timing separately isolates message construction, cloning, and `postMessage` cost.
+
+The Map Editor keeps its camera/input animation-frame loop responsive but applies backpressure only
+to worker submission, with no more than one editor presentation in flight. Terrain patches coalesce
+by tile and complete overlays remain pending until the worker acknowledges the exact revision as
+presented; edits made while that presentation is in flight merge into the next submission. This
+lets ordinary match frames remain latest-oriented without treating authoring changes as disposable
+presentation data. A failed editor worker stops new submissions and reports one visible error.
 
 ## 5. Babylon foundation contracts
 
@@ -223,7 +283,7 @@ projection agree.
 
 ### 5.3 Fog and generic content
 
-Babylon renders only the categories already separated by `PresentationFrameV1`. Current/explored
+Babylon renders only the categories already separated by `PresentationFrameV2`. Current/explored
 fog uses the immutable revisions; remembered, intel, and reveal presentation use their explicit
 layers and never query a hidden source id. A real two-recipient sentinel test covers scene,
 selection, and diagnostics before the live route is enabled.

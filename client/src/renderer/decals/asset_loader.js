@@ -1,3 +1,5 @@
+import { fetchImageBitmap } from "../raster_primitives.js";
+import { GROUND_DECAL_PNG_ATLAS } from "./atlas.generated.js";
 import { GROUND_DECAL_ASSET_MANIFEST } from "./manifest.js";
 
 export const GROUND_DECAL_ATLAS_STATUS = Object.freeze({
@@ -8,38 +10,38 @@ export const GROUND_DECAL_ATLAS_STATUS = Object.freeze({
 });
 
 export function canLoadGroundDecalAtlas({
-  documentRef = typeof document !== "undefined" ? document : null,
-  imageFactory = null,
+  fetchFn = globalThis.fetch,
+  createImageBitmapFn = globalThis.createImageBitmap,
 } = {}) {
-  return Boolean(
-    documentRef
-      && typeof documentRef.createElement === "function"
-      && (typeof imageFactory === "function" || typeof globalThis.Image === "function"),
-  );
+  return typeof fetchFn === "function" && typeof createImageBitmapFn === "function";
 }
 
 export async function loadGroundDecalAtlas({
   manifest = GROUND_DECAL_ASSET_MANIFEST,
-  documentRef = typeof document !== "undefined" ? document : null,
-  imageFactory = null,
+  atlasManifest = GROUND_DECAL_PNG_ATLAS,
+  fetchFn = globalThis.fetch,
+  createImageBitmapFn = globalThis.createImageBitmap,
 } = {}) {
-  if (!canLoadGroundDecalAtlas({ documentRef, imageFactory })) {
-    throw new Error("ground decal SVG atlas needs document.createElement and Image");
+  if (!canLoadGroundDecalAtlas({ fetchFn, createImageBitmapFn })) {
+    throw new Error("ground decal PNG atlas needs fetch and createImageBitmap");
   }
-
-  const makeImage = imageFactory || (() => new globalThis.Image());
+  validateAtlasCoverage(manifest, atlasManifest);
+  const image = await fetchImageBitmap(atlasManifest.url, { fetchFn, createImageBitmapFn });
+  if (image.width !== atlasManifest.width || image.height !== atlasManifest.height) {
+    image.close?.();
+    throw new Error(`ground decal PNG atlas dimensions ${image.width}x${image.height} do not match manifest`);
+  }
+  let destroyed = false;
   const atlas = {
-    infantry: [],
-    vehicleScorch: [],
-    vehiclePaint: [],
-    mortarBlast: [],
-    artilleryBlast: [],
+    infantry: masksForGroup(atlasManifest.groups.infantry, image),
+    vehicleScorch: masksForGroup(atlasManifest.groups.vehicleScorch, image),
+    vehiclePaint: masksForGroup(atlasManifest.groups.vehiclePaint, image),
+    mortarBlast: masksForGroup(atlasManifest.groups.mortarBlast, image),
+    artilleryBlast: masksForGroup(atlasManifest.groups.artilleryBlast, image),
     destroy() {
-      destroyMasks(this.infantry);
-      destroyMasks(this.vehicleScorch);
-      destroyMasks(this.vehiclePaint);
-      destroyMasks(this.mortarBlast);
-      destroyMasks(this.artilleryBlast);
+      if (destroyed) return;
+      destroyed = true;
+      image.close?.();
       this.infantry = [];
       this.vehicleScorch = [];
       this.vehiclePaint = [];
@@ -47,66 +49,38 @@ export async function loadGroundDecalAtlas({
       this.artilleryBlast = [];
     },
   };
-
-  try {
-    atlas.infantry = await loadMaskSet(manifest.infantry, { documentRef, makeImage });
-    atlas.vehicleScorch = await loadMaskSet(manifest.vehicleScorch, { documentRef, makeImage });
-    atlas.vehiclePaint = await loadMaskSet(manifest.vehiclePaint, { documentRef, makeImage });
-    atlas.mortarBlast = await loadMaskSet(manifest.mortarBlast, { documentRef, makeImage });
-    atlas.artilleryBlast = await loadMaskSet(manifest.artilleryBlast, { documentRef, makeImage });
-    return atlas;
-  } catch (err) {
-    atlas.destroy();
-    throw err;
-  }
+  return atlas;
 }
 
-async function loadMaskSet(assets, context) {
-  return Promise.all((assets || []).map((asset) => loadMask(asset, context)));
-}
-
-async function loadMask(asset, { documentRef, makeImage }) {
-  const image = await loadImage(asset, makeImage);
-  const canvas = documentRef.createElement("canvas");
-  canvas.width = Math.max(1, asset.width | 0);
-  canvas.height = Math.max(1, asset.height | 0);
-  const ctx = canvas.getContext("2d", { alpha: true });
-  if (!ctx) throw new Error(`ground decal mask ${asset.id} could not create a 2d context`);
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return {
-    id: asset.id,
-    url: asset.url,
-    width: canvas.width,
-    height: canvas.height,
-    canvas,
-  };
-}
-
-function loadImage(asset, makeImage) {
-  return new Promise((resolve, reject) => {
-    const image = makeImage();
-    let settled = false;
-    const finish = (fn, value) => {
-      if (settled) return;
-      settled = true;
-      image.onload = null;
-      image.onerror = null;
-      fn(value);
-    };
-    image.onload = () => finish(resolve, image);
-    image.onerror = () => finish(reject, new Error(`failed to load ground decal SVG ${asset.url}`));
-    image.src = asset.url;
-    if (image.complete && image.naturalWidth !== 0) finish(resolve, image);
-  });
-}
-
-function destroyMasks(masks) {
-  for (const mask of masks || []) {
-    if (mask?.canvas) {
-      mask.canvas.width = 0;
-      mask.canvas.height = 0;
+export function validateAtlasCoverage(sourceManifest, atlasManifest) {
+  if (atlasManifest?.version !== 1) throw new TypeError("ground decal PNG atlas manifest version is unsupported");
+  for (const [group, assets] of Object.entries(sourceManifest || {})) {
+    const rects = atlasManifest.groups?.[group];
+    if (!Array.isArray(rects) || rects.length !== assets.length) {
+      throw new Error(`ground decal PNG atlas group ${group} does not cover its SVG sources`);
+    }
+    for (let index = 0; index < assets.length; index += 1) {
+      const source = assets[index];
+      const rect = rects[index];
+      if (rect.id !== source.id || rect.width !== source.width || rect.height !== source.height) {
+        throw new Error(`ground decal PNG atlas entry ${group}[${index}] does not match ${source.id}`);
+      }
+      if (
+        !Number.isInteger(rect.x) || !Number.isInteger(rect.y) || rect.x < 0 || rect.y < 0
+        || rect.x + rect.width > atlasManifest.width || rect.y + rect.height > atlasManifest.height
+      ) throw new RangeError(`ground decal PNG atlas rect ${source.id} is out of bounds`);
     }
   }
+  return true;
+}
+
+function masksForGroup(rects, image) {
+  return rects.map((rect) => Object.freeze({
+    id: rect.id,
+    width: rect.width,
+    height: rect.height,
+    sourceX: rect.x,
+    sourceY: rect.y,
+    image,
+  }));
 }

@@ -11,6 +11,7 @@ import {
   normalizeColorNumber,
   rgba,
 } from "./decals/selection.js";
+import { createWorkerSafeCanvas } from "./raster_primitives.js";
 
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 
@@ -37,18 +38,16 @@ export class GroundDecalLayer {
   constructor({
     layer,
     pixi = globalThis.PIXI,
-    getDocument = () => (typeof document !== "undefined" ? document : null),
+    createCanvas = createWorkerSafeCanvas,
     downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE,
     recordDiagnostic = null,
-    imageFactory = null,
     loadAtlas = loadGroundDecalAtlas,
   } = {}) {
     this.layer = layer;
     this.pixi = pixi;
-    this.getDocument = getDocument;
+    this.createCanvas = createCanvas;
     this.downsample = downsample;
     this.recordDiagnostic = recordDiagnostic;
-    this.imageFactory = imageFactory;
     this.loadAtlas = loadAtlas;
     this.canvas = null;
     this.ctx = null;
@@ -69,12 +68,11 @@ export class GroundDecalLayer {
     this.destroy();
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
-    const doc = this.getDocument?.();
-    if (!doc || !this.pixi?.Texture || !this.pixi?.Sprite || !this.layer) return false;
+    if (!this.pixi?.Texture || !this.pixi?.Sprite || !this.layer) return false;
     const tileSize = Number.isFinite(map?.tileSize) ? map.tileSize : 32;
     const worldWidth = Math.max(1, (map?.width || 1) * tileSize);
     const worldHeight = Math.max(1, (map?.height || 1) * tileSize);
-    this.canvas = doc.createElement("canvas");
+    this.canvas = this.createCanvas();
     this.canvas.width = Math.max(1, Math.ceil(worldWidth / this.downsample));
     this.canvas.height = Math.max(1, Math.ceil(worldHeight / this.downsample));
     this.ctx = this.canvas.getContext("2d", { alpha: true });
@@ -88,15 +86,17 @@ export class GroundDecalLayer {
     this.sprite.scale.set(this.downsample);
     this.layer.addChild(this.sprite);
     this.recordDiagnostic?.("renderer.groundDecals.displayObjects", this.displayObjectCount());
-    this._beginAssetLoad(doc);
+    this._beginAssetLoad();
     return true;
   }
 
   stampBatch(decals, { onError = null } = {}) {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
+    if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.FAILED) {
+      throw this.assetLoadError || new Error("ground decal PNG atlas is unavailable");
+    }
     if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) {
-      this._queuedUntilAssets.push(...decals);
-      this.recordDiagnostic?.("renderer.groundDecals.queuedForAtlas", decals.length);
+      this.recordDiagnostic?.("renderer.groundDecals.awaitingAtlas", decals.length);
       return 0;
     }
     const batch = this._queuedUntilAssets.length > 0
@@ -105,7 +105,7 @@ export class GroundDecalLayer {
     return this._stampDecodedBatch(batch, { onError });
   }
 
-  _beginAssetLoad(doc) {
+  _beginAssetLoad() {
     this._assetLoadGeneration += 1;
     const generation = this._assetLoadGeneration;
     this.atlas?.destroy?.();
@@ -113,7 +113,7 @@ export class GroundDecalLayer {
     this.assetLoadError = null;
     this.assetLoadPromise = null;
 
-    if (!canLoadGroundDecalAtlas({ documentRef: doc, imageFactory: this.imageFactory })) {
+    if (!canLoadGroundDecalAtlas()) {
       this.assetStatus = GROUND_DECAL_ATLAS_STATUS.FAILED;
       this.recordDiagnostic?.("renderer.groundDecals.assetFallback", 1);
       return;
@@ -121,10 +121,7 @@ export class GroundDecalLayer {
 
     this.assetStatus = GROUND_DECAL_ATLAS_STATUS.PENDING;
     this.recordDiagnostic?.("renderer.groundDecals.assetLoadPending", 1);
-    this.assetLoadPromise = this.loadAtlas({
-      documentRef: doc,
-      imageFactory: this.imageFactory,
-    }).then((atlas) => {
+    this.assetLoadPromise = this.loadAtlas().then((atlas) => {
       if (generation !== this._assetLoadGeneration || !this.ctx) {
         atlas?.destroy?.();
         return null;
@@ -132,14 +129,12 @@ export class GroundDecalLayer {
       this.atlas = atlas;
       this.assetStatus = GROUND_DECAL_ATLAS_STATUS.READY;
       this.recordDiagnostic?.("renderer.groundDecals.assetLoadReady", 1);
-      this._stampQueuedAfterAssetSettled();
       return atlas;
     }).catch((err) => {
       if (generation !== this._assetLoadGeneration) return null;
       this.assetLoadError = err;
       this.assetStatus = GROUND_DECAL_ATLAS_STATUS.FAILED;
       this.recordDiagnostic?.("renderer.groundDecals.assetLoadFailed", 1);
-      this._stampQueuedAfterAssetSettled();
       return null;
     });
   }
@@ -180,9 +175,7 @@ export class GroundDecalLayer {
 
   _ensureTintScratch() {
     if (this._tintScratch?.ctx) return this._tintScratch;
-    const doc = this.getDocument?.();
-    if (!doc || typeof doc.createElement !== "function") return null;
-    const canvas = doc.createElement("canvas");
+    const canvas = this.createCanvas();
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return null;
     ctx.imageSmoothingEnabled = false;
@@ -485,7 +478,7 @@ function drawTintedMask(ctx, scratch, mask, color, x, y, downsample, {
   scaleY,
   opacity,
 }) {
-  if (!scratch?.ctx || !scratch?.canvas || !mask?.canvas) return false;
+  if (!scratch?.ctx || !scratch?.canvas || !mask?.image) return false;
   if (scratch.canvas.width !== mask.width || scratch.canvas.height !== mask.height) {
     scratch.canvas.width = mask.width;
     scratch.canvas.height = mask.height;
@@ -495,7 +488,17 @@ function drawTintedMask(ctx, scratch, mask, color, x, y, downsample, {
   scratchCtx.globalAlpha = 1;
   scratchCtx.globalCompositeOperation = "source-over";
   scratchCtx.clearRect(0, 0, mask.width, mask.height);
-  scratchCtx.drawImage(mask.canvas, 0, 0, mask.width, mask.height);
+  scratchCtx.drawImage(
+    mask.image,
+    mask.sourceX,
+    mask.sourceY,
+    mask.width,
+    mask.height,
+    0,
+    0,
+    mask.width,
+    mask.height,
+  );
   scratchCtx.globalCompositeOperation = "source-in";
   scratchCtx.fillStyle = rgba(color, 1);
   scratchCtx.fillRect(0, 0, mask.width, mask.height);

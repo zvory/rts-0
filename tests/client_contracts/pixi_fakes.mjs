@@ -84,6 +84,7 @@ export class RecordingGraphics extends FakeGraphics {
 export function installFakePixi() {
   const priorPixi = globalThis.PIXI;
   const priorWindow = globalThis.window;
+  const priorOffscreenCanvas = globalThis.OffscreenCanvas;
 
   class FakeContainer {
     constructor() {
@@ -241,10 +242,19 @@ export function installFakePixi() {
     Graphics: PixiGraphics,
     Text: FakeText,
     Texture: FakeTexture,
+    Assets: { load: async (resource) => FakeTexture.from(resource) },
     Rectangle: FakeRectangle,
     Sprite: FakeSprite,
     SCALE_MODES: { NEAREST: "nearest" },
     TextureStyle: { defaultOptions: {} },
+  };
+  globalThis.OffscreenCanvas = class FakeOffscreenCanvas {
+    constructor(width, height) {
+      this.width = width;
+      this.height = height;
+      this.context = fakeCanvasContext(this);
+    }
+    getContext() { return this.context; }
   };
 
   return () => {
@@ -252,5 +262,39 @@ export function installFakePixi() {
     else globalThis.PIXI = priorPixi;
     if (priorWindow === undefined) delete globalThis.window;
     else globalThis.window = priorWindow;
+    if (priorOffscreenCanvas === undefined) delete globalThis.OffscreenCanvas;
+    else globalThis.OffscreenCanvas = priorOffscreenCanvas;
+  };
+}
+
+function fakeCanvasContext(canvas) {
+  return {
+    canvas,
+    imageSmoothingEnabled: true,
+    fillStyle: "",
+    strokeStyle: "",
+    globalAlpha: 1,
+    globalCompositeOperation: "source-over",
+    clearRect() {},
+    fillRect() {},
+    strokeRect() {},
+    drawImage() {},
+    putImageData() {},
+    getImageData: (_x, _y, width = canvas.width, height = canvas.height) => ({
+      data: new Uint8ClampedArray(width * height * 4),
+    }),
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    scale() {},
+    beginPath() {},
+    closePath() {},
+    moveTo() {},
+    lineTo() {},
+    arc() {},
+    ellipse() {},
+    fill() {},
+    stroke() {},
   };
 }

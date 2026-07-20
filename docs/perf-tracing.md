@@ -19,10 +19,11 @@ The summary includes total frames, slow-frame count, recent frames, approximate 
 time, slow sample count, and worst-phase counts for match phases such as camera, input, prediction
 visual advance, fog, renderer, HUD, minimap, observer analysis, and health publish. Renderer
 sub-phases cover entity preparation, feedback view building, resources/buildings, units,
-selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement. The profiler
-also records `renderer.update` for backend scene translation and `renderer.present` for the one
-synchronous Pixi/Babylon presentation. Both are nested inside `match.renderer` and must not be
-added back into `frame.work`. The renderer frame counter advances only after a successful present.
+selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement when those
+phases execute on the profiled thread. For Pixi, `match.renderer` now measures only detached
+main-thread submission; `renderer.update` and `renderer.present` execute in the module worker and
+are returned as separate worker timings. Babylon retains its synchronous nested phase attribution.
+The acknowledged renderer frame counter advances only after a successful present.
 The profiler counts complete frame work and actual present work strictly above `1000 / 60` ms;
 these 60 FPS counters do not change the existing 33 ms slow-frame definition. Its histogram has a
 17 ms boundary so near-budget p95 values remain visible. The profiler also records
@@ -32,6 +33,20 @@ phase time for the same frame. High `frame.rafDispatch` p95 points at scheduling
 frame callback starts. High `frame.unattributed` p95 means the benchmark has found frame work that
 the current named phases do not explain yet; use recent long-frame context and, when needed,
 `--trace` to decide where to add finer timing.
+
+Pixi's local-only worker diagnostics are exposed separately:
+
+```js
+window.__rtsRenderWorkerStats
+window.__rtsRenderWorkerControl.snapshot()
+window.__rtsRenderWorkerControl.reset()
+```
+
+They report submitted, dispatched, retained, completed/presented, superseded, failed, long-frame and
+stale-response counts; bounded cloned bytes; in-flight/pending/capture state; the acknowledged frame
+id and WebGL backend identity; and main-submit, queue-age, compositor-observed display-age,
+worker-update, and worker-present distributions. Superseded submissions are not presentations.
+The queue is intentionally bounded to one in-flight and one latest pending frame.
 
 Shape context is intentionally bounded: entity counts, selected count, remembered building count,
 visible tile count, viewport/canvas size, device pixel ratio, match mode, local harness workload id,
@@ -312,9 +327,10 @@ The flame-graph command runs Player 1's deterministic 2v2 `supply-300-hellhole-s
 at the default viewport, DPR 1, CPU throttle 1, and a 500 microsecond V8 sampling interval. The
 harness completes workload assertions, resets its local performance window, and observes at least
 30 rendered frames before CPU sampling begins, so module loading and setup do not dominate the
-profile. It writes the raw `.cpuprofile`, the ordinary harness `summary.json`, a ranked function
-summary, and SVG/PNG flame graphs under ignored `target/client-perf/flamegraphs/`; `--preview`
-publishes the PNG through the normal 24-hour Tailnet Preview service.
+profile. For Pixi it starts independent CDP profilers for the main page and render worker, then
+writes both raw `.cpuprofile` files, ranked summaries, and SVG/PNG flame graphs alongside the
+ordinary harness `summary.json` under ignored `target/client-perf/flamegraphs/`; `--preview`
+publishes the main-page PNG through the normal 24-hour Tailnet Preview service.
 
 Flame width is inclusive sampled CPU time. The heading and ranked JSON use self time aggregated by
 function, source URL, and line so the same function reached through multiple call stacks is not
@@ -330,9 +346,10 @@ node scripts/client-flamegraph.mjs --cpu-throttle 4 --viewport 1440x900 --dpr 1 
 ```
 
 Before writing client optimization phases, capture from a clean worktree on current `origin/main`,
-inspect the ranked self/inclusive functions and their source, and pair the result with
-`frame.work`/renderer/fog phase evidence from the same harness summary. Use the snapshot stream as
-the sole supply-scale client renderer benchmark. Prediction or production-shaped active-player
+inspect both main and worker ranked self/inclusive functions and their source, and pair the result
+with main `frame.work`, worker update/present, queue outcome, and display-age evidence from the same
+harness summary. Use the snapshot stream as the sole supply-scale client renderer benchmark.
+Prediction or production-shaped active-player
 claims require separate evidence rather than a competing checked-in supply fixture. A page cannot
 grant itself V8 Profiler access, so remote playtester function profiles require a later DevTools,
 extension, or launcher workflow rather than a silent in-page upload.
@@ -381,7 +398,10 @@ the average percentage of `frame.work` covered by named top-level phases. It als
 `renderDiagnostics` block with the counter groups above, recent long-frame context, and the largest
 nonzero counters for the sample. It also includes a `snapshotPacketBudget` block
 with payload p95 bytes, the selected packet budget, over-budget count, and over-budget percentage
-when the generated `ClientNetReport` includes them. Pass `--trace` to also write a Chrome
+when the generated `ClientNetReport` includes them. The `renderWorker` block contains the raw
+bounded worker diagnostics, while `presentations` reports actual completions per measurement second
+plus submitted, superseded, failed, queue/display age, main submit, worker update, and worker present.
+On the synchronous baseline, the same field derives completions from `frame.work`. Pass `--trace` to also write a Chrome
 `trace.json`; traces are opt-in because they are larger and machine-local.
 
 Render stress matrix:
@@ -400,8 +420,8 @@ rollup keeps Chrome traces opt-in with `--trace`, includes CPU throttle, viewpor
 artifact paths for every cell, and ranks advisory budget failures by first missed frame-work budget
 and top measured phase.
 
-Interpret CPU/DPR stress as pressure testing, not hardware emulation. Chrome CPU throttling changes
-main-thread scheduling on the local machine, DPR changes canvas backing resolution, and viewport
+Interpret CPU/DPR stress as pressure testing, not hardware emulation. Chrome page CPU throttling
+does not throttle the render worker and is not whole-system worker evidence; DPR changes canvas backing resolution, and viewport
 changes visible/rendered area. A failing `cpu4-vplarge-dpr2` cell points to the subsystem to inspect
 next on this machine; it does not claim to reproduce Matt's laptop exactly.
 
@@ -410,8 +430,9 @@ The default harness result fails for runtime errors, page/console/request errors
 absolute FPS, frame time, or trace-timing budget. Treat the numbers as local evidence for comparing
 optimization branches on the same machine, not as a portable guarantee for other laptops.
 
-For render-lag comparisons, read `renderBudget.frameWork` first: `frame.work` is total browser work
-inside the RAF and should be compared to the 16.67 ms, 8.33 ms, 4.17 ms, and 2.08 ms frame-work
+For render-lag comparisons, read `renderBudget.frameWork` first for main-thread responsiveness, then
+read `presentations` and `renderWorker`: `frame.work` is total main-page work inside the RAF and
+should be compared to the 16.67 ms, 8.33 ms, 4.17 ms, and 2.08 ms frame-work
 budgets for 60, 120, 240, and 480 FPS. A positive margin means the measured frame-work metric was
 under that budget; a negative margin shows how far it missed. The 240 FPS/4.17 ms band is the actual
 target. The 60 and 120 FPS results remain useful intermediate diagnostics, but clearing either does

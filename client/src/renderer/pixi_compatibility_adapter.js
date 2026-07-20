@@ -1,5 +1,7 @@
 import { isResource } from "../protocol.js";
-import { Renderer } from "./index.js";
+import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../presentation/submission.js";
+import { copyGridSnapshotInto } from "../presentation/grid_snapshot.js";
+import { createRendererProjectionQueries } from "../presentation/projection_record.js";
 
 export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "state.resources.oil", reviewTrigger: "a Pixi DTO closure needs the low-oil cue" }),
@@ -42,26 +44,22 @@ const FEEDBACK_SINGLETON_TYPES = Object.freeze({
 });
 
 /**
- * Pixi-only bridge from PresentationFrameV1 to the existing Pixi drawing helpers.
+ * Pixi-only bridge from PresentationFrameV2 to the existing Pixi drawing helpers.
  * Match knows only render(frame); the mutable legacy sources below are sampled once
  * for each new immutable frame and are never exposed to another backend.
  */
 export class PixiPresentationAdapter {
-  static async create(canvasParent, sources) {
-    const renderer = await Renderer.create(canvasParent, { renderClock: sources?.renderClock });
-    return new PixiPresentationAdapter(canvasParent, sources, { renderer });
-  }
-
   constructor(canvasParent, sources, { renderer = null } = {}) {
     this.id = "pixi";
     this._sources = sources || {};
-    if (!renderer) throw new TypeError("PixiPresentationAdapter.create() must prepare the renderer.");
+    if (!renderer) throw new TypeError("Pixi render worker must prepare the renderer.");
     this._renderer = renderer;
     this._lastFrame = null;
     this._lastView = null;
     this._staticMapRevision = null;
     this._decalFrameKey = null;
-    this._groundDecalsAwaitingPresent = false;
+    this._retainedGroundDecalKey = null;
+    this._lastTiming = Object.freeze({ workerUpdateMs: 0, workerPresentMs: 0 });
     this._destroyed = false;
   }
 
@@ -74,10 +72,16 @@ export class PixiPresentationAdapter {
   }
 
   render(frame) {
+    if (!frame || frame.version !== 2) throw new TypeError("Pixi requires PresentationFrameV2.");
+    const identity = { generation: frame.generation, frameId: frame.frameId };
+    if (this._destroyed) {
+      return immediatePresentationSubmission({ ...identity, status: PRESENTATION_OUTCOME.DESTROYED });
+    }
     const profiler = this._sources?.profiler?.() || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
+    let retainedRevision = 0;
     try {
-      if (!frame || frame.version !== 1) throw new TypeError("Pixi requires PresentationFrameV1.");
+      const updateStartedAt = performance.now();
       time("renderer.update", () => {
         this._ensureStaticMap(frame);
         const repeated = frame === this._lastFrame;
@@ -87,7 +91,13 @@ export class PixiPresentationAdapter {
           this._lastView = view;
         }
         const frameKey = `${frame.generation}:${frame.frameId}`;
-        const groundDecals = frameKey === this._decalFrameKey || this._groundDecalsAwaitingPresent
+        const decalRevision = Number.isSafeInteger(frame.groundDecalRevision)
+          ? frame.groundDecalRevision
+          : 0;
+        const decalKey = decalRevision > 0 ? `${frame.generation}:${decalRevision}` : null;
+        const alreadyRetained = decalKey && decalKey === this._retainedGroundDecalKey;
+        if (alreadyRetained) retainedRevision = decalRevision;
+        const groundDecals = alreadyRetained || (decalRevision === 0 && frameKey === this._decalFrameKey)
           ? []
           : view.groundDecals;
         this._renderer.render(view.state, view.camera, view.fog, view.alpha, {
@@ -100,23 +110,40 @@ export class PixiPresentationAdapter {
           feedbackView: view.feedback,
           reconciledGroundDecals: groundDecals,
           onGroundDecalsStaged: () => {
-            this._groundDecalsAwaitingPresent = true;
+            if (decalKey) {
+              this._retainedGroundDecalKey = decalKey;
+              retainedRevision = decalRevision;
+            }
           },
         });
         this._renderer.drawSelectionBox(view.marquee);
         this._decalFrameKey = frameKey;
       });
+      const workerUpdateMs = performance.now() - updateStartedAt;
+      const presentStartedAt = performance.now();
       time("renderer.present", () => this._present());
-      this._groundDecalsAwaitingPresent = false;
-      return Object.freeze({ presented: true });
+      this._lastTiming = Object.freeze({
+        workerUpdateMs,
+        workerPresentMs: performance.now() - presentStartedAt,
+      });
+      return immediatePresentationSubmission({
+        ...identity,
+        retainedRevision,
+        status: PRESENTATION_OUTCOME.PRESENTED,
+      });
     } catch (err) {
       this._renderer?._recordRenderError?.("pixiPresentationFrame", err);
-      return Object.freeze({ presented: false });
+      return immediatePresentationSubmission({
+        ...identity,
+        retainedRevision,
+        status: PRESENTATION_OUTCOME.FAILED,
+        error: err,
+      });
     }
   }
 
-  resize(widthCssPx, heightCssPx) {
-    this._renderer.resize(widthCssPx, heightCssPx);
+  resize(widthCssPx, heightCssPx, dpr) {
+    this._renderer.resize(widthCssPx, heightCssPx, dpr);
   }
 
   setRenderClock(renderClock) {
@@ -151,12 +178,16 @@ export class PixiPresentationAdapter {
     return this._renderer.visualUnitOverrideDiagnostics();
   }
 
+  get lastTiming() {
+    return this._lastTiming;
+  }
+
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
     this._lastFrame = null;
     this._lastView = null;
-    this._groundDecalsAwaitingPresent = false;
+    this._retainedGroundDecalKey = null;
     this._sources = null;
     this._renderer.destroy();
   }
@@ -197,7 +228,9 @@ export class PixiPresentationAdapter {
     const sourceState = this._sources?.state?.() || null;
     const profiler = this._sources?.profiler?.() || null;
     const visualProfile = this._sources?.visualProfile?.() || null;
-    const legacy = snapshotLegacyState(sourceState, entities, frame.visualTimeMs, profiler);
+    const legacy = frame.pixiCompatibility
+      ? materializeLegacySnapshot(frame.pixiCompatibility)
+      : snapshotLegacyState(sourceState, entities, frame.visualTimeMs, profiler);
     const map = this._renderer._map;
     const state = buildStateFacade(frame, entities, rememberedBuildings, trenches, feedback, legacy, map);
     return {
@@ -225,7 +258,7 @@ function materializeStaticMap(staticMap) {
   const width = staticMap.terrain.width;
   const height = staticMap.terrain.height;
   const terrain = new Uint8Array(width * height);
-  staticMap.terrain.copyInto(terrain);
+  copyGridSnapshotInto(staticMap.terrain, terrain);
   return {
     width,
     height,
@@ -236,16 +269,13 @@ function materializeStaticMap(staticMap) {
 }
 
 function buildCameraFacade(projection) {
-  const scale = positiveNumber(projection?.camera?.framingScale, 1);
-  const focus = projection?.camera?.focus || { x: 0, y: 0 };
-  const width = finiteNumber(projection?.viewport?.widthCssPx, 0);
-  const height = finiteNumber(projection?.viewport?.heightCssPx, 0);
+  const queries = createRendererProjectionQueries(projection);
   return Object.freeze({
-    x: finiteNumber(focus.x, 0) - width / (2 * scale),
-    y: finiteNumber(focus.y, 0) - height / (2 * scale),
-    zoom: scale,
-    snapshot: projection.snapshot,
-    projectedExtent: projection.projectedExtent,
+    x: queries.state.x,
+    y: queries.state.y,
+    zoom: queries.state.zoom,
+    snapshot: queries.snapshot,
+    projectedExtent: queries.projectedExtent,
   });
 }
 
@@ -254,8 +284,8 @@ function buildFogFacade(frame) {
   const height = frame.visible.height;
   const visible = new Uint8Array(width * height);
   const explored = new Uint8Array(width * height);
-  frame.visible.copyInto(visible);
-  frame.explored.copyInto(explored);
+  copyGridSnapshotInto(frame.visible, visible);
+  copyGridSnapshotInto(frame.explored, explored);
   return Object.freeze({
     width,
     height,
@@ -386,6 +416,29 @@ function snapshotLegacyState(state, entities, now, profiler) {
   }
   return {
     oil: Number.isFinite(state?.resources?.oil) ? state.resources.oil : null,
+    currentById,
+    previousById,
+    recoilById,
+    recoilPhaseById,
+    recoilKindById,
+  };
+}
+
+function materializeLegacySnapshot(record) {
+  const currentById = new Map();
+  const previousById = new Map();
+  const recoilById = new Map();
+  const recoilPhaseById = new Map();
+  const recoilKindById = new Map();
+  for (const pose of record?.poses || []) {
+    copyPose(currentById, pose.id, pose.current);
+    copyPose(previousById, pose.id, pose.previous);
+    if (Number.isFinite(pose.recoil)) recoilById.set(pose.id, pose.recoil);
+    if (Number.isFinite(pose.recoilPhase)) recoilPhaseById.set(pose.id, pose.recoilPhase);
+    if (pose.recoilKind) recoilKindById.set(pose.id, pose.recoilKind);
+  }
+  return {
+    oil: Number.isFinite(record?.oil) ? record.oil : null,
     currentById,
     previousById,
     recoilById,
