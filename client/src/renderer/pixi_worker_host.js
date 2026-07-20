@@ -162,6 +162,9 @@ export class PixiWorkerPresentationAdapter {
 
   async readPresentedPixels(frameId = this._lastPresentedFrameId) {
     if (this._destroyed || this._fatal) throw this._fatal || new Error("Pixi render worker is destroyed.");
+    if (this._inFlight || this._pending) {
+      throw new Error("Cannot capture worker pixels while a newer frame is rendering.");
+    }
     if (frameId !== this._lastPresentedFrameId) {
       throw new Error(`Cannot capture worker frame ${frameId}; visible frame is ${this._lastPresentedFrameId}.`);
     }

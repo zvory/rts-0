@@ -44,6 +44,10 @@ async function queueAndLifecycleContracts() {
   assert(worker.messages.findLastIndex((message) => message.type === "resize")
       < worker.messages.findLastIndex((message) => message.type === "frame"),
     "the first post-resize frame is ordered after the resize barrier");
+  await assertRejects(
+    adapter.readPresentedPixels(frame1.frameId),
+    "a framebuffer read is rejected while a newer frame is rendering",
+  );
   worker.present(frame4);
   assert((await afterResize.settled).status === PRESENTATION_OUTCOME.PRESENTED,
     "the first post-resize frame presents against the resized canvas");
@@ -256,6 +260,15 @@ function response(type, generation, payload) {
 function restoreGlobal(name, value) {
   if (value === undefined) delete globalThis[name];
   else globalThis[name] = value;
+}
+
+async function assertRejects(promise, message) {
+  try {
+    await promise;
+  } catch {
+    return;
+  }
+  throw new Error(message);
 }
 
 try {

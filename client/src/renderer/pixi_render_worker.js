@@ -17,9 +17,13 @@ let compatibility = null;
 let visualProfile = null;
 let destroyed = false;
 const presentation = createWorkerPresentationState();
+let messageQueue = Promise.resolve();
 
 self.addEventListener("message", (event) => {
-  void handleMessage(event.data).catch((error) => fatal(error, event.data));
+  const candidate = event.data;
+  messageQueue = messageQueue
+    .then(() => handleMessage(candidate))
+    .catch((error) => fatal(error, candidate));
 });
 
 async function handleMessage(candidate) {
