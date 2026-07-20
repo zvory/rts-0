@@ -224,6 +224,36 @@ try {
     path.join(binPath, "codex"),
     `#!/usr/bin/env bash
 set -euo pipefail
+report_file=""
+is_patch_note=0
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then
+    report_file="$2"
+    shift
+  elif [ "$1" = "--output-schema" ]; then
+    if [[ "$2" == */patch-note-pass.schema.json ]]; then
+      is_patch_note=1
+    fi
+    shift
+  fi
+  shift
+done
+if [ -z "$report_file" ]; then
+  echo "missing report file" >&2
+  exit 1
+fi
+if [ "$is_patch_note" = "1" ]; then
+  cat >"$report_file" <<'JSON'
+{
+  "decision": "no_patch_note",
+  "title": "",
+  "changes": [],
+  "playtest_watch": [],
+  "reason": "The fixture source edit has no player-facing gameplay effect."
+}
+JSON
+  exit 0
+fi
 if [ -n "\${CODEX_CALLED_MARKER:-}" ]; then
   printf 'codex called\\n' >>"$CODEX_CALLED_MARKER"
 fi
@@ -233,18 +263,6 @@ if [ "\${RTS_ADVERSARIAL_QUALITY_PASS:-}" != "1" ]; then
 fi
 if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
   printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
-fi
-report_file=""
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then
-    report_file="$2"
-    shift
-  fi
-  shift
-done
-if [ -z "$report_file" ]; then
-  echo "missing report file" >&2
-  exit 1
 fi
 cat >"$report_file" <<'JSON'
 {

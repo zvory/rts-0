@@ -52,14 +52,14 @@ export function branchSlug(branch) {
 
 export function isGameplayCandidate(pathname) {
   if (pathname.startsWith("tests/") || pathname.startsWith("plans/") || pathname.startsWith("patch-notes/") || pathname.endsWith(".md")) return false;
-  return pathname.startsWith("server/crates/rules/") ||
-    pathname.startsWith("server/crates/sim/src/game/") ||
-    pathname.startsWith("server/crates/protocol/") ||
-    pathname === "server/src/config.rs" ||
-    pathname.startsWith("client/src/config") ||
-    pathname.startsWith("client/src/input/") ||
-    pathname.startsWith("client/src/hud") ||
-    pathname.startsWith("client/src/protocol");
+  return pathname.startsWith("server/crates/ai/src/") ||
+    pathname.startsWith("server/crates/rules/src/") ||
+    pathname.startsWith("server/crates/sim/src/") ||
+    pathname.startsWith("server/crates/protocol/src/") ||
+    pathname.startsWith("server/src/") ||
+    pathname.startsWith("client/src/") ||
+    pathname === "client/index.html" ||
+    (pathname.startsWith("client/") && pathname.endsWith(".css"));
 }
 
 export function normalizeDecision(raw) {
@@ -165,15 +165,17 @@ export function execute(options) {
   }
   const branch = git(options.repoRoot, ["branch", "--show-current"]);
   if (!branch || (options.headBranch && branch !== options.headBranch)) throw new Error(`patch-note pass branch mismatch: current=${branch || "<detached>"} requested=${options.headBranch || branch}`);
-  const status = git(options.repoRoot, ["status", "--porcelain=v1"]);
-  if (status) throw new Error(`patch-note pass requires a clean worktree:\n${status}`);
+  if (!options.dryRun) {
+    const status = git(options.repoRoot, ["status", "--porcelain=v1"]);
+    if (status) throw new Error(`patch-note pass requires a clean worktree:\n${status}`);
+  }
   const changedPaths = git(options.repoRoot, ["diff", "--name-only", "--no-renames", `${options.baseRef}...HEAD`]).split("\n").filter(Boolean);
   const candidates = changedPaths.filter(isGameplayCandidate);
   const slug = branchSlug(branch);
   const existing = existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
   const existingRelativePath = existing ? path.relative(options.repoRoot, existing) : "";
   if (candidates.length === 0) {
-    const decision = { decision: "no_patch_note", title: "", changes: [], playtestWatch: [], reason: "No gameplay-authoritative paths changed." };
+    const decision = { decision: "no_patch_note", title: "", changes: [], playtestWatch: [], reason: "No runtime paths with potential player impact changed." };
     if (existing && !options.dryRun) {
       run("git", ["rm", "--", existingRelativePath], { cwd: options.repoRoot });
       run("git", ["commit", "-m", "Remove stale gameplay patch note", "-m", decision.reason], { cwd: options.repoRoot });

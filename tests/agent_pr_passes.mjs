@@ -19,9 +19,15 @@ assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
+assert.equal(isGameplayCandidate("server/crates/ai/src/ai_core/decision/production.rs"), true);
+assert.equal(isGameplayCandidate("server/src/lobby/room_task/lobby.rs"), true);
 assert.equal(isGameplayCandidate("client/src/config/rules_mirror.js"), true);
+assert.equal(isGameplayCandidate("client/src/renderer/entities.js"), true);
+assert.equal(isGameplayCandidate("client/src/lobby_view.js"), true);
+assert.equal(isGameplayCandidate("client/styles.css"), true);
 assert.equal(isGameplayCandidate("tests/client_contracts/protocol_contracts.mjs"), false);
 assert.equal(isGameplayCandidate("docs/design/balance.md"), false);
+assert.equal(isGameplayCandidate("scripts/agent-pr.sh"), false);
 
 const decision = normalizeDecision({
   decision: "write_patch_note",
@@ -167,6 +173,16 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   assert.equal(fs.existsSync(staleFragment), false, "a fragment left after its gameplay diff is reverted should be removed");
   assert.match(run("git", ["log", "-1", "--format=%s"], lifecycleRoot), /Remove stale gameplay patch note/);
   assert.equal(run("git", ["status", "--porcelain=v1"], lifecycleRoot), "");
+
+  const scratchFile = path.join(lifecycleRoot, "uncommitted-scratch.txt");
+  fs.writeFileSync(scratchFile, "not part of the branch diff\n");
+  const dirtyStatus = run("git", ["status", "--porcelain=v1"], lifecycleRoot);
+  execute({ ...patchOptions, dryRun: true });
+  assert.equal(
+    run("git", ["status", "--porcelain=v1"], lifecycleRoot),
+    dirtyStatus,
+    "dry-run should allow and preserve unrelated worktree changes",
+  );
 } finally {
   fs.rmSync(lifecycleRoot, { recursive: true, force: true });
   fs.rmSync(fakeCodex, { force: true });
