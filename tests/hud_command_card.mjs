@@ -122,6 +122,27 @@ function buttonSlots(card) {
 }
 
 {
+  const selectedResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
+  const otherResearchComplex = {
+    ...researchComplex,
+    id: 12,
+    prodUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+  };
+  const card = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [selectedResearchComplex],
+    currentEntities: [selectedResearchComplex, otherResearchComplex],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(card.slots[0].enabled, false);
+  assert.equal(card.slots[0].title, "Researching");
+}
+
+{
   const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   assert.equal(card.slots[1].enabled, false);
   assert.equal(card.slots[1].title, "Queued");

@@ -54,7 +54,7 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
-  if (researchQueuedAtSelectedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
+  if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
   if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
   return affordable(def.cost, resources) ? "ready" : "unaffordable";
 }
@@ -63,9 +63,9 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
-  if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
-    .some((entity) => entity.prodUpgrade === upgrade)) return "Researching";
-  if (researchQueuedAtSelectedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "Queued";
+  const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);
+  if (queuedAt?.prodUpgrade === upgrade) return "Researching";
+  if (queuedAt) return "Queued";
   if (def.requiresUpgrade && !selectedResearchBuilding(ctx, upgrade, isOwn)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
@@ -86,12 +86,17 @@ export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
 }
 
-function researchQueuedAtSelectedBuilding(ctx, buildingKind, upgrade, isOwn) {
-  return (ctx.selection || []).some((entity) =>
+function researchQueuedBuilding(ctx, buildingKind, upgrade, isOwn) {
+  return researchBuildings(ctx, buildingKind, isOwn).find((entity) =>
+    (entity.prodUpgradeQueue || []).includes(upgrade));
+}
+
+function researchBuildings(ctx, buildingKind, isOwn) {
+  const entities = ctx.currentEntities || ctx.entities || ctx.selection || [];
+  return entities.filter((entity) =>
     isOwn(ctx, entity) &&
     entity.kind === buildingKind &&
-    entity.buildProgress == null &&
-    (entity.prodUpgradeQueue || []).includes(upgrade));
+    entity.buildProgress == null);
 }
 
 /** First selected building on which the server can append this research right now. */
