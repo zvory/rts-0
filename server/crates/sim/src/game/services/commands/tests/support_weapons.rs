@@ -1,102 +1,30 @@
 use super::*;
 
-fn assert_error_tiles(actual: f32, expected: f32) {
-    assert!(
-        (actual - expected).abs() < 0.001,
-        "expected {expected:.3} tiles, got {actual:.3}"
-    );
-}
-
 #[test]
-fn artillery_error_scales_by_range_without_ballistic_tables() {
-    let tile = config::TILE_SIZE as f32;
-    let origin = (100.0, 100.0);
-    let min_target = (
-        origin.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * tile,
-        origin.1,
-    );
-    let max_target = (
-        origin.0 + config::ARTILLERY_MAX_RANGE_TILES as f32 * tile,
-        origin.1,
-    );
+fn artillery_fire_samples_uniformly_inside_selected_circle() {
+    let center = (640.0, 480.0);
+    let radius_tiles = 6.0;
+    let radius_px = radius_tiles * config::TILE_SIZE as f32;
+    let mut squared_radius_sum = 0.0;
+    let sample_count = 2_000;
 
-    assert_error_tiles(
-        artillery_error_tiles(origin, min_target, 1, false),
-        config::ARTILLERY_MIN_RANGE_ERROR_TILES,
-    );
-    assert_error_tiles(
-        artillery_error_tiles(origin, max_target, 1, false),
-        config::ARTILLERY_MAX_RANGE_ERROR_TILES,
-    );
-    assert_error_tiles(
-        artillery_error_tiles(origin, max_target, 5, false),
-        config::ARTILLERY_MAX_RANGE_ERROR_TILES,
-    );
-}
-
-#[test]
-fn ballistic_tables_tighten_range_scaled_artillery_error_to_three_tiles() {
-    let tile = config::TILE_SIZE as f32;
-    let origin = (100.0, 100.0);
-    let max_target = (
-        origin.0 + config::ARTILLERY_MAX_RANGE_TILES as f32 * tile,
-        origin.1,
-    );
-
-    assert_error_tiles(
-        artillery_error_tiles(origin, max_target, 1, true),
-        config::ARTILLERY_MAX_RANGE_ERROR_TILES,
-    );
-    assert_error_tiles(artillery_error_tiles(origin, max_target, 3, true), 9.0);
-    assert_error_tiles(
-        artillery_error_tiles(origin, max_target, 5, true),
-        config::ARTILLERY_MIN_ERROR_TILES,
-    );
-}
-
-#[test]
-fn unupgraded_artillery_fire_does_not_bank_ballistic_tables_accuracy() {
-    let map = flat_map(64);
-    let mut entities = EntityStore::new();
-    let mut players = vec![player_state(1), player_state(2)];
-    let pos = (320.0, 320.0);
-    let target = (
-        pos.0 + config::TILE_SIZE as f32 * config::ARTILLERY_MAX_RANGE_TILES as f32,
-        pos.1,
-    );
-    let artillery = entities
-        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
-        .expect("artillery should spawn");
-    {
-        let unit = entities.get_mut(artillery).expect("artillery should exist");
-        unit.set_weapon_setup(WeaponSetup::Deployed);
-        unit.set_emplacement_facing(Some(0.0));
-        unit.set_weapon_facing(0.0);
+    for tick in 0..sample_count {
+        let sampled = artillery_blanket_point(17, 1, tick, center, tick as u16, radius_tiles);
+        let dx = sampled.0 - center.0;
+        let dy = sampled.1 - center.1;
+        let squared_radius = dx * dx + dy * dy;
+        assert!(
+            squared_radius <= radius_px * radius_px + 0.5,
+            "sampled artillery target must remain inside the selected circle"
+        );
+        squared_radius_sum += squared_radius;
     }
 
-    apply_with_players(
-        &map,
-        &mut entities,
-        &mut players,
-        vec![(
-            1,
-            SimCommand::UseAbility {
-                ability: AbilityKind::PointFire,
-                units: vec![artillery],
-                x: Some(target.0),
-                y: Some(target.1),
-                queued: false,
-            },
-        )],
-    );
-
-    assert_eq!(
-        entities
-            .get(artillery)
-            .expect("artillery should exist")
-            .artillery_shots_fired(),
-        0,
-        "unupgraded artillery shots should not pre-charge Artillery Fire Control accuracy"
+    let mean_squared_radius = squared_radius_sum / sample_count as f32;
+    let expected = radius_px * radius_px / 2.0;
+    assert!(
+        (mean_squared_radius - expected).abs() < expected * 0.08,
+        "uniform area sampling should have E[r²] = R²/2"
     );
 }
 
@@ -345,7 +273,11 @@ fn artillery_blanket_fire_system_rechecks_ammo_affordability() {
         unit.set_weapon_setup(WeaponSetup::Deployed);
         unit.set_emplacement_facing(Some(0.0));
         unit.set_weapon_facing(0.0);
-        unit.set_order(Order::artillery_blanket_fire(target.0, target.1));
+        unit.set_order(Order::artillery_blanket_fire(
+            target.0,
+            target.1,
+            crate::config::ARTILLERY_BLANKET_RADIUS_TILES,
+        ));
     }
     let mut artillery_shells = ArtilleryShellStore::default();
     let mut firing_reveals = Vec::new();

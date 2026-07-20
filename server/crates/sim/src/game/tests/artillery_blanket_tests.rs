@@ -48,7 +48,7 @@ fn artillery_blanket_fire_queue_is_terminal() {
 }
 
 #[test]
-fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
+fn packed_artillery_fire_auto_sets_up_and_samples_inside_selected_circle() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let initial_steel = game.state.players[0].steel;
@@ -62,11 +62,11 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
 
     game.enqueue(
         1,
-        Command::UseAbility {
-            ability: ability::AbilityKind::BlanketFire,
+        Command::ArtilleryFire {
             units: vec![artillery],
-            x: Some(target.0),
-            y: Some(target.1),
+            x: target.0,
+            y: target.1,
+            radius_tiles: 6.0,
             queued: false,
         },
     );
@@ -85,6 +85,7 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
         panic!("packed blanket fire should store a Blanket Fire order");
     };
     let center = (order.intent.x, order.intent.y);
+    assert_eq!(order.intent.radius_tiles, 6.0);
     assert_eq!(game.state.players[0].steel, initial_steel);
     assert!(
         events
@@ -111,12 +112,13 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
         }
     }
     let sampled = sampled_target.expect("auto-setup blanket fire should eventually fire");
-    let radius_px = config::ARTILLERY_BLANKET_RADIUS_TILES * config::TILE_SIZE as f32;
+    let max_impact_radius_px = order.intent.radius_tiles * config::TILE_SIZE as f32;
     let dx = sampled.0 - center.0;
     let dy = sampled.1 - center.1;
     assert!(
-        dx * dx + dy * dy <= (radius_px + 0.5) * (radius_px + 0.5),
-        "sampled target should stay inside the blanket radius"
+        dx * dx + dy * dy
+            <= (max_impact_radius_px + 0.5) * (max_impact_radius_px + 0.5),
+        "sampled target should stay inside the selected fire circle"
     );
     assert!(
         game.state.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL,

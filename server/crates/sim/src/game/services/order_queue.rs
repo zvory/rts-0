@@ -97,6 +97,7 @@ enum PromotedIntent {
     BlanketFire {
         x: f32,
         y: f32,
+        radius_tiles: f32,
     },
 }
 
@@ -214,11 +215,19 @@ pub(crate) fn promote_ready_orders(
                     continue;
                 };
                 if ability == AbilityKind::PointFire {
-                    execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point);
+                    execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point, 0.0);
                     continue;
                 }
                 if ability == AbilityKind::BlanketFire {
-                    execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Blanket);
+                    execute_artillery_fire(
+                        map,
+                        entities,
+                        id,
+                        x,
+                        y,
+                        ArtilleryFireMode::Blanket,
+                        config::ARTILLERY_BLANKET_RADIUS_TILES,
+                    );
                     continue;
                 }
                 let faction_id = players
@@ -263,10 +272,18 @@ pub(crate) fn promote_ready_orders(
                 execute_promoted_support_weapon_setup(entities, id, x, y);
             }
             PromotedIntent::PointFire { x, y } => {
-                execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point);
+                execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Point, 0.0);
             }
-            PromotedIntent::BlanketFire { x, y } => {
-                execute_artillery_fire(map, entities, id, x, y, ArtilleryFireMode::Blanket);
+            PromotedIntent::BlanketFire { x, y, radius_tiles } => {
+                execute_artillery_fire(
+                    map,
+                    entities,
+                    id,
+                    x,
+                    y,
+                    ArtilleryFireMode::Blanket,
+                    radius_tiles,
+                );
             }
         }
     }
@@ -427,6 +444,7 @@ fn pop_next_valid_intent(
                     return Some(PromotedIntent::BlanketFire {
                         x: point.x,
                         y: point.y,
+                        radius_tiles: point.radius_tiles,
                     });
                 }
             }
@@ -480,6 +498,7 @@ fn execute_artillery_fire(
     x: f32,
     y: f32,
     mode: ArtilleryFireMode,
+    radius_tiles: f32,
 ) -> bool {
     let Some(owner) = entities.get(id).map(|e| e.owner) else {
         return false;
@@ -495,7 +514,7 @@ fn execute_artillery_fire(
     ) else {
         return false;
     };
-    start_artillery_fire_promoted_order(entities, id, target, mode)
+    start_artillery_fire_promoted_order(entities, id, target, mode, radius_tiles)
 }
 
 fn world_ability_intent_valid(

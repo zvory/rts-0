@@ -533,15 +533,15 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       pointFireCommand.queued === true,
     "pointFire command builder emits targeted ability wire shape",
   );
-  const blanketFireCommand = cmd.blanketFire([11, 12], 704, 768, true);
+  const blanketFireCommand = cmd.blanketFire([11, 12], 704, 768, 6, true);
   assert(
-    blanketFireCommand.c === "useAbility" &&
-      blanketFireCommand.ability === ABILITY.BLANKET_FIRE &&
+    blanketFireCommand.c === "artilleryFire" &&
       blanketFireCommand.units.join(",") === "11,12" &&
       blanketFireCommand.x === 704 &&
       blanketFireCommand.y === 768 &&
+      blanketFireCommand.radiusTiles === 6 &&
       blanketFireCommand.queued === true,
-    "blanketFire command builder emits targeted ability wire shape",
+    "blanketFire command builder emits unified artillery fire wire shape",
   );
   assertThrows(
     () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),

@@ -11,6 +11,8 @@ import {
 } from "../protocol.js";
 import {
   ABILITIES,
+  ARTILLERY_BLANKET_RADIUS_TILES,
+  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
@@ -106,15 +108,10 @@ export function _issueTargetedCommand(p, ev = {}) {
       : ownUnits;
     if (units.length === 0) return true;
     const queued = !!ev.shiftKey;
-    const command = ability === ABILITY.POINT_FIRE
-      ? cmd.pointFire(units, world.x, world.y, queued)
-      : ability === ABILITY.BLANKET_FIRE
-        ? cmd.blanketFire(units, world.x, world.y, queued)
-        : cmd.useAbility(ability, units, world.x, world.y, queued);
     const selectedCarriers = this.state.selectedEntities().filter((e) => units.includes(e.id));
-    const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state, this.controlPolicy);
-    const artilleryLocks = isArtilleryFireAbility(ability)
-      ? buildArtilleryTargetLocks({
+    const firstFireClick = ability === ABILITY.POINT_FIRE && !intent.artilleryFireCenter;
+    if (firstFireClick) {
+      const locks = buildArtilleryTargetLocks({
         ability,
         carriers: selectedCarriers.map((e) => plannedEntityForIntent(intent, e)),
         rawX: world.x,
@@ -123,10 +120,41 @@ export function _issueTargetedCommand(p, ev = {}) {
         tileSize: this.state.map?.tileSize || DEFAULT_TILE_SIZE,
         definition,
         queued,
+      });
+      if (locks.length > 0) intent.beginArtilleryFireRadiusSelection?.(world.x, world.y);
+      return false;
+    }
+    const fireCenter = ability === ABILITY.POINT_FIRE ? intent.artilleryFireCenter : null;
+    const fireRadiusTiles = fireCenter
+      ? artilleryFireRadiusTiles(fireCenter, world, this.state.map?.tileSize || DEFAULT_TILE_SIZE)
+      : null;
+    const resolvedAbility = ability === ABILITY.POINT_FIRE && fireRadiusTiles != null
+      ? ABILITY.BLANKET_FIRE
+      : ability;
+    const targetWorld = fireCenter || world;
+    const command = resolvedAbility === ABILITY.POINT_FIRE
+      ? cmd.pointFire(units, targetWorld.x, targetWorld.y, queued)
+      : resolvedAbility === ABILITY.BLANKET_FIRE
+        ? cmd.blanketFire(units, targetWorld.x, targetWorld.y, fireRadiusTiles, queued)
+        : cmd.useAbility(resolvedAbility, units, targetWorld.x, targetWorld.y, queued);
+    const radiusTiles = fireRadiusTiles != null
+      ? fireRadiusTiles
+      : abilityTargetRadiusTiles(definition, ability, this.state, this.controlPolicy);
+    const artilleryLocks = isArtilleryFireAbility(resolvedAbility)
+      ? buildArtilleryTargetLocks({
+        ability: resolvedAbility,
+        carriers: selectedCarriers.map((e) => plannedEntityForIntent(intent, e)),
+        rawX: targetWorld.x,
+        rawY: targetWorld.y,
+        map: this.state.map,
+        tileSize: this.state.map?.tileSize || DEFAULT_TILE_SIZE,
+        definition,
+        queued,
       })
       : [];
     this.commandInteraction.issueCommand(command);
-    if (isArtilleryFireAbility(ability)) {
+    if (fireCenter) intent.artilleryFireCenter = null;
+    if (isArtilleryFireAbility(resolvedAbility)) {
       for (const lock of artilleryLocks) {
         this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
       }
@@ -501,11 +529,14 @@ export function _refreshAbilityTargetPreview() {
   let hoverInsideMinRange = false;
   let artilleryLocks = [];
   if (locksRangeBand) {
+    const targetWorld = target.ability === ABILITY.POINT_FIRE && intent.artilleryFireCenter
+      ? intent.artilleryFireCenter
+      : world;
     artilleryLocks = buildArtilleryTargetLocks({
       ability: target.ability,
       carriers,
-      rawX: world.x,
-      rawY: world.y,
+      rawX: targetWorld.x,
+      rawY: targetWorld.y,
       map: this.state.map,
       tileSize,
       definition,
@@ -565,13 +596,19 @@ export function _refreshAbilityTargetPreview() {
     radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
   }));
   const primaryLock = artilleryLocks[0] || null;
-  const radiusTiles = abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
+  const selectingArtilleryRadius = target.ability === ABILITY.POINT_FIRE && !!intent.artilleryFireCenter;
+  const radiusTiles = selectingArtilleryRadius
+    ? artilleryFireRadiusTiles(intent.artilleryFireCenter, world, tileSize)
+    : abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
   intent?.updateAbilityTargetPreview?.({
     ability: target.ability,
     mouseX: primaryLock?.x ?? world.x,
     mouseY: primaryLock?.y ?? world.y,
     rawMouseX: world.x,
     rawMouseY: world.y,
+    radiusCursorX: selectingArtilleryRadius ? world.x : null,
+    radiusCursorY: selectingArtilleryRadius ? world.y : null,
+    artilleryRadiusSelection: selectingArtilleryRadius,
     carriers,
     artilleryLocks,
     rangeOrigins: carrierOrigins,
@@ -586,6 +623,12 @@ export function _refreshAbilityTargetPreview() {
     hoverInRange,
     hoverInsideMinRange,
   });
+}
+
+function artilleryFireRadiusTiles(center, world, tileSize) {
+  if (!center || !world || !(tileSize > 0)) return ARTILLERY_MIN_FIRE_RADIUS_TILES;
+  const radius = Math.hypot(world.x - center.x, world.y - center.y) / tileSize;
+  return Math.max(ARTILLERY_MIN_FIRE_RADIUS_TILES, Math.min(ARTILLERY_BLANKET_RADIUS_TILES, radius));
 }
 
 export function _refreshAntiTankGunSetupPreview() {

@@ -230,6 +230,14 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    ArtilleryFire {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     RecastAbility {
         ability: String,
         units: Vec<u32>,

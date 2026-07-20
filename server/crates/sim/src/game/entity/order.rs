@@ -49,7 +49,7 @@ pub enum Order {
     /// Artillery repeats point fire at a fixed world position until interrupted.
     ArtilleryPointFire(ArtilleryPointFireOrder),
     /// Artillery repeats blanket fire around a fixed world center until interrupted.
-    ArtilleryBlanketFire(ArtilleryPointFireOrder),
+    ArtilleryBlanketFire(ArtilleryBlanketFireOrder),
 }
 
 impl Order {
@@ -85,8 +85,8 @@ impl Order {
         Order::ArtilleryPointFire(ArtilleryPointFireOrder::new(x, y))
     }
 
-    pub fn artillery_blanket_fire(x: f32, y: f32) -> Self {
-        Order::ArtilleryBlanketFire(ArtilleryPointFireOrder::new(x, y))
+    pub fn artillery_blanket_fire(x: f32, y: f32, radius_tiles: f32) -> Self {
+        Order::ArtilleryBlanketFire(ArtilleryBlanketFireOrder::new(x, y, radius_tiles))
     }
 
     pub fn attack_target(&self) -> Option<u32> {
@@ -157,7 +157,7 @@ pub enum OrderIntent {
     SelfAbility(SelfAbilityIntent),
     SetupAntiTankGuns(PointIntent),
     PointFire(PointIntent),
-    BlanketFire(PointIntent),
+    BlanketFire(ArtilleryFireIntent),
 }
 
 impl OrderIntent {
@@ -209,8 +209,8 @@ impl OrderIntent {
         OrderIntent::PointFire(PointIntent { x, y })
     }
 
-    pub(in crate::game) fn blanket_fire(x: f32, y: f32) -> Self {
-        OrderIntent::BlanketFire(PointIntent { x, y })
+    pub(in crate::game) fn blanket_fire(x: f32, y: f32, radius_tiles: f32) -> Self {
+        OrderIntent::BlanketFire(ArtilleryFireIntent { x, y, radius_tiles })
     }
 }
 
@@ -218,6 +218,13 @@ impl OrderIntent {
 pub struct PointIntent {
     pub x: f32,
     pub y: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ArtilleryFireIntent {
+    pub x: f32,
+    pub y: f32,
+    pub radius_tiles: f32,
 }
 
 /// Future order intent applied to units as they leave a production building.
@@ -509,6 +516,19 @@ impl ArtilleryPointFireOrder {
     fn new(x: f32, y: f32) -> Self {
         ArtilleryPointFireOrder {
             intent: PointIntent { x, y },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArtilleryBlanketFireOrder {
+    pub intent: ArtilleryFireIntent,
+}
+
+impl ArtilleryBlanketFireOrder {
+    fn new(x: f32, y: f32, radius_tiles: f32) -> Self {
+        ArtilleryBlanketFireOrder {
+            intent: ArtilleryFireIntent { x, y, radius_tiles },
         }
     }
 }

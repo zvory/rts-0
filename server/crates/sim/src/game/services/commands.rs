@@ -53,9 +53,7 @@ mod planner_facts;
 mod production_repeat;
 mod scout_plane_ability;
 mod support_weapon_setup;
-#[cfg(test)]
-use self::artillery_scatter::artillery_error_tiles;
-use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point};
+use self::artillery_scatter::artillery_blanket_point;
 use self::guards::{
     command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
     rally_intent_for_map, unit_can_accept_ground_command, unit_can_accept_player_command,
@@ -423,6 +421,35 @@ pub(in crate::game) fn apply_commands(
                         units,
                         x,
                         y,
+                        radius_tiles: None,
+                        queued,
+                        max_units_per_command: command_admission.max_units_per_command,
+                    },
+                );
+            }
+            SimCommand::ArtilleryFire {
+                units,
+                x,
+                y,
+                radius_tiles,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                let mut ctx = command_context!();
+                use_ability(
+                    &mut ctx,
+                    players,
+                    player,
+                    AbilityUse {
+                        ability: AbilityKind::BlanketFire,
+                        units,
+                        x: Some(x),
+                        y: Some(y),
+                        radius_tiles: Some(radius_tiles),
                         queued,
                         max_units_per_command: command_admission.max_units_per_command,
                     },
@@ -897,6 +924,10 @@ mod planned_actions {
                                 target.y,
                                 tick,
                                 mode,
+                                match mode {
+                                    ArtilleryFireMode::Point => 0.0,
+                                    ArtilleryFireMode::Blanket => config::ARTILLERY_BLANKET_RADIUS_TILES,
+                                },
                             );
                             continue;
                         }
@@ -955,7 +986,11 @@ mod planned_actions {
                                             OrderIntent::point_fire(locked.x, locked.y)
                                         }
                                         ArtilleryFireMode::Blanket => {
-                                            OrderIntent::blanket_fire(locked.x, locked.y)
+                                            OrderIntent::blanket_fire(
+                                                locked.x,
+                                                locked.y,
+                                                config::ARTILLERY_BLANKET_RADIUS_TILES,
+                                            )
                                         }
                                     };
                                     e.append_queued_order(intent);
@@ -1036,6 +1071,10 @@ mod planned_actions {
                                     point.y,
                                     tick,
                                     mode,
+                                    match mode {
+                                        ArtilleryFireMode::Point => 0.0,
+                                        ArtilleryFireMode::Blanket => config::ARTILLERY_BLANKET_RADIUS_TILES,
+                                    },
                                 );
                                 continue;
                             }
@@ -1197,6 +1236,7 @@ struct AbilityUse {
     ability: AbilityKind,
     x: Option<f32>,
     y: Option<f32>,
+    radius_tiles: Option<f32>,
     units: Vec<u32>,
     queued: bool,
     max_units_per_command: usize,
@@ -1248,6 +1288,21 @@ fn use_ability(
         let Some(y) = request.y else {
             return;
         };
+        let radius_tiles = match mode {
+            ArtilleryFireMode::Point => 0.0,
+            ArtilleryFireMode::Blanket => {
+                let radius = request
+                    .radius_tiles
+                    .unwrap_or(config::ARTILLERY_BLANKET_RADIUS_TILES);
+                if !radius.is_finite() {
+                    return;
+                }
+                radius.clamp(
+                    config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
+                    config::ARTILLERY_BLANKET_RADIUS_TILES,
+                )
+            }
+        };
         for unit in dedupe_cap_units(request.units, request.max_units_per_command) {
             if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
                 continue;
@@ -1260,7 +1315,7 @@ fn use_ability(
                         let intent = match mode {
                             ArtilleryFireMode::Point => OrderIntent::point_fire(target.x, target.y),
                             ArtilleryFireMode::Blanket => {
-                                OrderIntent::blanket_fire(target.x, target.y)
+                                OrderIntent::blanket_fire(target.x, target.y, radius_tiles)
                             }
                         };
                         e.append_queued_order(intent);
@@ -1282,6 +1337,7 @@ fn use_ability(
                     y,
                     tick,
                     mode,
+                    radius_tiles,
                 );
             }
         }
@@ -1375,6 +1431,7 @@ fn order_artillery_point_fire(
     y: f32,
     tick: u32,
     mode: ArtilleryFireMode,
+    radius_tiles: f32,
 ) -> bool {
     let Some(target) = artillery_point_fire_target(
         map,
@@ -1387,7 +1444,7 @@ fn order_artillery_point_fire(
     ) else {
         return false;
     };
-    if !start_artillery_fire_command_order(entities, unit, target, mode) {
+    if !start_artillery_fire_command_order(entities, unit, target, mode, radius_tiles) {
         return false;
     }
     if !target.inside_field_of_fire {
@@ -1407,6 +1464,7 @@ fn order_artillery_point_fire(
         target.y,
         tick,
         mode,
+        radius_tiles,
     )
 }
 
@@ -1425,6 +1483,7 @@ fn try_fire_artillery(
     y: f32,
     tick: u32,
     mode: ArtilleryFireMode,
+    radius_tiles: f32,
 ) -> bool {
     let ready = matches!(entities.get(unit), Some(e)
         if e.owner == player
@@ -1461,37 +1520,25 @@ fn try_fire_artillery(
         notice(events, player, "Not enough steel");
         return false;
     }
-    let ballistic_tables_researched =
-        mode == ArtilleryFireMode::Point && ps.has_upgrade(UpgradeKind::BallisticTables);
     let (target_x, target_y) = {
         let Some(e) = entities.get_mut(unit) else {
             ps.refund_cost(ammo_cost);
             return false;
         };
-        let shot_number = match mode {
-            ArtilleryFireMode::Point if ballistic_tables_researched => {
-                e.increment_artillery_shots_fired()
-            }
-            ArtilleryFireMode::Point => {
-                e.reset_artillery_accuracy();
-                1
-            }
-            ArtilleryFireMode::Blanket => e.increment_artillery_blanket_shots_fired(),
-        };
+        let shot_number = e.increment_artillery_blanket_shots_fired();
         e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
-        match mode {
-            ArtilleryFireMode::Point => artillery_scattered_point(
-                unit,
-                tick,
-                (e.pos_x, e.pos_y),
-                (x, y),
-                shot_number,
-                ballistic_tables_researched,
-            ),
-            ArtilleryFireMode::Blanket => {
-                artillery_blanket_point(unit, player, tick, (x, y), shot_number)
-            }
-        }
+        let fire_radius_tiles = match mode {
+            ArtilleryFireMode::Point => config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
+            ArtilleryFireMode::Blanket => radius_tiles,
+        };
+        artillery_blanket_point(
+            unit,
+            player,
+            tick,
+            (x, y),
+            shot_number,
+            fire_radius_tiles,
+        )
     };
     let reveal = entities.get(unit).map(|attacker| AttackReveal {
         owner: attacker.owner,
@@ -1568,24 +1615,29 @@ pub(in crate::game) fn artillery_point_fire_system(
     tick: u32,
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-    let orders: Vec<(u32, u32, f32, f32, ArtilleryFireMode)> = entities
+    let orders: Vec<(u32, u32, f32, f32, ArtilleryFireMode, f32)> = entities
         .ids()
         .into_iter()
         .filter_map(|id| {
             let e = entities.get(id)?;
-            let (x, y, mode) = match e.order() {
+            let (x, y, mode, radius_tiles) = match e.order() {
                 Order::ArtilleryPointFire(order) => {
-                    (order.intent.x, order.intent.y, ArtilleryFireMode::Point)
+                    (order.intent.x, order.intent.y, ArtilleryFireMode::Point, 0.0)
                 }
                 Order::ArtilleryBlanketFire(order) => {
-                    (order.intent.x, order.intent.y, ArtilleryFireMode::Blanket)
+                    (
+                        order.intent.x,
+                        order.intent.y,
+                        ArtilleryFireMode::Blanket,
+                        order.intent.radius_tiles,
+                    )
                 }
                 _ => return None,
             };
-            Some((id, e.owner, x, y, mode))
+            Some((id, e.owner, x, y, mode, radius_tiles))
         })
         .collect();
-    for (id, owner, x, y, mode) in orders {
+    for (id, owner, x, y, mode, radius_tiles) in orders {
         let target = stored_artillery_point_fire_target(
             map,
             entities,
@@ -1636,6 +1688,7 @@ pub(in crate::game) fn artillery_point_fire_system(
             y,
             tick,
             mode,
+            radius_tiles,
         );
     }
 }

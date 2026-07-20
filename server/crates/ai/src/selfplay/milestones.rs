@@ -484,6 +484,7 @@ impl PlayerMilestones {
             | Command::SetupAntiTankGuns { .. }
             | Command::TearDownAntiTankGuns { .. }
             | Command::UseAbility { .. }
+            | Command::ArtilleryFire { .. }
             | Command::RecastAbility { .. }
             | Command::SetAutocast { .. }
             | Command::Gather { .. }

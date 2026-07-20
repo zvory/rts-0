@@ -335,7 +335,7 @@ fn heavy_guns_research_requires_medium_guns() {
 }
 
 #[test]
-fn ballistic_tables_research_requires_heavy_guns() {
+fn removed_ballistic_tables_research_is_always_rejected() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
@@ -348,7 +348,7 @@ fn ballistic_tables_research_requires_heavy_guns() {
         upgrade: UpgradeKind::BallisticTables,
     };
 
-    let events = apply_with_players(
+    apply_with_players(
         &map,
         &mut entities,
         &mut players,
@@ -359,13 +359,8 @@ fn ballistic_tables_research_requires_heavy_guns() {
         .expect("research complex")
         .research_queue()
         .is_empty());
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
-    ));
-
     players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
-    let events = apply_with_players(
+    apply_with_players(
         &map,
         &mut entities,
         &mut players,
@@ -376,19 +371,13 @@ fn ballistic_tables_research_requires_heavy_guns() {
         .expect("research complex")
         .research_queue()
         .is_empty());
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
-    ));
-
     players[0].upgrades.insert(UpgradeKind::ArtilleryUnlock);
     apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
-    let queue = entities
+    assert!(entities
         .get(research_complex)
         .expect("research complex")
-        .research_queue();
-    assert_eq!(queue.len(), 1);
-    assert_eq!(queue[0].upgrade, UpgradeKind::BallisticTables);
+        .research_queue()
+        .is_empty());
 }
 
 #[test]
