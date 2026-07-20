@@ -1244,7 +1244,7 @@ impl Entity {
             Order::Build(_) => states::BUILD,
             Order::Deconstruct(_) => states::BUILD,
             Order::Ability(_) => states::MOVE,
-            Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_) => states::ATTACK,
+            Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire { .. } => states::ATTACK,
         }
     }
 

@@ -499,6 +499,8 @@ function commandOrderStage(command, clientSeq, createdAt) {
       return finitePointStage(ORDER_STAGE.SETUP_ANTI_TANK_GUNS, command, base);
     case CMD.HOLD_POSITION:
       return command.queued ? { kind: ORDER_STAGE.HOLD_POSITION, ...base } : null;
+    case CMD.ARTILLERY_FIRE:
+      return finitePointStage(ORDER_STAGE.BLANKET_FIRE, command, base);
     case CMD.USE_ABILITY:
       if (command.ability === ABILITY.POINT_FIRE) {
         return finitePointStage(ORDER_STAGE.POINT_FIRE, command, base);

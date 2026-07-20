@@ -1031,7 +1031,7 @@ mod tests {
             blanket_fire.cooldown_ticks,
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
-        assert!(blanket_fire.command_card);
+        assert!(!blanket_fire.command_card);
         assert_eq!(blanket_fire.protocol_code, 10);
         assert_eq!(blanket_fire.order_stage_code, 17);
 

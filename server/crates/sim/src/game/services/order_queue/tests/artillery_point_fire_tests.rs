@@ -58,7 +58,7 @@ fn queued_artillery_blanket_fire_outside_arc_redeploys_on_promotion() {
         unit.weapon_setup(),
         WeaponSetup::TearingDownToRedeploy { .. }
     ));
-    assert!(matches!(unit.order(), Order::ArtilleryBlanketFire(_)));
+    assert!(matches!(unit.order(), Order::ArtilleryBlanketFire { .. }));
     assert!(
         (unit.pending_redeploy_facing().unwrap_or_default() - angle).abs() < 0.001,
         "queued outside-arc Blanket Fire should redeploy toward the stored center"

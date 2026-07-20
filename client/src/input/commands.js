@@ -11,8 +11,6 @@ import {
 } from "../protocol.js";
 import {
   ABILITIES,
-  ARTILLERY_BLANKET_RADIUS_TILES,
-  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
@@ -20,6 +18,7 @@ import {
 } from "../config.js";
 import { DEFAULT_TILE_SIZE } from "./constants.js";
 import {
+  artilleryFireRadiusTiles,
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./artillery_targeting.js";
@@ -132,10 +131,10 @@ export function _issueTargetedCommand(p, ev = {}) {
       ? ABILITY.BLANKET_FIRE
       : ability;
     const targetWorld = fireCenter || world;
-    const command = resolvedAbility === ABILITY.POINT_FIRE
-      ? cmd.pointFire(units, targetWorld.x, targetWorld.y, queued)
-      : resolvedAbility === ABILITY.BLANKET_FIRE
-        ? cmd.blanketFire(units, targetWorld.x, targetWorld.y, fireRadiusTiles, queued)
+    const command = fireCenter
+      ? cmd.blanketFire(units, targetWorld.x, targetWorld.y, fireRadiusTiles, queued)
+      : resolvedAbility === ABILITY.POINT_FIRE
+        ? cmd.pointFire(units, targetWorld.x, targetWorld.y, queued)
         : cmd.useAbility(resolvedAbility, units, targetWorld.x, targetWorld.y, queued);
     const radiusTiles = fireRadiusTiles != null
       ? fireRadiusTiles
@@ -625,12 +624,6 @@ export function _refreshAbilityTargetPreview() {
   });
 }
 
-function artilleryFireRadiusTiles(center, world, tileSize) {
-  if (!center || !world || !(tileSize > 0)) return ARTILLERY_MIN_FIRE_RADIUS_TILES;
-  const radius = Math.hypot(world.x - center.x, world.y - center.y) / tileSize;
-  return Math.max(ARTILLERY_MIN_FIRE_RADIUS_TILES, Math.min(ARTILLERY_BLANKET_RADIUS_TILES, radius));
-}
-
 export function _refreshAntiTankGunSetupPreview() {
   const intent = clientIntent(this);
   if (!this.mouse || intent?.commandTarget !== "setupAntiTankGuns") {
@@ -941,7 +934,7 @@ export function _quickCastCommandTarget(ev = {}) {
   const intent = clientIntent(this);
   if (!intent?.commandTarget || !this.mouse) return false;
   const quickCastPoint = { x: this.mouse.x, y: this.mouse.y };
-  this._issueTargetedCommand(this.mouse, ev);
+  if (this._issueTargetedCommand(this.mouse, ev) === false) return true;
   const issued = typeof intent.issueCommandTarget === "function"
     ? intent.issueCommandTarget(ev)
     : { keepArmed: false };

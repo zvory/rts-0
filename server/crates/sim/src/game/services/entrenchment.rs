@@ -166,7 +166,7 @@ fn holds_ground(entity: &Entity) -> bool {
         | Order::Deconstruct(_)
         | Order::Ability(_)
         | Order::ArtilleryPointFire(_)
-        | Order::ArtilleryBlanketFire(_) => false,
+        | Order::ArtilleryBlanketFire { .. } => false,
     }
 }
 

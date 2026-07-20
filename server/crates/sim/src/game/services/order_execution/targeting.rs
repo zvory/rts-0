@@ -349,12 +349,12 @@ fn artillery_can_accept_queued_point_fire_command(e: &Entity) -> bool {
 fn artillery_point_fire_queue_terminal(e: &Entity) -> bool {
     matches!(
         e.order(),
-        Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_)
+        Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire { .. }
     ) || e.queued_orders().iter().any(|intent| {
         matches!(
             intent,
             crate::game::entity::OrderIntent::PointFire(_)
-                | crate::game::entity::OrderIntent::BlanketFire(_)
+                | crate::game::entity::OrderIntent::BlanketFire { .. }
         )
     })
 }
@@ -395,7 +395,7 @@ fn queued_artillery_target_context(e: &Entity) -> ArtilleryTargetContext {
                 }
             }
             crate::game::entity::OrderIntent::PointFire(_)
-            | crate::game::entity::OrderIntent::BlanketFire(_) => break,
+            | crate::game::entity::OrderIntent::BlanketFire { .. } => break,
             _ => {}
         }
     }

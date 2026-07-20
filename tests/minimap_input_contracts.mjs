@@ -639,7 +639,7 @@ function pointerEvent(canvas, clientX, clientY, {
   h.minimap.destroy();
 }
 
-// Artillery abilities issued through the minimap keep raw commands but show locked local feedback.
+// Unified Artillery Fire uses the same two-click center/radius gesture on the minimap.
 {
   const artillery = {
     id: 17,
@@ -652,22 +652,31 @@ function pointerEvent(canvas, clientX, clientY, {
   };
   const h = minimapHarness({
     selected: [artillery],
-    commandTarget: { kind: "ability", ability: ABILITY.BLANKET_FIRE },
+    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
   });
-  h.minimap._issueOrder(artillery.x + 5, artillery.y, true);
+  const center = { x: artillery.x + 5, y: artillery.y };
   assert(
-    h.net.sent[0]?.c === "useAbility" &&
-      h.net.sent[0].ability === ABILITY.BLANKET_FIRE &&
-      h.net.sent[0].x === artillery.x + 5 &&
-      h.net.sent[0].queued === true,
-    "minimap Blanket Fire targeting sends the raw queued ability command",
+    h.minimap._issuePrimaryTarget(center, { shiftKey: true }) === true &&
+      h.net.sent.length === 0 &&
+      h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
+    "minimap Artillery Fire first click stores a center and keeps targeting armed",
+  );
+  h.minimap._issuePrimaryTarget({ x: center.x + 6, y: center.y }, { shiftKey: true });
+  assert(
+    h.net.sent[0]?.c === "artilleryFire" &&
+      h.net.sent[0].x === center.x &&
+      h.net.sent[0].radiusTiles === 6 &&
+      h.net.sent[0].queued === true &&
+      h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE &&
+      h.clientIntent.artilleryFireCenter === null,
+    "minimap Artillery Fire second click sends the raw center and selected radius",
   );
   assert(
     h.clientIntent.commandFeedback[0]?.kind === "artillery" &&
       h.clientIntent.commandFeedback[0].x === artillery.x + ARTILLERY_MIN_RANGE_TILES &&
       h.clientIntent.commandFeedback[0].y === artillery.y &&
-      h.clientIntent.commandFeedback[0].radiusTiles === ARTILLERY_BLANKET_RADIUS_TILES,
-    "minimap Blanket Fire feedback uses the locked artillery center and blanket radius",
+      h.clientIntent.commandFeedback[0].radiusTiles === 6,
+    "minimap Artillery Fire feedback uses the locked center and selected radius",
   );
   h.minimap.destroy();
 }
@@ -864,12 +873,14 @@ function pointerEvent(canvas, clientX, clientY, {
     { sent: true, clientSeq: 8 },
   );
   h.minimap._issueOrder(plannedOrigin.x, plannedOrigin.y, true);
+  h.minimap._issueOrder(plannedOrigin.x + 6, plannedOrigin.y, true);
   assert(
-    h.net.sent[0]?.ability === ABILITY.POINT_FIRE &&
+    h.net.sent[0]?.c === "artilleryFire" &&
       h.net.sent[0].queued === true &&
       h.net.sent[0].x === plannedOrigin.x &&
-      h.net.sent[0].y === plannedOrigin.y,
-    "minimap queued Point Fire sends the same raw command semantics as world targeting",
+      h.net.sent[0].y === plannedOrigin.y &&
+      h.net.sent[0].radiusTiles === 6,
+    "minimap queued Artillery Fire sends the same raw command semantics as world targeting",
   );
   assertApprox(
     h.clientIntent.commandFeedback[0]?.x,

@@ -640,7 +640,7 @@ fn active_order_plan_marker(
             order.intent.x,
             order.intent.y,
         ),
-        Order::ArtilleryBlanketFire(order) => point_marker(
+        Order::ArtilleryBlanketFire { order, .. } => point_marker(
             protocol::abilities::BLANKET_FIRE,
             order.intent.x,
             order.intent.y,
@@ -677,7 +677,7 @@ fn intent_plan_marker(
         OrderIntent::PointFire(point) => {
             point_marker(protocol::abilities::POINT_FIRE, point.x, point.y)
         }
-        OrderIntent::BlanketFire(point) => {
+        OrderIntent::BlanketFire { point, .. } => {
             point_marker(protocol::abilities::BLANKET_FIRE, point.x, point.y)
         }
         OrderIntent::SelfAbility(ability) => point_marker(

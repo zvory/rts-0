@@ -10,11 +10,10 @@ pub(super) fn artillery_blanket_point(
     shot_number: u16,
     fire_radius_tiles: f32,
 ) -> (f32, f32) {
-    let radius_px = fire_radius_tiles
-        .clamp(
-            config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
-            config::ARTILLERY_BLANKET_RADIUS_TILES,
-        ) * config::TILE_SIZE as f32;
+    let radius_px = fire_radius_tiles.clamp(
+        config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
+        config::ARTILLERY_BLANKET_RADIUS_TILES,
+    ) * config::TILE_SIZE as f32;
     let seed = mix32(
         unit.wrapping_mul(0x9E37_79B9)
             ^ owner.wrapping_mul(0x85EB_CA6B)
@@ -30,7 +29,10 @@ fn offset_inside_circle(center: WorldPoint, radius_px: f32, seed: u32) -> WorldP
     }
     let angle = unit_float(seed) * std::f32::consts::TAU;
     let radial = unit_float(mix32(seed ^ 0xA5A5_5A5A)).sqrt() * radius_px;
-    (center.0 + angle.cos() * radial, center.1 + angle.sin() * radial)
+    (
+        center.0 + angle.cos() * radial,
+        center.1 + angle.sin() * radial,
+    )
 }
 
 fn mix32(mut x: u32) -> u32 {

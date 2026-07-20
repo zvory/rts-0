@@ -48,12 +48,16 @@ const MAX_RALLY_STAGES: usize = 4;
 const MIN_FORMATION_POINT_DISTANCE_PX: f32 = 2.0;
 mod artillery_scatter;
 mod cancel;
+mod command_helpers;
 mod guards;
 mod planner_facts;
 mod production_repeat;
 mod scout_plane_ability;
 mod support_weapon_setup;
 use self::artillery_scatter::artillery_blanket_point;
+use self::command_helpers::{
+    choose_smoke_caster, clear_queued_orders, clear_staged_anti_tank_gun_setup, teardown_ticks_for,
+};
 use self::guards::{
     command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
     rally_intent_for_map, unit_can_accept_ground_command, unit_can_accept_player_command,
@@ -926,7 +930,9 @@ mod planned_actions {
                                 mode,
                                 match mode {
                                     ArtilleryFireMode::Point => 0.0,
-                                    ArtilleryFireMode::Blanket => config::ARTILLERY_BLANKET_RADIUS_TILES,
+                                    ArtilleryFireMode::Blanket => {
+                                        config::ARTILLERY_BLANKET_RADIUS_TILES
+                                    }
                                 },
                             );
                             continue;
@@ -985,13 +991,11 @@ mod planned_actions {
                                         ArtilleryFireMode::Point => {
                                             OrderIntent::point_fire(locked.x, locked.y)
                                         }
-                                        ArtilleryFireMode::Blanket => {
-                                            OrderIntent::blanket_fire(
-                                                locked.x,
-                                                locked.y,
-                                                config::ARTILLERY_BLANKET_RADIUS_TILES,
-                                            )
-                                        }
+                                        ArtilleryFireMode::Blanket => OrderIntent::blanket_fire(
+                                            locked.x,
+                                            locked.y,
+                                            config::ARTILLERY_BLANKET_RADIUS_TILES,
+                                        ),
                                     };
                                     e.append_queued_order(intent);
                                 }
@@ -1073,7 +1077,9 @@ mod planned_actions {
                                     mode,
                                     match mode {
                                         ArtilleryFireMode::Point => 0.0,
-                                        ArtilleryFireMode::Blanket => config::ARTILLERY_BLANKET_RADIUS_TILES,
+                                        ArtilleryFireMode::Blanket => {
+                                            config::ARTILLERY_BLANKET_RADIUS_TILES
+                                        }
                                     },
                                 );
                                 continue;
@@ -1531,14 +1537,7 @@ fn try_fire_artillery(
             ArtilleryFireMode::Point => config::ARTILLERY_MIN_FIRE_RADIUS_TILES,
             ArtilleryFireMode::Blanket => radius_tiles,
         };
-        artillery_blanket_point(
-            unit,
-            player,
-            tick,
-            (x, y),
-            shot_number,
-            fire_radius_tiles,
-        )
+        artillery_blanket_point(unit, player, tick, (x, y), shot_number, fire_radius_tiles)
     };
     let reveal = entities.get(unit).map(|attacker| AttackReveal {
         owner: attacker.owner,
@@ -1621,17 +1620,21 @@ pub(in crate::game) fn artillery_point_fire_system(
         .filter_map(|id| {
             let e = entities.get(id)?;
             let (x, y, mode, radius_tiles) = match e.order() {
-                Order::ArtilleryPointFire(order) => {
-                    (order.intent.x, order.intent.y, ArtilleryFireMode::Point, 0.0)
-                }
-                Order::ArtilleryBlanketFire(order) => {
-                    (
-                        order.intent.x,
-                        order.intent.y,
-                        ArtilleryFireMode::Blanket,
-                        order.intent.radius_tiles,
-                    )
-                }
+                Order::ArtilleryPointFire(order) => (
+                    order.intent.x,
+                    order.intent.y,
+                    ArtilleryFireMode::Point,
+                    0.0,
+                ),
+                Order::ArtilleryBlanketFire {
+                    order,
+                    radius_tiles,
+                } => (
+                    order.intent.x,
+                    order.intent.y,
+                    ArtilleryFireMode::Blanket,
+                    radius_tiles,
+                ),
                 _ => return None,
             };
             Some((id, e.owner, x, y, mode, radius_tiles))
@@ -1690,67 +1693,6 @@ pub(in crate::game) fn artillery_point_fire_system(
             mode,
             radius_tiles,
         );
-    }
-}
-
-fn setup_ticks_for(kind: EntityKind) -> u16 {
-    match kind {
-        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
-        _ => config::ANTI_TANK_GUN_SETUP_TICKS,
-    }
-}
-
-fn teardown_ticks_for(kind: EntityKind) -> u16 {
-    match kind {
-        EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
-        _ => setup_ticks_for(kind),
-    }
-}
-
-fn choose_smoke_caster(
-    map: &Map,
-    entities: &EntityStore,
-    ability: AbilityKind,
-    eligible: &[u32],
-    x: f32,
-    y: f32,
-) -> Option<u32> {
-    let mut furthest_in_range: Option<(u32, f32)> = None;
-    let mut closest: Option<(u32, f32)> = None;
-    for id in eligible {
-        let Some(e) = entities.get(*id) else {
-            continue;
-        };
-        let d2 = dist2(e.pos_x, e.pos_y, x, y);
-        if closest.is_none_or(|(_, best)| d2 < best) {
-            closest = Some((*id, d2));
-        }
-        if ability_orders::caster_in_range(map, entities, *id, ability, x, y)
-            && furthest_in_range.is_none_or(|(_, best)| d2 > best)
-        {
-            furthest_in_range = Some((*id, d2));
-        }
-    }
-    furthest_in_range.or(closest).map(|(id, _)| id)
-}
-
-fn clear_queued_orders(entities: &mut EntityStore, ids: &[u32]) {
-    for id in ids {
-        if let Some(e) = entities.get_mut(*id) {
-            e.clear_queued_orders();
-        }
-    }
-}
-
-fn clear_staged_anti_tank_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
-    for id in ids {
-        let Some(e) = entities.get_mut(*id) else {
-            continue;
-        };
-        if e.kind == EntityKind::AntiTankGun {
-            e.set_emplacement_facing(None);
-            e.set_pending_redeploy_facing(None);
-        }
     }
 }
 
