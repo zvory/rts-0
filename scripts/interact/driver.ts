@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { Browser, KeyInput, Page, Viewport } from "puppeteer-core";
+import type { Browser, Page, Viewport } from "puppeteer-core";
 import { withAbortSignal as abortable } from "./abort_signal.ts";
 import {
   checkMediaCapabilities, createWallClockRecorder, finalizeMp4Artifacts, InteractRecordingError,
@@ -21,6 +21,7 @@ import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
 import { waitForInteractStartup } from "./bridge_startup.ts";
+import { performMouseDrag, type MouseDragInput } from "./mouse_drag.ts";
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -381,85 +382,18 @@ export class InteractDriver {
 
   async giveUp() { return this.call("giveUp", {}); }
 
-  async time(control: JsonObject) {
-    return this.call("time", control);
-  }
+  async time(control: JsonObject) { return this.call("time", control); }
 
   async inspect(query: JsonObject = {}) { return this.call("inspect", query); }
   async select(entityIds: number[]) { return this.call("select", { entityIds }); }
   async camera(command: JsonObject) { return this.call("camera", command); }
 
-  async drag({
-    button = "left", from, to, steps = 24, durationMs = 750, holdKeys = [],
-  }: {
-    button?: "left" | "right";
-    from: { x: number; y: number };
-    to: { x: number; y: number };
-    steps?: number;
-    durationMs?: number;
-    holdKeys?: Array<"attack" | "shift">;
-  }) {
-    if (this.state !== DRIVER_STATES.OPEN || !this.page) {
-      throw new InteractDriverError("sessionClosed", "Interact driver session is not open.");
-    }
-    const viewport = await this.page.evaluate(() => {
-      const element = document.getElementById("viewport");
-      if (!element) return null;
-      const rect = element.getBoundingClientRect();
-      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-    });
-    if (!viewport || viewport.width <= 0 || viewport.height <= 0) {
-      throw new InteractDriverError("viewportUnavailable", "The rendered game viewport is unavailable for mouse input.");
-    }
-    for (const [label, point] of [["from", from], ["to", to]] as const) {
-      if (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height) {
-        throw new InteractDriverError("outsideViewport", `drag.${label} must lie inside the current game viewport.`, {
-          point, viewport: { width: viewport.width, height: viewport.height },
-        });
-      }
-    }
-
-    const keyNames: KeyInput[] = holdKeys.map((key) => key === "attack" ? "a" : "Shift");
-    const pressedKeys: KeyInput[] = [];
-    let mouseDown = false;
-    try {
-      await this.page.mouse.move(viewport.left + from.x, viewport.top + from.y);
-      for (const key of keyNames) {
-        await this.page.keyboard.down(key);
-        pressedKeys.push(key);
-      }
-      await this.page.mouse.down({ button });
-      mouseDown = true;
-      const frameDelayMs = durationMs / steps;
-      for (let index = 1; index <= steps; index += 1) {
-        const progress = index / steps;
-        await this.page.mouse.move(
-          viewport.left + from.x + (to.x - from.x) * progress,
-          viewport.top + from.y + (to.y - from.y) * progress,
-        );
-        if (frameDelayMs > 0) await sleep(frameDelayMs);
-      }
-      await this.page.mouse.up({ button });
-      mouseDown = false;
-    } finally {
-      if (mouseDown) await this.page.mouse.up({ button }).catch(() => {});
-      for (const key of pressedKeys.reverse()) await this.page.keyboard.up(key).catch(() => {});
-    }
-    await sleep(50);
-    return {
-      button,
-      from: { ...from },
-      to: { ...to },
-      steps,
-      durationMs,
-      holdKeys: [...holdKeys],
-      viewport: { width: viewport.width, height: viewport.height },
-    };
+  async drag(input: MouseDragInput) {
+    if (this.state !== DRIVER_STATES.OPEN || !this.page) throw new InteractDriverError("sessionClosed", "Interact driver session is not open.");
+    return performMouseDrag(this.page, input, (code, message, details) => new InteractDriverError(code, message, details));
   }
 
-  async reset() {
-    return this.call("reset", {});
-  }
+  async reset() { return this.call("reset", {}); }
 
   async exportSetup(name = "") {
     return this.call("exportSetup", { name });
