@@ -298,6 +298,84 @@ fn construction_hp_scales_linearly_to_full_completion() {
 }
 
 #[test]
+fn construction_damage_permanently_reduces_completion_hp() {
+    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
+        .expect("city centre should spawn");
+    let original_max_hp = entity.max_hp;
+    let total = entity
+        .construction
+        .as_ref()
+        .expect("city centre should be under construction")
+        .total;
+
+    assert!(entity.set_construction_progress(total / 2));
+    assert!(entity.apply_damage(300, Some((2, (30.0, 40.0), 7))));
+    assert_eq!(entity.max_hp, original_max_hp - 300);
+    assert!(entity.set_construction_progress(total.saturating_sub(1)));
+    assert_eq!(entity.advance_construction(), Some(true));
+    assert_eq!(entity.hp, original_max_hp - 300);
+    assert_eq!(entity.max_hp, original_max_hp - 300);
+}
+
+#[test]
+fn construction_damage_destroys_scaffold_when_remaining_hp_budget_is_exhausted() {
+    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
+        .expect("city centre should spawn");
+    let original_max_hp = entity.max_hp;
+
+    assert!(entity.apply_damage(original_max_hp, Some((2, (30.0, 40.0), 7))));
+    assert_eq!(entity.hp, 0);
+    assert_eq!(entity.max_hp, 0);
+    assert!(entity.under_construction());
+    assert_eq!(entity.last_damage_owner(), Some(2));
+}
+
+#[test]
+fn construction_progress_cannot_outpace_cumulative_damage() {
+    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
+        .expect("city centre should spawn");
+    let original_max_hp = entity.max_hp;
+
+    for shot in 1..=6 {
+        assert!(entity.apply_damage(100, Some((2, (30.0, 40.0), shot))));
+        if shot < 6 {
+            assert!(entity.max_hp > 0);
+            assert_ne!(entity.advance_construction(), None);
+        }
+    }
+
+    assert_eq!(entity.max_hp, original_max_hp.saturating_sub(600));
+    assert_eq!(entity.hp, 0);
+}
+
+#[test]
+fn scaffold_survival_is_based_on_remaining_budget_not_temporary_progress_hp() {
+    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
+        .expect("city centre should spawn");
+    let temporary_progress_hp = entity.hp;
+    let original_max_hp = entity.max_hp;
+
+    assert!(entity.apply_damage(
+        temporary_progress_hp.saturating_add(1),
+        Some((2, (30.0, 40.0), 1)),
+    ));
+
+    assert!(entity.hp > 0);
+    assert_eq!(entity.max_hp, original_max_hp - temporary_progress_hp - 1);
+}
+
+#[test]
+fn damage_to_completed_building_does_not_reduce_max_hp() {
+    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, true)
+        .expect("city centre should spawn");
+    let original_max_hp = entity.max_hp;
+
+    assert!(entity.apply_damage(300, None));
+    assert_eq!(entity.hp, original_max_hp - 300);
+    assert_eq!(entity.max_hp, original_max_hp);
+}
+
+#[test]
 fn resource_node_kinds_have_exact_state_groups() {
     for kind in [EntityKind::Steel, EntityKind::Oil] {
         let entity = Entity::new_node(kind, 10.0, 20.0).expect("node kind should spawn");

@@ -1477,9 +1477,13 @@ General rules:
   grace. Clearing an active build order, completing construction, or losing a scaffold preserves
   any queued handoff orders; because queued promotion runs before construction in each tick, those
   handoffs promote on the next eligible promotion pass after the active build order becomes idle.
-  Constructed buildings spawn with their full max HP but only 10% current HP, then linearly gain
-  current HP with construction progress until completion restores them to full health; prebuilt
-  starting buildings are unchanged.
+  Constructed buildings spawn with their full max HP budget but only 10% current HP, then linearly
+  gain current HP with construction progress. Damage taken before completion permanently subtracts
+  from that max HP budget; later progress scales against the reduced budget, completion preserves
+  the missing HP, and exhausting the budget destroys the scaffold. Scaffold survival is based on
+  that remaining budget rather than its temporary progress-scaled current HP, so an early scaffold
+  can survive a hit larger than the HP currently shown. Prebuilt starting buildings and damage
+  taken after completion keep the normal fixed max HP behavior.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
   future intents. `stop` always clears both active and queued unit orders.
 - Queueable commands append future unit-local intents. Unit queues are capped at 8 intents today;
