@@ -157,13 +157,22 @@ fn artillery_fire_radius_clamp_tracks_fire_control_research() {
             },
         );
         game.tick();
-        match game.state.entities.get(artillery).expect("artillery").order() {
+        match game
+            .state
+            .entities
+            .get(artillery)
+            .expect("artillery")
+            .order()
+        {
             Order::ArtilleryBlanketFire { radius_tiles, .. } => radius_tiles,
             other => panic!("expected stored artillery fire order, got {other:?}"),
         }
     }
 
-    assert_eq!(stored_radius(false), config::ARTILLERY_MIN_FIRE_RADIUS_TILES);
+    assert_eq!(
+        stored_radius(false),
+        config::ARTILLERY_MIN_FIRE_RADIUS_TILES
+    );
     assert_eq!(
         stored_radius(true),
         config::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES

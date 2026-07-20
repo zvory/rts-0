@@ -1297,7 +1297,9 @@ fn use_ability(
         let min_fire_radius_tiles = players
             .iter()
             .find(|candidate| candidate.id == player)
-            .map(artillery_min_fire_radius_tiles)
+            .map(|candidate| {
+                artillery_min_fire_radius_tiles(candidate.has_upgrade(UpgradeKind::BallisticTables))
+            })
             .unwrap_or(config::ARTILLERY_MIN_FIRE_RADIUS_TILES);
         let radius_tiles = match mode {
             ArtilleryFireMode::Point => 0.0,
@@ -1520,7 +1522,8 @@ fn try_fire_artillery(
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
-    let min_fire_radius_tiles = artillery_min_fire_radius_tiles(ps);
+    let min_fire_radius_tiles =
+        artillery_min_fire_radius_tiles(ps.has_upgrade(UpgradeKind::BallisticTables));
     if !ps.can_afford(ammo_cost.steel, ammo_cost.oil) {
         notice(events, player, "Not enough steel");
         if let Some(e) = entities.get_mut(unit) {
@@ -1612,8 +1615,8 @@ fn try_fire_artillery(
     true
 }
 
-fn artillery_min_fire_radius_tiles(player: &PlayerState) -> f32 {
-    if player.has_upgrade(UpgradeKind::BallisticTables) {
+fn artillery_min_fire_radius_tiles(has_fire_control: bool) -> f32 {
+    if has_fire_control {
         config::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES
     } else {
         config::ARTILLERY_MIN_FIRE_RADIUS_TILES
