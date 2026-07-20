@@ -105,7 +105,8 @@ export class PresentationFrameAssembler {
     for (let entityIndex = 0; entityIndex < entities.length; entityIndex += 1) {
       const entity = entities[entityIndex];
       const prepared = frameContext?.preparedEntities?.[entityIndex];
-      const layerId = entity?.shotReveal
+      const aboveFogReveal = entity?.shotReveal || entity?.aboveFogReveal;
+      const layerId = aboveFogReveal
         ? "aboveFogReveal"
         : entity?.visionOnly
           ? "belowFogIntel"
@@ -117,7 +118,7 @@ export class PresentationFrameAssembler {
           context,
           tileSizePx: this._staticMap.tileSizePx,
           entityStats: this._entityStats,
-          presentationKind: entity?.shotReveal
+          presentationKind: aboveFogReveal
             ? "shotRevealEntity"
             : entity?.visionOnly
               ? "intelEntity"

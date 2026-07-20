@@ -25,6 +25,7 @@ import {
   worldInBounds as queryWorldInBounds,
 } from "./state_queries.js";
 import { VisualEffectBackedState, VisualEffectBuffers } from "./state_visual_effects.js";
+import { markActionableFiringReveal } from "./state_firing_reveal.js";
 
 const TWO_PI = Math.PI * 2;
 const PREDICTION_SMOOTH_MS = 120;
@@ -42,20 +43,6 @@ function shortestAngleDelta(from, to) {
 
 function lerpAngle(from, to, t) {
   return normalizeAngle(from + shortestAngleDelta(from, to) * t);
-}
-
-function markFiringRevealEntity(entity, map, visibleTiles, playerId) {
-  if (!entity || entity.shotReveal || entity.visionOnly || !isUnit(entity.kind)) return entity;
-  if (Number(entity.owner) === 0 || Number(entity.owner) === Number(playerId)) return entity;
-  const width = Number(map?.width);
-  const height = Number(map?.height);
-  const tileSize = Number(map?.tileSize);
-  if (!Number.isInteger(width) || !Number.isInteger(height) || !(tileSize > 0)) return entity;
-  if (visibleTiles.length !== width * height) return entity;
-  const tx = Math.floor(Number(entity.x) / tileSize);
-  const ty = Math.floor(Number(entity.y) / tileSize);
-  if (tx < 0 || ty < 0 || tx >= width || ty >= height) return entity;
-  return visibleTiles[ty * width + tx] ? entity : { ...entity, shotReveal: true };
 }
 
 function interpolateEntity(entity, prior, alpha) {
@@ -314,7 +301,7 @@ export class GameState extends VisualEffectBackedState {
       : [];
     const wireEntities = (msg.entities || [])
       .filter((e) => !isResource(e.kind))
-      .map((e) => markFiringRevealEntity(e, this.map, visibleTiles, this.playerId));
+      .map((e) => markActionableFiringReveal(e, this.map, visibleTiles, this.playerId));
     this.visualEffects.applyAttackReveals(events, visualNow);
     const visibleIds = new Set(wireEntities.map((e) => e.id));
     const entities = wireEntities

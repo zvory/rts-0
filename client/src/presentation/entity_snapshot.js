@@ -10,7 +10,7 @@ export const PRESENTATION_ENTITY_FIELDS = Object.freeze([
   "attackRangeTiles", "attackRangeProfile", "firingArcRad", "firingMinRangePx",
   "firingMinRangeTiles", "firingRangePx", "firingRangeTiles", "firingRangeProfile",
   "weaponArcRad", "weaponMinRangePx", "weaponMinRangeTiles", "weaponRangePx",
-  "weaponRangeTiles", "weaponRangeProfile", "shotRevealCreatedAt", "shotRevealExpiresAt",
+  "weaponRangeTiles", "weaponRangeProfile", "aboveFogReveal", "shotRevealCreatedAt", "shotRevealExpiresAt",
 ]);
 
 const ENTITY_FIELDS = new Set(PRESENTATION_ENTITY_FIELDS);

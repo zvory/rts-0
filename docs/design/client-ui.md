@@ -1949,7 +1949,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside presentation vision remain actionable server-side
   but their reveal-only tile stays absent from `visibleTiles`. `GameState` recognizes the projected
-  enemy on that presentation-dark tile and shows it briefly above the unchanged fog at full opacity,
+  enemy on that presentation-dark tile and marks it `aboveFogReveal`, preserving normal interaction
+  while showing it above the unchanged fog at full opacity,
   using its normal art path, rig-authored recoil where available, and a yellow tracer to the hit
   point. Only the final 20% of event-backed fallback reveals fades out;
   snapshot-backed actionable reveals remain fully opaque until the server removes them.

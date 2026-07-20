@@ -339,11 +339,25 @@ function buttonByLabel(card, label) {
     events: [],
   });
   assert(
-    actionableRevealState.entityById(100)?.shotReveal === true,
+    actionableRevealState.entityById(100)?.aboveFogReveal === true,
     "a projected enemy unit on a presentation-dark tile becomes an above-fog firing reveal",
   );
   assert(
-    actionableRevealState.entityById(101)?.shotReveal !== true,
+    actionableRevealState.entityById(100)?.shotReveal !== true,
+    "an actionable firing reveal is not downgraded to a visual-only shot ghost",
+  );
+  assert(
+    buildSelectionScene({
+      entities: [actionableRevealState.entityById(100)],
+      tileSize: 32,
+      projection: createOrthographicProjectionSnapshot({
+        x: 0, y: 0, zoom: 1, worldW: 128, worldH: 128, viewW: 128, viewH: 128,
+      }, 128),
+    }).proxies.length === 1,
+    "an actionable above-fog firing reveal remains available to click targeting",
+  );
+  assert(
+    actionableRevealState.entityById(101)?.aboveFogReveal !== true,
     "owned units remain ordinary entities even when their tile is presentation-dark",
   );
 

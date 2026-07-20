@@ -102,13 +102,28 @@ impl Fog {
         mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
-        // Normalize legacy/malformed state to keep visible tiles explored.
+        // Normalize legacy/malformed state to keep ordinary visible tiles explored. Actionable
+        // firing-reveal stamps are intentionally presentation-dark and must stay unexplored when
+        // a replay, Lab rewind, or checkpoint restore rebuilds this state.
         for (&player, visible_grid) in &grids {
+            let reveal_only_tiles = firing_reveal_visibility
+                .get(&player)
+                .into_iter()
+                .flat_map(|by_entity| by_entity.values())
+                .filter_map(|visibility| {
+                    visibility
+                        .reveal_only
+                        .then_some(visibility.revealed_tile)
+                        .flatten()
+                })
+                .collect::<BTreeSet<_>>();
             let explored_grid = explored_grids
                 .entry(player)
                 .or_insert_with(|| vec![false; visible_grid.len()]);
-            for (explored, visible) in explored_grid.iter_mut().zip(visible_grid) {
-                *explored = *explored || *visible;
+            for (index, (explored, visible)) in
+                explored_grid.iter_mut().zip(visible_grid).enumerate()
+            {
+                *explored = *explored || (*visible && !reveal_only_tiles.contains(&(index as u32)));
             }
         }
         Fog {
@@ -440,7 +455,12 @@ impl Fog {
             .get(&player)
             .into_iter()
             .flat_map(|by_entity| by_entity.values())
-            .filter_map(|visibility| visibility.reveal_only.then_some(visibility.revealed_tile).flatten())
+            .filter_map(|visibility| {
+                visibility
+                    .reveal_only
+                    .then_some(visibility.revealed_tile)
+                    .flatten()
+            })
             .collect()
     }
 
