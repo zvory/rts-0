@@ -725,6 +725,16 @@ function pointerEvent(canvas, clientX, clientY, {
       h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
     "cancelling the minimap drag clears its center without disarming Artillery Fire",
   );
+
+  down(pointerEvent(h.canvas, 150, 220, { pointerId: 73, pointerType: "mouse" }));
+  move(pointerEvent(h.canvas, 400, 220, { pointerId: 73, pointerType: "mouse" }));
+  up(pointerEvent(h.canvas, 400, 220, { pointerId: 73, pointerType: "mouse" }));
+  assert(
+    h.net.sent.length === 1 &&
+      h.clientIntent.artilleryFireCenter === null &&
+      h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
+    "releasing an Artillery Fire drag outside the minimap cancels its center without firing",
+  );
   h.minimap.destroy();
 }
 

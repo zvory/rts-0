@@ -6,7 +6,7 @@
     {
       "path": "client/src/minimap.js",
       "lines": 1530,
-      "reason": "Artillery radius selection now shares the minimap's authoritative pointer lifecycle and command dispatch so click-drag-release and two-click targeting stay consistent; keep ratcheting until minimap input handling is extracted."
+      "reason": "Artillery radius selection now shares the minimap's authoritative pointer lifecycle, including cancellation on interrupted or out-of-bounds release, so click-drag-release and two-click targeting stay consistent; keep ratcheting until minimap input handling is extracted."
     },
     {
       "path": "client/styles.css",
@@ -30,12 +30,12 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1712,
+      "lines": 1711,
       "reason": "FormationMove now carries the optional authoritative attack-move mode beside its existing queued flag; keep ratcheting until remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
-      "lines": 3436,
+      "lines": 3344,
       "reason": "Panzerfaust shot persistence adds detached shot-store plumbing to the existing oversized sim combat test harness; keep ratcheting until combat tests are split."
     },
     {
@@ -70,8 +70,8 @@
     },
     {
       "path": "tests/minimap_input_contracts.mjs",
-      "lines": 1538,
-      "reason": "The minimap input contract suite now covers artillery click-drag-release, two-click, and cancellation behavior in its shared pointer fixture; keep ratcheting until artillery gesture contracts are split."
+      "lines": 1548,
+      "reason": "The minimap input contract suite now covers artillery click-drag-release, two-click, pointer cancellation, and out-of-bounds release behavior in its shared pointer fixture; keep ratcheting until artillery gesture contracts are split."
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",

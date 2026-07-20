@@ -582,6 +582,20 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     commands.length === 0 && input._artilleryFireGesture && input.clientIntent.artilleryFireCenter?.x === 900,
     "holding the first Artillery Fire press stores its center without firing",
   );
+  input._shiftKeysDown = new Set();
+  input.cameraNavigation = { release() {} };
+  input._drag = null;
+  input._handleBlur();
+  assert(
+    input._artilleryFireGesture === null &&
+      input.clientIntent.artilleryFireCenter === null &&
+      input.clientIntent.commandTarget === null,
+    "window blur cancels an interrupted battlefield Artillery Fire drag",
+  );
+  input.cameraNavigation = null;
+
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input._onLeftDown({ x: 900, y: 100 }, { shiftKey: false });
   input._handlePointerMoveAt(
     { preventDefault() {} },
     { x: 900 + 8 * 32, y: 100 },

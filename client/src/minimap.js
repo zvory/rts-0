@@ -1198,6 +1198,7 @@ export class Minimap {
   _handleCanvasPointerUp(ev) {
     const gesture = this._activePointerGesture;
     if (!gesture || gesture.pointerId !== ev.pointerId) return;
+    const releasedInside = this._containsClientPoint(ev.clientX, ev.clientY);
     this._releasePointer(ev.pointerId);
     this._activePointerGesture = null;
     this._dragging = false;
@@ -1207,7 +1208,7 @@ export class Minimap {
       this._intent()?.artilleryFireCenter &&
       commandTargetsMatch(this._intent()?.commandTarget, gesture.commandTarget) &&
       this._ensureTransform() &&
-      this._containsClientPoint(ev.clientX, ev.clientY)
+      releasedInside
     ) {
       const point = this._eventToCanvas(ev);
       const actionEvent = this._routerEvent(ev, "dom");
@@ -1224,14 +1225,13 @@ export class Minimap {
       actionEvent.ctrlKey = gesture.ctrlKey;
       actionEvent.metaKey = gesture.metaKey;
       actionEvent.altKey = gesture.altKey;
-      if (this._ensureTransform() && this._containsClientPoint(ev.clientX, ev.clientY)) {
+      if (this._ensureTransform() && releasedInside) {
         const point = this._eventToCanvas(ev);
         this._issuePrimaryTarget(this._canvasToWorld(point.x, point.y), actionEvent);
       }
     }
-    if (!this._containsClientPoint(ev.clientX, ev.clientY)) {
-      this.inputRouter?.releaseSource?.("dom");
-    }
+    if (gesture.artilleryRadiusSelection && !releasedInside) this._intent()?.endArtilleryFireRadiusSelection?.();
+    if (!releasedInside) this.inputRouter?.releaseSource?.("dom");
     ev.preventDefault();
   }
 
