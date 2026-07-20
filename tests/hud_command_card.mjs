@@ -69,12 +69,14 @@ function buttonSlots(card) {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 5), [
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
@@ -82,8 +84,9 @@ function buttonSlots(card) {
   assert.equal(rAndDCard().slots[1].enabled, false);
   assert.equal(rAndDCard().slots[1].title, "Requires Medium Guns");
   assert.equal(rAndDCard().slots[1].label, "Heavy Guns");
-  assert.equal(rAndDCard().slots[2].label, "Tank Production");
-  assert(!rAndDCard().slots.some((slot) => slot?.upgrade === UPGRADE.BALLISTIC_TABLES));
+  assert.equal(rAndDCard().slots[2].title, "Requires Heavy Guns");
+  assert.equal(rAndDCard().slots[2].label, "Artillery Fire Control");
+  assert.equal(rAndDCard().slots[2].icon, "AFC");
 }
 
 {
@@ -92,8 +95,8 @@ function buttonSlots(card) {
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(card.slots[1].label, "Heavy Guns");
   assert.equal(card.slots[1].enabled, true);
-  assert.equal(card.slots[2].enabled, true);
-  assert.equal(card.slots[2].label, "Tank Production");
+  assert.equal(card.slots[2].enabled, false);
+  assert.equal(card.slots[2].title, "Requires Heavy Guns");
 }
 
 {
@@ -150,9 +153,10 @@ function buttonSlots(card) {
   const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], null);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], null);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
 }
 
 {
@@ -160,7 +164,8 @@ function buttonSlots(card) {
   const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(card.slots[2].enabled, true);
 }
 

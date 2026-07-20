@@ -51,7 +51,8 @@ export const ARTILLERY_SETUP_TICKS = TICK_HZ * 6;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 3;
 export const ARTILLERY_BLANKET_RADIUS_TILES = 15;
-export const ARTILLERY_MIN_FIRE_RADIUS_TILES = 4;
+export const ARTILLERY_MIN_FIRE_RADIUS_TILES = 6;
+export const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3;
 export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 10, oil: 0 });
 export const SMOKE_ABILITY_RANGE_TILES = 14;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
@@ -88,7 +89,7 @@ export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.25;
 export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.375;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
-export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 40;
+export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
@@ -177,6 +178,7 @@ export const STATS = Object.freeze({
     researches: [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
+      UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
@@ -425,6 +427,17 @@ export const UPGRADES = Object.freeze({
     researchedAt: KIND.RESEARCH_COMPLEX,
     requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     requiresText: "Requires Medium Guns",
+  }),
+  [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
+    upgrade: UPGRADE.BALLISTIC_TABLES,
+    label: "Artillery Fire Control",
+    icon: "AFC",
+    cost: Object.freeze({ steel: 100, oil: 150 }),
+    researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
+    description: "Reduce Artillery Fire minimum radius from 6 to 3 tiles",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+    requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
+    requiresText: "Requires Heavy Guns",
   }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.TANK_UNLOCK,

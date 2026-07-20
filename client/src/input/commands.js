@@ -19,6 +19,7 @@ import {
 import { DEFAULT_TILE_SIZE } from "./constants.js";
 import {
   artilleryFireRadiusTiles,
+  artilleryMinFireRadiusTiles,
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./artillery_targeting.js";
@@ -125,7 +126,12 @@ export function _issueTargetedCommand(p, ev = {}) {
     }
     const fireCenter = ability === ABILITY.POINT_FIRE ? intent.artilleryFireCenter : null;
     const fireRadiusTiles = fireCenter
-      ? artilleryFireRadiusTiles(fireCenter, world, this.state.map?.tileSize || DEFAULT_TILE_SIZE)
+      ? artilleryFireRadiusTiles(
+          fireCenter,
+          world,
+          this.state.map?.tileSize || DEFAULT_TILE_SIZE,
+          artilleryMinFireRadiusTiles(commandUpgrades(this.state, this.controlPolicy)),
+        )
       : null;
     const resolvedAbility = ability === ABILITY.POINT_FIRE && fireRadiusTiles != null
       ? ABILITY.BLANKET_FIRE
@@ -597,7 +603,12 @@ export function _refreshAbilityTargetPreview() {
   const primaryLock = artilleryLocks[0] || null;
   const selectingArtilleryRadius = target.ability === ABILITY.POINT_FIRE && !!intent.artilleryFireCenter;
   const radiusTiles = selectingArtilleryRadius
-    ? artilleryFireRadiusTiles(intent.artilleryFireCenter, world, tileSize)
+    ? artilleryFireRadiusTiles(
+        intent.artilleryFireCenter,
+        world,
+        tileSize,
+        artilleryMinFireRadiusTiles(commandUpgrades(this.state, this.controlPolicy)),
+      )
     : abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
   intent?.updateAbilityTargetPreview?.({
     ability: target.ability,

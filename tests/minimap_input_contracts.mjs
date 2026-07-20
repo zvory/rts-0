@@ -682,6 +682,42 @@ function pointerEvent(canvas, clientX, clientY, {
 }
 
 // Smoke Plus minimap targeting uses the upgraded cloud radius in local feedback.
+// Artillery Fire also accepts a single press-drag-release gesture on the minimap.
+{
+  const artillery = {
+    id: 18,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 20,
+    y: 20,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const h = minimapHarness({
+    selected: [artillery],
+    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
+  });
+  const down = listenerFor(h.canvas, "pointerdown");
+  const move = listenerFor(h.canvas, "pointermove");
+  const up = listenerFor(h.canvas, "pointerup");
+  down(pointerEvent(h.canvas, 150, 220, { pointerId: 71, pointerType: "mouse", shiftKey: true }));
+  assert(
+    h.net.sent.length === 0 && h.clientIntent.artilleryFireCenter?.x === 50,
+    "minimap Artillery Fire press stores the center before a possible drag",
+  );
+  move(pointerEvent(h.canvas, 160, 220, { pointerId: 71, pointerType: "mouse", shiftKey: true }));
+  up(pointerEvent(h.canvas, 160, 220, { pointerId: 71, pointerType: "mouse", shiftKey: true }));
+  assert(
+    h.net.sent[0]?.c === "artilleryFire" &&
+      h.net.sent[0].x === 50 &&
+      h.net.sent[0].radiusTiles === 10 &&
+      h.net.sent[0].queued === true,
+    "minimap Artillery Fire drag releases the selected radius as one gesture",
+  );
+  h.minimap.destroy();
+}
+
+// Smoke Plus minimap targeting uses the upgraded cloud radius in local feedback.
 {
   const scoutCar = { id: 21, owner: 1, kind: KIND.SCOUT_CAR, x: 100, y: 100 };
   const h = minimapHarness({
