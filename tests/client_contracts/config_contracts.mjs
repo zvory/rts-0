@@ -1063,7 +1063,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
     assert(
       commandCarButton && !commandCarButton.disabled && commandCarButton.className.includes("primary-disabled"),
-      "Command Car training should keep its primary action disabled while allowing auto-build allocation before unlock",
+      "Command Car training should keep its primary action disabled while allowing auto-build allocation before an R&D Complex exists",
     );
     assert(
       commandCarButton?.dataset.contextAction === "true",
@@ -1138,7 +1138,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
     renderedButtons.length = 0;
-    factoryHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
+    const completedResearchComplex = {
+      id: 780,
+      owner: playerId,
+      kind: KIND.RESEARCH_COMPLEX,
+      buildProgress: null,
+    };
+    factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedResearchComplex];
     factoryHud._cardSig = null;
     renderCommandCard(factoryHud);
     assert(
@@ -1148,7 +1154,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
     assert(
       unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
-      "Tank Production should enable Command Car training",
+      "a completed R&D Complex should enable Command Car training without Tank Production",
     );
 
     renderedButtons.length = 0;

@@ -104,7 +104,6 @@ pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
         EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
-        EntityKind::CommandCar => Some(UpgradeKind::TankUnlock),
         _ => None,
     }
 }

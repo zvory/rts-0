@@ -86,6 +86,7 @@ const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
+const RESEARCH_COMPLEX_REQUIRED: &[EntityKind] = &[EntityKind::ResearchComplex];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
@@ -327,7 +328,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::Factory),
-        train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
+        train_requirement: TechRequirement::All(RESEARCH_COMPLEX_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Ekat,

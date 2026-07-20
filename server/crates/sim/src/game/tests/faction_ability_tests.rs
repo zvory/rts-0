@@ -151,7 +151,7 @@ fn smoke_plus_increases_scout_car_smoke_radius_by_half_and_doubles_duration() {
 }
 
 #[test]
-fn command_car_requires_tank_production_then_trains_at_factory() {
+fn command_car_requires_completed_research_complex_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -165,18 +165,19 @@ fn command_car_requires_tank_production_then_trains_at_factory() {
     for id in game.state.entities.ids() {
         game.state.entities.remove(id);
     }
-    let city_centre_pos = game.state.map.tile_center(8, 12);
+    let research_complex_pos = game.state.map.tile_center(8, 12);
     let factory_pos = game.state.map.tile_center(12, 8);
-    game.state
+    let research_complex = game
+        .state
         .entities
         .spawn_building(
             1,
-            EntityKind::CityCentre,
-            city_centre_pos.0,
-            city_centre_pos.1,
-            true,
+            EntityKind::ResearchComplex,
+            research_complex_pos.0,
+            research_complex_pos.1,
+            false,
         )
-        .expect("city centre should spawn");
+        .expect("research complex should spawn");
     let factory = game
         .state
         .entities
@@ -198,12 +199,14 @@ fn command_car_requires_tank_production_then_trains_at_factory() {
             .expect("factory")
             .prod_queue()
             .is_empty(),
-        "Command Cars should require Tank Production first"
+        "Command Cars should require a completed R&D Complex"
     );
 
-    game.state.players[0]
-        .upgrades
-        .insert(crate::game::upgrade::UpgradeKind::TankUnlock);
+    game.state
+        .entities
+        .get_mut(research_complex)
+        .expect("research complex")
+        .construction = None;
     game.enqueue(
         1,
         Command::Train {
@@ -220,7 +223,7 @@ fn command_car_requires_tank_production_then_trains_at_factory() {
             .entities
             .iter()
             .any(|e| e.owner == 1 && e.kind == EntityKind::CommandCar),
-        "Vehicle Works should train Command Cars after Tank Production"
+        "Vehicle Works should train Command Cars once an R&D Complex is complete"
     );
 }
 
