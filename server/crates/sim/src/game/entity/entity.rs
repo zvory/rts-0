@@ -43,6 +43,8 @@ pub struct Entity {
     pub pos_y: f32,
 
     pub hp: u32,
+    /// Remaining health ceiling. Damage taken during construction permanently lowers this value;
+    /// finished entities otherwise retain their configured maximum.
     pub max_hp: u32,
     invulnerable: bool,
     /// Player id that most recently damaged this target. Used for score attribution when the
@@ -954,7 +956,18 @@ impl Entity {
         if self.hp == 0 || amount == 0 || self.invulnerable {
             return false;
         }
-        self.hp = self.hp.saturating_sub(amount);
+        if let Some(construction) = self.construction.as_ref() {
+            // Construction progress is not healing. Damage destroys part of the scaffold's
+            // eventual health budget, and subsequent progress only fills the reduced budget.
+            self.max_hp = self.max_hp.saturating_sub(amount);
+            self.hp = construction_hp_for_progress(
+                self.max_hp,
+                construction.progress,
+                construction.total,
+            );
+        } else {
+            self.hp = self.hp.saturating_sub(amount);
+        }
         if let Some((owner, pos, tick)) = attribution {
             self.last_damage_owner = Some(owner);
             self.last_damage_tick = Some(tick);
