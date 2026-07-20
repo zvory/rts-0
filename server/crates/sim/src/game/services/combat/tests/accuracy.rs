@@ -1,4 +1,14 @@
 use super::*;
+use rand::Rng;
+
+fn seed_with_primary_miss_and_secondary_hit(miss_chance: f32) -> u64 {
+    (0..10_000)
+        .find(|seed| {
+            let mut rng = SmallRng::seed_from_u64(*seed);
+            rng.gen::<f32>() < miss_chance && rng.gen::<f32>() >= miss_chance
+        })
+        .expect("test should find a seed that exercises independent miss rolls")
+}
 
 #[allow(clippy::too_many_arguments)]
 fn apply_test_damage_with_seed(
@@ -121,6 +131,8 @@ fn tank_and_at_gun_primary_dodge_do_not_cancel_secondary_overpenetration_roll() 
         let primary_hp = entities.get(primary).expect("primary should exist").hp;
         let secondary_hp = entities.get(secondary).expect("secondary should exist").hp;
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+        let miss_chance = combat_rules::miss_chance(attacker_kind, EntityKind::Rifleman);
+        let rng_seed = seed_with_primary_miss_and_secondary_hit(miss_chance);
 
         apply_test_damage_with_seed(
             &mut entities,
@@ -134,13 +146,13 @@ fn tank_and_at_gun_primary_dodge_do_not_cancel_secondary_overpenetration_roll() 
             140.0,
             100.0,
             160.0,
-            3,
+            rng_seed,
         );
 
         assert_eq!(
             entities.get(primary).expect("primary should exist").hp,
             primary_hp,
-            "seed 3 should make the primary infantry target dodge {attacker_kind:?}"
+            "the selected seed should make the primary infantry target dodge {attacker_kind:?}"
         );
         assert!(
             entities.get(secondary).expect("secondary should exist").hp < secondary_hp,
