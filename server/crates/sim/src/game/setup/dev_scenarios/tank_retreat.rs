@@ -79,6 +79,10 @@ impl Game {
         let retreat_distance = tile_size * 12.0;
         let convergence = (tank_x - vertical_gap / fan_angle.tan(), center.1);
         let mut entities = EntityStore::new();
+        spawn_enemy_scout_spotter(
+            &mut entities,
+            (center.0 + tile_size * 2.0, center.1 - tile_size * 6.0),
+        )?;
         let mut tanks = Vec::with_capacity(3);
         let mut goals = Vec::with_capacity(3);
 
@@ -184,6 +188,20 @@ fn spawn_front_at_gun(
     Ok(gun)
 }
 
+fn spawn_enemy_scout_spotter(entities: &mut EntityStore, pos: (f32, f32)) -> Result<u32, String> {
+    let scout = entities
+        .spawn_unit(2, EntityKind::ScoutCar, pos.0, pos.1)
+        .ok_or_else(|| "failed to spawn retreat inspection Scout Car".to_string())?;
+    if let Some(entity) = entities.get_mut(scout) {
+        entity.hold_position();
+        entity.set_facing(std::f32::consts::PI);
+        for weapon in WeaponKind::ALL {
+            entity.set_weapon_cooldown(weapon, TANK_WEAPON_DELAY_TICKS);
+        }
+    }
+    Ok(scout)
+}
+
 fn normalize_dev_angle(angle: f32) -> f32 {
     (angle + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
@@ -233,6 +251,25 @@ mod tests {
                 .count(),
             3
         );
+        let spotter = setup
+            .game
+            .state
+            .entities
+            .iter()
+            .find(|entity| entity.owner == 2 && entity.kind == EntityKind::ScoutCar)
+            .expect("enemy Scout Car spotter should exist");
+        let leftmost_gun_x = setup
+            .game
+            .state
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == 2 && entity.kind == EntityKind::AntiTankGun)
+            .map(|gun| gun.pos_x)
+            .fold(f32::INFINITY, f32::min);
+        assert!(spotter.pos_x < leftmost_gun_x);
+        assert!(WeaponKind::ALL
+            .into_iter()
+            .all(|weapon| spotter.weapon_cooldown(weapon) == TANK_WEAPON_DELAY_TICKS));
 
         let mut facings = setup
             .units
@@ -269,8 +306,43 @@ mod tests {
                 to_goal.0 * tank.facing().cos() + to_goal.1 * tank.facing().sin() < 0.0,
                 "each authored move should begin behind its Tank"
             );
+            let sight = config::unit_stats(EntityKind::ScoutCar)
+                .expect("Scout Car stats should exist")
+                .sight_tiles as f32
+                * config::TILE_SIZE as f32;
+            assert!(
+                (x - spotter.pos_x).hypot(y - spotter.pos_y) <= sight,
+                "the spotter should see each complete retreat lane"
+            );
         }
         assert_tanks_take_front_ap_damage_before_orders(setup);
+    }
+
+    #[test]
+    fn reverse_traffic_remains_under_fire_through_the_merge() {
+        let mut setup = Game::new_tank_reverse_traffic_scenario(EntityKind::Tank, 3, 0x5150_0722)
+            .expect("reverse-traffic scenario should build");
+        for _ in 0..setup.issue_after_ticks {
+            setup.game.tick();
+        }
+        for command in setup.commands() {
+            setup.game.enqueue(setup.player_id, command);
+        }
+        for _ in 0..config::TICK_HZ * 5 {
+            setup.game.tick();
+        }
+
+        let latest_hit = setup
+            .units
+            .iter()
+            .filter_map(|tank_id| setup.game.state.entities.get(*tank_id))
+            .filter_map(|tank| tank.last_damage_tick())
+            .max()
+            .expect("at least one inspection Tank should take damage");
+        assert!(
+            latest_hit > setup.issue_after_ticks + config::TICK_HZ * 3,
+            "the spotter should keep anti-tank fire active late into the merge"
+        );
     }
 
     fn assert_tanks_take_front_ap_damage_before_orders(mut setup: DevScenarioSetup) {

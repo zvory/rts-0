@@ -183,9 +183,10 @@ Current scenario ids:
   back away immediately.
 - `tank_reverse_traffic` — three Tanks form a shallow fan with adjacent headings 10 degrees apart,
   take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive individual
-  movement orders whose reverse trajectories intersect. This provides a rearward traffic-control
-  inspection scene. The scenario-only Tanks have extra health so sustained fire does not end the
-  observation early.
+  movement orders whose reverse trajectories intersect. A team-2 Scout Car spotter left of the gun
+  line keeps the full merge visible to the guns without joining the fight. This provides a rearward
+  traffic-control inspection scene under sustained fire. The scenario-only Tanks have extra health
+  so sustained fire does not end the observation early.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one
