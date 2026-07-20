@@ -53,24 +53,26 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
-  if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
-  if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
-    .some((e) => e.prodUpgrade === upgrade)) return "locked";
-  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) return "locked";
+  if (researchQueuedAtSelectedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
+  if (def.requiresUpgrade &&
+      !(ctx.upgrades || []).includes(def.requiresUpgrade) &&
+      !researchQueuedAtSelectedBuilding(ctx, def.researchedAt, def.requiresUpgrade, isOwn)) {
+    return "locked";
+  }
   return affordable(def.cost, resources) ? "ready" : "unaffordable";
 }
 
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
-  if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) {
-    return def.requiresText || `Requires ${UPGRADES[def.replacesUpgrade]?.label || def.replacesUpgrade}`;
-  }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
-    .some((e) => e.prodUpgrade === upgrade)) return "Researching";
-  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) {
+    .some((entity) => entity.prodUpgrade === upgrade)) return "Researching";
+  if (researchQueuedAtSelectedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "Queued";
+  if (def.requiresUpgrade &&
+      !(ctx.upgrades || []).includes(def.requiresUpgrade) &&
+      !researchQueuedAtSelectedBuilding(ctx, def.researchedAt, def.requiresUpgrade, isOwn)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
   if (!affordable(def.cost, resources)) return "Queue now; research waits for resources";
@@ -82,14 +84,20 @@ export function trainLimitSignature(ctx, unit, isOwn) {
 }
 
 export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
-  const replacedUpgrade = UPGRADES[upgrade]?.replacesUpgrade;
-  if (replacedUpgrade) return researchSlotForUpgrade(buildingKind, replacedUpgrade, trains);
   const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
   if (unitIndex >= 0) return unitIndex + 3;
   const researchIndex = researchesOf(buildingKind).indexOf(upgrade);
   if (researchIndex >= 0) return researchIndex;
   const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
+}
+
+function researchQueuedAtSelectedBuilding(ctx, buildingKind, upgrade, isOwn) {
+  return (ctx.selection || []).some((entity) =>
+    isOwn(ctx, entity) &&
+    entity.kind === buildingKind &&
+    entity.buildProgress == null &&
+    (entity.prodUpgradeQueue || []).includes(upgrade));
 }
 
 export function trainSlotForUnit(buildingKind, unit, trains) {

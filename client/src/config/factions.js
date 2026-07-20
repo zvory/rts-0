@@ -69,11 +69,11 @@ export const FACTION_CATALOGS = Object.freeze({
       ],
       [KIND.RESEARCH_COMPLEX]: [
         UPGRADE.ANTI_TANK_GUN_UNLOCK,
+        UPGRADE.ARTILLERY_UNLOCK,
         UPGRADE.BALLISTIC_TABLES,
         UPGRADE.TANK_UNLOCK,
         UPGRADE.MORTAR_AUTOCAST,
         UPGRADE.SMOKE_PLUS,
-        UPGRADE.ARTILLERY_UNLOCK,
       ],
     },
     abilities: [

@@ -947,6 +947,11 @@ extrapolate false progress. Production buildings are visited in stable entity-id
 construction, when multiple waiting purchases compete for the same newly available resources.
 Standing repeat production deliberately does not use unpaid entries: it continues retrying while the
 ordinary queue is empty and inserts a normal paid item only after cost and supply succeed.
+Dependent research is admissible when its prerequisite is complete or already earlier in the same
+building's FIFO. Owner/team projections expose the ordered `prodUpgradeQueue`, allowing the command
+card to enable Heavy Guns behind queued Medium Guns and Artillery Fire Control behind queued Heavy
+Guns. The FIFO completion path remains the authority for when each prerequisite actually takes
+effect.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 

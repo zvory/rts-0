@@ -509,7 +509,6 @@ export function buildTrainCard(ctx, building) {
   for (const upgrade of researches) {
     const def = UPGRADES[upgrade];
     if (!def) continue;
-    if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) continue;
     const preferredSlot = researchSlotForUpgrade(building.kind, upgrade, trains);
     const slot = firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
     if (slot < 0) continue;

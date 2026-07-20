@@ -294,6 +294,10 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
+        kind: UpgradeKind::ArtilleryUnlock,
+        researched_at: EntityKind::ResearchComplex,
+    },
+    UpgradeCatalogEntry {
         kind: UpgradeKind::BallisticTables,
         researched_at: EntityKind::ResearchComplex,
     },
@@ -307,10 +311,6 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::SmokePlus,
-        researched_at: EntityKind::ResearchComplex,
-    },
-    UpgradeCatalogEntry {
-        kind: UpgradeKind::ArtilleryUnlock,
         researched_at: EntityKind::ResearchComplex,
     },
 ];
@@ -857,7 +857,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus, artillery_unlock] =
+    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,

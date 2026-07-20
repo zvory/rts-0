@@ -666,6 +666,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.extractor_active.is_some() {
             len = 40;
         }
+        if !entity.prod_upgrade_queue.is_empty() {
+            len = 41;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -795,6 +798,15 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 39 {
             seq.serialize_element(&entity.extractor_active)?;
+        }
+        if len > 40 {
+            seq.serialize_element(
+                &entity
+                    .prod_upgrade_queue
+                    .iter()
+                    .map(|upgrade| upgrade_code(upgrade))
+                    .collect::<Vec<_>>(),
+            )?;
         }
         seq.end()
     }

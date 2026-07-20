@@ -386,6 +386,11 @@ pub fn project_entity(
         }
         if owner_or_ally {
             view.prod_queue = Some(entity.research_queue().len() as u32);
+            view.prod_upgrade_queue = entity
+                .research_queue()
+                .iter()
+                .map(|item| item.upgrade.to_protocol_str().to_string())
+                .collect();
             view.prod_waiting = entity
                 .research_queue()
                 .first()
