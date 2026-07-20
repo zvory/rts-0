@@ -16,7 +16,7 @@ const MAX_CHANGE_CHARS = 230;
 export function parseArgs(argv) {
   const options = {
     baseRef: "origin/main", codexCommand: "codex", codexModel: "", dryRun: false,
-    headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
+    deliverDiscord: false, headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -33,6 +33,7 @@ export function parseArgs(argv) {
     else if (arg === "--markdown-report-file") options.markdownReportFile = path.resolve(value(arg));
     else if (arg === "--repo") options.repoRoot = path.resolve(value(arg));
     else if (arg === "--schema") options.schemaFile = path.resolve(value(arg));
+    else if (arg === "--deliver-discord") options.deliverDiscord = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
@@ -60,6 +61,20 @@ export function renderDiscordMessage(decision) {
 
 export function renderDiscordPayload(message) {
   return JSON.stringify({ content: message, allowed_mentions: { parse: [] } });
+}
+
+export function parseFragmentChanges(contents) {
+  const changes = [];
+  let inChanges = false;
+  for (const line of contents.split(/\r?\n/)) {
+    if (line === "## Changes") {
+      inChanges = true;
+      continue;
+    }
+    if (inChanges && line.startsWith("## ")) break;
+    if (inChanges && line.startsWith("- ")) changes.push(line.slice(2).trim());
+  }
+  return changes;
 }
 
 export function parseEnvValue(contents, name) {
@@ -236,7 +251,7 @@ function markdownReport(decision, relativePath = "", removed = false) {
 
 export function execute(options) {
   if (options.help) {
-    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--dry-run]\n");
+    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--deliver-discord] [--dry-run]\n");
     return null;
   }
   const branch = git(options.repoRoot, ["branch", "--show-current"]);
@@ -250,6 +265,23 @@ export function execute(options) {
   const slug = branchSlug(branch);
   const existing = existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
   const existingRelativePath = existing ? path.relative(options.repoRoot, existing) : "";
+  if (options.deliverDiscord) {
+    if (!existing) {
+      process.stdout.write("patch-note-pass: no Discord changes to deliver\n");
+      return null;
+    }
+    const decision = { changes: parseFragmentChanges(fs.readFileSync(existing, "utf8")) };
+    if (decision.changes.length === 0) throw new Error(`${existingRelativePath} has no change bullets to deliver`);
+    if (options.dryRun) {
+      process.stdout.write(`patch-note-pass: would deliver ${decision.changes.length} final change bullet(s) to Discord if configured\n`);
+      return null;
+    }
+    const delivery = sendDiscordPatchNote({ branch, decision, repoRoot: options.repoRoot });
+    if (delivery.status === "sent") process.stdout.write("patch-note-pass: sent final changes to Discord\n");
+    else if (delivery.status === "unchanged") process.stdout.write("patch-note-pass: final Discord changes already sent\n");
+    else if (delivery.status === "not-configured") process.stdout.write("patch-note-pass: Discord webhook not configured\n");
+    return decision;
+  }
   if (candidates.length === 0) {
     const decision = { decision: "no_patch_note", title: "", changes: [], playtestWatch: [], reason: "No runtime paths with potential player impact changed." };
     if (existing && !options.dryRun) {
@@ -300,10 +332,6 @@ export function execute(options) {
       } else {
         process.stdout.write(`patch-note-pass: ${relativePath} already matches the classified impact\n`);
       }
-      const delivery = sendDiscordPatchNote({ branch, decision, repoRoot: options.repoRoot });
-      if (delivery.status === "sent") process.stdout.write("patch-note-pass: sent changes to Discord\n");
-      else if (delivery.status === "unchanged") process.stdout.write("patch-note-pass: Discord changes already sent\n");
-      else if (delivery.status === "not-configured") process.stdout.write("patch-note-pass: Discord webhook not configured\n");
     } else if (existing) {
       run("git", ["rm", "--", relativePath], { cwd: options.repoRoot });
       run("git", ["commit", "-m", "Remove stale gameplay patch note", "-m", decision.reason || "The final branch diff no longer has player-facing gameplay changes."], { cwd: options.repoRoot });

@@ -243,9 +243,10 @@ canary runs own a private server; the browser shard passes its existing loopback
   `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
   branches without runtime paths that may affect players, and qualifying branches receive one
   fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review.
-  When `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the process environment, the current
-  worktree `.env`, or the primary checkout `.env`, the pass sends only the `## Changes` bullets to
-  Discord. It omits the fragment title, date, playtest-watch section, and PR metadata. A hash of the
+  After the final adversarial review, when `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the
+  process environment, the current worktree `.env`, or the primary checkout `.env`, the helper
+  sends only the final fragment's `## Changes` bullets to Discord. It omits the fragment title,
+  date, playtest-watch section, and PR metadata. A hash of the
   destination and content under the shared Git directory suppresses duplicate deliveries
   when the helper is rerun. Discord rendering bounds change bullets so the complete post fits its
   message limit without truncating the canonical fragment, and webhook payloads disable mention

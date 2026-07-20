@@ -11,6 +11,7 @@ import {
   normalizeDecision,
   parseArgs as parsePatchArgs,
   parseEnvValue,
+  parseFragmentChanges,
   renderDiscordMessage,
   renderDiscordPayload,
   renderFragment,
@@ -20,6 +21,7 @@ import {
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).baseRef, "upstream/main");
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, true);
 assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small-model");
+assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
@@ -52,6 +54,10 @@ assert.deepEqual(
 assert.equal(
   parseEnvValue("OTHER=value\nRTS_PATCH_NOTES_DISCORD_WEBHOOK_URL='https://example.invalid/hook'\n", "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"),
   "https://example.invalid/hook",
+);
+assert.deepEqual(
+  parseFragmentChanges("# Note\n\n## Changes\n\n- First change.\n- Second change.\n\n## Playtest watch\n\n- Not delivered.\n"),
+  ["First change.", "Second change."],
 );
 assert.match(
   renderFragment({ branch: "zvorygin/at-gun-range", date: "2026-07-20", decision }),
