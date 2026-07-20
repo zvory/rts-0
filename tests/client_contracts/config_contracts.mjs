@@ -1147,11 +1147,12 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedResearchComplex];
     factoryHud._cardSig = null;
     renderCommandCard(factoryHud);
-    assert(
-      !renderedButtons.some((button) => button.innerHTML.includes("TK+")),
-      "completed Tank Production research should disappear from the command card",
-    );
+    const stillLockedTankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
     const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
+    assert(
+      stillLockedTankButton && stillLockedTankButton.className.includes("primary-disabled"),
+      "a completed R&D Complex should not unlock Tank training without Tank Production",
+    );
     assert(
       unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
       "a completed R&D Complex should enable Command Car training without Tank Production",

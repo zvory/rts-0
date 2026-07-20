@@ -202,11 +202,32 @@ fn command_car_requires_completed_research_complex_then_trains_at_factory() {
         "Command Cars should require a completed R&D Complex"
     );
 
-    game.state
+    let research_complex = game
+        .state
         .entities
         .get_mut(research_complex)
-        .expect("research complex")
-        .construction = None;
+        .expect("research complex");
+    while research_complex.under_construction() {
+        research_complex.advance_construction();
+    }
+    game.enqueue(
+        1,
+        Command::Train {
+            building: factory,
+            unit: EntityKind::Tank,
+        },
+    );
+    game.tick();
+    assert!(
+        game.state
+            .entities
+            .get(factory)
+            .expect("factory")
+            .prod_queue()
+            .is_empty(),
+        "a completed R&D Complex should not unlock Tanks without Tank Production"
+    );
+
     game.enqueue(
         1,
         Command::Train {
