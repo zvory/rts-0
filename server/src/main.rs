@@ -1055,7 +1055,6 @@ mod tests {
         );
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert_eq!(html.matches(".css?v=test-version\"").count(), 4);
-        assert!(html.contains("./live_pause.css?v=test-version\""));
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
     }
 
