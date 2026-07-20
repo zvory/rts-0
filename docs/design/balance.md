@@ -432,8 +432,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
-  Works and Command Cars from Vehicle Works. Scout Cars remain immediately trainable from Vehicle
-  Works.
+  Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
+  completed R&D Complex and do not require Tank Production.
 - **Mortar Autocast** (R&D Complex research, protocol id `mortar_autocast`): costs 150 steel /
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
@@ -569,7 +569,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 20-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
-| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed R&D Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
