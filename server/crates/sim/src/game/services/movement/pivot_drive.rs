@@ -11,6 +11,10 @@ use crate::protocol::{Event, NoticeSeverity};
 
 use super::scout_car::vehicle_desired_path_point;
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
+use super::traffic::{
+    car_will_start_reverse_to_final_waypoint, traffic_body_half_width,
+    vehicle_body_half_width_with_clearance,
+};
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
@@ -75,6 +79,7 @@ pub(super) fn vehicle_oil_starves_movement(
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct PivotDriveIntent {
     pub(super) desired_facing: f32,
+    pub(super) traffic_facing: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -108,7 +113,6 @@ pub(super) fn vehicle_traffic_adjustment(
     let query_radius = VEHICLE_TRAFFIC_LOOKAHEAD_PX + MAX_UNIT_BOUNDING_RADIUS_PX;
     let mut throttle_scale = 1.0_f32;
     let mut side_pressure = 0.0_f32;
-
     let mut neighbors: Vec<u32> = spatial
         .ids_in_circle_bbox(x, y, query_radius)
         .filter(|&neighbor_id| neighbor_id != id)
@@ -130,8 +134,7 @@ pub(super) fn vehicle_traffic_adjustment(
 
         let dx = neighbor.pos_x - x;
         let dy = neighbor.pos_y - y;
-        // Similar-heading moving vehicles form a local traffic stream. Only the trailing vehicle
-        // yields; making the leader react to its follower can trap both in reciprocal throttling.
+        // Similar-heading traffic yields only from the trailing vehicle to avoid reciprocal stops.
         if let (Some(ego_forward), Some(neighbor_forward)) = (
             follow_forward,
             forward_traffic_heading(neighbor, neighbor.facing()),
@@ -188,7 +191,6 @@ pub(super) fn vehicle_traffic_adjustment(
     } else {
         side_pressure.signum() * VEHICLE_TRAFFIC_TURN_BIAS_RAD
     };
-
     PivotTrafficAdjustment {
         throttle_scale,
         turn_bias,
@@ -211,47 +213,14 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
     let next = entity.next_waypoint()?;
     let to_next = (next.0 - entity.pos_x, next.1 - entity.pos_y);
     let forward_progress = to_next.0 * forward.0 + to_next.1 * forward.1;
-    (forward_progress > 0.0).then_some(forward)
-}
-
-fn car_will_start_reverse_to_final_waypoint(entity: &Entity, facing: f32) -> bool {
-    let Some(movement) = entity.movement.as_ref() else {
-        return false;
-    };
-    if movement.path.len() != 1 {
-        return false;
+    if forward_progress > 0.0 {
+        return Some(forward);
     }
-    let Some(next) = entity.next_waypoint() else {
-        return false;
-    };
-    let dx = next.0 - entity.pos_x;
-    let dy = next.1 - entity.pos_y;
-    let dist = (dx * dx + dy * dy).sqrt();
-    if !dist.is_finite() || dist <= 1.0e-4 || dist > VEHICLE_REVERSE_GOAL_DISTANCE_PX {
-        return false;
-    }
-    let desired = dy.atan2(dx);
-    angle_delta(facing, desired).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
-}
-
-fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
-    match kind {
-        EntityKind::AntiTankGun | EntityKind::MortarTeam => {
-            config::ANTI_TANK_GUN_BODY_WIDTH_PX * 0.5 + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX
-        }
-        EntityKind::Artillery => {
-            config::ARTILLERY_BODY_WIDTH_PX * 0.5 + config::ARTILLERY_BODY_CLEARANCE_PX
-        }
-        EntityKind::ScoutCar => {
-            config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
-        }
-        _ => config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX,
-    }
-}
-
-fn traffic_body_half_width(ego_kind: EntityKind, neighbor_kind: EntityKind) -> Option<f32> {
-    (ego_kind == EntityKind::ScoutCar && uses_oriented_vehicle_body(neighbor_kind))
-        .then(|| vehicle_body_half_width_with_clearance(neighbor_kind))
+    let distance = to_next.0.hypot(to_next.1);
+    (super::armor_reaction::locked_source_facing(entity).is_some()
+        && distance.is_finite()
+        && distance > 1.0e-4)
+        .then_some((to_next.0 / distance, to_next.1 / distance))
 }
 
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
@@ -279,18 +248,34 @@ pub(super) fn pivot_drive_intent(
         return None;
     }
 
-    let forward_desired = dy.atan2(dx);
-    if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
-        && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX
-        && angle_delta(e.facing(), forward_desired).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
-    {
-        return Some(PivotDriveIntent {
-            desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),
+    let travel_facing = dy.atan2(dx);
+    let normal_desired_facing =
+        if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
+            && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX
+            && angle_delta(e.facing(), travel_facing).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
+        {
+            normalize_angle(travel_facing + std::f32::consts::PI)
+        } else {
+            travel_facing
+        };
+
+    let desired_facing =
+        super::armor_reaction::locked_source_facing(e).map_or(normal_desired_facing, |preferred| {
+            let reverse_facing = normalize_angle(travel_facing + std::f32::consts::PI);
+            if angle_delta(preferred, reverse_facing).abs()
+                < angle_delta(preferred, travel_facing).abs()
+            {
+                reverse_facing
+            } else {
+                travel_facing
+            }
         });
-    }
+    let reverse_facing = normalize_angle(travel_facing + std::f32::consts::PI);
+    let reversing = angle_delta(desired_facing, reverse_facing).abs() <= 1.0e-4;
 
     Some(PivotDriveIntent {
-        desired_facing: forward_desired,
+        desired_facing,
+        traffic_facing: if reversing { travel_facing } else { e.facing() },
     })
 }
 

@@ -1404,13 +1404,19 @@ General rules:
   paths, or requests chase movement. It skips candidate construction while the coax weapon is on
   cooldown. Same-tick Tank cannon/coax events are emitted cannon first, then coax.
   The first successful enemy Tank cannon, Anti-Tank Gun, or Panzerfaust hit on a surviving Tank
-  locks its source for three seconds. Later hits cannot redirect or extend that lock. At the next
-  movement phase, a stationary Tank turns at the normal hull rate toward the locked source; once
-  the lock expires, the next qualifying hit may establish a new one. Active movement paths and zero
-  oil take precedence; Idle, Hold Position, in-range Attack, and arrived Attack Move may react
-  without changing their order, path, target, or independent turret aim. Static standability may
-  block a rotation but never translate the Tank to make room. This autonomous rotation preserves
-  the stationary range ramp; path translation and path-driven hull rotation still reset it.
+  establishes a three-second hull-facing preference toward its source. Later qualifying hits
+  refresh that under-fire window without redirecting the preference, preventing rapid threat
+  switching. A stationary Tank turns at the normal hull rate toward the preferred source. A moving
+  Tank compares the forward and reverse hull orientations for its current route direction and uses
+  whichever keeps its hull closer to the preferred source; a retreat route behind the threat
+  therefore begins in reverse even when its destination is far away or reached through intermediate
+  waypoints. After the preference expires, ordinary distance-based forward/reverse movement resumes.
+  Vehicle traffic sensing follows travel direction rather than hull direction, so reversing Tanks
+  yield to traffic behind them. Zero oil and static standability still gate movement. Idle, Hold
+  Position, in-range Attack, and arrived Attack Move react without changing their order, path,
+  target, or independent turret aim. Static standability may block a rotation but never translate
+  the Tank to make room. Stationary preference rotation preserves the stationary range ramp; path
+  translation and path-driven hull rotation still reset it.
   Direct-fire legality is centralized in `services::combat::acquisition::direct_fire_target_legal`:
   default auto-acquisition/firing uses the current resolved-target mode that rejects friendly hard
   blockers but may resolve to an intervening enemy hard blocker, while ordered/intended-target uses

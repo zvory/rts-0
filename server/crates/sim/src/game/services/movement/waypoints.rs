@@ -42,9 +42,8 @@ fn panzerfaust_movement_locked(e: &Entity) -> bool {
     )
 }
 
-/// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
-/// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
-/// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
+/// Advance moving units along waypoint paths, preserving passable landings and Move arrival.
+/// Unit overlap is handled later by collision resolution.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn advance_moving_units(
     map: &Map,
@@ -57,7 +56,6 @@ pub(super) fn advance_moving_units(
     ability_runtime: &AbilityRuntime,
 ) {
     for id in entities.ids() {
-        // Pull the data we need, then mutate.
         let (
             kind,
             owner,
@@ -140,8 +138,7 @@ pub(super) fn advance_moving_units(
             }
             _ => None,
         };
-        // Experimental vehicle fuel rule: an oil-starved vehicle pauses before retrying so sparse
-        // oil income does not make it lurch forward on isolated ticks.
+        // Oil-starved vehicles pause before retrying instead of lurching on sparse income ticks.
         if vehicle_oil_cost_per_px.is_some()
             && vehicle_oil_starves_movement(entities, players, events, id)
         {
@@ -158,8 +155,15 @@ pub(super) fn advance_moving_units(
         if is_pivot_vehicle {
             if let Some(e) = entities.get(id) {
                 if let Some(mut intent) = pivot_drive_intent(map, occ, e, x, y) {
-                    let traffic =
-                        vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
+                    let traffic = vehicle_traffic_adjustment(
+                        entities,
+                        spatial,
+                        id,
+                        kind,
+                        x,
+                        y,
+                        intent.traffic_facing,
+                    );
                     intent.desired_facing =
                         normalize_angle(intent.desired_facing + traffic.turn_bias);
                     if intent.desired_facing.is_finite() {
