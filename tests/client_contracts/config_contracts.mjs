@@ -342,7 +342,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     STATS[KIND.RIFLEMAN].cost.steel === 50 &&
       STATS[KIND.RIFLEMAN].cost.oil === 0 &&
-      STATS[KIND.PANZERFAUST].cost.steel === 57 &&
+      STATS[KIND.PANZERFAUST].cost.steel === 55 &&
       STATS[KIND.PANZERFAUST].cost.oil === 5 &&
       STATS[KIND.PANZERFAUST].upgradeRequires === UPGRADE.PANZERFAUSTS,
     "Rifleman and Panzerfaust costs and unlock mirror server",
