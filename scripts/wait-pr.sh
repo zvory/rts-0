@@ -67,6 +67,17 @@ refresh_main_checkout() {
   fi
 }
 
+deliver_patch_notes() {
+  local head_sha="$1"
+  local head_ref="$2"
+
+  node scripts/patch-note-pass.mjs \
+    --repo "$repo_root" \
+    --head-branch "$head_ref" \
+    --delivery-ref "$head_sha" \
+    --deliver-discord
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --interval) INTERVAL_SECONDS="${2:?missing --interval value}"; shift ;;
@@ -162,6 +173,7 @@ while true; do
       git fetch --quiet origin main
     fi
     if git merge-base --is-ancestor "$head_sha" "$MAIN_REF"; then
+      deliver_patch_notes "$head_sha" "$head_ref"
       refresh_main_checkout
       echo "wait-pr: PR #$number merged, $head_sha is reachable from $MAIN_REF, and local main is current"
       exit 0

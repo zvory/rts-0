@@ -161,12 +161,14 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "scripts/patch-note-pass.mjs" ||
     pathname === "scripts/patch-note-pass.schema.json" ||
     pathname === "scripts/agent-pr.sh" ||
+    pathname === "scripts/wait-pr.sh" ||
     pathname === "scripts/archive-completed-plans.mjs" ||
     pathname === "scripts/plan-phase-status.mjs" ||
     pathname === "scripts/format-touched-rust.sh" ||
     pathname === "tests/archive_completed_plans.mjs" ||
     pathname === "tests/adversarial_quality_pass.mjs" ||
     pathname === "tests/agent_pr_passes.mjs" ||
+    pathname === "tests/wait_pr.mjs" ||
     pathname === "tests/run-all.sh"
   );
 }
@@ -553,9 +555,11 @@ function verify() {
     [["scripts/patch-note-pass.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/patch-note-pass.schema.json"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
+    [["scripts/wait-pr.sh"], ["agent-workflow-quality-pass"]],
     [["scripts/archive-completed-plans.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/plan-phase-status.mjs"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["scripts/format-touched-rust.sh"], ["agent-workflow-quality-pass"]],
+    [["tests/wait_pr.mjs"], ["agent-workflow-quality-pass"]],
     [["tests/run-all.sh"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["server/crates/rules/src/faction.rs"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity"]],
     [["client/src/lobby_view.js"], ["client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
