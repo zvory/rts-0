@@ -259,11 +259,21 @@ function fakeProjection() {
   const camera = Object.freeze({ version: 1, focus: Object.freeze({ x: 32, y: 16 }), framingScale: 2 });
   const viewport = Object.freeze({ widthCssPx: 100, heightCssPx: 80 });
   const mapBounds = Object.freeze({ minX: 0, minY: 0, maxX: 64, maxY: 32 });
+  const orthographic = Object.freeze({
+    originX: 7,
+    originY: -4,
+    framingScale: 2,
+    worldWidthPx: 64,
+    worldHeightPx: 32,
+    viewportWidthCssPx: 100,
+    viewportHeightCssPx: 80,
+  });
   return Object.freeze({
     version: 1,
     camera,
     viewport,
     mapBounds,
+    orthographic,
     project: (point) => ({ x: point.x, y: point.y, depth: 1, clip: "inside", visible: true }),
     groundAtScreen: (point) => ({ x: point.x, y: point.y }),
     projectedExtent: () => ({ width: 2, height: 2, scaleX: 2, scaleY: 2, visible: true }),

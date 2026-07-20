@@ -1,5 +1,6 @@
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
+import { loadWorkerSafeTexture } from "../raster_primitives.js";
 import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "./anti_tank_gun_png_atlas.js";
 import { ARTILLERY_PNG_RIG_ATLAS } from "./artillery_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "./mortar_team_png_atlas.js";
@@ -40,6 +41,5 @@ export function loadPngRigAtlasTexture(pixi, atlas) {
 
 function loadRawPngRigAtlasTexture(pixi, atlas) {
   if (pixi.Assets?.load) return pixi.Assets.load(atlas.image);
-  const texture = pixi.Texture?.from?.(atlas.image) ?? null;
-  return Promise.resolve(texture);
+  return loadWorkerSafeTexture(pixi, atlas.image);
 }

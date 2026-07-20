@@ -40,7 +40,7 @@ export class BabylonPresentationAdapter {
   }
 
   render(frame) {
-    if (!frame || frame.version !== 1) throw new TypeError("Babylon requires PresentationFrameV1.");
+    if (!frame || frame.version !== 2) throw new TypeError("Babylon requires PresentationFrameV2.");
     const identity = { generation: frame.generation, frameId: frame.frameId };
     if (this._destroyed) {
       return immediatePresentationSubmission({ ...identity, status: PRESENTATION_OUTCOME.DESTROYED });

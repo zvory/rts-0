@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready after Phase 1 is merged and reachable from `origin/main`.
+- [x] Done.
 
 ## Objective
 

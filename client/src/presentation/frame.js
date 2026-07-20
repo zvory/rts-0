@@ -4,9 +4,10 @@ import {
   PRESENTATION_ENTITY_FIELDS,
   preparedPresentationEntityRecord,
 } from "./entity_snapshot.js";
+import { createRendererProjectionRecord } from "./projection_record.js";
 
-export const PRESENTATION_FRAME_VERSION = 1;
-export const STATIC_MAP_PRESENTATION_VERSION = 1;
+export const PRESENTATION_FRAME_VERSION = 2;
+export const STATIC_MAP_PRESENTATION_VERSION = 2;
 
 const FEEDBACK_ARRAYS = Object.freeze([
   ["commandFeedback", "command"],
@@ -216,7 +217,7 @@ export class PresentationFrameAssembler {
       frameId: this._frameId,
       groundDecalRevision: finiteNonNegativeInteger(groundDecalRevision),
       visualTimeMs: finiteNonNegativeNumber(visualTimeMs),
-      projection: projectionRecord(projection),
+      projection: createRendererProjectionRecord(projection),
       staticMapRevision: this._staticMap.revision,
       visible,
       explored,
@@ -385,26 +386,6 @@ function safePush(layers, layerId, category, diagnostics, build) {
       (diagnostics.droppedByCategory[category] || 0) + 1,
     );
   }
-}
-
-function projectionRecord(projection) {
-  if (!projection || projection.version !== 1) throw new TypeError("Presentation frame requires ProjectionSnapshotV1.");
-  const queryNames = [
-    "project", "groundAtScreen", "projectedExtent", "viewportGroundPolygon",
-    "viewportGroundBounds", "containsProjected", "snapshot", "audioListener",
-  ];
-  const out = {
-    version: 1,
-    camera: detachedRecord(projection.camera),
-    viewport: detachedRecord(projection.viewport),
-    mapBounds: projection.mapBounds == null ? null : detachedRecord(projection.mapBounds),
-  };
-  if (projection.perspective != null) out.perspective = detachedRecord(projection.perspective);
-  for (const name of queryNames) {
-    if (typeof projection[name] !== "function") throw new TypeError(`ProjectionSnapshotV1 is missing ${name}.`);
-    out[name] = projection[name];
-  }
-  return Object.freeze(out);
 }
 
 export function detachedRecord(value) {

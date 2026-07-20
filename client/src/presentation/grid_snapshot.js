@@ -1,4 +1,4 @@
-const GRID_SNAPSHOT_VERSION = 1;
+export const GRID_SNAPSHOT_VERSION = 2;
 
 export class GridSnapshotCache {
   constructor() {
@@ -49,23 +49,33 @@ export function createGridSnapshot({ revision, width, height, source }) {
     revision: normalizedRevision,
     width: shape.width,
     height: shape.height,
-    get(index) {
-      return Number.isInteger(index) && index >= 0 && index < count ? values[index] : undefined;
-    },
-    copyInto(targetTypedArray, targetOffset = 0) {
-      if (!isTypedArray(targetTypedArray)) {
-        throw new TypeError("GridSnapshot.copyInto requires a typed array target.");
-      }
-      if (!Number.isInteger(targetOffset) || targetOffset < 0) {
-        throw new RangeError("GridSnapshot target offset must be a non-negative integer.");
-      }
-      if (targetOffset + count > targetTypedArray.length) {
-        throw new RangeError("GridSnapshot target does not have enough capacity.");
-      }
-      targetTypedArray.set(values, targetOffset);
-      return count;
-    },
+    values,
   });
+}
+
+export function gridSnapshotValue(snapshot, index) {
+  const count = snapshot?.width * snapshot?.height;
+  return Number.isInteger(index) && index >= 0 && index < count
+    ? snapshot.values[index]
+    : undefined;
+}
+
+export function copyGridSnapshotInto(snapshot, targetTypedArray, targetOffset = 0) {
+  if (!isTypedArray(targetTypedArray)) {
+    throw new TypeError("copyGridSnapshotInto requires a typed array target.");
+  }
+  if (!Number.isInteger(targetOffset) || targetOffset < 0) {
+    throw new RangeError("GridSnapshot target offset must be a non-negative integer.");
+  }
+  const count = snapshot?.width * snapshot?.height;
+  if (!(snapshot?.values instanceof Uint8Array) || snapshot.values.length !== count) {
+    throw new TypeError("GridSnapshotV2 requires a shape-matched Uint8Array.");
+  }
+  if (targetOffset + count > targetTypedArray.length) {
+    throw new RangeError("GridSnapshot target does not have enough capacity.");
+  }
+  targetTypedArray.set(snapshot.values, targetOffset);
+  return count;
 }
 
 function normalizeShape(width, height) {

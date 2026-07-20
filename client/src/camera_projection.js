@@ -307,6 +307,15 @@ export function createOrthographicProjectionSnapshot(rawState, fallbackReference
     camera,
     viewport,
     mapBounds,
+    orthographic: Object.freeze({
+      originX: state.x,
+      originY: state.y,
+      framingScale: state.zoom,
+      worldWidthPx: state.worldW,
+      worldHeightPx: state.worldH,
+      viewportWidthCssPx: state.viewW,
+      viewportHeightCssPx: state.viewH,
+    }),
     project: (point) => projectOrthographic(state, point),
     groundAtScreen: (screen) => groundAtScreenOrthographic(state, screen),
     projectedExtent: (point, worldWidthPx, worldHeightPx) => (

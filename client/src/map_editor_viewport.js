@@ -1,8 +1,8 @@
-import { gfxCircle, gfxStrokePaths, gfxRect, gfxReset, gfxNoFill, gfxFill, gfxStroke } from "./renderer/native_graphics.js";
 import { Camera } from "./camera.js";
+import { createMapEditorPresentation } from "./map_editor_presentation.js";
+import { createMapEditorTerrainPreview } from "./map_editor_terrain_preview.js";
 import { TERRAIN } from "./protocol.js";
-import { Renderer } from "./renderer/index.js";
-import { createTerrainPreviewCanvas } from "./renderer/terrain.js";
+import { MapEditorPixiPresentationAdapter } from "./renderer/map_editor_presentation_adapter.js";
 import {
   addSymmetricDraftLocations,
   mapEditorRectTiles,
@@ -64,16 +64,16 @@ export function mapEditorSymmetryGuideCentre(size, symmetry) {
 
 export class MapEditorViewport {
   static async create(options) {
-    const renderer = await Renderer.create(options.root);
-    return new MapEditorViewport({ ...options, renderer });
+    const presentation = await MapEditorPixiPresentationAdapter.create(options.root);
+    return new MapEditorViewport({ ...options, presentation });
   }
 
-  constructor({ root, session, onStatus = () => {}, renderer }) {
+  constructor({ root, session, onStatus = () => {}, presentation }) {
     this.root = root;
     this.session = session;
     this.onStatus = onStatus;
-    if (!renderer) throw new TypeError("MapEditorViewport.create() must prepare the renderer.");
-    this.renderer = renderer;
+    if (!presentation) throw new TypeError("MapEditorViewport.create() must prepare presentation.");
+    this.presentation = presentation;
     this.camera = new Camera(root.clientWidth, root.clientHeight, {
       minZoom: 0.05,
       maxZoom: 4,
@@ -88,9 +88,11 @@ export class MapEditorViewport {
     this.paintStartTile = null;
     this.keys = { up: false, down: false, left: false, right: false };
     this.destroyed = false;
-    this.overlay = new PIXI.Graphics();
-    this.renderer.layers.feedback.addChild(this.overlay);
-    this.labels = [];
+    this.presentationFrameId = 0;
+    this.terrainRevision = 0;
+    this.overlayRevision = 0;
+    this.pendingTerrainUpdate = null;
+    this.pendingOverlay = null;
 
     this.onPointerDown = (event) => this.handlePointerDown(event);
     this.onPointerMove = (event) => this.handlePointerMove(event);
@@ -100,7 +102,7 @@ export class MapEditorViewport {
     this.onKeyDown = (event) => this.handleKey(event, true);
     this.onKeyUp = (event) => this.handleKey(event, false);
     this.onResize = () => this.resize();
-    const canvas = this.renderer.app.canvas;
+    const canvas = this.presentation.canvas;
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
@@ -137,7 +139,7 @@ export class MapEditorViewport {
   }
 
   createTerrainPreview(terrain) {
-    return createTerrainPreviewCanvas(terrain);
+    return createMapEditorTerrainPreview(terrain);
   }
 
   applySessionSnapshot(snapshot) {
@@ -149,12 +151,15 @@ export class MapEditorViewport {
   rebuildTerrain() {
     if (!this.session.draft) return;
     const materialized = this.session.materialized();
-    this.renderer.buildStaticMap({
+    this.terrainRevision += 1;
+    this.pendingTerrainUpdate = {
+      kind: "replace",
+      revision: this.terrainRevision,
       width: materialized.size,
       height: materialized.size,
       tileSize: TILE_SIZE,
       terrain: materialized.terrain,
-    });
+    };
     const worldSize = materialized.size * TILE_SIZE;
     const firstMap = this.camera.worldW <= 0;
     this.camera.setBounds(worldSize, worldSize, this.root.clientWidth, this.root.clientHeight);
@@ -168,68 +173,46 @@ export class MapEditorViewport {
   drawOverlay() {
     const draft = this.session.draft;
     if (!draft) return;
-    gfxReset(this.overlay.clear());
-    for (const label of this.labels) label.destroy();
-    this.labels = [];
     const size = draft.terrain.length;
     const gridPaths = [];
     for (let tile = 0; tile <= size; tile += 8) {
       const p = tile * TILE_SIZE;
       gridPaths.push([[p, 0], [p, size * TILE_SIZE]], [[0, p], [size * TILE_SIZE, p]]);
     }
-    gfxStrokePaths(this.overlay, gridPaths, 1, 0xffffff, 0.08);
-    const guides = mapEditorSymmetryGuideLines(size, this.symmetry);
-    if (guides.length) {
-      gfxStrokePaths(this.overlay, guides.map((guide) => [
-        [guide.x0, guide.y0], [guide.x1, guide.y1],
-      ]), 2, 0xffd878, 0.82);
-    }
+    const guides = mapEditorSymmetryGuideLines(size, this.symmetry).map((guide) => [
+      [guide.x0, guide.y0], [guide.x1, guide.y1],
+    ]);
     const guideCentre = mapEditorSymmetryGuideCentre(size, this.symmetry);
-    if (guideCentre) {
-      gfxStroke(this.overlay, 2, 0xffd878, 0.82);
-      gfxCircle(gfxFill(this.overlay, 0xffd878, 0.82), guideCentre.x, guideCentre.y, 5);
-      gfxNoFill(this.overlay);
-    }
     const locations = this.session.mapOverlay();
-    for (const start of locations?.starts || []) this.drawSite(start, 0x4ec9ff, 11, `S${start.index + 1}`);
+    const sites = [];
+    for (const start of locations?.starts || []) sites.push(this.siteRecord(start, 0x4ec9ff, 11, `S${start.index + 1}`));
     for (const [index, base] of (locations?.bases || []).entries()) {
-      this.drawSite(base, 0xf4c542, 7, `B${index + 1}`, base.index === this.selectedBaseIndex);
+      sites.push(this.siteRecord(base, 0xf4c542, 7, `B${index + 1}`, base.index === this.selectedBaseIndex));
     }
-    this.drawPaintPreview();
+    this.overlayRevision += 1;
+    this.pendingOverlay = {
+      revision: this.overlayRevision,
+      gridPaths,
+      guides,
+      guideCentre,
+      sites,
+      paintPreview: this.paintPreviewRecord(),
+    };
   }
 
-  drawPaintPreview() {
-    if (this.tool?.kind !== "terrain" || this.tool.shape !== "box" || !this.paintStartTile || !this.lastPaintTile) return;
+  paintPreviewRecord() {
+    if (this.tool?.kind !== "terrain" || this.tool.shape !== "box" || !this.paintStartTile || !this.lastPaintTile) return null;
     const x0 = Math.min(this.paintStartTile.x, this.lastPaintTile.x) * TILE_SIZE;
     const y0 = Math.min(this.paintStartTile.y, this.lastPaintTile.y) * TILE_SIZE;
     const width = (Math.abs(this.lastPaintTile.x - this.paintStartTile.x) + 1) * TILE_SIZE;
     const height = (Math.abs(this.lastPaintTile.y - this.paintStartTile.y) + 1) * TILE_SIZE;
-    gfxStroke(this.overlay, 2, terrainPreviewColor(this.tool.terrain), 0.9);
-    gfxRect(gfxFill(this.overlay, terrainPreviewColor(this.tool.terrain), 0.16), x0, y0, width, height);
-    gfxNoFill(this.overlay);
+    return { x: x0, y: y0, width, height, color: terrainPreviewColor(this.tool.terrain) };
   }
 
-  drawSite(site, color, radius, labelText, selected = false) {
+  siteRecord(site, color, radius, label, selected = false) {
     const x = (site.x + 0.5) * TILE_SIZE;
     const y = (site.y + 0.5) * TILE_SIZE;
-    if (selected) {
-      gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
-      gfxCircle(this.overlay, x, y, radius + 6);
-    }
-    gfxStroke(this.overlay, 3, 0x101418, 0.9);
-    gfxCircle(gfxFill(this.overlay, color, 0.82), x, y, radius);
-    gfxNoFill(this.overlay);
-    const label = new PIXI.Text({ text: labelText, style: {
-      fontFamily: "Inter, system-ui, sans-serif",
-      fontSize: 11,
-      fontWeight: "700",
-      fill: 0xffffff,
-      stroke: { color: 0x101418, width: 3 },
-    } });
-    label.anchor.set(0.5, 1);
-    label.position.set(x, y - radius - 3);
-    this.renderer.layers.feedback.addChild(label);
-    this.labels.push(label);
+    return { x, y, color, radius, label, selected: !!selected };
   }
 
   handlePointerDown(event) {
@@ -316,7 +299,26 @@ export class MapEditorViewport {
       symmetricTerrainTiles(size, tiles, this.tool.terrain, this.tool?.symmetry),
       this.tool.terrain,
     );
-    this.renderer.updateStaticTerrainTiles(changes);
+    if (changes.length > 0) {
+      this.terrainRevision += 1;
+      if (this.pendingTerrainUpdate?.kind === "replace") {
+        const materialized = this.session.materialized();
+        this.pendingTerrainUpdate = {
+          ...this.pendingTerrainUpdate,
+          revision: this.terrainRevision,
+          terrain: materialized.terrain,
+        };
+      } else {
+        const priorChanges = this.pendingTerrainUpdate?.kind === "patch"
+          ? this.pendingTerrainUpdate.changes
+          : [];
+        this.pendingTerrainUpdate = {
+          kind: "patch",
+          revision: this.terrainRevision,
+          changes: priorChanges.concat(changes),
+        };
+      }
+    }
   }
 
   applySiteTool(tile) {
@@ -349,7 +351,7 @@ export class MapEditorViewport {
   }
 
   eventTile(event, { kind = this.tool?.kind } = {}) {
-    const rect = this.renderer.app.canvas.getBoundingClientRect();
+    const rect = this.presentation.canvas.getBoundingClientRect();
     const world = this.camera.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
     const size = this.session.draft?.terrain?.length || 0;
     const radius = kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : kind === "base" ? MAP_EDITOR_BASE_SITE_CLEARANCE_TILES : 0;
@@ -361,7 +363,7 @@ export class MapEditorViewport {
   }
 
   handleWheel(event) {
-    const rect = this.renderer.app.canvas.getBoundingClientRect();
+    const rect = this.presentation.canvas.getBoundingClientRect();
     const factor = event.deltaY > 0 ? 0.88 : 1.14;
     this.camera.setZoom(
       this.camera.zoom * factor,
@@ -387,16 +389,22 @@ export class MapEditorViewport {
     const dt = Math.min(0.1, Math.max(0, (at - this.lastFrameAt) / 1000));
     this.lastFrameAt = at;
     this.camera.update(dt, { keys: this.keys, mouse: null });
-    this.renderer.world.position.set(-this.camera.x * this.camera.zoom, -this.camera.y * this.camera.zoom);
-    this.renderer.world.scale.set(this.camera.zoom);
-    this.renderer.present();
+    this.presentationFrameId += 1;
+    this.presentation.present(createMapEditorPresentation({
+      frameId: this.presentationFrameId,
+      camera: { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom },
+      terrainUpdate: this.pendingTerrainUpdate,
+      overlay: this.pendingOverlay,
+    }));
+    this.pendingTerrainUpdate = null;
+    this.pendingOverlay = null;
     this.frame = requestAnimationFrame((next) => this.tick(next));
   }
 
   resize() {
     const width = this.root.clientWidth || window.innerWidth;
     const height = this.root.clientHeight || window.innerHeight;
-    this.renderer.app.renderer.resize(width, height);
+    this.presentation.resize(width, height);
     this.camera.setBounds(this.camera.worldW, this.camera.worldH, width, height);
   }
 
@@ -405,7 +413,7 @@ export class MapEditorViewport {
     this.destroyed = true;
     cancelAnimationFrame(this.frame);
     this.unsubscribe?.();
-    const canvas = this.renderer.app.canvas;
+    const canvas = this.presentation.canvas;
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     canvas.removeEventListener("pointermove", this.onPointerMove);
     canvas.removeEventListener("pointerup", this.onPointerUp);
@@ -415,9 +423,7 @@ export class MapEditorViewport {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     window.removeEventListener("resize", this.onResize);
-    for (const label of this.labels) label.destroy();
-    this.overlay.destroy();
-    this.renderer.destroy();
+    this.presentation.destroy();
   }
 }
 

@@ -1,5 +1,7 @@
 import { isResource } from "../protocol.js";
 import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../presentation/submission.js";
+import { copyGridSnapshotInto } from "../presentation/grid_snapshot.js";
+import { createRendererProjectionQueries } from "../presentation/projection_record.js";
 import { Renderer } from "./index.js";
 
 export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
@@ -43,7 +45,7 @@ const FEEDBACK_SINGLETON_TYPES = Object.freeze({
 });
 
 /**
- * Pixi-only bridge from PresentationFrameV1 to the existing Pixi drawing helpers.
+ * Pixi-only bridge from PresentationFrameV2 to the existing Pixi drawing helpers.
  * Match knows only render(frame); the mutable legacy sources below are sampled once
  * for each new immutable frame and are never exposed to another backend.
  */
@@ -75,7 +77,7 @@ export class PixiPresentationAdapter {
   }
 
   render(frame) {
-    if (!frame || frame.version !== 1) throw new TypeError("Pixi requires PresentationFrameV1.");
+    if (!frame || frame.version !== 2) throw new TypeError("Pixi requires PresentationFrameV2.");
     const identity = { generation: frame.generation, frameId: frame.frameId };
     if (this._destroyed) {
       return immediatePresentationSubmission({ ...identity, status: PRESENTATION_OUTCOME.DESTROYED });
@@ -99,7 +101,7 @@ export class PixiPresentationAdapter {
         const decalKey = decalRevision > 0 ? `${frame.generation}:${decalRevision}` : null;
         const alreadyRetained = decalKey && decalKey === this._retainedGroundDecalKey;
         if (alreadyRetained) retainedRevision = decalRevision;
-        const groundDecals = frameKey === this._decalFrameKey || alreadyRetained
+        const groundDecals = alreadyRetained || (decalRevision === 0 && frameKey === this._decalFrameKey)
           ? []
           : view.groundDecals;
         this._renderer.render(view.state, view.camera, view.fog, view.alpha, {
@@ -248,7 +250,7 @@ function materializeStaticMap(staticMap) {
   const width = staticMap.terrain.width;
   const height = staticMap.terrain.height;
   const terrain = new Uint8Array(width * height);
-  staticMap.terrain.copyInto(terrain);
+  copyGridSnapshotInto(staticMap.terrain, terrain);
   return {
     width,
     height,
@@ -259,16 +261,13 @@ function materializeStaticMap(staticMap) {
 }
 
 function buildCameraFacade(projection) {
-  const scale = positiveNumber(projection?.camera?.framingScale, 1);
-  const focus = projection?.camera?.focus || { x: 0, y: 0 };
-  const width = finiteNumber(projection?.viewport?.widthCssPx, 0);
-  const height = finiteNumber(projection?.viewport?.heightCssPx, 0);
+  const queries = createRendererProjectionQueries(projection);
   return Object.freeze({
-    x: finiteNumber(focus.x, 0) - width / (2 * scale),
-    y: finiteNumber(focus.y, 0) - height / (2 * scale),
-    zoom: scale,
-    snapshot: projection.snapshot,
-    projectedExtent: projection.projectedExtent,
+    x: queries.state.x,
+    y: queries.state.y,
+    zoom: queries.state.zoom,
+    snapshot: queries.snapshot,
+    projectedExtent: queries.projectedExtent,
   });
 }
 
@@ -277,8 +276,8 @@ function buildFogFacade(frame) {
   const height = frame.visible.height;
   const visible = new Uint8Array(width * height);
   const explored = new Uint8Array(width * height);
-  frame.visible.copyInto(visible);
-  frame.explored.copyInto(explored);
+  copyGridSnapshotInto(frame.visible, visible);
+  copyGridSnapshotInto(frame.explored, explored);
   return Object.freeze({
     width,
     height,

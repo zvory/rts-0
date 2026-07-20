@@ -1,5 +1,6 @@
 import { COLORS } from "../config.js";
 import { hash2 } from "./shared.js";
+import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import {
   isImpassableAt,
   isImpassableTerrain,
@@ -32,7 +33,7 @@ function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
   if (!isImpassableAt(map, tx + 1, ty)) ctx.fillRect(x + ts - edge, y, edge, ts);
 }
 
-function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
+export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return;
   const code = map.terrain[ty * map.width + tx];
   const x = tx * textureTileSize;
@@ -107,29 +108,6 @@ function drawRoadMarking(ctx, code, x, y, size) {
   }
 }
 
-/** Create a small DOM canvas using the same tile painter as the game map. */
-export function createTerrainPreviewCanvas(code) {
-  const tiles = 3;
-  const textureTileSize = 8;
-  const canvas = document.createElement("canvas");
-  canvas.width = tiles * textureTileSize;
-  canvas.height = tiles * textureTileSize;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) return null;
-  ctx.imageSmoothingEnabled = false;
-  const map = {
-    width: tiles,
-    height: tiles,
-    terrain: Array(tiles * tiles).fill(code),
-  };
-  for (let ty = 0; ty < tiles; ty++) {
-    for (let tx = 0; tx < tiles; tx++) {
-      drawTerrainTile(ctx, map, tx, ty, textureTileSize);
-    }
-  }
-  return canvas;
-}
-
 export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
   this._map = {
     width: map.width,
@@ -143,7 +121,7 @@ export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
     && this._terrainCanvas.width === map.width * textureTileSize
     && this._terrainCanvas.height === map.height * textureTileSize
     && this._terrainSprite;
-  const canvas = reusable ? this._terrainCanvas : document.createElement("canvas");
+  const canvas = reusable ? this._terrainCanvas : createWorkerSafeCanvas();
   canvas.width = map.width * textureTileSize;
   canvas.height = map.height * textureTileSize;
   const ctx = canvas.getContext("2d", { alpha: false });

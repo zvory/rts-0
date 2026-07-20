@@ -3,9 +3,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PNG } from "pngjs";
 
 import { assert, assertApprox, assertDeepEqual } from "./assertions.mjs";
 import { GROUND_DECAL_ASSET_MANIFEST } from "../../client/src/renderer/decals/manifest.js";
+import { GROUND_DECAL_PNG_ATLAS } from "../../client/src/renderer/decals/atlas.generated.js";
+import {
+  loadGroundDecalAtlas,
+  validateAtlasCoverage,
+} from "../../client/src/renderer/decals/asset_loader.js";
 import { createGroundDecalStampPlan } from "../../client/src/renderer/decals/selection.js";
 import { KIND } from "../../client/src/protocol.js";
 
@@ -17,6 +23,37 @@ const allAssets = [
   ...GROUND_DECAL_ASSET_MANIFEST.mortarBlast,
   ...GROUND_DECAL_ASSET_MANIFEST.artilleryBlast,
 ];
+
+assert(validateAtlasCoverage(GROUND_DECAL_ASSET_MANIFEST, GROUND_DECAL_PNG_ATLAS),
+  "generated PNG atlas covers every SVG source in deterministic manifest order");
+const atlasPath = path.join(repoRoot, "client", GROUND_DECAL_PNG_ATLAS.url.slice(1));
+const atlasPng = PNG.sync.read(fs.readFileSync(atlasPath));
+assert(atlasPng.width === GROUND_DECAL_PNG_ATLAS.width && atlasPng.height === GROUND_DECAL_PNG_ATLAS.height,
+  "checked-in PNG atlas dimensions match generated rect metadata");
+
+{
+  let fetched = "";
+  let closed = 0;
+  const atlas = await loadGroundDecalAtlas({
+    fetchFn: async (url) => {
+      fetched = url;
+      return { ok: true, blob: async () => ({ type: "image/png" }) };
+    },
+    createImageBitmapFn: async () => ({
+      width: GROUND_DECAL_PNG_ATLAS.width,
+      height: GROUND_DECAL_PNG_ATLAS.height,
+      close() { closed += 1; },
+    }),
+  });
+  assert(fetched === GROUND_DECAL_PNG_ATLAS.url, "runtime fetches only the worker-decodable PNG atlas");
+  assert(atlas.infantry.length === GROUND_DECAL_ASSET_MANIFEST.infantry.length,
+    "runtime readiness exposes every infantry source rect");
+  assert(atlas.artilleryBlast[0].image === atlas.infantry[0].image,
+    "all mask rects share one decoded worker-owned bitmap");
+  atlas.destroy();
+  atlas.destroy();
+  assert(closed === 1, "atlas teardown closes its ImageBitmap exactly once");
+}
 
 assert(GROUND_DECAL_ASSET_MANIFEST.infantry.length >= 12, "manifest includes at least twelve infantry decal masks");
 assert(GROUND_DECAL_ASSET_MANIFEST.vehicleScorch.length >= 8, "manifest includes at least eight vehicle scorch masks");

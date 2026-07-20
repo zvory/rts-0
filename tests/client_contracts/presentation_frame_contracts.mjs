@@ -7,7 +7,11 @@ import {
   PresentationFrameAssembler,
   detachedRecord,
 } from "../../client/src/presentation/frame.js";
-import { createGridSnapshot } from "../../client/src/presentation/grid_snapshot.js";
+import {
+  copyGridSnapshotInto,
+  createGridSnapshot,
+  gridSnapshotValue,
+} from "../../client/src/presentation/grid_snapshot.js";
 import { prepareEntitySnapshots } from "../../client/src/presentation/entity_snapshot.js";
 import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../../client/src/presentation/submission.js";
 import {
@@ -185,8 +189,19 @@ assert(frame.visible.revision === 4 && frame.explored.revision === 7, "fog snaps
 assert(frame.staticMapRevision === assembler.staticMap.revision, "dynamic frames reference the separately versioned static map");
 assert(assembler.staticMap.widthPx === 64 && assembler.staticMap.heightPx === 64, "static map dimensions are world pixels");
 assert(assembler.staticMap.resourceSites[0].remaining === undefined, "static resource sites exclude mutable remaining amounts");
-assert(Object.keys(frame.visible).join(",") === "version,revision,width,height,get,copyInto", "grid snapshot exposes only the exact accessor contract");
-assert(!containsMutableCollection(frame), "renderer frame contains no mutable typed arrays, maps, or sets");
+assert(Object.keys(frame.visible).join(",") === "version,revision,width,height,values", "grid snapshot exposes the cloneable V2 shape");
+assert(frame.version === 2 && frame.projection.version === 2, "renderer frame and projection use PresentationFrameV2 data");
+assert(
+  frame.projection.kind === "orthographic" &&
+    frame.projection.orthographic.originX === -288 &&
+    frame.projection.orthographic.originY === -208,
+  "renderer projection preserves exact orthographic coefficients without reconstructing them from focus",
+);
+assert(!containsFunctionOrClass(frame), "renderer frame contains only structured-cloneable records and typed arrays");
+const clonedFrame = structuredClone(frame);
+assert(clonedFrame !== frame && clonedFrame.layers !== frame.layers, "structuredClone detaches the full renderer frame graph");
+assert(clonedFrame.visible.values !== frame.visible.values, "structuredClone detaches revisioned grid buffers");
+assert(JSON.stringify(clonedFrame) === JSON.stringify(frame), "structuredClone preserves renderer-frame semantics");
 
 normal.x = 999;
 placement.tileX = 99;
@@ -194,14 +209,14 @@ visibleGrid[0] = 0;
 map.terrain[0] = 9;
 assert(frame.layers.fogGatedWorld[0].x === 20, "entity records detach from mutable source state");
 assert(frame.layers.tacticalFeedback.find((record) => record.type === "placement").tileX === 1, "feedback records detach from client intent");
-assert(frame.visible.get(0) === 1, "fog snapshot is pinned against later source mutation");
-assert(assembler.staticMap.terrain.get(0) === 0, "terrain snapshot is pinned against later source mutation");
+assert(gridSnapshotValue(frame.visible, 0) === 1, "fog snapshot is pinned against later source mutation");
+assert(gridSnapshotValue(assembler.staticMap.terrain, 0) === 0, "terrain snapshot is pinned against later source mutation");
 
 const copied = new Uint8Array(6);
-assert(frame.visible.copyInto(copied, 1) === 4, "grid snapshot copies into backend-owned staging");
+assert(copyGridSnapshotInto(frame.visible, copied, 1) === 4, "grid snapshot copies into backend-owned staging");
 assert(copied.join(",") === "0,1,1,0,0,0", "grid copy respects target offset");
-assert(frame.visible.get(-1) === undefined && frame.visible.get(4) === undefined, "grid get rejects out-of-bounds indexes");
-assertThrows(() => frame.visible.copyInto(new Uint8Array(3)), "grid copy rejects insufficient target capacity");
+assert(gridSnapshotValue(frame.visible, -1) === undefined && gridSnapshotValue(frame.visible, 4) === undefined, "grid helper rejects out-of-bounds indexes");
+assertThrows(() => copyGridSnapshotInto(frame.visible, new Uint8Array(3)), "grid copy rejects insufficient target capacity");
 
 const sameRevision = assembler.assemble({
   map,
@@ -218,7 +233,7 @@ const nextRevision = assembler.assemble({
   fog: { visibleGrid: new Uint8Array([0, 0, 0, 0]), exploredGrid, visibleRevision: 5, exploredRevision: 7 },
   visualTimeMs: 1502,
 });
-assert(nextRevision.visible !== frame.visible && nextRevision.visible.get(0) === 0, "changed grid revision creates a new detached snapshot");
+assert(nextRevision.visible !== frame.visible && gridSnapshotValue(nextRevision.visible, 0) === 0, "changed grid revision creates a new detached snapshot");
 
 const oldStaticMap = assembler.staticMap;
 const resetMap = { width: 1, height: 1, tileSize: 16, terrain: [2], resources: [] };
@@ -236,7 +251,7 @@ const resetFrame = assembler.assemble({
 });
 assert(resetFrame.generation === 2 && resetFrame.frameId === 1, "Lab/replay reset starts a fresh presentation generation and frame sequence");
 assert(resetFrame.diagnosticsContext.mode === "fixedCapture", "fixed capture is explicit in detached diagnostics context");
-assert(oldStaticMap.terrain.get(0) === 0, "reset does not mutate an older retained static snapshot");
+assert(gridSnapshotValue(oldStaticMap.terrain, 0) === 0, "reset does not mutate an older retained static snapshot");
 
 const rematchAssembler = new PresentationFrameAssembler({ map: { width: 1, height: 1, tileSize: 16, terrain: [0] } });
 assert(rematchAssembler.staticMap !== assembler.staticMap, "a rematch owns a fresh static presentation object");
@@ -318,7 +333,7 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
       render(frame) {
         rendererCalls += 1;
         assert(fogUpdated, "backend runs only after fog and final frame assembly");
-        assert(frame.visible.get(0) === 1, "backend receives the post-fog presentation frame");
+        assert(gridSnapshotValue(frame.visible, 0) === 1, "backend receives the post-fog presentation frame");
         assert(frame.groundDecalRevision === (decalAcknowledgements === 0 ? 1 : 0), "backend receives the exact reconciled durable revision");
         assert(frame.layers.persistentGroundMark.length === (decalAcknowledgements === 0 ? 1 : 0), "decal reconciliation runs before final assembly");
         if (outcomeStatus == null) return {};
@@ -366,11 +381,21 @@ function fakeProjection() {
   });
   const viewport = Object.freeze({ widthCssPx: 640, heightCssPx: 480 });
   const mapBounds = Object.freeze({ minX: 0, minY: 0, maxX: 64, maxY: 64 });
+  const orthographic = Object.freeze({
+    originX: -288,
+    originY: -208,
+    framingScale: 1,
+    worldWidthPx: 64,
+    worldHeightPx: 64,
+    viewportWidthCssPx: 640,
+    viewportHeightCssPx: 480,
+  });
   return Object.freeze({
     version: 1,
     camera,
     viewport,
     mapBounds,
+    orthographic,
     project: (point) => ({ x: point.x, y: point.y, depth: 1, clip: "inside", visible: true }),
     groundAtScreen: (point) => ({ x: point.x, y: point.y }),
     projectedExtent: () => ({ width: 1, height: 1, scaleX: 1, scaleY: 1, visible: true }),
@@ -382,11 +407,15 @@ function fakeProjection() {
   });
 }
 
-function containsMutableCollection(value, seen = new Set()) {
+function containsFunctionOrClass(value, seen = new Set()) {
+  if (typeof value === "function") return true;
   if (value == null || typeof value !== "object" || seen.has(value)) return false;
-  if (ArrayBuffer.isView(value) || value instanceof Map || value instanceof Set) return true;
+  if (ArrayBuffer.isView(value)) return false;
+  if (value instanceof Map || value instanceof Set) return true;
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return true;
   seen.add(value);
-  return Object.values(value).some((entry) => containsMutableCollection(entry, seen));
+  return Object.values(value).some((entry) => containsFunctionOrClass(entry, seen));
 }
 
 function assertThrows(fn, message) {

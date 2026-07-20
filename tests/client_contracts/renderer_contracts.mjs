@@ -70,9 +70,38 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     "non-road terrain never receives a road shoulder",
   );
 }
+
+function fakeOffscreenCanvas(canvases) {
+  return class FakeOffscreenCanvas {
+    constructor(width, height) {
+      this.width = width;
+      this.height = height;
+      canvases.push(this);
+    }
+
+    getContext(type) {
+      assert(type === "2d", "worker-safe color loader requests a 2D canvas context");
+      return {
+        imageSmoothingEnabled: true,
+        clearRect() {},
+        drawImage() {},
+        getImageData: () => ({ data: new Uint8ClampedArray(this.width * this.height * 4) }),
+        putImageData() {},
+      };
+    }
+  };
+}
+
+function restoreGlobal(name, value) {
+  if (value === undefined) delete globalThis[name];
+  else globalThis[name] = value;
+}
 {
   const priorDocument = globalThis.document;
   const priorImage = globalThis.Image;
+  const priorOffscreenCanvas = globalThis.OffscreenCanvas;
+  const priorFetch = globalThis.fetch;
+  const priorCreateImageBitmap = globalThis.createImageBitmap;
   const rawLoads = [];
   const canvases = [];
   globalThis.document = {
@@ -113,6 +142,9 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       queueMicrotask(() => this.onload?.());
     }
   };
+  globalThis.OffscreenCanvas = fakeOffscreenCanvas(canvases);
+  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
+  globalThis.createImageBitmap = async () => ({ width: 0, height: 0, close() {} });
 
   try {
     const texture = await loadFrameStripTexture(
@@ -150,12 +182,18 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     else globalThis.document = priorDocument;
     if (priorImage === undefined) delete globalThis.Image;
     else globalThis.Image = priorImage;
+    restoreGlobal("OffscreenCanvas", priorOffscreenCanvas);
+    restoreGlobal("fetch", priorFetch);
+    restoreGlobal("createImageBitmap", priorCreateImageBitmap);
   }
 }
 
 {
   const priorDocument = globalThis.document;
   const priorImage = globalThis.Image;
+  const priorOffscreenCanvas = globalThis.OffscreenCanvas;
+  const priorFetch = globalThis.fetch;
+  const priorCreateImageBitmap = globalThis.createImageBitmap;
   const rawLoads = [];
   const canvases = [];
   globalThis.document = {
@@ -196,6 +234,9 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       queueMicrotask(() => this.onload?.());
     }
   };
+  globalThis.OffscreenCanvas = fakeOffscreenCanvas(canvases);
+  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
+  globalThis.createImageBitmap = async () => ({ width: 0, height: 0, close() {} });
 
   try {
     const texture = await loadPngRigAtlasTexture(
@@ -231,6 +272,9 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     else globalThis.document = priorDocument;
     if (priorImage === undefined) delete globalThis.Image;
     else globalThis.Image = priorImage;
+    restoreGlobal("OffscreenCanvas", priorOffscreenCanvas);
+    restoreGlobal("fetch", priorFetch);
+    restoreGlobal("createImageBitmap", priorCreateImageBitmap);
   }
 }
 
@@ -390,6 +434,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     for (const name of [
       "_drawAbilityObjects",
       "_drawSmokes",
+      "_drawTrenches",
       "_drawFog",
       "_drawSmokeCanisters",
       "_drawCommandFeedback",
@@ -452,10 +497,10 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     );
     assert(globalThis.__rtsRenderErrors?.latest?.label === "mortarImpacts", "renderer exposes latest render error diagnostics");
     renderer.present();
+    const readinessErrorLabels = renderer.captureReadiness().renderErrors.map((error) => error.label).sort().join(",");
     assert(
-      renderer.captureReadiness().renderErrors.map((error) => error.label).sort().join(",")
-        === "mortarImpacts,unit:worker",
-      "capture readiness associates update errors with the successfully presented frame",
+      readinessErrorLabels === "mortarImpacts,unit:worker",
+      `capture readiness associates update errors with the successfully presented frame (${readinessErrorLabels})`,
     );
     renderer._beginRenderFrame();
     renderer.present();
@@ -473,6 +518,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 {
   const restorePixi = installFakePixi();
   const priorDocument = globalThis.document;
+  const priorFetch = globalThis.fetch;
+  const priorCreateImageBitmap = globalThis.createImageBitmap;
   class FakeCanvasContext {
     constructor() {
       this.calls = [];
@@ -501,6 +548,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       };
     },
   };
+  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
+  globalThis.createImageBitmap = async () => ({ width: 1928, height: 216, close() {} });
   try {
     const parent = {
       clientWidth: 640,
@@ -514,6 +563,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     };
     const renderer = await Renderer.create(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
+    await renderer._groundDecals.assetLoadPromise;
     let decalLayerResets = 0;
     let trenchLayerResets = 0;
     renderer._initGroundDecalsForMap = () => { decalLayerResets += 1; };
@@ -545,6 +595,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
+    restoreGlobal("fetch", priorFetch);
+    restoreGlobal("createImageBitmap", priorCreateImageBitmap);
     restorePixi();
   }
 }
@@ -586,7 +638,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     const trenchLayer = new TrenchDecalLayer({
       layer: new PIXI.Container(),
       pixi: PIXI,
-      getDocument: () => globalThis.document,
+      createCanvas: () => globalThis.document.createElement("canvas"),
       recordDiagnostic(label, amount = 1) {
         diagnostics.push([label, amount]);
       },
@@ -652,6 +704,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
 {
   const restorePixi = installFakePixi();
   const priorDocument = globalThis.document;
+  const priorFetch = globalThis.fetch;
+  const priorCreateImageBitmap = globalThis.createImageBitmap;
   const canvasContexts = [];
   class FakeCanvasContext {
     constructor() {
@@ -687,6 +741,8 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
       };
     },
   };
+  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
+  globalThis.createImageBitmap = async () => ({ width: 1928, height: 216, close() {} });
   try {
     const parent = {
       clientWidth: 640,
@@ -700,6 +756,7 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     };
     const renderer = await Renderer.create(parent);
     renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
+    await renderer._groundDecals.assetLoadPromise;
     assert(renderer.layers.decals.children.length === 1, "renderer creates exactly one permanent decal sprite");
     assert(renderer._groundDecals.downsample === GROUND_DECAL_TEXTURE_WORLD_SCALE, "decal texture uses the configured downsample");
 
@@ -730,14 +787,14 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     assert(renderer._groundDecals.textureUpdateCount === 1, "renderer updates the decal texture once per consumed batch");
     renderer._drawGroundDecals(state);
     assert(renderer._groundDecals.textureUpdateCount === 1, "renderer does not update the decal texture when no decals are pending");
-    const decalCtx = canvasContexts[1];
-    assert(decalCtx.calls.some((call) => call[0] === "ellipse"), "infantry decals draw placeholder blob ellipses");
-    assert(decalCtx.calls.some((call) => call[0] === "fillRect"), "vehicle decals draw placeholder paint fragments");
+    assert(renderer._groundDecals.assetStatus === "ready", "ground decals stamp only after the PNG atlas is ready");
     renderer.destroy();
     renderer.destroy();
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
+    restoreGlobal("fetch", priorFetch);
+    restoreGlobal("createImageBitmap", priorCreateImageBitmap);
     restorePixi();
   }
 }

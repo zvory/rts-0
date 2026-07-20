@@ -57,6 +57,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "clean_presentation.js": "app-shell",
   "map_editor_app.js": "app-shell",
   "map_editor_viewport.js": "app-shell",
+  "map_editor_presentation.js": "app-shell",
+  "map_editor_terrain_preview.js": "app-shell",
 
   "state.js": "model",
   "state_firing_reveal.js": "model",
@@ -157,6 +159,12 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "minimap.js -> input/support_weapon_setup_targeting.js": "Minimap and viewport setup targeting share the same pure AT-gun convergence, parallel, and fan curves so preview and issued facing agree.",
   "renderer/backend_bundle.js -> camera.js": "The selected Pixi bundle owns construction of its orthographic semantic camera.",
   "renderer/pixi_compatibility_adapter.js -> presentation/submission.js": "The Pixi backend returns the renderer-neutral asynchronous presentation lifecycle result.",
+  "renderer/pixi_compatibility_adapter.js -> presentation/grid_snapshot.js": "The Pixi owner materializes cloneable revisioned grid records into private staging buffers.",
+  "renderer/pixi_compatibility_adapter.js -> presentation/projection_record.js": "The Pixi owner reconstructs private orthographic queries from the plain RendererProjectionV2 record.",
+  "renderer/babylon/fog_layer.js -> presentation/grid_snapshot.js": "The Babylon owner reads cloneable GridSnapshotV2 values through the shared bounds helper.",
+  "renderer/worker_messages.js -> presentation/frame.js": "The future worker wire pins and validates the renderer-neutral presentation and static-map versions.",
+  "renderer/map_editor_presentation_adapter.js -> map_editor_presentation.js": "The Pixi owner validates the detached Map Editor presentation record it consumes.",
+  "presentation/projection_record.js -> camera_projection.js": "RendererProjectionV2 reconstruction reuses the pure projection math used by the semantic camera.",
   "renderer/babylon/backend_bundle.js -> fixed_perspective_camera.js": "The selected Babylon bundle owns construction of its engine-independent semantic camera.",
   "renderer/babylon/presentation_adapter.js -> presentation/submission.js": "The Babylon backend follows the same renderer-neutral presentation lifecycle contract.",
 }));
@@ -243,7 +251,9 @@ const PRIVATE_RAW_CAMERA_ADAPTERS = new Set([
   "camera.js",
   "camera_projection.js",
   "map_editor_viewport.js",
+  "map_editor_presentation.js",
   "renderer/index.js",
+  "renderer/map_editor_presentation_adapter.js",
 ]);
 
 const rawCameraRepresentationRe = /\b(?:(?:this|match)\.)?(?:camera|cam)(?:\?\.|\.)(?:x|y|zoom|viewW|viewH|worldW|worldH|centerOn|setZoom|setView|setBounds)\b/g;

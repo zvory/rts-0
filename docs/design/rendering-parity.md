@@ -20,10 +20,13 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 | One Match-owned rAF and visual clock | complete | complete | Babylon calls `scene.render()` only from the Match frame seam. |
 | Semantic camera/projection | complete | complete | Fixed perspective and scene-camera coefficients share one snapshot. |
 | Perspective-safe selection/marquee/ground hits | complete | complete | Shared `SelectionSceneV1` receives the selected camera projection. |
-| Detached fog-filtered dynamic presentation | complete | complete | Babylon's render path reads only `PresentationFrameV1`. |
+| Detached fog-filtered dynamic presentation | complete | complete | Both adapters read only structured-cloneable `PresentationFrameV2`; Pixi reconstructs private projection/grid helpers. |
 | Babylon backend construction isolation | n/a | missing | Match currently passes Babylon the broad mutable Pixi-oriented source bag even though the adapter uses only its profiler hook. |
 | Default Pixi and explicit lazy Babylon selector | complete | complete | `rtsRenderer=babylon` is live-player/Lab-only and lazy; replay/spectator matches stay Pixi. |
 | Narrow detached static-map delivery | complete | missing | Babylon is passed a broad source bag containing a static-map callback but has no safe narrow contract and does not consume the data. |
+| Render-worker message vocabulary | complete | n/a | `RenderWorkerMessageV1` separates initialization, map, durable, revisioned, frame, and control lifetimes; Phase 2 starts no production worker. |
+| Worker-decodable Pixi assets | complete | n/a | Ground-decal SVG sources generate one checked-in PNG atlas; Pixi raster paths use OffscreenCanvas and fetch/createImageBitmap or Pixi Assets. |
+| Map Editor detached Pixi boundary | complete | n/a | The viewport emits `MapEditorPresentationV1`; only the Pixi adapter owns display objects and renderer internals. |
 | Terrain and resource-site readability | complete | missing | Babylon draws one flat map-bounds plane and does not present terrain classes or static resource sites. |
 | Current/explored fog, memory, intel, and reveals | complete | complete | Revisioned grids, separated presentation layers, and two-recipient secrecy check. |
 | Generic entity presence, team, selection, HP, and progress | complete | placeholder | Shared boxes and bars truthfully cover every received entity but are not kind-readable. |

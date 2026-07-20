@@ -12,7 +12,7 @@ perspective camera before its renderer; ordinary spectators and replays remain o
 index.html        # PINNED — CDN + #app + module entry + screens markup
 styles.css        # HUD, lobby, menus, command card
 live_pause.css    # live-match pause overlay and actions
-assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
+assets/decals/    # SVG decal source art plus generated worker-decodable PNG mask atlas
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
   config.js       # PINNED — stable public facade for render/UI constants and balance mirrors
@@ -42,7 +42,7 @@ src/
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
   renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
-  renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
+  renderer/decals/ # SVG source manifest, generated PNG atlas metadata, worker-safe loader, deterministic selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
   renderer/lab_tool_preview.js # Armed Lab unit/remove-tool cursor ghosts
@@ -104,7 +104,8 @@ src/
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
   map_editor_session.js # Flat authored-map state, local storage, undo/redo, stroke transactions
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, save/export, and Lab launch
-  map_editor_viewport.js # Pixi renderer/camera composition plus editor-only pointer/keyboard input
+  map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
+  map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
@@ -114,7 +115,7 @@ src/
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   visual_clock.js # Render-only normal/capture clocks; never used for networking, health, input, or timeouts
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
-  presentation/    # Frozen semantic layers, opaque GridSnapshot accessors, static map, and frame assembly
+  presentation/    # Frozen semantic layers, cloneable revisioned grids/projection data, static map, and frame assembly
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
   replay_seek_notice.js # Shared replay-seek direction/duration toast formatting
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
@@ -126,7 +127,11 @@ src/
 `/map-editor` is a separate frozen client session. `main.js` constructs `MapEditorApp` for that route,
 so it never opens a WebSocket or constructs `App`, `Match`, `GameState`, Lab controls, fog, resources,
 orders, replay controls, or a simulation clock. It reuses the normal Pixi `Renderer`, terrain cache,
-`Camera`, map schema, and player palette through an editor-owned viewport and panel. The removed
+`Camera`, map schema, and player palette, but `MapEditorViewport` never constructs Pixi or reaches
+into renderer layers/application state. Input, hit math, session edits, and camera stay on the main
+thread; `MapEditorPresentationV1` carries revisioned terrain replacement/patch data and detached
+grid, symmetry, start/base, selection, label, and paint-preview records. The Pixi adapter alone owns
+the stable HTML canvas, display objects, resize, present, and teardown. The removed
 `map-editor.html` implementation and Lab-embedded editor are not compatibility routes.
 
 ### 4.1 Module export contracts
@@ -398,9 +403,12 @@ export class GroundDecalLayer {
   destroy()
 }
 ```
-`GroundDecalLayer` owns one downsampled canvas-backed Pixi texture and one sprite on the `decals`
-world layer. New visible death and impact decals are stamped into that texture in batches from SVG
-alpha-mask assets under `assets/decals/`; historical decals are pixels, not retained display objects or
+`GroundDecalLayer` owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite on the
+`decals` world layer. SVG files remain source art; `scripts/generate-ground-decal-atlas.mjs` creates
+the checked-in `ground-decals-v1.png` plus deterministic rect metadata, and runtime loads that one
+PNG through `fetch`/`createImageBitmap`. New visible death and impact decals stamp from those rects;
+an unavailable or failed atlas remains a reported blocking asset error and never silently chooses a
+procedural replacement. Historical decals are pixels, not retained display objects or
 per-frame records. `diagnostics()` exposes total stamped decals, queued decals, texture update
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
@@ -521,10 +529,10 @@ buildings keep their legacy detachment fallback.
 `presentation/layers.js`, `presentation/grid_snapshot.js`, and `presentation/frame.js`
 ```js
 PRESENTATION_LAYER_DESCRIPTORS       // exact frozen back-to-front semantic descriptors
-createGridSnapshot(input)            // opaque immutable revisioned grid accessor
+createGridSnapshot(input)            // source-detached cloneable revisioned Uint8Array record
 new PresentationFrameAssembler({map, generation?, entityStats?})
-assembler.staticMap                  // StaticMapPresentationV1, rebuilt only on map revision/reset
-assembler.assemble(inputs)           // one detached frozen PresentationFrameV1
+assembler.staticMap                  // StaticMapPresentationV2, rebuilt only on map revision/reset
+assembler.assemble(inputs)           // one structured-cloneable frozen PresentationFrameV2
 assembler.reset({map, generation?})  // replay/Lab/rematch generation reset seam
 ```
 `frame_recovery.js` updates authoritative fog before it assembles this sidecar. It samples one
@@ -1132,9 +1140,9 @@ separate occupied-infantry trench ring in the selection layer. Trench ground dec
 the authoritative trench radius; snapshot data and the gameplay radius remain unchanged. Frame-local entity views may carry
 bounded render diagnostics for local profiling consumers without changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
 into deduped, browser-local pending ground decal stamps and rendered below resources and fog as
-visual-only decals. Death decals use SVG-authored mask assets from the client asset path when they
-load, queue stamps while the atlas is loading, and fall back to procedural masks when SVG loading is
-unavailable or fails; they do not change server protocol, simulation, or balance.
+visual-only decals. Death decals use the generated PNG atlas only after readiness; unretained durable
+batches are retried rather than stamped before readiness. They do not change server protocol,
+simulation, or balance.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
@@ -1265,11 +1273,13 @@ export class PixiPresentationAdapter {
 and returns that public acknowledged id; it never reads a renderer-private counter.
 
 Normal Match rendering uses this adapter. The direct `Renderer` surface remains Pixi-private and
-is also owned separately by Map Editor, which has no Match or simulation frame. Pixi applications
+is owned for Map Editor only by `MapEditorPixiPresentationAdapter`, which consumes detached editor
+records and exposes a stable canvas to viewport input. Pixi applications
 use `autoStart:false`. Fixed capture drives the ordinary adapter once per requested capture frame
 and resumes one Match RAF; it never stops or restarts a ticker. Map Editor owns its separate RAF and
-calls `Renderer.present()` exactly once after each editor scene/camera update. Both owners cancel
-their RAFs during teardown, and renderer destruction is idempotent.
+submits one editor record exactly once after each editor scene/camera update. Both owners cancel
+their RAFs during teardown, and renderer destruction is idempotent. Phase 2 still has one
+main-thread Pixi production path; no worker, transferred production canvas, flag, or fallback exists.
 
 `fog.js`
 ```js
@@ -1975,8 +1985,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   baked into its checked-in runtime PNG, and raw strips receive the missing delta once when the
   texture loads. Individual strips can set a lower or higher target when their generated source art
   needs unit-specific visual matching.
-  PNG atlas rigs can also declare a small `runtimeColorAdjustment` so generated vehicle art can be
-  matched in-game without rewriting the atlas source PNG.
+  PNG atlas rigs can also declare a worker-safe `runtimeColorAdjustment`. The Scout Car's historical
+  90% brightness/saturation treatment is baked into its checked-in worker-ready PNG by
+  `scripts/generate-color-adjusted-rig-assets.mjs`; its descriptor records that baked profile and
+  uses a neutral runtime adjustment, preserving the prior browser-decoded pixels exactly.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the

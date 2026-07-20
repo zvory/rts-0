@@ -166,13 +166,11 @@ export class Renderer {
     this._groundDecals = new GroundDecalLayer({
       layer: this.layers.decals,
       pixi: PIXI,
-      getDocument: () => (typeof document !== "undefined" ? document : null),
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
     this._trenchDecals = new TrenchDecalLayer({
       layer: this.layers.trenches,
       pixi: PIXI,
-      getDocument: () => (typeof document !== "undefined" ? document : null),
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
     this._visualSamples = new VisualSampleLayer({
@@ -515,13 +513,17 @@ export class Renderer {
       }),
     );
     time("renderer.groundDecals", () => {
+      let stagedGroundDecals = false;
       this._drawSafely(
         "groundDecals",
-        () => this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state),
+        () => {
+          const count = this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state);
+          stagedGroundDecals = Array.isArray(reconciledGroundDecals)
+            && reconciledGroundDecals.length > 0
+            && count === reconciledGroundDecals.length;
+        },
       );
-      if (Array.isArray(reconciledGroundDecals) && reconciledGroundDecals.length > 0) {
-        onGroundDecalsStaged?.();
-      }
+      if (stagedGroundDecals) onGroundDecalsStaged?.();
     });
     time("renderer.trenches", () => {
       this._drawSafely("trenches", () => this._drawTrenches(state));

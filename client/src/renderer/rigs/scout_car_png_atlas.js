@@ -72,10 +72,15 @@ const GUN_NEUTRAL_FRAME = paletteFrame("#0072b2", "rearMachineGun");
 export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "scout_car",
-  image: "/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png?v=pass02-team-halfres-rgba8",
-  runtimeColorAdjustment: {
+  image: "/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png?v=pass02-team-halfres-rgba8-adjusted",
+  bakedColorAdjustment: {
     brightness: 90,
     saturation: 90,
+    hue: 100,
+  },
+  runtimeColorAdjustment: {
+    brightness: 100,
+    saturation: 100,
     hue: 100,
   },
   viewBox: {

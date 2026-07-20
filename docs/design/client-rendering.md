@@ -17,7 +17,7 @@ in [client-ui.md](client-ui.md), and implementation status lives in
   and facing are backend-private presentation conversions.
 - Input and commands use semantic projection and selection data. Meshes, asset bounds, LODs,
   shadow proxies, and GPU picking are never gameplay authority.
-- A backend consumes only detached `PresentationFrameV1` data. It never receives `GameState`,
+- A backend consumes only detached `PresentationFrameV2` data. It never receives `GameState`,
   `ClientIntent`, transport objects, hidden entity variants, or another backend's engine objects.
 - The backend root owns its canvas, engine/renderer, scene, and shared GPU resources. Entity/effect
   children own instances only and cannot dispose shared resources.
@@ -129,27 +129,26 @@ bounds, shadow proxies, or fresh mutable state.
 ## 4. Presentation frame
 
 Static map presentation changes only with the static-map revision. Per-rAF data is assembled once
-by Match. Large grids cross the boundary as immutable accessors:
+by Match. Large grids cross the boundary as source-detached cloneable buffers:
 
 ```text
-GridSnapshotV1 = {
-  version: 1, revision, width, height,
-  get(index) -> number,
-  copyInto(targetTypedArray, targetOffset = 0) -> copiedCount
+GridSnapshotV2 = {
+  version: 2, revision, width, height,
+  values: Uint8Array
 }
 
-StaticMapPresentationV1 = {
-  version: 1, generation, revision,
+StaticMapPresentationV2 = {
+  version: 2, generation, revision,
   widthPx, heightPx, tileSizePx,
-  terrain: GridSnapshotV1,
+  terrain: GridSnapshotV2,
   resourceSites: readonly detached records[]
 }
 
-PresentationFrameV1 = {
-  version: 1, generation, frameId, groundDecalRevision, visualTimeMs,
-  projection, staticMapRevision,
-  visible: GridSnapshotV1,
-  explored: GridSnapshotV1,
+PresentationFrameV2 = {
+  version: 2, generation, frameId, groundDecalRevision, visualTimeMs,
+  projection: RendererProjectionV2, staticMapRevision,
+  visible: GridSnapshotV2,
+  explored: GridSnapshotV2,
   layers: LayerRecordsV1,
   diagnosticsContext
 }
@@ -162,9 +161,17 @@ tile-footprint descriptor. Freehand formation feedback crosses `tacticalFeedback
 `slots`; every backend renders both the stroke and admitted slots. These are presentation hints only: `SelectionSceneV1` remains the sole
 entity/ground interaction authority.
 
-The backend owns any mutable staging buffers. Frame objects, arrays, and ordinary records are
-detached and frozen. Malformed individual records are dropped with bounded category diagnostics;
-they do not abort the whole frame.
+The main thread keeps this rich `ProjectionSnapshotV1` for input, audio, minimap, and selection.
+`PresentationFrameV2` instead carries a function-free `RendererProjectionV2` with `kind`, `camera`,
+`viewport`, `mapBounds`, and plain backend coefficients. Orthographic records preserve the sampled
+origin, framing scale, world size, and CSS viewport size exactly; perspective records carry their
+existing plain coefficients. The Pixi owner reconstructs private projection queries from that data;
+functions and camera instances never cross the renderer boundary.
+
+The backend owns mutable staging buffers. Frame objects, arrays, and ordinary records are detached
+and frozen; the explicitly revisioned grid `Uint8Array` values are copied from mutable game sources
+and are the only typed-array leaves. Malformed individual records are dropped with bounded category
+diagnostics; they do not abort the whole frame.
 
 For received interpolated entities, Match creates one aligned frame-local preparation entry per
 source record. Its complete graph-aware detached interaction feeds `SelectionSceneV1`; its
@@ -214,6 +221,27 @@ allowlist uses `{id, reviewTrigger}` records: a trigger is a concrete reason to 
 not a promised cleanup phase. New reads fail the contract, and Babylon cannot import the adapter or
 receive its sources.
 
+### 4.1 Render-worker message boundary
+
+`RenderWorkerMessageV1` is the only Phase 3 worker vocabulary. Every request has
+`{version:1,type,generation,payload}` and is validated for known type, matching presentation/static
+versions, safe integer ids, finite bounded dimensions/DPR/timings, and shape-matched typed arrays.
+Its payload lifetimes are explicit:
+
+- initialization: transferred canvas, CSS size, DPR, PresentationFrameV2/StaticMapPresentationV2
+  versions, and immutable configuration;
+- map generation: one static-map payload and transferred terrain copy per generation;
+- durable update: monotonic ground-decal revision plus its detached records;
+- revisioned data: transferred visible/explored copies only when each revision changes;
+- frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
+- control: resize, capture/flush, generation reset, and destroy.
+
+Responses are `ready` (including asset readiness), `retained`, `presented` with frame id and worker
+update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
+transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
+usable and unchanged. This phase defines and tests the vocabulary but does not create a production
+worker; Pixi still has exactly one main-thread production path until the atomic Phase 3 cutover.
+
 ## 5. Babylon foundation contracts
 
 ### 5.1 Backend bundle and lifecycle
@@ -233,7 +261,7 @@ projection agree.
 
 ### 5.3 Fog and generic content
 
-Babylon renders only the categories already separated by `PresentationFrameV1`. Current/explored
+Babylon renders only the categories already separated by `PresentationFrameV2`. Current/explored
 fog uses the immutable revisions; remembered, intel, and reveal presentation use their explicit
 layers and never query a hidden source id. A real two-recipient sentinel test covers scene,
 selection, and diagnostics before the live route is enabled.

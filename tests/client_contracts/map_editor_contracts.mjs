@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { installFakePixi } from "./pixi_fakes.mjs";
-
 {
   const savedRaf = globalThis.requestAnimationFrame;
   let scheduled = 0;
@@ -18,18 +16,18 @@ import { installFakePixi } from "./pixi_fakes.mjs";
         zoom: 2,
         update() {},
       },
-      renderer: {
-        world: {
-          position: { set() {} },
-          scale: { set() {} },
-        },
+      presentationFrameId: 0,
+      pendingTerrainUpdate: null,
+      pendingOverlay: null,
+      presentation: {
         presents: 0,
-        present() { this.presents += 1; },
+        present(record) { this.presents += 1; this.record = record; },
       },
       tick: MapEditorViewport.prototype.tick,
     };
     viewport.tick(16);
-    assert.equal(viewport.renderer.presents, 1, "each Map Editor RAF explicitly presents once");
+    assert.equal(viewport.presentation.presents, 1, "each Map Editor RAF explicitly presents once");
+    assert.equal(viewport.presentation.record.version, 1, "Map Editor RAF submits one detached presentation record");
     assert.equal(scheduled, 1, "Map Editor schedules one successor RAF");
   } finally {
     globalThis.requestAnimationFrame = savedRaf;
@@ -90,18 +88,16 @@ import {
       destroyed: false,
       frame: 73,
       unsubscribe() {},
-      renderer: {
-        app: { canvas: { removeEventListener() {} } },
+      presentation: {
+        canvas: { removeEventListener() {} },
         destroyed: 0,
         destroy() { this.destroyed += 1; },
       },
-      labels: [],
-      overlay: { destroy() {} },
     };
     MapEditorViewport.prototype.destroy.call(viewport);
     MapEditorViewport.prototype.destroy.call(viewport);
     assert.deepEqual(cancelled, [73], "Map Editor teardown cancels its one owned RAF exactly once");
-    assert.equal(viewport.renderer.destroyed, 1, "Map Editor teardown destroys Pixi idempotently");
+    assert.equal(viewport.presentation.destroyed, 1, "Map Editor teardown destroys presentation idempotently");
   } finally {
     globalThis.cancelAnimationFrame = savedCancel;
     globalThis.window = savedWindow;
@@ -265,38 +261,25 @@ const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.
   MapEditorViewport.prototype.setSelectedBase.call(viewport, null);
   assert.equal(viewport.redraws, 2, "base selection redraws the editor overlay only when it changes");
 
-  const restorePixi = installFakePixi();
-  try {
-    const overlay = {
-      calls: [],
-      stroke(style) { this.calls.push(["stroke", style]); return this; },
-      circle(...args) { this.calls.push(["drawCircle", ...args]); return this; },
-      fill(style) { this.calls.push(["fill", style]); return this; },
-    };
-    const feedback = new PIXI.Container();
-    const siteViewport = { overlay, labels: [], renderer: { layers: { feedback } } };
-    MapEditorViewport.prototype.drawSite.call(siteViewport, { x: 10, y: 12 }, 0xf4c542, 7, "B1", true);
-    assert(overlay.calls.some((call) => call[0] === "drawCircle" && call[3] === 13),
-      "the selected base gets a larger map highlight ring");
+  const site = MapEditorViewport.prototype.siteRecord.call({}, { x: 10, y: 12 }, 0xf4c542, 7, "B1", true);
+  assert.deepEqual(site, { x: 336, y: 400, color: 0xf4c542, radius: 7, label: "B1", selected: true },
+    "the selected base becomes a detached presentation marker");
 
-    const gridOverlay = new PIXI.Graphics();
-    MapEditorViewport.prototype.drawOverlay.call({
-      session: {
-        draft: { terrain: Array(16) },
-        mapOverlay: () => ({ starts: [], bases: [] }),
-      },
-      symmetry: MAP_EDITOR_SYMMETRY.NONE,
-      overlay: gridOverlay,
-      labels: [],
-      drawSite() {},
-      drawPaintPreview() {},
-    });
-    assert(gridOverlay.calls.some((call) => call[0] === "lineTo") &&
-      gridOverlay.calls.some((call) => call[0] === "lineStyle"),
-    "Map Editor grid lines execute native v8 strokes instead of leaving an unpainted path");
-  } finally {
-    restorePixi();
-  }
+  const recordViewport = {
+    session: {
+      draft: { terrain: Array(16) },
+      mapOverlay: () => ({ starts: [], bases: [] }),
+    },
+    symmetry: MAP_EDITOR_SYMMETRY.NONE,
+    overlayRevision: 0,
+    selectedBaseIndex: null,
+    siteRecord: MapEditorViewport.prototype.siteRecord,
+    paintPreviewRecord: () => null,
+  };
+  MapEditorViewport.prototype.drawOverlay.call(recordViewport);
+  assert.equal(recordViewport.pendingOverlay.revision, 1);
+  assert(Array.isArray(recordViewport.pendingOverlay.gridPaths),
+    "Map Editor grid lines cross as detached paths for the Pixi owner");
 }
 
 {
