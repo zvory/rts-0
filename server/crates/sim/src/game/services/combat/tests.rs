@@ -16,7 +16,6 @@ use crate::rules::combat as combat_rules;
 use rand::{rngs::SmallRng, SeedableRng};
 mod accuracy;
 mod anti_tank_acquisition;
-mod anti_tank_traverse;
 mod coax;
 mod entrenchment;
 mod fog_visibility;
@@ -1870,6 +1869,37 @@ fn deployed_anti_tank_gun_fires_at_long_range() {
 }
 
 #[test]
+fn anti_tank_gun_turns_slowly_before_firing() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Tank, 100.0, 20.0)
+        .expect("enemy tank should spawn");
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+    if let Some(at) = entities.get_mut(at_id) {
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+        at.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let at = entities.get(at_id).expect("at should exist");
+    assert!(
+        at.facing().abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "anti-tank gun should only slew by its turn-rate cap, got {:.4}",
+        at.facing()
+    );
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "anti-tank gun should not fire until its barrel is aligned"
+    );
+}
+
+#[test]
 fn mortar_turns_fast_before_auto_firing() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
@@ -2194,6 +2224,41 @@ fn mortar_autocast_requires_research_even_if_entity_flag_is_enabled() {
 }
 
 #[test]
+fn deployed_anti_tank_gun_clamps_to_field_edge_and_does_not_fire_outside_arc() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Tank, 100.0, 180.0)
+        .expect("enemy tank should spawn");
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+    if let Some(at) = entities.get_mut(at_id) {
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+
+    for _ in 0..20 {
+        run_combat_tick(&mut entities);
+    }
+
+    let at = entities.get(at_id).expect("at should exist");
+    let edge = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
+    assert!(
+        (at.facing() - edge).abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "anti-tank gun should clamp to the nearest arc edge, got {:.4}",
+        at.facing()
+    );
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "anti-tank gun should not fire outside its deployed field of fire"
+    );
+}
+
+#[test]
 fn support_weapon_redeploy_rotates_after_teardown_completes() {
     for (kind, setup_ticks, label) in [
         (
@@ -2249,24 +2314,19 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
 
         let unit = entities.get(id).expect("support weapon should exist");
         assert!(
-            unit.facing() > 0.0
-                && unit.facing()
-                    <= config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK + 0.001,
+            unit.facing() > 0.0 && unit.facing() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
             "{label} should start rotating only after it is packed, got {:.4}",
             unit.facing()
         );
 
-        let turn_ticks =
-            (target / config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK).ceil() as u32;
-        for _ in 0..turn_ticks.saturating_add(u32::from(setup_ticks)) {
+        for _ in 0..(setup_ticks as usize * 2) {
             run_combat_tick(&mut entities);
         }
 
         let unit = entities.get(id).expect("support weapon should exist");
         assert_eq!(unit.weapon_setup(), WeaponSetup::Deployed);
         assert!(
-            (unit.facing() - target).abs()
-                <= config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK + 0.001,
+            (unit.facing() - target).abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
             "{label} should finish redeploy facing the requested direction, got {:.4}",
             unit.facing()
         );
@@ -2297,16 +2357,13 @@ fn packed_anti_tank_gun_rotates_before_setup_animation_begins() {
         "anti-tank gun should stay packed until it has rotated into setup tolerance"
     );
     assert!(
-        (at.facing() - 0.035).abs() <= 0.001,
-        "packed anti-tank gun should retain its original 0.035 rad/tick turn rate, got {:.4}",
+        at.facing() > 0.0 && at.facing() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "anti-tank gun should begin rotating while still packed, got {:.4}",
         at.facing()
     );
 
-    let setup_alignment_ticks = ((target - ANTI_TANK_GUN_FIRE_TOLERANCE_RAD)
-        / config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK)
-        .ceil() as u32;
     let mut saw_setting_up = false;
-    for _ in 0..=setup_alignment_ticks {
+    for _ in 0..200 {
         run_combat_tick(&mut entities);
         let at = entities.get(at_id).expect("at should exist");
         if matches!(

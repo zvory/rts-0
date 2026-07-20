@@ -9,8 +9,8 @@ use crate::rules::combat as combat_rules;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::tank_effective_range_tiles;
 use super::{
-    ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, TANK_TURRET_FIRE_TOLERANCE_RAD,
-    TANK_TURRET_TURN_RATE_RAD_PER_TICK,
+    ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
+    TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
 const SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS: u16 = config::TICK_HZ as u16;
@@ -77,15 +77,8 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
     if !target_angle.is_finite() {
         return false;
     }
-    if matches!(e.weapon_setup(), WeaponSetup::Deployed)
-        && anti_tank_gun_target_inside_field_of_fire(e, target_angle)
-    {
-        // A deployed AT gun treats its current firing cone as a no-slew firing zone.
-        // It can fire anywhere inside that cone without tracking the target barrel-first.
-        return true;
-    }
-
-    e.set_desired_weapon_facing(target_angle);
+    let desired = deployed_anti_tank_gun_desired_facing(e, target_angle);
+    e.set_desired_weapon_facing(desired);
     let current = e
         .weapon_facing()
         .filter(|facing| facing.is_finite())
@@ -97,25 +90,15 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
                 0.0
             }
         });
-    let rotated = rotate_toward(
-        current,
-        target_angle,
-        config::ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK,
-    );
+    let rotated = rotate_toward(current, desired, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     } else {
         return false;
     }
-    if matches!(e.weapon_setup(), WeaponSetup::Deployed) {
-        // Outside the cone, traverse the whole firing field until the target enters it.
-        // Once it does, the next combat decision fires without further muzzle tracking.
-        e.set_emplacement_facing(Some(rotated));
-        return anti_tank_gun_target_inside_field_of_fire(e, target_angle);
-    }
-
-    angle_delta(rotated, target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
+    anti_tank_gun_target_inside_field_of_fire(e, target_angle)
+        && angle_delta(rotated, target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
 }
 
 pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
@@ -283,6 +266,22 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     profile
 }
 
+fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
+    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        return target_angle;
+    }
+    let Some(center) = anti_tank_gun_field_center(e) else {
+        return target_angle;
+    };
+    let half = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
+    let delta = angle_delta(center, target_angle);
+    if delta.abs() <= half {
+        target_angle
+    } else {
+        center + delta.signum() * half
+    }
+}
+
 pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
     if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return true;
@@ -291,12 +290,6 @@ pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle
         return true;
     };
     angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
-}
-
-/// Automatic retention only keeps an AT gun target when it is already inside the deployed field.
-/// Explicit attack orders are handled separately and intentionally keep their commanded target.
-pub(super) fn auto_retention_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
-    e.kind != EntityKind::AntiTankGun || anti_tank_gun_target_inside_field_of_fire(e, target_angle)
 }
 
 pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
@@ -367,7 +360,7 @@ fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
     let turn_rate = if e.kind == EntityKind::MortarTeam {
         crate::game::mortar::TURN_RATE_RAD_PER_TICK
     } else {
-        config::MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK
+        ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK
     };
     let rotated = rotate_toward(current, target, turn_rate);
     if rotated.is_finite() {

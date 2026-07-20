@@ -15,6 +15,7 @@ use crate::game::services::ability_orders::{
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::movement::angle_delta;
 use crate::game::services::order_execution::targeting::{
     stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
 };
@@ -565,6 +566,9 @@ fn attack_intent_valid(
     if unit.owner != owner || !unit.is_unit() || !unit.can_attack() {
         return false;
     }
+    if deployed_anti_tank_gun_target_outside_arc(entities, attacker, target) {
+        return false;
+    }
     world_query::unit_explicit_attack_target_valid(
         entities, teams, fog, smokes, owner, attacker, target,
     )
@@ -594,6 +598,35 @@ fn attack_order_complete(
         return false;
     }
     direct_panzerfaust_shot_spent(entities, attacker, target)
+}
+
+fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
+    let Some(attacker) = entities.get(id) else {
+        return false;
+    };
+    if attacker.kind != EntityKind::AntiTankGun
+        || !matches!(
+            attacker.weapon_setup(),
+            crate::game::entity::WeaponSetup::Deployed
+        )
+    {
+        return false;
+    }
+    let Some(center) = attacker
+        .emplacement_facing()
+        .or_else(|| attacker.weapon_facing())
+        .filter(|facing| facing.is_finite())
+    else {
+        return false;
+    };
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    let target_angle = (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x);
+    if !target_angle.is_finite() {
+        return true;
+    }
+    angle_delta(center, target_angle).abs() > config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
