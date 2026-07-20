@@ -176,7 +176,6 @@ export function buildCommandCardContextCatalog() {
       UPGRADE.METHAMPHETAMINES,
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
-      UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
     ],
     groupCooldownClocks: () => [],

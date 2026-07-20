@@ -373,7 +373,7 @@ fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
     if !e.path_is_empty()
         || !matches!(
             e.order(),
-            Order::Idle | Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_)
+            Order::Idle | Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire { .. }
         )
     {
         return;

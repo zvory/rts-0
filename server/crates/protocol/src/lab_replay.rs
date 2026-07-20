@@ -564,6 +564,19 @@ fn validate_command(
                 validate_finite_point(*x, *y, "command.useAbility")?;
             }
         }
+        Command::ArtilleryFire {
+            units,
+            x,
+            y,
+            radius_tiles,
+            ..
+        } => {
+            validate_unit_list(units, unit_cap, "command.units", state)?;
+            validate_finite_point(*x, *y, "command.artilleryFire")?;
+            if !radius_tiles.is_finite() || *radius_tiles < 0.0 || *radius_tiles > 64.0 {
+                return Err(invalid("command artilleryFire radiusTiles is out of range"));
+            }
+        }
         Command::RecastAbility { units, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
         }

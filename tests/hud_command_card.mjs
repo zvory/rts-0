@@ -69,14 +69,12 @@ function buttonSlots(card) {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
-  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
+  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 5), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
-    kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
@@ -84,9 +82,8 @@ function buttonSlots(card) {
   assert.equal(rAndDCard().slots[1].enabled, false);
   assert.equal(rAndDCard().slots[1].title, "Requires Medium Guns");
   assert.equal(rAndDCard().slots[1].label, "Heavy Guns");
-  assert.equal(rAndDCard().slots[2].title, "Requires Heavy Guns");
-  assert.equal(rAndDCard().slots[2].label, "Artillery Fire Control");
-  assert.equal(rAndDCard().slots[2].icon, "AFC");
+  assert.equal(rAndDCard().slots[2].label, "Tank Production");
+  assert(!rAndDCard().slots.some((slot) => slot?.upgrade === UPGRADE.BALLISTIC_TABLES));
 }
 
 {
@@ -95,8 +92,8 @@ function buttonSlots(card) {
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(card.slots[1].label, "Heavy Guns");
   assert.equal(card.slots[1].enabled, true);
-  assert.equal(card.slots[2].enabled, false);
-  assert.equal(card.slots[2].title, "Requires Heavy Guns");
+  assert.equal(card.slots[2].enabled, true);
+  assert.equal(card.slots[2].label, "Tank Production");
 }
 
 {
@@ -153,10 +150,9 @@ function buttonSlots(card) {
   const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
-  assert.equal(ids[3], null);
-  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.equal(ids[2], null);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
 }
 
 {
@@ -164,7 +160,7 @@ function buttonSlots(card) {
   const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
-  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(card.slots[2].enabled, true);
 }
 
@@ -381,24 +377,19 @@ function buttonSlots(card) {
     selection: [artillery],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
-    commandTarget: { kind: "ability", ability: ABILITY.BLANKET_FIRE },
+    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
   const pointFireCommandId = kriegsiaCommandId("ability", ABILITY.POINT_FIRE);
-  const blanketFireCommandId = kriegsiaCommandId("ability", ABILITY.BLANKET_FIRE);
   const pointFire = artilleryCard.slots.find((slot) => slot?.commandId === pointFireCommandId);
-  const blanketFire = artilleryCard.slots.find((slot) => slot?.commandId === blanketFireCommandId);
   assert.equal(pointFire.slotIndex, 7);
   assert.equal(pointFire.hotkey, "X");
-  assert.equal(pointFire.label, "Point Fire");
-  assert.equal(blanketFire.slotIndex, 8);
-  assert.equal(blanketFire.hotkey, "C");
-  assert.equal(blanketFire.label, "Blanket Fire");
-  assert.equal(blanketFire.intent.ability, ABILITY.BLANKET_FIRE);
-  assert(!pointFire.cls.includes("active"), "Point Fire does not share Blanket Fire active state");
-  assert(blanketFire.cls.includes("active"), "Blanket Fire has its own active targeting state");
-  assert.deepEqual(duplicateCommandIdsForCard(artilleryCard), [], "artillery fire buttons keep distinct command ids");
+  assert.equal(pointFire.label, "Fire");
+  assert.equal(pointFire.intent.ability, ABILITY.POINT_FIRE);
+  assert(pointFire.cls.includes("active"), "unified Artillery Fire reflects active targeting state");
+  assert(!artilleryCard.slots.some((slot) => slot?.ability === ABILITY.BLANKET_FIRE));
+  assert.deepEqual(duplicateCommandIdsForCard(artilleryCard), [], "unified Artillery Fire keeps a unique command id");
 }
 
 {
@@ -501,7 +492,7 @@ function buttonSlots(card) {
   ], "mixed ability collisions keep their preferred slots and favor non-artillery abilities");
   assert(!combinedCard.slots.some((slot) =>
     slot?.ability === ABILITY.POINT_FIRE || slot?.ability === ABILITY.BLANKET_FIRE
-  ), "Point Fire and Blanket Fire yield their colliding slots in a full Kriegsia selection");
+  ), "unified Artillery Fire yields its colliding slot in a full Kriegsia selection");
 }
 
 {

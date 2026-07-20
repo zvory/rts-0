@@ -1,6 +1,8 @@
 import {
+  ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
 } from "../config.js";
 import { ABILITY, KIND, ORDER_STAGE, SETUP } from "../protocol.js";
@@ -8,6 +10,17 @@ import { DEFAULT_TILE_SIZE } from "./constants.js";
 
 export function isArtilleryFireAbility(ability) {
   return ability === ABILITY.POINT_FIRE || ability === ABILITY.BLANKET_FIRE;
+}
+
+export function artilleryFireRadiusTiles(center, target, tileSize = DEFAULT_TILE_SIZE) {
+  const ts = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : DEFAULT_TILE_SIZE;
+  if (!center || !target) return ARTILLERY_MIN_FIRE_RADIUS_TILES;
+  const radius = Math.hypot(target.x - center.x, target.y - center.y) / ts;
+  if (!Number.isFinite(radius)) return ARTILLERY_MIN_FIRE_RADIUS_TILES;
+  return Math.max(
+    ARTILLERY_MIN_FIRE_RADIUS_TILES,
+    Math.min(ARTILLERY_BLANKET_RADIUS_TILES, radius),
+  );
 }
 
 export function buildArtilleryTargetLocks({

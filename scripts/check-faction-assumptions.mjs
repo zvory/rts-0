@@ -279,6 +279,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/projection.rs",
   "server/crates/sim/src/game/services/combat/weapons.rs",
   "server/crates/sim/src/game/services/commands.rs",
+  // Command helper extraction preserves existing support-weapon setup timing and staged-state
+  // cleanup special cases moved out of commands.rs; it does not expand faction admission.
+  "server/crates/sim/src/game/services/commands/command_helpers.rs",
   // Command-budget guard extraction keeps the existing Command Car cap special case.
   "server/crates/sim/src/game/services/commands/guards.rs",
   // Command planner fact extraction keeps existing current-catalog capability facts split out of commands.rs.

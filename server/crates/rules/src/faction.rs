@@ -35,7 +35,6 @@ impl UpgradeKind {
         Self::Entrenchment,
         Self::AntiTankGunUnlock,
         Self::ArtilleryUnlock,
-        Self::BallisticTables,
         Self::TankUnlock,
         Self::MortarAutocast,
         Self::SmokePlus,
@@ -276,7 +275,7 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 8] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -295,10 +294,6 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::ArtilleryUnlock,
-        researched_at: EntityKind::ResearchComplex,
-    },
-    UpgradeCatalogEntry {
-        kind: UpgradeKind::BallisticTables,
         researched_at: EntityKind::ResearchComplex,
     },
     UpgradeCatalogEntry {
@@ -384,10 +379,10 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::PointFire,
-        label: "Point Fire",
-        icon: "PF",
+        label: "Fire",
+        icon: "FIR",
         hotkey: Some("X"),
-        title: "Target artillery fire",
+        title: "Click a target, then click again to set the fire radius",
         carriers: ARTILLERY_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
@@ -420,7 +415,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
-        command_card: true,
+        command_card: false,
         protocol_code: 10,
         order_stage_code: 17,
     },
@@ -857,14 +852,17 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus] =
+    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, tank_unlock, mortar_autocast, smoke_plus] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
         UpgradeKind::Panzerfausts => panzerfausts,
         UpgradeKind::Entrenchment => entrenchment,
         UpgradeKind::AntiTankGunUnlock => anti_tank_gun_unlock,
-        UpgradeKind::BallisticTables => ballistic_tables,
+        UpgradeKind::BallisticTables => UpgradeCatalogEntry {
+            kind: UpgradeKind::BallisticTables,
+            researched_at: EntityKind::ResearchComplex,
+        },
         UpgradeKind::TankUnlock => tank_unlock,
         UpgradeKind::MortarAutocast => mortar_autocast,
         UpgradeKind::SmokePlus => smoke_plus,
@@ -923,7 +921,7 @@ mod tests {
         assert!(catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(UpgradeKind::AntiTankGunUnlock, research_complex));
-        assert!(catalog.allows_research(UpgradeKind::BallisticTables, research_complex));
+        assert!(!catalog.allows_research(UpgradeKind::BallisticTables, research_complex));
         assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, research_complex));
         assert!(catalog.allows_research(UpgradeKind::TankUnlock, research_complex));
         assert!(catalog.allows_research(UpgradeKind::MortarAutocast, research_complex));
@@ -1033,7 +1031,7 @@ mod tests {
             blanket_fire.cooldown_ticks,
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
-        assert!(blanket_fire.command_card);
+        assert!(!blanket_fire.command_card);
         assert_eq!(blanket_fire.protocol_code, 10);
         assert_eq!(blanket_fire.order_stage_code, 17);
 

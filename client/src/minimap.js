@@ -29,6 +29,7 @@ import {
   isProducerBuilding,
 } from "./config.js";
 import {
+  artilleryFireRadiusTiles,
   buildArtilleryTargetLocks,
   isArtilleryFireAbility,
 } from "./input/artillery_targeting.js";
@@ -1145,7 +1146,7 @@ export class Minimap {
   }
 
   _issuePrimaryTarget(world, ev) {
-    this._issueOrder(world.x, world.y, !!ev.shiftKey);
+    if (this._issueOrder(world.x, world.y, !!ev.shiftKey) === false) return true;
     const issued = typeof this._intent()?.issueCommandTarget === "function"
       ? this._intent().issueCommandTarget(ev)
       : { keepArmed: false };
@@ -1388,8 +1389,10 @@ export class Minimap {
       const selectedCarriers = sel
         .filter((e) => abilityUnits.includes(e.id))
         .map((e) => plannedEntityForIntent(this._intent(), e));
-      const artilleryLocks = isArtilleryFireAbility(ability)
-        ? buildArtilleryTargetLocks({
+      const intent = this._intent();
+      const firstFireClick = ability === ABILITY.POINT_FIRE && !intent?.artilleryFireCenter;
+      if (firstFireClick) {
+        const locks = buildArtilleryTargetLocks({
           ability,
           carriers: selectedCarriers,
           rawX: wx,
@@ -1398,11 +1401,40 @@ export class Minimap {
           tileSize: this.state.map?.tileSize,
           definition,
           queued,
+        });
+        if (locks.length > 0) intent?.beginArtilleryFireRadiusSelection?.(wx, wy);
+        return false;
+      }
+      const fireCenter = ability === ABILITY.POINT_FIRE ? intent?.artilleryFireCenter : null;
+      const fireRadiusTiles = fireCenter
+        ? artilleryFireRadiusTiles(fireCenter, { x: wx, y: wy }, this.state.map?.tileSize)
+        : null;
+      const resolvedAbility = fireCenter ? ABILITY.BLANKET_FIRE : ability;
+      const target = fireCenter || { x: wx, y: wy };
+      const artilleryLocks = isArtilleryFireAbility(resolvedAbility)
+        ? buildArtilleryTargetLocks({
+          ability: resolvedAbility,
+          carriers: selectedCarriers,
+          rawX: target.x,
+          rawY: target.y,
+          map: this.state.map,
+          tileSize: this.state.map?.tileSize,
+          definition,
+          queued,
         })
         : [];
-      const radiusTiles = abilityTargetRadiusTiles(definition, ability, this.state, this.controlPolicy);
-      this.commandInteraction.issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
-      if (isArtilleryFireAbility(ability)) {
+      const radiusTiles = fireRadiusTiles ?? abilityTargetRadiusTiles(
+        definition,
+        ability,
+        this.state,
+        this.controlPolicy,
+      );
+      const command = fireCenter
+        ? cmd.blanketFire(abilityUnits, target.x, target.y, fireRadiusTiles, queued)
+        : cmd.useAbility(resolvedAbility, abilityUnits, target.x, target.y, queued);
+      this.commandInteraction.issueCommand(command);
+      if (fireCenter) intent.artilleryFireCenter = null;
+      if (isArtilleryFireAbility(resolvedAbility)) {
         for (const lock of artilleryLocks) {
           this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
         }

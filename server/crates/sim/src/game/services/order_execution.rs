@@ -102,6 +102,7 @@ pub(crate) fn start_artillery_fire_command_order(
     unit: u32,
     target: ArtilleryPointFireTarget,
     mode: ArtilleryFireMode,
+    radius_tiles: f32,
 ) -> bool {
     entities.release_miner(unit);
     let Some(e) = entities.get_mut(unit) else {
@@ -112,7 +113,7 @@ pub(crate) fn start_artillery_fire_command_order(
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
-    start_artillery_fire_from_target(e, target, mode)
+    start_artillery_fire_from_target(e, target, mode, radius_tiles)
 }
 
 pub(crate) fn start_artillery_fire_promoted_order(
@@ -120,19 +121,21 @@ pub(crate) fn start_artillery_fire_promoted_order(
     unit: u32,
     target: ArtilleryPointFireTarget,
     mode: ArtilleryFireMode,
+    radius_tiles: f32,
 ) -> bool {
     let Some(e) = entities.get_mut(unit) else {
         return false;
     };
     e.clear_active_order();
     e.set_path_goal(None);
-    start_artillery_fire_from_target(e, target, mode)
+    start_artillery_fire_from_target(e, target, mode, radius_tiles)
 }
 
 fn start_artillery_fire_from_target(
     e: &mut Entity,
     target: ArtilleryPointFireTarget,
     mode: ArtilleryFireMode,
+    radius_tiles: f32,
 ) -> bool {
     match e.weapon_setup() {
         WeaponSetup::Deployed if target.inside_field_of_fire => {
@@ -161,9 +164,12 @@ fn start_artillery_fire_from_target(
             e.replace_active_order(Order::artillery_point_fire(target.x, target.y));
         }
         ArtilleryFireMode::Blanket => {
-            e.reset_artillery_accuracy();
             e.reset_artillery_blanket_sequence();
-            e.replace_active_order(Order::artillery_blanket_fire(target.x, target.y));
+            e.replace_active_order(Order::artillery_blanket_fire(
+                target.x,
+                target.y,
+                radius_tiles,
+            ));
         }
     }
     true

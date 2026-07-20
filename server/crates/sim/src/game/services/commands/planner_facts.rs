@@ -79,12 +79,12 @@ pub(super) fn planner_facts(
             facts.queue_len = e.queued_orders().len();
             facts.queue_terminal = matches!(
                 e.order(),
-                Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire(_)
+                Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire { .. }
             ) || e.queued_orders().iter().any(|intent| {
                 matches!(
                     intent,
                     OrderIntent::PointFire(_)
-                        | OrderIntent::BlanketFire(_)
+                        | OrderIntent::BlanketFire { .. }
                         | OrderIntent::HoldPosition
                 ) || (e.kind == EntityKind::MortarTeam
                     && matches!(intent, OrderIntent::SetupAntiTankGuns(_)))
