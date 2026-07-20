@@ -51,6 +51,9 @@ function git(repoRoot, args) { return run("git", args, { cwd: repoRoot }); }
 export function renderDiscordMessage(decision) {
   return decision.changes
     .map((item) => item.replace(/^[-*•]\s+/, ""))
+    .map((item) => item.length > MAX_CHANGE_CHARS
+      ? `${item.slice(0, MAX_CHANGE_CHARS - 1).trimEnd()}…`
+      : item)
     .map((item) => `• ${item}`)
     .join("\n");
 }
@@ -91,9 +94,11 @@ export function resolveDiscordWebhookUrl(repoRoot, env = process.env) {
 
 function postDiscordMessage(webhookUrl, message) {
   run("curl", [
+    "--connect-timeout", "10", "--max-time", "30",
     "--fail-with-body", "--silent", "--show-error", "--output", "/dev/null",
     "--header", "Content-Type: application/json",
     "--data-binary", renderDiscordPayload(message),
+    "--proto", "=https", "--",
     webhookUrl,
   ]);
 }
@@ -103,7 +108,9 @@ export function sendDiscordPatchNote({ branch, decision, env = process.env, post
   if (!webhookUrl) return { status: "not-configured" };
   const message = renderDiscordMessage(decision);
   if (!message) return { status: "empty" };
-  const digest = crypto.createHash("sha256").update(message).digest("hex");
+  // A new destination must receive the current note even when another webhook already did.
+  // Hashing the URL keeps the secret out of the state file.
+  const digest = crypto.createHash("sha256").update(webhookUrl).update("\0").update(message).digest("hex");
   const stateDir = path.join(gitCommonDir(repoRoot), "rts-patch-notes-discord");
   const statePath = path.join(stateDir, `${branchSlug(branch)}.sha256`);
   if (fs.existsSync(statePath) && fs.readFileSync(statePath, "utf8").trim() === digest) {
@@ -134,14 +141,11 @@ export function isGameplayCandidate(pathname) {
 export function normalizeDecision(raw) {
   if (!raw || !["no_patch_note", "write_patch_note"].includes(raw.decision)) throw new Error("patch-note pass returned an invalid decision");
   const singleLine = (value) => String(value || "").replace(/\s+/g, " ").trim();
-  const strings = (value, max, maxChars = Infinity) => Array.isArray(value)
-    ? value.map(singleLine).filter(Boolean).map((item) => item.slice(0, maxChars).trim()).slice(0, max)
-    : [];
+  const strings = (value, max) => Array.isArray(value) ? value.map(singleLine).filter(Boolean).slice(0, max) : [];
   const decision = {
     decision: raw.decision,
     title: singleLine(raw.title),
-    // Eight prefixed bullets of this size remain below Discord's 2,000-character content limit.
-    changes: strings(raw.changes, 8, MAX_CHANGE_CHARS),
+    changes: strings(raw.changes, 8),
     playtestWatch: strings(raw.playtest_watch, 4),
     reason: singleLine(raw.reason),
   };

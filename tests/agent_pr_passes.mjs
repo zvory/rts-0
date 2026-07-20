@@ -84,8 +84,15 @@ const maximumDiscordDecision = normalizeDecision({
   playtest_watch: [],
   reason: "Exercise the Discord content limit.",
 });
-assert.equal(maximumDiscordDecision.changes.every((item) => item.length === 230), true);
+assert.equal(maximumDiscordDecision.changes.every((item) => item.length === 300), true);
 assert(renderDiscordMessage(maximumDiscordDecision).length <= 2000, "Discord patch notes must fit one message");
+assert.equal(renderDiscordMessage(maximumDiscordDecision).includes("…"), true);
+assert.equal(
+  renderFragment({ branch: "zvorygin/bounded", date: "2026-07-20", decision: maximumDiscordDecision })
+    .includes("x".repeat(300)),
+  true,
+  "Discord limits must not truncate the canonical patch-note fragment",
+);
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });
@@ -120,6 +127,12 @@ try {
   assert.deepEqual(delivered, ["• Deployed anti-tank-gun range increased from 20 to 40 tiles."]);
   assert.equal(sendDiscordPatchNote(deliveryOptions).status, "unchanged");
   assert.equal(delivered.length, 1, "unchanged patch notes should not be sent twice");
+  const movedDelivery = {
+    ...deliveryOptions,
+    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/another-hook" },
+  };
+  assert.equal(sendDiscordPatchNote(movedDelivery).status, "sent");
+  assert.equal(delivered.length, 2, "a new Discord destination should receive the current patch note");
 
   fs.writeFileSync(config, JSON.stringify({ version: 2, passes: [] }));
   assert.throws(() => loadPasses(config), /version 1/);
