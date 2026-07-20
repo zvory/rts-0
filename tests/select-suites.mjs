@@ -156,12 +156,17 @@ function isQualityPassWorkflowPath(pathname) {
   return (
     pathname === "scripts/adversarial-quality-pass.mjs" ||
     pathname === "scripts/adversarial-quality-pass.schema.json" ||
+    pathname === "scripts/agent-pr-passes.mjs" ||
+    pathname === "scripts/agent-pr-passes.json" ||
+    pathname === "scripts/patch-note-pass.mjs" ||
+    pathname === "scripts/patch-note-pass.schema.json" ||
     pathname === "scripts/agent-pr.sh" ||
     pathname === "scripts/archive-completed-plans.mjs" ||
     pathname === "scripts/plan-phase-status.mjs" ||
     pathname === "scripts/format-touched-rust.sh" ||
     pathname === "tests/archive_completed_plans.mjs" ||
     pathname === "tests/adversarial_quality_pass.mjs" ||
+    pathname === "tests/agent_pr_passes.mjs" ||
     pathname === "tests/run-all.sh"
   );
 }
@@ -543,6 +548,10 @@ function verify() {
     [["scripts/phase-runner-result.schema.json"], ["agent-workflow-phase-runner"]],
     [["scripts/adversarial-quality-pass.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/adversarial-quality-pass.schema.json"], ["agent-workflow-quality-pass"]],
+    [["scripts/agent-pr-passes.mjs"], ["agent-workflow-quality-pass"]],
+    [["scripts/agent-pr-passes.json"], ["agent-workflow-quality-pass"]],
+    [["scripts/patch-note-pass.mjs"], ["agent-workflow-quality-pass"]],
+    [["scripts/patch-note-pass.schema.json"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
     [["scripts/archive-completed-plans.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/plan-phase-status.mjs"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],

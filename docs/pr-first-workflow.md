@@ -8,6 +8,11 @@ The normal agent lifecycle is:
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
    Before the quality pass, the helper archives any plan newly completed by the branch and commits
    that move, so the archive lands in the final phase PR rather than as a post-merge local change.
+   It then runs the ordered specialist passes in `scripts/agent-pr-passes.json`. The patch-note pass
+   uses a bounded branch diff and creates or refreshes one dated, branch-keyed fragment only for a
+   player-facing gameplay change. Each configured pass can select its own Codex model through its
+   `modelEnv` setting. The final adversarial pass runs after all specialist edits and verifies any
+   generated patch note against the final diff.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
    `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
    `adversarial-quality-pass` status with a docs-only skip description, and writes the skip report
