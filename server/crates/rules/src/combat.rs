@@ -432,8 +432,8 @@ pub fn default_weapon_target_fit(
     }
 }
 
-/// Miss probability [0.0, 1.0) for an attack. Anti-Tank Gun shells have a 50% miss rate against
-/// infantry-sized targets, while Tank cannon shells have a 90% miss rate against humanoid infantry.
+/// Miss probability [0.0, 1.0) for an attack. Anti-Tank Gun shells have a 90% miss rate against
+/// infantry-sized targets, while Tank cannon shells have a 50% miss rate against humanoid infantry.
 /// A miss flies straight through without finding anyone; hits that connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
     default_weapon_profile(attacker_kind)
@@ -443,8 +443,8 @@ pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
 
 pub fn miss_chance_for_weapon(profile: &WeaponProfile, victim_kind: EntityKind) -> f32 {
     match profile.miss_policy {
-        MissPolicy::AntiTankGunVsInfantrySized if anti_tank_gun_miss_target(victim_kind) => 0.50,
-        MissPolicy::TankCannonVsInfantry if tank_cannon_miss_target(victim_kind) => 0.90,
+        MissPolicy::AntiTankGunVsInfantrySized if anti_tank_gun_miss_target(victim_kind) => 0.90,
+        MissPolicy::TankCannonVsInfantry if tank_cannon_miss_target(victim_kind) => 0.50,
         _ => 0.0,
     }
 }
@@ -994,11 +994,11 @@ mod tests {
         );
         assert_eq!(
             miss_chance_for_weapon(anti_tank_gun, EntityKind::Rifleman),
-            0.50
+            0.90
         );
         assert_eq!(
             miss_chance_for_weapon(tank_cannon, EntityKind::Rifleman),
-            0.90
+            0.50
         );
     }
 
@@ -1317,7 +1317,7 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_misses_infantry_sized_targets_half_the_time() {
+    fn anti_tank_gun_misses_infantry_sized_targets_nine_times_out_of_ten() {
         for victim in [
             EntityKind::Worker,
             EntityKind::Golem,
@@ -1325,7 +1325,7 @@ mod tests {
             EntityKind::Panzerfaust,
             EntityKind::MachineGunner,
         ] {
-            assert_eq!(miss_chance(EntityKind::AntiTankGun, victim), 0.50);
+            assert_eq!(miss_chance(EntityKind::AntiTankGun, victim), 0.90);
         }
 
         for victim in [
@@ -1338,14 +1338,14 @@ mod tests {
     }
 
     #[test]
-    fn tank_cannon_misses_humanoid_infantry_nine_times_out_of_ten() {
+    fn tank_cannon_misses_humanoid_infantry_half_the_time() {
         for victim in [
             EntityKind::Worker,
             EntityKind::Rifleman,
             EntityKind::Panzerfaust,
             EntityKind::MachineGunner,
         ] {
-            assert_eq!(miss_chance(EntityKind::Tank, victim), 0.90);
+            assert_eq!(miss_chance(EntityKind::Tank, victim), 0.50);
         }
 
         for victim in [
