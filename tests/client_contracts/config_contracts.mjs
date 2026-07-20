@@ -1145,7 +1145,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       buildProgress: null,
     };
     factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedResearchComplex];
-    factoryHud._cardSig = null;
     renderCommandCard(factoryHud);
     const stillLockedTankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
     const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
