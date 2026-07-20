@@ -187,6 +187,10 @@ function copyWorkflowScripts(targetRepo) {
   fs.mkdirSync(targetTests, { recursive: true });
   for (const script of [
     "agent-pr.sh",
+    "agent-pr-passes.mjs",
+    "agent-pr-passes.json",
+    "patch-note-pass.mjs",
+    "patch-note-pass.schema.json",
     "archive-completed-plans.mjs",
     "plan-phase-status.mjs",
     "adversarial-quality-pass.mjs",
@@ -197,6 +201,8 @@ function copyWorkflowScripts(targetRepo) {
   }
   fs.copyFileSync(path.join(repoRoot, "tests", "select-suites.mjs"), path.join(targetTests, "select-suites.mjs"));
   fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
+  fs.chmodSync(path.join(targetScripts, "agent-pr-passes.mjs"), 0o755);
+  fs.chmodSync(path.join(targetScripts, "patch-note-pass.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "archive-completed-plans.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "format-touched-rust.sh"), 0o755);
@@ -342,6 +348,8 @@ done
   assert.match(body, /<!-- rts-agent-pr:v1 -->/);
   assert.match(body, /^Focused-Verification: workflow fixture$/m);
   assert.match(body, /## Adversarial quality pass/);
+  assert.match(body, /## Agent PR passes/);
+  assert.match(body, /Decision: no_patch_note/);
   assert.match(body, /Verdict: improved/);
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);

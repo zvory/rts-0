@@ -235,8 +235,14 @@ canary runs own a private server; the browser shard passes its existing loopback
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
   names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`
   arguments.
-- Adversarial quality pass / agent PR workflow: run `node tests/adversarial_quality_pass.mjs` when
-  changing `scripts/adversarial-quality-pass.mjs`, its schema, or agent PR quality-pass wiring.
+- Agent PR passes / adversarial quality workflow: run `node tests/agent_pr_passes.mjs` and
+  `node tests/adversarial_quality_pass.mjs` when changing `scripts/agent-pr-passes.mjs`, its
+  configured passes, `scripts/adversarial-quality-pass.mjs`, their schemas, or agent PR wiring.
+  `scripts/agent-pr.sh` runs manifest-ordered specialist passes before the final adversarial review.
+  Each pass may select its own model through the manifest's `modelEnv`; the patch-note pass uses
+  `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
+  branches without gameplay-authoritative paths, and qualifying branches receive one fragment at
+  `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review.
   Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
   Codex quality-pass coverage should verify access to linked worktree git common directories while
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
@@ -410,7 +416,10 @@ The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` b
 
 `scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. A
 supplied `--head` value must match the current branch before the docs-only skip can push or post
-status. When the branch diff against `origin/main` contains only `.md` files, including Markdown
+status. Before that final classification, it runs the ordered entries in
+`scripts/agent-pr-passes.json`; mutating passes must commit their work and leave the same branch
+clean so the adversarial review covers their final output. Pass reports are preserved in the PR
+body. When the resulting branch diff against `origin/main` contains only `.md` files, including Markdown
 files outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts
 a successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
 Any non-Markdown changed file keeps the normal adversarial quality pass requirement.

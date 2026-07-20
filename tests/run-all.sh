@@ -666,6 +666,8 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/phase_runner_agents.mjs"
     run_suite_bg "Agent workflow: quality pass helper" \
       node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
+    run_suite_bg "Agent workflow: configurable PR passes" \
+      node "$SCRIPT_DIR/agent_pr_passes.mjs"
     run_suite_bg "Agent workflow: completed plan archival" \
       node "$SCRIPT_DIR/archive_completed_plans.mjs"
     run_suite_bg "Agent workflow: post-merge main refresh" \

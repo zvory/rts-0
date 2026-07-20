@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "title", "changes", "playtest_watch", "reason"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["no_patch_note", "write_patch_note"]
+    },
+    "title": { "type": "string" },
+    "changes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 8
+    },
+    "playtest_watch": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 4
+    },
+    "reason": { "type": "string" }
+  }
+}

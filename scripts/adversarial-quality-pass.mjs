@@ -147,10 +147,12 @@ Focus on:
 1. Correctness bugs.
 2. Architectural issues where the implementer made the locally easiest change instead of the change
    that leaves the overall system simplest.
-3. Anything else important enough to improve before merge.
+3. Accuracy and completeness of any player-facing patch-note fragment relative to the final diff.
+4. Anything else important enough to improve before merge.
 
-Ignore missing documentation updates, contract-documentation updates, release notes, and patch-note
-paperwork unless the omission directly creates a correctness or architecture problem.
+Ignore missing documentation updates and contract-documentation updates unless the omission directly
+creates a correctness or architecture problem. The earlier agent PR passes own patch-note creation;
+when a patch-note fragment exists, correct it if your changes or the existing diff make it inaccurate.
 
 You may rewrite the branch. Prefer the simplest resulting system, not the smallest diff. If a better
 path is clear and you can complete it coherently, take it. If the ideal rewrite is too large to finish

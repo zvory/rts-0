@@ -130,7 +130,9 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
 - Never use the in-app browser skill.
 - Balance or gameplay changes: collect factual patch-note bullets covering changed stats, economy,
-  combat behavior, UI affordances, and what should be watched in playtests.
+  combat behavior, UI affordances, and what should be watched in playtests. The configured
+  `agent-pr.sh` patch-note pass is the final backstop and records qualifying changes under
+  `patch-notes/YYYY-MM-DD/<branch-slug>.md` before adversarial review.
 - New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
   implementation. Until the user explicitly authorizes implementation, edit only planning,
   checklist, and design documents.

@@ -35,9 +35,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/agent-pr.sh [options]
 
-Archives any plan newly completed by this branch, runs the adversarial quality
-pass, opens or updates the PR for the current agent branch, writes predictable
-ownership metadata into the body, applies agent labels, and arms auto-merge.
+Archives any plan newly completed by this branch, runs the configured specialist
+passes followed by the adversarial quality pass, opens or updates the PR for the
+current agent branch, writes predictable ownership metadata into the body,
+applies agent labels, and arms auto-merge.
 
 Options:
   --base BRANCH              Base branch, default: main.
@@ -120,10 +121,11 @@ fi
 
 quality_report_json="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.json)"
 quality_report_md="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.md)"
+passes_report_md="$(mktemp -t rts-agent-pr-passes.XXXXXX.md)"
 tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
 
 cleanup() {
-  rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"
+  rm -f "$quality_report_json" "$quality_report_md" "$passes_report_md" "$tmp_body"
   if [ -n "$STABLE_COPY_PATH" ]; then
     rm -f "$STABLE_COPY_PATH"
   fi
@@ -218,6 +220,19 @@ archive_completed_plans() {
   node scripts/archive-completed-plans.mjs --base "origin/$BASE_BRANCH" --commit
 }
 
+run_configured_passes() {
+  local args=(
+    --base "origin/$BASE_BRANCH"
+    --head-branch "$HEAD_BRANCH"
+    --markdown-report-file "$passes_report_md"
+    --repo "$repo_root"
+  )
+  if [ "$DRY_RUN" = "1" ]; then
+    args+=(--dry-run)
+  fi
+  node scripts/agent-pr-passes.mjs "${args[@]}"
+}
+
 run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
     if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 && is_docs_only_change; then
@@ -262,6 +277,7 @@ run_quality_pass() {
 }
 
 archive_completed_plans
+run_configured_passes
 run_quality_pass
 
 needs_human="false"
@@ -286,6 +302,11 @@ EOF
 
   if [ -s "$quality_report_md" ]; then
     cat "$quality_report_md"
+    printf '\n'
+  fi
+
+  if [ -s "$passes_report_md" ]; then
+    cat "$passes_report_md"
     printf '\n'
   fi
 
