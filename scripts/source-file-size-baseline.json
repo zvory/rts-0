@@ -4,6 +4,11 @@
   "reason": "Initial frozen exceptions for files already above the 1500-line source/test cap when the repo-wide size gate was added.",
   "exceptions": [
     {
+      "path": "client/src/minimap.js",
+      "lines": 1530,
+      "reason": "Artillery radius selection now shares the minimap's authoritative pointer lifecycle and command dispatch so click-drag-release and two-click targeting stay consistent; keep ratcheting until minimap input handling is extracted."
+    },
+    {
       "path": "client/styles.css",
       "lines": 5746,
       "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
@@ -35,8 +40,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1954,
-      "reason": "FormationMove admission now preserves its validated per-unit destinations for either move or attack-move orders; point sanitization, queue handling, and authoritative dispatch stay together until command families are extracted."
+      "lines": 1970,
+      "reason": "Artillery Fire admission and execution now apply the research-dependent minimum radius beside the existing authoritative command validation; keep ratcheting until artillery command handling is extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
@@ -47,11 +52,6 @@
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
       "lines": 5124,
       "reason": "Existing oversized movement test module before repo-wide source-size gate."
-    },
-    {
-      "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1506,
-      "reason": "Ready-order and hold-position promotion tests were split from the existing oversized order adapter; keep ratcheting until queue validation is fully split."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
@@ -67,6 +67,11 @@
       "path": "server/src/structured_log.rs",
       "lines": 1538,
       "reason": "Frame-budget Phase 1 adds stable update, present, RAF-dispatch, unattributed-work, and 60 FPS budget diagnostics to the centralized structured-log classifier; keep ratcheting until net-report classification is extracted."
+    },
+    {
+      "path": "tests/minimap_input_contracts.mjs",
+      "lines": 1538,
+      "reason": "The minimap input contract suite now covers artillery click-drag-release, two-click, and cancellation behavior in its shared pointer fixture; keep ratcheting until artillery gesture contracts are split."
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
