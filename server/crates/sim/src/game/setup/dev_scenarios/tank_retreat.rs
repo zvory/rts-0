@@ -2,7 +2,7 @@ use super::*;
 use crate::game::entity::WeaponSetup;
 use crate::rules::combat::WeaponKind;
 
-const ISSUE_AFTER_TICKS: u32 = config::TICK_HZ * 20;
+const ISSUE_AFTER_TICKS: u32 = config::TICK_HZ * 10;
 const TANK_WEAPON_DELAY_TICKS: u32 = config::TICK_HZ * 120;
 const INSPECTION_TANK_HP: u32 = 2_000;
 
@@ -72,29 +72,30 @@ impl Game {
 
         let center = map.tile_center(center_tile.0, center_tile.1);
         let tile_size = config::TILE_SIZE as f32;
-        let tank_radius = tile_size * 4.5;
+        let tank_x = center.0 + tile_size * 4.0;
+        let vertical_gap = tile_size * 1.5;
+        let fan_angle = 10.0_f32.to_radians();
         let gun_offset = tile_size * 7.0;
+        let retreat_distance = tile_size * 12.0;
+        let convergence = (tank_x - vertical_gap / fan_angle.tan(), center.1);
         let mut entities = EntityStore::new();
         let mut tanks = Vec::with_capacity(3);
         let mut goals = Vec::with_capacity(3);
 
-        for facing in [
-            0.0,
-            std::f32::consts::TAU / 3.0,
-            -std::f32::consts::TAU / 3.0,
+        for (y_offset, facing) in [
+            (-vertical_gap, -fan_angle),
+            (0.0, 0.0),
+            (vertical_gap, fan_angle),
         ] {
-            let outward = (facing.cos(), facing.sin());
-            let tank_pos = (
-                center.0 + outward.0 * tank_radius,
-                center.1 + outward.1 * tank_radius,
-            );
+            let forward = (facing.cos(), facing.sin());
+            let tank_pos = (tank_x, center.1 + y_offset);
             let gun_pos = (
-                tank_pos.0 + outward.0 * gun_offset,
-                tank_pos.1 + outward.1 * gun_offset,
+                tank_pos.0 + forward.0 * gun_offset,
+                tank_pos.1 + forward.1 * gun_offset,
             );
             let goal = (
-                center.0 - outward.0 * tank_radius,
-                center.1 - outward.1 * tank_radius,
+                tank_pos.0 - forward.0 * retreat_distance,
+                tank_pos.1 - forward.1 * retreat_distance,
             );
             let tank = spawn_inspection_tank(&mut entities, tank_pos, facing)?;
             spawn_front_at_gun(
@@ -120,7 +121,7 @@ impl Game {
             game,
             player_id: 1,
             units: tanks,
-            goal: center,
+            goal: convergence,
             issue_after_ticks: ISSUE_AFTER_TICKS,
             order: DevScenarioOrder::IndividualMoves(goals),
         }
@@ -154,8 +155,7 @@ fn spawn_inspection_tank(
         // These scenarios run under sustained live AT fire. Extra scenario-only health keeps the
         // subject alive long enough to inspect the retreat and traffic behavior without changing
         // damage, armor-facing, targeting, or reaction-lock rules.
-        entity.hp = INSPECTION_TANK_HP;
-        entity.max_hp = INSPECTION_TANK_HP;
+        entity.set_spawn_health(INSPECTION_TANK_HP);
         entity.set_facing(facing);
         entity.set_weapon_facing(facing);
         for weapon in WeaponKind::ALL {
@@ -214,12 +214,12 @@ mod tests {
         assert!((gun.pos_y - tank.pos_y).abs() <= 0.001);
         assert!(setup.goal.0 < tank.pos_x - config::TILE_SIZE as f32 * 3.0);
         assert!((setup.goal.1 - tank.pos_y).abs() <= 0.001);
-        assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 20);
+        assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 10);
         assert_tanks_take_front_ap_damage_before_orders(setup);
     }
 
     #[test]
-    fn reverse_traffic_authors_three_individual_paths_through_the_shared_center() {
+    fn reverse_traffic_authors_a_ten_degree_fan_with_converging_paths() {
         let setup = Game::new_tank_reverse_traffic_scenario(EntityKind::Tank, 3, 0x5150_0721)
             .expect("reverse-traffic scenario should build");
         assert_eq!(setup.units.len(), 3);
@@ -233,6 +233,17 @@ mod tests {
                 .count(),
             3
         );
+
+        let mut facings = setup
+            .units
+            .iter()
+            .filter_map(|tank_id| setup.game.state.entities.get(*tank_id))
+            .map(|tank| tank.facing())
+            .collect::<Vec<_>>();
+        facings.sort_by(f32::total_cmp);
+        let expected_gap = 10.0_f32.to_radians();
+        assert!((facings[1] - facings[0] - expected_gap).abs() <= 0.001);
+        assert!((facings[2] - facings[1] - expected_gap).abs() <= 0.001);
 
         let commands = setup.commands();
         assert_eq!(commands.len(), 3);
@@ -250,6 +261,10 @@ mod tests {
             let to_goal = (x - tank.pos_x, y - tank.pos_y);
             let to_center = (setup.goal.0 - tank.pos_x, setup.goal.1 - tank.pos_y);
             assert!(to_goal.0 * to_center.0 + to_goal.1 * to_center.1 > 0.0);
+            assert!(
+                (to_goal.0 * to_center.1 - to_goal.1 * to_center.0).abs() <= 0.1,
+                "each authored reverse path should pass through the shared convergence point"
+            );
             assert!(
                 to_goal.0 * tank.facing().cos() + to_goal.1 * tank.facing().sin() < 0.0,
                 "each authored move should begin behind its Tank"

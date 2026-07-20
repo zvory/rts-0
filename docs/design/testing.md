@@ -178,12 +178,12 @@ Current scenario ids:
   reload permits fresh acquisition; after a fix, the same scene should stop at the initial boundary
   and wait there to fire.
 - `tank_under_fire_retreat` — one reinforced inspection Tank takes frontal fire from a deployed
-  Anti-Tank Gun, then after 20 seconds receives a long move order directly behind it. The baseline
+  Anti-Tank Gun, then after 10 seconds receives a long move order directly behind it. The baseline
   captures the current 180-degree pivot before retreat; future under-fire reverse behavior should
   back away immediately.
-- `tank_reverse_traffic` — three outward-facing Tanks take frontal fire from three deployed
-  Anti-Tank Guns, then after 20 seconds receive individual movement orders across the shared
-  center. Their future reverse trajectories intersect, providing a rearward traffic-control
+- `tank_reverse_traffic` — three Tanks form a shallow fan with adjacent headings 10 degrees apart,
+  take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive individual
+  movement orders whose reverse trajectories intersect. This provides a rearward traffic-control
   inspection scene. The scenario-only Tanks have extra health so sustained fire does not end the
   observation early.
 
