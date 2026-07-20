@@ -372,7 +372,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   cars, and command cars cannot advance while their owner has zero oil.
 - Scout Plane constants for the Command Car Scout Plane ability:
   `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 75`,
-  `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 15`,
+  `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 16`,
   `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.0`, `SCOUT_PLANE_SUPPLY = 0`,
   `SCOUT_PLANE_ORBIT_RADIUS_TILES = 2`, `SCOUT_PLANE_LIFETIME_TICKS = 600`,
   and `SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = 900`. It has no default weapon and a zero-radius
