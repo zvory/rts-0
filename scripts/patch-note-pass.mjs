@@ -50,14 +50,17 @@ export function branchSlug(branch) {
   return branch.replace(/^zvorygin\//, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "change";
 }
 
+const GAMEPLAY_PATH_PREFIXES = [
+  "server/crates/ai/src/",
+  "server/crates/rules/src/",
+  "server/crates/sim/src/",
+  "server/crates/protocol/src/",
+  "client/src/",
+];
+
 export function isGameplayCandidate(pathname) {
   if (pathname.startsWith("tests/") || pathname.startsWith("plans/") || pathname.startsWith("patch-notes/") || pathname.endsWith(".md")) return false;
-  return pathname.startsWith("server/crates/ai/src/") ||
-    pathname.startsWith("server/crates/rules/src/") ||
-    pathname.startsWith("server/crates/sim/src/") ||
-    pathname.startsWith("server/crates/protocol/src/") ||
-    pathname.startsWith("server/src/") ||
-    pathname.startsWith("client/src/") ||
+  return GAMEPLAY_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
     pathname === "client/index.html" ||
     (pathname.startsWith("client/") && pathname.endsWith(".css"));
 }
