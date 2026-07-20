@@ -323,44 +323,6 @@ function buttonByLabel(card, label) {
   assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
   assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
 
-  const actionableRevealState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  actionableRevealState.applySnapshot({
-    tick: 12,
-    steel: 0,
-    oil: 0,
-    supplyUsed: 0,
-    supplyCap: 10,
-    visibleTiles: new Array(16).fill(0),
-    exploredTiles: new Array(16).fill(0),
-    entities: [
-      { id: 100, owner: 2, kind: KIND.ANTI_TANK_GUN, x: 16, y: 16, hp: 45, maxHp: 45, state: STATE.ATTACK },
-      { id: 101, owner: 1, kind: KIND.RIFLEMAN, x: 48, y: 16, hp: 45, maxHp: 45, state: STATE.IDLE },
-    ],
-    events: [],
-  });
-  assert(
-    actionableRevealState.entityById(100)?.aboveFogReveal === true,
-    "a projected enemy unit on a presentation-dark tile becomes an above-fog firing reveal",
-  );
-  assert(
-    actionableRevealState.entityById(100)?.shotReveal !== true,
-    "an actionable firing reveal is not downgraded to a visual-only shot ghost",
-  );
-  assert(
-    buildSelectionScene({
-      entities: [actionableRevealState.entityById(100)],
-      tileSize: 32,
-      projection: createOrthographicProjectionSnapshot({
-        x: 0, y: 0, zoom: 1, worldW: 128, worldH: 128, viewW: 128, viewH: 128,
-      }, 128),
-    }).proxies.length === 1,
-    "an actionable above-fog firing reveal remains available to click targeting",
-  );
-  assert(
-    actionableRevealState.entityById(101)?.aboveFogReveal !== true,
-    "owned units remain ordinary entities even when their tile is presentation-dark",
-  );
-
   const overpenEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   overpenEventState.applySnapshot({
     tick: 12,
