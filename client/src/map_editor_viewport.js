@@ -1,6 +1,7 @@
 import { Camera } from "./camera.js";
 import { createMapEditorPresentation } from "./map_editor_presentation.js";
 import { createMapEditorTerrainPreview } from "./map_editor_terrain_preview.js";
+import { PRESENTATION_OUTCOME } from "./presentation/submission.js";
 import { TERRAIN } from "./protocol.js";
 import { MapEditorPixiPresentationAdapter } from "./renderer/map_editor_presentation_adapter.js";
 import {
@@ -93,6 +94,8 @@ export class MapEditorViewport {
     this.overlayRevision = 0;
     this.pendingTerrainUpdate = null;
     this.pendingOverlay = null;
+    this.presentationInFlight = null;
+    this.presentationStopped = false;
 
     this.onPointerDown = (event) => this.handlePointerDown(event);
     this.onPointerMove = (event) => this.handlePointerMove(event);
@@ -315,7 +318,7 @@ export class MapEditorViewport {
         this.pendingTerrainUpdate = {
           kind: "patch",
           revision: this.terrainRevision,
-          changes: priorChanges.concat(changes),
+          changes: coalesceTerrainChanges(priorChanges, changes),
         };
       }
     }
@@ -385,20 +388,76 @@ export class MapEditorViewport {
   }
 
   tick(at) {
-    if (this.destroyed) return;
+    if (this.destroyed || this.presentationStopped) return;
     const dt = Math.min(0.1, Math.max(0, (at - this.lastFrameAt) / 1000));
     this.lastFrameAt = at;
     this.camera.update(dt, { keys: this.keys, mouse: null });
-    this.presentationFrameId += 1;
-    this.presentation.present(createMapEditorPresentation({
-      frameId: this.presentationFrameId,
-      camera: { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom },
-      terrainUpdate: this.pendingTerrainUpdate,
-      overlay: this.pendingOverlay,
-    }));
-    this.pendingTerrainUpdate = null;
-    this.pendingOverlay = null;
+    this.submitPresentation();
     this.frame = requestAnimationFrame((next) => this.tick(next));
+  }
+
+  submitPresentation() {
+    if (this.destroyed || this.presentationStopped || this.presentationInFlight) return;
+    this.presentationFrameId += 1;
+    const terrainRevision = this.pendingTerrainUpdate?.revision ?? 0;
+    const overlayRevision = this.pendingOverlay?.revision ?? 0;
+    const token = Object.freeze({
+      frameId: this.presentationFrameId,
+      terrainRevision,
+      overlayRevision,
+    });
+    this.presentationInFlight = token;
+    let settlement;
+    try {
+      settlement = this.presentation.present(createMapEditorPresentation({
+        frameId: token.frameId,
+        camera: { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom },
+        terrainUpdate: this.pendingTerrainUpdate,
+        overlay: this.pendingOverlay,
+      }));
+    } catch (error) {
+      this.settlePresentation(token, { status: PRESENTATION_OUTCOME.FAILED, error });
+      return;
+    }
+    Promise.resolve(settlement).then(
+      (outcome) => this.settlePresentation(token, outcome),
+      (error) => this.settlePresentation(token, { status: PRESENTATION_OUTCOME.FAILED, error }),
+    );
+  }
+
+  settlePresentation(token, outcome) {
+    if (this.presentationInFlight !== token) return;
+    this.presentationInFlight = null;
+    if (this.destroyed) return;
+    if (outcome?.status === PRESENTATION_OUTCOME.PRESENTED) {
+      if (token.terrainRevision > 0 && this.pendingTerrainUpdate?.revision === token.terrainRevision) {
+        this.pendingTerrainUpdate = null;
+      }
+      if (token.overlayRevision > 0 && this.pendingOverlay?.revision === token.overlayRevision) {
+        this.pendingOverlay = null;
+      }
+      return;
+    }
+    if (outcome?.status === PRESENTATION_OUTCOME.SUPERSEDED) {
+      this.stopPresentation("Map renderer discarded a serialized editor frame.");
+      return;
+    }
+    if (outcome?.status === PRESENTATION_OUTCOME.FAILED) {
+      this.stopPresentation(`Map renderer stopped: ${presentationOutcomeMessage(outcome)}`);
+      return;
+    }
+    if (outcome?.status === PRESENTATION_OUTCOME.DESTROYED) {
+      this.stopPresentation("Map renderer stopped unexpectedly.");
+      return;
+    }
+    this.stopPresentation("Map renderer returned an invalid presentation result.");
+  }
+
+  stopPresentation(message) {
+    if (this.presentationStopped || this.destroyed) return;
+    this.presentationStopped = true;
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+    this.onStatus(message, true);
   }
 
   resize() {
@@ -411,6 +470,7 @@ export class MapEditorViewport {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.presentationStopped = true;
     cancelAnimationFrame(this.frame);
     this.unsubscribe?.();
     const canvas = this.presentation.canvas;
@@ -425,6 +485,19 @@ export class MapEditorViewport {
     window.removeEventListener("resize", this.onResize);
     this.presentation.destroy();
   }
+}
+
+function coalesceTerrainChanges(previous, changes) {
+  const byTile = new Map();
+  for (const change of previous.concat(changes)) {
+    if (!Number.isInteger(change?.x) || !Number.isInteger(change?.y)) continue;
+    byTile.set(`${change.x},${change.y}`, change);
+  }
+  return [...byTile.values()];
+}
+
+function presentationOutcomeMessage(outcome) {
+  return outcome?.error?.message || outcome?.error?.name || "unknown worker failure";
 }
 
 function lineTiles(from, to) {

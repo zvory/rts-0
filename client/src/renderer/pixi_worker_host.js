@@ -111,10 +111,22 @@ export class PixiWorkerPresentationAdapter {
 
   presentEditor(record) {
     if (this.surface !== "mapEditor") throw new Error("Editor records require the Map Editor worker surface.");
-    if (this._destroyed || this._fatal) return Promise.resolve({ status: "destroyed", frameId: record?.frameId || 0 });
+    const identity = { generation: this._generation, frameId: record?.frameId };
+    if (this._destroyed) {
+      return Promise.resolve(outcomeRecord(PRESENTATION_OUTCOME.DESTROYED, identity));
+    }
+    if (this._fatal) {
+      return Promise.resolve(outcomeRecord(PRESENTATION_OUTCOME.FAILED, identity, {
+        error: { name: this._fatal.name || "Error", message: this._fatal.message || String(this._fatal) },
+      }));
+    }
     const job = createEditorJob(record, this._generation);
     this._schedule(job);
     return job.settled.promise;
+  }
+
+  terminalFailure() {
+    return this._fatal;
   }
 
   resize(widthCssPx, heightCssPx) {
@@ -323,7 +335,7 @@ export class PixiWorkerPresentationAdapter {
       const packets = job.editor
         ? [createEditorFrameMessage(job.editor, job.generation)]
         : this._framePackets(job.frame);
-      const submittedAtMs = epochNow();
+      const submittedAtMs = job.enqueuedAtMs;
       for (const packet of packets) {
         if (packet.message.type === RENDER_WORKER_MESSAGE.FRAME) {
           packet.message.payload.submittedAtMs = submittedAtMs;
@@ -338,7 +350,6 @@ export class PixiWorkerPresentationAdapter {
       }
       const mainSubmitMs = performance.now() - startedAt;
       pushTiming(this._stats.mainSubmitMs, mainSubmitMs);
-      job.submittedAtMs = submittedAtMs;
       this._inFlight = job;
       this._stats.dispatched += 1;
       this._publishStats();
@@ -446,8 +457,8 @@ export class PixiWorkerPresentationAdapter {
     pushTiming(this._stats.workerUpdateMs, message.payload.workerUpdateMs);
     pushTiming(this._stats.workerPresentMs, message.payload.workerPresentMs);
     pushTiming(this._stats.queueAgeMs, message.payload.queueAgeMs);
-    const displayAgeMs = Number.isFinite(job.submittedAtMs)
-      ? Math.max(0, epochNow() - job.submittedAtMs)
+    const displayAgeMs = Number.isFinite(job.enqueuedAtMs)
+      ? Math.max(0, epochNow() - job.enqueuedAtMs)
       : message.payload.displayAgeMs;
     pushTiming(this._stats.displayAgeMs, displayAgeMs);
     if (message.payload.workerUpdateMs + message.payload.workerPresentMs > 16.67) this._stats.longFrames += 1;
@@ -605,6 +616,7 @@ function createJob(frame) {
     frameId: frame.frameId,
     frame,
     editor: null,
+    enqueuedAtMs: epochNow(),
     retained,
     settled,
     terminalSettled: false,
@@ -627,6 +639,7 @@ function createEditorJob(record, generation) {
     frameId: record.frameId,
     frame: null,
     editor: record,
+    enqueuedAtMs: epochNow(),
     retained,
     settled,
     terminalSettled: false,

@@ -269,6 +269,8 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   let decalReconciliations = 0;
   let decalAcknowledgements = 0;
   let outcomeStatus = PRESENTATION_OUTCOME.FAILED;
+  let terminalRendererFailure = false;
+  let stopCalls = 0;
   const integrationMap = { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] };
   const match = {
     running: true,
@@ -330,6 +332,7 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
     clientIntent: null,
     renderClock: { now: () => 700 },
     renderer: {
+      terminalFailure() { return terminalRendererFailure ? new Error("terminal worker failure") : null; },
       render(frame) {
         rendererCalls += 1;
         assert(fogUpdated, "backend runs only after fog and final frame assembly");
@@ -347,6 +350,7 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
       },
     },
     observerDiagnostics: null,
+    stop() { stopCalls += 1; this.running = false; },
   };
   await runMatchCaptureFrame(match, 700);
   assert(rendererCalls === 1, "one backend call occurs for one capture frame");
@@ -370,6 +374,11 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   const fixed = await renderFixedCaptureFrame(match, 724);
   assert(fixed.rendererFrame === match.presentationFrame.frameId && fixed.rendererFrame !== 999,
     "fixed capture awaits and returns the public acknowledged frame id instead of a renderer-private counter");
+  terminalRendererFailure = true;
+  outcomeStatus = PRESENTATION_OUTCOME.FAILED;
+  await runMatchCaptureFrame(match, 732);
+  assert(stopCalls === 1 && match.running === false,
+    "a terminal worker failure stops the match loop instead of assembling failed frames forever");
 }
 
 function fakeProjection() {

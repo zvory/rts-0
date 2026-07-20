@@ -229,10 +229,16 @@ function presentationCoordinatorFor(match) {
     publishSelectionScene: (scene) => match.input?.publishSelectionScene?.(scene),
     acknowledgeGroundDecals: (revision) => match.state?.acknowledgeReconciledGroundDecals?.(revision),
     recordCounter: (label, amount) => match.frameProfiler?.recordDiagnosticCounter?.(label, amount),
-    recordFailure: (error) => recordFrameError(
-      match.frameErrors || (match.frameErrors = createFrameErrorState()),
-      new Error(error?.message || "Renderer failed a presentation frame."),
-    ),
+    recordFailure: (error) => {
+      recordFrameError(
+        match.frameErrors || (match.frameErrors = createFrameErrorState()),
+        new Error(error?.message || "Renderer failed a presentation frame."),
+      );
+      if (match.renderer?.terminalFailure?.()) {
+        if (typeof match.stop === "function") match.stop();
+        else match.running = false;
+      }
+    },
     recordProtocolError: (message) => recordFrameError(
       match.frameErrors || (match.frameErrors = createFrameErrorState()),
       new Error(`Renderer protocol error: ${message}`),

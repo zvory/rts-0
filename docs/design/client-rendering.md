@@ -26,7 +26,8 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 
 Rendering work does not change the Rust server, protocol, simulation, fog authority, replay format,
 or command coordinates. A Pixi worker failure is a visible bounded fatal presentation error for
-that match: it settles pending work and tears down without selecting another renderer.
+that match: it settles pending work, stops that match's animation-frame loop, and tears down without
+selecting another renderer.
 
 ## 2. Semantic camera and projection
 
@@ -251,6 +252,17 @@ ordered before the next frame; reset and idempotent destroy discard every pendin
 decal, capture, and resize record. Live, replay, spectator, Lab, stress, fixed capture, and Map
 Editor all use this same worker host. There is no Pixi flag, synchronous canvas, hidden renderer,
 WebGPU probe, or fallback renderer.
+
+Worker display age starts when the host accepts the frame, before host-pending time, message
+construction, cloning, and dispatch. Queue age uses that same boundary through worker task start;
+main-submit timing separately isolates message construction, cloning, and `postMessage` cost.
+
+The Map Editor keeps its camera/input animation-frame loop responsive but applies backpressure only
+to worker submission, with no more than one editor presentation in flight. Terrain patches coalesce
+by tile and complete overlays remain pending until the worker acknowledges the exact revision as
+presented; edits made while that presentation is in flight merge into the next submission. This
+lets ordinary match frames remain latest-oriented without treating authoring changes as disposable
+presentation data. A failed editor worker stops new submissions and reports one visible error.
 
 ## 5. Babylon foundation contracts
 

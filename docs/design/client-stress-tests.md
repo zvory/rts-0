@@ -36,6 +36,9 @@ identity; Long Tasks and Long Animation Frames
 when supported; and a JS trace/flame graph when supported. The result UI reports the p95 frame-work
 tier and the approximate work reduction or headroom against 16.67 ms. This is a relative
 frame-work indicator, not a claim that the display actually presented at 120 or 240 Hz.
+Worker display age covers the complete interval from host acceptance through acknowledgment,
+including bounded host-pending time, message construction/cloning, dispatch, worker update, and
+presentation. Queue age uses the same acceptance boundary through worker task start.
 
 Warmup and measurement require an uninterrupted visible, focused tab. If either condition changes,
 the current attempt and its browser profile are discarded without uploading; the runner waits for

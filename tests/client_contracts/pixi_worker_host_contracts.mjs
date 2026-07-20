@@ -116,7 +116,66 @@ async function generationAndFatalContracts() {
   assert(worker.terminated === 1, "destroy after fatal remains idempotent");
 }
 
-function createFixture() {
+async function editorFatalContracts() {
+  const fixture = createFixture({ surface: "mapEditor" });
+  const { adapter } = fixture;
+  const record = (frameId) => ({
+    version: 1,
+    generation: 1,
+    frameId,
+    camera: { x: 0, y: 0, zoom: 1 },
+    terrainUpdate: null,
+    overlay: null,
+  });
+  const pending = adapter.presentEditor(record(1));
+  const priorConsoleError = console.error;
+  try {
+    console.error = () => {};
+    adapter._failFatal(new Error("planned editor worker failure"));
+  } finally {
+    console.error = priorConsoleError;
+  }
+  assert((await pending).status === PRESENTATION_OUTCOME.FAILED,
+    "an in-flight editor frame reports fatal worker failure instead of teardown");
+  const afterFatal = await adapter.presentEditor(record(2));
+  assert(afterFatal.status === PRESENTATION_OUTCOME.FAILED
+      && afterFatal.error?.message === "planned editor worker failure",
+    "later editor submissions preserve the fatal error and do not masquerade as destroyed");
+  assert(adapter.terminalFailure()?.message === "planned editor worker failure",
+    "the match owner can distinguish a terminal renderer failure from a bounded frame failure");
+  adapter.destroy();
+}
+
+async function measurementBoundaryContracts() {
+  const savedPerformance = globalThis.performance;
+  let now = 5;
+  globalThis.performance = { timeOrigin: 1000, now: () => now };
+  try {
+    const fixture = createFixture();
+    const { adapter, worker, assembler } = fixture;
+    const frame1 = assemble(assembler, 1);
+    const frame2 = assemble(assembler, 2);
+    const first = adapter.render(frame1);
+    now = 15;
+    const second = adapter.render(frame2);
+    now = 65;
+    worker.present(frame1);
+    await first.settled;
+    const dispatchedSecond = worker.frameMessages().at(-1);
+    assert(dispatchedSecond.payload.submittedAtMs === 1015,
+      "a pending frame keeps its host-acceptance timestamp through later packet construction and dispatch");
+    now = 75;
+    worker.present(frame2);
+    await second.settled;
+    assert(adapter.diagnostics().displayAgeMs.p95 >= 60,
+      "display age includes host-pending and main-thread packet work instead of starting after cloning");
+    adapter.destroy();
+  } finally {
+    globalThis.performance = savedPerformance;
+  }
+}
+
+function createFixture({ surface = "match" } = {}) {
   const map = { width: 2, height: 2, tileSize: 32, terrain: [0, 1, 2, 3], resources: [] };
   const assembler = new PresentationFrameAssembler({ map });
   const worker = new FakeWorker();
@@ -145,7 +204,7 @@ function createFixture() {
   const adapter = new PixiWorkerPresentationAdapter(root, canvas, worker, {
     state: () => ({ resources: {}, _curById: new Map(), _prevById: new Map() }),
     staticMap: () => assembler.staticMap,
-  });
+  }, { surface });
   return { adapter, worker, canvas, root, assembler, map };
 }
 
@@ -202,6 +261,8 @@ function restoreGlobal(name, value) {
 try {
   await queueAndLifecycleContracts();
   await generationAndFatalContracts();
+  await editorFatalContracts();
+  await measurementBoundaryContracts();
 } finally {
   restoreGlobal("document", priorDocument);
   restoreGlobal("requestAnimationFrame", priorRaf);
