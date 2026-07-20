@@ -266,6 +266,16 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     profile
 }
 
+pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        return true;
+    }
+    let Some(center) = anti_tank_gun_field_center(e) else {
+        return true;
+    };
+    angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
+}
+
 fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
     if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return target_angle;
@@ -280,16 +290,6 @@ fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
     } else {
         center + delta.signum() * half
     }
-}
-
-pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
-    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
-        return true;
-    }
-    let Some(center) = anti_tank_gun_field_center(e) else {
-        return true;
-    };
-    angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
