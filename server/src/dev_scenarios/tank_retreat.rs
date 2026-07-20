@@ -27,6 +27,6 @@ pub(super) const TANK_UNDER_FIRE_RETREAT_SPEC: DevScenarioSpec = DevScenarioSpec
 pub(super) const TANK_REVERSE_TRAFFIC_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "tank_reverse_traffic",
     title: "Tank Reverse Traffic",
-    description: "Three reinforced Tanks form a shallow fan with adjacent headings 10 degrees apart, take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive simultaneous converging moves behind them. An enemy Scout Car spotter keeps the retreat visible so reverse traffic control plays out under sustained fire.",
+    description: "Three reinforced Tanks form a shallow fan with adjacent headings 10 degrees apart, take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive one grouped move order behind them. The normal formation planner assigns their destinations while an enemy Scout Car spotter keeps the retreat visible under sustained fire.",
     launches: &REVERSE_TRAFFIC_LAUNCHES,
 };

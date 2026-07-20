@@ -12,6 +12,8 @@ _2026-07-20_
 - Repeated qualifying hits keep the three-second facing preference active without redirecting it
   to a different attacker during the same under-fire window.
 - Reversing Tank traffic now senses and yields along its actual travel direction.
+- The reverse-traffic inspection scenario now issues one grouped move order, letting the normal
+  formation planner assign the Tanks' destinations as it would for a player-issued group command.
 - Unit stats, economy, weapon damage, armor multipliers, and player controls are unchanged.
 
 ## Playtest watch

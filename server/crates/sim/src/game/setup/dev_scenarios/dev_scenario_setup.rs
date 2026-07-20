@@ -13,7 +13,6 @@ pub struct DevScenarioSetup {
 pub(super) enum DevScenarioOrder {
     Move,
     AttackMove,
-    IndividualMoves(Vec<(u32, (f32, f32))>),
 }
 
 impl DevScenarioSetup {
@@ -41,15 +40,6 @@ impl DevScenarioSetup {
                 y: self.goal.1,
                 queued: false,
             }],
-            DevScenarioOrder::IndividualMoves(goals) => goals
-                .iter()
-                .map(|&(unit, (x, y))| SimCommand::Move {
-                    units: vec![unit],
-                    x,
-                    y,
-                    queued: false,
-                })
-                .collect(),
         }
     }
 

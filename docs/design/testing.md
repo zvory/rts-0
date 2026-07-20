@@ -182,11 +182,12 @@ Current scenario ids:
   captures the current 180-degree pivot before retreat; future under-fire reverse behavior should
   back away immediately.
 - `tank_reverse_traffic` — three Tanks form a shallow fan with adjacent headings 10 degrees apart,
-  take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive individual
-  movement orders whose reverse trajectories intersect. A team-2 Scout Car spotter left of the gun
-  line keeps the full merge visible to the guns without joining the fight. This provides a rearward
-  traffic-control inspection scene under sustained fire. The scenario-only Tanks have extra health
-  so sustained fire does not end the observation early.
+  take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive one grouped
+  movement order behind them. The normal formation planner assigns their destinations instead of
+  the scenario supplying hand-authored crossing destinations. A team-2 Scout Car spotter left of
+  the gun line keeps the retreat visible to the guns without joining the fight. This provides a
+  rearward traffic-control inspection scene under sustained fire. The scenario-only Tanks have
+  extra health so sustained fire does not end the observation early.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

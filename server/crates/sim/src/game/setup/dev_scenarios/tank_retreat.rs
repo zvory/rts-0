@@ -76,7 +76,6 @@ impl Game {
         let vertical_gap = tile_size * 1.5;
         let fan_angle = 10.0_f32.to_radians();
         let gun_offset = tile_size * 7.0;
-        let retreat_distance = tile_size * 12.0;
         let convergence = (tank_x - vertical_gap / fan_angle.tan(), center.1);
         let mut entities = EntityStore::new();
         spawn_enemy_scout_spotter(
@@ -84,7 +83,6 @@ impl Game {
             (center.0 + tile_size * 2.0, center.1 - tile_size * 6.0),
         )?;
         let mut tanks = Vec::with_capacity(3);
-        let mut goals = Vec::with_capacity(3);
 
         for (y_offset, facing) in [
             (-vertical_gap, -fan_angle),
@@ -97,10 +95,6 @@ impl Game {
                 tank_pos.0 + forward.0 * gun_offset,
                 tank_pos.1 + forward.1 * gun_offset,
             );
-            let goal = (
-                tank_pos.0 - forward.0 * retreat_distance,
-                tank_pos.1 - forward.1 * retreat_distance,
-            );
             let tank = spawn_inspection_tank(&mut entities, tank_pos, facing)?;
             spawn_front_at_gun(
                 &mut entities,
@@ -108,7 +102,6 @@ impl Game {
                 normalize_dev_angle(facing + std::f32::consts::PI),
             )?;
             tanks.push(tank);
-            goals.push((tank, goal));
         }
 
         let game = build_dev_scenario_game_with_teams(
@@ -127,7 +120,7 @@ impl Game {
             units: tanks,
             goal: convergence,
             issue_after_ticks: ISSUE_AFTER_TICKS,
-            order: DevScenarioOrder::IndividualMoves(goals),
+            order: DevScenarioOrder::Move,
         }
         .checkpoint_backed("dev:tank_reverse_traffic")
     }
@@ -237,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn reverse_traffic_authors_a_ten_degree_fan_with_converging_paths() {
+    fn reverse_traffic_authors_a_ten_degree_fan_and_one_grouped_retreat() {
         let setup = Game::new_tank_reverse_traffic_scenario(EntityKind::Tank, 3, 0x5150_0721)
             .expect("reverse-traffic scenario should build");
         assert_eq!(setup.units.len(), 3);
@@ -283,43 +276,45 @@ mod tests {
         assert!((facings[2] - facings[1] - expected_gap).abs() <= 0.001);
 
         let commands = setup.commands();
-        assert_eq!(commands.len(), 3);
-        for command in commands {
-            let SimCommand::Move { units, x, y, .. } = command else {
-                panic!("reverse-traffic scenario should author only Move commands");
-            };
-            assert_eq!(units.len(), 1);
+        assert_eq!(commands.len(), 1);
+        let SimCommand::Move {
+            units,
+            x,
+            y,
+            queued,
+        } = &commands[0]
+        else {
+            panic!("reverse-traffic scenario should author one grouped Move command");
+        };
+        assert_eq!(units, &setup.units);
+        assert_eq!((*x, *y), setup.goal);
+        assert!(!*queued);
+        for tank_id in units {
             let tank = setup
                 .game
                 .state
                 .entities
-                .get(units[0])
+                .get(*tank_id)
                 .expect("commanded Tank should exist");
-            let to_goal = (x - tank.pos_x, y - tank.pos_y);
-            let to_center = (setup.goal.0 - tank.pos_x, setup.goal.1 - tank.pos_y);
-            assert!(to_goal.0 * to_center.0 + to_goal.1 * to_center.1 > 0.0);
-            assert!(
-                (to_goal.0 * to_center.1 - to_goal.1 * to_center.0).abs() <= 0.1,
-                "each authored reverse path should pass through the shared convergence point"
-            );
+            let to_goal = (*x - tank.pos_x, *y - tank.pos_y);
             assert!(
                 to_goal.0 * tank.facing().cos() + to_goal.1 * tank.facing().sin() < 0.0,
-                "each authored move should begin behind its Tank"
-            );
-            let sight = config::unit_stats(EntityKind::ScoutCar)
-                .expect("Scout Car stats should exist")
-                .sight_tiles as f32
-                * config::TILE_SIZE as f32;
-            assert!(
-                (x - spotter.pos_x).hypot(y - spotter.pos_y) <= sight,
-                "the spotter should see each complete retreat lane"
+                "the grouped move destination should begin behind every Tank"
             );
         }
+        let sight = config::unit_stats(EntityKind::ScoutCar)
+            .expect("Scout Car stats should exist")
+            .sight_tiles as f32
+            * config::TILE_SIZE as f32;
+        assert!(
+            (*x - spotter.pos_x).hypot(*y - spotter.pos_y) <= sight,
+            "the spotter should see the grouped retreat destination"
+        );
         assert_tanks_take_front_ap_damage_before_orders(setup);
     }
 
     #[test]
-    fn reverse_traffic_remains_under_fire_through_the_merge() {
+    fn reverse_traffic_remains_under_fire_after_the_grouped_order() {
         let mut setup = Game::new_tank_reverse_traffic_scenario(EntityKind::Tank, 3, 0x5150_0722)
             .expect("reverse-traffic scenario should build");
         for _ in 0..setup.issue_after_ticks {
