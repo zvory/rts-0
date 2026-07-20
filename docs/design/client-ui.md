@@ -533,9 +533,12 @@ the frame; the same projection drives `SelectionSceneV1`. Match then makes exact
 `renderer.render(presentationFrame)` call. `PixiPresentationAdapter` reconstructs only its
 ratcheted frame-local compatibility facade, copies static/fog grids into Pixi-owned staging, and
 times that work as `renderer.update`, then times exactly one actual `app.render()` as
-`renderer.present`. The outer `match.renderer` phase includes both nested phases. A frame is counted
-and its selection/decal state is published only after the present succeeds. Babylon follows the
-same update/present attribution with one `scene.render()`. Neither backend owns an animation loop.
+`renderer.present`. The outer `match.renderer` phase includes both nested phases. The Match-owned
+`PresentationCoordinator` keeps pending selection/decal metadata keyed by generation and frame id.
+The adapter reports durable decal retention independently, and only an asynchronous matching
+`presented` outcome advances the displayed counter or publishes selection; failed/superseded frames
+preserve the prior scene. Babylon follows the same update/present attribution with one
+`scene.render()`. Neither backend owns an animation loop.
 The sidecar contains no mutable state/intent,
 selection proxy, mutable typed array, Pixi object, or transport record. Static terrain/resource
 locations are separately revisioned; visible/explored grids reuse opaque snapshots by revision.
@@ -1251,11 +1254,16 @@ export class Renderer {
 export const PIXI_LEGACY_READ_ALLOWLIST // frozen ids plus concrete review triggers
 export class PixiPresentationAdapter {
   constructor(canvasParent, {renderClock,state,profiler,visualProfile,staticMap})
-  render(presentationFrame) -> {presented:boolean}
+  render(presentationFrame) -> PresentationSubmissionV1
   resize(w,h), enterFixedCapture(clock), exitFixedCapture(clock)
   captureReadiness(query), destroy()
 }
 ```
+`PresentationSubmissionV1` carries the submitted generation/frame id, an asynchronous nullable
+`retained` outcome for the exact ground-decal revision, and an asynchronous terminal outcome from
+`presented | superseded | failed | destroyed`. Fixed capture awaits `presented` for its requested id
+and returns that public acknowledged id; it never reads a renderer-private counter.
+
 Normal Match rendering uses this adapter. The direct `Renderer` surface remains Pixi-private and
 is also owned separately by Map Editor, which has no Match or simulation frame. Pixi applications
 use `autoStart:false`. Fixed capture drives the ordinary adapter once per requested capture frame

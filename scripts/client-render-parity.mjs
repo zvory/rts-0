@@ -464,7 +464,7 @@ async function resetCaptureFromBeginning(page) {
 }
 
 async function renderCaptureFrame(page, targetFrame, options, { deliver = true, capturePng = false } = {}) {
-  return page.evaluate(({ target, visualTimeMs, shouldDeliver, shouldCapturePng }) => {
+  return page.evaluate(async ({ target, visualTimeMs, shouldDeliver, shouldCapturePng }) => {
     const app = window.__rts;
     const net = app.net;
     const match = app.match;
@@ -475,7 +475,7 @@ async function renderCaptureFrame(page, targetFrame, options, { deliver = true, 
         window.__rtsParityNextFrame = index + 1;
       }
     }
-    match.renderFixedCaptureFrame(visualTimeMs);
+    await match.renderFixedCaptureFrame(visualTimeMs);
     const entities = match.state.entitiesInterpolated(1, { includePrediction: false });
     const readiness = match.renderer.captureReadiness({
       subjectIds: entities.map((entity) => entity.id),

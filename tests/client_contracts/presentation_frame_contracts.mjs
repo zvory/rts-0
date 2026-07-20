@@ -2,12 +2,14 @@
 
 import { assert } from "./assertions.mjs";
 import { runMatchCaptureFrame } from "../../client/src/frame_recovery.js";
+import { renderFixedCaptureFrame } from "../../client/src/match_fixed_capture.js";
 import {
   PresentationFrameAssembler,
   detachedRecord,
 } from "../../client/src/presentation/frame.js";
 import { createGridSnapshot } from "../../client/src/presentation/grid_snapshot.js";
 import { prepareEntitySnapshots } from "../../client/src/presentation/entity_snapshot.js";
+import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../../client/src/presentation/submission.js";
 import {
   PRESENTATION_LAYER_DESCRIPTORS,
   PRESENTATION_LAYER_IDS,
@@ -173,6 +175,7 @@ assert(frame.layers.fogGatedWorld[0].relationship === "own", "viewer relationshi
 assert(frame.layers.fogGatedWorld[0].teamColor === "#123456", "team color is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].anchors.hp.heightPx === 10, "presentation anchors use semantic mirrored size");
 assert(frame.layers.fogGatedWorld[0].extractorActive === false, "extractor status crosses the presentation boundary");
+assert(frame.groundDecalRevision === 0, "detached frames carry an explicit zero revision when no durable batch id was supplied");
 assert(!("secretAuthoritativeVariant" in frame.layers.fogGatedWorld[0]), "unadmitted entity fields do not cross the boundary");
 assert(!JSON.stringify(frame).includes("hidden-sentinel"), "authoritative variants never enter the renderer frame");
 assert(!JSON.stringify(frame).includes("hidden-fog-source"), "fog-source variants never enter the renderer frame");
@@ -250,7 +253,7 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   let entityReads = 0;
   let decalReconciliations = 0;
   let decalAcknowledgements = 0;
-  let presented = false;
+  let outcomeStatus = PRESENTATION_OUTCOME.FAILED;
   const integrationMap = { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] };
   const match = {
     running: true,
@@ -281,9 +284,12 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
       trenches: [],
       reconcilePendingGroundDecals() {
         decalReconciliations += 1;
-        return decalAcknowledgements === 0 ? [{ id: 12, kind: "rifleman", x: 10, y: 10 }] : [];
+        return decalAcknowledgements === 0
+          ? { revision: 1, decals: [{ id: 12, kind: "rifleman", x: 10, y: 10 }] }
+          : { revision: 0, decals: [] };
       },
-      acknowledgeReconciledGroundDecals() {
+      acknowledgeReconciledGroundDecals(revision) {
+        assert(revision === 1, "frame integration acknowledges the exact retained decal revision");
         decalAcknowledgements += 1;
       },
       tick: 9,
@@ -313,13 +319,21 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
         rendererCalls += 1;
         assert(fogUpdated, "backend runs only after fog and final frame assembly");
         assert(frame.visible.get(0) === 1, "backend receives the post-fog presentation frame");
+        assert(frame.groundDecalRevision === (decalAcknowledgements === 0 ? 1 : 0), "backend receives the exact reconciled durable revision");
         assert(frame.layers.persistentGroundMark.length === (decalAcknowledgements === 0 ? 1 : 0), "decal reconciliation runs before final assembly");
-        return { presented };
+        if (outcomeStatus == null) return {};
+        return immediatePresentationSubmission({
+          generation: frame.generation,
+          frameId: frame.frameId,
+          retainedRevision: outcomeStatus === PRESENTATION_OUTCOME.PRESENTED ? frame.groundDecalRevision : 0,
+          status: outcomeStatus,
+          error: outcomeStatus === PRESENTATION_OUTCOME.FAILED ? new Error("planned frame failure") : null,
+        });
       },
     },
     observerDiagnostics: null,
   };
-  runMatchCaptureFrame(match, 700);
+  await runMatchCaptureFrame(match, 700);
   assert(rendererCalls === 1, "one backend call occurs for one capture frame");
   assert(projectionReads === 1, "one projection snapshot is shared by frame and SelectionScene");
   assert(entityReads === 2, "alpha-1 capture builds predicted and authoritative views without backend re-query");
@@ -327,15 +341,20 @@ assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source
   assert(decalAcknowledgements === 0, "a failed backend frame retains its reconciled decal batch for retry");
   assert(match.presentationFrame.diagnosticsContext.assemblyOrdinal === 1, "one presentation assembly occurs for the frame");
   assert(published === null, "a failed backend frame does not publish a new selection scene");
-  presented = undefined;
-  runMatchCaptureFrame(match, 708);
+  outcomeStatus = null;
+  await runMatchCaptureFrame(match, 708);
   assert(decalAcknowledgements === 0, "a malformed backend result cannot acknowledge the reconciled decal batch");
   assert(published === null, "a malformed backend result cannot publish a new selection scene");
-  presented = true;
-  runMatchCaptureFrame(match, 716);
+  outcomeStatus = PRESENTATION_OUTCOME.PRESENTED;
+  await runMatchCaptureFrame(match, 716);
   assert(decalReconciliations === 3, "later frames keep reconciling the retained decal batch until presentation succeeds");
   assert(decalAcknowledgements === 1, "a successful backend frame acknowledges its reconciled decal batch");
   assert(published?.frameId === match.presentationFrame.frameId, "published selection scene matches the presented frame id");
+  match.captureClock = { advanceTo() {} };
+  match.renderer._renderFrameCount = 999;
+  const fixed = await renderFixedCaptureFrame(match, 724);
+  assert(fixed.rendererFrame === match.presentationFrame.frameId && fixed.rendererFrame !== 999,
+    "fixed capture awaits and returns the public acknowledged frame id instead of a renderer-private counter");
 }
 
 function fakeProjection() {

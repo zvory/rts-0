@@ -68,6 +68,7 @@ const REPORT_COUNTER_GROUPS = Object.freeze([
   "hud.dirty",
   "observer.dirty",
   "commands",
+  "presentation",
 ]);
 
 export class FrameProfiler {

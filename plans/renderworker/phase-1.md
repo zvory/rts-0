@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready.
+- [x] Done.
 
 ## Objective
 

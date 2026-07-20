@@ -3,6 +3,7 @@ import {
   worldPointToScene,
   worldScaleToScene,
 } from "./coordinates.js";
+import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../../presentation/submission.js";
 import { BabylonFeedbackLayer } from "./feedback_layer.js";
 import { BabylonFogLayer } from "./fog_layer.js";
 import { BabylonGenericEntities } from "./generic_entities.js";
@@ -39,25 +40,46 @@ export class BabylonPresentationAdapter {
   }
 
   render(frame) {
-    if (this._destroyed || !this._scene) return Object.freeze({ presented: false });
+    if (!frame || frame.version !== 1) throw new TypeError("Babylon requires PresentationFrameV1.");
+    const identity = { generation: frame.generation, frameId: frame.frameId };
+    if (this._destroyed) {
+      return immediatePresentationSubmission({ ...identity, status: PRESENTATION_OUTCOME.DESTROYED });
+    }
+    if (!this._scene) {
+      return immediatePresentationSubmission({
+        ...identity,
+        status: PRESENTATION_OUTCOME.FAILED,
+        error: this._lastError?.message || "Babylon scene is unavailable.",
+      });
+    }
     const profiler = this._sources?.profiler?.() || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
+    let retainedRevision = 0;
     try {
-      if (!frame || frame.version !== 1) throw new TypeError("Babylon requires PresentationFrameV1.");
       time("renderer.update", () => {
         this._syncCamera(frame.projection);
         this._syncGround(frame.projection?.mapBounds);
         this._genericEntities.sync(frame);
         this._fogLayer.sync(frame);
         this._feedbackLayer.sync(frame);
+        retainedRevision = frame.groundDecalRevision;
       });
       time("renderer.present", () => this._present());
       this._renderFrameCount += 1;
       this._lastError = null;
-      return Object.freeze({ presented: true });
+      return immediatePresentationSubmission({
+        ...identity,
+        retainedRevision,
+        status: PRESENTATION_OUTCOME.PRESENTED,
+      });
     } catch (error) {
       this._recordError("babylonPresentationFrame", error);
-      return Object.freeze({ presented: false });
+      return immediatePresentationSubmission({
+        ...identity,
+        retainedRevision,
+        status: PRESENTATION_OUTCOME.FAILED,
+        error,
+      });
     }
   }
 

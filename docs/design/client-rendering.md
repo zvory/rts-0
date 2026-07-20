@@ -146,7 +146,7 @@ StaticMapPresentationV1 = {
 }
 
 PresentationFrameV1 = {
-  version: 1, generation, frameId, visualTimeMs,
+  version: 1, generation, frameId, groundDecalRevision, visualTimeMs,
   projection, staticMapRevision,
   visible: GridSnapshotV1,
   explored: GridSnapshotV1,
@@ -172,8 +172,9 @@ separately admitted presentation fields feed the entity layer without repeating 
 Unadmitted fields can neither reach nor invalidate presentation, while cycles, mutable collection
 views, unsupported prototypes, excessive depth, and non-finite values in admitted fields retain
 the existing bounded entity-drop behavior. These entries are positional and frame-local—there is
-no cross-frame cache or id lookup. A failed render never publishes or retains that frame's
-interaction; the prior successful selection scene remains authoritative for input.
+no cross-frame cache or id lookup. A failed or superseded frame never publishes or retains that
+frame's interaction; the prior successfully presented selection scene remains authoritative for
+input.
 
 Back-to-front layer ids are exact:
 
@@ -191,13 +192,22 @@ Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later wo
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
-pending ground decals, assembles one frame, and calls `renderer.render(frame)`. Only after a
-successful presentation does Match publish the matching `SelectionSceneV1` and acknowledge its
-reconciled ground decals. Each adapter call first updates backend scene state, then synchronously
-presents exactly once. Pixi presentation is one `PIXI.Application.render()` call; Babylon
-presentation is one `Scene.render()` call. Update or present failure returns `presented:false`, does
-not advance the successful renderer-frame count, and cannot prevent Match from scheduling its next
-RAF.
+one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.
+`PresentationCoordinator` owns the pending metadata for every accepted generation/frame id and is
+the only consumer of renderer lifecycle outcomes. A submission exposes an independent `retained`
+promise plus one terminal `presented`, `superseded`, `failed`, or `destroyed` promise. `retained`
+acknowledges only the exact durable decal revision and is independent of displayed pixels; a later
+failure cannot make Match resend and double-stamp that revision. Only `presented` advances the
+public displayed-frame counter and publishes the matching `SelectionSceneV1`. Superseded and failed
+frames discard their pending selection scene, while teardown settles pending work as destroyed and
+blocks late selection/decal/capture side effects.
+
+Each Phase 1 adapter still updates backend scene state and synchronously presents exactly once
+inside `render(frame)`, but returns already-settled promise channels so coordinator callbacks run in
+a later microtask and cannot re-enter Match. Pixi presentation is one `PIXI.Application.render()`
+call; Babylon presentation is one `Scene.render()` call. Duplicate, stale, unknown, impossibly
+ordered, or presented-after-destroy outcomes are bounded protocol diagnostics and cannot change the
+newest visible selection scene.
 
 The `PixiPresentationAdapter` is the sole bridge to existing Pixi helpers. Its exact private-read
 allowlist uses `{id, reviewTrigger}` records: a trigger is a concrete reason to reconsider a read,

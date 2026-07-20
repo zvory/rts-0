@@ -86,6 +86,7 @@ export function runFrameProfilerContracts() {
     profiler.recordPhase("private.localLabel", 11);
     profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 2);
     profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 1);
+    profiler.recordDiagnosticCounter("presentation.frames.submitted", 1);
     profiler.recordDiagnosticCounter("private.counter.label", 99);
     profiler.endFrame({ at: 25, context: { entityCount: 7, selectedCount: 2, hidden: false, focused: true } });
 
@@ -160,6 +161,10 @@ export function runFrameProfilerContracts() {
       report.renderDiagnosticCounters.some((counter) => counter.label === "renderer.pixi.displayObject") &&
         report.renderDiagnosticCounters.every((counter) => counter.label !== "private.counter.label"),
       "FrameProfiler upload diagnostics are grouped through an allowlist",
+    );
+    assert(
+      report.renderDiagnosticCounters.some((counter) => counter.label === "presentation"),
+      "FrameProfiler uploads asynchronous presentation lifecycle counters as a bounded group",
     );
     assert(
       report.topRenderDiagnosticGroup === "renderer.pixi.displayObject",

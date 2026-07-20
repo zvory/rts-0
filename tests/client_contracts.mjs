@@ -14,6 +14,7 @@ await import("./client_contracts/client_render_parity_contracts.mjs");
 runFrameProfilerContracts();
 await import("./client_contracts/frame_entity_contracts.mjs");
 await import("./client_contracts/presentation_frame_contracts.mjs");
+await import("./client_contracts/presentation_coordinator_contracts.mjs");
 await import("./client_contracts/pixi_presentation_adapter_contracts.mjs");
 await import("./client_contracts/babylon_kernel_contracts.mjs");
 await import("./client_contracts/frame_strip_runtime_contracts.mjs");

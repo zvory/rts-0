@@ -60,10 +60,10 @@ and mesh-independent targeting.
 
 ### `P3-presentation-frame` and `P3.5-pixi-cutover`
 
-Presentation-frame, Pixi-adapter, renderer-feedback, Lab capture, architecture, and browser-smoke
-contracts prove one detached frame assembly, exact layers/grids, one `render(frame)` call, private
-Pixi compatibility reads, non-destructive decal reconciliation, bounded render failure, and
-successful-frame selection publication.
+Presentation-frame, coordinator, Pixi-adapter, renderer-feedback, Lab capture, architecture, and
+browser-smoke contracts prove one detached frame assembly, exact layers/grids, one `render(frame)`
+call, private Pixi compatibility reads, revision-exact durable decal retention, bounded lifecycle
+failure, and acknowledged-presented-frame selection publication.
 
 ### `P4-babylon-kernel`
 

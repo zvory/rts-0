@@ -4,6 +4,7 @@ import {
   PIXI_LEGACY_READ_ALLOWLIST,
   PixiPresentationAdapter,
 } from "../../client/src/renderer/pixi_compatibility_adapter.js";
+import { PRESENTATION_OUTCOME } from "../../client/src/presentation/submission.js";
 
 const EXPECTED_LEGACY_READS = [
   "state.resources.oil",
@@ -75,6 +76,7 @@ const frameInputs = {
     },
   },
   groundDecals: [{ id: 71, kind: "tank", decalClass: "scorch", x: 20, y: 24 }],
+  groundDecalRevision: 1,
   screenOverlay: { marquee: { x: 4, y: 5, w: 10, h: 12 } },
   selectionIds: new Set([7]),
   players: [{ id: 1, teamId: 1, color: "#123456" }],
@@ -117,7 +119,10 @@ const adapter = new PixiPresentationAdapter(null, sources, { renderer: engine })
 const first = adapter.render(frame);
 const readsAfterFirst = stateReadCount;
 const second = adapter.render(frame);
-assert(first.presented && second.presented, "Pixi adapter presents an immutable frame and a repeated call");
+assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED
+  && (await second.settled).status === PRESENTATION_OUTCOME.PRESENTED,
+"Pixi adapter presents an immutable frame and a repeated call through asynchronous outcomes");
+assert((await first.retained)?.groundDecalRevision === 1, "Pixi reports the exact durable revision independently from presentation");
 assert(engine.staticMaps.length === 1, "unchanged static-map revision is materialized once into Pixi-owned staging");
 assert(engine.staticMaps[0].terrain instanceof Uint8Array, "Pixi owns its copied terrain staging buffer");
 assert(engine.renders.length === 2, "repeated render(frame) calls reach the backend without reassembly");
@@ -141,31 +146,35 @@ assert(
   "Pixi receives formation stroke and destination slots from the immutable presentation frame",
 );
 
-const nextFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 516, sourceTick: 10, groundDecals: [] });
+const nextFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 516, sourceTick: 10, groundDecals: [], groundDecalRevision: 0 });
 engine.failNext = true;
-assert(adapter.render(nextFrame).presented === false, "top-level Pixi failure is bounded to the current frame");
-const recoveryFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 532, sourceTick: 11, groundDecals: [] });
-assert(adapter.render(recoveryFrame).presented === true, "a later Pixi frame still presents after a bounded backend failure");
+assert((await adapter.render(nextFrame).settled).status === PRESENTATION_OUTCOME.FAILED, "top-level Pixi failure is bounded to the current frame");
+const recoveryFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 532, sourceTick: 11, groundDecals: [], groundDecalRevision: 0 });
+assert((await adapter.render(recoveryFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED, "a later Pixi frame still presents after a bounded backend failure");
 assert(engine.errors.some(([label]) => label === "pixiPresentationFrame"), "bounded backend failure records an actionable diagnostic");
 
 const updateRetryDecal = { id: 90, decalClass: "infantry", x: 44, y: 48, seed: 90 };
-const stagedUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 536, sourceTick: 12, groundDecals: [updateRetryDecal] });
+const stagedUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 536, sourceTick: 12, groundDecals: [updateRetryDecal], groundDecalRevision: 2 });
 engine.failAfterStagingNext = true;
-assert(adapter.render(stagedUpdateFailureFrame).presented === false, "Pixi update failure after persistent staging is bounded to the current frame");
+const stagedUpdateFailure = adapter.render(stagedUpdateFailureFrame);
+assert((await stagedUpdateFailure.settled).status === PRESENTATION_OUTCOME.FAILED, "Pixi update failure after persistent staging is bounded to the current frame");
+assert((await stagedUpdateFailure.retained)?.groundDecalRevision === 2, "Pixi reports retain-then-fail without coupling durability to pixels");
 assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the failed update had already staged its persistent decal batch");
-const afterUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 538, sourceTick: 13, groundDecals: [updateRetryDecal] });
-assert(adapter.render(afterUpdateFailureFrame).presented === true, "Pixi presents a later frame after a post-staging update failure");
+const afterUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 538, sourceTick: 13, groundDecals: [updateRetryDecal], groundDecalRevision: 2 });
+assert((await adapter.render(afterUpdateFailureFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED, "Pixi presents a later frame after a post-staging update failure");
 assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "update retry does not stamp the retained decal batch twice");
 
 const retryDecal = { id: 91, decalClass: "infantry", x: 48, y: 52, seed: 91 };
-const presentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 540, sourceTick: 14, groundDecals: [retryDecal] });
+const presentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 540, sourceTick: 14, groundDecals: [retryDecal], groundDecalRevision: 3 });
 engine.failPresentNext = true;
 const framesBeforePresentFailure = engine._renderFrameCount;
-assert(adapter.render(presentFailureFrame).presented === false, "Pixi present failure is bounded to the current frame");
+const presentFailure = adapter.render(presentFailureFrame);
+assert((await presentFailure.settled).status === PRESENTATION_OUTCOME.FAILED, "Pixi present failure is bounded to the current frame");
+assert((await presentFailure.retained)?.groundDecalRevision === 3, "a failed present still reports its already retained durable revision");
 assert(engine._renderFrameCount === framesBeforePresentFailure, "a failed present does not advance renderer readiness");
 assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the failed present had already staged its persistent decal batch");
-const afterPresentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 544, sourceTick: 15, groundDecals: [retryDecal] });
-assert(adapter.render(afterPresentFailureFrame).presented === true, "Pixi presents a later frame after a bounded present failure");
+const afterPresentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 544, sourceTick: 15, groundDecals: [retryDecal], groundDecalRevision: 3 });
+assert((await adapter.render(afterPresentFailureFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED, "Pixi presents a later frame after a bounded present failure");
 assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "present retry does not stamp the retained decal batch twice");
 
 const captureClock = { now: () => 532 };
@@ -181,11 +190,12 @@ const replacementFrame = assembler.assemble({
   frameContext: { alpha: 1, interpolatedEntities: [] },
   fog: { visibleGrid: [1], exploredGrid: [1], visibleRevision: 1, exploredRevision: 1 },
   groundDecals: [],
+  groundDecalRevision: 0,
   screenOverlay: null,
   visualTimeMs: 548,
   sourceTick: 0,
 });
-assert(adapter.render(replacementFrame).presented === true, "Lab/replay static-map reset presents a fresh generation");
+assert((await adapter.render(replacementFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED, "Lab/replay static-map reset presents a fresh generation");
 assert(engine.staticMaps.length === 2 && engine.staticMaps[1].tileSize === 16, "changed static revision rebuilds Pixi-owned staging once");
 
 adapter.destroy();

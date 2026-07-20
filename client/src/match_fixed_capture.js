@@ -18,11 +18,20 @@ export function enterFixedCapture(match) {
   return { visualStartMs: match.captureClock.now() };
 }
 
-export function renderFixedCaptureFrame(match, visualTimeMs) {
+export async function renderFixedCaptureFrame(match, visualTimeMs) {
   if (!match.captureClock) throw new Error("Fixed capture is not active.");
   match.captureClock.advanceTo(visualTimeMs);
-  runMatchCaptureFrame(match, visualTimeMs);
-  return { visualTimeMs, tick: match.state.tick, rendererFrame: match.renderer._renderFrameCount };
+  const outcome = await runMatchCaptureFrame(match, visualTimeMs);
+  if (outcome?.status !== "presented") {
+    const detail = outcome?.error?.message || outcome?.status || "missing outcome";
+    throw new Error(`Fixed capture frame was not presented: ${detail}.`);
+  }
+  return {
+    visualTimeMs,
+    tick: match.state.tick,
+    rendererGeneration: outcome.generation,
+    rendererFrame: outcome.frameId,
+  };
 }
 
 export function exitFixedCapture(match) {

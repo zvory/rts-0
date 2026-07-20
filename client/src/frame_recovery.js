@@ -4,6 +4,8 @@ import { buildSelectionScene } from "./input/selection_projection.js";
 import { prepareEntitySnapshots } from "./presentation/entity_snapshot.js";
 import { buildRendererFeedbackView } from "./renderer/feedback_view_model.js";
 import { PresentationFrameAssembler } from "./presentation/frame.js";
+import { PresentationCoordinator } from "./presentation/coordinator.js";
+import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "./presentation/submission.js";
 import { STATS } from "./config.js";
 
 const FRAME_ERROR_LOG_INTERVAL_MS = 5000;
@@ -26,7 +28,7 @@ export function runMatchFrameSafely(match, now) {
 
 export function runMatchCaptureFrame(match, now) {
   if (!match.running) return;
-  runMatchFrame(match, now, { capture: true });
+  return runMatchFrame(match, now, { capture: true });
 }
 
 function runMatchFrame(match, now, { capture = false } = {}) {
@@ -127,10 +129,16 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       entityStats: STATS,
     });
     match.presentationAssembler = presentationAssembler;
-    const groundDecals = time(
+    const groundDecalBatch = time(
       "match.groundDecalReconciliation",
       () => match.state.reconcilePendingGroundDecals?.() || [],
     );
+    const groundDecals = Array.isArray(groundDecalBatch)
+      ? groundDecalBatch
+      : groundDecalBatch.decals || [];
+    const groundDecalRevision = Array.isArray(groundDecalBatch)
+      ? 0
+      : groundDecalBatch.revision || 0;
     const presentationFrame = time("match.presentationFrame", () => presentationAssembler.assemble({
       map: match.state.map,
       frameContext: frameViews,
@@ -140,6 +148,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       rememberedBuildings: match.state.rememberedBuildings,
       trenches: match.state.trenches,
       groundDecals,
+      groundDecalRevision,
       selectionIds: match.state.selection,
       players: match.state.players,
       playerId: match.state.playerId,
@@ -167,15 +176,27 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       frameId: presentationFrame.frameId,
     }));
 
-    const renderResult = time("match.renderer", () => match.renderer.render(presentationFrame));
-    if (renderResult?.presented === true) {
-      match.state.acknowledgeReconciledGroundDecals?.();
-      match.input?.publishSelectionScene?.(selectionScene);
+    let submission;
+    try {
+      submission = time("match.renderer", () => match.renderer.render(presentationFrame));
+    } catch (error) {
+      submission = immediatePresentationSubmission({
+        generation: presentationFrame.generation,
+        frameId: presentationFrame.frameId,
+        status: PRESENTATION_OUTCOME.FAILED,
+        error,
+      });
     }
+    const presentation = presentationCoordinatorFor(match).submit({
+      frame: presentationFrame,
+      selectionScene,
+      submission,
+    });
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
     if (!capture) time("match.healthPublish", () => match.health.publish());
+    return presentation;
   } finally {
     const frameSummary = match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });
     if (!capture) {
@@ -186,7 +207,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
   }
 }
 
-function recordFrameError(state, err) {
+export function recordFrameError(state, err) {
   const now = typeof performance !== "undefined" && typeof performance.now === "function"
     ? performance.now()
     : Date.now();
@@ -200,4 +221,22 @@ function recordFrameError(state, err) {
     state.lastLogAt = now;
     console.error("[RTS_FRAME] recovered from frame error", err);
   }
+}
+
+function presentationCoordinatorFor(match) {
+  if (match.presentationCoordinator) return match.presentationCoordinator;
+  match.presentationCoordinator = new PresentationCoordinator({
+    publishSelectionScene: (scene) => match.input?.publishSelectionScene?.(scene),
+    acknowledgeGroundDecals: (revision) => match.state?.acknowledgeReconciledGroundDecals?.(revision),
+    recordCounter: (label, amount) => match.frameProfiler?.recordDiagnosticCounter?.(label, amount),
+    recordFailure: (error) => recordFrameError(
+      match.frameErrors || (match.frameErrors = createFrameErrorState()),
+      new Error(error?.message || "Renderer failed a presentation frame."),
+    ),
+    recordProtocolError: (message) => recordFrameError(
+      match.frameErrors || (match.frameErrors = createFrameErrorState()),
+      new Error(`Renderer protocol error: ${message}`),
+    ),
+  });
+  return match.presentationCoordinator;
 }

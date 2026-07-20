@@ -1232,6 +1232,7 @@ export class Match {
       this.input.destroy();
       this.input = null;
     }
+    this.presentationCoordinator?.destroy?.();
   }
 
   applyRoomTimeState(state) {
@@ -1287,6 +1288,7 @@ export class Match {
       this.unregisterDomInputZone();
       this.unregisterDomInputZone = null;
     }
+    this.presentationCoordinator?.destroy?.();
     // Let modules release DOM/WebGL resources if they own any.
     for (const m of [this.input, this.minimap, this.hud, this.renderer, this.fog]) {
       if (m && typeof m.destroy === "function") {

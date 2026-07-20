@@ -70,7 +70,7 @@ const dom = fakeDom();
 globalThis.document = dom.document;
 try {
   const renderer = new BabylonPresentationAdapter(dom.parent, { Babylon: fakeBabylon() });
-  assert.equal(renderer.render(frame).presented, true, "the recipient-one frame reaches the Babylon scene");
+  assert.equal((await renderer.render(frame).settled).status, "presented", "the recipient-one frame reaches the Babylon scene");
   assert.ok(
     renderer._scene.meshes.every((mesh) => !mesh.name?.includes(`:${sentinelId}`)),
     "the Babylon scene creates no sentinel instance",

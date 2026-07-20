@@ -156,7 +156,9 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "minimap.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
   "minimap.js -> input/support_weapon_setup_targeting.js": "Minimap and viewport setup targeting share the same pure AT-gun convergence, parallel, and fan curves so preview and issued facing agree.",
   "renderer/backend_bundle.js -> camera.js": "The selected Pixi bundle owns construction of its orthographic semantic camera.",
+  "renderer/pixi_compatibility_adapter.js -> presentation/submission.js": "The Pixi backend returns the renderer-neutral asynchronous presentation lifecycle result.",
   "renderer/babylon/backend_bundle.js -> fixed_perspective_camera.js": "The selected Babylon bundle owns construction of its engine-independent semantic camera.",
+  "renderer/babylon/presentation_adapter.js -> presentation/submission.js": "The Babylon backend follows the same renderer-neutral presentation lifecycle contract.",
 }));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([

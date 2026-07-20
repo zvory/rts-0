@@ -12,6 +12,7 @@ import {
 } from "../../client/src/input/selection_projection.js";
 import { KIND } from "../../client/src/protocol.js";
 import { runMatchCaptureFrame } from "../../client/src/frame_recovery.js";
+import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../../client/src/presentation/submission.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { admitSelectionIds } from "../../client/src/command_budget.js";
 import { prepareEntitySnapshots } from "../../client/src/presentation/entity_snapshot.js";
@@ -368,28 +369,27 @@ function scene(entities, projection = orthographic(), options = {}) {
     },
     fog: { update() {} },
     renderer: {
-      render() {
+      render(frame) {
         if (failRender) throw new Error("synthetic render failure");
-        return { presented: true };
+        return immediatePresentationSubmission({
+          generation: frame.generation,
+          frameId: frame.frameId,
+          status: PRESENTATION_OUTCOME.PRESENTED,
+        });
       },
     },
     clientIntent: null,
     visualProfile: null,
     hud: { update() {} },
   };
-  runMatchCaptureFrame(match, 16);
+  await runMatchCaptureFrame(match, 16);
   const presented = input.selectionScene;
   assert(presented?.frameId === 1, "successful frame publishes its detached SelectionScene after rendering");
   entities = [{ id: 70, owner: 1, kind: KIND.RIFLEMAN, x: 170, y: 70 }];
   projection = orthographic({ x: 100 });
   failRender = true;
-  let threw = false;
-  try {
-    runMatchCaptureFrame(match, 32);
-  } catch {
-    threw = true;
-  }
-  assert(threw, "synthetic renderer failure reaches the capture caller");
+  const failed = await runMatchCaptureFrame(match, 32);
+  assert(failed.status === PRESENTATION_OUTCOME.FAILED, "synthetic renderer failure is bounded to its capture outcome");
   assert(input.selectionScene === presented, "render failure preserves the prior successfully presented SelectionScene");
 }
 

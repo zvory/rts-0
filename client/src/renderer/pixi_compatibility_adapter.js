@@ -1,4 +1,5 @@
 import { isResource } from "../protocol.js";
+import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../presentation/submission.js";
 import { Renderer } from "./index.js";
 
 export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
@@ -61,7 +62,7 @@ export class PixiPresentationAdapter {
     this._lastView = null;
     this._staticMapRevision = null;
     this._decalFrameKey = null;
-    this._groundDecalsAwaitingPresent = false;
+    this._retainedGroundDecalKey = null;
     this._destroyed = false;
   }
 
@@ -74,10 +75,15 @@ export class PixiPresentationAdapter {
   }
 
   render(frame) {
+    if (!frame || frame.version !== 1) throw new TypeError("Pixi requires PresentationFrameV1.");
+    const identity = { generation: frame.generation, frameId: frame.frameId };
+    if (this._destroyed) {
+      return immediatePresentationSubmission({ ...identity, status: PRESENTATION_OUTCOME.DESTROYED });
+    }
     const profiler = this._sources?.profiler?.() || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
+    let retainedRevision = 0;
     try {
-      if (!frame || frame.version !== 1) throw new TypeError("Pixi requires PresentationFrameV1.");
       time("renderer.update", () => {
         this._ensureStaticMap(frame);
         const repeated = frame === this._lastFrame;
@@ -87,7 +93,13 @@ export class PixiPresentationAdapter {
           this._lastView = view;
         }
         const frameKey = `${frame.generation}:${frame.frameId}`;
-        const groundDecals = frameKey === this._decalFrameKey || this._groundDecalsAwaitingPresent
+        const decalRevision = Number.isSafeInteger(frame.groundDecalRevision)
+          ? frame.groundDecalRevision
+          : 0;
+        const decalKey = decalRevision > 0 ? `${frame.generation}:${decalRevision}` : null;
+        const alreadyRetained = decalKey && decalKey === this._retainedGroundDecalKey;
+        if (alreadyRetained) retainedRevision = decalRevision;
+        const groundDecals = frameKey === this._decalFrameKey || alreadyRetained
           ? []
           : view.groundDecals;
         this._renderer.render(view.state, view.camera, view.fog, view.alpha, {
@@ -100,18 +112,29 @@ export class PixiPresentationAdapter {
           feedbackView: view.feedback,
           reconciledGroundDecals: groundDecals,
           onGroundDecalsStaged: () => {
-            this._groundDecalsAwaitingPresent = true;
+            if (decalKey) {
+              this._retainedGroundDecalKey = decalKey;
+              retainedRevision = decalRevision;
+            }
           },
         });
         this._renderer.drawSelectionBox(view.marquee);
         this._decalFrameKey = frameKey;
       });
       time("renderer.present", () => this._present());
-      this._groundDecalsAwaitingPresent = false;
-      return Object.freeze({ presented: true });
+      return immediatePresentationSubmission({
+        ...identity,
+        retainedRevision,
+        status: PRESENTATION_OUTCOME.PRESENTED,
+      });
     } catch (err) {
       this._renderer?._recordRenderError?.("pixiPresentationFrame", err);
-      return Object.freeze({ presented: false });
+      return immediatePresentationSubmission({
+        ...identity,
+        retainedRevision,
+        status: PRESENTATION_OUTCOME.FAILED,
+        error: err,
+      });
     }
   }
 
@@ -156,7 +179,7 @@ export class PixiPresentationAdapter {
     this._destroyed = true;
     this._lastFrame = null;
     this._lastView = null;
-    this._groundDecalsAwaitingPresent = false;
+    this._retainedGroundDecalKey = null;
     this._sources = null;
     this._renderer.destroy();
   }
