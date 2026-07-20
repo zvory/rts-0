@@ -327,7 +327,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
   deterministic scattered impact points that would hit any same-team unit or building at its current position,
   while manual fire remains unrestricted.
-- anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 40` and
+- anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 100` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`; packed, setting-up, and tearing-down guns
   cannot fire.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
