@@ -10,12 +10,18 @@ import {
   isGameplayCandidate,
   normalizeDecision,
   parseArgs as parsePatchArgs,
+  parseEnvValue,
+  parseFragmentChanges,
+  renderDiscordMessage,
+  renderDiscordPayload,
   renderFragment,
+  sendDiscordPatchNote,
 } from "../scripts/patch-note-pass.mjs";
 
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).baseRef, "upstream/main");
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, true);
 assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small-model");
+assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
@@ -37,6 +43,22 @@ const decision = normalizeDecision({
   reason: "The authoritative and mirrored range constants doubled.",
 });
 assert.equal(decision.playtestWatch.length, 1);
+assert.equal(
+  renderDiscordMessage(decision),
+  "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
+);
+assert.deepEqual(
+  JSON.parse(renderDiscordPayload("@everyone changed")),
+  { content: "@everyone changed", allowed_mentions: { parse: [] } },
+);
+assert.equal(
+  parseEnvValue("OTHER=value\nRTS_PATCH_NOTES_DISCORD_WEBHOOK_URL='https://example.invalid/hook'\n", "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"),
+  "https://example.invalid/hook",
+);
+assert.deepEqual(
+  parseFragmentChanges("# Note\n\n## Changes\n\n- First change.\n- Second change.\n\n## Playtest watch\n\n- Not delivered.\n"),
+  ["First change.", "Second change."],
+);
 assert.match(
   renderFragment({ branch: "zvorygin/at-gun-range", date: "2026-07-20", decision }),
   /patch-notes|Longer-ranged anti-tank guns|20 to 40 tiles|Playtest watch/s,
@@ -61,6 +83,22 @@ assert.deepEqual(
     reason: "One line reason",
   },
 );
+const maximumDiscordDecision = normalizeDecision({
+  decision: "write_patch_note",
+  title: "Bounded changes",
+  changes: Array.from({ length: 8 }, () => "x".repeat(300)),
+  playtest_watch: [],
+  reason: "Exercise the Discord content limit.",
+});
+assert.equal(maximumDiscordDecision.changes.every((item) => item.length === 300), true);
+assert(renderDiscordMessage(maximumDiscordDecision).length <= 2000, "Discord patch notes must fit one message");
+assert.equal(renderDiscordMessage(maximumDiscordDecision).includes("…"), true);
+assert.equal(
+  renderFragment({ branch: "zvorygin/bounded", date: "2026-07-20", decision: maximumDiscordDecision })
+    .includes("x".repeat(300)),
+  true,
+  "Discord limits must not truncate the canonical patch-note fragment",
+);
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });
@@ -81,6 +119,26 @@ try {
     modelEnv: "RTS_FIXTURE_MODEL",
   }]);
   assert.match(markdownSummary([{ id: "fixture", report: "Decision: no-op" }]), /Agent PR passes.*fixture.*no-op/s);
+
+  run("git", ["init", "-b", "main"], tempRoot);
+  const delivered = [];
+  const deliveryOptions = {
+    branch: "zvorygin/at-gun-range",
+    decision,
+    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/hook" },
+    post: (_url, message) => delivered.push(message),
+    repoRoot: tempRoot,
+  };
+  assert.equal(sendDiscordPatchNote(deliveryOptions).status, "sent");
+  assert.deepEqual(delivered, ["• Deployed anti-tank-gun range increased from 20 to 40 tiles."]);
+  assert.equal(sendDiscordPatchNote(deliveryOptions).status, "unchanged");
+  assert.equal(delivered.length, 1, "unchanged patch notes should not be sent twice");
+  const movedDelivery = {
+    ...deliveryOptions,
+    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/another-hook" },
+  };
+  assert.equal(sendDiscordPatchNote(movedDelivery).status, "sent");
+  assert.equal(delivered.length, 2, "a new Discord destination should receive the current patch note");
 
   fs.writeFileSync(config, JSON.stringify({ version: 2, passes: [] }));
   assert.throws(() => loadPasses(config), /version 1/);
