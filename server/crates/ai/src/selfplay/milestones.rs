@@ -464,16 +464,23 @@ impl PlayerMilestones {
     ) -> bool {
         let before = self.clone();
         let attack_units = match command {
-            Command::AttackMove { units, .. } | Command::Attack { units, .. } => {
-                Some(units.len() as u32)
-            }
-            Command::Move { units, .. } | Command::FormationMove { units, .. }
-                if self.rifleman_trained =>
-            {
-                Some(units.len() as u32)
-            }
+            Command::AttackMove { units, .. }
+            | Command::Attack { units, .. }
+            | Command::FormationMove {
+                units,
+                attack_move: true,
+                ..
+            } => Some(units.len() as u32),
+            Command::Move { units, .. }
+            | Command::FormationMove {
+                units,
+                attack_move: false,
+                ..
+            } if self.rifleman_trained => Some(units.len() as u32),
             Command::Move { .. }
-            | Command::FormationMove { .. }
+            | Command::FormationMove {
+                attack_move: false, ..
+            }
             | Command::SetupAntiTankGuns { .. }
             | Command::TearDownAntiTankGuns { .. }
             | Command::UseAbility { .. }
