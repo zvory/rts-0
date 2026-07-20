@@ -152,6 +152,9 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         null,
         [KIND_CODE[KIND.WORKER], KIND_CODE[KIND.SCOUT_CAR]],
         true,
+        null,
+        null,
+        [UPGRADE_CODE[UPGRADE.ANTI_TANK_GUN_UNLOCK], UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
       ],
       [
         4,
@@ -325,6 +328,11 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
   assert(decoded.entities[2].prodScoutPlaneQueued === true, "entity Scout Plane queue flag decodes");
   assert(decoded.entities[2].prodWaiting === true, "entity unpaid production state decodes");
+  assert(
+    decoded.entities[2].prodUpgradeQueue.join(",") ===
+      `${UPGRADE.ANTI_TANK_GUN_UNLOCK},${UPGRADE.ARTILLERY_UNLOCK}`,
+    "entity research queue decodes",
+  );
   assert(
     decoded.entities[2].prodRepeatKinds.join(",") === `${KIND.WORKER},${KIND.SCOUT_CAR}`,
     "entity repeat production kinds decode",

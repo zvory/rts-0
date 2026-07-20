@@ -145,9 +145,9 @@ function ekatCard() {
     catalog.commands.some((command) =>
       command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
         command.label === "Heavy Guns" &&
-        command.slotIndex === 0
+        command.slotIndex === 1
     ),
-    "hotkey command catalog includes Heavy Guns research after Medium Guns unlocks its replacement slot",
+    "hotkey command catalog keeps Heavy Guns research in its permanent W slot",
   );
   assert(
     catalog.commands.some((command) =>

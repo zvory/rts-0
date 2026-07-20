@@ -175,11 +175,11 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
     researches: [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
-      UPGRADE.ARTILLERY_UNLOCK,
     ],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 1,
@@ -424,7 +424,6 @@ export const UPGRADES = Object.freeze({
     researchedAt: KIND.RESEARCH_COMPLEX,
     requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     requiresText: "Requires Medium Guns",
-    replacesUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
   }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.TANK_UNLOCK,

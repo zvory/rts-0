@@ -1306,6 +1306,7 @@ mod tests {
         center.prod_kind = Some(kinds::WORKER.to_string());
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
+        center.prod_upgrade_queue = vec![upgrades::ANTI_TANK_GUN_UNLOCK.to_string()];
         center.prod_repeat_kinds = vec![kinds::WORKER.to_string(), kinds::SCOUT_CAR.to_string()];
         center.prod_scout_plane_queued = true;
         center.prod_waiting = true;
@@ -1508,6 +1509,10 @@ mod tests {
         assert_eq!(value["e"][2][34], serde_json::json!(true));
         let repeat_codes = [kind_code(kinds::WORKER), kind_code(kinds::SCOUT_CAR)];
         assert_eq!(value["e"][2][36], serde_json::json!(repeat_codes));
+        assert_eq!(
+            value["e"][2][40],
+            serde_json::json!([upgrade_code(upgrades::ANTI_TANK_GUN_UNLOCK)])
+        );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
             value["sm"],

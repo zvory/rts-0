@@ -570,6 +570,9 @@ pub struct EntityView {
     pub prod_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_upgrade: Option<String>,
+    /// Owner/allies only: ordered upgrade ids in this building's research queue.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prod_upgrade_queue: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_progress: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -665,6 +668,7 @@ impl EntityView {
             panzerfaust_loaded: None,
             prod_kind: None,
             prod_upgrade: None,
+            prod_upgrade_queue: Vec::new(),
             prod_progress: None,
             prod_queue: None,
             prod_repeat_kinds: Vec::new(),

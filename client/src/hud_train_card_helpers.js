@@ -53,24 +53,20 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
-  if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
-  if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
-    .some((e) => e.prodUpgrade === upgrade)) return "locked";
-  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) return "locked";
+  if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
+  if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
   return affordable(def.cost, resources) ? "ready" : "unaffordable";
 }
 
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
-  if (def.replacesUpgrade && !(ctx.upgrades || []).includes(def.replacesUpgrade)) {
-    return def.requiresText || `Requires ${UPGRADES[def.replacesUpgrade]?.label || def.replacesUpgrade}`;
-  }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
-  if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
-    .some((e) => e.prodUpgrade === upgrade)) return "Researching";
-  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) {
+  const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);
+  if (queuedAt?.prodUpgrade === upgrade) return "Researching";
+  if (queuedAt) return "Queued";
+  if (def.requiresUpgrade && !selectedResearchBuilding(ctx, upgrade, isOwn)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
   if (!affordable(def.cost, resources)) return "Queue now; research waits for resources";
@@ -82,14 +78,40 @@ export function trainLimitSignature(ctx, unit, isOwn) {
 }
 
 export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
-  const replacedUpgrade = UPGRADES[upgrade]?.replacesUpgrade;
-  if (replacedUpgrade) return researchSlotForUpgrade(buildingKind, replacedUpgrade, trains);
   const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
   if (unitIndex >= 0) return unitIndex + 3;
   const researchIndex = researchesOf(buildingKind).indexOf(upgrade);
   if (researchIndex >= 0) return researchIndex;
   const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
+}
+
+function researchQueuedBuilding(ctx, buildingKind, upgrade, isOwn) {
+  return researchBuildings(ctx, buildingKind, isOwn).find((entity) =>
+    (entity.prodUpgradeQueue || []).includes(upgrade));
+}
+
+function researchBuildings(ctx, buildingKind, isOwn) {
+  const entities = ctx.currentEntities || ctx.entities || ctx.selection || [];
+  return entities.filter((entity) =>
+    isOwn(ctx, entity) &&
+    entity.kind === buildingKind &&
+    entity.buildProgress == null);
+}
+
+/** First selected building on which the server can append this research right now. */
+export function selectedResearchBuilding(ctx, upgrade, isOwn) {
+  const def = UPGRADES[upgrade];
+  if (!def) return null;
+  const prerequisiteResearched = !def.requiresUpgrade ||
+    (ctx.upgrades || []).includes(def.requiresUpgrade);
+  return (ctx.selection || []).find((entity) =>
+    isOwn(ctx, entity) &&
+    entity.kind === def.researchedAt &&
+    entity.buildProgress == null &&
+    !(entity.prodUpgradeQueue || []).includes(upgrade) &&
+    (prerequisiteResearched ||
+      (entity.prodUpgradeQueue || []).includes(def.requiresUpgrade))) || null;
 }
 
 export function trainSlotForUnit(buildingKind, unit, trains) {

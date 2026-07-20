@@ -577,10 +577,15 @@ pub(in crate::game) fn apply_commands(
                     notice(events, player, "Already researched");
                     continue;
                 }
-                if definition
-                    .requires_upgrade
-                    .is_some_and(|required| !ps.upgrades.contains(&required))
-                {
+                let prerequisite_available = definition.requires_upgrade.is_none_or(|required| {
+                    ps.upgrades.contains(&required)
+                        || entities.get(building).is_some_and(|b| {
+                            b.research_queue()
+                                .iter()
+                                .any(|item| item.upgrade == required)
+                        })
+                });
+                if !prerequisite_available {
                     notice(events, player, "Requirement not met");
                     continue;
                 }

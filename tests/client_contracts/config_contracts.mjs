@@ -437,13 +437,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.RESEARCH_COMPLEX].researches,
     [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
-      UPGRADE.ARTILLERY_UNLOCK,
     ],
-    "R&D Complex should expose Medium Guns, Artillery Fire Control, Tank, Mortar Autocast, Smoke Plus, and Heavy Guns research",
+    "R&D Complex should expose the Medium Guns, Heavy Guns, and Fire Control chain before its independent research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -514,8 +514,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK &&
       UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresText === "Requires Medium Guns" &&
-      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].replacesUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    "Heavy Guns research replaces Medium Guns and keeps its prerequisite explicit",
+      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].replacesUpgrade == null,
+    "Heavy Guns research keeps a permanent slot and its prerequisite explicit",
   );
   assert(
     UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 300 &&
@@ -1222,33 +1222,37 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
-    assert(rdArtilleryFireControlButton?.dataset.hotkey === "W", "Artillery Fire Control research should appear in R&D Complex");
+    assert(rdArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in R&D Complex");
     assert(rdMediumGunsResearchButton?.dataset.hotkey === "Q", "Medium Guns research should appear in R&D Complex");
-    assert(!rdHeavyGunsResearchButton, "Heavy Guns research should be hidden before Medium Guns");
-    assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
-    assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
-    assert(rdSmokePlusButton?.dataset.hotkey === "S", "Smoke Plus research should appear in R&D Complex");
+    assert(rdHeavyGunsResearchButton?.dataset.hotkey === "W", "Heavy Guns research should keep the W slot before Medium Guns");
+    assert(rdHeavyGunsResearchButton?.disabled, "Heavy Guns should be disabled before Medium Guns is complete or queued");
+    assert(rdTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in R&D Complex");
+    assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
     assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "R&D Complex should not expose Command Car research");
     assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control research should be disabled before Heavy Guns");
     assert(rdArtilleryFireControlButton?.title === "Requires Heavy Guns", "Artillery Fire Control research should name Heavy Guns prerequisite");
     assert(!rdArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
-    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
+    selectedResearchComplex.prodUpgradeQueue = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("HG+"));
     const mediumUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedHeavyGunsResearchButton?.dataset.hotkey === "Q", "Heavy Guns should replace Medium Guns in the Q slot");
-    assert(unlockedHeavyGunsResearchButton && !unlockedHeavyGunsResearchButton.disabled, "Heavy Guns should enable after Medium Guns");
-    assert(mediumUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Heavy Guns after Medium Guns");
+    assert(unlockedHeavyGunsResearchButton?.dataset.hotkey === "W", "Heavy Guns should retain the W slot");
+    assert(unlockedHeavyGunsResearchButton && !unlockedHeavyGunsResearchButton.disabled, "Heavy Guns should enable when Medium Guns is queued");
+    assert(mediumUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Heavy Guns after Medium Guns is queued");
 
     renderedButtons.length = 0;
-    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK];
+    selectedResearchComplex.prodUpgradeQueue = [
+      UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      UPGRADE.ARTILLERY_UNLOCK,
+    ];
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable after Heavy Guns");
+    assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable when Heavy Guns is queued");
 
     renderedButtons.length = 0;
     const playedNotices = [];

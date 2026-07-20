@@ -255,7 +255,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   over 600 ticks, enabling Mortar Team autocast for current and future owned Mortar Teams; and
   `smoke_plus` for 150 steel / 150 oil over 600 ticks, doubling future Scout Car Smoke radius and
   duration.
-  Server-side research validation checks the research building and prerequisite upgrades, while
+  Server-side research validation checks the research building and requires each prerequisite to
+  be completed or already earlier in that same building's bounded FIFO research queue, while
   train validation checks both the producer kind and completed player upgrade set, so clients cannot
   bypass these locks by sending `research` or `train` commands directly.
 - **Tank armor facing**: tank and Anti-Tank Gun attacks against tank victims use the victim tank's hull

@@ -122,7 +122,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node; when its builder arrives, owned and allied units on that footprint are moved to nearby clear positions before placement is revalidated, while enemy units remain blockers. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a manual unit at a production building. A legal manual request is accepted without current Steel, Oil, or supply; an unpaid front item waits at zero progress until it can pay and reserve supply. Later FIFO items do not prepay. Standing repeat production remains separate and creates no queue item until it can pay. |
 | `adjustProductionRepeat` | `buildings: u32[]`, `unit: string`, `delta: -1\|1` | Atomically adjust `unit` across the selected owned completed compatible producers. `+1` enables it on one producer that does not already repeat it, preferring the producer with the fewest standing repeat units; `-1` removes it from one producer that repeats it, preferring the producer with the most standing repeat units so another automatic order survives when possible. Stable opposite entity-id tie-breaks make repeated additions followed by removals reversible. Other delta values are ignored. When a producer's ordinary unit queue is empty, it silently retries the ordered list's current entry. Each successful automatic enqueue advances to the next enabled unit, so two active units alternate. Once inserted, a repeated unit is an ordinary FIFO item, so later manual production queues behind it. Any production cancel clears the affected producer's whole repeat list. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available; prerequisite research must still already be complete when the command is accepted. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `artillery_unlock` (Heavy Guns) at the R&D Complex (`research_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires completed `anti_tank_gun_unlock` and unlocks Artillery training. `ballistic_tables` requires completed `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available. A prerequisite must either be complete or already appear earlier in the same building's authoritative FIFO research queue; this allows Medium Guns → Heavy Guns → Artillery Fire Control to be queued as one chain without weakening completion-time unlocks. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (Medium Guns), `artillery_unlock` (Heavy Guns), `ballistic_tables`, `tank_unlock`, `mortar_autocast`, and `smoke_plus` at the R&D Complex (`research_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires `anti_tank_gun_unlock` and unlocks Artillery training; `ballistic_tables` requires `artillery_unlock`; `tank_unlock` unlocks Tank and Command Car training. `smoke_plus` doubles Scout Car Smoke radius and duration. |
 | `cancel`     | `building: u32`, `construction?: bool` | With `construction: true`, cancel an owned unfinished building for a full construction-cost refund; otherwise cancel the latest item in a completed building's production queue. The explicit construction scope prevents a delayed scaffold action from cancelling production after the building completes. Attached builders return to ordinary order handling when a construction site is canceled. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]`, `queued?: bool` | Stand ground. Without `queued`, clear active and queued unit orders immediately. With `queued: true`, append a terminal hold-position intent so units complete earlier queued stages before standing ground. Held units still fire at enemies already in weapon range and can still be pushed by collision resolution. |
@@ -721,7 +721,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 44. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 45. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -747,7 +747,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 44,
+  "v": 45,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -757,7 +757,8 @@ adds an explicit application compression envelope.
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
-      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?
+      panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
+      prodUpgradeQueue?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -953,6 +954,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   // production buildings:
   prodKind?: string,             // unit currently being produced
   prodUpgrade?: string,          // upgrade currently being researched
+  prodUpgradeQueue?: string[],   // owner/allied; ordered authoritative research queue
   prodProgress?: f32,            // 0..1
   prodQueue?: u32,               // queued count (including the in-progress one)
   prodRepeatKinds?: string[],    // owner/allied; ordered standing unit list for an empty queue

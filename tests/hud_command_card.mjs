@@ -38,10 +38,10 @@ function testGroupCooldownClocks(values, totalTicks) {
     }));
 }
 
-function rAndDCard(upgrades = []) {
+function rAndDCard(upgrades = [], prodUpgradeQueue = []) {
   return buildCommandCardDescriptors({
     playerId: 1,
-    selection: [researchComplex],
+    selection: [{ ...researchComplex, prodUpgradeQueue }],
     resources: { steel: 1000, oil: 1000 },
     upgrades,
     playerHasCompleteKind: () => true,
@@ -68,53 +68,104 @@ function buttonSlots(card) {
 {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
-  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 5), [
+  assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
   ]);
   assert.equal(rAndDCard().slots[1].enabled, false);
-  assert.equal(rAndDCard().slots[1].title, "Requires Heavy Guns");
-  assert.equal(rAndDCard().slots[1].label, "Artillery Fire Control");
-  assert.equal(rAndDCard().slots[1].icon, "AFC");
-  assert(!ids.includes(`research:${UPGRADE.ARTILLERY_UNLOCK}`));
+  assert.equal(rAndDCard().slots[1].title, "Requires Medium Guns");
+  assert.equal(rAndDCard().slots[1].label, "Heavy Guns");
+  assert.equal(rAndDCard().slots[2].title, "Requires Heavy Guns");
+  assert.equal(rAndDCard().slots[2].label, "Artillery Fire Control");
+  assert.equal(rAndDCard().slots[2].icon, "AFC");
 }
 
 {
-  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK]);
+  const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
   const ids = slotIds(card);
-  assert.equal(ids[0], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
-  assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.equal(card.slots[0].label, "Heavy Guns");
-  assert.equal(card.slots[0].enabled, true);
+  assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
+  assert.equal(card.slots[1].label, "Heavy Guns");
+  assert.equal(card.slots[1].enabled, true);
+  assert.equal(card.slots[2].enabled, false);
+  assert.equal(card.slots[2].title, "Requires Heavy Guns");
+}
+
+{
+  const emptyResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
+  const queuedResearchComplex = {
+    ...researchComplex,
+    id: 12,
+    prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+  };
+  const card = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [emptyResearchComplex, queuedResearchComplex],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(
+    card.slots[1].intent.buildingId,
+    queuedResearchComplex.id,
+    "dependent research should target the selected building that owns its queued prerequisite",
+  );
+}
+
+{
+  const selectedResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
+  const otherResearchComplex = {
+    ...researchComplex,
+    id: 12,
+    prodUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+  };
+  const card = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [selectedResearchComplex],
+    currentEntities: [selectedResearchComplex, otherResearchComplex],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(card.slots[0].enabled, false);
+  assert.equal(card.slots[0].title, "Researching");
+}
+
+{
+  const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   assert.equal(card.slots[1].enabled, false);
-  assert.equal(card.slots[1].title, "Requires Heavy Guns");
+  assert.equal(card.slots[1].title, "Queued");
+  assert.equal(card.slots[2].enabled, true);
 }
 
 {
   const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
-  assert.equal(ids[0], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
-  assert.equal(ids[2], null);
-  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
-  assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.equal(ids[0], null);
+  assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], null);
+  assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
 }
 
 {
   const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[0], null);
-  assert.equal(ids[1], `research:${UPGRADE.BALLISTIC_TABLES}`);
-  assert.equal(card.slots[1].enabled, true);
+  assert.equal(ids[1], null);
+  assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(card.slots[2].enabled, true);
 }
 
 {
@@ -589,7 +640,7 @@ function buttonSlots(card) {
           slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
         )
     ),
-    "command-card context catalog samples Heavy Guns after Medium Guns so direct hotkeys can discover it",
+    "command-card context catalog samples the queued research-chain state",
   );
   assert(
     catalog.some((entry) =>

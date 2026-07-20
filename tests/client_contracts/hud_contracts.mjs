@@ -1340,9 +1340,10 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(mediumGuns && mediumGuns.enabled, "available affordable upgrade should be enabled");
   assert(mediumGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
   assert(mediumGuns.intent.type === "research", "upgrade button should carry research intent");
-  assert(!buttonByLabel(researchCard, "Heavy Guns"), "R&D should hide Heavy Guns until Medium Guns is researched");
+  const lockedHeavyGuns = buttonByLabel(researchCard, "Heavy Guns");
+  assert(lockedHeavyGuns && !lockedHeavyGuns.enabled, "R&D should keep Heavy Guns visible but locked before Medium Guns");
+  assert(lockedHeavyGuns.slotIndex !== mediumGuns.slotIndex, "Heavy Guns should keep a slot separate from Medium Guns");
   assert(!buttonByLabel(researchCard, "Unlock Artillery"), "R&D should not expose a separate Artillery unlock");
-
   const heavyGunsCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [researchComplex],
     entities: [
@@ -1354,10 +1355,9 @@ withFakeHudDocument(({ FakeElement }) => {
     upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
   }));
   const heavyGuns = buttonByLabel(heavyGunsCard, "Heavy Guns");
-  assert(heavyGuns && heavyGuns.enabled, "Heavy Guns should replace Medium Guns after Medium is researched");
-  assert(heavyGuns.slotIndex === mediumGuns.slotIndex, "Heavy Guns should reuse the Medium Guns button slot");
+  assert(heavyGuns && heavyGuns.enabled, "Heavy Guns should enable after Medium is researched");
+  assert(heavyGuns.slotIndex === lockedHeavyGuns.slotIndex, "Heavy Guns should retain its permanent button slot");
   assert(heavyGuns.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Heavy Guns should use the artillery unlock identity");
-
   const catalog = buildCommandCardContextCatalog();
   assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");
   assert(catalog.every((entry) => duplicateCommandIdsForCard(entry.card).length === 0), "catalog contexts have unique command identities");

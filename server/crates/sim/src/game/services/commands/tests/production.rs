@@ -392,6 +392,62 @@ fn ballistic_tables_research_requires_heavy_guns() {
 }
 
 #[test]
+fn dependent_research_can_queue_behind_its_full_prerequisite_chain() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
+    let research_complex = entities
+        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
+        .expect("research complex should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![
+            (
+                1,
+                SimCommand::Research {
+                    building: research_complex,
+                    upgrade: UpgradeKind::AntiTankGunUnlock,
+                },
+            ),
+            (
+                1,
+                SimCommand::Research {
+                    building: research_complex,
+                    upgrade: UpgradeKind::ArtilleryUnlock,
+                },
+            ),
+            (
+                1,
+                SimCommand::Research {
+                    building: research_complex,
+                    upgrade: UpgradeKind::BallisticTables,
+                },
+            ),
+        ],
+    );
+
+    let queued: Vec<_> = entities
+        .get(research_complex)
+        .expect("research complex")
+        .research_queue()
+        .iter()
+        .map(|item| item.upgrade)
+        .collect();
+    assert_eq!(
+        queued,
+        vec![
+            UpgradeKind::AntiTankGunUnlock,
+            UpgradeKind::ArtilleryUnlock,
+            UpgradeKind::BallisticTables,
+        ]
+    );
+}
+
+#[test]
 fn manual_train_resource_shortages_create_unpaid_queue_entries() {
     let map = flat_map(24);
 

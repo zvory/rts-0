@@ -126,11 +126,11 @@ mod tests {
             researchable_upgrades(EntityKind::ResearchComplex),
             vec![
                 UpgradeKind::AntiTankGunUnlock,
+                UpgradeKind::ArtilleryUnlock,
                 UpgradeKind::BallisticTables,
                 UpgradeKind::TankUnlock,
                 UpgradeKind::MortarAutocast,
                 UpgradeKind::SmokePlus,
-                UpgradeKind::ArtilleryUnlock,
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));

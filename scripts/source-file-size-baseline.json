@@ -25,8 +25,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1705,
-      "reason": "The authoritative FormationMove wire DTO adds a bounded polyline command and point type beside the existing command envelope; keep ratcheting until remaining protocol DTO groups are split."
+      "lines": 1710,
+      "reason": "The compact snapshot integration fixture now covers the owner/allied research-upgrade queue slot added for chained research admission; keep ratcheting until remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -35,7 +35,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1946,
+      "lines": 1936,
       "reason": "FormationMove admission, point sanitization, queue handling, and authoritative dispatch stay together in the command boundary for this prototype; keep ratcheting by extracting command families as their contracts stabilize."
     },
     {

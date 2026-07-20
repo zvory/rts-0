@@ -122,9 +122,11 @@ Heavy Guns research.
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
 Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Mortar Autocast,
-and Smoke Plus; Heavy Guns requires completed Medium Guns research, and Artillery Fire Control
-requires completed Heavy Guns research. Tank Production unlocks Tanks; Command Cars require the
-R&D Complex itself but no completed research. The current Ekat tech tree starts with Zamok training Golems;
+and Smoke Plus; Heavy Guns requires Medium Guns and Artillery Fire Control requires Heavy Guns.
+Each dependency may already be complete or earlier in the same R&D queue when its dependent is
+ordered, while completion still gates the actual unlock. Tank Production unlocks Tanks; Command
+Cars require the R&D Complex itself but no completed research. The current Ekat tech tree starts
+with Zamok training Golems;
 Golem-converted tech buildings are still planned work.
 
 ## Current Ability Surface

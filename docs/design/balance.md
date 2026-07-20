@@ -423,13 +423,16 @@ profiles and explicit activation/autocast policy instead of being folded into de
   occupation and combat modifiers.
 - **Medium Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 100 steel /
   50 oil and takes 300 ticks (~10s). Once complete, that player can train Anti-Tank Guns from Gun
-  Works, and the R&D command card replaces the Medium Guns button with Heavy Guns.
+  Works. Medium Guns keeps its own R&D command-card slot while incomplete.
 - **Heavy Guns** (R&D Complex research, protocol id `artillery_unlock`): costs 200 steel / 100 oil
-  and takes 750 ticks (~25s). It requires completed Medium Guns research. Once complete, that
-  player can train Artillery from Gun Works.
+  and takes 750 ticks (~25s). It has its own permanent R&D slot and requires Medium Guns either
+  completed or earlier in that R&D Complex's queue when ordered. Research begins only after the
+  earlier Medium Guns item completes. Once complete, that player can train Artillery from Gun Works.
 - **Artillery Fire Control** (R&D Complex research, protocol id `ballistic_tables`): costs 300 steel /
-  200 oil and takes 1,200 ticks (~40s). It requires completed Heavy Guns research. Once
-  complete, that player's deployed Artillery tightens repeated point-fire shots from the
+  200 oil and takes 1,200 ticks (~40s). It requires Heavy Guns either completed or earlier in that
+  R&D Complex's queue when ordered, so the full Medium Guns → Heavy Guns → Artillery Fire Control
+  chain can be queued at once. Research begins only after Heavy Guns completes. Once complete,
+  that player's deployed Artillery tightens repeated point-fire shots from the
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
