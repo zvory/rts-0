@@ -155,9 +155,15 @@ fn combat_intent_units(intents: &[AiIntent]) -> BTreeSet<u32> {
 pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSet<u32>) -> bool {
     match command {
         Command::Attack { .. } | Command::AttackMove { .. } => true,
-        Command::Move { units, .. } | Command::FormationMove { units, .. } => {
-            units.iter().any(|id| combat_intent_units.contains(id))
-        }
+        Command::FormationMove {
+            attack_move: true, ..
+        } => true,
+        Command::Move { units, .. }
+        | Command::FormationMove {
+            units,
+            attack_move: false,
+            ..
+        } => units.iter().any(|id| combat_intent_units.contains(id)),
         Command::SetupAntiTankGuns { .. }
         | Command::TearDownAntiTankGuns { .. }
         | Command::UseAbility { .. }

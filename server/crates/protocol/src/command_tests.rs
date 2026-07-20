@@ -8,8 +8,23 @@ fn formation_move_uses_object_points_and_defaults_queue_false() {
     .expect("formation move should deserialize");
     assert!(matches!(
         command,
-        Command::FormationMove { units, points, queued: false }
+        Command::FormationMove { units, points, attack_move: false, queued: false }
             if units == vec![3, 4] && points.len() == 2
+    ));
+}
+
+#[test]
+fn formation_move_accepts_attack_move_mode() {
+    let command: Command = serde_json::from_str(
+        r#"{"c":"formationMove","units":[3,4],"points":[{"x":10.0,"y":20.0},{"x":30.0,"y":40.0}],"attackMove":true}"#,
+    )
+    .expect("attack formation move should deserialize");
+    assert!(matches!(
+        command,
+        Command::FormationMove {
+            attack_move: true,
+            ..
+        }
     ));
 }
 

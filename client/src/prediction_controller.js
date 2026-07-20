@@ -699,8 +699,9 @@ function finiteU32(value) {
 function commandLifecycleFamily(command) {
   switch (command?.c) {
     case "move":
-    case "formationMove":
       return "move";
+    case "formationMove":
+      return command.attackMove ? "attackMove" : "move";
     case "attackMove":
       return "attackMove";
     case "build":

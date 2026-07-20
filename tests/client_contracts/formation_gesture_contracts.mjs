@@ -123,12 +123,12 @@ function attackHarness() {
   _finishFormationGesture.call(h.input, { x: 196, y: 100 }, { shiftKey: true });
 
   assert(h.targetedClicks.length === 0, "a promoted attack-move line does not issue the fallback targeted click");
-  assert(h.commands.length === 2, "a promoted attack-move line issues one command per selected unit");
-  assert(h.commands.every((command) => command.c === "attackMove" && command.units.length === 1),
-    "each assigned slot receives an ordinary single-unit attack-move order");
-  assert(new Set(h.commands.map((command) => `${command.x},${command.y}`)).size === 2,
-    "selected units receive distinct points along the attack-move line");
-  assert(h.commands.every((command) => command.queued === true), "Shift queues every attack-move slot order");
+  assert(h.commands.length === 1, "a promoted attack-move line issues one atomic group command");
+  assert(h.commands[0].c === "formationMove" && h.commands[0].attackMove === true,
+    "the shared formation command carries authoritative attack-move semantics");
+  assert(h.commands[0].units.length === 2 && h.commands[0].points.length >= 2,
+    "the server receives the selected group and sampled formation line");
+  assert(h.commands[0].queued === true, "Shift queues the attack-move formation order");
   assert(h.targetIssues() === 1 && h.ended() === 1, "attack-move line release consumes targeting once");
   assert(h.feedback.length === 1 && h.feedback[0].kind === "attack", "attack-move line release uses red command feedback");
 }

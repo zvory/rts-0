@@ -412,7 +412,7 @@ export class InteractDriver {
       throw new InteractDriverError("viewportUnavailable", "The rendered game viewport is unavailable for mouse input.");
     }
     for (const [label, point] of [["from", from], ["to", to]] as const) {
-      if (point.x < 0 || point.y < 0 || point.x > viewport.width || point.y > viewport.height) {
+      if (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height) {
         throw new InteractDriverError("outsideViewport", `drag.${label} must lie inside the current game viewport.`, {
           point, viewport: { width: viewport.width, height: viewport.height },
         });

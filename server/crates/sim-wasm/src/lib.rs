@@ -363,10 +363,21 @@ impl CorePredictor {
             Command::FormationMove {
                 units,
                 points,
+                attack_move,
                 queued,
             } => {
                 if let Some(point) = points.last() {
-                    self.apply_move(units, point.x, point.y, *queued, MoveOrderKind::Move);
+                    self.apply_move(
+                        units,
+                        point.x,
+                        point.y,
+                        *queued,
+                        if *attack_move {
+                            MoveOrderKind::AttackMove
+                        } else {
+                            MoveOrderKind::Move
+                        },
+                    );
                 } else {
                     self.note_disabled("invalidFormationMoveTarget");
                 }

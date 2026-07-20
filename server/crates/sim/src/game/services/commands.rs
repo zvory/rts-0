@@ -188,6 +188,7 @@ pub(in crate::game) fn apply_commands(
             SimCommand::FormationMove {
                 units,
                 points,
+                attack_move,
                 queued,
             } => {
                 let Some(units) =
@@ -203,8 +204,14 @@ pub(in crate::game) fn apply_commands(
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
-                    order: planner::RequestedOrder::Move {
-                        to: planner::Point::new(endpoint.0, endpoint.1),
+                    order: if attack_move {
+                        planner::RequestedOrder::AttackMove {
+                            to: planner::Point::new(endpoint.0, endpoint.1),
+                        }
+                    } else {
+                        planner::RequestedOrder::Move {
+                            to: planner::Point::new(endpoint.0, endpoint.1),
+                        }
                     },
                 };
                 let output = planner::plan_order(
@@ -226,7 +233,12 @@ pub(in crate::game) fn apply_commands(
                 if queued {
                     for (unit, point) in requested {
                         if let Some(entity) = entities.get_mut(unit) {
-                            entity.append_queued_order(OrderIntent::move_to(point.0, point.1));
+                            let intent = if attack_move {
+                                OrderIntent::attack_move_to(point.0, point.1)
+                            } else {
+                                OrderIntent::move_to(point.0, point.1)
+                            };
+                            entity.append_queued_order(intent);
                         }
                     }
                     if !output.notices.is_empty() {
@@ -234,7 +246,13 @@ pub(in crate::game) fn apply_commands(
                     }
                 } else {
                     clear_queued_orders(entities, &accepted);
-                    coordinator.order_group_formation_move(entities, player, &accepted, &requested);
+                    coordinator.order_group_formation_move(
+                        entities,
+                        player,
+                        &accepted,
+                        &requested,
+                        attack_move,
+                    );
                 }
             }
             SimCommand::AttackMove {

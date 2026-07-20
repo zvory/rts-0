@@ -339,12 +339,20 @@ impl<'a> MoveCoordinator<'a> {
         player: u32,
         ids: &[u32],
         requested: &[(u32, (f32, f32))],
+        attack_move: bool,
     ) {
         let units = formation_units(entities, player, ids);
         if units.is_empty() {
             return;
         }
-        self.record_group_queued_for_path(PathingRequestSource::Move, units.len());
+        self.record_group_queued_for_path(
+            if attack_move {
+                PathingRequestSource::AttackMove
+            } else {
+                PathingRequestSource::Move
+            },
+            units.len(),
+        );
         let selected = units.iter().map(|unit| unit.id).collect::<BTreeSet<_>>();
         let mut occupied_trenches = self
             .known_trench_entry_for_player(player)
@@ -369,7 +377,11 @@ impl<'a> MoveCoordinator<'a> {
             let Some(entity) = entities.get_mut(id) else {
                 continue;
             };
-            entity.replace_active_order(Order::move_to(goal.0, goal.1));
+            entity.replace_active_order(if attack_move {
+                Order::attack_move_to(goal.0, goal.1)
+            } else {
+                Order::move_to(goal.0, goal.1)
+            });
             entity.set_path_goal(Some(goal));
             entity.mark_move_phase(MovePhase::AwaitingPath);
             entity.reset_gather_state();

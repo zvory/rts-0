@@ -32,7 +32,7 @@ const SESSION_RE = /^(?:lab|game|scenario)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
-  formationMove: ["c", "units", "points", "queued"],
+  formationMove: ["c", "units", "points", "attackMove", "queued"],
   attackMove: ["c", "units", "x", "y", "queued"],
   attack: ["c", "units", "target", "queued"],
   deconstruct: ["c", "units", "target", "queued"],
@@ -469,6 +469,7 @@ function validateGameCommand(value: unknown) {
   if (allowed.includes("delta") && value.delta !== -1 && value.delta !== 1) invalid("order.command.delta", "must be -1 or 1");
   if (value.kind != null && (typeof value.kind !== "string" || !["move", "attackMove", "attack", "gather", "build"].includes(value.kind))) invalid("order.command.kind", "is unsupported");
   optionalBoolean(value.queued, "order.command.queued");
+  optionalBoolean(value.attackMove, "order.command.attackMove");
   if (allowed.includes("enabled")) optionalBoolean(value.enabled, "order.command.enabled", false);
 }
 

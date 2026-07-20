@@ -69,14 +69,13 @@ export function _finishFormationGesture(p, ev = {}) {
   this._intent?.()?.clearFormationMovePreview?.();
   if (preview.points.length < 2 || gesture.units.length === 0) return true;
   const queued = !!ev.shiftKey;
-  if (gesture.kind === "attackMove") {
-    for (const slot of preview.slots) {
-      this.commandInteraction.issueCommand(cmd.attackMove([slot.unitId], slot.x, slot.y, queued));
-    }
-    finishCommandTargetLifetime(this, ev);
-  } else {
-    this.commandInteraction.issueCommand(cmd.formationMove(gesture.units, preview.points, queued));
-  }
+  this.commandInteraction.issueCommand(cmd.formationMove(
+    gesture.units,
+    preview.points,
+    queued,
+    gesture.kind === "attackMove",
+  ));
+  if (gesture.kind === "attackMove") finishCommandTargetLifetime(this, ev);
   const endpoint = preview.points[preview.points.length - 1];
   this._addCommandFeedback?.(gesture.kind === "attackMove" ? "attack" : "move", endpoint.x, endpoint.y, queued);
   return true;

@@ -196,7 +196,7 @@ assert.deepEqual(dragEvents, [
 ], "driver translates viewport-local drag coordinates and releases bounded held keys in reverse order");
 assert.deepEqual(dragged.viewport, { width: 800, height: 600 }, "driver reports the viewport used for the gesture");
 await assert.rejects(
-  dragDriver.drag({ from: { x: 100, y: 100 }, to: { x: 801, y: 100 } }),
+  dragDriver.drag({ from: { x: 100, y: 100 }, to: { x: 800, y: 100 } }),
   (error) => error?.code === "outsideViewport" && error?.details?.viewport?.width === 800,
   "driver rejects a drag endpoint outside the current rendered viewport",
 );

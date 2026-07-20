@@ -1013,6 +1013,7 @@ mod tests {
             &SimCommand::FormationMove {
                 units: vec![3],
                 points: vec![(500.0, 600.0), (600.0, 600.0)],
+                attack_move: false,
                 queued: false,
             },
             &snapshot,
