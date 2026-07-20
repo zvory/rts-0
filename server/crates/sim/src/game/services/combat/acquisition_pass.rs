@@ -215,8 +215,8 @@ fn retained_target(
     let target = entities.get(target_id)?;
     let target_angle = (target.pos_y - py).atan2(target.pos_x - px);
     if !auto_retention_target_inside_field_of_fire(attacker, target_angle) {
-        // Explicit attacks returned above preserve their commanded target. Automatic retention
-        // must not drag an emplaced gun away from another target already in its current cone.
+        // A retained automatic target must not prevent acquisition of a new target that is still
+        // inside the gun's fixed deployed field.
         return None;
     }
     let legality = auto_target_legality(

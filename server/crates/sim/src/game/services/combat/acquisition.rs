@@ -17,7 +17,7 @@ use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::auto_target_legality;
 use super::weapons::{
-    choose_target_preferring_anti_tank_field, effective_attack_profile,
+    choose_target_inside_anti_tank_field, effective_attack_profile,
     moving_fire_move_order_holds_path,
 };
 
@@ -206,7 +206,7 @@ pub(super) fn resolve_target_for_weapon(
     if mode_requires_currently_fireable_targets(mode)
         || aggressive_auto_acquisition_prefers_currently_fireable_targets(mode)
     {
-        let fireable_target = choose_target_preferring_anti_tank_field(
+        let fireable_target = choose_target_inside_anti_tank_field(
             &context,
             attacker,
             px,
@@ -221,7 +221,7 @@ pub(super) fn resolve_target_for_weapon(
             return fireable_target;
         }
     }
-    choose_target_preferring_anti_tank_field(&context, attacker, px, py, &candidates, |candidate| {
+    choose_target_inside_anti_tank_field(&context, attacker, px, py, &candidates, |candidate| {
         target_filter(candidate.id)
     })
 }
