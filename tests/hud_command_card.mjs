@@ -100,6 +100,28 @@ function buttonSlots(card) {
 }
 
 {
+  const emptyResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
+  const queuedResearchComplex = {
+    ...researchComplex,
+    id: 12,
+    prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+  };
+  const card = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [emptyResearchComplex, queuedResearchComplex],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(
+    card.slots[1].intent.buildingId,
+    queuedResearchComplex.id,
+    "dependent research should target the selected building that owns its queued prerequisite",
+  );
+}
+
+{
   const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   assert.equal(card.slots[1].enabled, false);
   assert.equal(card.slots[1].title, "Queued");

@@ -55,11 +55,7 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
   if (!def) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedAtSelectedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
-  if (def.requiresUpgrade &&
-      !(ctx.upgrades || []).includes(def.requiresUpgrade) &&
-      !researchQueuedAtSelectedBuilding(ctx, def.researchedAt, def.requiresUpgrade, isOwn)) {
-    return "locked";
-  }
+  if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
   return affordable(def.cost, resources) ? "ready" : "unaffordable";
 }
 
@@ -70,9 +66,7 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt, isOwn)
     .some((entity) => entity.prodUpgrade === upgrade)) return "Researching";
   if (researchQueuedAtSelectedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "Queued";
-  if (def.requiresUpgrade &&
-      !(ctx.upgrades || []).includes(def.requiresUpgrade) &&
-      !researchQueuedAtSelectedBuilding(ctx, def.researchedAt, def.requiresUpgrade, isOwn)) {
+  if (def.requiresUpgrade && !selectedResearchBuilding(ctx, upgrade, isOwn)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
   if (!affordable(def.cost, resources)) return "Queue now; research waits for resources";
@@ -98,6 +92,21 @@ function researchQueuedAtSelectedBuilding(ctx, buildingKind, upgrade, isOwn) {
     entity.kind === buildingKind &&
     entity.buildProgress == null &&
     (entity.prodUpgradeQueue || []).includes(upgrade));
+}
+
+/** First selected building on which the server can append this research right now. */
+export function selectedResearchBuilding(ctx, upgrade, isOwn) {
+  const def = UPGRADES[upgrade];
+  if (!def) return null;
+  const prerequisiteResearched = !def.requiresUpgrade ||
+    (ctx.upgrades || []).includes(def.requiresUpgrade);
+  return (ctx.selection || []).find((entity) =>
+    isOwn(ctx, entity) &&
+    entity.kind === def.researchedAt &&
+    entity.buildProgress == null &&
+    !(entity.prodUpgradeQueue || []).includes(upgrade) &&
+    (prerequisiteResearched ||
+      (entity.prodUpgradeQueue || []).includes(def.requiresUpgrade))) || null;
 }
 
 export function trainSlotForUnit(buildingKind, unit, trains) {

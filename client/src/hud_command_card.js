@@ -29,6 +29,7 @@ import {
   researchAvailability,
   researchDisabledReason,
   researchSlotForUpgrade,
+  selectedResearchBuilding,
   selectedProducerBuildingsForUnit,
   selectedProducingBuildingsForKind,
   trainAvailability,
@@ -463,7 +464,10 @@ export function buildTrainCard(ctx, building) {
       return `${unit}:${trainAvailability(ctx, unit, resources, isOwn)}:${trainLimitSignature(ctx, unit, isOwn)}:${producerIds}:repeat:${repeatingIds}`;
     }).join(",") +
     `|research:` +
-    researches.map((upgrade) => `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}`).join(",") +
+    researches.map((upgrade) => {
+      const target = selectedResearchBuilding(ctx, upgrade, isOwn);
+      return `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}`;
+    }).join(",") +
     `|cancel:${producingBuildings.map((e) => e.id).join(".")}`;
 
   const slots = new Array(9).fill(null);
@@ -513,12 +517,13 @@ export function buildTrainCard(ctx, building) {
     const slot = firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
     if (slot < 0) continue;
     const availability = researchAvailability(ctx, upgrade, resources, isOwn);
+    const target = selectedResearchBuilding(ctx, upgrade, isOwn);
     slots[slot] = {
       id: `research:${upgrade}`,
       commandId: factionCommandId(factionId, "research", upgrade),
       kind: "button",
       action: "research",
-      intent: { type: "research", upgrade },
+      intent: { type: "research", upgrade, buildingId: target?.id ?? null },
       icon: def.icon,
       label: def.label,
       cost: def.cost,

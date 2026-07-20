@@ -609,7 +609,7 @@ export class HUD {
         }
         return;
       case "research":
-        this._issueResearch(intent.upgrade);
+        this._issueResearch(intent.upgrade, intent.buildingId);
         return;
       case "ability":
         this._dispatchAbilityIntent(intent, ev);
@@ -836,11 +836,15 @@ export class HUD {
     this.commandInteraction.issueCommand(cmd.cancel(building.id));
   }
 
-  _issueResearch(upgrade) {
+  _issueResearch(upgrade, buildingId = null) {
     const def = UPGRADES[upgrade];
     if (!def) return;
-    const building = (this.state.selectedEntities() || []).find(
-      (e) => this._isOwn(e) && e.kind === def.researchedAt && e.buildProgress == null,
+    const selected = this.state.selectedEntities() || [];
+    const building = selected.find((entity) =>
+      (buildingId == null || entity.id === buildingId) &&
+      this._isOwn(entity) &&
+      entity.kind === def.researchedAt &&
+      entity.buildProgress == null,
     );
     if (!building) return;
     this.commandInteraction.issueCommand(cmd.research(building.id, upgrade));
