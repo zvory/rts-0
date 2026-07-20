@@ -118,6 +118,51 @@ async function generationAndFatalContracts() {
   adapter.destroy();
   adapter.destroy();
   assert(worker.terminated === 1, "destroy after fatal remains idempotent");
+
+  const staleFailureFixture = createFixture();
+  const staleFailureOldFrame = assemble(staleFailureFixture.assembler, 1);
+  const staleFailureOld = staleFailureFixture.adapter.render(staleFailureOldFrame);
+  staleFailureFixture.assembler.reset({ map: staleFailureFixture.map, generation: 2 });
+  const staleFailureFreshFrame = assemble(staleFailureFixture.assembler, 2);
+  const staleFailureFresh = staleFailureFixture.adapter.render(staleFailureFreshFrame);
+  assert((await staleFailureOld.settled).status === PRESENTATION_OUTCOME.SUPERSEDED,
+    "generation reset supersedes the old job before its worker result arrives");
+  const savedConsoleError = console.error;
+  try {
+    console.error = () => {};
+    staleFailureFixture.worker.emit(response(RENDER_WORKER_RESPONSE.FAILED, 1, {
+      frameId: staleFailureOldFrame.frameId,
+      code: "renderWorkerFailure",
+      message: "old generation render failed",
+    }));
+  } finally {
+    console.error = savedConsoleError;
+  }
+  assert((await staleFailureFresh.settled).status === PRESENTATION_OUTCOME.FAILED,
+    "a worker-closing failure from an old generation settles current-generation work");
+  assert(staleFailureFixture.adapter.terminalFailure()?.message === "old generation render failed"
+      && staleFailureFixture.worker.terminated === 1,
+    "stale-generation worker failure remains lifecycle-fatal instead of leaving a dead worker active");
+  staleFailureFixture.adapter.destroy();
+
+  const postFailureFixture = createFixture();
+  postFailureFixture.assembler.reset({ map: postFailureFixture.map, generation: 2 });
+  const postFailureFrame = assemble(postFailureFixture.assembler, 2);
+  postFailureFixture.worker.postMessage = () => { throw new Error("worker post failed"); };
+  const priorPostFailureConsoleError = console.error;
+  let postFailure;
+  try {
+    console.error = () => {};
+    postFailure = postFailureFixture.adapter.render(postFailureFrame);
+  } finally {
+    console.error = priorPostFailureConsoleError;
+  }
+  assert((await postFailure.settled).status === PRESENTATION_OUTCOME.FAILED,
+    "a synchronous worker command failure returns a settled presentation instead of escaping render");
+  assert(postFailureFixture.adapter.terminalFailure()?.message === "worker post failed"
+      && postFailureFixture.worker.terminated === 1,
+    "synchronous worker command failure tears down the unusable renderer lifecycle");
+  postFailureFixture.adapter.destroy();
 }
 
 async function editorFatalContracts() {

@@ -37,14 +37,20 @@ export class PixiWorkerPresentationAdapter {
     canvas.width = Math.ceil(widthCssPx * dpr);
     canvas.height = Math.ceil(heightCssPx * dpr);
     canvasParent.appendChild(canvas);
-    const offscreen = canvas.transferControlToOffscreen();
-    const worker = new Worker(new URL("./pixi_render_worker.js", import.meta.url), { type: "module" });
-    const adapter = new PixiWorkerPresentationAdapter(canvasParent, canvas, worker, sources, options);
+    let worker = null;
+    let adapter = null;
     try {
+      const offscreen = canvas.transferControlToOffscreen();
+      worker = new Worker(new URL("./pixi_render_worker.js", import.meta.url), { type: "module" });
+      adapter = new PixiWorkerPresentationAdapter(canvasParent, canvas, worker, sources, options);
       await adapter._initialize(offscreen, { widthCssPx, heightCssPx, dpr });
       return adapter;
     } catch (error) {
-      adapter.destroy();
+      if (adapter) adapter.destroy();
+      else {
+        worker?.terminate?.();
+        canvas.remove();
+      }
       throw error;
     }
   }
@@ -102,10 +108,15 @@ export class PixiWorkerPresentationAdapter {
       return immediatePresentationSubmission({ ...identity, status: PRESENTATION_OUTCOME.FAILED, error: this._fatal });
     }
     if (!frame || frame.version !== 2) throw new TypeError("Pixi worker requires PresentationFrameV2.");
-    this._ensureGeneration(frame.generation);
     const job = createJob(frame);
-    this._retainDurableDecals(job);
-    this._schedule(job);
+    try {
+      this._ensureGeneration(frame.generation);
+      this._retainDurableDecals(job);
+      this._schedule(job);
+    } catch (error) {
+      this._settleJob(job, PRESENTATION_OUTCOME.FAILED, error);
+      this._failFatal(error);
+    }
     return job.submission;
   }
 
@@ -386,6 +397,13 @@ export class PixiWorkerPresentationAdapter {
       this._failFatal(error);
       return;
     }
+    // Worker failures are lifecycle-wide, not generation-local. The worker sends
+    // FAILED and then closes, so ignoring an older generation here would strand
+    // any current-generation job that was queued behind the failed frame.
+    if (message.type === RENDER_WORKER_RESPONSE.FAILED) {
+      this._failFatal(new Error(message.payload.message || "Pixi render worker failed."));
+      return;
+    }
     if (message.generation !== this._generation) {
       this._stats.staleResponses += 1;
       this._recordCounter("renderWorker.responses.stale");
@@ -411,10 +429,6 @@ export class PixiWorkerPresentationAdapter {
     }
     if (message.type === RENDER_WORKER_RESPONSE.PRESENTED) {
       this._acceptPresented(message);
-      return;
-    }
-    if (message.type === RENDER_WORKER_RESPONSE.FAILED) {
-      this._failFatal(new Error(message.payload.message || "Pixi render worker failed."));
     }
   }
 
