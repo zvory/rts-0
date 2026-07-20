@@ -1822,8 +1822,8 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 
 #[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
-    const TARGET_RANGE_TILES: f32 = crate::config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32 - 1.0;
-    let map = open_map(128);
+    const TARGET_RANGE_TILES: f32 = 39.0;
+    let map = open_map(64);
     let mut entities = EntityStore::new();
     let at_id = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
