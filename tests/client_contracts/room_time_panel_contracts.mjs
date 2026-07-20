@@ -59,6 +59,10 @@ try {
     /@media \(pointer: coarse\) and \(max-width: 1024px\) and \(max-height: 1024px\)\s*\{[\s\S]*?#game-menu,[\s\S]*?z-index:\s*40\b/s.test(styles),
     "mobile-debug settings menu layers above room-time and diagnostic overlays",
   );
+  assert(
+    /@media \(pointer: coarse\) and \(max-width: 1024px\) and \(max-height: 1024px\)\s*\{[\s\S]*?#game-menu\.live-pause-active\s*\{[\s\S]*?z-index:\s*calc\(var\(--overlay-z\) \+ 2\)/s.test(styles),
+    "mobile-debug settings menu remains above the live-pause blocker",
+  );
 
   const root = fakeEl("div");
   const speed = fakeEl("button");
