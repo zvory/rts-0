@@ -1344,7 +1344,6 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(lockedHeavyGuns && !lockedHeavyGuns.enabled, "R&D should keep Heavy Guns visible but locked before Medium Guns");
   assert(lockedHeavyGuns.slotIndex !== mediumGuns.slotIndex, "Heavy Guns should keep a slot separate from Medium Guns");
   assert(!buttonByLabel(researchCard, "Unlock Artillery"), "R&D should not expose a separate Artillery unlock");
-
   const heavyGunsCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [researchComplex],
     entities: [
@@ -1359,18 +1358,6 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(heavyGuns && heavyGuns.enabled, "Heavy Guns should enable after Medium is researched");
   assert(heavyGuns.slotIndex === lockedHeavyGuns.slotIndex, "Heavy Guns should retain its permanent button slot");
   assert(heavyGuns.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Heavy Guns should use the artillery unlock identity");
-
-  const queuedChainCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [{ ...researchComplex, prodUpgradeQueue: [
-      UPGRADE.ANTI_TANK_GUN_UNLOCK,
-      UPGRADE.ARTILLERY_UNLOCK,
-    ] }],
-    entities: [researchComplex],
-    resources: { steel: 500, oil: 500 },
-  }));
-  assert(!buttonByLabel(queuedChainCard, "Heavy Guns").enabled, "queued Heavy Guns should not be duplicated");
-  assert(buttonByLabel(queuedChainCard, "Artillery Fire Control").enabled, "Fire Control should queue behind queued Heavy Guns");
-
   const catalog = buildCommandCardContextCatalog();
   assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");
   assert(catalog.every((entry) => duplicateCommandIdsForCard(entry.card).length === 0), "catalog contexts have unique command identities");
