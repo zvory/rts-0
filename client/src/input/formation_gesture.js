@@ -4,15 +4,18 @@ import { DEFAULT_TILE_SIZE } from "./constants.js";
 
 const FORMATION_LINE_MIN_TILES = 3;
 
-export function _beginFormationGesture(p, ev = {}) {
+export function _beginFormationGesture(p, ev = {}, kind = "move") {
   const world = this._groundAtScreen(p.x, p.y);
-  const units = this._selectedOwnUnitIds();
+  const attackMove = kind === "attackMove";
+  const units = attackMove
+    ? (this._selectedOwnLandUnitIds?.() || [])
+    : this._selectedOwnUnitIds();
   const intent = this._intent?.();
   const eligible = !!world &&
     units.length > 0 &&
     !intent?.activeLabTool &&
     !intent?.placement &&
-    !intent?.commandTarget;
+    (attackMove ? intent?.commandTarget === "attack" : !intent?.commandTarget);
   this._formationGesture = {
     startWorld: world ? { x: world.x, y: world.y } : null,
     maxExtentWorld: 0,
@@ -24,6 +27,7 @@ export function _beginFormationGesture(p, ev = {}) {
     eligible,
     promoted: false,
     queued: !!ev.shiftKey,
+    kind: attackMove ? "attackMove" : "move",
   };
   return true;
 }
@@ -48,7 +52,7 @@ export function _finishFormationGesture(p, ev = {}) {
   this._formationGesture = null;
   if (!gesture.eligible) {
     this._intent?.()?.clearFormationMovePreview?.();
-    this._onRightClick(p, ev);
+    finishClick(this, gesture, p, ev);
     return true;
   }
   const world = this._groundAtScreen(p.x, p.y);
@@ -58,16 +62,23 @@ export function _finishFormationGesture(p, ev = {}) {
   }
   if (!gesture.promoted) {
     this._intent?.()?.clearFormationMovePreview?.();
-    this._onRightClick(p, ev);
+    finishClick(this, gesture, p, ev);
     return true;
   }
   const preview = buildFormationLinePreview(gesture.points, gesture.entities);
   this._intent?.()?.clearFormationMovePreview?.();
   if (preview.points.length < 2 || gesture.units.length === 0) return true;
   const queued = !!ev.shiftKey;
-  this.commandInteraction.issueCommand(cmd.formationMove(gesture.units, preview.points, queued));
+  if (gesture.kind === "attackMove") {
+    for (const slot of preview.slots) {
+      this.commandInteraction.issueCommand(cmd.attackMove([slot.unitId], slot.x, slot.y, queued));
+    }
+    finishCommandTargetLifetime(this, ev);
+  } else {
+    this.commandInteraction.issueCommand(cmd.formationMove(gesture.units, preview.points, queued));
+  }
   const endpoint = preview.points[preview.points.length - 1];
-  this._addCommandFeedback?.("move", endpoint.x, endpoint.y, queued);
+  this._addCommandFeedback?.(gesture.kind === "attackMove" ? "attack" : "move", endpoint.x, endpoint.y, queued);
   return true;
 }
 
@@ -89,8 +100,28 @@ export function _refreshFormationGesture() {
 
 function refreshPreview(input, gesture) {
   input._intent?.()?.updateFormationMovePreview?.(
-    buildFormationLinePreview(gesture.points, gesture.promoted ? gesture.entities : []),
+    {
+      ...buildFormationLinePreview(gesture.points, gesture.promoted ? gesture.entities : []),
+      kind: gesture.kind,
+    },
   );
+}
+
+function finishClick(input, gesture, p, ev) {
+  if (gesture.kind !== "attackMove") {
+    input._onRightClick(p, ev);
+    return;
+  }
+  if (input._issueTargetedCommand(p, ev) === false) return;
+  finishCommandTargetLifetime(input, ev);
+}
+
+function finishCommandTargetLifetime(input, ev) {
+  const intent = input._intent?.();
+  const issued = typeof intent?.issueCommandTarget === "function"
+    ? intent.issueCommandTarget(ev)
+    : { keepArmed: false };
+  if (!issued.keepArmed) intent?.endCommandTarget?.();
 }
 
 function updatePromotion(input, gesture, world) {

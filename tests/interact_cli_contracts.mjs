@@ -436,6 +436,44 @@ try {
   assert.deepEqual(labSelection.result.selection, [100, 101], "Lab select resolves aliases and replaces browser-local selection");
   assert.deepEqual(labSelection.result.entities.map((entity) => entity.alias), ["shooter", "target"], "Lab select returns decorated selected entities");
   assert.deepEqual(call("inspect", { sessionId, limit: 4 }).result.selection, [100, 101], "Lab inspect reports browser-local selection ids");
+  const drag = call("drag", {
+    sessionId,
+    button: "left",
+    from: { x: 120, y: 140 },
+    to: { x: 520, y: 340 },
+    steps: 60,
+    durationMs: 2000,
+    holdKeys: ["attack", "shift"],
+  });
+  assert.deepEqual(
+    {
+      button: drag.result.result.button,
+      from: drag.result.result.from,
+      to: drag.result.result.to,
+      steps: drag.result.result.steps,
+      durationMs: drag.result.result.durationMs,
+      holdKeys: drag.result.result.holdKeys,
+    },
+    {
+      button: "left",
+      from: { x: 120, y: 140 },
+      to: { x: 520, y: 340 },
+      steps: 60,
+      durationMs: 2000,
+      holdKeys: ["attack", "shift"],
+    },
+    "Lab drag preserves one bounded viewport gesture through the command service",
+  );
+  assert.equal(
+    callFailure("drag", { sessionId, from: { x: 0, y: 0 }, to: { x: 10, y: 10 }, holdKeys: ["Escape"] }).error.code,
+    "invalidInput",
+    "Lab drag rejects arbitrary keyboard input",
+  );
+  assert.equal(
+    callFailure("drag", { sessionId, from: { x: 0, y: 0 }, to: { x: 10, y: 10 }, durationMs: 10_001 }).error.code,
+    "invalidInput",
+    "Lab drag duration remains hard bounded",
+  );
   assert.equal(
     callFailure("order", {
       sessionId,

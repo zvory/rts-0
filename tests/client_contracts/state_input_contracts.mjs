@@ -1444,7 +1444,19 @@ function buttonByLabel(card, label) {
   targetedInput._commitClickSelection = (p) => selectionClicks.push(p);
   targetedInput._screenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
   targetedInput._trackMouse = () => {};
-  targetedInput._onLeftDown({ x: 200, y: 200 }, {});
+  const clickTarget = (input, p, ev = {}) => {
+    input._onLeftDown(p, ev);
+    input._handleMouseUp({
+      button: 0,
+      clientX: p.x,
+      clientY: p.y,
+      shiftKey: !!ev.shiftKey,
+      ctrlKey: !!ev.ctrlKey,
+      metaKey: !!ev.metaKey,
+      preventDefault() {},
+    });
+  };
+  clickTarget(targetedInput, { x: 200, y: 200 });
   assert(targetedInput.clientIntent.commandTarget === null, "attack targeting clears after one click");
   assert(sentCommands.length === 1, "own click while attack targeting should issue one command");
   assert(sentCommands[0].c === "attack", "own click while attack targeting should issue attack");
@@ -1452,28 +1464,12 @@ function buttonByLabel(card, label) {
   assert(sentCommands[0].target === ownBuilding.id, "self-attack should target the clicked own entity");
   assert(feedback.length === 1 && feedback[0].kind === "attack", "self-attack click should show attack feedback");
   assert(targetedInput._drag == null, "attack targeting should not fall through to selection on the same click");
-  targetedInput._handleMouseUp({
-    button: 0,
-    clientX: 200,
-    clientY: 200,
-    shiftKey: false,
-    ctrlKey: false,
-    metaKey: false,
-  });
   assert(selectionClicks.length === 0, "attack targeting click should not also select on mouse-up");
 
   targetedInput.clientIntent.endCommandTarget();
   targetedInput._drag = null;
   targetedInput._entityAtScreen = () => null;
-  targetedInput._onLeftDown({ x: 240, y: 240 }, {});
-  targetedInput._handleMouseUp({
-    button: 0,
-    clientX: 240,
-    clientY: 240,
-    shiftKey: false,
-    ctrlKey: false,
-    metaKey: false,
-  });
+  clickTarget(targetedInput, { x: 240, y: 240 });
   assert(sentCommands.length === 1, "a second click without another A press should not issue attack-move");
   assert(selectionClicks.length === 1, "a second click without another A press should be normal selection");
 
@@ -1485,14 +1481,14 @@ function buttonByLabel(card, label) {
 
   targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput._entityAtScreen = () => null;
-  targetedInput._onLeftDown({ x: 280, y: 280 }, { shiftKey: true });
+  clickTarget(targetedInput, { x: 280, y: 280 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "attackMove", "attack targeting terrain should attack-move");
   assert(lastSent.queued === true, "Shift attack-move targeting should queue attack-move");
 
   targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput._entityAtScreen = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
-  targetedInput._onLeftDown({ x: 300, y: 300 }, { shiftKey: true });
+  clickTarget(targetedInput, { x: 300, y: 300 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "attack", "attack targeting an enemy should issue attack");
   assert(
@@ -1503,12 +1499,12 @@ function buttonByLabel(card, label) {
   targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput.clientIntent.holdCommandTarget("attack", "KeyA", true);
   targetedInput._entityAtScreen = () => null;
-  targetedInput._onLeftDown({ x: 320, y: 320 }, { shiftKey: true });
+  clickTarget(targetedInput, { x: 320, y: 320 }, { shiftKey: true });
   assert(
     targetedInput.clientIntent.commandTarget === "attack",
     "Shift attack targeting should stay armed while A is held",
   );
-  targetedInput._onLeftDown({ x: 340, y: 340 }, { shiftKey: true });
+  clickTarget(targetedInput, { x: 340, y: 340 }, { shiftKey: true });
   assert(
     sentCommands.at(-2).c === "attackMove" &&
       sentCommands.at(-2).queued === true &&
@@ -1516,7 +1512,7 @@ function buttonByLabel(card, label) {
       sentCommands.at(-1).queued === true,
     "held A plus Shift should queue multiple attack-move orders",
   );
-  targetedInput._onLeftDown({ x: 360, y: 360 }, { shiftKey: false });
+  clickTarget(targetedInput, { x: 360, y: 360 }, { shiftKey: false });
   assert(
     targetedInput.clientIntent.commandTarget === "attack",
     "held A keeps attack targeting armed after an unqueued click",

@@ -160,6 +160,46 @@ assert.deepEqual(
   { ready: false, reason: "pageError" },
   "driver does not report readiness after a page error",
 );
+const dragEvents = [];
+const dragDriver = new InteractDriver({ workspaceRoot: root });
+dragDriver.state = DRIVER_STATES.OPEN;
+dragDriver.page = {
+  evaluate: async () => ({ left: 10, top: 20, width: 800, height: 600 }),
+  mouse: {
+    move: async (x, y) => { dragEvents.push(["move", x, y]); },
+    down: async ({ button }) => { dragEvents.push(["down", button]); },
+    up: async ({ button }) => { dragEvents.push(["up", button]); },
+  },
+  keyboard: {
+    down: async (key) => { dragEvents.push(["keyDown", key]); },
+    up: async (key) => { dragEvents.push(["keyUp", key]); },
+  },
+};
+const dragged = await dragDriver.drag({
+  button: "left",
+  from: { x: 100, y: 120 },
+  to: { x: 300, y: 320 },
+  steps: 2,
+  durationMs: 0,
+  holdKeys: ["attack", "shift"],
+});
+assert.deepEqual(dragEvents, [
+  ["move", 110, 140],
+  ["keyDown", "a"],
+  ["keyDown", "Shift"],
+  ["down", "left"],
+  ["move", 210, 240],
+  ["move", 310, 340],
+  ["up", "left"],
+  ["keyUp", "Shift"],
+  ["keyUp", "a"],
+], "driver translates viewport-local drag coordinates and releases bounded held keys in reverse order");
+assert.deepEqual(dragged.viewport, { width: 800, height: 600 }, "driver reports the viewport used for the gesture");
+await assert.rejects(
+  dragDriver.drag({ from: { x: 100, y: 100 }, to: { x: 801, y: 100 } }),
+  (error) => error?.code === "outsideViewport" && error?.details?.viewport?.width === 800,
+  "driver rejects a drag endpoint outside the current rendered viewport",
+);
 const concludedCaptureDriver = new InteractDriver({ workspaceRoot: root });
 concludedCaptureDriver.pageErrors = [];
 concludedCaptureDriver.pageConsoleErrors = [];

@@ -126,6 +126,19 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
   } else if (command === "select") {
     exact(value, ["sessionId", "refs"], command);
     refs(value.refs, "select.refs", 0, INTERACT_LIMITS.maxSelectionRefs);
+  } else if (command === "drag") {
+    exact(value, ["sessionId", "button", "from", "to", "steps", "durationMs", "holdKeys"], command);
+    if (value.button != null && value.button !== "left" && value.button !== "right") invalid("drag.button", "must be left or right");
+    dragPoint(value.from, "drag.from");
+    dragPoint(value.to, "drag.to");
+    if (value.steps != null) integer(value.steps, "drag.steps", 1, 240);
+    if (value.durationMs != null) integer(value.durationMs, "drag.durationMs", 0, 10_000);
+    if (value.holdKeys != null) {
+      array(value.holdKeys, "drag.holdKeys", 0, 2, (entry) => {
+        if (entry !== "attack" && entry !== "shift") invalid("drag.holdKeys", "contains an unsupported key");
+      });
+      if (new Set(value.holdKeys).size !== value.holdKeys.length) invalid("drag.holdKeys", "must not contain duplicate keys");
+    }
   } else if (command === "camera") {
     exact(value, ["sessionId", "camera"], command);
     validateCamera(value.camera);
@@ -381,6 +394,13 @@ function recordingCrop(value: unknown) {
   boundedNumber(value.y, "record-start.crop.y", 0, 2048);
   boundedNumber(value.width, "record-start.crop.width", 2, 2048);
   boundedNumber(value.height, "record-start.crop.height", 2, 2048);
+}
+
+function dragPoint(value: unknown, label: string) {
+  record(value, label);
+  exact(value, ["x", "y"], label);
+  boundedNumber(value.x, `${label}.x`, 0, 4096);
+  boundedNumber(value.y, `${label}.y`, 0, 4096);
 }
 
 function captureRegion(value: unknown, label: string) {

@@ -12,7 +12,7 @@ export function drawFormationMovePreview(g, preview) {
     ? preview.points.filter(finitePoint)
     : [];
   if (points.length < 2) return;
-  const color = COLORS.selectOwn;
+  const color = preview?.kind === "attackMove" ? COLORS.selectEnemy : COLORS.selectOwn;
   // A dark outside stroke keeps the freehand path readable over bright terrain,
   // selection ranges, and fog; the saturated inner stroke shows the exact path.
   const path = points.map(({ x, y }) => [x, y]);
