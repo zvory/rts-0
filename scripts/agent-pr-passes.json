@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "passes": [
+    {
+      "id": "patch-notes",
+      "command": ["node", "scripts/patch-note-pass.mjs"],
+      "modelEnv": "RTS_PATCH_NOTES_MODEL"
+    }
+  ]
+}
