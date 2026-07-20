@@ -12,6 +12,7 @@ import {
   parseArgs as parsePatchArgs,
   parseEnvValue,
   renderDiscordMessage,
+  renderDiscordPayload,
   renderFragment,
   sendDiscordPatchNote,
 } from "../scripts/patch-note-pass.mjs";
@@ -44,6 +45,10 @@ assert.equal(
   renderDiscordMessage(decision),
   "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
 );
+assert.deepEqual(
+  JSON.parse(renderDiscordPayload("@everyone changed")),
+  { content: "@everyone changed", allowed_mentions: { parse: [] } },
+);
 assert.equal(
   parseEnvValue("OTHER=value\nRTS_PATCH_NOTES_DISCORD_WEBHOOK_URL='https://example.invalid/hook'\n", "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"),
   "https://example.invalid/hook",
@@ -72,6 +77,15 @@ assert.deepEqual(
     reason: "One line reason",
   },
 );
+const maximumDiscordDecision = normalizeDecision({
+  decision: "write_patch_note",
+  title: "Bounded changes",
+  changes: Array.from({ length: 8 }, () => "x".repeat(300)),
+  playtest_watch: [],
+  reason: "Exercise the Discord content limit.",
+});
+assert.equal(maximumDiscordDecision.changes.every((item) => item.length === 230), true);
+assert(renderDiscordMessage(maximumDiscordDecision).length <= 2000, "Discord patch notes must fit one message");
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });

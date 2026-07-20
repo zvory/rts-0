@@ -11,6 +11,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
 const defaultSchema = path.join(scriptDir, "patch-note-pass.schema.json");
 const MAX_DIFF_CHARS = 60000;
+const MAX_CHANGE_CHARS = 230;
 
 export function parseArgs(argv) {
   const options = {
@@ -54,6 +55,10 @@ export function renderDiscordMessage(decision) {
     .join("\n");
 }
 
+export function renderDiscordPayload(message) {
+  return JSON.stringify({ content: message, allowed_mentions: { parse: [] } });
+}
+
 export function parseEnvValue(contents, name) {
   for (const line of contents.split(/\r?\n/)) {
     const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
@@ -88,7 +93,7 @@ function postDiscordMessage(webhookUrl, message) {
   run("curl", [
     "--fail-with-body", "--silent", "--show-error", "--output", "/dev/null",
     "--header", "Content-Type: application/json",
-    "--data-binary", JSON.stringify({ content: message }),
+    "--data-binary", renderDiscordPayload(message),
     webhookUrl,
   ]);
 }
@@ -129,11 +134,14 @@ export function isGameplayCandidate(pathname) {
 export function normalizeDecision(raw) {
   if (!raw || !["no_patch_note", "write_patch_note"].includes(raw.decision)) throw new Error("patch-note pass returned an invalid decision");
   const singleLine = (value) => String(value || "").replace(/\s+/g, " ").trim();
-  const strings = (value, max) => Array.isArray(value) ? value.map(singleLine).filter(Boolean).slice(0, max) : [];
+  const strings = (value, max, maxChars = Infinity) => Array.isArray(value)
+    ? value.map(singleLine).filter(Boolean).map((item) => item.slice(0, maxChars).trim()).slice(0, max)
+    : [];
   const decision = {
     decision: raw.decision,
     title: singleLine(raw.title),
-    changes: strings(raw.changes, 8),
+    // Eight prefixed bullets of this size remain below Discord's 2,000-character content limit.
+    changes: strings(raw.changes, 8, MAX_CHANGE_CHARS),
     playtestWatch: strings(raw.playtest_watch, 4),
     reason: singleLine(raw.reason),
   };

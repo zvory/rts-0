@@ -246,7 +246,9 @@ canary runs own a private server; the browser shard passes its existing loopback
   When `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the process environment, the current
   worktree `.env`, or the primary checkout `.env`, the pass sends only the `## Changes` bullets to
   Discord. It omits the fragment title, date, playtest-watch section, and PR metadata. A content
-  hash under the shared Git directory suppresses duplicate deliveries when the helper is rerun.
+  hash under the shared Git directory suppresses duplicate deliveries when the helper is rerun;
+  normalized change bullets are bounded so the complete post fits Discord's message limit, and
+  webhook payloads disable mention parsing.
   Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
   Codex quality-pass coverage should verify access to linked worktree git common directories while
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
