@@ -59,7 +59,7 @@ use self::artillery_scatter::{artillery_blanket_point, artillery_scattered_point
 use self::guards::{
     command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
     rally_intent_for_map, unit_can_accept_ground_command, unit_can_accept_player_command,
-    CommandAdmissionPolicy,
+    unit_can_accept_stop_command, CommandAdmissionPolicy,
 };
 use self::planner_facts::{
     entity_order_intent_from_planner, issue_mode, planner_config, planner_facts, AbilityFactInput,
@@ -619,7 +619,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 for id in units {
-                    if unit_can_accept_ground_command(entities, player, id) {
+                    if unit_can_accept_stop_command(entities, player, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();

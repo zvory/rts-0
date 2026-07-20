@@ -1514,7 +1514,11 @@ Allocation rules:
   workers not already assigned to build/deconstruct work, then interruptible workers already assigned
   to build/deconstruct work; distance to the footprint/target center breaks ties within each tier.
   Workers actively constructing a building are not immediate candidates, but may still receive
-  queued handoff work. Queued orders prefer the lowest work assignment load, then closest worker.
+  queued handoff work. Stop is the explicit exception: it immediately detaches an active builder,
+  leaves the unfinished paid scaffold in place, and clears that worker's queued handoff work. The
+  released worker can immediately receive ordinary commands, and any eligible owned worker can
+  resume the scaffold through the normal build intent without paying again. Queued orders prefer
+  the lowest work assignment load, then closest worker.
   Work assignment load is the worker's current queued-order count plus one when its active order is
   already a build or deconstruct intent. Deconstruct targets must be completed Tank
   Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps

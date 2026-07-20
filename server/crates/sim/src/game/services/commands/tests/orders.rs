@@ -617,6 +617,101 @@ fn stop_clears_orders_and_hold_position_enters_hold_stance() {
 }
 
 #[test]
+fn stop_releases_worker_from_active_construction() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let site = entities
+        .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
+        .expect("scaffold should spawn");
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, site_x + 96.0, site_y)
+        .expect("worker should spawn");
+    let replacement_worker = entities
+        .spawn_unit(1, EntityKind::Worker, site_x + 128.0, site_y)
+        .expect("replacement worker should spawn");
+    {
+        let worker = entities.get_mut(worker).expect("worker should exist");
+        worker.set_order(Order::build(EntityKind::CityCentre, 4, 4));
+        worker.mark_build_phase(BuildPhase::Constructing { site });
+        worker.set_target_id(Some(site));
+        worker.append_queued_order(OrderIntent::move_to(400.0, 400.0));
+    }
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Stop {
+                units: vec![worker],
+            },
+        )],
+    );
+
+    let stopped = entities.get(worker).expect("worker should remain alive");
+    assert!(matches!(stopped.order(), Order::Idle));
+    assert!(stopped.queued_orders().is_empty());
+    assert_eq!(stopped.target_id(), None);
+    assert!(
+        entities
+            .get(site)
+            .is_some_and(|site| site.under_construction()),
+        "stopping the worker must leave the unfinished scaffold available to resume"
+    );
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Move {
+                units: vec![worker],
+                x: 500.0,
+                y: 500.0,
+                queued: false,
+            },
+        )],
+    );
+
+    assert!(
+        matches!(
+            entities
+                .get(worker)
+                .expect("worker should remain alive")
+                .order(),
+            Order::Move(_)
+        ),
+        "a stopped builder should immediately accept ordinary worker commands"
+    );
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![replacement_worker],
+                building: EntityKind::CityCentre,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+    );
+
+    assert_eq!(
+        entities
+            .get(replacement_worker)
+            .expect("replacement worker should remain alive")
+            .order()
+            .build_intent_tile(),
+        Some((EntityKind::CityCentre, 4, 4)),
+        "another worker should accept the normal resume intent for the stopped scaffold"
+    );
+}
+
+#[test]
 fn queued_hold_position_appends_a_terminal_stance() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
