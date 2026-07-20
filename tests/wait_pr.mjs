@@ -135,5 +135,5 @@ try {
   assert.notEqual(git(["rev-parse", "main"]).trim(), git(["rev-parse", "origin/main"]).trim());
   assert.equal(fs.existsSync(second.taskPath), true, "cleanup must not run after a failed fast-forward");
 } finally {
-  fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  fs.rmSync(fixtureRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }
