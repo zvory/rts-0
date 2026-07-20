@@ -205,6 +205,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     STATS[KIND.SCOUT_PLANE].cost.steel === 50 &&
       STATS[KIND.SCOUT_PLANE].cost.oil === 75 &&
+      STATS[KIND.SCOUT_PLANE].sight === 16 &&
       STATS[KIND.SCOUT_PLANE].supply === 0 &&
       STATS[KIND.SCOUT_PLANE].buildTicks === 0 &&
       STATS[KIND.SCOUT_PLANE].body.length === 48 &&
