@@ -279,16 +279,6 @@ run_quality_pass() {
 archive_completed_plans
 run_configured_passes
 run_quality_pass
-discord_delivery_args=(
-  --base "origin/$BASE_BRANCH"
-  --head-branch "$HEAD_BRANCH"
-  --repo "$repo_root"
-  --deliver-discord
-)
-if [ "$DRY_RUN" = "1" ]; then
-  discord_delivery_args+=(--dry-run)
-fi
-node scripts/patch-note-pass.mjs "${discord_delivery_args[@]}"
 
 needs_human="false"
 auto_merge_text="requested"

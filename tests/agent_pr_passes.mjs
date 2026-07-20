@@ -18,10 +18,22 @@ import {
   sendDiscordPatchNote,
 } from "../scripts/patch-note-pass.mjs";
 
+assert.doesNotMatch(
+  fs.readFileSync(new URL("../scripts/agent-pr.sh", import.meta.url), "utf8"),
+  /--deliver-discord/,
+  "agent-pr must never deliver patch notes before merge",
+);
+assert.match(
+  fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8"),
+  /--delivery-ref.*--deliver-discord/s,
+  "wait-pr owns immutable post-merge patch-note delivery",
+);
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).baseRef, "upstream/main");
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, true);
 assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small-model");
 assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
+assert.equal(parsePatchArgs(["--delivery-ref", "abc123"]).deliveryRef, "abc123");
+assert.deepEqual(parsePatchArgs(["--delivery-path", "patch-notes/note.md"]).deliveryPaths, ["patch-notes/note.md"]);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
@@ -215,6 +227,47 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   );
   assert.match(run("git", ["log", "-1", "--format=%s"], lifecycleRoot), /Remove stale gameplay patch note/);
   assert.equal(run("git", ["status", "--porcelain=v1"], lifecycleRoot), "");
+
+  fs.mkdirSync(path.dirname(staleFragment), { recursive: true });
+  fs.writeFileSync(
+    staleFragment,
+    "<!-- rts-patch-note:v1 -->\n<!-- branch: zvorygin/stale-note -->\n# Final note\n\n## Changes\n\n- Merged factual change.\n",
+  );
+  run("git", ["add", "patch-notes/2026-07-20/stale-note.md"], lifecycleRoot);
+  run("git", ["commit", "-m", "Add final patch note"], lifecycleRoot);
+  const deliveryRef = run("git", ["rev-parse", "HEAD"], lifecycleRoot);
+  run("git", ["checkout", "main"], lifecycleRoot);
+  fs.writeFileSync(path.join(lifecycleRoot, "unrelated.txt"), "delivery must not depend on the checkout\n");
+  const delivery = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--delivery-path", "patch-notes/2026-07-20/stale-note.md",
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.deepEqual(delivery.changes, ["Merged factual change."], "delivery should read the immutable merged head");
+
+  const historicalOnly = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.equal(historicalOnly, null, "delivery should not rediscover an unchanged historical fragment");
+
+  const deletedFragment = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--delivery-path", "patch-notes/2025-12-31/stale-note.md",
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.equal(deletedFragment, null, "delivery should ignore a changed fragment that is absent at the immutable head");
+  run("git", ["checkout", "zvorygin/stale-note"], lifecycleRoot);
+  fs.rmSync(path.join(lifecycleRoot, "unrelated.txt"));
 
   run("git", ["rm", "server/crates/rules/src/fixture.rs"], lifecycleRoot);
   run("git", ["commit", "-m", "Revert gameplay change"], lifecycleRoot);

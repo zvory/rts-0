@@ -67,6 +67,24 @@ refresh_main_checkout() {
   fi
 }
 
+deliver_patch_notes() {
+  local head_sha="$1"
+  local head_ref="$2"
+  local view_json="$3"
+  local -a delivery_args=(
+    --repo "$repo_root"
+    --head-branch "$head_ref"
+    --delivery-ref "$head_sha"
+    --deliver-discord
+  )
+
+  while IFS= read -r fragment_path; do
+    delivery_args+=(--delivery-path "$fragment_path")
+  done < <(jq -r '.files[]?.path | select(startswith("patch-notes/"))' <<<"$view_json")
+
+  node scripts/patch-note-pass.mjs "${delivery_args[@]}"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --interval) INTERVAL_SECONDS="${2:?missing --interval value}"; shift ;;
@@ -106,7 +124,7 @@ load_view_json() {
     printf '%s\n' "$RTS_WAIT_PR_VIEW_JSON"
   else
     "$GH_BIN" pr view "$PR" \
-      --json number,url,state,mergedAt,headRefOid,headRefName,baseRefName,autoMergeRequest,mergeStateStatus,isDraft
+      --json number,url,state,mergedAt,headRefOid,headRefName,baseRefName,autoMergeRequest,mergeStateStatus,isDraft,files
   fi
 }
 
@@ -162,6 +180,7 @@ while true; do
       git fetch --quiet origin main
     fi
     if git merge-base --is-ancestor "$head_sha" "$MAIN_REF"; then
+      deliver_patch_notes "$head_sha" "$head_ref" "$view_json"
       refresh_main_checkout
       echo "wait-pr: PR #$number merged, $head_sha is reachable from $MAIN_REF, and local main is current"
       exit 0
