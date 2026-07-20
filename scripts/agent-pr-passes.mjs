@@ -42,15 +42,20 @@ export function parseArgs(argv) {
 export function loadPasses(configFile) {
   const parsed = JSON.parse(fs.readFileSync(configFile, "utf8"));
   if (parsed?.version !== 1 || !Array.isArray(parsed.passes)) throw new Error("agent PR pass config must have version 1 and passes[]");
+  const ids = new Set();
   return parsed.passes.map((entry) => {
     if (!entry || typeof entry.id !== "string" || !entry.id.trim()) throw new Error("agent PR pass requires a non-empty id");
-    if (!Array.isArray(entry.command) || entry.command.some((part) => typeof part !== "string") || entry.command.length === 0) {
-      throw new Error(`agent PR pass ${entry.id} requires a string command[]`);
+    const id = entry.id.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) throw new Error(`agent PR pass has invalid id: ${id}`);
+    if (ids.has(id)) throw new Error(`duplicate agent PR pass id: ${id}`);
+    ids.add(id);
+    if (!Array.isArray(entry.command) || entry.command.some((part) => typeof part !== "string" || !part) || entry.command.length === 0) {
+      throw new Error(`agent PR pass ${id} requires a non-empty string command[]`);
     }
     if (entry.modelEnv !== undefined && (typeof entry.modelEnv !== "string" || !entry.modelEnv.trim())) {
-      throw new Error(`agent PR pass ${entry.id} has invalid modelEnv`);
+      throw new Error(`agent PR pass ${id} has invalid modelEnv`);
     }
-    return { id: entry.id.trim(), command: entry.command, modelEnv: entry.modelEnv?.trim() || "" };
+    return { id, command: entry.command, modelEnv: entry.modelEnv?.trim() || "" };
   });
 }
 
@@ -83,6 +88,10 @@ export function run(options) {
   }
   const branch = git(options.repoRoot, ["branch", "--show-current"]);
   if (!branch || (options.headBranch && branch !== options.headBranch)) throw new Error(`agent PR pass branch mismatch: current=${branch || "<detached>"} requested=${options.headBranch || branch}`);
+  if (!options.dryRun) {
+    const status = git(options.repoRoot, ["status", "--porcelain=v1"]);
+    if (status) throw new Error(`agent PR passes require a clean worktree before starting:\n${status}`);
+  }
   const passes = loadPasses(options.configFile);
   const records = [];
   for (const pass of passes) {

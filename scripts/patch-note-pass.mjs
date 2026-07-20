@@ -64,13 +64,14 @@ export function isGameplayCandidate(pathname) {
 
 export function normalizeDecision(raw) {
   if (!raw || !["no_patch_note", "write_patch_note"].includes(raw.decision)) throw new Error("patch-note pass returned an invalid decision");
-  const strings = (value, max) => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean).slice(0, max) : [];
+  const singleLine = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  const strings = (value, max) => Array.isArray(value) ? value.map(singleLine).filter(Boolean).slice(0, max) : [];
   const decision = {
     decision: raw.decision,
-    title: String(raw.title || "").trim(),
+    title: singleLine(raw.title),
     changes: strings(raw.changes, 8),
     playtestWatch: strings(raw.playtest_watch, 4),
-    reason: String(raw.reason || "").trim(),
+    reason: singleLine(raw.reason),
   };
   if (decision.decision === "write_patch_note" && (!decision.title || decision.changes.length === 0)) {
     throw new Error("write_patch_note requires a title and at least one factual change");
@@ -121,21 +122,32 @@ ${diff}
 `;
 }
 
-function existingFragmentPath(repoRoot, slug) {
-  const root = path.join(repoRoot, "patch-notes");
-  if (!fs.existsSync(root)) return "";
-  const matches = [];
-  for (const date of fs.readdirSync(root, { withFileTypes: true })) {
-    if (!date.isDirectory()) continue;
-    const candidate = path.join(root, date.name, `${slug}.md`);
-    if (fs.existsSync(candidate)) matches.push(candidate);
-  }
+function existingFragmentPath(repoRoot, baseRef, branch, slug) {
+  const changedFragments = git(repoRoot, [
+    "diff", "--name-only", "--diff-filter=ACMR", "--no-renames", `${baseRef}...HEAD`, "--", "patch-notes",
+  ]).split("\n").filter(Boolean);
+  const suffix = `/${slug}.md`;
+  const matches = changedFragments
+    .filter((candidate) => candidate.startsWith("patch-notes/") && candidate.endsWith(suffix))
+    .map((candidate) => path.join(repoRoot, candidate))
+    .filter((candidate) => fs.existsSync(candidate));
   if (matches.length > 1) throw new Error(`multiple patch-note fragments exist for ${slug}`);
-  return matches[0] || "";
+  const existing = matches[0] || "";
+  if (existing) {
+    const contents = fs.readFileSync(existing, "utf8");
+    if (!contents.startsWith("<!-- rts-patch-note:v1 -->\n") || !contents.includes(`<!-- branch: ${branch} -->`)) {
+      throw new Error(`refusing to overwrite unmanaged patch-note fragment ${path.relative(repoRoot, existing)}`);
+    }
+  }
+  return existing;
 }
 
-function markdownReport(decision, relativePath = "") {
-  const result = decision.decision === "write_patch_note" ? `Updated \`${relativePath}\`.` : "No player-facing gameplay change detected.";
+function markdownReport(decision, relativePath = "", removed = false) {
+  const result = decision.decision === "write_patch_note"
+    ? `Updated \`${relativePath}\`.`
+    : removed
+      ? `Removed stale fragment \`${relativePath}\`.`
+      : "No player-facing gameplay change detected.";
   return [
     `Decision: ${decision.decision}`,
     "",
@@ -157,17 +169,29 @@ export function execute(options) {
   if (status) throw new Error(`patch-note pass requires a clean worktree:\n${status}`);
   const changedPaths = git(options.repoRoot, ["diff", "--name-only", "--no-renames", `${options.baseRef}...HEAD`]).split("\n").filter(Boolean);
   const candidates = changedPaths.filter(isGameplayCandidate);
+  const slug = branchSlug(branch);
+  const existing = existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
+  const existingRelativePath = existing ? path.relative(options.repoRoot, existing) : "";
   if (candidates.length === 0) {
     const decision = { decision: "no_patch_note", title: "", changes: [], playtestWatch: [], reason: "No gameplay-authoritative paths changed." };
-    if (options.markdownReportFile) fs.writeFileSync(options.markdownReportFile, markdownReport(decision));
-    process.stdout.write("patch-note-pass: skipped; no gameplay candidate paths\n");
+    if (existing && !options.dryRun) {
+      run("git", ["rm", "--", existingRelativePath], { cwd: options.repoRoot });
+      run("git", ["commit", "-m", "Remove stale gameplay patch note", "-m", decision.reason], { cwd: options.repoRoot });
+      process.stdout.write(`patch-note-pass: removed ${existingRelativePath}\n`);
+    } else {
+      process.stdout.write(`patch-note-pass: skipped; no gameplay candidate paths${existing ? `; would remove ${existingRelativePath}` : ""}\n`);
+    }
+    if (options.markdownReportFile) fs.writeFileSync(options.markdownReportFile, markdownReport(decision, existingRelativePath, Boolean(existing) && !options.dryRun));
     return decision;
   }
-  const slug = branchSlug(branch);
-  const date = new Date().toISOString().slice(0, 10);
-  const existing = existingFragmentPath(options.repoRoot, slug);
+  const date = existing
+    ? path.basename(path.dirname(existing))
+    : new Date().toISOString().slice(0, 10);
   const fragmentPath = existing || path.join(options.repoRoot, "patch-notes", date, `${slug}.md`);
   const relativePath = path.relative(options.repoRoot, fragmentPath);
+  if (!existing && fs.existsSync(fragmentPath)) {
+    throw new Error(`refusing to overwrite base-owned patch-note fragment ${relativePath}`);
+  }
   const diff = git(options.repoRoot, ["diff", "--no-ext-diff", "--unified=3", `${options.baseRef}...HEAD`, "--", ...candidates]);
   const boundedDiff = diff.length > MAX_DIFF_CHARS ? `${diff.slice(0, MAX_DIFF_CHARS)}\n[diff truncated]` : diff;
   const prompt = renderPrompt({
@@ -193,13 +217,17 @@ export function execute(options) {
       fs.writeFileSync(fragmentPath, renderFragment({ branch, date, decision }));
       run("git", ["add", "--", relativePath], { cwd: options.repoRoot });
       if (git(options.repoRoot, ["status", "--porcelain=v1", "--", relativePath])) {
-        run("git", ["commit", "-m", "Add gameplay patch note", "-m", decision.reason || "Record the player-facing impact detected by the agent PR patch-note pass."], { cwd: options.repoRoot });
+        run("git", ["commit", "-m", existing ? "Update gameplay patch note" : "Add gameplay patch note", "-m", decision.reason || "Record the player-facing impact detected by the agent PR patch-note pass."], { cwd: options.repoRoot });
         process.stdout.write(`patch-note-pass: committed ${relativePath}\n`);
       } else {
         process.stdout.write(`patch-note-pass: ${relativePath} already matches the classified impact\n`);
       }
+    } else if (existing) {
+      run("git", ["rm", "--", relativePath], { cwd: options.repoRoot });
+      run("git", ["commit", "-m", "Remove stale gameplay patch note", "-m", decision.reason || "The final branch diff no longer has player-facing gameplay changes."], { cwd: options.repoRoot });
+      process.stdout.write(`patch-note-pass: removed ${relativePath}\n`);
     }
-    if (options.markdownReportFile) fs.writeFileSync(options.markdownReportFile, markdownReport(decision, relativePath));
+    if (options.markdownReportFile) fs.writeFileSync(options.markdownReportFile, markdownReport(decision, relativePath, decision.decision === "no_patch_note" && Boolean(existing)));
     return decision;
   } finally {
     fs.rmSync(outputFile, { force: true });

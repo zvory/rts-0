@@ -10,4 +10,4 @@ _2026-07-20_
 
 ## Playtest watch
 
-- Watch whether the doubled range makes deployed anti-tank guns too effective at controlling open ground and engaging armored units before they can respond.
+- Watch whether the doubled range makes deployed anti-tank guns with allied vision too effective at controlling open ground and engaging armored units before they can respond.

@@ -1822,13 +1822,19 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 
 #[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
+    const TARGET_RANGE_TILES: f32 = 39.0;
+    let map = open_map(64);
     let mut entities = EntityStore::new();
     let at_id = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
         .expect("anti-tank gun should spawn");
+    let target_x = 100.0 + TARGET_RANGE_TILES * config::TILE_SIZE as f32;
     let tank_id = entities
-        .spawn_unit(2, EntityKind::Tank, 310.0, 100.0)
+        .spawn_unit(2, EntityKind::Tank, target_x, 100.0)
         .expect("enemy tank should spawn");
+    entities
+        .spawn_unit(3, EntityKind::Rifleman, target_x, 132.0)
+        .expect("allied spotter should spawn");
     if let Some(at) = entities.get_mut(at_id) {
         at.set_weapon_setup(WeaponSetup::Deployed);
         at.set_emplacement_facing(Some(0.0));
@@ -1841,11 +1847,17 @@ fn deployed_anti_tank_gun_fires_at_long_range() {
         .set_facing(std::f32::consts::PI);
     let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
 
-    let events = run_combat_tick(&mut entities);
+    let mut spotter = player_state(3, false);
+    spotter.team_id = 1;
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false), spotter],
+        &map,
+    );
 
     assert!(
         entities.get(tank_id).expect("enemy should exist").hp < enemy_hp,
-        "deployed Anti-Tank Gun should fire at range 7"
+        "deployed Anti-Tank Gun should fire at range {TARGET_RANGE_TILES} with allied vision"
     );
     assert!(
         events.get(&2).is_some_and(|events| events.iter().any(|event| {
@@ -1861,7 +1873,7 @@ fn deployed_anti_tank_gun_fires_at_long_range() {
                     && *to == tank_id
                     && reveal.kind == crate::protocol::kind_to_wire(EntityKind::AntiTankGun)
                     && reveal.setup_state.as_deref() == Some(WeaponSetup::Deployed.to_protocol_str())
-                    && *to_pos == [310.0, 100.0]
+                    && *to_pos == [target_x, 100.0]
                     && weapon_kind == crate::rules::combat::WeaponKind::AntiTankGun.stable_id()
             )
         })),
