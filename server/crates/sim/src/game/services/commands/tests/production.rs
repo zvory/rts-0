@@ -28,12 +28,6 @@ fn support_weapon_and_vehicle_training_require_finished_unlock_upgrades() {
             UpgradeKind::TankUnlock,
             None,
         ),
-        (
-            EntityKind::Factory,
-            EntityKind::CommandCar,
-            UpgradeKind::TankUnlock,
-            None,
-        ),
     ] {
         let mut entities = EntityStore::new();
         let (px, py) = footprint_center(&map, producer, 6, 6);

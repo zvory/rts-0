@@ -331,7 +331,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`. Packed or setting-up guns retain their
   shared `MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK = 0.035` alignment speed (about 60.2°/s),
   while an emplaced gun turns its cone at
-  `ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND = 6.5`; packed, setting-up, and tearing-down
+  `ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND = 1.0`; packed, setting-up, and tearing-down
   guns cannot fire. A deployed gun fires immediately at any target already inside its current cone.
   If its selected visible, in-range target is outside the cone, it turns the cone at that rate
   until the target enters it, then fires without further target tracking.
@@ -435,8 +435,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
-  Works and Command Cars from Vehicle Works. Scout Cars remain immediately trainable from Vehicle
-  Works.
+  Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
+  completed R&D Complex and do not require Tank Production.
 - **Mortar Autocast** (R&D Complex research, protocol id `mortar_autocast`): costs 150 steel /
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
@@ -566,13 +566,13 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.6 | 9     | 150 | 40  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 20-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
-| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed R&D Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured

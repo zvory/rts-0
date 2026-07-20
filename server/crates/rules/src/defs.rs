@@ -86,6 +86,7 @@ const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
+const RESEARCH_COMPLEX_REQUIRED: &[EntityKind] = &[EntityKind::ResearchComplex];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
@@ -198,8 +199,8 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: 72,
             speed: 1.6,
             sight_tiles: 9,
-            cost_steel: 75,
-            cost_oil: 25,
+            cost_steel: 150,
+            cost_oil: 40,
             supply: 3,
             build_ticks: 440,
             radius: 20.0,
@@ -219,7 +220,7 @@ pub const UNITS: &[UnitDef] = &[
             speed: 1.6,
             sight_tiles: 10,
             cost_steel: 100,
-            cost_oil: 50,
+            cost_oil: 40,
             supply: 3,
             build_ticks: 460,
             radius: 18.0,
@@ -327,7 +328,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::Factory),
-        train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
+        train_requirement: TechRequirement::All(RESEARCH_COMPLEX_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Ekat,
