@@ -45,7 +45,7 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     assert_eq!(def.stats.dmg, 0);
     assert_eq!(def.stats.range_tiles, 0);
     assert_eq!(def.stats.cooldown, 0);
-    assert_eq!(def.stats.sight_tiles, 15);
+    assert_eq!(def.stats.sight_tiles, 16);
     assert_eq!(def.stats.cost_steel, 50);
     assert_eq!(def.stats.cost_oil, 75);
     assert_eq!(def.stats.supply, 0);
