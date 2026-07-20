@@ -88,8 +88,20 @@ pub(super) fn unit_can_accept_ground_command(
         && !matches!(entities.get(unit), Some(entity) if entity.kind == EntityKind::ScoutPlane)
 }
 
-/// True if this unit is a worker that has already begun laying concrete - it cannot
-/// be pulled away until the building finishes or is destroyed.
+/// Stop is the explicit escape hatch for active construction, so unlike ordinary ground
+/// commands it accepts a worker that is already attached to a scaffold.
+pub(super) fn unit_can_accept_stop_command(entities: &EntityStore, player: u32, unit: u32) -> bool {
+    matches!(
+        entities.get(unit),
+        Some(entity)
+            if entity.owner == player
+                && entity.is_unit()
+                && entity.kind != EntityKind::ScoutPlane
+    )
+}
+
+/// True if this unit is a worker that has already begun laying concrete. Ordinary replacement
+/// commands leave active construction latched; Stop may explicitly release the worker first.
 pub(super) fn is_constructing(entities: &EntityStore, id: u32) -> bool {
     matches!(
         entities.get(id),
