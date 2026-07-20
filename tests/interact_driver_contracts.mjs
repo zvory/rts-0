@@ -160,6 +160,37 @@ assert.deepEqual(
   { ready: false, reason: "pageError" },
   "driver does not report readiness after a page error",
 );
+let transientInspectCalls = 0;
+let transientReadinessWaits = 0;
+const transientStartDriver = new InteractDriver({ workspaceRoot: root });
+transientStartDriver.state = DRIVER_STATES.OPEN;
+transientStartDriver.page = {
+  waitForFunction: async (predicate) => {
+    transientReadinessWaits += 1;
+    const previousWindow = globalThis.window;
+    globalThis.window = { __rtsInteract: { status: () => ({ ready: true, reason: "ready" }) } };
+    try {
+      assert.equal(predicate(), true, "transient session recovery waits for the replacement match");
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  },
+  evaluate: async (_callback, request) => {
+    if (!request) return { ready: true, reason: "ready" };
+    transientInspectCalls += 1;
+    return transientInspectCalls === 1
+      ? { ok: false, error: { code: "waitingForStart", message: "replacement match is starting" } }
+      : { ok: true, value: { entities: [{ id: 7 }] } };
+  },
+};
+assert.deepEqual(
+  await transientStartDriver.callBridge("inspect", {}),
+  { entities: [{ id: 7 }] },
+  "driver retries a command rejected before execution by a transient match replacement",
+);
+assert.equal(transientReadinessWaits, 1, "driver performs one bounded replacement-readiness wait");
+assert.equal(transientInspectCalls, 2, "driver retries a transiently rejected command exactly once");
 const dragEvents = [];
 const dragDriver = new InteractDriver({ workspaceRoot: root });
 dragDriver.state = DRIVER_STATES.OPEN;

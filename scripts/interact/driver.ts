@@ -34,6 +34,7 @@ const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const MAX_CAPTURE_VIEWPORT = 2048;
 const ARTIFACT_CAPABILITY_HEADER = "x-interact-lab-capability";
+const TRANSIENT_SESSION_START_CODES = new Set(["waitingForStart", "waitingForSnapshot"]);
 export const DRIVER_STATES = Object.freeze({
   OPENING: "opening",
   OPEN: "open",
@@ -909,14 +910,11 @@ export class InteractDriver {
     if (this.state !== DRIVER_STATES.OPEN || !this.page) {
       throw new InteractDriverError("sessionClosed", "Interact driver session is not open.");
     }
-    const result = await withTimeout(
-      this.page!.evaluate(
-        ({ method: bridgeMethod, input: bridgeInput }: { method: string; input: JsonObject }) => window.__rtsInteract!.call(bridgeMethod, bridgeInput),
-        { method, input },
-      ),
-      this.options.timeoutMs,
-      `Interact ${method}`,
-    );
+    let result = await this.evaluateBridgeCall(method, input);
+    if (method !== "status" && !result?.ok && TRANSIENT_SESSION_START_CODES.has(result?.error?.code || "")) {
+      await waitForInteractStartup(this.page, this.options.startupTimeoutMs);
+      result = await this.evaluateBridgeCall(method, input);
+    }
     if (!result?.ok) {
       throw new InteractDriverError(
         result?.error?.code || "bridgeError",
@@ -928,6 +926,17 @@ export class InteractDriver {
       throw new InteractDriverError("bridgeError", `Interact ${method} returned a non-object result.`);
     }
     return result.value as BridgeResult;
+  }
+
+  evaluateBridgeCall(method: string, input: JsonObject) {
+    return withTimeout(
+      this.page!.evaluate(
+        ({ method: bridgeMethod, input: bridgeInput }: { method: string; input: JsonObject }) => window.__rtsInteract!.call(bridgeMethod, bridgeInput),
+        { method, input },
+      ),
+      this.options.timeoutMs,
+      `Interact ${method}`,
+    );
   }
 
   async captureScreenshot({ sessionId, name, presentation, viewport, region, subjectIds, subjectSummaries, request }: {
