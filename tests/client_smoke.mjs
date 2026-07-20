@@ -52,7 +52,7 @@ try {
   await page.goto(TEST_URL, { waitUntil: "networkidle2", timeout: 15000 });
   await page.waitForSelector("#lobby-screen", { visible: true, timeout: 5000 });
   ok(true, "lobby screen visible on load");
-  ok(await page.evaluate(() => !!window.PIXI), `PixiJS loaded (v${await page.evaluate(() => window.PIXI?.VERSION)})`);
+  ok(await page.evaluate(() => !window.PIXI), "main thread does not load the Pixi runtime");
   ok(await page.evaluate(() => !!document.querySelector("#lobby-browser")),
     "pre-join lobby browser is visible on first paint");
 
@@ -113,6 +113,10 @@ try {
   ok(true, "game screen shown after start");
 
   await page.waitForSelector("#viewport canvas", { timeout: 5000 });
+  await page.waitForFunction(() => window.__rtsRenderWorkerStats?.backendInfo?.backend === "webgl", { timeout: 5000 });
+  const workerBackend = await page.evaluate(() => window.__rtsRenderWorkerStats);
+  ok(workerBackend.mode === "pixi-webgl-module-worker" && workerBackend.backendInfo.pixiVersion === "8.19.0",
+    `sole Pixi module worker owns WebGL (v${workerBackend.backendInfo.pixiVersion})`);
   const canvas = await page.evaluate(() => { const c = document.querySelector("#viewport canvas"); return c ? { w: c.width, h: c.height } : null; });
   ok(canvas && canvas.w > 0 && canvas.h > 0, `canvas mounted and sized (${canvas?.w}x${canvas?.h})`);
 
@@ -416,6 +420,8 @@ try {
   editorUrl.search = "";
   await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
   await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 8, { timeout: 5000 });
+  await editorPage.waitForFunction(() => window.__rtsRenderWorkerStats?.surface === "mapEditor"
+    && window.__rtsRenderWorkerStats?.backendInfo?.backend === "webgl", { timeout: 5000 });
   const editorUi = await editorPage.evaluate(() => {
     const panelWindow = document.querySelector(".map-editor-panel");
     const panel = document.querySelector(".map-editor-panel-body");

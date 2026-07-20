@@ -482,6 +482,24 @@ async function renderCaptureFrame(page, targetFrame, options, { deliver = true, 
       subjectKinds: [...new Set(entities.map((entity) => entity.kind))],
     });
     const canvas = document.querySelector("#viewport canvas");
+    const capturePresentedPixels = async () => {
+      if (typeof match.renderer.readPresentedPixels === "function") {
+        return match.renderer.readPresentedPixels(match.presentationFrame.frameId);
+      }
+      const renderer = match.renderer?._renderer?.app?.renderer;
+      const gl = renderer?.gl;
+      const width = renderer?.width || 0;
+      const height = renderer?.height || 0;
+      if (!gl || width <= 0 || height <= 0) return null;
+      const bottomUp = new Uint8Array(width * height * 4);
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, bottomUp);
+      const rgba = new Uint8Array(bottomUp.length);
+      const stride = width * 4;
+      for (let y = 0; y < height; y += 1) {
+        rgba.set(bottomUp.subarray(y * stride, (y + 1) * stride), (height - y - 1) * stride);
+      }
+      return { width, height, rgba };
+    };
     const stable = (value) => {
       if (Array.isArray(value)) return value.map(stable);
       if (ArrayBuffer.isView(value)) return Array.from(value, stable);
@@ -491,6 +509,18 @@ async function renderCaptureFrame(page, targetFrame, options, { deliver = true, 
       return out;
     };
     const snapshot = window.__rtsParityLastSnapshot;
+    let pngDataUrl = null;
+    if (shouldCapturePng) {
+      const pixels = await capturePresentedPixels();
+      if (pixels) {
+        const captureCanvas = document.createElement("canvas");
+        captureCanvas.width = pixels.width;
+        captureCanvas.height = pixels.height;
+        const context = captureCanvas.getContext("2d");
+        context.putImageData(new ImageData(new Uint8ClampedArray(pixels.rgba), pixels.width, pixels.height), 0, 0);
+        pngDataUrl = captureCanvas.toDataURL("image/png");
+      }
+    }
     return {
       stateTick: match.state.tick,
       stateJson: JSON.stringify(stable(snapshot)),
@@ -502,7 +532,7 @@ async function renderCaptureFrame(page, targetFrame, options, { deliver = true, 
         clientHeight: canvas.clientHeight,
       } : null,
       readiness,
-      pngDataUrl: shouldCapturePng ? canvas?.toDataURL("image/png") || "" : null,
+      pngDataUrl,
     };
   }, {
     target: targetFrame,

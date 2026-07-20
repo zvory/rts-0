@@ -40,6 +40,5 @@ export function loadPngRigAtlasTexture(pixi, atlas) {
 }
 
 function loadRawPngRigAtlasTexture(pixi, atlas) {
-  if (pixi.Assets?.load) return pixi.Assets.load(atlas.image);
   return loadWorkerSafeTexture(pixi, atlas.image);
 }

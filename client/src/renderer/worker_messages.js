@@ -37,7 +37,7 @@ export function createInitializeMessage({ canvas, widthCssPx, heightCssPx, dpr, 
     heightCssPx: positiveFinite(heightCssPx, "heightCssPx"),
     dpr: boundedDpr(dpr),
     configuration: clonePlain(configuration),
-  });
+  }, [canvas]);
 }
 
 export function createMapGenerationMessage(staticMap) {
@@ -99,18 +99,39 @@ export function createFrameMessages(frame, state = createRenderWorkerWireState()
   return messages;
 }
 
-export function createResizeMessage({ generation, widthCssPx, heightCssPx, dpr }) {
+export function createDurableDecalMessage(frame) {
+  validatePresentationFrame(frame);
+  const decals = (frame.layers?.persistentGroundMark || [])
+    .filter((record) => record?.type === "groundDecal")
+    .map((record) => clonePlain(record));
+  if (frame.groundDecalRevision <= 0 || decals.length === 0) return null;
+  return request(RENDER_WORKER_MESSAGE.DURABLE_DECALS, frame.generation, {
+    revision: requireId(frame.groundDecalRevision, "ground decal revision"),
+    decals,
+  });
+}
+
+export function createEditorFrameMessage(record, generation = 1) {
+  if (record?.version !== 1 || !Number.isSafeInteger(record?.frameId) || record.frameId <= 0) {
+    throw new TypeError("Map Editor worker frame requires a version-1 record and positive frame id.");
+  }
+  return request(RENDER_WORKER_MESSAGE.FRAME, generation, { editor: clonePlain(record) });
+}
+
+export function createResizeMessage({ generation, frameId = 0, widthCssPx, heightCssPx, dpr }) {
   return request(RENDER_WORKER_MESSAGE.RESIZE, generation, {
+    frameId: requireId(frameId, "resize frame id"),
     widthCssPx: positiveFinite(widthCssPx, "widthCssPx"),
     heightCssPx: positiveFinite(heightCssPx, "heightCssPx"),
     dpr: boundedDpr(dpr),
   });
 }
 
-export function createCaptureMessage({ generation, frameId, captureId }) {
+export function createCaptureMessage({ generation, frameId, captureId, readPixels = false }) {
   return request(RENDER_WORKER_MESSAGE.CAPTURE, generation, {
     frameId: requireId(frameId, "frame id", { allowZero: false }),
     captureId: requireId(captureId, "capture id", { allowZero: false }),
+    readPixels: !!readPixels,
   });
 }
 
@@ -132,6 +153,9 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       positiveFinite(payload?.widthCssPx, "widthCssPx");
       positiveFinite(payload?.heightCssPx, "heightCssPx");
       boundedDpr(payload?.dpr);
+      if (!["match", "mapEditor"].includes(payload?.configuration?.surface || "match")) {
+        throw new TypeError("initialize surface must be match or mapEditor");
+      }
       if (requireCanvas && !payload?.canvas) throw new TypeError("initialize requires a transferred canvas");
       break;
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
@@ -150,16 +174,30 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       if (!Array.isArray(payload?.decals)) throw new TypeError("durableDecals requires records");
       break;
     case RENDER_WORKER_MESSAGE.FRAME:
-      validatePresentationFrame(payload?.frame, { valuesOptional: true });
+      if (payload?.editor) {
+        if (payload.editor.version !== 1 || !Number.isSafeInteger(payload.editor.frameId) || payload.editor.frameId <= 0) {
+          throw new TypeError("invalid Map Editor worker frame");
+        }
+      } else {
+        validatePresentationFrame(payload?.frame, { valuesOptional: true });
+      }
+      if (payload?.submittedAtMs != null) nonNegativeFinite(payload.submittedAtMs, "submittedAtMs");
+      if (payload?.capturePixels != null && typeof payload.capturePixels !== "boolean") {
+        throw new TypeError("capturePixels must be boolean");
+      }
       break;
     case RENDER_WORKER_MESSAGE.RESIZE:
       positiveFinite(payload?.widthCssPx, "widthCssPx");
       positiveFinite(payload?.heightCssPx, "heightCssPx");
       boundedDpr(payload?.dpr);
+      requireId(payload?.frameId ?? 0, "resize frame id");
       break;
     case RENDER_WORKER_MESSAGE.CAPTURE:
       requireId(payload?.frameId, "frame id", { allowZero: false });
       requireId(payload?.captureId, "capture id", { allowZero: false });
+      if (payload?.readPixels != null && typeof payload.readPixels !== "boolean") {
+        throw new TypeError("readPixels must be boolean");
+      }
       break;
     default:
       break;
@@ -176,6 +214,18 @@ export function validateRenderWorkerResponse(message) {
   if (message.type === RENDER_WORKER_RESPONSE.PRESENTED) {
     nonNegativeFinite(payload?.workerUpdateMs, "workerUpdateMs");
     nonNegativeFinite(payload?.workerPresentMs, "workerPresentMs");
+    nonNegativeFinite(payload?.queueAgeMs ?? 0, "queueAgeMs");
+    nonNegativeFinite(payload?.displayAgeMs ?? 0, "displayAgeMs");
+    if (payload?.rgba != null && !(payload.rgba instanceof ArrayBuffer)) {
+      throw new TypeError("presented capture rgba must be an ArrayBuffer");
+    }
+    if (payload?.rgba instanceof ArrayBuffer) {
+      requireId(payload?.width, "capture width", { allowZero: false });
+      requireId(payload?.height, "capture height", { allowZero: false });
+      if (payload.rgba.byteLength !== payload.width * payload.height * 4) {
+        throw new TypeError("presented capture rgba must match its dimensions");
+      }
+    }
   }
   if (message.type === RENDER_WORKER_RESPONSE.RETAINED) {
     requireId(payload?.revision, "ground decal revision");

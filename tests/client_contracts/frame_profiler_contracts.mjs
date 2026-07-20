@@ -2,6 +2,7 @@ import { assert, assertDeepEqual } from "./assertions.mjs";
 import {
   RENDER_FRAME_BUDGET_MS,
   RENDER_FRAME_BUDGET_TARGETS,
+  buildPresentationMetrics,
   buildRenderStressMatrixCells,
   buildRenderStressMatrixSummary,
   buildRenderDiagnosticsReport,
@@ -19,6 +20,26 @@ import {
 } from "../../scripts/client-perf/workloads.mjs";
 
 export function runFrameProfilerContracts() {
+  {
+    const worker = buildPresentationMetrics({
+      renderWorker: {
+        mode: "pixi-webgl-module-worker",
+        completed: 360,
+        submitted: 500,
+        superseded: 140,
+        failed: 0,
+        displayAgeMs: { p95: 12 },
+      },
+      perf: { summary: { frameCount: 999 } },
+    }, 6000);
+    assert(worker.source === "renderWorker.completed" && worker.completedPerSecond === 60,
+      "canonical performance reports actual worker completions rather than submitted main RAF calls");
+    assert(worker.superseded === 140 && worker.failed === 0 && worker.displayAgeMs.p95 === 12,
+      "canonical performance keeps queue outcomes and display age explicit");
+    const baseline = buildPresentationMetrics({ perf: { summary: { frameCount: 630 } } }, 6000);
+    assert(baseline.source === "frame.work" && baseline.completedPerSecond === 105,
+      "the unchanged workload can still quantify the synchronous baseline on the same host");
+  }
   {
     const workloads = buildClientPerfWorkloads({});
     const ids = workloads.map((workload) => workload.id);

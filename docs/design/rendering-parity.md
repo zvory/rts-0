@@ -24,9 +24,10 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 | Babylon backend construction isolation | n/a | missing | Match currently passes Babylon the broad mutable Pixi-oriented source bag even though the adapter uses only its profiler hook. |
 | Default Pixi and explicit lazy Babylon selector | complete | complete | `rtsRenderer=babylon` is live-player/Lab-only and lazy; replay/spectator matches stay Pixi. |
 | Narrow detached static-map delivery | complete | missing | Babylon is passed a broad source bag containing a static-map callback but has no safe narrow contract and does not consume the data. |
-| Render-worker message vocabulary | complete | n/a | `RenderWorkerMessageV1` separates initialization, map, durable, revisioned, frame, and control lifetimes; Phase 2 starts no production worker. |
-| Worker-decodable Pixi assets | complete | n/a | Ground-decal SVG sources generate one checked-in PNG atlas; Pixi raster paths use OffscreenCanvas and fetch/createImageBitmap or Pixi Assets. |
-| Map Editor detached Pixi boundary | complete | n/a | The viewport emits `MapEditorPresentationV1`; only the Pixi adapter owns display objects and renderer internals. |
+| Sole Pixi module-worker path | complete | n/a | Live, replay, spectator, Lab, fixed capture, stress, and Map Editor transfer one visible canvas to the same WebGL-only worker host; architecture checks reject a second Pixi owner, WebGPU path, flag, or fallback. |
+| Render-worker message vocabulary | complete | n/a | `RenderWorkerMessageV1` separates initialization, map, durable, revisioned, frame, resize/capture/reset/destroy lifetimes and validates current-generation acknowledgments. |
+| Worker-decodable Pixi assets | complete | n/a | Ground-decal SVG sources generate one checked-in PNG atlas; every runtime raster path uses OffscreenCanvas plus fetch/createImageBitmap with parity-pinned alpha/color decode. Worker readiness waits for all assets. |
+| Map Editor detached Pixi boundary | complete | n/a | The viewport emits `MapEditorPresentationV1`; the common Pixi worker owns editor display objects, WebGL, ordered resize, and teardown. |
 | Terrain and resource-site readability | complete | missing | Babylon draws one flat map-bounds plane and does not present terrain classes or static resource sites. |
 | Current/explored fog, memory, intel, and reveals | complete | complete | Revisioned grids, separated presentation layers, and two-recipient secrecy check. |
 | Generic entity presence, team, selection, HP, and progress | complete | placeholder | Shared boxes and bars truthfully cover every received entity but are not kind-readable. |
@@ -67,6 +68,15 @@ Presentation-frame, coordinator, Pixi-adapter, renderer-feedback, Lab capture, a
 browser-smoke contracts prove one detached frame assembly, exact layers/grids, one `render(frame)`
 call, private Pixi compatibility reads, revision-exact durable decal retention, bounded lifecycle
 failure, and acknowledged-presented-frame selection publication.
+
+### `renderworker-phase-3`
+
+Worker-host lifecycle/message contracts, route browser checks, the architecture ratchet, independent
+main/worker CPU profiles, the canonical Hellhole stream, and 16 deterministic decoded-RGBA samples
+prove the atomic Pixi cutover. The host bounds work to one in-flight plus one latest pending frame,
+keeps decals independently durable, publishes selection only for the acknowledged frame, orders
+resize/reset/teardown, and reads fixed-capture pixels in the presenting worker task. The Phase 2
+main-thread Pixi baseline and worker output are pixel-identical at all required sampled ticks.
 
 ### `P4-babylon-kernel`
 

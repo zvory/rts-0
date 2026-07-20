@@ -3,7 +3,9 @@ import { Camera } from "../../client/src/camera.js";
 import { PresentationFrameAssembler } from "../../client/src/presentation/frame.js";
 import {
   createCaptureMessage,
+  createDurableDecalMessage,
   createDestroyMessage,
+  createEditorFrameMessage,
   createFrameMessages,
   createInitializeMessage,
   createMapGenerationMessage,
@@ -55,6 +57,8 @@ const canvas = { transferMarker: true };
 const init = createInitializeMessage({ canvas, widthCssPx: 640, heightCssPx: 480, dpr: 2, configuration: { nearest: true } });
 assert(init.message.version === RENDER_WORKER_MESSAGE_VERSION && init.message.type === RENDER_WORKER_MESSAGE.INITIALIZE,
   "initialization carries message and presentation versions");
+assert(init.transfer.length === 1 && init.transfer[0] === canvas,
+  "initialization transfers the sole visible canvas instead of cloning or constructing a hidden renderer");
 validateRenderWorkerRequest(init, { requireCanvas: true });
 
 const mapMessage = createMapGenerationMessage(assembler.staticMap);
@@ -81,10 +85,15 @@ for (const entry of firstMessages) validateRenderWorkerRequest(entry);
 const repeat = createFrameMessages(representative, state);
 assert(repeat.map((entry) => entry.message.type).join(",") === "durableDecals,frame",
   "unchanged large grids are omitted while an unacknowledged durable revision remains explicit");
+assert(createDurableDecalMessage(representative).message.payload.revision === 9,
+  "durable decal retention can be sent independently of a supersedable dynamic frame");
+const editor = createEditorFrameMessage({ version: 1, frameId: 3, terrainUpdate: null, overlay: {} }, 2);
+assert(editor.message.type === RENDER_WORKER_MESSAGE.FRAME && editor.message.payload.editor.frameId === 3,
+  "Map Editor records use the same worker frame route and remain detached cloneable data");
 
 for (const control of [
-  createResizeMessage({ generation: 1, widthCssPx: 800, heightCssPx: 600, dpr: 1 }),
-  createCaptureMessage({ generation: 1, frameId: 1, captureId: 4 }),
+  createResizeMessage({ generation: 1, frameId: 1, widthCssPx: 800, heightCssPx: 600, dpr: 2 }),
+  createCaptureMessage({ generation: 1, frameId: 1, captureId: 4, readPixels: true }),
   createResetGenerationMessage(2),
   createDestroyMessage(2),
 ]) validateRenderWorkerRequest(control);
@@ -93,6 +102,9 @@ for (const response of [
   { version: 1, type: RENDER_WORKER_RESPONSE.READY, generation: 1, payload: { assets: { ready: true } } },
   { version: 1, type: RENDER_WORKER_RESPONSE.RETAINED, generation: 1, payload: { revision: 9 } },
   { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: { frameId: 1, workerUpdateMs: 2, workerPresentMs: 1 } },
+  { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: {
+    frameId: 1, captureId: 4, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(4), width: 1, height: 1,
+  } },
   { version: 1, type: RENDER_WORKER_RESPONSE.SUPERSEDED, generation: 1, payload: { frameId: 1 } },
   { version: 1, type: RENDER_WORKER_RESPONSE.FAILED, generation: 1, payload: { code: "asset", message: "atlas failed" } },
   { version: 1, type: RENDER_WORKER_RESPONSE.DESTROYED, generation: 1, payload: {} },
@@ -107,6 +119,11 @@ assertThrows(() => createCaptureMessage({ generation: 1, frameId: 0, captureId: 
 assertThrows(() => validateRenderWorkerResponse({
   version: 1, type: "failed", generation: 1, payload: { code: "x".repeat(81), message: "bad" },
 }), "wire bounds worker failures");
+assertThrows(() => validateRenderWorkerResponse({
+  version: 1, type: "presented", generation: 1, payload: {
+    frameId: 1, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(3), width: 1, height: 1,
+  },
+}), "wire rejects framebuffer captures whose decoded RGBA length does not match their dimensions");
 
 function assertThrows(fn, message) {
   let threw = false;

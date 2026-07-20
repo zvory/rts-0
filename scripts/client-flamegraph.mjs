@@ -137,6 +137,35 @@ export async function runClientFlameGraph(options) {
   const result = writeCpuFlameGraphArtifacts({ profilePath, svgPath, title });
   await renderSvgToPng({ svg: result.svg, svgPath, pngPath, chrome: options.chrome });
 
+  const workerProfilePath = path.join(artifactDir, "render-worker-cpu-profile.cpuprofile");
+  let workerArtifacts = null;
+  if (fs.existsSync(workerProfilePath)) {
+    const workerSvgPath = path.join(artifactDir, "render-worker-cpu-flamegraph.svg");
+    const workerPngPath = path.join(artifactDir, "render-worker-cpu-flamegraph.png");
+    const workerTitle = `RTS ${options.workload} — Pixi render worker CPU flame graph `
+      + `(${options.seconds} s, ${options.intervalUs} µs samples)`;
+    const workerResult = writeCpuFlameGraphArtifacts({
+      profilePath: workerProfilePath,
+      svgPath: workerSvgPath,
+      title: workerTitle,
+    });
+    await renderSvgToPng({ svg: workerResult.svg, svgPath: workerSvgPath, pngPath: workerPngPath, chrome: options.chrome });
+    workerArtifacts = {
+      profilePath: workerProfilePath,
+      svgPath: workerSvgPath,
+      pngPath: workerPngPath,
+      rankedSummaryPath: workerResult.summaryPath,
+      summary: workerResult.analysis.summary,
+    };
+    console.log(`Render worker CPU profile: ${workerProfilePath}`);
+    console.log(`Render worker flame graph SVG: ${workerSvgPath}`);
+    console.log(`Render worker flame graph PNG: ${workerPngPath}`);
+    console.log(`Render worker ranked summary: ${workerResult.summaryPath}`);
+    for (const row of workerResult.analysis.summary.topSelfByFunction.slice(0, 15)) {
+      console.log(`${row.selfPct.toFixed(1).padStart(5)}% worker self  ${row.label}`);
+    }
+  }
+
   console.log(`CPU profile: ${profilePath}`);
   console.log(`Flame graph SVG: ${svgPath}`);
   console.log(`Flame graph PNG: ${pngPath}`);
@@ -157,6 +186,7 @@ export async function runClientFlameGraph(options) {
     svgPath,
     pngPath,
     rankedSummaryPath: result.summaryPath,
+    worker: workerArtifacts,
     summary: result.analysis.summary,
   };
 }

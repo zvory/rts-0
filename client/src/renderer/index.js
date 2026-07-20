@@ -16,7 +16,8 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 // scene graph: each frame we touch the live ids, then hide any pooled object whose
 // id was not seen.
 //
-// PixiJS v8.19.0 is loaded globally as `PIXI`; we never import it.
+// PixiJS v8.19.0 is installed as `globalThis.PIXI` by the render worker entry.
+// This module is worker-owned production code; main-thread client modules must not import it.
 
 import { COLORS } from "../config.js";
 import { isUnit, isBuilding, isResource } from "../protocol.js";
@@ -102,17 +103,18 @@ const MISSING_TEXTURE_SIZE_PX = 26;
 const MISSING_TEXTURE_MAGENTA = 0xff00ff;
 const MISSING_TEXTURE_DARK = 0x141018;
 
-function applicationOptions(canvasParent) {
+function applicationOptions(canvasParent, options = {}) {
   return {
     autoStart: false,
     antialias: false,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
+    resolution: options.resolution || globalThis.devicePixelRatio || 1,
+    autoDensity: options.autoDensity ?? true,
     backgroundColor: COLORS.bgVoid,
-    width: canvasParent.clientWidth || window.innerWidth,
-    height: canvasParent.clientHeight || window.innerHeight,
+    width: options.width || canvasParent.clientWidth || globalThis.innerWidth || 1,
+    height: options.height || canvasParent.clientHeight || globalThis.innerHeight || 1,
     preference: "webgl",
     roundPixels: false,
+    ...(options.canvas ? { canvas: options.canvas } : {}),
   };
 }
 
@@ -120,7 +122,10 @@ export class Renderer {
   static async create(canvasParent, options = {}) {
     const app = new PIXI.Application();
     try {
-      await app.init(applicationOptions(canvasParent));
+      await app.init(applicationOptions(canvasParent, options));
+      if (app.renderer?.type !== PIXI.RendererType?.WEBGL) {
+        throw new Error("Pixi render worker requires the WebGL backend.");
+      }
       return new Renderer(canvasParent, { ...options, app });
     } catch (error) {
       // init() may have allocated a canvas or renderer before rejecting. Cleanup is
@@ -147,8 +152,8 @@ export class Renderer {
     PIXI.TextureStyle.defaultOptions.scaleMode = "nearest";
     // Keep interpolated entity positions fractional. Nearest scaling preserves
     // the low-res look without snapping smooth server-snapshot interpolation.
-    this.app.canvas.style.imageRendering = "pixelated";
-    canvasParent.appendChild(this.app.canvas);
+    if (this.app.canvas.style) this.app.canvas.style.imageRendering = "pixelated";
+    canvasParent.appendChild?.(this.app.canvas);
 
     // World container — moved/scaled by the camera every frame.
     this.world = new PIXI.Container();
@@ -433,7 +438,8 @@ export class Renderer {
    * @param {number} w width in screen px
    * @param {number} h height in screen px
    */
-  resize(w, h) {
+  resize(w, h, resolution = this.app.renderer.resolution) {
+    if (Number.isFinite(resolution) && resolution > 0) this.app.renderer.resolution = resolution;
     this.app.renderer.resize(w, h);
   }
 

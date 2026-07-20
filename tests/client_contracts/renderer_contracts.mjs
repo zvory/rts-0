@@ -11,8 +11,6 @@ import {
   roadMarkingOrientation,
   terrainColor,
 } from "../../client/src/renderer/terrain_palette.js";
-import { loadFrameStripTexture } from "../../client/src/renderer/rigs/frame_strip_routing.js";
-import { loadPngRigAtlasTexture } from "../../client/src/renderer/rigs/png_routing.js";
 import {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
@@ -23,6 +21,12 @@ import {
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
 import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
+
+function restoreGlobal(name, value) {
+  if (value === undefined) delete globalThis[name];
+  else globalThis[name] = value;
+}
+
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");
   const bareRoad = terrainColor(TERRAIN.ROAD_BARE, 2, 3);
@@ -69,213 +73,6 @@ import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
     roadEdgeDirections(roadMap, 0, 0, TERRAIN.GRASS).length === 0,
     "non-road terrain never receives a road shoulder",
   );
-}
-
-function fakeOffscreenCanvas(canvases) {
-  return class FakeOffscreenCanvas {
-    constructor(width, height) {
-      this.width = width;
-      this.height = height;
-      canvases.push(this);
-    }
-
-    getContext(type) {
-      assert(type === "2d", "worker-safe color loader requests a 2D canvas context");
-      return {
-        imageSmoothingEnabled: true,
-        clearRect() {},
-        drawImage() {},
-        getImageData: () => ({ data: new Uint8ClampedArray(this.width * this.height * 4) }),
-        putImageData() {},
-      };
-    }
-  };
-}
-
-function restoreGlobal(name, value) {
-  if (value === undefined) delete globalThis[name];
-  else globalThis[name] = value;
-}
-{
-  const priorDocument = globalThis.document;
-  const priorImage = globalThis.Image;
-  const priorOffscreenCanvas = globalThis.OffscreenCanvas;
-  const priorFetch = globalThis.fetch;
-  const priorCreateImageBitmap = globalThis.createImageBitmap;
-  const rawLoads = [];
-  const canvases = [];
-  globalThis.document = {
-    createElement(tag) {
-      assert(tag === "canvas", "frame-strip color loader creates a canvas");
-      const canvas = {
-        width: 0,
-        height: 0,
-        getContext(type) {
-          assert(type === "2d", "frame-strip color loader requests a 2D canvas context");
-          return {
-            imageSmoothingEnabled: true,
-            clearRect() {},
-            drawImage() {},
-            getImageData() {
-              return { data: new Uint8ClampedArray(canvas.width * canvas.height * 4) };
-            },
-            putImageData() {},
-          };
-        },
-      };
-      canvases.push(canvas);
-      return canvas;
-    },
-  };
-  globalThis.Image = class FakeImage {
-    constructor() {
-      this.naturalWidth = 0;
-      this.width = 0;
-      this.naturalHeight = 0;
-      this.height = 0;
-      this.onload = null;
-      this.onerror = null;
-    }
-
-    set src(value) {
-      this._src = value;
-      queueMicrotask(() => this.onload?.());
-    }
-  };
-  globalThis.OffscreenCanvas = fakeOffscreenCanvas(canvases);
-  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
-  globalThis.createImageBitmap = async () => ({ width: 0, height: 0, close() {} });
-
-  try {
-    const texture = await loadFrameStripTexture(
-      {
-        Assets: {
-          load: async (src) => {
-            rawLoads.push(src);
-            return { fallbackSrc: src };
-          },
-        },
-        Texture: {
-          from() {
-            throw new Error("canvas texture unavailable");
-          },
-        },
-      },
-      {
-        image: "/assets/rigs/test-strip.png?v=contract",
-        frameWidth: 12,
-        frameHeight: 8,
-        frameCount: 4,
-        bakedColorAdjustment: { brightness: 100, saturation: 100, hue: 100 },
-      },
-    );
-
-    assert(
-      texture?.fallbackSrc === "/assets/rigs/test-strip.png?v=contract",
-      "adjusted strip falls back to raw texture load when canvas texture creation fails",
-    );
-    assert(rawLoads.length === 1, "adjusted strip fallback loads the raw source once");
-    assert(canvases[0]?.width === 48, "frame-strip canvas fallback width covers every frame");
-    assert(canvases[0]?.height === 8, "frame-strip canvas fallback height uses frame metadata");
-  } finally {
-    if (priorDocument === undefined) delete globalThis.document;
-    else globalThis.document = priorDocument;
-    if (priorImage === undefined) delete globalThis.Image;
-    else globalThis.Image = priorImage;
-    restoreGlobal("OffscreenCanvas", priorOffscreenCanvas);
-    restoreGlobal("fetch", priorFetch);
-    restoreGlobal("createImageBitmap", priorCreateImageBitmap);
-  }
-}
-
-{
-  const priorDocument = globalThis.document;
-  const priorImage = globalThis.Image;
-  const priorOffscreenCanvas = globalThis.OffscreenCanvas;
-  const priorFetch = globalThis.fetch;
-  const priorCreateImageBitmap = globalThis.createImageBitmap;
-  const rawLoads = [];
-  const canvases = [];
-  globalThis.document = {
-    createElement(tag) {
-      assert(tag === "canvas", "PNG atlas color loader creates a canvas");
-      const canvas = {
-        width: 0,
-        height: 0,
-        getContext(type) {
-          assert(type === "2d", "PNG atlas color loader requests a 2D canvas context");
-          return {
-            imageSmoothingEnabled: true,
-            clearRect() {},
-            drawImage() {},
-            getImageData() {
-              return { data: new Uint8ClampedArray(canvas.width * canvas.height * 4) };
-            },
-            putImageData() {},
-          };
-        },
-      };
-      canvases.push(canvas);
-      return canvas;
-    },
-  };
-  globalThis.Image = class FakeImage {
-    constructor() {
-      this.naturalWidth = 0;
-      this.width = 0;
-      this.naturalHeight = 0;
-      this.height = 0;
-      this.onload = null;
-      this.onerror = null;
-    }
-
-    set src(value) {
-      this._src = value;
-      queueMicrotask(() => this.onload?.());
-    }
-  };
-  globalThis.OffscreenCanvas = fakeOffscreenCanvas(canvases);
-  globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
-  globalThis.createImageBitmap = async () => ({ width: 0, height: 0, close() {} });
-
-  try {
-    const texture = await loadPngRigAtlasTexture(
-      {
-        Assets: {
-          load: async (src) => {
-            rawLoads.push(src);
-            return { fallbackSrc: src };
-          },
-        },
-        Texture: {
-          from() {
-            throw new Error("canvas texture unavailable");
-          },
-        },
-      },
-      {
-        image: "/assets/rigs/test-atlas.png?v=contract",
-        grid: { width: 32, height: 24 },
-        runtimeColorAdjustment: { brightness: 105, saturation: 100, hue: 100 },
-      },
-    );
-
-    assert(
-      texture?.fallbackSrc === "/assets/rigs/test-atlas.png?v=contract",
-      "adjusted atlas falls back to raw texture load when canvas texture creation fails",
-    );
-    assert(rawLoads.length === 1, "adjusted atlas fallback loads the raw source once");
-    assert(canvases[0]?.width === 32, "PNG atlas canvas fallback width uses atlas metadata");
-    assert(canvases[0]?.height === 24, "PNG atlas canvas fallback height uses atlas metadata");
-  } finally {
-    if (priorDocument === undefined) delete globalThis.document;
-    else globalThis.document = priorDocument;
-    if (priorImage === undefined) delete globalThis.Image;
-    else globalThis.Image = priorImage;
-    restoreGlobal("OffscreenCanvas", priorOffscreenCanvas);
-    restoreGlobal("fetch", priorFetch);
-    restoreGlobal("createImageBitmap", priorCreateImageBitmap);
-  }
 }
 
 {

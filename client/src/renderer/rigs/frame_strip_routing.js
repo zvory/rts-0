@@ -44,7 +44,6 @@ export function loadFrameStripTexture(pixi, strip) {
 }
 
 function loadRawFrameStripTexture(pixi, strip) {
-  if (pixi.Assets?.load) return pixi.Assets.load(strip.image);
   return loadWorkerSafeTexture(pixi, strip.image);
 }
 

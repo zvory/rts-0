@@ -91,6 +91,7 @@ export class PresentationCoordinator {
   }
 
   acceptRetained(outcome) {
+    if (this._destroyed) return false;
     const pending = this._pendingForOutcome(outcome, PRESENTATION_OUTCOME.RETAINED);
     if (!pending) return false;
     if (pending.retainedSettled) {
@@ -121,6 +122,7 @@ export class PresentationCoordinator {
   }
 
   acceptTerminal(outcome) {
+    if (this._destroyed) return false;
     if (!isTerminalPresentationOutcome(outcome?.status)) {
       this._protocolError(`invalid terminal presentation outcome ${JSON.stringify(outcome?.status)}`);
       return false;
@@ -249,6 +251,7 @@ export class PresentationCoordinator {
   }
 
   _settleRetainedChannel(identity, outcome) {
+    if (this._destroyed) return;
     const pending = this._pending.get(identityKey(identity));
     if (!pending) {
       this._lateOutcome(identity, outcome?.status || "empty retained");
@@ -263,6 +266,7 @@ export class PresentationCoordinator {
   }
 
   _rejectRetainedChannel(identity, error) {
+    if (this._destroyed) return;
     const pending = this._pending.get(identityKey(identity));
     this._protocolError(`retained channel rejected for ${identityKey(identity)}: ${presentationError(error).message}`);
     if (!pending) return;
@@ -271,6 +275,7 @@ export class PresentationCoordinator {
   }
 
   _rejectTerminalChannel(identity, error) {
+    if (this._destroyed) return;
     this._protocolError(`terminal channel rejected for ${identityKey(identity)}: ${presentationError(error).message}`);
     this.acceptTerminal(outcomeRecord(PRESENTATION_OUTCOME.FAILED, identity, {
       error: presentationError(error),

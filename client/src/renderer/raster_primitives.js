@@ -16,7 +16,10 @@ export async function fetchImageBitmap(url, {
   }
   const response = await fetchFn(url);
   if (!response?.ok) throw new Error(`failed to fetch renderer asset ${url} (${response?.status ?? "unknown"})`);
-  return createImageBitmapFn(await response.blob());
+  return createImageBitmapFn(await response.blob(), {
+    premultiplyAlpha: "premultiply",
+    colorSpaceConversion: "none",
+  });
 }
 
 export async function loadWorkerSafeTexture(pixi, url, options = {}) {

@@ -6,7 +6,7 @@ This document owns the cross-file contract for the shareable client-only Hellhol
 ## Route and workload
 
 `/stress-test` automatically launches the checked-in `supply-300-hellhole.rtsstream` through
-`SnapshotStreamNet`. It uses the normal snapshot decode, `GameState`, `Match`, Pixi, fog, HUD,
+`SnapshotStreamNet`. It uses the normal snapshot decode, `GameState`, `Match`, Pixi module worker, fog, HUD,
 minimap, and animation-frame paths, but never opens a WebSocket or runs a server simulation.
 The canonical recording starts with 416 projected entities: the 300-supply 2v2 armies and structures
 plus Player 1's 120 map-wide, deterministically scattered Tank Traps.
@@ -14,10 +14,12 @@ plus Player 1's 120 map-wide, deterministically scattered Tank Traps.
 iteration; the shareable default is five seconds after a three-second warmup. The cap keeps the
 measurement inside the finite 30-second recording.
 
-The route response alone sends `Document-Policy: js-profiling`. Pixi's pinned CDN script uses
-anonymous CORS so Chromium can attribute its frames. Chromium browsers with the JS Self-Profiling
-API collect a 10 ms sampled trace and an SVG flame graph. Browsers without that API still complete
-the run with the same bounded phase/frame summary and long-frame observations.
+The route response alone sends `Document-Policy: js-profiling`. The pinned Pixi ESM module is loaded
+inside the render worker. Chromium browsers with the JS Self-Profiling API collect the main-page
+10 ms sampled trace and SVG flame graph; that browser API does not make the page trace a worker CPU
+profile. Browsers without it still complete the run with the same bounded main-thread phase/frame
+summary, render-worker queue/timing diagnostics, and long-frame observations. The canonical CLI
+harness profiles the page and render worker independently.
 
 ## Measurement and validity
 
@@ -26,8 +28,10 @@ starts after `App.onStart` has constructed the ordinary `Match`, warms the rende
 three seconds, then resets `Match.frameProfiler` immediately before measuring. Stream download,
 parsing, initial Pixi allocation, and shader warmup are therefore outside the result.
 
-The report includes frame-work, renderer, nested renderer, fog, scheduling, and diagnostic-counter
-summaries from `FrameProfiler`; actual average rendered-frame throughput; the static stream
+The report includes main-thread frame-work, renderer submission, fog, scheduling, and
+diagnostic-counter summaries from `FrameProfiler`; render-worker submitted/completed/superseded/
+failed counts and queue/display/main-submit/worker-update/worker-present timings; actual average
+completed-presentation throughput; the static stream
 identity; Long Tasks and Long Animation Frames
 when supported; and a JS trace/flame graph when supported. The result UI reports the p95 frame-work
 tier and the approximate work reduction or headroom against 16.67 ms. This is a relative

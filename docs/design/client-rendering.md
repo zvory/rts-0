@@ -9,10 +9,10 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 
 - There is one JavaScript client, one `Match`, one state/interpolation pipeline, and one active
   world renderer per match. Pixi is the default.
-- During a match, `Match` owns the only `requestAnimationFrame` loop and visual clock. Pixi is
-  pinned at v8.19.0 and initialized asynchronously with `autoStart:false` and an initial WebGL
-  preference; no normal, capture, or teardown path starts its ticker. A
-  backend updates and presents only when Match calls it; Babylon never calls `runRenderLoop()`.
+- During a match, `Match` owns the only main-thread `requestAnimationFrame` loop and visual clock.
+  Pixi is pinned at v8.19.0 and initialized in one module worker with `autoStart:false` and an
+  explicit WebGL preference; no normal, capture, or teardown path starts its ticker. The worker
+  updates and presents only from submitted frames; Babylon never calls `runRenderLoop()`.
 - Server/application coordinates remain two-dimensional world pixels. Scene axes, scale, height,
   and facing are backend-private presentation conversions.
 - Input and commands use semantic projection and selection data. Meshes, asset bounds, LODs,
@@ -25,8 +25,8 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 - HUD, lobby, minimap, audio, diagnostics, and Lab panels remain shared external surfaces.
 
 Rendering work does not change the Rust server, protocol, simulation, fog authority, replay format,
-or command coordinates. A renderer failure is a bounded presentation failure and cannot stop later
-Match frames.
+or command coordinates. A Pixi worker failure is a visible bounded fatal presentation error for
+that match: it settles pending work and tears down without selecting another renderer.
 
 ## 2. Semantic camera and projection
 
@@ -209,10 +209,10 @@ public displayed-frame counter and publishes the matching `SelectionSceneV1`. Su
 frames discard their pending selection scene, while teardown settles pending work as destroyed and
 blocks late selection/decal/capture side effects.
 
-Each Phase 1 adapter still updates backend scene state and synchronously presents exactly once
-inside `render(frame)`, but returns already-settled promise channels so coordinator callbacks run in
-a later microtask and cannot re-enter Match. Pixi presentation is one `PIXI.Application.render()`
-call; Babylon presentation is one `Scene.render()` call. Duplicate, stale, unknown, impossibly
+Babylon still updates scene state and synchronously presents exactly once inside `render(frame)`.
+Pixi's main-thread host returns asynchronous promise channels, while its module worker performs one
+`PIXI.Application.render()` for the accepted frame and acknowledges the exact generation/frame id.
+Duplicate, stale, unknown, impossibly
 ordered, or presented-after-destroy outcomes are bounded protocol diagnostics and cannot change the
 newest visible selection scene.
 
@@ -236,11 +236,21 @@ Its payload lifetimes are explicit:
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
 - control: resize, capture/flush, generation reset, and destroy.
 
-Responses are `ready` (including asset readiness), `retained`, `presented` with frame id and worker
+Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
 update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
-usable and unchanged. This phase defines and tests the vocabulary but does not create a production
-worker; Pixi still has exactly one main-thread production path until the atomic Phase 3 cutover.
+usable and unchanged.
+
+The production `PixiWorkerPresentationAdapter` transfers the sole visible canvas during
+construction. It admits one in-flight frame plus one latest pending frame. Replacing the pending
+frame settles its exact id as `superseded`; durable decal messages have an independent retained
+lifetime. Only a current-generation `presented` acknowledgment publishes that frame's stored
+`SelectionSceneV1`. Fixed capture cancels ordinary pending work, waits for its exact frame, and
+reads decoded RGBA from that same worker render task. Resize is held behind an in-flight frame and
+ordered before the next frame; reset and idempotent destroy discard every pending frame, selection,
+decal, capture, and resize record. Live, replay, spectator, Lab, stress, fixed capture, and Map
+Editor all use this same worker host. There is no Pixi flag, synchronous canvas, hidden renderer,
+WebGPU probe, or fallback renderer.
 
 ## 5. Babylon foundation contracts
 

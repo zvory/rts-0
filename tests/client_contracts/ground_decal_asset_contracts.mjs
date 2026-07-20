@@ -34,18 +34,24 @@ assert(atlasPng.width === GROUND_DECAL_PNG_ATLAS.width && atlasPng.height === GR
 {
   let fetched = "";
   let closed = 0;
+  let decodeOptions = null;
   const atlas = await loadGroundDecalAtlas({
     fetchFn: async (url) => {
       fetched = url;
       return { ok: true, blob: async () => ({ type: "image/png" }) };
     },
-    createImageBitmapFn: async () => ({
+    createImageBitmapFn: async (_blob, options) => {
+      decodeOptions = options;
+      return ({
       width: GROUND_DECAL_PNG_ATLAS.width,
       height: GROUND_DECAL_PNG_ATLAS.height,
       close() { closed += 1; },
-    }),
+      });
+    },
   });
   assert(fetched === GROUND_DECAL_PNG_ATLAS.url, "runtime fetches only the worker-decodable PNG atlas");
+  assert(decodeOptions?.premultiplyAlpha === "premultiply" && decodeOptions?.colorSpaceConversion === "none",
+    "worker bitmap decoding pins premultiplied alpha and source colors for exact DOM-canvas parity");
   assert(atlas.infantry.length === GROUND_DECAL_ASSET_MANIFEST.infantry.length,
     "runtime readiness exposes every infantry source rect");
   assert(atlas.artilleryBlast[0].image === atlas.infantry[0].image,

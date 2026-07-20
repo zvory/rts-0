@@ -18,6 +18,19 @@ import {
   startCpuProfile,
   stopCpuProfile,
 } from "./client-perf/browser_profile.mjs";
+import {
+  buildPresentationMetrics,
+  cancelRenderWorkerProfile,
+  presentationConsoleLine,
+  renderWorkerErrors,
+  resetPerfDiagnostics,
+  scaledTimeoutMs,
+  snapshotPacketBudgetSummary,
+  startRenderWorkerProfile,
+  stopRenderWorkerProfile,
+  workloadTimeoutScale,
+} from "./client-perf/harness_runtime.mjs";
+export { buildPresentationMetrics } from "./client-perf/harness_runtime.mjs";
 import { buildClientPerfWorkloads, defaultClientPerfWorkloads } from "./client-perf/workloads.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -173,6 +186,8 @@ function reportWorkloadResult(result) {
   if (diagnosticsText) {
     for (const line of diagnosticsText.split("\n")) console.log(`  ${line}`);
   }
+  const presentationLine = presentationConsoleLine(result.presentations);
+  if (presentationLine) console.log(`  ${presentationLine}`);
   if (result.status !== "passed") {
     for (const error of result.errors) console.error(`  ${error}`);
   }
@@ -189,6 +204,8 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   let tracePath = null;
   let cpuProfile = null;
   let cpuProfilePath = null;
+  let renderWorkerCpuProfile = null;
+  let renderWorkerCpuProfilePath = null;
   let page = null;
   let cdpSession = null;
   let summary = null;
@@ -237,16 +254,19 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     await page.waitForSelector("#viewport canvas", { timeout: scaledTimeoutMs(5000, timeoutScale) });
     workloadSetup = await applyWorkloadSetup(page, workload);
     if (workload.setup?.resetPerfAfterSetup) {
-      await page.evaluate(() => window.__rtsPerf?.reset?.());
+      await resetPerfDiagnostics(page);
     }
     await page.waitForFunction(
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
     );
+    await resetPerfDiagnostics(page);
     cpuProfile = await startCpuProfile(page, args.cpuProfileIntervalUs, cdpSession);
+    renderWorkerCpuProfile = await startRenderWorkerProfile(page, args.cpuProfileIntervalUs);
     await sleep(args.durationMs);
     cpuProfilePath = cpuProfile ? path.join(artifactDir, "cpu-profile.cpuprofile") : null;
     await stopCpuProfile(cpuProfile, cpuProfilePath);
+    renderWorkerCpuProfilePath = await stopRenderWorkerProfile(renderWorkerCpuProfile, artifactDir);
 
     summary = await collectPageSummary(page);
     if (args.snapshotCodecBakeoff) {
@@ -295,6 +315,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     const endedAt = new Date().toISOString();
     const renderBudget = buildRenderBudgetReport(summary.perf?.summary, summary.perf?.reportSummary);
     const renderDiagnostics = buildRenderDiagnosticsReport(summary.perf?.summary, summary.perf?.reportSummary);
+    const presentations = buildPresentationMetrics(summary, args.durationMs);
     const artifact = {
       schemaVersion: 1,
       status: "passed",
@@ -328,6 +349,8 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       websocket: summary.websocket,
       health: summary.health,
       perf: summary.perf,
+      renderWorker: summary.renderWorker,
+      presentations,
       renderBudget,
       renderDiagnostics,
       clientNetReport: summary.clientNetReport,
@@ -345,10 +368,12 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         summaryJson: path.join(artifactDir, "summary.json"),
         traceJson: tracePath,
         cpuProfile: cpuProfilePath,
+        renderWorkerCpuProfile: renderWorkerCpuProfilePath,
       },
       notes: [
         "This harness fails on runtime errors and missing summaries, not absolute FPS thresholds.",
         "Numbers are machine-local evidence for optimization work.",
+        "Page CPU throttling is not worker-inclusive; worker evidence is the independent worker profile plus same-host unthrottled timings.",
       ],
     };
 
@@ -358,6 +383,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     if (!summary.clientNetReport) {
       errors.push("ClientNetReport snapshot could not be generated");
     }
+    errors.push(...renderWorkerErrors(summary.renderWorker));
     errors.push(...workloadSetupErrors(workload, workloadSetup));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
@@ -379,6 +405,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       deviceScaleFactor: args.deviceScaleFactor,
       renderBudget,
       renderDiagnostics,
+      presentations,
       topMeasuredPhase: topMeasuredPhase(renderBudget),
       matrixCell: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
     };
@@ -406,37 +433,9 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       matrixCell: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
     };
   } finally {
+    await cancelRenderWorkerProfile(renderWorkerCpuProfile);
     await cleanupBrowserProfile({ controller: cpuProfile, emulationSession: cdpSession, page });
   }
-}
-
-function snapshotPacketBudgetSummary(report) {
-  if (!report) return null;
-  return {
-    snapshotBytesP95: numberOrNull(report.snapshotBytesP95),
-    snapshotSegmentBudgetBytes: numberOrNull(report.snapshotSegmentBudgetBytes),
-    snapshotOverSegmentBudgetCount: numberOrNull(report.snapshotOverSegmentBudgetCount),
-    snapshotOverSegmentBudgetPctX100: numberOrNull(report.snapshotOverSegmentBudgetPctX100),
-    snapshotByteSource: stringOrNull(report.snapshotByteSource),
-    snapshotCodec: stringOrNull(report.snapshotCodec),
-    snapshotCodecVersion: numberOrNull(report.snapshotCodecVersion),
-    snapshotFrameKind: stringOrNull(report.snapshotFrameKind),
-    websocketCompression: stringOrNull(report.websocketCompression),
-    websocketExtensions: stringOrNull(report.websocketExtensions),
-  };
-}
-
-function workloadTimeoutScale(args) {
-  const rate = Number(args?.cpuThrottleRate || DEFAULT_CPU_THROTTLE_RATE);
-  return Number.isFinite(rate) && rate > 1 ? rate : 1;
-}
-
-function scaledTimeoutMs(timeoutMs, scale) {
-  const timeout = Number(timeoutMs);
-  const factor = Number(scale);
-  if (!Number.isFinite(timeout) || timeout <= 0) return timeoutMs;
-  if (!Number.isFinite(factor) || factor <= 1) return timeout;
-  return Math.ceil(timeout * factor);
 }
 
 export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
@@ -1246,6 +1245,7 @@ async function collectPageSummary(page) {
       canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
       health: healthSnapshot,
       perf: perfSnapshot,
+      renderWorker: JSON.parse(JSON.stringify(window.__rtsRenderWorkerStats || null)),
       clientNetReport,
       labHellholeMonitor: JSON.parse(JSON.stringify(window.__rtsLabHellholeMonitor || null)),
     };

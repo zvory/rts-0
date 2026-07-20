@@ -2,7 +2,6 @@ import { isResource } from "../protocol.js";
 import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../presentation/submission.js";
 import { copyGridSnapshotInto } from "../presentation/grid_snapshot.js";
 import { createRendererProjectionQueries } from "../presentation/projection_record.js";
-import { Renderer } from "./index.js";
 
 export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "state.resources.oil", reviewTrigger: "a Pixi DTO closure needs the low-oil cue" }),
@@ -50,21 +49,17 @@ const FEEDBACK_SINGLETON_TYPES = Object.freeze({
  * for each new immutable frame and are never exposed to another backend.
  */
 export class PixiPresentationAdapter {
-  static async create(canvasParent, sources) {
-    const renderer = await Renderer.create(canvasParent, { renderClock: sources?.renderClock });
-    return new PixiPresentationAdapter(canvasParent, sources, { renderer });
-  }
-
   constructor(canvasParent, sources, { renderer = null } = {}) {
     this.id = "pixi";
     this._sources = sources || {};
-    if (!renderer) throw new TypeError("PixiPresentationAdapter.create() must prepare the renderer.");
+    if (!renderer) throw new TypeError("Pixi render worker must prepare the renderer.");
     this._renderer = renderer;
     this._lastFrame = null;
     this._lastView = null;
     this._staticMapRevision = null;
     this._decalFrameKey = null;
     this._retainedGroundDecalKey = null;
+    this._lastTiming = Object.freeze({ workerUpdateMs: 0, workerPresentMs: 0 });
     this._destroyed = false;
   }
 
@@ -86,6 +81,7 @@ export class PixiPresentationAdapter {
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     let retainedRevision = 0;
     try {
+      const updateStartedAt = performance.now();
       time("renderer.update", () => {
         this._ensureStaticMap(frame);
         const repeated = frame === this._lastFrame;
@@ -123,7 +119,13 @@ export class PixiPresentationAdapter {
         this._renderer.drawSelectionBox(view.marquee);
         this._decalFrameKey = frameKey;
       });
+      const workerUpdateMs = performance.now() - updateStartedAt;
+      const presentStartedAt = performance.now();
       time("renderer.present", () => this._present());
+      this._lastTiming = Object.freeze({
+        workerUpdateMs,
+        workerPresentMs: performance.now() - presentStartedAt,
+      });
       return immediatePresentationSubmission({
         ...identity,
         retainedRevision,
@@ -140,8 +142,8 @@ export class PixiPresentationAdapter {
     }
   }
 
-  resize(widthCssPx, heightCssPx) {
-    this._renderer.resize(widthCssPx, heightCssPx);
+  resize(widthCssPx, heightCssPx, dpr) {
+    this._renderer.resize(widthCssPx, heightCssPx, dpr);
   }
 
   setRenderClock(renderClock) {
@@ -174,6 +176,10 @@ export class PixiPresentationAdapter {
 
   visualUnitOverrideDiagnostics() {
     return this._renderer.visualUnitOverrideDiagnostics();
+  }
+
+  get lastTiming() {
+    return this._lastTiming;
   }
 
   destroy() {
@@ -222,7 +228,9 @@ export class PixiPresentationAdapter {
     const sourceState = this._sources?.state?.() || null;
     const profiler = this._sources?.profiler?.() || null;
     const visualProfile = this._sources?.visualProfile?.() || null;
-    const legacy = snapshotLegacyState(sourceState, entities, frame.visualTimeMs, profiler);
+    const legacy = frame.pixiCompatibility
+      ? materializeLegacySnapshot(frame.pixiCompatibility)
+      : snapshotLegacyState(sourceState, entities, frame.visualTimeMs, profiler);
     const map = this._renderer._map;
     const state = buildStateFacade(frame, entities, rememberedBuildings, trenches, feedback, legacy, map);
     return {
@@ -408,6 +416,29 @@ function snapshotLegacyState(state, entities, now, profiler) {
   }
   return {
     oil: Number.isFinite(state?.resources?.oil) ? state.resources.oil : null,
+    currentById,
+    previousById,
+    recoilById,
+    recoilPhaseById,
+    recoilKindById,
+  };
+}
+
+function materializeLegacySnapshot(record) {
+  const currentById = new Map();
+  const previousById = new Map();
+  const recoilById = new Map();
+  const recoilPhaseById = new Map();
+  const recoilKindById = new Map();
+  for (const pose of record?.poses || []) {
+    copyPose(currentById, pose.id, pose.current);
+    copyPose(previousById, pose.id, pose.previous);
+    if (Number.isFinite(pose.recoil)) recoilById.set(pose.id, pose.recoil);
+    if (Number.isFinite(pose.recoilPhase)) recoilPhaseById.set(pose.id, pose.recoilPhase);
+    if (pose.recoilKind) recoilKindById.set(pose.id, pose.recoilKind);
+  }
+  return {
+    oil: Number.isFinite(record?.oil) ? record.oil : null,
     currentById,
     previousById,
     recoilById,

@@ -1,5 +1,5 @@
 import { Camera } from "../camera.js";
-import { PixiPresentationAdapter } from "./pixi_compatibility_adapter.js";
+import { PixiWorkerPresentationAdapter } from "./pixi_worker_host.js";
 
 export function createPixiBackendBundle() {
   return Object.freeze({
@@ -8,7 +8,7 @@ export function createPixiBackendBundle() {
       return new Camera(0, 0, options);
     },
     async createRenderer(canvasParent, sources) {
-      return PixiPresentationAdapter.create(canvasParent, sources);
+      return PixiWorkerPresentationAdapter.create(canvasParent, sources);
     },
   });
 }
