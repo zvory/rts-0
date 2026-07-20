@@ -497,7 +497,10 @@ export class Match {
     if (this.capabilities.matchControls?.pause) {
       this.livePauseOverlay = new LivePauseOverlay({
         root: dom.gameScreen,
+        settingsRoot: dom.gameMenu,
         onUnpause: this.onUnpauseGame,
+        onOpenSettings: (tabId) => this.openSettingsTab(tabId),
+        playerNameForId: (playerId) => this.state.playerById(playerId)?.name,
       });
     }
     this.applySpectatorUi();
@@ -983,6 +986,12 @@ export class Match {
     const wasOpen = keepOpen && this.settings.isOpen();
     this.settings.setContext(buildMatchSettingsContextForMatch(this));
     if (wasOpen) this.settings.open({ focus: false });
+  }
+
+  openSettingsTab(tabId) {
+    if (!this.settings) return;
+    this.settings.open({ focus: false });
+    this.settings.activateTab(tabId);
   }
 
   livePauseActionLabel() {

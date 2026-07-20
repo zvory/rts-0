@@ -11,6 +11,7 @@ perspective camera before its renderer; ordinary spectators and replays remain o
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
 styles.css        # HUD, lobby, menus, command card
+live_pause.css    # live-match pause overlay and actions
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
@@ -561,7 +562,7 @@ buildPauseAction({ visible, disabled, label, title, onPause })
 `live_pause_overlay.js`
 ```js
 export class LivePauseOverlay {
-  constructor({ root, onUnpause })
+  constructor({ root, settingsRoot?, onUnpause, onOpenSettings?, playerNameForId? })
   applyLivePauseState(state)
   destroy()
 }
@@ -987,8 +988,10 @@ spectator, and replay contexts through dependency-injected collaborators. The st
 inside the settings mount point are `#pointer-lock-toggle`, `#debug-path-toggle`, and
 `#give-up-open` plus live-match action `#live-pause-open`; they may not exist until their owning
 tab/action is visible. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
-`livePauseState` messages; the overlay exposes resume only when the server grants
-`canUnpause` and is destroyed with the match.
+`livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
+Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
+paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is
+destroyed with the match.
 
 `state.js`
 ```js
