@@ -197,7 +197,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: 100,
             range_tiles: 5,
             cooldown: 72,
-            speed: 1.6,
+            speed: 1.52,
             sight_tiles: 9,
             cost_steel: 150,
             cost_oil: 40,
@@ -704,7 +704,7 @@ mod tests {
     }
 
     #[test]
-    fn artillery_moves_at_anti_tank_gun_speed() {
+    fn heavy_support_weapon_movement_speeds_match_balance() {
         let artillery_speed = unit_def(EntityKind::Artillery)
             .expect("artillery def")
             .stats
@@ -714,7 +714,8 @@ mod tests {
             .stats
             .speed;
 
-        assert_eq!(artillery_speed, anti_tank_gun_speed);
+        assert_eq!(anti_tank_gun_speed, 1.52);
+        assert_eq!(artillery_speed, 1.6);
     }
 
     #[test]
