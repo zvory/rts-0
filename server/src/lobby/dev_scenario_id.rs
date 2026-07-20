@@ -18,6 +18,8 @@ pub(in crate::lobby) enum DevScenarioId {
     EntrenchmentInspection,
     TankCoaxInspection,
     AttackMoveReloadAcquisition,
+    TankUnderFireRetreat,
+    TankReverseTraffic,
 }
 
 impl DevScenarioId {
@@ -43,6 +45,8 @@ impl DevScenarioId {
             "entrenchment_inspection" => Some(Self::EntrenchmentInspection),
             "tank_coax_inspection" => Some(Self::TankCoaxInspection),
             "attack_move_reload_acquisition" => Some(Self::AttackMoveReloadAcquisition),
+            "tank_under_fire_retreat" => Some(Self::TankUnderFireRetreat),
+            "tank_reverse_traffic" => Some(Self::TankReverseTraffic),
             _ => None,
         }
     }
@@ -69,6 +73,8 @@ impl DevScenarioId {
             Self::EntrenchmentInspection => "entrenchment_inspection",
             Self::TankCoaxInspection => "tank_coax_inspection",
             Self::AttackMoveReloadAcquisition => "attack_move_reload_acquisition",
+            Self::TankUnderFireRetreat => "tank_under_fire_retreat",
+            Self::TankReverseTraffic => "tank_reverse_traffic",
         }
     }
 }

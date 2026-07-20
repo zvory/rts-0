@@ -30,7 +30,7 @@ impl DevDriver {
 
 pub(super) struct DevScenarioDriver {
     player_id: u32,
-    command: SimCommand,
+    commands: Vec<SimCommand>,
     issue_after_ticks: u32,
     issued: bool,
 }
@@ -44,7 +44,9 @@ impl DevScenarioDriver {
             return;
         }
         self.issued = true;
-        game.enqueue(self.player_id, self.command.clone());
+        for command in &self.commands {
+            game.enqueue(self.player_id, command.clone());
+        }
     }
 }
 
@@ -121,10 +123,10 @@ impl RoomTask {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
                         let player_id = setup.player_id;
-                        let command = setup.command();
+                        let commands = setup.commands();
                         let driver = DevScenarioDriver {
                             player_id,
-                            command,
+                            commands,
                             issue_after_ticks: setup.issue_after_ticks,
                             issued: false,
                         };
@@ -233,6 +235,20 @@ impl RoomTask {
                     }
                     DevScenarioId::AttackMoveReloadAcquisition => {
                         session_from_setup!(Game::new_attack_move_reload_acquisition_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
+                    DevScenarioId::TankUnderFireRetreat => {
+                        session_from_setup!(Game::new_tank_under_fire_retreat_scenario(
+                            config.unit,
+                            config.count,
+                            seed,
+                        )?)
+                    }
+                    DevScenarioId::TankReverseTraffic => {
+                        session_from_setup!(Game::new_tank_reverse_traffic_scenario(
                             config.unit,
                             config.count,
                             seed,

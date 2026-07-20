@@ -8,6 +8,7 @@ mod factory_wall_rally_spawn;
 mod layouts;
 mod replay_142_vehicle_lock;
 mod tank_coax;
+mod tank_retreat;
 
 use dev_scenario_setup::{DevScenarioOrder, DevScenarioSetup};
 
