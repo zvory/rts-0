@@ -243,6 +243,10 @@ canary runs own a private server; the browser shard passes its existing loopback
   `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
   branches without runtime paths that may affect players, and qualifying branches receive one
   fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review.
+  When `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the process environment, the current
+  worktree `.env`, or the primary checkout `.env`, the pass sends only the `## Changes` bullets to
+  Discord. It omits the fragment title, date, playtest-watch section, and PR metadata. A content
+  hash under the shared Git directory suppresses duplicate deliveries when the helper is rerun.
   Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
   Codex quality-pass coverage should verify access to linked worktree git common directories while
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
