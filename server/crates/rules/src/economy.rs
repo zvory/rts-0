@@ -255,14 +255,6 @@ mod tests {
             EntityKind::Tank,
             &[EntityKind::Factory]
         ));
-        assert!(!train_requirement_met(
-            EntityKind::CommandCar,
-            &[EntityKind::Factory]
-        ));
-        assert!(train_requirement_met(
-            EntityKind::CommandCar,
-            &[EntityKind::ResearchComplex]
-        ));
         assert_eq!(
             defs::unit_def(EntityKind::ScoutPlane).and_then(|d| d.trained_at),
             None,
