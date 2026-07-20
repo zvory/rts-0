@@ -1275,6 +1275,9 @@ export class Minimap {
   _cancelActivePointerGesture() {
     const gesture = this._activePointerGesture;
     if (gesture) this._releasePointer(gesture.pointerId);
+    if (gesture?.artilleryRadiusSelection) {
+      this._intent()?.endArtilleryFireRadiusSelection?.();
+    }
     this._activePointerGesture = null;
     this._dragging = false;
     this.inputRouter?.releaseSource?.("dom");
@@ -1460,7 +1463,7 @@ export class Minimap {
         ? cmd.blanketFire(abilityUnits, target.x, target.y, fireRadiusTiles, queued)
         : cmd.useAbility(resolvedAbility, abilityUnits, target.x, target.y, queued);
       this.commandInteraction.issueCommand(command);
-      if (fireCenter) intent.artilleryFireCenter = null;
+      if (fireCenter) intent.endArtilleryFireRadiusSelection?.();
       if (isArtilleryFireAbility(resolvedAbility)) {
         for (const lock of artilleryLocks) {
           this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);

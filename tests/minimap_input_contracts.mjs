@@ -714,6 +714,17 @@ function pointerEvent(canvas, clientX, clientY, {
       h.net.sent[0].queued === true,
     "minimap Artillery Fire drag releases the selected radius as one gesture",
   );
+
+  h.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  down(pointerEvent(h.canvas, 150, 220, { pointerId: 72, pointerType: "touch" }));
+  listenerFor(h.canvas, "pointercancel")(
+    pointerEvent(h.canvas, 150, 220, { pointerId: 72, pointerType: "touch" }),
+  );
+  assert(
+    h.clientIntent.artilleryFireCenter === null &&
+      h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
+    "cancelling the minimap drag clears its center without disarming Artillery Fire",
+  );
   h.minimap.destroy();
 }
 

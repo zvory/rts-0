@@ -158,7 +158,7 @@ export function _issueTargetedCommand(p, ev = {}) {
       })
       : [];
     this.commandInteraction.issueCommand(command);
-    if (fireCenter) intent.artilleryFireCenter = null;
+    if (fireCenter) intent.endArtilleryFireRadiusSelection?.();
     if (isArtilleryFireAbility(resolvedAbility)) {
       for (const lock of artilleryLocks) {
         this._addCommandFeedback("artillery", lock.x, lock.y, queued, radiusTiles);
