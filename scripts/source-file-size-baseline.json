@@ -25,8 +25,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1710,
-      "reason": "The compact snapshot integration fixture now covers the owner/allied research-upgrade queue slot added for chained research admission; keep ratcheting until remaining protocol DTO and integration-test groups are split."
+      "lines": 1712,
+      "reason": "FormationMove now carries the optional authoritative attack-move mode beside its existing queued flag; keep ratcheting until remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -35,13 +35,13 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1936,
-      "reason": "FormationMove admission, point sanitization, queue handling, and authoritative dispatch stay together in the command boundary for this prototype; keep ratcheting by extracting command families as their contracts stabilize."
+      "lines": 1954,
+      "reason": "FormationMove admission now preserves its validated per-unit destinations for either move or attack-move orders; point sanitization, queue handling, and authoritative dispatch stay together until command families are extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1794,
-      "reason": "Freehand formation moves add coordinator entry points for slot assignment and reachable path goals while the geometry remains split into the formation module; keep ratcheting until coordinator policy is split."
+      "lines": 1806,
+      "reason": "Freehand formation moves share coordinator entry points for move and attack-move slot assignment while geometry remains split into the formation module; keep ratcheting until coordinator policy is split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
@@ -70,7 +70,7 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1915,
+      "lines": 1911,
       "reason": "Input-command coverage remains in the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
