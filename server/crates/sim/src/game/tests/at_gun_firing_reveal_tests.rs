@@ -196,6 +196,34 @@ fn anti_tank_gun_firing_from_fog_projects_as_actionable_snapshot_entity() {
         !view.vision_only,
         "firing reveal must use normal live fog, not render-only intel"
     );
+    let enemy = game
+        .state
+        .entities
+        .get(enemy_at)
+        .expect("firing AT gun should still exist");
+    let tile_x = (enemy.pos_x / config::TILE_SIZE as f32).floor() as usize;
+    let tile_y = (enemy.pos_y / config::TILE_SIZE as f32).floor() as usize;
+    let tile = tile_y * game.state.map.size as usize + tile_x;
+    assert_eq!(
+        snapshot.visible_tiles[tile], 0,
+        "an actionable firing reveal must not clear the attacker's presentation-fog tile"
+    );
+    assert_eq!(
+        snapshot.explored_tiles[tile], 0,
+        "an actionable firing reveal must not add the attacker's tile to explored history"
+    );
+    let observer_snapshot = game.snapshot_for_observer(&ObserverView::Players(vec![1]));
+    assert!(
+        observer_snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.id == enemy_at),
+        "a selected-player observer should receive the actionable firing-revealed unit"
+    );
+    assert_eq!(
+        observer_snapshot.visible_tiles[tile], 0,
+        "selected-player observer presentation fog must also keep the firing tile covered"
+    );
 
     game.enqueue(
         1,

@@ -323,6 +323,30 @@ function buttonByLabel(card, label) {
   assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
   assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
 
+  const actionableRevealState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  actionableRevealState.applySnapshot({
+    tick: 12,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    visibleTiles: new Array(16).fill(0),
+    exploredTiles: new Array(16).fill(0),
+    entities: [
+      { id: 100, owner: 2, kind: KIND.ANTI_TANK_GUN, x: 16, y: 16, hp: 45, maxHp: 45, state: STATE.ATTACK },
+      { id: 101, owner: 1, kind: KIND.RIFLEMAN, x: 48, y: 16, hp: 45, maxHp: 45, state: STATE.IDLE },
+    ],
+    events: [],
+  });
+  assert(
+    actionableRevealState.entityById(100)?.shotReveal === true,
+    "a projected enemy unit on a presentation-dark tile becomes an above-fog firing reveal",
+  );
+  assert(
+    actionableRevealState.entityById(101)?.shotReveal !== true,
+    "owned units remain ordinary entities even when their tile is presentation-dark",
+  );
+
   const overpenEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   overpenEventState.applySnapshot({
     tick: 12,

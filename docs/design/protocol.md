@@ -690,6 +690,10 @@ complete for every player.
 Anti-Tank Guns that fire from fog create actionable temporary live fog for the recipients that see
 the attack event. The revealed gun is projected as a normal non-`visionOnly` snapshot entity and
 can validate direct attack commands or combat target acquisition until the firing reveal expires.
+Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and does not enter
+`exploredTiles`; clients infer the explicit above-fog `shotReveal` presentation when a projected
+enemy unit occupies a presentation-dark tile. This keeps the unit fully legible without clearing
+the terrain tile beneath it.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
 0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The one-second counterfire
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
@@ -702,8 +706,8 @@ deadline. Tile-level provenance covers colocated entities and remains tied to th
 the firing entity moves before the next fog rebuild.
 Artillery Point Fire creates the same kind of actionable temporary live fog for every enemy player,
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
-as a normal snapshot entity without exposing the target point, surrounding terrain, or pre-impact
-target marker.
+as a normal snapshot entity without exposing the target point, its terrain tile, surrounding
+terrain, or pre-impact target marker.
 Lingering death sight is ordinary temporary team sight for five seconds. It makes current
 non-owned units/buildings visible as normal entities, contributes to `visibleTiles`, refreshes
 remembered buildings, and can drive command validation and combat auto-acquisition while active.

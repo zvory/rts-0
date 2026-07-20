@@ -70,7 +70,11 @@ impl Game {
             .state
             .fog
             .union_for(OBSERVER_FOG_VIEWER_ID, &fog_players);
-        self.snapshot_for_mode(
+        let presentation_fog = self
+            .state
+            .fog
+            .presentation_union_for(OBSERVER_FOG_VIEWER_ID, &fog_players);
+        let mut snapshot = self.snapshot_for_mode(
             SnapshotMode {
                 player: OBSERVER_FOG_VIEWER_ID,
                 memory_players: selected_players,
@@ -85,6 +89,8 @@ impl Game {
                 omniscient: false,
             },
             options,
-        )
+        );
+        snapshot.visible_tiles = presentation_fog.visible_tiles_for(OBSERVER_FOG_VIEWER_ID);
+        snapshot
     }
 }

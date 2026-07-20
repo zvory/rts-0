@@ -44,6 +44,20 @@ function lerpAngle(from, to, t) {
   return normalizeAngle(from + shortestAngleDelta(from, to) * t);
 }
 
+function markFiringRevealEntity(entity, map, visibleTiles, playerId) {
+  if (!entity || entity.shotReveal || entity.visionOnly || !isUnit(entity.kind)) return entity;
+  if (Number(entity.owner) === 0 || Number(entity.owner) === Number(playerId)) return entity;
+  const width = Number(map?.width);
+  const height = Number(map?.height);
+  const tileSize = Number(map?.tileSize);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || !(tileSize > 0)) return entity;
+  if (visibleTiles.length !== width * height) return entity;
+  const tx = Math.floor(Number(entity.x) / tileSize);
+  const ty = Math.floor(Number(entity.y) / tileSize);
+  if (tx < 0 || ty < 0 || tx >= width || ty >= height) return entity;
+  return visibleTiles[ty * width + tx] ? entity : { ...entity, shotReveal: true };
+}
+
 function interpolateEntity(entity, prior, alpha) {
   if (!prior) return { ...entity };
   const next = {
@@ -295,7 +309,12 @@ export class GameState extends VisualEffectBackedState {
     const events = msg.events || [];
     this._applyResourceDeltas(msg.resourceDeltas || []);
     this._applyResourceDeaths(events);
-    const wireEntities = (msg.entities || []).filter((e) => !isResource(e.kind));
+    const visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
+      ? msg.visibleTiles
+      : [];
+    const wireEntities = (msg.entities || [])
+      .filter((e) => !isResource(e.kind))
+      .map((e) => markFiringRevealEntity(e, this.map, visibleTiles, this.playerId));
     this.visualEffects.applyAttackReveals(events, visualNow);
     const visibleIds = new Set(wireEntities.map((e) => e.id));
     const entities = wireEntities
@@ -330,9 +349,7 @@ export class GameState extends VisualEffectBackedState {
     this.rememberedBuildings = Array.isArray(msg.rememberedBuildings)
       ? msg.rememberedBuildings
       : [];
-    this.visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
-      ? msg.visibleTiles
-      : [];
+    this.visibleTiles = visibleTiles;
     this.exploredTiles = Array.isArray(msg.exploredTiles) || msg.exploredTiles instanceof Uint8Array
       ? msg.exploredTiles
       : [];

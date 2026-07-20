@@ -29,7 +29,8 @@ impl Game {
 
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot {
         let live_fog = self.team_current_fog_for(player, &self.state.fog);
-        self.snapshot_for_mode(
+        let presentation_fog = self.team_presentation_fog_for(player, &self.state.fog);
+        let mut snapshot = self.snapshot_for_mode(
             SnapshotMode {
                 player,
                 memory_players: &[player],
@@ -42,7 +43,9 @@ impl Game {
                 omniscient: false,
             },
             options,
-        )
+        );
+        snapshot.visible_tiles = presentation_fog.visible_tiles_for(player);
+        snapshot
     }
 
     /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
@@ -378,5 +381,13 @@ impl Game {
             visible_players.push(player);
         }
         fog.union_for(player, &visible_players)
+    }
+
+    pub(in crate::game) fn team_presentation_fog_for(&self, player: u32, fog: &Fog) -> Fog {
+        let mut visible_players = self.living_team_player_ids_for_vision(player);
+        if visible_players.is_empty() {
+            visible_players.push(player);
+        }
+        fog.presentation_union_for(player, &visible_players)
     }
 }

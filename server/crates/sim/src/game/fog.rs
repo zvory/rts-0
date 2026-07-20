@@ -17,7 +17,7 @@
 //! authoritative current grids makes observer perspective changes and replay seeks independent of
 //! which views a particular client happened to render.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
@@ -366,6 +366,35 @@ impl Fog {
         fog
     }
 
+    /// Build the current-vision union used to draw fog, excluding tiles that are visible only
+    /// because an enemy fired from them. Firing reveals remain in [`Self::union_for`] so combat
+    /// and command validation keep using the actionable grid.
+    pub(in crate::game) fn presentation_union_for(&self, viewer: u32, players: &[u32]) -> Self {
+        let cells = (self.size * self.size) as usize;
+        let mut union = vec![false; cells];
+        let mut explored_union = vec![false; cells];
+        for player in players {
+            let reveal_only_tiles = self.firing_reveal_only_tiles(*player);
+            if let Some(grid) = self.grids.get(player) {
+                for (index, (dst, src)) in union.iter_mut().zip(grid.iter()).enumerate() {
+                    if !reveal_only_tiles.contains(&(index as u32)) {
+                        *dst = *dst || *src;
+                    }
+                }
+            }
+            if let Some(grid) = self.explored_grids.get(player) {
+                for (dst, src) in explored_union.iter_mut().zip(grid.iter()) {
+                    *dst = *dst || *src;
+                }
+            }
+        }
+
+        let mut fog = Fog::new(self.size);
+        fog.grids.insert(viewer, union);
+        fog.explored_grids.insert(viewer, explored_union);
+        fog
+    }
+
     /// Accumulate the current fog unions into each viewer's durable exploration history.
     pub(in crate::game) fn accumulate_explored_for_viewers(
         &mut self,
@@ -378,8 +407,11 @@ impl Fog {
                 let Some(grid) = self.grids.get(source) else {
                     continue;
                 };
-                for (dst, src) in current_union.iter_mut().zip(grid.iter()) {
-                    *dst = *dst || *src;
+                let reveal_only_tiles = self.firing_reveal_only_tiles(*source);
+                for (index, (dst, src)) in current_union.iter_mut().zip(grid.iter()).enumerate() {
+                    if !reveal_only_tiles.contains(&(index as u32)) {
+                        *dst = *dst || *src;
+                    }
                 }
             }
             let explored = self
@@ -401,6 +433,15 @@ impl Fog {
             .map(|player| (*player, vec![*player]))
             .collect::<Vec<_>>();
         self.accumulate_explored_for_viewers(&viewer_sources);
+    }
+
+    fn firing_reveal_only_tiles(&self, player: u32) -> BTreeSet<u32> {
+        self.firing_reveal_visibility
+            .get(&player)
+            .into_iter()
+            .flat_map(|by_entity| by_entity.values())
+            .filter_map(|visibility| visibility.reveal_only.then_some(visibility.revealed_tile).flatten())
+            .collect()
     }
 
     /// Whether a grid has been allocated for `player`.

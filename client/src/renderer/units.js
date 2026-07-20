@@ -327,10 +327,11 @@ function finite(value, fallback) {
 
 export function _drawShotRevealUnit(e, colorByOwner, state, pools = {}) {
   const now = rendererVisualNow(this);
-  const age = Math.max(0, now - (e.shotRevealCreatedAt || now));
-  const ttl = Math.max(1, (e.shotRevealExpiresAt || now + 1) - (e.shotRevealCreatedAt || now));
+  const timedReveal = Number.isFinite(e.shotRevealCreatedAt) && Number.isFinite(e.shotRevealExpiresAt);
+  const age = timedReveal ? Math.max(0, now - e.shotRevealCreatedAt) : 0;
+  const ttl = timedReveal ? Math.max(1, e.shotRevealExpiresAt - e.shotRevealCreatedAt) : 1;
   const t = clamp01(age / ttl);
-  const alpha = 0.82 * (1 - smoothstep01(Math.max(0, t - 0.62) / 0.38));
+  const alpha = timedReveal ? 1 - smoothstep01(Math.max(0, t - 0.8) / 0.2) : 1;
   this._drawUnit(e, colorByOwner, state, {
     visualOverride: pools.visualOverride || null,
     visualFrameStrip: pools.visualFrameStrip || null,
