@@ -55,7 +55,6 @@ const GAMEPLAY_PATH_PREFIXES = [
   "server/crates/rules/src/",
   "server/crates/sim/src/",
   "server/crates/protocol/src/",
-  "server/src/",
   "client/src/",
 ];
 
