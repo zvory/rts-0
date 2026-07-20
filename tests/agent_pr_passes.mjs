@@ -33,6 +33,7 @@ assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, t
 assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small-model");
 assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
 assert.equal(parsePatchArgs(["--delivery-ref", "abc123"]).deliveryRef, "abc123");
+assert.deepEqual(parsePatchArgs(["--delivery-path", "patch-notes/note.md"]).deliveryPaths, ["patch-notes/note.md"]);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
@@ -240,11 +241,31 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   const delivery = execute(parsePatchArgs([
     "--deliver-discord",
     "--delivery-ref", deliveryRef,
+    "--delivery-path", "patch-notes/2026-07-20/stale-note.md",
     "--head-branch", "zvorygin/stale-note",
     "--repo", lifecycleRoot,
     "--dry-run",
   ]));
   assert.deepEqual(delivery.changes, ["Merged factual change."], "delivery should read the immutable merged head");
+
+  const historicalOnly = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.equal(historicalOnly, null, "delivery should not rediscover an unchanged historical fragment");
+
+  const deletedFragment = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--delivery-path", "patch-notes/2025-12-31/stale-note.md",
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.equal(deletedFragment, null, "delivery should ignore a changed fragment that is absent at the immutable head");
   run("git", ["checkout", "zvorygin/stale-note"], lifecycleRoot);
   fs.rmSync(path.join(lifecycleRoot, "unrelated.txt"));
 

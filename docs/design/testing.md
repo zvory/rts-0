@@ -245,9 +245,9 @@ canary runs own a private server; the browser shard passes its existing loopback
   fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review.
   After `scripts/wait-pr.sh` confirms the PR merged and its head is reachable from `origin/main`,
   when `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the process environment, the current
-  worktree `.env`, or the primary checkout `.env`, the waiter sends only the merged fragment's
-  `## Changes` bullets to Discord before refreshing and cleaning up the worktree. It omits the
-  fragment title, date, playtest-watch section, and PR metadata. A hash of the destination and
+  worktree `.env`, or the primary checkout `.env`, the waiter sends only the PR-changed merged
+  fragment's `## Changes` bullets to Discord before refreshing and cleaning up the worktree. It
+  omits the fragment title, date, playtest-watch section, and PR metadata. A hash of the destination and
   content under the shared Git directory suppresses duplicate deliveries
   when the waiter is rerun. Review-time and CI-recovery reruns of `scripts/agent-pr.sh` never
   deliver the webhook. Discord rendering bounds change bullets so the complete post fits its

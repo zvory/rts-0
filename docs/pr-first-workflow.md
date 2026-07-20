@@ -25,8 +25,8 @@ The normal agent lifecycle is:
    ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic
    merged-worktree cleanup, including when `main` was already current and Git's `post-merge` hook
    therefore did not fire. After proving merge reachability and before cleanup, the waiter delivers
-   any branch patch-note fragment to Discord. Rerunning `scripts/agent-pr.sh` during CI recovery
-   only regenerates the fragment; it does not notify Discord.
+   any patch-note fragment changed by that PR to Discord. Rerunning `scripts/agent-pr.sh` during CI
+   recovery only regenerates the fragment; it does not notify Discord.
 
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
 the `Main test gate` workflow. The workflow runs split coverage jobs for server build, Rust

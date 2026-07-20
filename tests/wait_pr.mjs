@@ -70,7 +70,7 @@ function mergeTask(branch) {
   git(["push", "origin", "main"], { cwd: publisher });
 }
 
-function mergedViewJson(headSha, number) {
+function mergedViewJson(headSha, number, files = []) {
   return JSON.stringify({
     number,
     url: `https://example.invalid/pull/${number}`,
@@ -82,12 +82,13 @@ function mergedViewJson(headSha, number) {
     autoMergeRequest: null,
     mergeStateStatus: "CLEAN",
     isDraft: false,
+    files: files.map((filePath) => ({ path: filePath })),
   });
 }
 
-function waitEnvironment(headSha, number) {
+function waitEnvironment(headSha, number, files = []) {
   return {
-    RTS_WAIT_PR_VIEW_JSON: mergedViewJson(headSha, number),
+    RTS_WAIT_PR_VIEW_JSON: mergedViewJson(headSha, number, files),
     RTS_WAIT_PR_CHECKS_JSON: "[]",
     RTS_WORKTREE_ROOT: worktreeRoot,
     RTS_CARGO_TARGET_BASE_DIR: targetRoot,
@@ -123,7 +124,7 @@ try {
 
   const output = run("bash", [waitScript, "41"], {
     cwd: first.taskPath,
-    env: waitEnvironment(first.headSha, 41),
+    env: waitEnvironment(first.headSha, 41, ["first.txt", "patch-notes/2026-07-20/wait-pr-41.md"]),
   });
 
   assert.match(output, /refreshing local main checkout/);

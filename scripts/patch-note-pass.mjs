@@ -16,7 +16,7 @@ const MAX_CHANGE_CHARS = 230;
 export function parseArgs(argv) {
   const options = {
     baseRef: "origin/main", codexCommand: "codex", codexModel: "", dryRun: false,
-    deliverDiscord: false, deliveryRef: "", headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
+    deliverDiscord: false, deliveryPaths: [], deliveryRef: "", headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -29,6 +29,7 @@ export function parseArgs(argv) {
     else if (arg === "--base") options.baseRef = value(arg);
     else if (arg === "--codex-command") options.codexCommand = value(arg);
     else if (arg === "--codex-model") options.codexModel = value(arg);
+    else if (arg === "--delivery-path") options.deliveryPaths.push(value(arg));
     else if (arg === "--delivery-ref") options.deliveryRef = value(arg);
     else if (arg === "--head-branch") options.headBranch = value(arg);
     else if (arg === "--markdown-report-file") options.markdownReportFile = path.resolve(value(arg));
@@ -234,17 +235,20 @@ function existingFragmentPath(repoRoot, baseRef, branch, slug) {
   return existing;
 }
 
-function fragmentAtRef(repoRoot, ref, branch, slug) {
+function fragmentAtRef(repoRoot, ref, branch, slug, changedPaths) {
   const suffix = `/${slug}.md`;
-  const candidates = git(repoRoot, ["ls-tree", "-r", "--name-only", ref, "--", "patch-notes"])
+  const treePaths = new Set(git(repoRoot, ["ls-tree", "-r", "--name-only", ref, "--", "patch-notes"])
     .split("\n")
-    .filter((candidate) => candidate.startsWith("patch-notes/") && candidate.endsWith(suffix))
+    .filter(Boolean));
+  const candidates = changedPaths
+    .filter((candidate) => candidate.startsWith("patch-notes/") && candidate.endsWith(suffix) && treePaths.has(candidate))
     .sort()
     .reverse();
   const matches = candidates
     .map((fragmentPath) => ({ fragmentPath, contents: git(repoRoot, ["show", `${ref}:${fragmentPath}`]) }))
     .filter(({ contents }) => contents.startsWith("<!-- rts-patch-note:v1 -->\n") && contents.includes(`<!-- branch: ${branch} -->`));
   if (matches.length === 0) return null;
+  if (matches.length > 1) throw new Error(`multiple changed patch-note fragments exist for ${slug}`);
   return { contents: matches[0].contents, path: matches[0].fragmentPath };
 }
 
@@ -266,9 +270,10 @@ function markdownReport(decision, relativePath = "", removed = false) {
 
 export function execute(options) {
   if (options.help) {
-    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--deliver-discord --delivery-ref REF] [--dry-run]\n");
+    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--deliver-discord --delivery-ref REF [--delivery-path PATH ...]] [--dry-run]\n");
     return null;
   }
+  if (options.deliveryPaths.length > 0 && !options.deliveryRef) throw new Error("--delivery-path requires --delivery-ref");
   if (options.deliveryRef && !options.deliverDiscord) throw new Error("--delivery-ref requires --deliver-discord");
   if (options.deliveryRef && !options.headBranch) throw new Error("--delivery-ref requires --head-branch");
   const currentBranch = git(options.repoRoot, ["branch", "--show-current"]);
@@ -283,9 +288,9 @@ export function execute(options) {
   const slug = branchSlug(branch);
   if (options.deliverDiscord) {
     const referenced = options.deliveryRef
-      ? fragmentAtRef(options.repoRoot, options.deliveryRef, branch, slug)
+      ? fragmentAtRef(options.repoRoot, options.deliveryRef, branch, slug, options.deliveryPaths)
       : null;
-    const existing = referenced ? "" : existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
+    const existing = options.deliveryRef ? "" : existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
     const existingRelativePath = referenced?.path || (existing ? path.relative(options.repoRoot, existing) : "");
     if (!referenced && !existing) {
       process.stdout.write("patch-note-pass: no Discord changes to deliver\n");
