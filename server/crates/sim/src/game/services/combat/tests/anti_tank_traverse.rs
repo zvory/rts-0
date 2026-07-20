@@ -21,10 +21,10 @@ fn anti_tank_gun_turns_slowly_before_firing() {
     }
 
     let at = entities.get(at_id).expect("at should exist");
-    let expected_turn = 6.5_f32.to_radians();
+    let expected_turn = 1.0_f32.to_radians();
     assert!(
         (at.facing().abs() - expected_turn).abs() <= 0.001,
-        "deployed anti-tank gun should slew by 6.5 degrees per second, got {:.4} radians after one second",
+        "deployed anti-tank gun should slew by 1 degree per second, got {:.4} radians after one second",
         at.facing().abs()
     );
     assert_eq!(
