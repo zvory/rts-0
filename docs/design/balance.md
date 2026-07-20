@@ -114,7 +114,7 @@ review.
 | Terrain, health, selection, placement, and drag colors | None in Rust; rendering-only choices | `client/src/config.js` `COLORS` except resource identity colors that should stay consistent with Steel/Oil presentation | UI-only presentation data | None | Exclusion list in future config parity check | Client owns visual palette; it does not affect simulation, wire DTO shape, or authoritative fog | No compact impact |
 | Fog overlay alpha | Authoritative fog visibility is in sim snapshots; alpha is not a Rust value | `client/src/config.js` `FOG_EXPLORED_ALPHA`, `FOG_UNEXPLORED_ALPHA` | UI-only presentation data | None | Exclusion list in future config parity check | Client owns opacity; Rust owns which tiles/entities are visible | No compact impact |
 | Camera defaults | None in Rust | `client/src/config.js` `CAMERA` | UI-only presentation data | None | Exclusion list in future config parity check | Client-only input/render affordance | No compact impact |
-| Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 35 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc. The separate packed and deployed turn-rate constants are server-only combat behavior and need no client mirror. | No compact impact |
+| Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 35 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc | No compact impact |
 
 ### Parity exclusions after the split
 
@@ -328,13 +328,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   deterministic scattered impact points that would hit any same-team unit or building at its current position,
   while manual fire remains unrestricted.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
-  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`. Packed or setting-up guns retain their
-  shared `MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK = 0.035` alignment speed (about 60.2°/s),
-  while an emplaced gun turns its cone at
-  `ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND = 1.0`; packed, setting-up, and tearing-down
-  guns cannot fire. A deployed gun fires immediately at any target already inside its current cone.
-  If its selected visible, in-range target is outside the cone, it turns the cone at that rate
-  until the target enters it, then fires without further target tracking.
+  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`; packed, setting-up, and tearing-down guns
+  cannot fire.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
   `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,

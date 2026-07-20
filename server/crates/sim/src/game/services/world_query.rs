@@ -15,7 +15,7 @@
 //! through its docs so the placement / spawn surface is discoverable from one place.
 
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
+use crate::game::entity::{Entity, EntityKind, EntityStore, WeaponSetup, NEUTRAL};
 use crate::game::fog::Fog;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
@@ -228,7 +228,8 @@ pub(crate) fn unit_explicit_attack_target_valid(
         return false;
     }
     matches!(entities.get(target_id),
-        Some(target) if is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
+        Some(target) if explicit_attack_target_inside_fixed_arc(attacker, target)
+            && is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
             && projection::team_visible_world(
                 attacker_owner,
                 target.pos_x,
@@ -237,6 +238,28 @@ pub(crate) fn unit_explicit_attack_target_valid(
                 teams
             )
             && smokes.is_none_or(|smokes| !smokes.point_inside(target.pos_x, target.pos_y)))
+}
+
+fn explicit_attack_target_inside_fixed_arc(attacker: &Entity, target: &Entity) -> bool {
+    if attacker.kind != EntityKind::AntiTankGun
+        || !matches!(attacker.weapon_setup(), WeaponSetup::Deployed)
+    {
+        return true;
+    }
+    let Some(center) = attacker
+        .emplacement_facing()
+        .or_else(|| attacker.weapon_facing())
+        .filter(|facing| facing.is_finite())
+    else {
+        return true;
+    };
+    let target_angle = (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x);
+    if !target_angle.is_finite() {
+        return false;
+    }
+    let delta = (target_angle - center + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+        - std::f32::consts::PI;
+    delta.abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 /// Nearest hostile entity (`is_enemy_targetable`) to `(px, py)` within `radius_px`.
