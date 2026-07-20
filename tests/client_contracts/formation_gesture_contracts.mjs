@@ -31,11 +31,46 @@ function harness() {
     },
     _groundAtScreen: (x, y) => ({ x, y }),
     _selectedOwnUnitIds: () => [1, 2],
+    _selectedOwnLandUnitIds: () => [1, 2],
     _intent: () => intent,
     _onRightClick: (point) => rightClicks.push(point),
     commandInteraction: { issueCommand: (command) => commands.push(command) },
   };
   return { input, commands, rightClicks, previews };
+}
+
+function attackHarness() {
+  const h = harness();
+  const targetedClicks = [];
+  const feedback = [];
+  let targetIssues = 0;
+  let ended = 0;
+  h.input._intent = () => ({
+    commandTarget: "attack",
+    updateFormationMovePreview(preview) {
+      h.previews.push(preview);
+    },
+    clearFormationMovePreview() {},
+    issueCommandTarget() {
+      targetIssues += 1;
+      return { keepArmed: false };
+    },
+    endCommandTarget() {
+      ended += 1;
+    },
+  });
+  h.input._issueTargetedCommand = (point) => {
+    targetedClicks.push(point);
+    return true;
+  };
+  h.input._addCommandFeedback = (kind, x, y, queued) => feedback.push({ kind, x, y, queued });
+  return {
+    ...h,
+    targetedClicks,
+    feedback,
+    targetIssues: () => targetIssues,
+    ended: () => ended,
+  };
 }
 
 {
@@ -67,6 +102,38 @@ function harness() {
 }
 
 {
+  const h = attackHarness();
+  _beginFormationGesture.call(h.input, { x: 100, y: 100 }, {}, "attackMove");
+  _updateFormationGesture.call(h.input, { x: 195, y: 100 });
+
+  const preview = h.previews.at(-1);
+  assert(preview.kind === "attackMove", "attack-targeted left drag marks the shared preview as attack-move");
+  assert(preview.slots.length === 0, "attack-move slots use the shared three-tile promotion threshold");
+
+  _finishFormationGesture.call(h.input, { x: 195, y: 100 });
+  assert(h.commands.length === 0, "a short attack-targeted drag does not issue formation orders");
+  assert(h.targetedClicks.length === 1, "a short attack-targeted drag resolves as the existing targeted click");
+  assert(h.targetIssues() === 1 && h.ended() === 1, "short attack targeting preserves command-composer lifetime");
+}
+
+{
+  const h = attackHarness();
+  _beginFormationGesture.call(h.input, { x: 100, y: 100 }, { shiftKey: true }, "attackMove");
+  _updateFormationGesture.call(h.input, { x: 196, y: 100 }, { shiftKey: true });
+  _finishFormationGesture.call(h.input, { x: 196, y: 100 }, { shiftKey: true });
+
+  assert(h.targetedClicks.length === 0, "a promoted attack-move line does not issue the fallback targeted click");
+  assert(h.commands.length === 1, "a promoted attack-move line issues one atomic group command");
+  assert(h.commands[0].c === "formationMove" && h.commands[0].attackMove === true,
+    "the shared formation command carries authoritative attack-move semantics");
+  assert(h.commands[0].units.length === 2 && h.commands[0].points.length >= 2,
+    "the server receives the selected group and sampled formation line");
+  assert(h.commands[0].queued === true, "Shift queues the attack-move formation order");
+  assert(h.targetIssues() === 1 && h.ended() === 1, "attack-move line release consumes targeting once");
+  assert(h.feedback.length === 1 && h.feedback[0].kind === "attack", "attack-move line release uses red command feedback");
+}
+
+{
   const h = harness();
   _beginFormationGesture.call(h.input, { x: 100, y: 100 });
   _updateFormationGesture.call(h.input, { x: 196, y: 100 });
@@ -90,6 +157,19 @@ function harness() {
   assert(lineStyles.some(([, width, color, alpha]) => width === 7 && color === 0x071018 && alpha === 0.72), "preview has a contrasting outer stroke");
   assert(lineStyles.some(([, width, , alpha]) => width === 3 && alpha === 1), "preview has an opaque colored inner stroke");
   assert(circles.length === 2, "preview marks both stroke endpoints");
+}
+
+{
+  const graphics = new RecordingGraphics();
+  drawFormationMovePreview(graphics, {
+    kind: "attackMove",
+    points: [{ x: 0, y: 0 }, { x: 96, y: 0 }],
+    slots: [{ unitId: 1, x: 48, y: 0, radius: 10 }],
+  });
+  const redStyles = graphics.calls.filter(
+    ([name, , color]) => name === "lineStyle" && color === 0xd47a5f,
+  );
+  assert(redStyles.length >= 2, "attack-move polyline and placement ring use the red enemy-selection color");
 }
 
 console.log("formation_gesture_contracts: ok");

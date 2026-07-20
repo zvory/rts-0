@@ -37,6 +37,7 @@ export async function executeLabCommand(
   if (command === "time") return { sessionId, result: await session.driver.time(input.control || {}) };
   if (command === "inspect") return inspect(session, input);
   if (command === "select") return select(session, input);
+  if (command === "drag") return drag(session, input);
   if (command === "camera") return camera(session, input.camera || {});
   if (command === "screenshot") return screenshot(session, input, artifactPreview);
   if (command === "export") return exportArtifact(workspaceRoot, session, input);
@@ -146,6 +147,13 @@ async function select(session: InteractSession, { refs = [] }: ServiceInput) {
   return { sessionId: session.sessionId, selection: Array.isArray(response.selection) ? response.selection : [],
     entities: objectArray(response.entities).map((entity) => decorateEntity(entity, session.aliases)),
   };
+}
+
+async function drag(session: InteractSession, {
+  button = "left", from, to, steps = 24, durationMs = 750, holdKeys = [],
+}: ServiceInput) {
+  const result = await session.driver.drag({ button, from: from!, to: to!, steps, durationMs, holdKeys });
+  return { sessionId: session.sessionId, result };
 }
 
 async function camera(session: InteractSession, value: JsonObject = {}) {

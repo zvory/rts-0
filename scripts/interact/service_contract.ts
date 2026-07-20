@@ -34,6 +34,12 @@ export interface ServiceInput extends JsonObject {
   control?: JsonObject;
   kinds?: string[]; owners?: number[]; cameraViewport?: boolean; limit?: number;
   camera?: JsonObject;
+  button?: "left" | "right";
+  from?: { x: number; y: number };
+  to?: { x: number; y: number };
+  steps?: number;
+  durationMs?: number;
+  holdKeys?: Array<"attack" | "shift">;
   name?: string;
   presentation?: "clean" | "normal";
   subjects?: EntityRef[];

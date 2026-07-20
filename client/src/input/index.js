@@ -669,6 +669,13 @@ export class Input {
       return;
     }
     if (ev.button !== 0) return;
+    if (this._formationGesture) {
+      const p = this._eventScreenPos(ev);
+      if (!this.pointerLocked) this._trackMouse(p);
+      this._finishFormationGesture(p, ev);
+      ev.preventDefault?.();
+      return;
+    }
     if (this._finishTankTrapPlacementDrag(ev)) return;
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
@@ -778,6 +785,10 @@ export class Input {
     // Command-card targeting: the next left-click issues the armed command.
     if (this._commandTarget()) {
       clearPostQuickCastSelectionGuard(this);
+      if (this._commandTarget() === "attack") {
+        this._beginFormationGesture(p, ev, "attackMove");
+        return;
+      }
       if (this._issueTargetedCommand(p, ev) === false) return;
       const issued = typeof this._intent()?.issueCommandTarget === "function"
         ? this._intent().issueCommandTarget(ev)

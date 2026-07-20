@@ -152,8 +152,13 @@ impl CommandLifecycleFamily {
     pub fn from_protocol_command(cmd: &crate::protocol::Command) -> Self {
         match cmd {
             crate::protocol::Command::Move { .. }
-            | crate::protocol::Command::FormationMove { .. } => Self::Move,
-            crate::protocol::Command::AttackMove { .. } => Self::AttackMove,
+            | crate::protocol::Command::FormationMove {
+                attack_move: false, ..
+            } => Self::Move,
+            crate::protocol::Command::FormationMove {
+                attack_move: true, ..
+            }
+            | crate::protocol::Command::AttackMove { .. } => Self::AttackMove,
             crate::protocol::Command::Build { .. } => Self::Build,
             crate::protocol::Command::Train { .. } => Self::Train,
             _ => Self::Other,

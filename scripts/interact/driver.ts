@@ -21,6 +21,7 @@ import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
 import { defaultMapForMode } from "./session_defaults.ts";
 import { waitForInteractStartup } from "./bridge_startup.ts";
+import { performMouseDrag, type MouseDragInput } from "./mouse_drag.ts";
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -381,17 +382,18 @@ export class InteractDriver {
 
   async giveUp() { return this.call("giveUp", {}); }
 
-  async time(control: JsonObject) {
-    return this.call("time", control);
-  }
+  async time(control: JsonObject) { return this.call("time", control); }
 
   async inspect(query: JsonObject = {}) { return this.call("inspect", query); }
   async select(entityIds: number[]) { return this.call("select", { entityIds }); }
   async camera(command: JsonObject) { return this.call("camera", command); }
 
-  async reset() {
-    return this.call("reset", {});
+  async drag(input: MouseDragInput) {
+    if (this.state !== DRIVER_STATES.OPEN || !this.page) throw new InteractDriverError("sessionClosed", "Interact driver session is not open.");
+    return performMouseDrag(this.page, input, (code, message, details) => new InteractDriverError(code, message, details));
   }
+
+  async reset() { return this.call("reset", {}); }
 
   async exportSetup(name = "") {
     return this.call("exportSetup", { name });

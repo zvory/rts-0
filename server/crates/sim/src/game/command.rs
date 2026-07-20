@@ -20,6 +20,7 @@ pub enum SimCommand {
     FormationMove {
         units: Vec<u32>,
         points: Vec<(f32, f32)>,
+        attack_move: bool,
         queued: bool,
     },
     AttackMove {
@@ -150,10 +151,12 @@ impl SimCommand {
             protocol::Command::FormationMove {
                 units,
                 points,
+                attack_move,
                 queued,
             } => SimCommand::FormationMove {
                 units,
                 points: points.into_iter().map(|point| (point.x, point.y)).collect(),
+                attack_move,
                 queued,
             },
             protocol::Command::AttackMove {
@@ -357,6 +360,7 @@ impl SimCommand {
             SimCommand::FormationMove {
                 units,
                 points,
+                attack_move,
                 queued,
             } => protocol::Command::FormationMove {
                 units: units.clone(),
@@ -364,6 +368,7 @@ impl SimCommand {
                     .iter()
                     .map(|&(x, y)| protocol::FormationPoint { x, y })
                     .collect(),
+                attack_move: *attack_move,
                 queued: *queued,
             },
             SimCommand::AttackMove {

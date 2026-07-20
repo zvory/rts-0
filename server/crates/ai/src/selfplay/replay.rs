@@ -559,12 +559,18 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
         let player = stats.entry(entry.player_id).or_default();
         player.command_count += 1;
         match &entry.command {
-            WireCommand::AttackMove { .. } | WireCommand::Attack { .. } => {
+            WireCommand::AttackMove { .. }
+            | WireCommand::Attack { .. }
+            | WireCommand::FormationMove {
+                attack_move: true, ..
+            } => {
                 player.attack_command_count += 1;
                 player.first_attack_command_tick.get_or_insert(entry.tick);
             }
             WireCommand::Move { .. }
-            | WireCommand::FormationMove { .. }
+            | WireCommand::FormationMove {
+                attack_move: false, ..
+            }
             | WireCommand::SetupAntiTankGuns { .. }
             | WireCommand::TearDownAntiTankGuns { .. }
             | WireCommand::Charge { .. }
@@ -747,6 +753,10 @@ fn is_attack_command(command: &rts_sim::game::command::SimCommand) -> bool {
         command,
         rts_sim::game::command::SimCommand::AttackMove { .. }
             | rts_sim::game::command::SimCommand::Attack { .. }
+            | rts_sim::game::command::SimCommand::FormationMove {
+                attack_move: true,
+                ..
+            }
     )
 }
 
@@ -754,7 +764,10 @@ fn is_harass_command(command: &rts_sim::game::command::SimCommand) -> bool {
     matches!(
         command,
         rts_sim::game::command::SimCommand::Move { .. }
-            | rts_sim::game::command::SimCommand::FormationMove { .. }
+            | rts_sim::game::command::SimCommand::FormationMove {
+                attack_move: false,
+                ..
+            }
     )
 }
 
@@ -948,16 +961,19 @@ fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, M
 #[cfg(test)]
 mod tests {
     use super::{
-        available_profile_ids, canonical_profile_id, run_profile_matchup_result,
-        ProfileMatchupOptions, ScorecardCollector,
+        available_profile_ids, canonical_profile_id, command_stats_by_player,
+        run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
     use crate::ai_core::profiles::{AI_2_1_ID, AI_TURTLE_ID};
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
+    use rts_sim::game::replay::CommandLogEntry;
     use rts_sim::game::{Game, PlayerInit};
     use rts_sim::protocol::kinds;
-    use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
+    use rts_sim::protocol::{
+        Command, EntityView, Event, FormationPoint, Snapshot, SnapshotNetStatus,
+    };
 
     #[test]
     fn canonical_profiles_are_the_only_selectable_profiles() {
@@ -988,10 +1004,10 @@ mod tests {
         collector.observe_command(
             110,
             1,
-            &SimCommand::AttackMove {
+            &SimCommand::FormationMove {
                 units: vec![2],
-                x: 500.0,
-                y: 500.0,
+                points: vec![(400.0, 500.0), (500.0, 500.0)],
+                attack_move: true,
                 queued: false,
             },
             &snapshot,
@@ -1013,6 +1029,7 @@ mod tests {
             &SimCommand::FormationMove {
                 units: vec![3],
                 points: vec![(500.0, 600.0), (600.0, 600.0)],
+                attack_move: false,
                 queued: false,
             },
             &snapshot,
@@ -1068,6 +1085,28 @@ mod tests {
         assert_eq!(score.first_expansion_city_centre_planned_tick, Some(130));
         assert_eq!(score.damage_dealt_events, 1);
         assert_eq!(score.death_count, 1);
+    }
+
+    #[test]
+    fn attack_formation_counts_as_an_attack_command() {
+        let commands = vec![CommandLogEntry {
+            tick: 42,
+            player_id: 1,
+            command: Command::FormationMove {
+                units: vec![7],
+                points: vec![
+                    FormationPoint { x: 100.0, y: 100.0 },
+                    FormationPoint { x: 200.0, y: 100.0 },
+                ],
+                attack_move: true,
+                queued: false,
+            },
+        }];
+
+        let stats = command_stats_by_player(&commands);
+        let player = stats.get(&1).expect("player command stats");
+        assert_eq!(player.attack_command_count, 1);
+        assert_eq!(player.first_attack_command_tick, Some(42));
     }
 
     #[test]

@@ -184,6 +184,8 @@ pub enum Command {
         units: Vec<u32>,
         points: Vec<FormationPoint>,
         #[serde(default, skip_serializing_if = "is_false")]
+        attack_move: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
     AttackMove {

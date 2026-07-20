@@ -36,7 +36,7 @@ export class ClientIntent {
     this.lastCommandTargetArm = null;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,radiusTiles:number|null,createdAt:number,ownerId:number|null}>} */
     this.commandFeedback = [];
-    /** @type {null | {points:Array<{x:number,y:number}>,slots:Array<{unitId:number,x:number,y:number,radius:number}>}} */
+    /** @type {null | {kind:"move"|"attackMove",points:Array<{x:number,y:number}>,slots:Array<{unitId:number,x:number,y:number,radius:number}>}} */
     this.formationMovePreview = null;
     /** @type {null | {targetId:number, kind:string, x:number, y:number}} */
     this.attackTargetPreview = null;
@@ -209,6 +209,7 @@ export class ClientIntent {
       return null;
     }
     this.formationMovePreview = {
+      kind: preview.kind === "attackMove" ? "attackMove" : "move",
       points: preview.points.map((point) => ({ x: point.x, y: point.y })),
       slots: (Array.isArray(preview.slots) ? preview.slots : []).map((slot) => ({ ...slot })),
     };

@@ -1360,6 +1360,11 @@ or append building rally stages and rely on owner-only `rallyPlan` for accepted 
 patches suppress rally command emission. The minimap applies the same resource-target
 classification against known live map resources. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
+Right-dragging selected units promotes to a freehand formation move after three tiles. While attack
+targeting is armed, the same three-tile gesture is available on left-drag: its polyline and
+body-aware provisional slots render red, and release issues one atomic `formationMove` command with
+attack-move semantics so the server assigns and admits the full group together. Shorter gestures retain the existing contextual right-click or targeted
+left-click behavior, including command-composer Shift/held-key lifetime.
 Selection, hover, and entity targeting use the last successfully presented detached
 `SelectionSceneV1`; move/ground abilities/placement use its nullable ground query. Screen clicks and
 marquees project plain mirrored proxies rather than reading current state or renderer geometry.

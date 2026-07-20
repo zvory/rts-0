@@ -32,7 +32,7 @@ const SESSION_RE = /^(?:lab|game|scenario)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
-  formationMove: ["c", "units", "points", "queued"],
+  formationMove: ["c", "units", "points", "attackMove", "queued"],
   attackMove: ["c", "units", "x", "y", "queued"],
   attack: ["c", "units", "target", "queued"],
   deconstruct: ["c", "units", "target", "queued"],
@@ -126,6 +126,19 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
   } else if (command === "select") {
     exact(value, ["sessionId", "refs"], command);
     refs(value.refs, "select.refs", 0, INTERACT_LIMITS.maxSelectionRefs);
+  } else if (command === "drag") {
+    exact(value, ["sessionId", "button", "from", "to", "steps", "durationMs", "holdKeys"], command);
+    if (value.button != null && value.button !== "left" && value.button !== "right") invalid("drag.button", "must be left or right");
+    dragPoint(value.from, "drag.from");
+    dragPoint(value.to, "drag.to");
+    if (value.steps != null) integer(value.steps, "drag.steps", 1, 240);
+    if (value.durationMs != null) integer(value.durationMs, "drag.durationMs", 0, 10_000);
+    if (value.holdKeys != null) {
+      array(value.holdKeys, "drag.holdKeys", 0, 2, (entry) => {
+        if (entry !== "attack" && entry !== "shift") invalid("drag.holdKeys", "contains an unsupported key");
+      });
+      if (new Set(value.holdKeys).size !== value.holdKeys.length) invalid("drag.holdKeys", "must not contain duplicate keys");
+    }
   } else if (command === "camera") {
     exact(value, ["sessionId", "camera"], command);
     validateCamera(value.camera);
@@ -383,6 +396,13 @@ function recordingCrop(value: unknown) {
   boundedNumber(value.height, "record-start.crop.height", 2, 2048);
 }
 
+function dragPoint(value: unknown, label: string) {
+  record(value, label);
+  exact(value, ["x", "y"], label);
+  boundedNumber(value.x, `${label}.x`, 0, 4096);
+  boundedNumber(value.y, `${label}.y`, 0, 4096);
+}
+
 function captureRegion(value: unknown, label: string) {
   if (value === "viewport" || value === "minimap") return;
   record(value, label);
@@ -449,6 +469,7 @@ function validateGameCommand(value: unknown) {
   if (allowed.includes("delta") && value.delta !== -1 && value.delta !== 1) invalid("order.command.delta", "must be -1 or 1");
   if (value.kind != null && (typeof value.kind !== "string" || !["move", "attackMove", "attack", "gather", "build"].includes(value.kind))) invalid("order.command.kind", "is unsupported");
   optionalBoolean(value.queued, "order.command.queued");
+  optionalBoolean(value.attackMove, "order.command.attackMove");
   if (allowed.includes("enabled")) optionalBoolean(value.enabled, "order.command.enabled", false);
 }
 

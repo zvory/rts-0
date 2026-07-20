@@ -29,6 +29,7 @@ node scripts/interact/cli.mjs lab update '{"sessionId":"<id>","updates":[{"opera
 node scripts/interact/cli.mjs lab remove '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/interact/cli.mjs lab inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/interact/cli.mjs lab select '{"sessionId":"<id>","refs":["subject"]}'
+node scripts/interact/cli.mjs lab drag '{"sessionId":"<id>","button":"left","from":{"x":420,"y":360},"to":{"x":760,"y":520},"steps":90,"durationMs":3000,"holdKeys":["attack"]}'
 node scripts/interact/cli.mjs lab camera '{"sessionId":"<id>","camera":{"action":"focus","refs":["subject"]}}'
 node scripts/interact/cli.mjs lab screenshot '{"sessionId":"<id>","name":"subject","presentation":"clean","subjects":["subject"]}'
 node scripts/interact/cli.mjs lab record-start '{"sessionId":"<id>","name":"motion","maxDurationMs":10000,"resumeSpeed":1}'
@@ -86,11 +87,17 @@ node scripts/interact/cli.mjs dev-scenario shutdown
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
-`time`, `inspect`, `select`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
+`time`, `inspect`, `select`, `drag`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
 `import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
 writes exactly one JSON envelope to stdout. Failure writes a concise JSON error to stderr and exits
 nonzero. Every command has an exact, bounded input shape; arbitrary state patches, protocol
 messages, browser evaluation, and caller-selected artifact paths are not accepted.
+
+`lab drag` drives one real browser mouse gesture through the normal viewport listeners. Its points
+are viewport-local CSS pixels and must lie inside the current rendered viewport. The button is
+limited to left or right; interpolation is limited to 240 steps over at most ten seconds. The only
+keys it can hold are the resolved Attack hotkey and Shift, which is enough to capture attack-line
+and queued-order gestures without exposing arbitrary keyboard or browser input.
 
 The complete `game` surface is `open`, `close`, `status`, `inspect`, `select`, `move`, `camera`, `screenshot`,
 `record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, `give-up`, and

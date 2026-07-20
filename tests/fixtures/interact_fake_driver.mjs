@@ -201,6 +201,9 @@ export async function openInteractDriver(options) {
         ui: { selection: selection.length ? `${selection.length} selected` : "" },
       };
     },
+    async drag(input) {
+      return structuredClone({ ...input, viewport: { width: 1440, height: 900 } });
+    },
     async camera(command) {
       if (command.action === "set") {
         Object.assign(camera, structuredClone(command.snapshot));

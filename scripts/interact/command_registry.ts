@@ -102,7 +102,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   order: descriptor("Issue one normal authoritative game command as a selected player.", "{sessionId:string,playerId:u32,command:game-command,ignoreCommandLimits?:boolean}", {
     sceneMutation: true,
-    variants: ["move|formationMove|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|adjustProductionRepeat|research|cancel|stop|holdPosition|setRally", "formationMove {c,units,points:[{x,y}],queued?} accepts 2-64 finite world-space points", "adjustProductionRepeat {c,buildings,unit,delta:-1|1} changes auto-build on one of 1-100 producers", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
+    variants: ["move|formationMove|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|adjustProductionRepeat|research|cancel|stop|holdPosition|setRally", "formationMove {c,units,points:[{x,y}],attackMove?,queued?} accepts 2-64 finite world-space points", "adjustProductionRepeat {c,buildings,unit,delta:-1|1} changes auto-build on one of 1-100 producers", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
     defaults: ["ignoreCommandLimits=false", "queued omitted unless supplied by the command variant"], bounds: ["1-100 entity references", "command bridge JSON <=16 KiB"],
     example: { sessionId: "<lab-session-id>", playerId: 1, command: { c: "move", units: ["subject"], x: 1100, y: 960 } },
   }),
@@ -120,6 +120,13 @@ const COMMAND_RECORDS = Object.freeze({
     variants: ["refs=[] clears selection", "selection is local presentation state and sends no gameplay command"],
     bounds: ["0-400 unique resolved references", "entities must exist in the current authoritative snapshot"],
     example: { sessionId: "<lab-session-id>", refs: ["subject"] },
+  }),
+  drag: descriptor("Perform one bounded mouse drag inside the rendered game viewport.", "{sessionId:string,button?:\"left\"|\"right\",from:{x,y},to:{x,y},steps?:int,durationMs?:int,holdKeys?:(\"attack\"|\"shift\")[]}", {
+    sceneMutation: true,
+    variants: ["coordinates are viewport-local CSS pixels", "holdKeys=attack holds the resolved Attack hotkey for the gesture", "holdKeys=shift preserves queued-order semantics"],
+    defaults: ["button=left", "steps=24", "durationMs=750", "holdKeys=[]"],
+    bounds: ["points must lie inside the current game viewport", "1-240 interpolation steps", "duration 0-10000 ms", "only attack and shift keys are accepted"],
+    example: { sessionId: "<lab-session-id>", button: "left", from: { x: 420, y: 360 }, to: { x: 760, y: 520 }, steps: 90, durationMs: 3000, holdKeys: ["attack"] },
   }),
   camera: descriptor("Set the camera or focus a bounded referenced subject set; returns semantic camera/viewport/bounds facts.", "{sessionId:string,camera:camera-command}", {
     variants: ["focus {action,refs,padding?}", "set {action,snapshot:CameraSnapshotV1}"], defaults: ["focus.padding=32 for one unit, otherwise 48"],
