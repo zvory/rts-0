@@ -1947,9 +1947,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
-  setup/deployment. Units that fire from outside current vision are shown briefly above the fog
-  as semi-transparent silhouettes with their normal art path, rig-authored recoil where available,
-  and a yellow tracer to the hit point.
+  setup/deployment. Units that fire from outside presentation vision remain actionable server-side
+  but their reveal-only tile stays absent from `visibleTiles`. `GameState` recognizes the projected
+  enemy on that presentation-dark tile and marks it `aboveFogReveal`, preserving normal interaction
+  while showing it above the unchanged fog at full opacity,
+  using its normal art path, rig-authored recoil where available, and a yellow tracer to the hit
+  point. Only the final 20% of event-backed fallback reveals fades out;
+  snapshot-backed actionable reveals remain fully opaque until the server removes them.
   PNG frame-strip units use a shared load-time color profile target in
   `renderer/rigs/frame_strip_color_profile.js`; each strip records any brightness/saturation already
   baked into its checked-in runtime PNG, and raw strips receive the missing delta once when the

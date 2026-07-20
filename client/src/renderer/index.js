@@ -490,8 +490,8 @@ export class Renderer {
       entities = Array.isArray(frameViews?.interpolatedEntities)
         ? frameViews.interpolatedEntities
         : state.entitiesInterpolated(alpha) || [];
-      regularEntities = entities.filter((e) => !e.shotReveal);
-      shotReveals = entities.filter((e) => e.shotReveal);
+      regularEntities = entities.filter((e) => !e.shotReveal && !e.aboveFogReveal);
+      shotReveals = entities.filter((e) => e.shotReveal || e.aboveFogReveal);
       selection = state.selection || new Set();
       colorByOwner = this._ownerColors(state);
       profiler?.setContext({
@@ -963,8 +963,8 @@ export class Renderer {
    * @private
    */
   /**
-   * Draw a short-lived shot reveal on layers above fog. These entities are visual-only and
-   * non-interactive; normal visibility still comes from the authoritative fog-filtered snapshot.
+   * Draw a firing reveal on layers above fog. Event-backed `shotReveal` ghosts are visual-only;
+   * snapshot-backed `aboveFogReveal` entities remain authoritative and interactive.
    * @private
    */
   /**

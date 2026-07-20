@@ -25,6 +25,7 @@ import {
   worldInBounds as queryWorldInBounds,
 } from "./state_queries.js";
 import { VisualEffectBackedState, VisualEffectBuffers } from "./state_visual_effects.js";
+import { markActionableFiringReveal } from "./state_firing_reveal.js";
 
 const TWO_PI = Math.PI * 2;
 const PREDICTION_SMOOTH_MS = 120;
@@ -295,7 +296,12 @@ export class GameState extends VisualEffectBackedState {
     const events = msg.events || [];
     this._applyResourceDeltas(msg.resourceDeltas || []);
     this._applyResourceDeaths(events);
-    const wireEntities = (msg.entities || []).filter((e) => !isResource(e.kind));
+    const visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
+      ? msg.visibleTiles
+      : [];
+    const wireEntities = (msg.entities || [])
+      .filter((e) => !isResource(e.kind))
+      .map((e) => markActionableFiringReveal(e, this.map, visibleTiles, this.playerId));
     this.visualEffects.applyAttackReveals(events, visualNow);
     const visibleIds = new Set(wireEntities.map((e) => e.id));
     const entities = wireEntities
@@ -330,9 +336,7 @@ export class GameState extends VisualEffectBackedState {
     this.rememberedBuildings = Array.isArray(msg.rememberedBuildings)
       ? msg.rememberedBuildings
       : [];
-    this.visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
-      ? msg.visibleTiles
-      : [];
+    this.visibleTiles = visibleTiles;
     this.exploredTiles = Array.isArray(msg.exploredTiles) || msg.exploredTiles instanceof Uint8Array
       ? msg.exploredTiles
       : [];

@@ -17,7 +17,7 @@
 //! authoritative current grids makes observer perspective changes and replay seeks independent of
 //! which views a particular client happened to render.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore};
@@ -28,6 +28,7 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use serde::{Deserialize, Serialize};
 
+mod presentation;
 mod reveal_provenance;
 pub(in crate::game) use reveal_provenance::FiringRevealVisibility;
 
@@ -102,13 +103,28 @@ impl Fog {
         mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
     ) -> Self {
-        // Normalize legacy/malformed state to keep visible tiles explored.
+        // Normalize legacy/malformed state to keep ordinary visible tiles explored. Actionable
+        // firing-reveal stamps are intentionally presentation-dark and must stay unexplored when
+        // a replay, Lab rewind, or checkpoint restore rebuilds this state.
         for (&player, visible_grid) in &grids {
+            let reveal_only_tiles = firing_reveal_visibility
+                .get(&player)
+                .into_iter()
+                .flat_map(|by_entity| by_entity.values())
+                .filter_map(|visibility| {
+                    visibility
+                        .reveal_only
+                        .then_some(visibility.revealed_tile)
+                        .flatten()
+                })
+                .collect::<BTreeSet<_>>();
             let explored_grid = explored_grids
                 .entry(player)
                 .or_insert_with(|| vec![false; visible_grid.len()]);
-            for (explored, visible) in explored_grid.iter_mut().zip(visible_grid) {
-                *explored = *explored || *visible;
+            for (index, (explored, visible)) in
+                explored_grid.iter_mut().zip(visible_grid).enumerate()
+            {
+                *explored = *explored || (*visible && !reveal_only_tiles.contains(&(index as u32)));
             }
         }
         Fog {
@@ -340,67 +356,6 @@ impl Fog {
             Some(g) => g[(ty * self.size + tx) as usize],
             None => false,
         }
-    }
-
-    /// Build a temporary fog view where `viewer` can see every tile visible to any of `players`.
-    pub fn union_for(&self, viewer: u32, players: &[u32]) -> Self {
-        let cells = (self.size * self.size) as usize;
-        let mut union = vec![false; cells];
-        let mut explored_union = vec![false; cells];
-        for player in players {
-            if let Some(grid) = self.grids.get(player) {
-                for (dst, src) in union.iter_mut().zip(grid.iter()) {
-                    *dst = *dst || *src;
-                }
-            }
-            if let Some(grid) = self.explored_grids.get(player) {
-                for (dst, src) in explored_union.iter_mut().zip(grid.iter()) {
-                    *dst = *dst || *src;
-                }
-            }
-        }
-
-        let mut fog = Fog::new(self.size);
-        fog.grids.insert(viewer, union);
-        fog.explored_grids.insert(viewer, explored_union);
-        fog
-    }
-
-    /// Accumulate the current fog unions into each viewer's durable exploration history.
-    pub(in crate::game) fn accumulate_explored_for_viewers(
-        &mut self,
-        viewer_sources: &[(u32, Vec<u32>)],
-    ) {
-        let cells = self.size.saturating_mul(self.size) as usize;
-        for (viewer, sources) in viewer_sources {
-            let mut current_union = vec![false; cells];
-            for source in sources {
-                let Some(grid) = self.grids.get(source) else {
-                    continue;
-                };
-                for (dst, src) in current_union.iter_mut().zip(grid.iter()) {
-                    *dst = *dst || *src;
-                }
-            }
-            let explored = self
-                .explored_grids
-                .entry(*viewer)
-                .or_insert_with(|| vec![false; cells]);
-            if explored.len() != cells {
-                *explored = vec![false; cells];
-            }
-            for (dst, src) in explored.iter_mut().zip(current_union.iter()) {
-                *dst = *dst || *src;
-            }
-        }
-    }
-
-    fn accumulate_explored_for_players(&mut self, players: &[u32]) {
-        let viewer_sources = players
-            .iter()
-            .map(|player| (*player, vec![*player]))
-            .collect::<Vec<_>>();
-        self.accumulate_explored_for_viewers(&viewer_sources);
     }
 
     /// Whether a grid has been allocated for `player`.
