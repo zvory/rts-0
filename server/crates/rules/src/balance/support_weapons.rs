@@ -23,7 +23,7 @@ pub const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD: f32 = 35.0_f32 * std::f32::consts::PI
 /// Normal body rotation while a manually emplaced weapon is packed or lining up to deploy.
 pub const MANUAL_EMPLACEMENT_PACKED_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 /// Slow field-of-fire traversal after deployment.
-pub const ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND: f32 = 6.5;
+pub const ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND: f32 = 1.0;
 pub const ANTI_TANK_GUN_DEPLOYED_TURN_RATE_RAD_PER_TICK: f32 =
     ANTI_TANK_GUN_DEPLOYED_TURN_RATE_DEGREES_PER_SECOND.to_radians() / TICK_HZ as f32;
 
