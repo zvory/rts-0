@@ -3657,6 +3657,12 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
 }
+.room-time-panel-drag-handle,
+.spectator-controls-drag-handle, .replay-analysis-drag-handle {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .room-time-panel-titlebar {
   gap: 8px;
   justify-content: space-between;
@@ -3670,9 +3676,6 @@ input[type="text"]:focus {
   border-radius: var(--radius-sm);
   color: var(--ink-dim);
   cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .room-time-panel-drag-handle:hover,
 .room-time-panel-drag-handle:focus-visible,
@@ -3763,9 +3766,6 @@ input[type="text"]:focus {
   border-radius: var(--radius-sm);
   color: var(--ink-dim);
   cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .spectator-controls-drag-handle:hover,
 .spectator-controls-drag-handle:focus-visible,
@@ -3869,9 +3869,6 @@ input[type="text"]:focus {
   padding: 4px;
   border-radius: var(--radius-sm);
   cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .replay-analysis-drag-handle:hover,
 .replay-analysis-drag-handle:focus-visible,
