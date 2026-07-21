@@ -6,11 +6,9 @@ _2026-07-21_
 
 ## Changes
 
-- Observer analysis, room-time, and spectator-control panels can now be dragged by their titlebars
-  on mobile without replacing their saved desktop positions.
-- Observer analysis tabs and show, hide, and collapse buttons now respond directly on touch release.
+- Mobile room-time, spectator, and observer-analysis panels can now be dragged without overwriting saved desktop positions.
+- Observer-analysis tabs and panel controls now activate immediately on touch release.
 
 ## Playtest watch
 
-- Check panel dragging and observer-analysis button taps across mobile viewport sizes and
-  orientations.
+- Check panel dragging and analysis controls across mobile viewport sizes and orientations.
