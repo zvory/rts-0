@@ -10,7 +10,9 @@ The normal agent lifecycle is:
    that move, so the archive lands in the final phase PR rather than as a post-merge local change.
    It then runs the ordered specialist passes in `scripts/agent-pr-passes.json`. The patch-note pass
    uses a bounded branch diff and creates or refreshes one dated, branch-keyed fragment only for a
-   player-facing gameplay change. Each configured pass can select its own Codex model through its
+   change to an active participant's experience in an ordinary live match. Spectator/observer,
+   replay, match-history, Lab/dev, lobby/setup, and analysis-only changes are explicitly excluded,
+   even when they are user-facing. Each configured pass can select its own Codex model through its
    `modelEnv` setting. The final adversarial pass runs after all specialist edits and verifies any
    generated patch note against the final diff.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in

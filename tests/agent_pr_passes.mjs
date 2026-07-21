@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { loadPasses, markdownSummary, parseArgs as parseRunnerArgs } from "../scripts/agent-pr-passes.mjs";
 import {
+  PATCH_NOTE_SCOPE,
   branchSlug,
   isGameplayCandidate,
   normalizeDecision,
@@ -35,6 +36,12 @@ assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
 assert.equal(parsePatchArgs(["--delivery-ref", "abc123"]).deliveryRef, "abc123");
 assert.deepEqual(parsePatchArgs(["--delivery-path", "patch-notes/note.md"]).deliveryPaths, ["patch-notes/note.md"]);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
+
+const normalizedPatchNoteScope = PATCH_NOTE_SCOPE.replace(/\s+/g, " ");
+assert.match(normalizedPatchNoteScope, /only when the branch changes the experience of an active participant playing an ordinary live match/);
+assert.match(normalizedPatchNoteScope, /spectators, observers, casters, observer analysis, replays or replay playback/);
+assert.match(normalizedPatchNoteScope, /Convenience and presentation changes outside an active player's live-match experience are not gameplay/);
+assert.match(normalizedPatchNoteScope, /runtime source path is only a reason to inspect the diff, not evidence of gameplay impact/);
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
 assert.equal(isGameplayCandidate("server/crates/ai/src/ai_core/decision/production.rs"), true);
