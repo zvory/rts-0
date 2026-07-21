@@ -15,6 +15,21 @@ const MAX_DISCORD_BULLETS = 3;
 const MAX_DISCORD_MESSAGE_CHARS = 240;
 const OVERSIZED_DISCORD_FALLBACK = "• Gameplay changed; see the full patch notes for details.";
 
+export const PATCH_NOTE_SCOPE = `A Discord patch note is required only when the branch changes the
+experience of an active participant playing an ordinary live match. Eligible changes include game
+rules and balance; economy, combat, production, units, buildings, abilities, and victory conditions;
+commands and controls used to play; and in-match information, feedback, rendering, networking, or
+performance when the change materially affects a player's decisions or ability to play.
+
+Do not write a patch note for changes that affect only spectators, observers, casters, observer
+analysis, replays or replay playback, match history, Lab/dev/debug/scenario tools, lobby or room
+setup, administration, deployment, or developer workflows. Convenience and presentation changes
+outside an active player's live-match experience are not gameplay. In particular, draggable
+spectator/replay panels and touch behavior for observer-analysis controls are not eligible.
+
+A runtime source path is only a reason to inspect the diff, not evidence of gameplay impact. If a
+branch mixes eligible and excluded work, mention only the eligible active-player gameplay effects.`;
+
 export function parseArgs(argv) {
   const options = {
     baseRef: "origin/main", codexCommand: "codex", codexModel: "", dryRun: false,
@@ -212,10 +227,12 @@ export function renderFragment({ branch, date, decision }) {
 function renderPrompt({ baseRef, branch, changedPaths, diff, existingFragment, fragmentPath }) {
   return `You are the player-impact and patch-note pass for an RTS pull request.
 
-Classify the complete branch diff from ${baseRef} to HEAD. A patch note is required for player-facing
-gameplay changes: unit/building stats, costs, economy, combat behavior, available commands or units,
-meaningful gameplay UI affordances, or other changes players should adapt to. Tests, refactors,
-developer tools, and fixes with no player-observable gameplay effect do not need a patch note.
+Classify the complete branch diff from ${baseRef} to HEAD using this scope:
+
+${PATCH_NOTE_SCOPE}
+
+Return no_patch_note when the diff has no eligible active-player gameplay effect, even if the work
+is user-facing or improves another way of viewing a match.
 
 If a note is required, write an ultra-concise player summary: at most three change bullets whose
 rendered Discord message, including each "• " prefix and the newlines between bullets, is at most
