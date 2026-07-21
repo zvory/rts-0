@@ -26,6 +26,7 @@ mod pivot_drive;
 mod scout_car;
 mod standability;
 mod steering;
+mod traffic;
 mod waypoints;
 
 #[cfg(test)]

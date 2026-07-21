@@ -239,7 +239,8 @@ pub struct CombatState {
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
-    /// The first direct-AP source this Tank committed to during the current reaction window.
+    /// The first direct-AP source this Tank committed to during the current under-fire window.
+    /// Later qualifying hits refresh the window without redirecting the facing preference.
     #[serde(default)]
     pub(in crate::game) tank_armor_reaction_lock: Option<TankArmorReactionLock>,
     /// Disposable launcher state carried by the dedicated Panzerfaust unit.
@@ -273,11 +274,13 @@ impl CombatState {
         if !source.0.is_finite() || !source.1.is_finite() {
             return;
         }
-        if self.tank_armor_reaction_lock.is_some_and(|lock| {
-            tick.saturating_sub(lock.acquired_tick)
+        if let Some(lock) = self.tank_armor_reaction_lock.as_mut() {
+            if tick.saturating_sub(lock.acquired_tick)
                 < crate::rules::combat::TANK_ARMOR_REACTION_LOCK_TICKS
-        }) {
-            return;
+            {
+                lock.acquired_tick = tick;
+                return;
+            }
         }
         self.tank_armor_reaction_lock = Some(TankArmorReactionLock {
             source_x: source.0,

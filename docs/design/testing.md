@@ -177,6 +177,17 @@ Current scenario ids:
   already inside its current moving-range boundary. On the known failure, it keeps advancing until
   reload permits fresh acquisition; after a fix, the same scene should stop at the initial boundary
   and wait there to fire.
+- `tank_under_fire_retreat` — one reinforced inspection Tank takes frontal fire from a deployed
+  Anti-Tank Gun, then after 10 seconds receives a long move order directly behind it. The baseline
+  captures the current 180-degree pivot before retreat; future under-fire reverse behavior should
+  back away immediately.
+- `tank_reverse_traffic` — three Tanks form a shallow fan with adjacent headings 10 degrees apart,
+  take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive one grouped
+  movement order behind them. The normal formation planner assigns their destinations instead of
+  the scenario supplying hand-authored crossing destinations. A team-2 Scout Car spotter left of
+  the gun line keeps the retreat visible to the guns without joining the fight. This provides a
+  rearward traffic-control inspection scene under sustained fire. The scenario-only Tanks have
+  extra health so sustained fire does not end the observation early.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

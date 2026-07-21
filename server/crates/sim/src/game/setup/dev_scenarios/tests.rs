@@ -201,12 +201,14 @@ const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u
     (EntityKind::ScoutCar, 3, None, 298),
     (EntityKind::ScoutCar, 3, Some(EntityKind::Rifleman), 298),
     (EntityKind::ScoutCar, 3, Some(EntityKind::Worker), 298),
-    (EntityKind::ScoutCar, 5, Some(EntityKind::AntiTankGun), 367),
+    // Five vehicles now approach as a compact two-rank blob. Braced blockers make that deliberate
+    // merge slower than the old one-rank line, while soft/no-blocker variants remain faster.
+    (EntityKind::ScoutCar, 5, Some(EntityKind::AntiTankGun), 431),
     (
         EntityKind::ScoutCar,
         5,
         Some(EntityKind::MachineGunner),
-        360,
+        429,
     ),
     (EntityKind::ScoutCar, 5, None, 333),
     (EntityKind::ScoutCar, 5, Some(EntityKind::Rifleman), 333),

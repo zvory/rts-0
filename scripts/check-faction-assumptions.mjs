@@ -297,6 +297,9 @@ const approvedCurrentFactionFiles = new Set([
   // Armor-reaction runtime eligibility is rules-routed; focused inline tests use the Tank entry.
   "server/crates/sim/src/game/services/movement/armor_reaction.rs",
   "server/crates/sim/src/game/services/movement/pivot_drive.rs",
+  // Traffic helpers preserve the existing current-roster vehicle body classes extracted from
+  // pivot_drive.rs; they do not admit units or choose a player faction.
+  "server/crates/sim/src/game/services/movement/traffic.rs",
   "server/crates/sim/src/game/services/movement/scout_car.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",
   "server/crates/sim/src/game/services/movement/waypoints.rs",
@@ -333,6 +336,9 @@ const approvedCurrentFactionFiles = new Set([
   // Tank coax inspection deliberately seeds current roster targets as a no-fog dev fixture;
   // public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/tank_coax.rs",
+  // Tank retreat inspection deliberately seeds a fixed Kriegsia armor matchup; public faction
+  // admission remains routed through the catalog-aware dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/tank_retreat.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts/tank_traps.rs",
   "server/crates/sim/src/game/systems.rs",
@@ -343,6 +349,9 @@ const approvedCurrentFactionFiles = new Set([
   // This catalog entry is an intentionally Kriegsia-specific Command Car corner fixture; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/command_car_corner.rs",
+  // These catalog entries describe intentionally Kriegsia-specific Tank retreat fixtures; public
+  // faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/src/dev_scenarios/tank_retreat.rs",
   // The frame-budget hellhole generator deliberately materializes a fixed current-roster Kriegsia
   // Lab checkpoint for benchmarking; runtime faction admission remains outside this offline tool.
   "server/src/bin/generate_supply_300_hellhole.rs",

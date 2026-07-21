@@ -1,9 +1,11 @@
 use rts_sim::game::entity::EntityKind;
 
 mod command_car_corner;
+mod tank_retreat;
 use command_car_corner::{
     COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
 };
+use tank_retreat::{TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DevScenarioLaunch {
@@ -764,7 +766,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 20] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -864,6 +866,8 @@ const DEV_SCENARIOS: [DevScenarioSpec; 18] = [
         description: "After a ten-second inspection pause, a reloading Tank receives an attack-move through an invulnerable enemy Tank already inside its moving weapon range. The current bug lets it close to near-contact before acquiring the target; a corrected build should stop at the initial range boundary and wait for reload.",
         launches: &ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES,
     },
+    TANK_UNDER_FIRE_RETREAT_SPEC,
+    TANK_REVERSE_TRAFFIC_SPEC,
 ];
 
 pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {

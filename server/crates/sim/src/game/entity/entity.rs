@@ -927,6 +927,11 @@ impl Entity {
         self.invulnerable = invulnerable;
     }
 
+    pub(in crate::game) fn set_spawn_health(&mut self, hp: u32) {
+        self.hp = hp;
+        self.max_hp = hp;
+    }
+
     pub fn apply_damage(
         &mut self,
         amount: u32,

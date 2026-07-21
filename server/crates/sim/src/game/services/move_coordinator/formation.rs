@@ -7,6 +7,7 @@ use crate::game::map::Map;
 use crate::protocol::TrenchView;
 
 mod goal_search;
+mod layout;
 mod polyline;
 mod reachability;
 #[cfg(test)]
@@ -18,9 +19,6 @@ pub(super) use polyline::{
 };
 pub(super) use reachability::FormationReachability;
 
-const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
-const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
-const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_TRENCH_PREFERENCE_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 pub(super) const VEHICLE_BODY_FORMATION_GAP_TILES: u32 = 1;
 
@@ -155,83 +153,15 @@ where
         known_trenches,
         occupied_trenches,
     };
-    if units.len() <= 1 {
-        let anchor = map.tile_of(goal.0, goal.1);
-        return spread_goals_with_known_trenches(
-            inputs,
-            units,
-            anchor,
-            goal,
-            &mut is_goal_reachable,
-        );
-    }
-
-    let inv_count = 1.0 / units.len() as f32;
-    let centroid = units.iter().fold((0.0f32, 0.0f32), |acc, unit| {
-        (
-            acc.0 + unit.pos.0 * inv_count,
-            acc.1 + unit.pos.1 * inv_count,
-        )
-    });
-    let dx = goal.0 - centroid.0;
-    let dy = goal.1 - centroid.1;
-    let move_distance = (dx * dx + dy * dy).sqrt();
-    let formation_scale = formation_scale_for_distance(move_distance);
-    let max = map.world_size_px() - 1.0;
+    let desired_points = layout::compact_formation_points(map, units, goal);
     let mut out = Vec::with_capacity(units.len());
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
-    for unit in units {
-        let offset = clamp_offset(
-            unit.pos.0 - centroid.0,
-            unit.pos.1 - centroid.1,
-            FORMATION_MAX_OFFSET_PX,
-        );
-        let desired = (
-            (goal.0 + offset.0 * formation_scale).clamp(0.0, max),
-            (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
-        );
+    for (unit, desired) in units.iter().zip(desired_points) {
         let anchor = map.tile_of(desired.0, desired.1);
         let context = inputs.with_assigned(&assigned);
-        if let Some(formation_goal) = assign_formation_goal(
-            &context,
-            unit,
-            anchor,
-            desired,
-            goal,
-            &mut is_goal_reachable,
-        ) {
-            assigned.push(FormationAssignment {
-                kind: unit.kind,
-                tile: formation_goal.tile,
-                trench_id: formation_goal.trench_id,
-            });
-            out.push(formation_goal.point);
-        } else {
-            out.push(unit.pos);
-        }
-    }
-
-    out
-}
-
-fn spread_goals_with_known_trenches<F>(
-    inputs: FormationInputContext<'_>,
-    units: &[FormationUnit],
-    anchor: (u32, u32),
-    desired: (f32, f32),
-    is_goal_reachable: &mut F,
-) -> Vec<(f32, f32)>
-where
-    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
-{
-    let mut out = Vec::with_capacity(units.len());
-    let mut assigned: Vec<FormationAssignment> = Vec::new();
-
-    for unit in units {
-        let context = inputs.with_assigned(&assigned);
         if let Some(formation_goal) =
-            assign_formation_goal(&context, unit, anchor, desired, desired, is_goal_reachable)
+            assign_formation_goal(&context, unit, anchor, desired, &mut is_goal_reachable)
         {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
@@ -252,7 +182,6 @@ fn assign_formation_goal<F>(
     unit: &FormationUnit,
     anchor: (u32, u32),
     desired: (f32, f32),
-    formation_center: (f32, f32),
     is_goal_reachable: &mut F,
 ) -> Option<FormationGoal>
 where
@@ -267,7 +196,6 @@ where
         unit,
         anchor,
         context.assigned,
-        formation_center,
         is_goal_reachable,
     )
     .map(|tile| FormationGoal {
@@ -352,6 +280,9 @@ fn formation_goal_point_free(
     if assigned.iter().any(|assignment| assignment.tile == tile) {
         return false;
     }
+    if !preferred_goal_spacing_clear(unit, tile, assigned) {
+        return false;
+    }
     if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
@@ -366,22 +297,6 @@ fn point_distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     dx * dx + dy * dy
-}
-
-fn formation_scale_for_distance(distance: f32) -> f32 {
-    let t = ((distance - FORMATION_NEAR_DISTANCE_PX)
-        / (FORMATION_FAR_DISTANCE_PX - FORMATION_NEAR_DISTANCE_PX))
-        .clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
-fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
-    let len = (dx * dx + dy * dy).sqrt();
-    if len <= max_len || len <= f32::EPSILON {
-        return (dx, dy);
-    }
-    let scale = max_len / len;
-    (dx * scale, dy * scale)
 }
 
 pub(super) fn is_free_goal(

@@ -71,7 +71,7 @@ fn tank_can_react(tank: &Entity) -> bool {
     }
 }
 
-fn locked_source_facing(tank: &Entity) -> Option<f32> {
+pub(super) fn locked_source_facing(tank: &Entity) -> Option<f32> {
     let lock = tank.combat.as_ref()?.tank_armor_reaction_lock?;
     let dx = lock.source_x - tank.pos_x;
     let dy = lock.source_y - tank.pos_y;
@@ -126,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn later_hits_cannot_change_or_extend_the_lock() {
+    fn later_hits_refresh_without_redirecting_the_lock() {
         let mut entities = EntityStore::new();
         let tank_id = entities
             .spawn_unit(1, EntityKind::Tank, 300.0, 300.0)
@@ -150,10 +150,14 @@ mod tests {
             .expect("first source should remain locked");
         assert_eq!(
             (lock.source_x, lock.source_y, lock.acquired_tick),
-            (400.0, 300.0, 10)
+            (
+                400.0,
+                300.0,
+                10 + crate::rules::combat::TANK_ARMOR_REACTION_LOCK_TICKS - 1
+            )
         );
 
-        let expiry_tick = 10 + crate::rules::combat::TANK_ARMOR_REACTION_LOCK_TICKS;
+        let expiry_tick = lock.acquired_tick + crate::rules::combat::TANK_ARMOR_REACTION_LOCK_TICKS;
         turn_once(&mut entities, expiry_tick);
         assert!(entities
             .get(tank_id)

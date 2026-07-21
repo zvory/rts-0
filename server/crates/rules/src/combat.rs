@@ -12,7 +12,7 @@ const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.5;
 const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.7;
 const NO_ARMOR_PENETRATION: f32 = 0.0;
 const FULL_ARMOR_PENETRATION: f32 = 1.0;
-/// A tank commits to the first direct-AP damage source for this long.
+/// A tank keeps its hull-facing preference for this long after the latest qualifying direct-AP hit.
 pub const TANK_ARMOR_REACTION_LOCK_TICKS: u32 = crate::balance::TICK_HZ * 3;
 
 /// Attack profile for a combat-capable unit or building.

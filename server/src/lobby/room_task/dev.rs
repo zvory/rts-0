@@ -5,7 +5,6 @@ use tokio::time::Instant as TokioInstant;
 use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::crash_replay::{dump_crash_replay, panic_reason};
 use super::super::dev_replay::match_seed;
-use super::super::dev_scenario_id::DevScenarioId;
 use super::super::faction_validation::{default_faction_id_for, FactionRequestContext};
 use super::super::launch::{LaunchRecipient, StartPayloadBuilder};
 use super::super::projection::{observer_view_or_all, RecipientRole};
@@ -132,113 +131,14 @@ impl RoomTask {
                     }};
                 }
 
-                match &config.id {
-                    DevScenarioId::DynamicConstructionPathBlock => {
-                        session_from_setup!(Game::new_dynamic_construction_path_block_scenario(
-                            config.case,
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?,)
-                    }
-                    DevScenarioId::ScoutCarSnakingCorridor => session_from_setup!(
-                        Game::new_snaking_corridor_scenario(config.unit, config.count, seed)?,
-                    ),
-                    DevScenarioId::DirectReverseOrder => session_from_setup!(
-                        Game::new_direct_reverse_order_scenario(config.unit, config.count, seed)?,
-                    ),
-                    DevScenarioId::Replay142VehicleLock => {
-                        session_from_setup!(Game::new_replay_142_vehicle_lock_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?,)
-                    }
-                    DevScenarioId::ScoutCarWallChokepoint => {
-                        session_from_setup!(Game::new_scout_car_wall_chokepoint_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::VehicleCornerWall => session_from_setup!(
-                        Game::new_vehicle_corner_wall_scenario(config.unit, config.count, seed)?,
-                    ),
-                    DevScenarioId::VehicleSmallBlockBaseline => {
-                        session_from_setup!(Game::new_vehicle_small_block_baseline_scenario(
-                            config.unit,
-                            config.count,
-                            config.blocker,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::FactoryZeroGapPerpendicular => {
-                        session_from_setup!(Game::new_factory_zero_gap_perpendicular_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::CommandCarBuildingCorner => session_from_setup!(
-                        Game::new_command_car_corner_scenario(config.unit, config.count, seed)?,
-                    ),
-                    DevScenarioId::CommandCarBuildingCornerWestSouthwest => {
-                        session_from_setup!(Game::new_command_car_corner_west_southwest_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?,)
-                    }
-                    DevScenarioId::FactoryWallRallySpawn => {
-                        session_from_setup!(Game::new_factory_wall_rally_spawn_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::TankTrapLineHorizontal
-                    | DevScenarioId::TankTrapLineVertical
-                    | DevScenarioId::TankTrapLineDiagonal => {
-                        session_from_setup!(Game::new_tank_trap_line_build_scenario(
-                            config.id.room_id(),
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::TankTrapPathingMatrix => {
-                        let scenario_case = config
-                            .case
-                            .ok_or_else(|| "missing Tank Trap pathing case".to_string())?;
-                        session_from_setup!(Game::new_tank_trap_pathing_scenario(
-                            scenario_case,
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::EntrenchmentInspection => {
-                        session_from_setup!(Game::new_entrenchment_inspection_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::TankCoaxInspection => {
-                        session_from_setup!(Game::new_tank_coax_inspection_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                    DevScenarioId::AttackMoveReloadAcquisition => {
-                        session_from_setup!(Game::new_attack_move_reload_acquisition_scenario(
-                            config.unit,
-                            config.count,
-                            seed,
-                        )?)
-                    }
-                }
+                session_from_setup!(Game::new_dev_scenario(
+                    config.id.room_id(),
+                    config.unit,
+                    config.count,
+                    config.blocker,
+                    config.case,
+                    seed,
+                )?)
             }
         }
     }
