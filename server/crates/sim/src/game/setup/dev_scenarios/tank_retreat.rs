@@ -275,14 +275,13 @@ mod tests {
         assert!((facings[1] - facings[0] - expected_gap).abs() <= 0.001);
         assert!((facings[2] - facings[1] - expected_gap).abs() <= 0.001);
 
-        let commands = setup.commands();
-        assert_eq!(commands.len(), 1);
+        let command = setup.command();
         let SimCommand::Move {
             units,
             x,
             y,
             queued,
-        } = &commands[0]
+        } = &command
         else {
             panic!("reverse-traffic scenario should author one grouped Move command");
         };
@@ -320,9 +319,7 @@ mod tests {
         for _ in 0..setup.issue_after_ticks {
             setup.game.tick();
         }
-        for command in setup.commands() {
-            setup.game.enqueue(setup.player_id, command);
-        }
+        setup.game.enqueue(setup.player_id, setup.command());
         for _ in 0..config::TICK_HZ * 5 {
             setup.game.tick();
         }
@@ -347,9 +344,7 @@ mod tests {
         for _ in 0..setup.issue_after_ticks {
             setup.game.tick();
         }
-        for command in setup.commands() {
-            setup.game.enqueue(setup.player_id, command);
-        }
+        setup.game.enqueue(setup.player_id, setup.command());
         setup.game.tick();
 
         let goal_tiles = setup

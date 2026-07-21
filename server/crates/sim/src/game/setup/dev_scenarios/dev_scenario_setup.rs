@@ -9,7 +9,7 @@ pub struct DevScenarioSetup {
     pub(super) order: DevScenarioOrder,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub(super) enum DevScenarioOrder {
     Move,
     AttackMove,
@@ -17,29 +17,19 @@ pub(super) enum DevScenarioOrder {
 
 impl DevScenarioSetup {
     pub fn command(&self) -> SimCommand {
-        let mut commands = self.commands();
-        assert_eq!(
-            commands.len(),
-            1,
-            "single-command accessor used for a multi-command dev scenario"
-        );
-        commands.remove(0)
-    }
-
-    pub fn commands(&self) -> Vec<SimCommand> {
-        match &self.order {
-            DevScenarioOrder::Move => vec![SimCommand::Move {
+        match self.order {
+            DevScenarioOrder::Move => SimCommand::Move {
                 units: self.units.clone(),
                 x: self.goal.0,
                 y: self.goal.1,
                 queued: false,
-            }],
-            DevScenarioOrder::AttackMove => vec![SimCommand::AttackMove {
+            },
+            DevScenarioOrder::AttackMove => SimCommand::AttackMove {
                 units: self.units.clone(),
                 x: self.goal.0,
                 y: self.goal.1,
                 queued: false,
-            }],
+            },
         }
     }
 

@@ -30,7 +30,7 @@ impl DevDriver {
 
 pub(super) struct DevScenarioDriver {
     player_id: u32,
-    commands: Vec<SimCommand>,
+    command: SimCommand,
     issue_after_ticks: u32,
     issued: bool,
 }
@@ -44,9 +44,7 @@ impl DevScenarioDriver {
             return;
         }
         self.issued = true;
-        for command in &self.commands {
-            game.enqueue(self.player_id, command.clone());
-        }
+        game.enqueue(self.player_id, self.command.clone());
     }
 }
 
@@ -123,10 +121,10 @@ impl RoomTask {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
                         let player_id = setup.player_id;
-                        let commands = setup.commands();
+                        let command = setup.command();
                         let driver = DevScenarioDriver {
                             player_id,
-                            commands,
+                            command,
                             issue_after_ticks: setup.issue_after_ticks,
                             issued: false,
                         };
