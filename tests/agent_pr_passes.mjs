@@ -124,6 +124,11 @@ assert.throws(
 const legacyOversizedMessage = renderDiscordMessage({ changes: Array.from({ length: 8 }, () => "x".repeat(300)) });
 assert.equal(legacyOversizedMessage, "• Gameplay changed; see the full patch notes for details.");
 assert.equal(legacyOversizedMessage.includes("…"), false, "legacy notes should not be cut off mid-sentence");
+assert.equal(
+  renderDiscordMessage({ changes: ["One.", "Two.", "Three.", "Four."] }),
+  "• Gameplay changed; see the full patch notes for details.",
+  "legacy notes with extra short bullets should not be silently shortened",
+);
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });

@@ -54,15 +54,20 @@ function run(command, args, options = {}) {
 function git(repoRoot, args) { return run("git", args, { cwd: repoRoot }); }
 
 export function renderDiscordMessage(decision) {
-  const message = formatDiscordChanges(decision.changes);
+  const changes = cleanDiscordChanges(decision.changes);
+  if (changes.length > MAX_DISCORD_BULLETS) return OVERSIZED_DISCORD_FALLBACK;
+  const message = formatDiscordChanges(changes);
   return message.length <= MAX_DISCORD_MESSAGE_CHARS ? message : OVERSIZED_DISCORD_FALLBACK;
+}
+
+function cleanDiscordChanges(changes) {
+  return changes
+    .map((item) => item.replace(/^[-*•]\s+/, ""))
+    .filter(Boolean);
 }
 
 function formatDiscordChanges(changes) {
   return changes
-    .map((item) => item.replace(/^[-*•]\s+/, ""))
-    .filter(Boolean)
-    .slice(0, MAX_DISCORD_BULLETS)
     .map((item) => `• ${item}`)
     .join("\n");
 }
@@ -175,7 +180,7 @@ export function normalizeDecision(raw) {
   if (decision.decision === "write_patch_note" && (!decision.title || decision.changes.length === 0)) {
     throw new Error("write_patch_note requires a title and at least one factual change");
   }
-  if (decision.decision === "write_patch_note" && formatDiscordChanges(decision.changes).length > MAX_DISCORD_MESSAGE_CHARS) {
+  if (decision.decision === "write_patch_note" && formatDiscordChanges(cleanDiscordChanges(decision.changes)).length > MAX_DISCORD_MESSAGE_CHARS) {
     throw new Error(`write_patch_note changes must fit one ${MAX_DISCORD_MESSAGE_CHARS}-character Discord message`);
   }
   return decision;
