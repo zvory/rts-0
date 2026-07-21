@@ -40,7 +40,7 @@ assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 const normalizedPatchNoteScope = PATCH_NOTE_SCOPE.replace(/\s+/g, " ");
 assert.match(normalizedPatchNoteScope, /only when the branch changes the experience of an active participant playing an ordinary live match/);
 assert.match(normalizedPatchNoteScope, /spectators, observers, casters, observer analysis, replays or replay playback/);
-assert.match(normalizedPatchNoteScope, /draggable spectator\/replay panels and touch behavior for observer-analysis controls are not eligible/);
+assert.match(normalizedPatchNoteScope, /Convenience and presentation changes outside an active player's live-match experience are not gameplay/);
 assert.match(normalizedPatchNoteScope, /runtime source path is only a reason to inspect the diff, not evidence of gameplay impact/);
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);

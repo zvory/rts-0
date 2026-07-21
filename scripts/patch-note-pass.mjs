@@ -24,8 +24,7 @@ performance when the change materially affects a player's decisions or ability t
 Do not write a patch note for changes that affect only spectators, observers, casters, observer
 analysis, replays or replay playback, match history, Lab/dev/debug/scenario tools, lobby or room
 setup, administration, deployment, or developer workflows. Convenience and presentation changes
-outside an active player's live-match experience are not gameplay. In particular, draggable
-spectator/replay panels and touch behavior for observer-analysis controls are not eligible.
+outside an active player's live-match experience are not gameplay.
 
 A runtime source path is only a reason to inspect the diff, not evidence of gameplay impact. If a
 branch mixes eligible and excluded work, mention only the eligible active-player gameplay effects.`;
