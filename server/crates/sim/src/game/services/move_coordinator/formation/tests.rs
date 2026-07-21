@@ -198,13 +198,14 @@ fn partial_compact_row_stays_on_its_original_side() {
     let middle = map.tile_of(goals[1].0, goals[1].1);
     let bottom = map.tile_of(goals[2].0, goals[2].1);
 
-    assert!(top.0 < middle.0);
-    assert_eq!(middle.0, bottom.0);
-    assert!(top.1 < bottom.1);
+    assert_eq!(top.0, middle.0);
+    assert!(middle.0 < bottom.0);
+    assert!(top.1 < middle.1);
+    assert_eq!(middle.1, bottom.1);
 }
 
 #[test]
-fn vehicle_column_keeps_one_open_tile_and_original_vertical_order() {
+fn three_vehicle_line_folds_into_a_spaced_blob() {
     let map = flat_map(80);
     let entities = EntityStore::new();
     let occ = Occupancy::build(&map, &entities);
@@ -216,14 +217,175 @@ fn vehicle_column_keeps_one_open_tile_and_original_vertical_order() {
     let click = map.tile_center(60, 40);
 
     let goals = formation_goals(&map, &occ, &units, click);
-    let bottom = map.tile_of(goals[0].0, goals[0].1);
-    let top = map.tile_of(goals[1].0, goals[1].1);
-    let middle = map.tile_of(goals[2].0, goals[2].1);
+    let tiles = goals
+        .iter()
+        .map(|goal| map.tile_of(goal.0, goal.1))
+        .collect::<Vec<_>>();
+    let distinct_x = tiles
+        .iter()
+        .map(|tile| tile.0)
+        .collect::<std::collections::BTreeSet<_>>();
+    let distinct_y = tiles
+        .iter()
+        .map(|tile| tile.1)
+        .collect::<std::collections::BTreeSet<_>>();
 
-    assert_eq!(top.0, middle.0);
-    assert_eq!(middle.0, bottom.0);
-    assert_eq!(middle.1, top.1 + 2);
-    assert_eq!(bottom.1, middle.1 + 2);
+    assert_eq!(distinct_x.len(), 2);
+    assert_eq!(distinct_y.len(), 2);
+    for i in 0..tiles.len() {
+        for j in (i + 1)..tiles.len() {
+            assert!(tile_chebyshev_distance(tiles[i], tiles[j]) > 1);
+        }
+    }
+}
+
+#[test]
+fn six_vehicle_line_centers_the_deeper_part_of_its_blob() {
+    let map = flat_map(100);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let units = (0..6)
+        .map(|index| formation_unit_kind(index + 1, EntityKind::Tank, &map, (5 + index * 4, 20)))
+        .collect::<Vec<_>>();
+    let click = map.tile_center(60, 50);
+
+    let goals = formation_goals(&map, &occ, &units, click);
+    let mut row_counts = std::collections::BTreeMap::<u32, usize>::new();
+    for goal in &goals {
+        let tile = map.tile_of(goal.0, goal.1);
+        *row_counts.entry(tile.1).or_default() += 1;
+    }
+    let mut counts = row_counts.values().copied().collect::<Vec<_>>();
+    counts.sort_unstable();
+    let min_y = *row_counts.first_key_value().unwrap().0;
+    let max_y = *row_counts.last_key_value().unwrap().0;
+    let tiles = goals
+        .iter()
+        .map(|goal| map.tile_of(goal.0, goal.1))
+        .collect::<Vec<_>>();
+
+    assert_formation_dimensions(&map, &goals, 4, 2);
+    assert_eq!(counts, vec![2, 4]);
+    assert_eq!(tiles[0].1, min_y);
+    assert_eq!(tiles[2].1, max_y);
+    assert_eq!(tiles[3].1, max_y);
+    assert_eq!(tiles[5].1, min_y);
+}
+
+#[test]
+fn horizontal_line_repeated_moves_stay_a_compact_blob() {
+    let map = flat_map(100);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let units = (0..10)
+        .map(|index| formation_unit(index + 1, &map, (5 + index * 4, 20)))
+        .collect::<Vec<_>>();
+    let first_click = map.tile_center(60, 50);
+    let second_click = map.tile_center(60, 60);
+    let third_click = map.tile_center(60, 70);
+
+    let first = formation_goals(&map, &occ, &units, first_click);
+    let moved_units = units
+        .iter()
+        .zip(&first)
+        .map(|(unit, point)| FormationUnit {
+            id: unit.id,
+            kind: unit.kind,
+            pos: *point,
+        })
+        .collect::<Vec<_>>();
+    let second = formation_goals(&map, &occ, &moved_units, second_click);
+    let moved_again = moved_units
+        .iter()
+        .zip(&second)
+        .map(|(unit, point)| FormationUnit {
+            id: unit.id,
+            kind: unit.kind,
+            pos: *point,
+        })
+        .collect::<Vec<_>>();
+    let third = formation_goals(&map, &occ, &moved_again, third_click);
+
+    assert_formation_dimensions(&map, &first, 4, 3);
+    assert_formation_dimensions(&map, &second, 4, 3);
+    assert_formation_dimensions(&map, &third, 4, 3);
+    assert_eq!(
+        formation_offsets(&second, second_click),
+        formation_offsets(&third, third_click)
+    );
+}
+
+#[test]
+fn vertical_line_repeated_moves_stay_a_compact_blob() {
+    let map = flat_map(100);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let units = (0..10)
+        .map(|index| formation_unit(index + 1, &map, (20, 5 + index * 4)))
+        .collect::<Vec<_>>();
+    let first_click = map.tile_center(60, 50);
+    let second_click = map.tile_center(70, 50);
+    let third_click = map.tile_center(80, 50);
+
+    let first = formation_goals(&map, &occ, &units, first_click);
+    let moved_units = units
+        .iter()
+        .zip(&first)
+        .map(|(unit, point)| FormationUnit {
+            id: unit.id,
+            kind: unit.kind,
+            pos: *point,
+        })
+        .collect::<Vec<_>>();
+    let second = formation_goals(&map, &occ, &moved_units, second_click);
+    let moved_again = moved_units
+        .iter()
+        .zip(&second)
+        .map(|(unit, point)| FormationUnit {
+            id: unit.id,
+            kind: unit.kind,
+            pos: *point,
+        })
+        .collect::<Vec<_>>();
+    let third = formation_goals(&map, &occ, &moved_again, third_click);
+
+    assert_formation_dimensions(&map, &first, 3, 4);
+    assert_formation_dimensions(&map, &second, 3, 4);
+    assert_formation_dimensions(&map, &third, 3, 4);
+    assert_eq!(
+        formation_offsets(&second, second_click),
+        formation_offsets(&third, third_click)
+    );
+}
+
+fn assert_formation_dimensions(
+    map: &Map,
+    goals: &[(f32, f32)],
+    expected_columns: usize,
+    expected_rows: usize,
+) {
+    let columns = goals
+        .iter()
+        .map(|goal| map.tile_of(goal.0, goal.1).0)
+        .collect::<std::collections::BTreeSet<_>>();
+    let rows = goals
+        .iter()
+        .map(|goal| map.tile_of(goal.0, goal.1).1)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(columns.len(), expected_columns);
+    assert_eq!(rows.len(), expected_rows);
+}
+
+fn formation_offsets(goals: &[(f32, f32)], center: (f32, f32)) -> Vec<(i32, i32)> {
+    goals
+        .iter()
+        .map(|goal| {
+            (
+                (goal.0 - center.0).round() as i32,
+                (goal.1 - center.1).round() as i32,
+            )
+        })
+        .collect()
 }
 
 #[test]

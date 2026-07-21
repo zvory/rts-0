@@ -1290,13 +1290,20 @@ permits a Pump Jack to coexist with its oil node, and simulation invariant check
 Pump Jack policy.
 
 Point move and attack-move commands translate selections into one compact destination layout
-regardless of command distance. The layout groups units into broad rows from top to bottom, then
-keeps left-to-right ordering within each row; small vertical jitter therefore does not swap nearby
-units' horizontal destinations. It does not preserve original world-space separation. Infantry-like
-selections use adjacent destination tiles. A selection containing an oriented vehicle body uses a
-two-tile pitch, leaving one open tile between destination slots so mixed selections also keep clear
-of vehicle bodies. Blocked-slot fallback keeps this vehicle spacing strict. Player-drawn formation
-lines remain an explicitly authored layout with their separate line-and-rank assignment policy.
+regardless of command distance. The destination footprint is the nearest compact rectangle: for
+example, ten units use four-by-three or three-by-four slots rather than inheriting a one-deep line.
+Wide selections fold into ordered columns and tall selections fold into ordered rows, preserving
+position most strongly along the selection's long axis while preventing repeated moves from feeding
+an extreme aspect ratio back into the next formation. It does not preserve original world-space
+separation. Infantry-like selections use adjacent destination tiles. A selection containing an
+oriented vehicle body uses a two-tile pitch, leaving one open tile between destination slots so mixed
+selections also keep clear of vehicle bodies. Vehicle groups of six or more use one additional slot
+along the footprint's long side, reducing deep same-lane traffic queues while remaining at least two
+slots deep. In partially filled rectangles, the deeper cells are centered so central units lead and
+outside units trail through constrained routes; when folding a one-deep line, that leading edge
+follows the move direction. Blocked-slot fallback keeps vehicle spacing strict.
+Player-drawn formation lines remain an explicitly authored layout with their separate line-and-rank
+assignment policy.
 
 Eligible infantry move and attack-move formation slots bias toward nearby known, unoccupied trench
 terrain within a two-tile footprint band around the normal formation goal. A trench occupant counts

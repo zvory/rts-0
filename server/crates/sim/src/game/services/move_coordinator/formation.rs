@@ -7,6 +7,7 @@ use crate::game::map::Map;
 use crate::protocol::TrenchView;
 
 mod goal_search;
+mod layout;
 mod polyline;
 mod reachability;
 #[cfg(test)]
@@ -152,7 +153,7 @@ where
         known_trenches,
         occupied_trenches,
     };
-    let desired_points = compact_formation_points(map, units, goal);
+    let desired_points = layout::compact_formation_points(map, units, goal);
     let mut out = Vec::with_capacity(units.len());
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
@@ -174,121 +175,6 @@ where
     }
 
     out
-}
-
-/// Build one compact translated layout. Broad rows retain top-to-bottom order, and units within a
-/// row retain left-to-right order, but original world-space separation is discarded. Infantry
-/// occupies adjacent tiles; a selection containing a vehicle uses a two-tile pitch.
-fn compact_formation_points(
-    map: &Map,
-    units: &[FormationUnit],
-    center: (f32, f32),
-) -> Vec<(f32, f32)> {
-    if units.len() <= 1 {
-        return units.iter().map(|_| center).collect();
-    }
-
-    let (min_x, max_x, min_y, max_y) = units.iter().fold(
-        (
-            f32::INFINITY,
-            f32::NEG_INFINITY,
-            f32::INFINITY,
-            f32::NEG_INFINITY,
-        ),
-        |(min_x, max_x, min_y, max_y), unit| {
-            (
-                min_x.min(unit.pos.0),
-                max_x.max(unit.pos.0),
-                min_y.min(unit.pos.1),
-                max_y.max(unit.pos.1),
-            )
-        },
-    );
-    let width = max_x - min_x;
-    let height = max_y - min_y;
-    let columns = if height <= f32::EPSILON {
-        units.len()
-    } else if width <= f32::EPSILON {
-        1
-    } else {
-        ((units.len() as f32 * width / height).sqrt().round() as usize).clamp(1, units.len())
-    };
-    let rows = units.len().div_ceil(columns);
-    let pitch_tiles = if units
-        .iter()
-        .any(|unit| uses_oriented_vehicle_body(unit.kind))
-    {
-        VEHICLE_BODY_FORMATION_GAP_TILES + 1
-    } else {
-        1
-    };
-    let max_row_size = columns.min(units.len()) as u32;
-    let width_tiles = max_row_size.saturating_sub(1) * pitch_tiles;
-    let height_tiles = (rows as u32).saturating_sub(1) * pitch_tiles;
-    let center_tile = map.tile_of(center.0, center.1);
-    let start_x = centered_tile_start(center_tile.0, width_tiles, map.size);
-    let start_y = centered_tile_start(center_tile.1, height_tiles, map.size);
-
-    let mut ordered = (0..units.len()).collect::<Vec<_>>();
-    ordered.sort_by(|&a, &b| {
-        units[a]
-            .pos
-            .1
-            .total_cmp(&units[b].pos.1)
-            .then_with(|| units[a].pos.0.total_cmp(&units[b].pos.0))
-            .then_with(|| units[a].id.cmp(&units[b].id))
-    });
-
-    let mut points = vec![center; units.len()];
-    for (row, row_units) in ordered.chunks_mut(columns).enumerate() {
-        row_units.sort_by(|&a, &b| {
-            units[a]
-                .pos
-                .0
-                .total_cmp(&units[b].pos.0)
-                .then_with(|| units[a].pos.1.total_cmp(&units[b].pos.1))
-                .then_with(|| units[a].id.cmp(&units[b].id))
-        });
-        let row_start_x = start_x
-            + compact_row_start_column(units, row_units, min_x, width, columns) as u32
-                * pitch_tiles;
-        for (column, &unit_index) in row_units.iter().enumerate() {
-            let tile = (
-                row_start_x + column as u32 * pitch_tiles,
-                start_y + row as u32 * pitch_tiles,
-            );
-            points[unit_index] = map.tile_center(tile.0, tile.1);
-        }
-    }
-    points
-}
-
-fn compact_row_start_column(
-    units: &[FormationUnit],
-    row_units: &[usize],
-    min_x: f32,
-    width: f32,
-    columns: usize,
-) -> usize {
-    if row_units.len() >= columns || width <= f32::EPSILON {
-        return 0;
-    }
-    let mean_x = row_units
-        .iter()
-        .map(|&index| units[index].pos.0)
-        .sum::<f32>()
-        / row_units.len() as f32;
-    let desired_center = ((mean_x - min_x) / width) * (columns - 1) as f32;
-    let half_row = (row_units.len() - 1) as f32 * 0.5;
-    (desired_center - half_row)
-        .round()
-        .clamp(0.0, (columns - row_units.len()) as f32) as usize
-}
-
-fn centered_tile_start(center: u32, span: u32, map_size: u32) -> u32 {
-    center
-        .saturating_sub(span.div_ceil(2))
-        .min(map_size.saturating_sub(span.saturating_add(1)))
 }
 
 fn assign_formation_goal<F>(

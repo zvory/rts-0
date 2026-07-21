@@ -341,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn reverse_traffic_grouped_destinations_keep_tank_order_and_spacing() {
+    fn reverse_traffic_grouped_destinations_form_a_spaced_blob() {
         let mut setup = Game::new_tank_reverse_traffic_scenario(EntityKind::Tank, 3, 0x5150_0723)
             .expect("reverse-traffic scenario should build");
         for _ in 0..setup.issue_after_ticks {
@@ -368,10 +368,24 @@ mod tests {
                 setup.game.state.map.tile_of(goal.0, goal.1)
             })
             .collect::<Vec<_>>();
-        assert_eq!(goal_tiles[0].0, goal_tiles[1].0);
-        assert_eq!(goal_tiles[1].0, goal_tiles[2].0);
-        assert_eq!(goal_tiles[1].1, goal_tiles[0].1 + 2);
-        assert_eq!(goal_tiles[2].1, goal_tiles[1].1 + 2);
+        let distinct_x = goal_tiles
+            .iter()
+            .map(|tile| tile.0)
+            .collect::<std::collections::BTreeSet<_>>();
+        let distinct_y = goal_tiles
+            .iter()
+            .map(|tile| tile.1)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(distinct_x.len(), 2);
+        assert_eq!(distinct_y.len(), 2);
+        for i in 0..goal_tiles.len() {
+            for j in (i + 1)..goal_tiles.len() {
+                assert!(
+                    goal_tiles[i].0.abs_diff(goal_tiles[j].0) > 1
+                        || goal_tiles[i].1.abs_diff(goal_tiles[j].1) > 1
+                );
+            }
+        }
     }
 
     fn assert_tanks_take_front_ap_damage_before_orders(mut setup: DevScenarioSetup) {

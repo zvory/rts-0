@@ -14,10 +14,13 @@ _2026-07-20_
 - Reversing Tank traffic now senses and yields along its actual travel direction.
 - Group move and attack-move destinations now form one compact layout at every command distance
   instead of preserving progressively more of the selection's original world-space separation.
-- Compact formations retain broad top-to-bottom rows and left-to-right order within each row:
-  infantry occupies adjacent slots, while selections containing vehicles leave one open tile
+- Compact formations now favor near-square blobs instead of inheriting extreme lines from the
+  selection's current shape. Wide groups fold into ordered columns, tall groups fold into ordered
+  rows, infantry occupies adjacent slots, and selections containing vehicles leave one open tile
   between slots.
-- Compact rows now keep left-to-right order despite small vertical position differences, and
+- Larger vehicle groups use a slightly wider blob with the deeper cells centered, keeping central
+  vehicles ahead of outside vehicles when traffic compresses through a choke.
+- Small position differences no longer unpredictably switch between line and blob layouts, and
   infantry trench preference no longer violates an assigned vehicle's one-tile clearance.
 - The reverse-traffic inspection scenario now issues one grouped move order, letting the normal
   formation planner assign the Tanks' destinations as it would for a player-issued group command.
