@@ -169,12 +169,16 @@ export function isGameplayCandidate(pathname) {
 export function normalizeDecision(raw) {
   if (!raw || !["no_patch_note", "write_patch_note"].includes(raw.decision)) throw new Error("patch-note pass returned an invalid decision");
   const singleLine = (value) => String(value || "").replace(/\s+/g, " ").trim();
-  const strings = (value, max) => Array.isArray(value) ? value.map(singleLine).filter(Boolean).slice(0, max) : [];
+  const strings = (value) => Array.isArray(value) ? value.map(singleLine).filter(Boolean) : [];
+  const changes = strings(raw.changes);
+  if (raw.decision === "write_patch_note" && changes.length > MAX_DISCORD_BULLETS) {
+    throw new Error(`write_patch_note allows at most ${MAX_DISCORD_BULLETS} changes`);
+  }
   const decision = {
     decision: raw.decision,
     title: singleLine(raw.title),
-    changes: strings(raw.changes, MAX_DISCORD_BULLETS),
-    playtestWatch: strings(raw.playtest_watch, 4),
+    changes,
+    playtestWatch: strings(raw.playtest_watch).slice(0, 4),
     reason: singleLine(raw.reason),
   };
   if (decision.decision === "write_patch_note" && (!decision.title || decision.changes.length === 0)) {

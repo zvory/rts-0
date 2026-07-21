@@ -98,18 +98,27 @@ assert.deepEqual(
 const maximumDiscordDecision = normalizeDecision({
   decision: "write_patch_note",
   title: "Bounded changes",
-  changes: ["Infantry movement improved.", "Tank movement improved.", "Formation movement improved.", "Ignored fourth change."],
+  changes: ["Infantry movement improved.", "Tank movement improved.", "Formation movement improved."],
   playtest_watch: [],
   reason: "Exercise the Discord content limit.",
 });
 assert.equal(maximumDiscordDecision.changes.length, 3);
 assert(renderDiscordMessage(maximumDiscordDecision).length <= 240, "Discord patch notes must fit 240 characters");
-assert.equal(renderDiscordMessage(maximumDiscordDecision).includes("Ignored fourth change."), false);
 assert.equal(
   renderFragment({ branch: "zvorygin/bounded", date: "2026-07-20", decision: maximumDiscordDecision })
     .includes("Formation movement improved."),
   true,
   "the canonical patch-note fragment should contain the bounded Discord changes",
+);
+assert.throws(
+  () => normalizeDecision({
+    decision: "write_patch_note",
+    title: "Too many changes",
+    changes: ["One.", "Two.", "Three.", "Four."],
+    playtest_watch: [],
+    reason: "Exercise the bullet-count limit.",
+  }),
+  /allows at most 3 changes/,
 );
 assert.throws(
   () => normalizeDecision({
