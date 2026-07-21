@@ -171,6 +171,7 @@ export class App {
       ensureConnected: () => this.ensureConnected(),
       disconnectWhenIdle: () => this.disconnectIdleConnection(),
       autoRefreshLobbies: !this.requiresConnectionOnStart(),
+      onReadyChange: (ready) => this.onLobbyReadyChange(ready),
     });
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
@@ -473,6 +474,7 @@ export class App {
         return;
       case "ready":
         this.lobby?.setStatus("Ready check...");
+        this.onLobbyReadyChange(!!action.ready);
         this.net.ready(!!action.ready);
         return;
       case "start":
@@ -540,7 +542,7 @@ export class App {
    */
   onError(m) {
     const msg = m && m.msg ? m.msg : "Server error";
-    if (msg.endsWith("failed to load the game.")) this.discardCountdownRendererPreparation();
+    if (msg.endsWith("failed to load the game.")) this.releaseCountdownRendererPreparation();
     this.interactBridge?.noteLaunchError?.(msg);
     this.showToast(msg);
     this.labCatalog?.setStatus(msg, { error: true });
@@ -633,14 +635,33 @@ export class App {
   onMatchCountdown(payload) {
     const countdownId = Number(payload?.countdownId);
     if (!Number.isInteger(countdownId) || countdownId <= 0 || countdownId > 0xffffffff) return;
-    this.discardCountdownRendererPreparation();
+    const state = this.countdownRendererPreparation || this.warmMatchRenderer();
+    if (!state) return;
+    state.countdownId = countdownId;
+    state.acknowledged = false;
+    this.acknowledgeMatchLoadReady(state);
+    if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
+    const durationMs = Math.max(1000, Number(payload?.durationMs) || 3000);
+    state.cleanupTimer = window.setTimeout(() => {
+      if (this.countdownRendererPreparation === state) this.discardCountdownRendererPreparation();
+    }, durationMs + 5000);
+  }
+
+  onLobbyReadyChange(ready) {
+    if (ready) this.warmMatchRenderer();
+    else this.discardCountdownRendererPreparation();
+  }
+
+  warmMatchRenderer() {
+    if (this.countdownRendererPreparation) return this.countdownRendererPreparation;
     const rendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
       spectator: this.lobby?.isSpectator?.() === true,
       replay: false,
       lab: false,
     });
     const state = {
-      countdownId,
+      countdownId: null,
+      acknowledged: false,
       preparation: null,
       promise: null,
       cleanupTimer: undefined,
@@ -652,21 +673,26 @@ export class App {
         return null;
       }
       state.preparation = preparation;
-      this.net.matchLoadReady(countdownId);
+      this.acknowledgeMatchLoadReady(state);
       return preparation;
     }).catch((error) => {
       if (this.countdownRendererPreparation === state) {
-        diagnostics.mark("app.matchCountdown.rendererWarmupFailed", {
-          countdownId,
+        this.countdownRendererPreparation = null;
+        diagnostics.mark("app.matchRenderer.warmupFailed", {
           message: error?.message || String(error),
         });
+        console.error("[rts-app] match renderer warmup failed", error);
       }
       return null;
     });
-    const durationMs = Math.max(1000, Number(payload?.durationMs) || 3000);
-    state.cleanupTimer = window.setTimeout(() => {
-      if (this.countdownRendererPreparation === state) this.discardCountdownRendererPreparation();
-    }, durationMs + 5000);
+    return state;
+  }
+
+  acknowledgeMatchLoadReady(state) {
+    if (this.countdownRendererPreparation !== state || !state.preparation
+      || !Number.isInteger(state.countdownId) || state.acknowledged) return;
+    state.acknowledged = true;
+    this.net.matchLoadReady(state.countdownId);
   }
 
   async takeCountdownRendererPreparation() {
@@ -686,6 +712,15 @@ export class App {
     if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
     if (state.preparation) state.preparation.destroy();
     else void state.promise?.then((preparation) => preparation?.destroy?.());
+  }
+
+  releaseCountdownRendererPreparation() {
+    const state = this.countdownRendererPreparation;
+    if (!state) return;
+    state.countdownId = null;
+    state.acknowledged = false;
+    if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
+    state.cleanupTimer = undefined;
   }
 
   async startMatch(payload, generation) {
