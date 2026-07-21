@@ -461,7 +461,9 @@ seek-triggered `start` messages and spectator rematches. Preferences are stored 
 `rts.observerAnalysisOverlay`; clients still read the old `rts.replayAnalysisOverlay` key for
 compatibility. Its titlebar is draggable, keyboard-nudgeable, viewport-clamped, and retains its
 desktop placement through replay seeks and spectator rematches; `Home` restores the default
-placement. The overlay owns its generated DOM and is read-only. The Army Value tab is
+placement. Coarse-pointer layouts also support viewport-clamped titlebar dragging without writing
+their temporary placement over the saved desktop position. Analysis buttons activate directly on
+touch release and suppress the synthesized compatibility click. The overlay owns its generated DOM and is read-only. The Army Value tab is
 client-side and viewport-specific; Production, Research, Units, Resources, Units Lost, and
 Resources Lost render the latest server-authored `observerAnalysis` payload. Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
@@ -1093,7 +1095,12 @@ restored under that limit during normal match initialization. Room-time controls
 sources, retain server-confirmed state while requests are pending, and confirm time movement against
 the authoritative baseline and controller identity. Blocked, failed, or unconfirmed sends are
 exposed instead of applying optimistic selection. Read-only Lab viewers keep these
-controls inactive with an authorization-specific status. Coarse-pointer layouts arrange existing mobile debug chrome around safe areas, keep low-priority detail scrollable, and keep controls reachable; room-time panel placement uses the same coarse-pointer gate. Desktop layout is unchanged, and no touch world-command behavior is added. Runtime modules should not gain direct imports across the model, input, UI, minimap,
+controls inactive with an authorization-specific status. Coarse-pointer layouts arrange existing
+mobile debug chrome around safe areas, keep low-priority detail scrollable, and keep controls
+reachable. Floating room-time, spectator, and observer-analysis titlebars support bounded touch
+dragging there, while their mobile positions remain session-local so saved desktop placement is not
+overwritten. Desktop layout is unchanged, and no touch world-command behavior is added. Runtime
+modules should not gain direct imports across the model, input, UI, minimap,
 renderer, and prediction areas except for pinned mirrors such as `protocol.js` and `config.js`, or
 for explicitly documented architecture-check exceptions.
 

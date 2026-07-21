@@ -54,7 +54,7 @@ export class FloatingPanelPositioner {
   }
 
   beginDrag(event) {
-    if (this.isMobileViewport() || !isPrimaryPointer(event)) return;
+    if (!isPrimaryPointer(event)) return;
     const point = eventPoint(event);
     if (!point) return;
 
