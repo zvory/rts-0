@@ -20,7 +20,7 @@ const REVERSE_TRAFFIC_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
 pub(super) const TANK_UNDER_FIRE_RETREAT_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "tank_under_fire_retreat",
     title: "Tank Under-Fire Retreat",
-    description: "One reinforced Tank faces a deployed Anti-Tank Gun, takes frontal AP fire, then after 10 seconds receives a long move order directly behind it. The current baseline pivots 180 degrees before retreating.",
+    description: "One reinforced Tank faces a deployed Anti-Tank Gun, takes frontal AP fire, then after 10 seconds receives a long move order directly behind it so the under-fire reverse preference can be inspected.",
     launches: &UNDER_FIRE_RETREAT_LAUNCHES,
 };
 
