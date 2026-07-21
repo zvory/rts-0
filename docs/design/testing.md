@@ -261,9 +261,11 @@ canary runs own a private server; the browser shard passes its existing loopback
   omits the fragment title, date, playtest-watch section, and PR metadata. A hash of the destination and
   content under the shared Git directory suppresses duplicate deliveries
   when the waiter is rerun. Review-time and CI-recovery reruns of `scripts/agent-pr.sh` never
-  deliver the webhook. Discord rendering bounds change bullets so the complete post fits its
-  message limit without truncating the canonical fragment, and webhook payloads disable mention
-  parsing.
+  deliver the webhook. Generated notes use at most three change bullets and must fit the complete
+  Discord post within 240 characters. The classifier favors a general player-facing gist over
+  exhaustive detail; legacy oversized fragments fall back to a short generic notice instead of
+  being cut off mid-sentence. Delivery dry-runs print the exact bounded message without contacting
+  Discord. Webhook payloads disable mention parsing.
   Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
   Codex quality-pass coverage should verify access to linked worktree git common directories while
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
