@@ -44,10 +44,6 @@ fn trench_at(id: u32, map: &Map, tile: (u32, u32)) -> KnownTrench {
     }
 }
 
-fn offset_from(point: (f32, f32), origin: (f32, f32)) -> (f32, f32) {
-    (point.0 - origin.0, point.1 - origin.1)
-}
-
 fn assert_close(actual: f32, expected: f32) {
     assert!(
         (actual - expected).abs() <= 0.01,
@@ -116,90 +112,77 @@ fn short_polyline_adds_parallel_ranks() {
 }
 
 #[test]
-fn near_group_move_compacts_goals_near_click() {
+fn point_move_uses_the_same_compact_shape_at_every_distance() {
     let map = Map::generate(1, 0x1234_5678);
     let entities = EntityStore::new();
     let occ = Occupancy::build(&map, &entities);
     let units = square_formation(&map);
-    let click = map.tile_center(11, 65);
+    let near_click = map.tile_center(11, 65);
+    let far_click = map.tile_center(30, 65);
 
-    let goals = formation_goals(&map, &occ, &units, click);
+    let near = formation_goals(&map, &occ, &units, near_click);
+    let far = formation_goals(&map, &occ, &units, far_click);
+    let near_offsets = near
+        .iter()
+        .map(|point| (point.0 - near_click.0, point.1 - near_click.1))
+        .collect::<Vec<_>>();
+    let far_offsets = far
+        .iter()
+        .map(|point| (point.0 - far_click.0, point.1 - far_click.1))
+        .collect::<Vec<_>>();
 
-    assert_eq!(goals.len(), units.len());
-    for goal in goals {
-        let dx = goal.0 - click.0;
-        let dy = goal.1 - click.1;
-        let dist = (dx * dx + dy * dy).sqrt();
-        assert!(
-            dist <= config::TILE_SIZE as f32 * 1.5,
-            "near goals should stay clustered around the click, got {goal:?}"
-        );
-    }
+    assert_eq!(near_offsets, far_offsets);
+    assert_eq!(
+        near_offsets,
+        vec![
+            (-(config::TILE_SIZE as f32), -(config::TILE_SIZE as f32)),
+            (0.0, -(config::TILE_SIZE as f32)),
+            (-(config::TILE_SIZE as f32), 0.0),
+            (0.0, 0.0),
+        ]
+    );
 }
 
 #[test]
-fn far_group_move_preserves_world_offsets() {
-    let map = Map::generate(1, 0x1234_5678);
-    let entities = EntityStore::new();
-    let occ = Occupancy::build(&map, &entities);
-    let units = square_formation(&map);
-    let click = map.tile_center(30, 65);
-
-    let goals = formation_goals(&map, &occ, &units, click);
-
-    let ts = config::TILE_SIZE as f32;
-    let expected = [
-        (-2.0 * ts, -2.0 * ts),
-        (2.0 * ts, -2.0 * ts),
-        (-2.0 * ts, 2.0 * ts),
-        (2.0 * ts, 2.0 * ts),
-    ];
-    for (goal, expected_offset) in goals.iter().zip(expected) {
-        let actual = offset_from(*goal, click);
-        assert_close(actual.0, expected_offset.0);
-        assert_close(actual.1, expected_offset.1);
-    }
-}
-
-#[test]
-fn far_scattered_group_move_caps_preserved_offsets() {
+fn scattered_infantry_compacts_without_reversing_left_to_right_order() {
     let map = flat_map(80);
     let entities = EntityStore::new();
     let occ = Occupancy::build(&map, &entities);
     let units = vec![
-        formation_unit(1, &map, (5, 20)),
-        formation_unit(2, &map, (45, 20)),
+        formation_unit(1, &map, (45, 20)),
+        formation_unit(2, &map, (5, 20)),
     ];
     let click = map.tile_center(60, 50);
 
     let goals = formation_goals(&map, &occ, &units, click);
+    let right_goal = map.tile_of(goals[0].0, goals[0].1);
+    let left_goal = map.tile_of(goals[1].0, goals[1].1);
 
-    let ts = config::TILE_SIZE as f32;
-    let expected = [(-4.0 * ts, 0.0), (4.0 * ts, 0.0)];
-    for (goal, expected_offset) in goals.iter().zip(expected) {
-        let actual = offset_from(*goal, click);
-        assert_close(actual.0, expected_offset.0);
-        assert_close(actual.1, expected_offset.1);
-    }
+    assert_eq!(right_goal.0, left_goal.0 + 1);
+    assert_eq!(right_goal.1, left_goal.1);
 }
 
 #[test]
-fn medium_group_move_blends_offsets() {
-    let map = Map::generate(1, 0x1234_5678);
+fn vehicle_column_keeps_one_open_tile_and_original_vertical_order() {
+    let map = flat_map(80);
     let entities = EntityStore::new();
     let occ = Occupancy::build(&map, &entities);
-    let units = square_formation(&map);
-    let click = map.tile_center(21, 65);
+    let units = vec![
+        formation_unit_kind(1, EntityKind::Tank, &map, (20, 30)),
+        formation_unit_kind(2, EntityKind::Tank, &map, (20, 10)),
+        formation_unit_kind(3, EntityKind::Tank, &map, (20, 20)),
+    ];
+    let click = map.tile_center(60, 40);
 
     let goals = formation_goals(&map, &occ, &units, click);
+    let bottom = map.tile_of(goals[0].0, goals[0].1);
+    let top = map.tile_of(goals[1].0, goals[1].1);
+    let middle = map.tile_of(goals[2].0, goals[2].1);
 
-    let ts = config::TILE_SIZE as f32;
-    let expected = [(-ts, -ts), (ts, -ts), (-ts, ts), (ts, ts)];
-    for (goal, expected_offset) in goals.iter().zip(expected) {
-        let actual = offset_from(*goal, click);
-        assert_close(actual.0, expected_offset.0);
-        assert_close(actual.1, expected_offset.1);
-    }
+    assert_eq!(top.0, middle.0);
+    assert_eq!(middle.0, bottom.0);
+    assert_eq!(middle.1, top.1 + 2);
+    assert_eq!(bottom.1, middle.1 + 2);
 }
 
 #[test]
@@ -345,7 +328,7 @@ fn vehicle_body_goal_spacing_applies_to_mixed_units_but_not_dense_infantry() {
 fn blocked_formation_slot_falls_back_to_nearby_passable_tile() {
     let map = Map::generate(1, 0x1234_5678);
     let mut entities = EntityStore::new();
-    let blocked_tile = (28, 63);
+    let blocked_tile = (29, 64);
     let blocked_center = map.tile_center(blocked_tile.0, blocked_tile.1);
     entities
         .spawn_building(
@@ -367,19 +350,15 @@ fn blocked_formation_slot_falls_back_to_nearby_passable_tile() {
         first_tile, blocked_tile,
         "blocked desired formation slot should not be assigned"
     );
-    assert_eq!(
-        first_tile,
-        (29, 62),
-        "nearby fallback should use deterministic ring order"
-    );
+    assert!(tile_chebyshev_distance(first_tile, blocked_tile) <= 6);
     assert!(map.is_passable(first_tile.0 as i32, first_tile.1 as i32));
     assert!(occ.passable(first_tile.0 as i32, first_tile.1 as i32));
 }
 
 #[test]
-fn unreachable_formation_slot_collapses_toward_center() {
+fn unreachable_compact_slots_use_nearby_reachable_tiles() {
     let mut map = flat_map(80);
-    let isolated_tile = (56, 50);
+    let isolated_tile = (59, 50);
     for ty in (isolated_tile.1 - 1)..=(isolated_tile.1 + 1) {
         for tx in (isolated_tile.0 - 1)..=(isolated_tile.0 + 1) {
             let idx = map.index(tx, ty);
@@ -415,21 +394,8 @@ fn unreachable_formation_slot_collapses_toward_center() {
         left_tile, isolated_tile,
         "formation assignment should reject an isolated but locally passable slot"
     );
-    assert_eq!(
-        left_tile,
-        (58, 50),
-        "unreachable offset should collapse inward toward the formation center"
-    );
-    let dist_sq = |a: (f32, f32), b: (f32, f32)| {
-        let dx = a.0 - b.0;
-        let dy = a.1 - b.1;
-        dx * dx + dy * dy
-    };
-    assert!(
-        dist_sq(left_goal, click)
-            < dist_sq(map.tile_center(isolated_tile.0, isolated_tile.1), click),
-        "fallback goal should be closer to the formation center"
-    );
+    assert!(tile_chebyshev_distance(left_tile, isolated_tile) <= 6);
+    assert!(map.is_passable(left_tile.0 as i32, left_tile.1 as i32));
 }
 
 #[test]

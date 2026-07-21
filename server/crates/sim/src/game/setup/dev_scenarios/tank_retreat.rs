@@ -340,6 +340,40 @@ mod tests {
         );
     }
 
+    #[test]
+    fn reverse_traffic_grouped_destinations_keep_tank_order_and_spacing() {
+        let mut setup = Game::new_tank_reverse_traffic_scenario(EntityKind::Tank, 3, 0x5150_0723)
+            .expect("reverse-traffic scenario should build");
+        for _ in 0..setup.issue_after_ticks {
+            setup.game.tick();
+        }
+        for command in setup.commands() {
+            setup.game.enqueue(setup.player_id, command);
+        }
+        setup.game.tick();
+
+        let goal_tiles = setup
+            .units
+            .iter()
+            .map(|tank_id| {
+                let tank = setup
+                    .game
+                    .state
+                    .entities
+                    .get(*tank_id)
+                    .expect("inspection Tank should exist");
+                let goal = tank
+                    .path_goal()
+                    .expect("grouped Tank should receive a goal");
+                setup.game.state.map.tile_of(goal.0, goal.1)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(goal_tiles[0].0, goal_tiles[1].0);
+        assert_eq!(goal_tiles[1].0, goal_tiles[2].0);
+        assert_eq!(goal_tiles[1].1, goal_tiles[0].1 + 2);
+        assert_eq!(goal_tiles[2].1, goal_tiles[1].1 + 2);
+    }
+
     fn assert_tanks_take_front_ap_damage_before_orders(mut setup: DevScenarioSetup) {
         for _ in 0..setup.issue_after_ticks {
             setup.game.tick();

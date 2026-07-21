@@ -133,14 +133,9 @@ where
         let desired = (requested.0.clamp(0.0, max), requested.1.clamp(0.0, max));
         let anchor = map.tile_of(desired.0, desired.1);
         let context = inputs.with_assigned(&assigned);
-        if let Some(goal) = assign_formation_goal(
-            &context,
-            unit,
-            anchor,
-            desired,
-            desired,
-            &mut is_goal_reachable,
-        ) {
+        if let Some(goal) =
+            assign_formation_goal(&context, unit, anchor, desired, &mut is_goal_reachable)
+        {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
                 tile: goal.tile,

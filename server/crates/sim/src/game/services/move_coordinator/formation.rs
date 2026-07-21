@@ -18,9 +18,6 @@ pub(super) use polyline::{
 };
 pub(super) use reachability::FormationReachability;
 
-const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
-const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
-const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_TRENCH_PREFERENCE_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 pub(super) const VEHICLE_BODY_FORMATION_GAP_TILES: u32 = 1;
 
@@ -155,83 +152,15 @@ where
         known_trenches,
         occupied_trenches,
     };
-    if units.len() <= 1 {
-        let anchor = map.tile_of(goal.0, goal.1);
-        return spread_goals_with_known_trenches(
-            inputs,
-            units,
-            anchor,
-            goal,
-            &mut is_goal_reachable,
-        );
-    }
-
-    let inv_count = 1.0 / units.len() as f32;
-    let centroid = units.iter().fold((0.0f32, 0.0f32), |acc, unit| {
-        (
-            acc.0 + unit.pos.0 * inv_count,
-            acc.1 + unit.pos.1 * inv_count,
-        )
-    });
-    let dx = goal.0 - centroid.0;
-    let dy = goal.1 - centroid.1;
-    let move_distance = (dx * dx + dy * dy).sqrt();
-    let formation_scale = formation_scale_for_distance(move_distance);
-    let max = map.world_size_px() - 1.0;
+    let desired_points = compact_formation_points(map, units, goal);
     let mut out = Vec::with_capacity(units.len());
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
-    for unit in units {
-        let offset = clamp_offset(
-            unit.pos.0 - centroid.0,
-            unit.pos.1 - centroid.1,
-            FORMATION_MAX_OFFSET_PX,
-        );
-        let desired = (
-            (goal.0 + offset.0 * formation_scale).clamp(0.0, max),
-            (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
-        );
+    for (unit, desired) in units.iter().zip(desired_points) {
         let anchor = map.tile_of(desired.0, desired.1);
         let context = inputs.with_assigned(&assigned);
-        if let Some(formation_goal) = assign_formation_goal(
-            &context,
-            unit,
-            anchor,
-            desired,
-            goal,
-            &mut is_goal_reachable,
-        ) {
-            assigned.push(FormationAssignment {
-                kind: unit.kind,
-                tile: formation_goal.tile,
-                trench_id: formation_goal.trench_id,
-            });
-            out.push(formation_goal.point);
-        } else {
-            out.push(unit.pos);
-        }
-    }
-
-    out
-}
-
-fn spread_goals_with_known_trenches<F>(
-    inputs: FormationInputContext<'_>,
-    units: &[FormationUnit],
-    anchor: (u32, u32),
-    desired: (f32, f32),
-    is_goal_reachable: &mut F,
-) -> Vec<(f32, f32)>
-where
-    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
-{
-    let mut out = Vec::with_capacity(units.len());
-    let mut assigned: Vec<FormationAssignment> = Vec::new();
-
-    for unit in units {
-        let context = inputs.with_assigned(&assigned);
         if let Some(formation_goal) =
-            assign_formation_goal(&context, unit, anchor, desired, desired, is_goal_reachable)
+            assign_formation_goal(&context, unit, anchor, desired, &mut is_goal_reachable)
         {
             assigned.push(FormationAssignment {
                 kind: unit.kind,
@@ -247,12 +176,96 @@ where
     out
 }
 
+/// Build one compact translated layout. Units retain their original top-to-bottom and left-to-right
+/// relationships, but not their original world-space separation. Infantry occupies adjacent tiles;
+/// a selection containing a vehicle uses a two-tile pitch so every vehicle keeps one open tile.
+fn compact_formation_points(
+    map: &Map,
+    units: &[FormationUnit],
+    center: (f32, f32),
+) -> Vec<(f32, f32)> {
+    if units.len() <= 1 {
+        return units.iter().map(|_| center).collect();
+    }
+
+    let (min_x, max_x, min_y, max_y) = units.iter().fold(
+        (
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ),
+        |(min_x, max_x, min_y, max_y), unit| {
+            (
+                min_x.min(unit.pos.0),
+                max_x.max(unit.pos.0),
+                min_y.min(unit.pos.1),
+                max_y.max(unit.pos.1),
+            )
+        },
+    );
+    let width = max_x - min_x;
+    let height = max_y - min_y;
+    let columns = if height <= f32::EPSILON {
+        units.len()
+    } else if width <= f32::EPSILON {
+        1
+    } else {
+        ((units.len() as f32 * width / height).sqrt().round() as usize).clamp(1, units.len())
+    };
+    let rows = units.len().div_ceil(columns);
+    let pitch_tiles = if units
+        .iter()
+        .any(|unit| uses_oriented_vehicle_body(unit.kind))
+    {
+        VEHICLE_BODY_FORMATION_GAP_TILES + 1
+    } else {
+        1
+    };
+    let max_row_size = columns.min(units.len()) as u32;
+    let width_tiles = max_row_size.saturating_sub(1) * pitch_tiles;
+    let height_tiles = (rows as u32).saturating_sub(1) * pitch_tiles;
+    let center_tile = map.tile_of(center.0, center.1);
+    let start_x = centered_tile_start(center_tile.0, width_tiles, map.size);
+    let start_y = centered_tile_start(center_tile.1, height_tiles, map.size);
+
+    let mut ordered = (0..units.len()).collect::<Vec<_>>();
+    ordered.sort_by(|&a, &b| {
+        units[a]
+            .pos
+            .1
+            .total_cmp(&units[b].pos.1)
+            .then_with(|| units[a].pos.0.total_cmp(&units[b].pos.0))
+            .then_with(|| units[a].id.cmp(&units[b].id))
+    });
+
+    let mut points = vec![center; units.len()];
+    for (rank, unit_index) in ordered.into_iter().enumerate() {
+        let row = rank / columns;
+        let column = rank % columns;
+        let row_size = (units.len() - row * columns).min(columns) as u32;
+        let row_width = row_size.saturating_sub(1) * pitch_tiles;
+        let row_start_x = start_x + (width_tiles - row_width) / 2;
+        let tile = (
+            row_start_x + column as u32 * pitch_tiles,
+            start_y + row as u32 * pitch_tiles,
+        );
+        points[unit_index] = map.tile_center(tile.0, tile.1);
+    }
+    points
+}
+
+fn centered_tile_start(center: u32, span: u32, map_size: u32) -> u32 {
+    center
+        .saturating_sub(span.div_ceil(2))
+        .min(map_size.saturating_sub(span.saturating_add(1)))
+}
+
 fn assign_formation_goal<F>(
     context: &FormationGoalContext<'_, '_>,
     unit: &FormationUnit,
     anchor: (u32, u32),
     desired: (f32, f32),
-    formation_center: (f32, f32),
     is_goal_reachable: &mut F,
 ) -> Option<FormationGoal>
 where
@@ -267,7 +280,6 @@ where
         unit,
         anchor,
         context.assigned,
-        formation_center,
         is_goal_reachable,
     )
     .map(|tile| FormationGoal {
@@ -366,22 +378,6 @@ fn point_distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     dx * dx + dy * dy
-}
-
-fn formation_scale_for_distance(distance: f32) -> f32 {
-    let t = ((distance - FORMATION_NEAR_DISTANCE_PX)
-        / (FORMATION_FAR_DISTANCE_PX - FORMATION_NEAR_DISTANCE_PX))
-        .clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
-fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
-    let len = (dx * dx + dy * dy).sqrt();
-    if len <= max_len || len <= f32::EPSILON {
-        return (dx, dy);
-    }
-    let scale = max_len / len;
-    (dx * scale, dy * scale)
 }
 
 pub(super) fn is_free_goal(

@@ -1285,6 +1285,14 @@ and is never serialized. Pump Jack standability
 permits a Pump Jack to coexist with its oil node, and simulation invariant checks use that same
 Pump Jack policy.
 
+Point move and attack-move commands translate selections into one compact destination layout
+regardless of command distance. The layout keeps the selection's original top-to-bottom and
+left-to-right ordering but does not preserve its original world-space separation. Infantry-like
+selections use adjacent destination tiles. A selection containing an oriented vehicle body uses a
+two-tile pitch, leaving one open tile between destination slots so mixed selections also keep clear
+of vehicle bodies. Blocked-slot fallback keeps this vehicle spacing strict. Player-drawn formation
+lines remain an explicitly authored layout with their separate line-and-rank assignment policy.
+
 Eligible infantry move and attack-move formation slots bias toward nearby known, unoccupied trench
 terrain within a two-tile footprint band around the normal formation goal. A trench occupant counts
 as occupied only when visible to the issuing player through the fog and smoke projection used for
