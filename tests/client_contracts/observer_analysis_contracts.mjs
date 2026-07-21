@@ -218,6 +218,7 @@ import { textWithin } from "./dom_text.mjs";
       globalThis.window.innerWidth = 390;
       globalThis.window.innerHeight = 844;
       globalThis.window.matchMedia = () => ({ matches: true });
+      draggablePrefs.position = { left: 300, top: 120 };
       dragHandle.listeners.pointerdown?.({
         button: 0,
         isPrimary: true,
@@ -240,8 +241,30 @@ import { textWithin } from "./dom_text.mjs";
         "observer analysis supports viewport-constrained touch dragging on mobile",
       );
       assert(
-        draggablePrefs.position === null,
+        draggablePrefs.position?.left === 300 && draggablePrefs.position?.top === 120,
         "observer analysis does not overwrite its saved desktop position from a mobile drag",
+      );
+      windowListeners.resize?.();
+      assert(
+        overlayRoot.style.left === "42px" && overlayRoot.style.top === "108px",
+        "observer analysis retains its session-local mobile position through a mobile resize",
+      );
+      globalThis.window.innerWidth = 1000;
+      globalThis.window.innerHeight = 800;
+      globalThis.window.matchMedia = () => ({ matches: false });
+      windowListeners.resize?.();
+      assert(
+        overlayRoot.style.left === "300px" && overlayRoot.style.top === "120px" &&
+          draggablePrefs.position?.left === 300 && draggablePrefs.position?.top === 120,
+        "observer analysis restores its saved desktop position after leaving the mobile layout",
+      );
+      globalThis.window.innerWidth = 390;
+      globalThis.window.innerHeight = 844;
+      globalThis.window.matchMedia = () => ({ matches: true });
+      windowListeners.resize?.();
+      assert(
+        overlayRoot.style.left === "42px" && overlayRoot.style.top === "108px",
+        "observer analysis restores its session-local mobile position after returning to mobile",
       );
       overlay.destroy();
       assert(!windowListeners.resize, "observer analysis teardown removes its viewport listener");
