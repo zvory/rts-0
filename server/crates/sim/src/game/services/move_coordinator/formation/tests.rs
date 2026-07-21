@@ -163,6 +163,47 @@ fn scattered_infantry_compacts_without_reversing_left_to_right_order() {
 }
 
 #[test]
+fn slightly_staggered_infantry_keeps_left_to_right_order() {
+    let map = flat_map(80);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let units = vec![
+        formation_unit(1, &map, (45, 19)),
+        formation_unit(2, &map, (5, 20)),
+    ];
+    let click = map.tile_center(60, 50);
+
+    let goals = formation_goals(&map, &occ, &units, click);
+    let right_goal = map.tile_of(goals[0].0, goals[0].1);
+    let left_goal = map.tile_of(goals[1].0, goals[1].1);
+
+    assert_eq!(right_goal.0, left_goal.0 + 1);
+    assert_eq!(right_goal.1, left_goal.1);
+}
+
+#[test]
+fn partial_compact_row_stays_on_its_original_side() {
+    let map = flat_map(80);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let units = vec![
+        formation_unit(1, &map, (10, 10)),
+        formation_unit(2, &map, (20, 20)),
+        formation_unit(3, &map, (30, 30)),
+    ];
+    let click = map.tile_center(60, 50);
+
+    let goals = formation_goals(&map, &occ, &units, click);
+    let top = map.tile_of(goals[0].0, goals[0].1);
+    let middle = map.tile_of(goals[1].0, goals[1].1);
+    let bottom = map.tile_of(goals[2].0, goals[2].1);
+
+    assert!(top.0 < middle.0);
+    assert_eq!(middle.0, bottom.0);
+    assert!(top.1 < bottom.1);
+}
+
+#[test]
 fn vehicle_column_keeps_one_open_tile_and_original_vertical_order() {
     let map = flat_map(80);
     let entities = EntityStore::new();
@@ -322,6 +363,33 @@ fn vehicle_body_goal_spacing_applies_to_mixed_units_but_not_dense_infantry() {
     assert!(!is_free_goal(&map, &occ, &tank, adjacent, &infantry, true));
     assert!(!is_free_goal(&map, &occ, &rifle, adjacent, &vehicle, true));
     assert!(is_free_goal(&map, &occ, &tank, adjacent, &infantry, false));
+}
+
+#[test]
+fn trench_preference_does_not_violate_vehicle_goal_spacing() {
+    let map = flat_map(40);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let units = vec![
+        formation_unit_kind(1, EntityKind::Tank, &map, (10, 20)),
+        formation_unit_kind(2, EntityKind::Rifleman, &map, (12, 20)),
+    ];
+    let click = map.tile_center(20, 20);
+    let trench = trench_at(1, &map, (20, 20));
+
+    let goals = formation_goals_with_known_trenches(
+        &map,
+        &occ,
+        &units,
+        click,
+        &[trench],
+        &std::collections::BTreeSet::new(),
+    );
+    let tank_goal = map.tile_of(goals[0].0, goals[0].1);
+    let rifle_goal = map.tile_of(goals[1].0, goals[1].1);
+
+    assert_ne!(goals[1], (trench.x, trench.y));
+    assert!(tile_chebyshev_distance(tank_goal, rifle_goal) > VEHICLE_BODY_FORMATION_GAP_TILES);
 }
 
 #[test]

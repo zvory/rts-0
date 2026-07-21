@@ -1216,7 +1216,11 @@ Automatic acquisition considers only legal enemy candidates inside the attacker'
 
 Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a City Centre requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 20-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
-Group move formation assignment checks cached reachability components before issuing per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. When a preserved offset is locally passable but unreachable, the affected unit searches inward toward the formation center for a reachable replacement; if no useful route exists, its old goal is preserved so normal path processing can report `PathFailed`.
+Group move formation assignment checks cached reachability components before issuing per-unit goals,
+avoiding command-time A* probes outside the move coordinator pathing budget. A blocked or unreachable
+compact slot is smudged independently to a nearby standable tile; the planner does not translate the
+whole formation around an obstacle. If no reachable local alternative exists, it may preserve a free
+local goal so normal path processing can report `PathFailed`.
 
 `FormationMove` accepts a bounded, sanitized world-space polyline and assigns deterministic slots
 by arc length. A stroke with enough length uses a single rank across the complete stroke; a shorter
@@ -1286,8 +1290,9 @@ permits a Pump Jack to coexist with its oil node, and simulation invariant check
 Pump Jack policy.
 
 Point move and attack-move commands translate selections into one compact destination layout
-regardless of command distance. The layout keeps the selection's original top-to-bottom and
-left-to-right ordering but does not preserve its original world-space separation. Infantry-like
+regardless of command distance. The layout groups units into broad rows from top to bottom, then
+keeps left-to-right ordering within each row; small vertical jitter therefore does not swap nearby
+units' horizontal destinations. It does not preserve original world-space separation. Infantry-like
 selections use adjacent destination tiles. A selection containing an oriented vehicle body uses a
 two-tile pitch, leaving one open tile between destination slots so mixed selections also keep clear
 of vehicle bodies. Blocked-slot fallback keeps this vehicle spacing strict. Player-drawn formation
@@ -1300,7 +1305,8 @@ snapshots; selected units still free their own occupied trenches for group moves
 contributors derived from `Game::alive_players()`, matching the living-team visibility boundary used
 for snapshots; leftover units owned by defeated teammates do not reveal trench candidates. Hidden
 trenches, blocked trench points, occupied trenches outside the command, far trenches, and
-non-eligible units use ordinary formation spreading.
+non-eligible units use ordinary formation spreading. Trench preference cannot place infantry inside
+the one-tile clearance reserved around an already assigned vehicle goal.
 
 Tank weapon range is dynamic in the simulation: tanks keep their base 5-tile range while moving,
 then linearly ramp to 14 tiles after three stationary seconds. Path-driven translation or hull

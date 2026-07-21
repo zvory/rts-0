@@ -176,9 +176,9 @@ where
     out
 }
 
-/// Build one compact translated layout. Units retain their original top-to-bottom and left-to-right
-/// relationships, but not their original world-space separation. Infantry occupies adjacent tiles;
-/// a selection containing a vehicle uses a two-tile pitch so every vehicle keeps one open tile.
+/// Build one compact translated layout. Broad rows retain top-to-bottom order, and units within a
+/// row retain left-to-right order, but original world-space separation is discarded. Infantry
+/// occupies adjacent tiles; a selection containing a vehicle uses a two-tile pitch.
 fn compact_formation_points(
     map: &Map,
     units: &[FormationUnit],
@@ -240,19 +240,49 @@ fn compact_formation_points(
     });
 
     let mut points = vec![center; units.len()];
-    for (rank, unit_index) in ordered.into_iter().enumerate() {
-        let row = rank / columns;
-        let column = rank % columns;
-        let row_size = (units.len() - row * columns).min(columns) as u32;
-        let row_width = row_size.saturating_sub(1) * pitch_tiles;
-        let row_start_x = start_x + (width_tiles - row_width) / 2;
-        let tile = (
-            row_start_x + column as u32 * pitch_tiles,
-            start_y + row as u32 * pitch_tiles,
-        );
-        points[unit_index] = map.tile_center(tile.0, tile.1);
+    for (row, row_units) in ordered.chunks_mut(columns).enumerate() {
+        row_units.sort_by(|&a, &b| {
+            units[a]
+                .pos
+                .0
+                .total_cmp(&units[b].pos.0)
+                .then_with(|| units[a].pos.1.total_cmp(&units[b].pos.1))
+                .then_with(|| units[a].id.cmp(&units[b].id))
+        });
+        let row_start_x = start_x
+            + compact_row_start_column(units, row_units, min_x, width, columns) as u32
+                * pitch_tiles;
+        for (column, &unit_index) in row_units.iter().enumerate() {
+            let tile = (
+                row_start_x + column as u32 * pitch_tiles,
+                start_y + row as u32 * pitch_tiles,
+            );
+            points[unit_index] = map.tile_center(tile.0, tile.1);
+        }
     }
     points
+}
+
+fn compact_row_start_column(
+    units: &[FormationUnit],
+    row_units: &[usize],
+    min_x: f32,
+    width: f32,
+    columns: usize,
+) -> usize {
+    if row_units.len() >= columns || width <= f32::EPSILON {
+        return 0;
+    }
+    let mean_x = row_units
+        .iter()
+        .map(|&index| units[index].pos.0)
+        .sum::<f32>()
+        / row_units.len() as f32;
+    let desired_center = ((mean_x - min_x) / width) * (columns - 1) as f32;
+    let half_row = (row_units.len() - 1) as f32 * 0.5;
+    (desired_center - half_row)
+        .round()
+        .clamp(0.0, (columns - row_units.len()) as f32) as usize
 }
 
 fn centered_tile_start(center: u32, span: u32, map_size: u32) -> u32 {
@@ -362,6 +392,9 @@ fn formation_goal_point_free(
     }
     let tile = map.tile_of(point.0, point.1);
     if assigned.iter().any(|assignment| assignment.tile == tile) {
+        return false;
+    }
+    if !preferred_goal_spacing_clear(unit, tile, assigned) {
         return false;
     }
     if !map.is_passable(tile.0 as i32, tile.1 as i32) {

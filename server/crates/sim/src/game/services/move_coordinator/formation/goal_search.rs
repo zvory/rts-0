@@ -1,8 +1,8 @@
 use super::{is_free_goal, preferred_gap_tiles, FormationAssignment, FormationUnit, Occupancy};
 use crate::game::map::Map;
 
-/// Keep compact vehicle spacing strict while looking for the nearest reachable fallback tile.
-/// Infantry uses the same search with no additional gap requirement.
+/// Keep compact vehicle spacing strict while looking for the nearest local fallback tile. Reachable
+/// candidates are preferred; a free fallback can still let normal path processing report failure.
 pub(super) fn find_unique_tile_near<F>(
     map: &Map,
     occ: &Occupancy,
