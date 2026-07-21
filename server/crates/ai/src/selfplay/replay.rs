@@ -575,6 +575,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::TearDownAntiTankGuns { .. }
             | WireCommand::Charge { .. }
             | WireCommand::UseAbility { .. }
+            | WireCommand::ArtilleryFire { .. }
             | WireCommand::RecastAbility { .. }
             | WireCommand::SetAutocast { .. }
             | WireCommand::Gather { .. }
@@ -732,6 +733,7 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         | rts_sim::game::command::SimCommand::SetupAntiTankGuns { units, .. }
         | rts_sim::game::command::SimCommand::TearDownAntiTankGuns { units }
         | rts_sim::game::command::SimCommand::UseAbility { units, .. }
+        | rts_sim::game::command::SimCommand::ArtilleryFire { units, .. }
         | rts_sim::game::command::SimCommand::RecastAbility { units, .. }
         | rts_sim::game::command::SimCommand::SetAutocast { units, .. }
         | rts_sim::game::command::SimCommand::Gather { units, .. }

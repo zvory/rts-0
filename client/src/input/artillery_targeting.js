@@ -1,13 +1,41 @@
 import {
+  ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_FIELD_OF_FIRE_RAD,
+  ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
 } from "../config.js";
-import { ABILITY, KIND, ORDER_STAGE, SETUP } from "../protocol.js";
+import { ABILITY, KIND, ORDER_STAGE, SETUP, UPGRADE } from "../protocol.js";
 import { DEFAULT_TILE_SIZE } from "./constants.js";
 
 export function isArtilleryFireAbility(ability) {
   return ability === ABILITY.POINT_FIRE || ability === ABILITY.BLANKET_FIRE;
+}
+
+export function artilleryMinFireRadiusTiles(upgrades = []) {
+  return Array.isArray(upgrades) && upgrades.includes(UPGRADE.BALLISTIC_TABLES)
+    ? ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES
+    : ARTILLERY_MIN_FIRE_RADIUS_TILES;
+}
+
+export function artilleryFireRadiusTiles(
+  center,
+  target,
+  tileSize = DEFAULT_TILE_SIZE,
+  minRadiusTiles = ARTILLERY_MIN_FIRE_RADIUS_TILES,
+) {
+  const ts = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : DEFAULT_TILE_SIZE;
+  const minimum = Number.isFinite(minRadiusTiles)
+    ? Math.max(ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES, minRadiusTiles)
+    : ARTILLERY_MIN_FIRE_RADIUS_TILES;
+  if (!center || !target) return minimum;
+  const radius = Math.hypot(target.x - center.x, target.y - center.y) / ts;
+  if (!Number.isFinite(radius)) return minimum;
+  return Math.max(
+    minimum,
+    Math.min(ARTILLERY_BLANKET_RADIUS_TILES, radius),
+  );
 }
 
 export function buildArtilleryTargetLocks({

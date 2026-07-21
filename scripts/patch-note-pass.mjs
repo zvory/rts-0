@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,11 +11,12 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
 const defaultSchema = path.join(scriptDir, "patch-note-pass.schema.json");
 const MAX_DIFF_CHARS = 60000;
+const MAX_CHANGE_CHARS = 230;
 
 export function parseArgs(argv) {
   const options = {
     baseRef: "origin/main", codexCommand: "codex", codexModel: "", dryRun: false,
-    headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
+    deliverDiscord: false, deliveryPaths: [], deliveryRef: "", headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -27,10 +29,13 @@ export function parseArgs(argv) {
     else if (arg === "--base") options.baseRef = value(arg);
     else if (arg === "--codex-command") options.codexCommand = value(arg);
     else if (arg === "--codex-model") options.codexModel = value(arg);
+    else if (arg === "--delivery-path") options.deliveryPaths.push(value(arg));
+    else if (arg === "--delivery-ref") options.deliveryRef = value(arg);
     else if (arg === "--head-branch") options.headBranch = value(arg);
     else if (arg === "--markdown-report-file") options.markdownReportFile = path.resolve(value(arg));
     else if (arg === "--repo") options.repoRoot = path.resolve(value(arg));
     else if (arg === "--schema") options.schemaFile = path.resolve(value(arg));
+    else if (arg === "--deliver-discord") options.deliverDiscord = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
@@ -45,6 +50,94 @@ function run(command, args, options = {}) {
 }
 
 function git(repoRoot, args) { return run("git", args, { cwd: repoRoot }); }
+
+export function renderDiscordMessage(decision) {
+  return decision.changes
+    .map((item) => item.replace(/^[-*•]\s+/, ""))
+    .map((item) => item.length > MAX_CHANGE_CHARS
+      ? `${item.slice(0, MAX_CHANGE_CHARS - 1).trimEnd()}…`
+      : item)
+    .map((item) => `• ${item}`)
+    .join("\n");
+}
+
+export function renderDiscordPayload(message) {
+  return JSON.stringify({ content: message, allowed_mentions: { parse: [] } });
+}
+
+export function parseFragmentChanges(contents) {
+  const changes = [];
+  let inChanges = false;
+  for (const line of contents.split(/\r?\n/)) {
+    if (line === "## Changes") {
+      inChanges = true;
+      continue;
+    }
+    if (inChanges && line.startsWith("## ")) break;
+    if (inChanges && line.startsWith("- ")) changes.push(line.slice(2).trim());
+  }
+  return changes;
+}
+
+export function parseEnvValue(contents, name) {
+  for (const line of contents.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match || match[1] !== name) continue;
+    const value = match[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1);
+    }
+    return value;
+  }
+  return "";
+}
+
+function gitCommonDir(repoRoot) {
+  const commonDir = git(repoRoot, ["rev-parse", "--git-common-dir"]);
+  return path.resolve(repoRoot, commonDir);
+}
+
+export function resolveDiscordWebhookUrl(repoRoot, env = process.env) {
+  const configured = env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL?.trim();
+  if (configured) return configured;
+  const primaryCheckout = path.dirname(gitCommonDir(repoRoot));
+  for (const candidate of [path.join(repoRoot, ".env"), path.join(primaryCheckout, ".env")]) {
+    if (!fs.existsSync(candidate)) continue;
+    const value = parseEnvValue(fs.readFileSync(candidate, "utf8"), "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function postDiscordMessage(webhookUrl, message) {
+  run("curl", [
+    "--connect-timeout", "10", "--max-time", "30",
+    "--fail-with-body", "--silent", "--show-error", "--output", "/dev/null",
+    "--header", "Content-Type: application/json",
+    "--data-binary", renderDiscordPayload(message),
+    "--proto", "=https", "--",
+    webhookUrl,
+  ]);
+}
+
+export function sendDiscordPatchNote({ branch, decision, env = process.env, post = postDiscordMessage, repoRoot }) {
+  const webhookUrl = resolveDiscordWebhookUrl(repoRoot, env);
+  if (!webhookUrl) return { status: "not-configured" };
+  const message = renderDiscordMessage(decision);
+  if (!message) return { status: "empty" };
+  // A new destination must receive the current note even when another webhook already did.
+  // Hashing the URL keeps the secret out of the state file.
+  const digest = crypto.createHash("sha256").update(webhookUrl).update("\0").update(message).digest("hex");
+  const stateDir = path.join(gitCommonDir(repoRoot), "rts-patch-notes-discord");
+  const statePath = path.join(stateDir, `${branchSlug(branch)}.sha256`);
+  if (fs.existsSync(statePath) && fs.readFileSync(statePath, "utf8").trim() === digest) {
+    return { status: "unchanged", message };
+  }
+  post(webhookUrl, message);
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.writeFileSync(statePath, `${digest}\n`, { mode: 0o600 });
+  return { status: "sent", message };
+}
 
 export function branchSlug(branch) {
   return branch.replace(/^zvorygin\//, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "change";
@@ -142,6 +235,23 @@ function existingFragmentPath(repoRoot, baseRef, branch, slug) {
   return existing;
 }
 
+function fragmentAtRef(repoRoot, ref, branch, slug, changedPaths) {
+  const suffix = `/${slug}.md`;
+  const treePaths = new Set(git(repoRoot, ["ls-tree", "-r", "--name-only", ref, "--", "patch-notes"])
+    .split("\n")
+    .filter(Boolean));
+  const candidates = changedPaths
+    .filter((candidate) => candidate.startsWith("patch-notes/") && candidate.endsWith(suffix) && treePaths.has(candidate))
+    .sort()
+    .reverse();
+  const matches = candidates
+    .map((fragmentPath) => ({ fragmentPath, contents: git(repoRoot, ["show", `${ref}:${fragmentPath}`]) }))
+    .filter(({ contents }) => contents.startsWith("<!-- rts-patch-note:v1 -->\n") && contents.includes(`<!-- branch: ${branch} -->`));
+  if (matches.length === 0) return null;
+  if (matches.length > 1) throw new Error(`multiple changed patch-note fragments exist for ${slug}`);
+  return { contents: matches[0].contents, path: matches[0].fragmentPath };
+}
+
 function markdownReport(decision, relativePath = "", removed = false) {
   const result = decision.decision === "write_patch_note"
     ? `Updated \`${relativePath}\`.`
@@ -160,18 +270,47 @@ function markdownReport(decision, relativePath = "", removed = false) {
 
 export function execute(options) {
   if (options.help) {
-    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--dry-run]\n");
+    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--deliver-discord --delivery-ref REF [--delivery-path PATH ...]] [--dry-run]\n");
     return null;
   }
-  const branch = git(options.repoRoot, ["branch", "--show-current"]);
-  if (!branch || (options.headBranch && branch !== options.headBranch)) throw new Error(`patch-note pass branch mismatch: current=${branch || "<detached>"} requested=${options.headBranch || branch}`);
-  if (!options.dryRun) {
+  if (options.deliveryPaths.length > 0 && !options.deliveryRef) throw new Error("--delivery-path requires --delivery-ref");
+  if (options.deliveryRef && !options.deliverDiscord) throw new Error("--delivery-ref requires --deliver-discord");
+  if (options.deliveryRef && !options.headBranch) throw new Error("--delivery-ref requires --head-branch");
+  const currentBranch = git(options.repoRoot, ["branch", "--show-current"]);
+  const branch = options.deliveryRef ? options.headBranch : currentBranch;
+  if (!branch || (!options.deliveryRef && options.headBranch && currentBranch !== options.headBranch)) {
+    throw new Error(`patch-note pass branch mismatch: current=${currentBranch || "<detached>"} requested=${options.headBranch || currentBranch}`);
+  }
+  if (!options.dryRun && !options.deliveryRef) {
     const status = git(options.repoRoot, ["status", "--porcelain=v1"]);
     if (status) throw new Error(`patch-note pass requires a clean worktree:\n${status}`);
   }
+  const slug = branchSlug(branch);
+  if (options.deliverDiscord) {
+    const referenced = options.deliveryRef
+      ? fragmentAtRef(options.repoRoot, options.deliveryRef, branch, slug, options.deliveryPaths)
+      : null;
+    const existing = options.deliveryRef ? "" : existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
+    const existingRelativePath = referenced?.path || (existing ? path.relative(options.repoRoot, existing) : "");
+    if (!referenced && !existing) {
+      process.stdout.write("patch-note-pass: no Discord changes to deliver\n");
+      return null;
+    }
+    const contents = referenced?.contents || fs.readFileSync(existing, "utf8");
+    const decision = { changes: parseFragmentChanges(contents) };
+    if (decision.changes.length === 0) throw new Error(`${existingRelativePath} has no change bullets to deliver`);
+    if (options.dryRun) {
+      process.stdout.write(`patch-note-pass: would deliver ${decision.changes.length} final change bullet(s) to Discord if configured\n`);
+      return decision;
+    }
+    const delivery = sendDiscordPatchNote({ branch, decision, repoRoot: options.repoRoot });
+    if (delivery.status === "sent") process.stdout.write("patch-note-pass: sent final changes to Discord\n");
+    else if (delivery.status === "unchanged") process.stdout.write("patch-note-pass: final Discord changes already sent\n");
+    else if (delivery.status === "not-configured") process.stdout.write("patch-note-pass: Discord webhook not configured\n");
+    return decision;
+  }
   const changedPaths = git(options.repoRoot, ["diff", "--name-only", "--no-renames", `${options.baseRef}...HEAD`]).split("\n").filter(Boolean);
   const candidates = changedPaths.filter(isGameplayCandidate);
-  const slug = branchSlug(branch);
   const existing = existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
   const existingRelativePath = existing ? path.relative(options.repoRoot, existing) : "";
   if (candidates.length === 0) {

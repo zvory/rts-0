@@ -55,6 +55,13 @@ pub enum SimCommand {
         y: Option<f32>,
         queued: bool,
     },
+    ArtilleryFire {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+        queued: bool,
+    },
     RecastAbility {
         ability: AbilityKind,
         units: Vec<u32>,
@@ -226,6 +233,19 @@ impl SimCommand {
                 Err(_) => SimCommand::Rejected {
                     reason: CommandRejection::Ability,
                 },
+            },
+            protocol::Command::ArtilleryFire {
+                units,
+                x,
+                y,
+                radius_tiles,
+                queued,
+            } => SimCommand::ArtilleryFire {
+                units,
+                x,
+                y,
+                radius_tiles,
+                queued,
             },
             protocol::Command::RecastAbility {
                 ability,
@@ -425,6 +445,19 @@ impl SimCommand {
                 units: units.clone(),
                 x: *x,
                 y: *y,
+                queued: *queued,
+            },
+            SimCommand::ArtilleryFire {
+                units,
+                x,
+                y,
+                radius_tiles,
+                queued,
+            } => protocol::Command::ArtilleryFire {
+                units: units.clone(),
+                x: *x,
+                y: *y,
+                radius_tiles: *radius_tiles,
                 queued: *queued,
             },
             SimCommand::RecastAbility {

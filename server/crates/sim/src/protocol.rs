@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn rules_upgrade_ids_match_protocol_vocabulary_and_compact_codes() {
+    fn active_rule_upgrade_ids_match_protocol_codes() {
         let rule_ids = UpgradeKind::ALL
             .iter()
             .map(|kind| kind.stable_id())
@@ -105,5 +105,11 @@ mod tests {
             );
             assert_ne!(upgrade_code(id), COMPACT_UNKNOWN_CODE);
         }
+        assert!(UpgradeKind::ALL.contains(&UpgradeKind::BallisticTables));
+        assert!(upgrades::ALL.contains(&upgrades::BALLISTIC_TABLES));
+        assert_ne!(
+            upgrade_code(upgrades::BALLISTIC_TABLES),
+            COMPACT_UNKNOWN_CODE
+        );
     }
 }

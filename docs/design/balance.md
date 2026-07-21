@@ -210,8 +210,7 @@ Core unit roles:
   lands delayed area shells that punish static positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
   gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
-  cannot shoot inside its minimum range, and spends steel on each long-range Point Fire or Blanket
-  Fire shell.
+  cannot shoot inside its minimum range, and spends steel on each long-range Fire shell.
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
@@ -346,15 +345,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`. It moves at 1.6 px/tick, slightly faster than the
   Anti-Tank Gun's 1.52 px/tick speed.
-  Blanket Fire uses `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored locked center for
-  deterministic uniform impact sampling and appears as a separate Artillery command-card ability.
-  Unupgraded artillery error scales by shot range, from `ARTILLERY_MIN_RANGE_ERROR_TILES = 3.0`
-  at minimum range to `ARTILLERY_MAX_RANGE_ERROR_TILES = 15.0` at maximum range, and does not
-  tighten over repeated fire. The interpolation span is the current 25-to-55 tile range band.
-  Artillery Fire Control restores repeated Point Fire tightening for the same deployed gun:
-  starting error is still range-scaled, then tightens to `ARTILLERY_MIN_ERROR_TILES = 3.0` over 5
-  shots. Blanket Fire does not tighten with Artillery Fire Control. Moving resets the Point Fire
-  accuracy ramp.
+  Unified Fire uses a player-selected radius clamped between
+  `ARTILLERY_MIN_FIRE_RADIUS_TILES = 6` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
+  locked center. Every shell lands at a point sampled uniformly by area inside that circle. There
+  is no separate range-based error, accuracy sequence, or repeated-shot tightening. Artillery Fire
+  Control costs 100 steel and 150 oil, takes 20 seconds, requires Heavy Guns, and reduces the
+  minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3`.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
   long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
   footprint. Impacts deal
@@ -424,12 +420,6 @@ profiles and explicit activation/autocast policy instead of being folded into de
   and takes 750 ticks (~25s). It has its own permanent R&D slot and requires Medium Guns either
   completed or earlier in that R&D Complex's queue when ordered. Research begins only after the
   earlier Medium Guns item completes. Once complete, that player can train Artillery from Gun Works.
-- **Artillery Fire Control** (R&D Complex research, protocol id `ballistic_tables`): costs 300 steel /
-  200 oil and takes 1,200 ticks (~40s). It requires Heavy Guns either completed or earlier in that
-  R&D Complex's queue when ordered, so the full Medium Guns → Heavy Guns → Artillery Fire Control
-  chain can be queued at once. Research begins only after Heavy Guns completes. Once complete,
-  that player's deployed Artillery tightens repeated point-fire shots from the
-  range-scaled starting error down to three tiles over the existing five-shot accuracy period.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
@@ -447,9 +437,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
-  artillery fire path. The `blanketFire` id is registry-backed as an Artillery-carried,
-  world-point, queueable ability with the same range band, ammunition cost, and reload cadence as
-  `pointFire`, plus a 15-tile blanket radius and command-card exposure. The legacy `charge` ability id remains
+  artillery fire path. The visible `pointFire` catalog row supplies the unified Fire button, while
+  the hidden `blanketFire` row backs the radius-bearing server order. Both retain the same range
+  band, ammunition cost, and reload cadence. The legacy `charge` ability id remains
   registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
   entry, or runtime status.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
@@ -583,7 +573,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Artillery Fire Control, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after Medium Guns, and Artillery after Heavy Guns; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |

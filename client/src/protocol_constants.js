@@ -90,6 +90,7 @@ export const CMD = Object.freeze({
   TEAR_DOWN_ANTI_TANK_GUNS: "tearDownAntiTankGuns",
   CHARGE: "charge",
   USE_ABILITY: "useAbility",
+  ARTILLERY_FIRE: "artilleryFire",
   RECAST_ABILITY: "recastAbility",
   SET_AUTOCAST: "setAutocast",
   GATHER: "gather",

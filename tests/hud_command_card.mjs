@@ -165,6 +165,7 @@ function buttonSlots(card) {
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
+  assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(card.slots[2].enabled, true);
 }
 
@@ -381,24 +382,19 @@ function buttonSlots(card) {
     selection: [artillery],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
-    commandTarget: { kind: "ability", ability: ABILITY.BLANKET_FIRE },
+    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
   const pointFireCommandId = kriegsiaCommandId("ability", ABILITY.POINT_FIRE);
-  const blanketFireCommandId = kriegsiaCommandId("ability", ABILITY.BLANKET_FIRE);
   const pointFire = artilleryCard.slots.find((slot) => slot?.commandId === pointFireCommandId);
-  const blanketFire = artilleryCard.slots.find((slot) => slot?.commandId === blanketFireCommandId);
   assert.equal(pointFire.slotIndex, 7);
   assert.equal(pointFire.hotkey, "X");
-  assert.equal(pointFire.label, "Point Fire");
-  assert.equal(blanketFire.slotIndex, 8);
-  assert.equal(blanketFire.hotkey, "C");
-  assert.equal(blanketFire.label, "Blanket Fire");
-  assert.equal(blanketFire.intent.ability, ABILITY.BLANKET_FIRE);
-  assert(!pointFire.cls.includes("active"), "Point Fire does not share Blanket Fire active state");
-  assert(blanketFire.cls.includes("active"), "Blanket Fire has its own active targeting state");
-  assert.deepEqual(duplicateCommandIdsForCard(artilleryCard), [], "artillery fire buttons keep distinct command ids");
+  assert.equal(pointFire.label, "Fire");
+  assert.equal(pointFire.intent.ability, ABILITY.POINT_FIRE);
+  assert(pointFire.cls.includes("active"), "unified Artillery Fire reflects active targeting state");
+  assert(!artilleryCard.slots.some((slot) => slot?.ability === ABILITY.BLANKET_FIRE));
+  assert.deepEqual(duplicateCommandIdsForCard(artilleryCard), [], "unified Artillery Fire keeps a unique command id");
 }
 
 {
@@ -501,7 +497,7 @@ function buttonSlots(card) {
   ], "mixed ability collisions keep their preferred slots and favor non-artillery abilities");
   assert(!combinedCard.slots.some((slot) =>
     slot?.ability === ABILITY.POINT_FIRE || slot?.ability === ABILITY.BLANKET_FIRE
-  ), "Point Fire and Blanket Fire yield their colliding slots in a full Kriegsia selection");
+  ), "unified Artillery Fire yields its colliding slot in a full Kriegsia selection");
 }
 
 {

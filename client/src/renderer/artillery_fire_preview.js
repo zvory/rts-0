@@ -13,6 +13,7 @@ import {
 } from "./shared.js";
 
 const FIELD_OF_FIRE_COLOR = 0x4aa3ff;
+const TARGET_AREA_COLOR = 0x76c9ff;
 
 export function isArtilleryFirePreview(preview) {
   return preview?.ability === ABILITY.POINT_FIRE || preview?.ability === ABILITY.BLANKET_FIRE;
@@ -48,7 +49,22 @@ export function drawArtilleryFireTargetPreview(g, preview, map) {
     ) {
       dashedLine(g, lock.rawX, lock.rawY, lock.x, lock.y, 8, 6, 1.5, 0xffd15c, 0.48);
     }
-    drawLockedArtilleryTarget(g, lock.x, lock.y, radiusPx, targetColor, preview.ability);
+    drawLockedArtilleryTarget(
+      g,
+      lock.x,
+      lock.y,
+      radiusPx,
+      targetColor,
+      preview.ability,
+      !!preview.artilleryRadiusSelection,
+    );
+    if (
+      preview.artilleryRadiusSelection &&
+      finiteNumber(preview.radiusCursorX) &&
+      finiteNumber(preview.radiusCursorY)
+    ) {
+      dashedLine(g, lock.x, lock.y, preview.radiusCursorX, preview.radiusCursorY, 7, 5, 1.5, targetColor, 0.72);
+    }
   }
   return true;
 }
@@ -61,20 +77,32 @@ function artilleryFieldOfFireProfile(tileSize) {
   };
 }
 
-function drawLockedArtilleryTarget(g, x, y, radiusPx, color, ability) {
-  const markerRadius = ability === ABILITY.BLANKET_FIRE
+function drawLockedArtilleryTarget(g, x, y, radiusPx, color, ability, selectingRadius = false) {
+  const markerRadius = selectingRadius
+    ? Math.max(18, radiusPx)
+    : ability === ABILITY.BLANKET_FIRE
     ? Math.max(18, radiusPx)
     : Math.max(18, radiusPx || 24);
-  drawDashedCircle(g, x, y, markerRadius, ability === ABILITY.BLANKET_FIRE ? 36 : 18, 2, color, 0.95);
-  gfxFill(g, color, 0.14);
-  gfxCircle(g, x, y, ability === ABILITY.BLANKET_FIRE ? 7 : Math.min(18, markerRadius));
+  if (selectingRadius || ability === ABILITY.BLANKET_FIRE) {
+    drawTargetArea(g, x, y, markerRadius);
+  }
+  const markerColor = selectingRadius || ability === ABILITY.BLANKET_FIRE ? TARGET_AREA_COLOR : color;
+  drawDashedCircle(g, x, y, markerRadius, selectingRadius || ability === ABILITY.BLANKET_FIRE ? 36 : 18, 2, markerColor, 0.95);
+  gfxFill(g, markerColor, 0.14);
+  gfxCircle(g, x, y, selectingRadius || ability === ABILITY.BLANKET_FIRE ? 7 : Math.min(18, markerRadius));
   gfxNoFill(g);
-  gfxStroke(g, 2, color, 0.85);
-  const arm = ability === ABILITY.BLANKET_FIRE ? 13 : Math.min(18, markerRadius * 0.45);
+  gfxStroke(g, 2, markerColor, 0.85);
+  const arm = selectingRadius || ability === ABILITY.BLANKET_FIRE ? 13 : Math.min(18, markerRadius * 0.45);
   gfxStrokePaths(g, [
     [[x - arm, y], [x + arm, y]],
     [[x, y - arm], [x, y + arm]],
-  ], 2, color, 0.85);
+  ], 2, markerColor, 0.85);
+}
+
+function drawTargetArea(g, x, y, radius) {
+  gfxFill(g, TARGET_AREA_COLOR, 0.14);
+  gfxCircle(g, x, y, radius);
+  gfxNoFill(g);
 }
 
 function drawDashedCircle(g, x, y, radius, segments, width, color, alpha) {

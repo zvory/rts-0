@@ -10,12 +10,30 @@ import {
   isGameplayCandidate,
   normalizeDecision,
   parseArgs as parsePatchArgs,
+  parseEnvValue,
+  parseFragmentChanges,
+  renderDiscordMessage,
+  renderDiscordPayload,
   renderFragment,
+  sendDiscordPatchNote,
 } from "../scripts/patch-note-pass.mjs";
 
+assert.doesNotMatch(
+  fs.readFileSync(new URL("../scripts/agent-pr.sh", import.meta.url), "utf8"),
+  /--deliver-discord/,
+  "agent-pr must never deliver patch notes before merge",
+);
+assert.match(
+  fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8"),
+  /--delivery-ref.*--deliver-discord/s,
+  "wait-pr owns immutable post-merge patch-note delivery",
+);
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).baseRef, "upstream/main");
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, true);
 assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small-model");
+assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
+assert.equal(parsePatchArgs(["--delivery-ref", "abc123"]).deliveryRef, "abc123");
+assert.deepEqual(parsePatchArgs(["--delivery-path", "patch-notes/note.md"]).deliveryPaths, ["patch-notes/note.md"]);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 
 assert.equal(isGameplayCandidate("server/crates/rules/src/balance/support_weapons.rs"), true);
@@ -37,6 +55,22 @@ const decision = normalizeDecision({
   reason: "The authoritative and mirrored range constants doubled.",
 });
 assert.equal(decision.playtestWatch.length, 1);
+assert.equal(
+  renderDiscordMessage(decision),
+  "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
+);
+assert.deepEqual(
+  JSON.parse(renderDiscordPayload("@everyone changed")),
+  { content: "@everyone changed", allowed_mentions: { parse: [] } },
+);
+assert.equal(
+  parseEnvValue("OTHER=value\nRTS_PATCH_NOTES_DISCORD_WEBHOOK_URL='https://example.invalid/hook'\n", "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"),
+  "https://example.invalid/hook",
+);
+assert.deepEqual(
+  parseFragmentChanges("# Note\n\n## Changes\n\n- First change.\n- Second change.\n\n## Playtest watch\n\n- Not delivered.\n"),
+  ["First change.", "Second change."],
+);
 assert.match(
   renderFragment({ branch: "zvorygin/at-gun-range", date: "2026-07-20", decision }),
   /patch-notes|Longer-ranged anti-tank guns|20 to 40 tiles|Playtest watch/s,
@@ -61,6 +95,22 @@ assert.deepEqual(
     reason: "One line reason",
   },
 );
+const maximumDiscordDecision = normalizeDecision({
+  decision: "write_patch_note",
+  title: "Bounded changes",
+  changes: Array.from({ length: 8 }, () => "x".repeat(300)),
+  playtest_watch: [],
+  reason: "Exercise the Discord content limit.",
+});
+assert.equal(maximumDiscordDecision.changes.every((item) => item.length === 300), true);
+assert(renderDiscordMessage(maximumDiscordDecision).length <= 2000, "Discord patch notes must fit one message");
+assert.equal(renderDiscordMessage(maximumDiscordDecision).includes("…"), true);
+assert.equal(
+  renderFragment({ branch: "zvorygin/bounded", date: "2026-07-20", decision: maximumDiscordDecision })
+    .includes("x".repeat(300)),
+  true,
+  "Discord limits must not truncate the canonical patch-note fragment",
+);
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });
@@ -81,6 +131,26 @@ try {
     modelEnv: "RTS_FIXTURE_MODEL",
   }]);
   assert.match(markdownSummary([{ id: "fixture", report: "Decision: no-op" }]), /Agent PR passes.*fixture.*no-op/s);
+
+  run("git", ["init", "-b", "main"], tempRoot);
+  const delivered = [];
+  const deliveryOptions = {
+    branch: "zvorygin/at-gun-range",
+    decision,
+    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/hook" },
+    post: (_url, message) => delivered.push(message),
+    repoRoot: tempRoot,
+  };
+  assert.equal(sendDiscordPatchNote(deliveryOptions).status, "sent");
+  assert.deepEqual(delivered, ["• Deployed anti-tank-gun range increased from 20 to 40 tiles."]);
+  assert.equal(sendDiscordPatchNote(deliveryOptions).status, "unchanged");
+  assert.equal(delivered.length, 1, "unchanged patch notes should not be sent twice");
+  const movedDelivery = {
+    ...deliveryOptions,
+    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/another-hook" },
+  };
+  assert.equal(sendDiscordPatchNote(movedDelivery).status, "sent");
+  assert.equal(delivered.length, 2, "a new Discord destination should receive the current patch note");
 
   fs.writeFileSync(config, JSON.stringify({ version: 2, passes: [] }));
   assert.throws(() => loadPasses(config), /version 1/);
@@ -157,6 +227,47 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   );
   assert.match(run("git", ["log", "-1", "--format=%s"], lifecycleRoot), /Remove stale gameplay patch note/);
   assert.equal(run("git", ["status", "--porcelain=v1"], lifecycleRoot), "");
+
+  fs.mkdirSync(path.dirname(staleFragment), { recursive: true });
+  fs.writeFileSync(
+    staleFragment,
+    "<!-- rts-patch-note:v1 -->\n<!-- branch: zvorygin/stale-note -->\n# Final note\n\n## Changes\n\n- Merged factual change.\n",
+  );
+  run("git", ["add", "patch-notes/2026-07-20/stale-note.md"], lifecycleRoot);
+  run("git", ["commit", "-m", "Add final patch note"], lifecycleRoot);
+  const deliveryRef = run("git", ["rev-parse", "HEAD"], lifecycleRoot);
+  run("git", ["checkout", "main"], lifecycleRoot);
+  fs.writeFileSync(path.join(lifecycleRoot, "unrelated.txt"), "delivery must not depend on the checkout\n");
+  const delivery = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--delivery-path", "patch-notes/2026-07-20/stale-note.md",
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.deepEqual(delivery.changes, ["Merged factual change."], "delivery should read the immutable merged head");
+
+  const historicalOnly = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.equal(historicalOnly, null, "delivery should not rediscover an unchanged historical fragment");
+
+  const deletedFragment = execute(parsePatchArgs([
+    "--deliver-discord",
+    "--delivery-ref", deliveryRef,
+    "--delivery-path", "patch-notes/2025-12-31/stale-note.md",
+    "--head-branch", "zvorygin/stale-note",
+    "--repo", lifecycleRoot,
+    "--dry-run",
+  ]));
+  assert.equal(deletedFragment, null, "delivery should ignore a changed fragment that is absent at the immutable head");
+  run("git", ["checkout", "zvorygin/stale-note"], lifecycleRoot);
+  fs.rmSync(path.join(lifecycleRoot, "unrelated.txt"));
 
   run("git", ["rm", "server/crates/rules/src/fixture.rs"], lifecycleRoot);
   run("git", ["commit", "-m", "Revert gameplay change"], lifecycleRoot);

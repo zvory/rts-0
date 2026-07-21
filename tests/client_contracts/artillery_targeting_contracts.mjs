@@ -5,17 +5,24 @@ import { assert, assertApprox } from "./assertions.mjs";
 import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
+  ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MIN_RANGE_TILES,
 } from "../../client/src/config.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { Input } from "../../client/src/input/index.js";
+import {
+  artilleryFireRadiusTiles,
+  artilleryMinFireRadiusTiles,
+} from "../../client/src/input/artillery_targeting.js";
 import {
   ABILITY,
   cmd,
   KIND,
   ORDER_STAGE,
   SETUP,
+  UPGRADE,
 } from "../../client/src/protocol.js";
 import {
   _drawAbilityTargetPreview,
@@ -23,6 +30,21 @@ import {
 import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
+
+{
+  const center = { x: 100, y: 100 };
+  const close = { x: 101, y: 100 };
+  assert(
+    artilleryFireRadiusTiles(center, close, 1) === ARTILLERY_MIN_FIRE_RADIUS_TILES &&
+      artilleryFireRadiusTiles(
+        center,
+        close,
+        1,
+        artilleryMinFireRadiusTiles([UPGRADE.BALLISTIC_TABLES]),
+      ) === ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
+    "Artillery Fire radius selection uses the six-tile base minimum and three-tile Fire Control minimum",
+  );
+}
 
 {
   const artilleryPreviewInput = Object.create(Input.prototype);
@@ -61,6 +83,48 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
 }
 
 {
+  const commands = [];
+  const artillery = {
+    id: 49,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const input = Object.create(Input.prototype);
+  input.mouse = { x: 900, y: 100 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    selectedEntities: () => [artillery],
+  };
+  input.clientIntent = new ClientIntent();
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._selectedOwnUnitIds = () => [artillery.id];
+  input._addCommandFeedback = () => {};
+
+  input._quickCastCommandTarget({ shiftKey: false });
+  assert(
+    commands.length === 0 &&
+      input.clientIntent.artilleryFireCenter?.x === 900 &&
+      input.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
+    "quick-cast keeps unified Artillery Fire armed after selecting its center",
+  );
+  input.mouse = { x: 900 + 6 * 32, y: 100 };
+  input._quickCastCommandTarget({ shiftKey: false });
+  assert(
+    commands[0]?.c === "artilleryFire" &&
+      commands[0].radiusTiles === 6 &&
+      input.clientIntent.commandTarget === null,
+    "quick-cast issues Artillery Fire only after selecting its radius",
+  );
+}
+
+{
   const artilleryCommands = [];
   const artilleryFeedback = [];
   const selectedArtillery = {
@@ -91,21 +155,29 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8,
     y: selectedArtillery.y,
   };
-  pointFireInput._issueTargetedCommand(closeRawPoint, { shiftKey: true });
+  const firstClickResult = pointFireInput._issueTargetedCommand(closeRawPoint, { shiftKey: true });
   assert(
-    artilleryCommands[0]?.c === "useAbility" &&
-      artilleryCommands[0].ability === ABILITY.POINT_FIRE &&
+    firstClickResult === false &&
+      artilleryCommands.length === 0 &&
+      pointFireInput.clientIntent.artilleryFireCenter?.x === closeRawPoint.x,
+    "Artillery Fire first click stores the raw center without issuing a command",
+  );
+  const radiusPoint = { x: closeRawPoint.x + 6 * 32, y: closeRawPoint.y };
+  pointFireInput._issueTargetedCommand(radiusPoint, { shiftKey: true });
+  assert(
+    artilleryCommands[0]?.c === "artilleryFire" &&
       artilleryCommands[0].units[0] === selectedArtillery.id &&
       artilleryCommands[0].x === closeRawPoint.x &&
+      artilleryCommands[0].radiusTiles === 6 &&
       artilleryCommands[0].queued === true,
-    "Point Fire targeting sends the raw click in the dedicated ability command",
+    "Artillery Fire second click sends the raw center and selected radius",
   );
   assert(
     artilleryFeedback[0]?.kind === "artillery" &&
-      artilleryFeedback[0].radiusTiles === ABILITIES[ABILITY.POINT_FIRE].radiusTiles &&
+      artilleryFeedback[0].radiusTiles === 6 &&
       artilleryFeedback[0].x === selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 &&
       artilleryFeedback[0].y === selectedArtillery.y,
-    "Point Fire targeting shows command feedback at the locked effective point with splash radius",
+    "Artillery Fire targeting shows the selected circle at the locked effective center",
   );
 
   pointFireInput.clientIntent.endCommandTarget();
@@ -143,17 +215,22 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     y: futureOrigin.y,
   };
   pointFireInput._issueTargetedCommand(queuedRawPoint, { shiftKey: true });
+  pointFireInput._issueTargetedCommand(
+    { x: queuedRawPoint.x + 4 * 32, y: queuedRawPoint.y },
+    { shiftKey: true },
+  );
   assert(
-    artilleryCommands[2]?.ability === ABILITY.POINT_FIRE &&
+    artilleryCommands[2]?.c === "artilleryFire" &&
       artilleryCommands[2].x === queuedRawPoint.x &&
+      artilleryCommands[2].radiusTiles === 6 &&
       artilleryCommands[2].queued === true,
-    "Queued Point Fire targeting still sends the raw click to the server",
+    "Queued Artillery Fire sends its raw center and selected radius to the server",
   );
   assertApprox(
     artilleryFeedback[2]?.x,
     futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32,
     0.001,
-    "Queued Point Fire feedback locks from the projected movement endpoint",
+    "Queued Artillery Fire feedback locks from the projected movement endpoint",
   );
 
   pointFireInput.clientIntent.endCommandTarget();
@@ -244,7 +321,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     "Queued Point Fire preview uses the frozen setup facing for zero-length target rays",
   );
   pointFireInput.clientIntent.recordPlannedCommand(
-    cmd.pointFire([locallyPlannedArtillery.id], localMove.x, localMove.y, true),
+    cmd.blanketFire([locallyPlannedArtillery.id], localMove.x, localMove.y, 6, true),
     [locallyPlannedArtillery],
     { sent: true, clientSeq: 92 },
   );
@@ -255,9 +332,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
   const localPlanAfterTerminal = pointFireInput.clientIntent.plannedOrderPlanForEntity(locallyPlannedArtillery);
   assert(
-    localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.POINT_FIRE) &&
+    localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.BLANKET_FIRE) &&
       !localPlanAfterTerminal.some((stage) => stage.kind === ORDER_STAGE.MOVE && stage.x === localMove.x + 64),
-    "Client planned order stages do not append behind terminal queued Point Fire",
+    "Client planned order stages do not append behind terminal queued Artillery Fire",
   );
   const rejectedSetupArtillery = { ...locallyPlannedArtillery, id: 47 };
   pointFireInput.clientIntent.recordPlannedCommand(
@@ -271,7 +348,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     { sent: true, clientSeq: 101 },
   );
   pointFireInput.clientIntent.recordPlannedCommand(
-    cmd.pointFire([rejectedSetupArtillery.id], localMove.x, localMove.y, true),
+    cmd.blanketFire([rejectedSetupArtillery.id], localMove.x, localMove.y, 6, true),
     [rejectedSetupArtillery],
     { sent: true, clientSeq: 102 },
   );
@@ -463,5 +540,78 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
             ARTILLERY_BLANKET_RADIUS_TILES * 32 &&
         call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY),
     "Blanket Fire preview draws the 15-tile blanket radius around the locked center",
+  );
+}
+
+{
+  const commands = [];
+  const artillery = {
+    id: 81,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const input = Object.create(Input.prototype);
+  input.pointerLocked = false;
+  input._panDrag = null;
+  input._formationGesture = null;
+  input._placementDrag = null;
+  input.state = {
+    playerId: 1,
+    upgrades: [],
+    map: { tileSize: 32 },
+    selectedEntities: () => [artillery],
+  };
+  input.clientIntent = new ClientIntent();
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input.commandInteraction = { issueCommand: (command) => commands.push(command) };
+  input._groundAtScreen = (x, y) => ({ x, y });
+  input._selectedOwnUnitIds = () => [artillery.id];
+  input._addCommandFeedback = () => {};
+  input._routeLockedPointerMove = () => false;
+  input._routeLockedPointerUp = () => false;
+  input._finishTankTrapPlacementDrag = () => false;
+  input._eventScreenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
+  input._trackMouse = () => {};
+
+  input._onLeftDown({ x: 900, y: 100 }, { shiftKey: false });
+  assert(
+    commands.length === 0 && input._artilleryFireGesture && input.clientIntent.artilleryFireCenter?.x === 900,
+    "holding the first Artillery Fire press stores its center without firing",
+  );
+  input._shiftKeysDown = new Set();
+  input.cameraNavigation = { release() {} };
+  input._drag = null;
+  input._handleBlur();
+  assert(
+    input._artilleryFireGesture === null &&
+      input.clientIntent.artilleryFireCenter === null &&
+      input.clientIntent.commandTarget === null,
+    "window blur cancels an interrupted battlefield Artillery Fire drag",
+  );
+  input.cameraNavigation = null;
+
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  input._onLeftDown({ x: 900, y: 100 }, { shiftKey: false });
+  input._handlePointerMoveAt(
+    { preventDefault() {} },
+    { x: 900 + 8 * 32, y: 100 },
+  );
+  input._handleMouseUp({
+    button: 0,
+    clientX: 900 + 8 * 32,
+    clientY: 100,
+    shiftKey: false,
+    preventDefault() {},
+  });
+  assert(
+    commands[0]?.c === "artilleryFire" &&
+      commands[0].x === 900 &&
+      commands[0].radiusTiles === 8 &&
+      input.clientIntent.commandTarget === null,
+    "dragging the first Artillery Fire press fires with the chosen radius on release",
   );
 }

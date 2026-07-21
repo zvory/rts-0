@@ -49,7 +49,10 @@ pub enum Order {
     /// Artillery repeats point fire at a fixed world position until interrupted.
     ArtilleryPointFire(ArtilleryPointFireOrder),
     /// Artillery repeats blanket fire around a fixed world center until interrupted.
-    ArtilleryBlanketFire(ArtilleryPointFireOrder),
+    ArtilleryBlanketFire {
+        order: ArtilleryPointFireOrder,
+        radius_tiles: f32,
+    },
 }
 
 impl Order {
@@ -85,8 +88,11 @@ impl Order {
         Order::ArtilleryPointFire(ArtilleryPointFireOrder::new(x, y))
     }
 
-    pub fn artillery_blanket_fire(x: f32, y: f32) -> Self {
-        Order::ArtilleryBlanketFire(ArtilleryPointFireOrder::new(x, y))
+    pub fn artillery_blanket_fire(x: f32, y: f32, radius_tiles: f32) -> Self {
+        Order::ArtilleryBlanketFire {
+            order: ArtilleryPointFireOrder::new(x, y),
+            radius_tiles,
+        }
     }
 
     pub fn attack_target(&self) -> Option<u32> {
@@ -157,7 +163,10 @@ pub enum OrderIntent {
     SelfAbility(SelfAbilityIntent),
     SetupAntiTankGuns(PointIntent),
     PointFire(PointIntent),
-    BlanketFire(PointIntent),
+    BlanketFire {
+        point: PointIntent,
+        radius_tiles: f32,
+    },
 }
 
 impl OrderIntent {
@@ -209,8 +218,11 @@ impl OrderIntent {
         OrderIntent::PointFire(PointIntent { x, y })
     }
 
-    pub(in crate::game) fn blanket_fire(x: f32, y: f32) -> Self {
-        OrderIntent::BlanketFire(PointIntent { x, y })
+    pub(in crate::game) fn blanket_fire(x: f32, y: f32, radius_tiles: f32) -> Self {
+        OrderIntent::BlanketFire {
+            point: PointIntent { x, y },
+            radius_tiles,
+        }
     }
 }
 

@@ -1173,7 +1173,7 @@ active preview surface: while the minimap is hovered it
 suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
 hiding minimap-authored setup cones or issued-command feedback. HUD command-target arming preserves
 Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
-current and queued origins as Shift changes. Armed Point Fire and Blanket Fire previews
+current and queued origins as Shift changes. Armed Artillery Fire previews
 compute advisory per-artillery locked effective points from the current gun origin, the authoritative
 or local pending planned origin, the 25-to-55 tile range band, the current or planned setup facing
 fallback, and same-ray map clamping when map bounds are available; command feedback marks those
@@ -1542,8 +1542,8 @@ enqueue. A repeated unit already inserted in the FIFO stays ahead of later manua
 Cancel clears the affected producer's repeat state. Standing repeat controls never create unpaid
 queue entries; their swirl remains a policy indicator until a fully funded item is admitted.
 Research buttons that unlock production appear directly
-below the production button they unlock and disappear once complete. Medium Guns, Heavy Guns, and
-Artillery Fire Control have separate stable R&D slots. A dependent button unlocks for queueing when
+below the production button they unlock and disappear once complete. Medium Guns and Heavy Guns
+have separate stable R&D slots. A dependent button unlocks for queueing when
 its prerequisite is complete or already present earlier in the selected building's authoritative
 `prodUpgradeQueue`. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. Selecting an owned building
@@ -1560,15 +1560,14 @@ armed, the ground overlay draws an advisory line from the launching Command Car 
 dotted ring around the car for the plane's maximum 20-second travel distance; targets outside that
 ring remain valid and produce sorties that expire before arrival.
 Unit abilities remain on their declared grid slots in mixed selections rather than spilling into an
-unrelated empty hotkey. When abilities collide, Point Fire and Blanket Fire have the lowest command-
-card priority: Mortar Fire replaces Point Fire on `X`, and Scout Plane replaces Blanket Fire on `C`.
+unrelated empty hotkey. When abilities collide, Artillery Fire has the lowest command-card
+priority: Mortar Fire replaces it on `X`.
 The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns, Mortar Teams,
 or Artillery are present and that slot is available. Mortar-only setup issues in place directly
 from the button or hotkey; holding Shift appends a terminal setup after existing queued movement.
 Selections containing Anti-Tank Guns or Artillery retain the directional world-point target step.
 A deployed selected Mortar Team draws its
-5-to-17-tile full-circle range band. Artillery-only selections still expose Point Fire, Blanket Fire,
-and Set Up together because those commands do not collide in that context.
+5-to-17-tile full-circle range band. Artillery-only selections expose Fire and Set Up together.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.
@@ -1750,7 +1749,7 @@ use real time and are hidden or out of scope for the clean Pixi viewport artifac
 fixed capture of them must extend the injected seam explicitly rather than changing their clocks
 as a side effect.
 
-### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire, Blanket Fire, Scout Plane)
+### 4.1a Targeted ability mode (Smoke, Mortar Fire, Artillery Fire, Scout Plane)
 
 `input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
 abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ kind: "ability", ability })`,
@@ -1761,10 +1760,13 @@ the input module enters targeted cursor mode:
   origin projected from queued movement and setup stages, update `ClientIntent.abilityTargetPreview`
   for renderer feedback. The Smoke preview radius uses the active command owner's completed
   upgrades, including during Lab control, so Smoke Plus previews the server-created 4-tile cloud.
-- Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
-  coords, and the `queued` flag (from Shift). Artillery Point Fire and Blanket Fire still send the
-  raw clicked world coords; the server owns effective target locking. The local feedback marker uses
-  the client-computed locked point when available. Clear cursor mode unless the resolved
+- Left-click normally builds a `useAbility` command with the ability name, filtered carrier ids,
+  world coords, and the `queued` flag (from Shift). Artillery Fire accepts either click-click or
+  press-drag-release: the initial press/click fixes the raw center, pointer distance selects a
+  radius from 6 to 15 tiles (3 to 15 after Artillery Fire Control), and the second click or drag
+  release sends `artilleryFire`. The battlefield and minimap use the same gesture semantics. The
+  server owns center locking and radius clamping. The local
+  feedback marker uses the client-computed locked point when available. Clear cursor mode unless the resolved
   command-card hotkey is still held for repeated world-point targeting.
 - Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
   armed until the first unqueued world click. That click issues the ability and clears targeting
@@ -1789,7 +1791,7 @@ does not arm manual targeting.
 
 `client_intent.js` holds `commandTarget` (null or `{ kind, ability }`), ability previews, and a
 small local planned-stage map keyed by unit id. The local map stores only pending move, attack-move,
-setup, Point Fire, and Blanket Fire stages needed for queued preview origins; it is not serialized
+setup, and Artillery Fire stages needed for queued preview origins; it is not serialized
 and never replaces server `orderPlan`. `abilityTargetPreview` is null or `{ ability, mouseX, mouseY,
 carriers, rangeOrigins, pathOrigins, returnMarkers, hoverInRange, artilleryLocks? }`.
 `artilleryLocks` is advisory client data for selected Artillery only: per-gun origin, locked
@@ -1810,9 +1812,11 @@ Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
   Command Car-to-cursor Scout Plane route and can add server-projected origins such as Magic Anchors
   for multi-origin line-shot previews.
 - `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
-- Point Fire and Blanket Fire draw the current artillery cone when the locked point is inside a
-  deployed gun's cone, otherwise they draw the future setup/redeploy cone toward the locked point.
-  Blanket Fire also draws the 15-tile blanket radius around each locked center.
+- Artillery Fire draws the current artillery cone when the locked point is inside a deployed gun's
+  cone, otherwise it draws the future setup/redeploy cone toward the locked point. After the first
+  click it draws a flat translucent light-blue target area, a dashed boundary, and a center-to-pointer
+  guide. The circle begins at six tiles, or three after Artillery Fire Control, and grows only when
+  the pointer moves farther than that minimum from the center, up to 15 tiles.
 - At the cursor position, draws the ability-specific target feedback: smoke uses a 2-tile cloud
   radius, Magic Anchor uses the configured anchor radius, and Ekat Line Shot draws projected path
   segments from every current origin. Feedback is colored green when in range of at least one

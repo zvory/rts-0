@@ -46,6 +46,8 @@ export class ClientIntent {
     this.antiTankGunSetupPreview = null;
     /** @type {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
+    /** @type {null | {x:number,y:number}} */
+    this.artilleryFireCenter = null;
     /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number,replacesAuthority?:boolean}>>} */
     this._plannedOrderStagesByUnit = new Map();
   }
@@ -117,6 +119,7 @@ export class ClientIntent {
     this._clearActiveLabTool();
     this.placement = null;
     this.closeCommandCardMenu();
+    this.artilleryFireCenter = null;
     const armed = this.commandComposer.arm(kind, options);
     this.lastCommandTargetArm = armed;
     this._syncCommandTargetFromComposer();
@@ -127,6 +130,7 @@ export class ClientIntent {
   endCommandTarget() {
     this.commandComposer.cancel();
     this.lastCommandTargetArm = null;
+    this.artilleryFireCenter = null;
     this._syncCommandTargetFromComposer();
   }
 
@@ -250,6 +254,18 @@ export class ClientIntent {
    */
   updateAbilityTargetPreview(preview) {
     this.abilityTargetPreview = preview;
+  }
+
+  /** Hold the first click of the unified Artillery Fire gesture while radius is chosen. */
+  beginArtilleryFireRadiusSelection(x, y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    this.artilleryFireCenter = { x, y };
+    return this.artilleryFireCenter;
+  }
+
+  /** Cancel or complete radius selection without disarming Artillery Fire. */
+  endArtilleryFireRadiusSelection() {
+    this.artilleryFireCenter = null;
   }
 
   /**
@@ -488,6 +504,8 @@ function commandOrderStage(command, clientSeq, createdAt) {
       return finitePointStage(ORDER_STAGE.SETUP_ANTI_TANK_GUNS, command, base);
     case CMD.HOLD_POSITION:
       return command.queued ? { kind: ORDER_STAGE.HOLD_POSITION, ...base } : null;
+    case CMD.ARTILLERY_FIRE:
+      return finitePointStage(ORDER_STAGE.BLANKET_FIRE, command, base);
     case CMD.USE_ABILITY:
       if (command.ability === ABILITY.POINT_FIRE) {
         return finitePointStage(ORDER_STAGE.POINT_FIRE, command, base);

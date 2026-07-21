@@ -384,10 +384,10 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::PointFire,
-        label: "Point Fire",
-        icon: "PF",
+        label: "Fire",
+        icon: "FIR",
         hotkey: Some("X"),
-        title: "Target artillery fire",
+        title: "Click a target, then click again to set the fire radius",
         carriers: ARTILLERY_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
@@ -420,7 +420,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         tech_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
-        command_card: true,
+        command_card: false,
         protocol_code: 10,
         order_stage_code: 17,
     },
@@ -1033,7 +1033,7 @@ mod tests {
             blanket_fire.cooldown_ticks,
             balance::ARTILLERY_RELOAD_TICKS as u16
         );
-        assert!(blanket_fire.command_card);
+        assert!(!blanket_fire.command_card);
         assert_eq!(blanket_fire.protocol_code, 10);
         assert_eq!(blanket_fire.order_stage_code, 17);
 

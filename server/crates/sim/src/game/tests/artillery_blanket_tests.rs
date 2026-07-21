@@ -40,7 +40,7 @@ fn artillery_blanket_fire_queue_is_terminal() {
         .entities
         .get(artillery)
         .expect("artillery exists");
-    assert!(matches!(entity.order(), Order::ArtilleryBlanketFire(_)));
+    assert!(matches!(entity.order(), Order::ArtilleryBlanketFire { .. }));
     assert!(
         entity.queued_orders().is_empty(),
         "later queued move should not be accepted behind terminal Blanket Fire"
@@ -48,7 +48,7 @@ fn artillery_blanket_fire_queue_is_terminal() {
 }
 
 #[test]
-fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
+fn packed_artillery_fire_auto_sets_up_and_samples_inside_selected_circle() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let initial_steel = game.state.players[0].steel;
@@ -62,11 +62,11 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
 
     game.enqueue(
         1,
-        Command::UseAbility {
-            ability: ability::AbilityKind::BlanketFire,
+        Command::ArtilleryFire {
             units: vec![artillery],
-            x: Some(target.0),
-            y: Some(target.1),
+            x: target.0,
+            y: target.1,
+            radius_tiles: 6.0,
             queued: false,
         },
     );
@@ -81,10 +81,15 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
         entity.weapon_setup(),
         WeaponSetup::Packed | WeaponSetup::SettingUp { .. }
     ));
-    let Order::ArtilleryBlanketFire(order) = entity.order() else {
+    let Order::ArtilleryBlanketFire {
+        order,
+        radius_tiles,
+    } = entity.order()
+    else {
         panic!("packed blanket fire should store a Blanket Fire order");
     };
     let center = (order.intent.x, order.intent.y);
+    assert_eq!(radius_tiles, 6.0);
     assert_eq!(game.state.players[0].steel, initial_steel);
     assert!(
         events
@@ -111,12 +116,12 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
         }
     }
     let sampled = sampled_target.expect("auto-setup blanket fire should eventually fire");
-    let radius_px = config::ARTILLERY_BLANKET_RADIUS_TILES * config::TILE_SIZE as f32;
+    let max_impact_radius_px = radius_tiles * config::TILE_SIZE as f32;
     let dx = sampled.0 - center.0;
     let dy = sampled.1 - center.1;
     assert!(
-        dx * dx + dy * dy <= (radius_px + 0.5) * (radius_px + 0.5),
-        "sampled target should stay inside the blanket radius"
+        dx * dx + dy * dy <= (max_impact_radius_px + 0.5) * (max_impact_radius_px + 0.5),
+        "sampled target should stay inside the selected fire circle"
     );
     assert!(
         game.state.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL,
@@ -125,13 +130,63 @@ fn packed_artillery_blanket_fire_auto_sets_up_and_samples_inside_radius() {
 }
 
 #[test]
-fn blanket_fire_sampling_is_replay_stable_and_ignores_ballistic_tables() {
+fn artillery_fire_radius_clamp_tracks_fire_control_research() {
+    fn stored_radius(with_fire_control: bool) -> f32 {
+        let players = human_vs_ai_players();
+        let mut game = empty_flat_game(&players);
+        if with_fire_control {
+            game.state.players[0]
+                .upgrades
+                .insert(crate::game::upgrade::UpgradeKind::BallisticTables);
+        }
+        let pos = game.state.map.tile_center(10, 10);
+        let target = game.state.map.tile_center(38, 10);
+        let artillery = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        game.enqueue(
+            1,
+            Command::ArtilleryFire {
+                units: vec![artillery],
+                x: target.0,
+                y: target.1,
+                radius_tiles: 1.0,
+                queued: false,
+            },
+        );
+        game.tick();
+        match game
+            .state
+            .entities
+            .get(artillery)
+            .expect("artillery")
+            .order()
+        {
+            Order::ArtilleryBlanketFire { radius_tiles, .. } => radius_tiles,
+            other => panic!("expected stored artillery fire order, got {other:?}"),
+        }
+    }
+
+    assert_eq!(
+        stored_radius(false),
+        config::ARTILLERY_MIN_FIRE_RADIUS_TILES
+    );
+    assert_eq!(
+        stored_radius(true),
+        config::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES
+    );
+}
+
+#[test]
+fn blanket_fire_sampling_is_replay_stable_for_same_radius_after_fire_control() {
     let baseline = collect_blanket_fire_targets(false);
     let with_ballistic_tables = collect_blanket_fire_targets(true);
 
     assert_eq!(
         baseline, with_ballistic_tables,
-        "Blanket Fire sampling should not tighten or otherwise change with Ballistic Tables"
+        "Fire Control should not alter the deterministic sample for an unchanged selected radius"
     );
     assert!(
         baseline.windows(2).any(|pair| pair[0] != pair[1]),
@@ -197,10 +252,17 @@ fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queu
         .entities
         .get(second_artillery)
         .expect("second artillery should exist");
-    let Order::ArtilleryBlanketFire(first_order) = first_entity.order() else {
+    let Order::ArtilleryBlanketFire {
+        order: first_order, ..
+    } = first_entity.order()
+    else {
         panic!("first artillery should promote queued Blanket Fire");
     };
-    let Order::ArtilleryBlanketFire(second_order) = second_entity.order() else {
+    let Order::ArtilleryBlanketFire {
+        order: second_order,
+        ..
+    } = second_entity.order()
+    else {
         panic!("second artillery should promote queued Blanket Fire");
     };
 

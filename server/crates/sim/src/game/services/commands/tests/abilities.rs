@@ -91,7 +91,7 @@ fn blanket_fire_command_starts_runtime_order() {
     );
     assert_eq!(gun.attack_cd(), config::ARTILLERY_RELOAD_TICKS);
     assert!(
-        matches!(gun.order(), Order::ArtilleryBlanketFire(_)),
+        matches!(gun.order(), Order::ArtilleryBlanketFire { .. }),
         "Blanket Fire must replace the current order with its own runtime order"
     );
 }

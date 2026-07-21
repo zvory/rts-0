@@ -67,7 +67,7 @@ fn tank_can_react(tank: &Entity) -> bool {
         | Order::Deconstruct(_)
         | Order::Ability(_)
         | Order::ArtilleryPointFire(_)
-        | Order::ArtilleryBlanketFire(_) => false,
+        | Order::ArtilleryBlanketFire { .. } => false,
     }
 }
 

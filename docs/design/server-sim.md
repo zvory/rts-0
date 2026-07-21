@@ -949,9 +949,8 @@ Standing repeat production deliberately does not use unpaid entries: it continue
 ordinary queue is empty and inserts a normal paid item only after cost and supply succeed.
 Dependent research is admissible when its prerequisite is complete or already earlier in the same
 building's FIFO. Owner/team projections expose the ordered `prodUpgradeQueue`, allowing the command
-card to enable Heavy Guns behind queued Medium Guns and Artillery Fire Control behind queued Heavy
-Guns. The FIFO completion path remains the authority for when each prerequisite actually takes
-effect.
+card to enable Heavy Guns behind queued Medium Guns. The FIFO completion path remains the authority
+for when each prerequisite actually takes effect.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
@@ -1579,9 +1578,10 @@ Allocation rules:
   treat queued setup as terminal: they finish preceding orders, set up in place, and reject later
   queued stages. Mixed selections ignore non-setup-capable units for setup but keep them for later
   compatible orders.
-- Artillery Point Fire and Blanket Fire are queueable, terminal per-gun fire orders. Issue-time
-  admission stores a locked effective fire point for Point Fire or locked blanket center for
-  Blanket Fire, not the raw clicked point. Immediate fire commands can accept packed artillery and
+- Artillery Fire is a queueable, terminal per-gun fire order. Issue-time admission stores a locked
+  effective center and a radius clamped from 6 to 15 tiles, or 3 to 15 after Artillery Fire
+  Control, not merely the raw pointer gesture. Immediate
+  fire commands can accept packed artillery and
   set it up in place, or redeploy already-deployed artillery when the effective point is outside the
   current cone. Queued fire commands lock from the active or queued future move destination when
   available, use a preceding queued setup stage as the zero-length fallback facing, and promote into
@@ -1589,17 +1589,17 @@ Allocation rules:
   construction state, path state, faction ability eligibility, stored target map/range/cone
   validity, ammo, and deployment before any shell is launched.
 - Client world-view and minimap previews may temporarily combine local pending move/setup/fire
-  stages with owner-only `orderPlan` snapshots so queued Point Fire and Blanket Fire appear to aim
+  stages with owner-only `orderPlan` snapshots so queued Artillery Fire appears to aim
   from the future origin before the server echo arrives. This is preview-only: command admission,
   target locking, terminal queue behavior, stale-stage skipping, and the projected `orderPlan`
   remain server-owned. Minimap targeting sends the same world-coordinate `useAbility` command as
   viewport targeting; there is no separate minimap simulation path.
-- Point Fire samples normal artillery scatter around the stored point, with Ballistic Tables
-  tightening repeated Point Fire shots only. Blanket Fire samples each shot deterministically and
-  uniformly within `ARTILLERY_BLANKET_RADIUS_TILES` around the stored center using authoritative
-  shot inputs; sampled impacts are not re-clamped to the artillery cone or range band. Both modes
-  share ammunition cost, reload, shell delay, impact radius, damage, fog-gated impact events,
-  global firing markers, and firing-reveal behavior.
+- Artillery Fire samples each impact deterministically and uniformly by area within the selected
+  circle. There is no additional range-based error, accuracy sequence, or repeated-shot tightening;
+  every impact remains inside the selected circle. Artillery Fire Control is researched after Heavy
+  Guns and changes only the authoritative minimum selected radius from 6 tiles to 3.
+  Every shot shares the existing ammunition cost, reload, shell delay, impact radius, damage,
+  fog-gated impact events, global firing markers, and firing-reveal behavior.
 
 Examples:
 

@@ -51,6 +51,8 @@ export const ARTILLERY_SETUP_TICKS = TICK_HZ * 6;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 3;
 export const ARTILLERY_BLANKET_RADIUS_TILES = 15;
+export const ARTILLERY_MIN_FIRE_RADIUS_TILES = 6;
+export const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3;
 export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 10, oil: 0 });
 export const SMOKE_ABILITY_RANGE_TILES = 14;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
@@ -87,7 +89,7 @@ export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.25;
 export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.375;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
-export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 40;
+export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
@@ -246,11 +248,11 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.POINT_FIRE]: Object.freeze({
     ability: ABILITY.POINT_FIRE,
-    label: "Point Fire",
-    icon: "PF",
+    label: "Fire",
+    icon: "FIR",
     hotkey: "X",
     commandCardPriority: -1,
-    title: "Target artillery fire",
+    title: "Click a target, then click again to set the fire radius",
     carriers: Object.freeze([KIND.ARTILLERY]),
     targetMode: "worldPoint",
     rangeTiles: ARTILLERY_MAX_RANGE_TILES,
@@ -278,6 +280,7 @@ export const ABILITIES = Object.freeze({
     radiusTiles: ARTILLERY_BLANKET_RADIUS_TILES,
     queued: true,
     queuePolicy: "skipIfNotReady",
+    commandCard: false,
   }),
   [ABILITY.BREAKTHROUGH]: Object.freeze({
     ability: ABILITY.BREAKTHROUGH,
@@ -425,6 +428,17 @@ export const UPGRADES = Object.freeze({
     requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     requiresText: "Requires Medium Guns",
   }),
+  [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
+    upgrade: UPGRADE.BALLISTIC_TABLES,
+    label: "Artillery Fire Control",
+    icon: "AFC",
+    cost: Object.freeze({ steel: 100, oil: 150 }),
+    researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
+    description: "Reduce Artillery Fire minimum radius from 6 to 3 tiles",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+    requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
+    requiresText: "Requires Heavy Guns",
+  }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.TANK_UNLOCK,
     label: "Tank Production",
@@ -433,17 +447,6 @@ export const UPGRADES = Object.freeze({
     researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Tank training",
     researchedAt: KIND.RESEARCH_COMPLEX,
-  }),
-  [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
-    upgrade: UPGRADE.BALLISTIC_TABLES,
-    label: "Artillery Fire Control",
-    icon: "AFC",
-    cost: Object.freeze({ steel: 300, oil: 200 }),
-    researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
-    description: "Artillery fire tightens over repeated shots",
-    researchedAt: KIND.RESEARCH_COMPLEX,
-    requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
-    requiresText: "Requires Heavy Guns",
   }),
   [UPGRADE.MORTAR_AUTOCAST]: Object.freeze({
     upgrade: UPGRADE.MORTAR_AUTOCAST,

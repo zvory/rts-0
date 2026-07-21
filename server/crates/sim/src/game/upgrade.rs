@@ -136,6 +136,8 @@ mod tests {
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
         assert!(researchable_upgrades(EntityKind::ResearchComplex)
             .contains(&UpgradeKind::ArtilleryUnlock));
+        assert!(researchable_upgrades(EntityKind::ResearchComplex)
+            .contains(&UpgradeKind::BallisticTables));
     }
 
     #[test]

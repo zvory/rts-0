@@ -330,6 +330,14 @@ fn print_client_constants(indent: &str) {
         json_f32(balance::ARTILLERY_BLANKET_RADIUS_TILES)
     );
     println!(
+        "{indent}    \"artilleryMinFireRadiusTiles\": {},",
+        json_f32(balance::ARTILLERY_MIN_FIRE_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"artilleryFireControlMinFireRadiusTiles\": {},",
+        json_f32(balance::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES)
+    );
+    println!(
         "{indent}    \"artilleryAmmoCost\": {{\"steel\":{},\"oil\":0}},",
         balance::ARTILLERY_AMMO_COST_STEEL
     );
@@ -540,20 +548,20 @@ fn print_upgrades(indent: &str) {
     );
     print_upgrade(
         indent,
-        faction::BALLISTIC_TABLES_UPGRADE,
-        balance::BALLISTIC_TABLES_COST_STEEL,
-        balance::BALLISTIC_TABLES_COST_OIL,
-        balance::BALLISTIC_TABLES_RESEARCH_TICKS,
-        Some(faction::ARTILLERY_UNLOCK_UPGRADE),
-        true,
-    );
-    print_upgrade(
-        indent,
         faction::ARTILLERY_UNLOCK_UPGRADE,
         balance::ARTILLERY_UNLOCK_COST_STEEL,
         balance::ARTILLERY_UNLOCK_COST_OIL,
         balance::ARTILLERY_UNLOCK_RESEARCH_TICKS,
         Some(faction::ANTI_TANK_GUN_UNLOCK_UPGRADE),
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::BALLISTIC_TABLES_UPGRADE,
+        balance::BALLISTIC_TABLES_COST_STEEL,
+        balance::BALLISTIC_TABLES_COST_OIL,
+        balance::BALLISTIC_TABLES_RESEARCH_TICKS,
+        Some(faction::ARTILLERY_UNLOCK_UPGRADE),
         true,
     );
     print_upgrade(

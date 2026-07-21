@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const waitScript = path.join(projectRoot, "scripts", "wait-pr.sh");
 const cleanupScript = path.join(projectRoot, "scripts", "cleanup-worktrees.sh");
+const patchNoteScript = path.join(projectRoot, "scripts", "patch-note-pass.mjs");
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-wait-pr-"));
 const repo = path.join(fixtureRoot, "repo");
 const origin = path.join(fixtureRoot, "origin.git");
@@ -49,13 +50,27 @@ function createTask(branch, directory, fileName) {
   return { taskPath, headSha: git(["rev-parse", "HEAD"], { cwd: taskPath }).trim() };
 }
 
+function addPatchNote(taskPath, branch, text) {
+  const slug = branch.replace(/^zvorygin\//, "");
+  const relativePath = path.join("patch-notes", "2026-07-20", `${slug}.md`);
+  fs.mkdirSync(path.dirname(path.join(taskPath, relativePath)), { recursive: true });
+  fs.writeFileSync(
+    path.join(taskPath, relativePath),
+    `<!-- rts-patch-note:v1 -->\n<!-- branch: ${branch} -->\n# Fixture\n\n## Changes\n\n- ${text}\n`,
+  );
+  git(["add", relativePath], { cwd: taskPath });
+  git(["commit", "-m", "Add patch note"], { cwd: taskPath });
+  git(["push", "origin", branch], { cwd: taskPath });
+  return git(["rev-parse", "HEAD"], { cwd: taskPath }).trim();
+}
+
 function mergeTask(branch) {
   git(["fetch", "origin", branch], { cwd: publisher });
   git(["merge", "--no-ff", `origin/${branch}`, "-m", `Merge ${branch}`], { cwd: publisher });
   git(["push", "origin", "main"], { cwd: publisher });
 }
 
-function mergedViewJson(headSha, number) {
+function mergedViewJson(headSha, number, files = []) {
   return JSON.stringify({
     number,
     url: `https://example.invalid/pull/${number}`,
@@ -67,12 +82,13 @@ function mergedViewJson(headSha, number) {
     autoMergeRequest: null,
     mergeStateStatus: "CLEAN",
     isDraft: false,
+    files: files.map((filePath) => ({ path: filePath })),
   });
 }
 
-function waitEnvironment(headSha, number) {
+function waitEnvironment(headSha, number, files = []) {
   return {
-    RTS_WAIT_PR_VIEW_JSON: mergedViewJson(headSha, number),
+    RTS_WAIT_PR_VIEW_JSON: mergedViewJson(headSha, number, files),
     RTS_WAIT_PR_CHECKS_JSON: "[]",
     RTS_WORKTREE_ROOT: worktreeRoot,
     RTS_CARGO_TARGET_BASE_DIR: targetRoot,
@@ -83,11 +99,13 @@ fs.mkdirSync(path.join(repo, "scripts"), { recursive: true });
 fs.mkdirSync(worktreeRoot, { recursive: true });
 fs.copyFileSync(cleanupScript, path.join(repo, "scripts", "cleanup-worktrees.sh"));
 fs.chmodSync(path.join(repo, "scripts", "cleanup-worktrees.sh"), 0o755);
+fs.copyFileSync(patchNoteScript, path.join(repo, "scripts", "patch-note-pass.mjs"));
+fs.chmodSync(path.join(repo, "scripts", "patch-note-pass.mjs"), 0o755);
 git(["init", "--initial-branch=main"], { cwd: repo });
 configureIdentity(repo);
 commitFile(repo, "base.txt", "base");
 commitFile(repo, "local-note.txt", "committed local note");
-git(["add", "scripts/cleanup-worktrees.sh"]);
+git(["add", "scripts/cleanup-worktrees.sh", "scripts/patch-note-pass.mjs"]);
 git(["commit", "--amend", "--no-edit"]);
 git(["config", "branch.main.mergeOptions", "--no-ff"]);
 
@@ -100,15 +118,21 @@ configureIdentity(publisher);
 try {
   const firstBranch = "zvorygin/wait-pr-41";
   const first = createTask(firstBranch, "wait-pr-41", "first.txt");
+  first.headSha = addPatchNote(first.taskPath, firstBranch, "Merged fixture change.");
   mergeTask(firstBranch);
   fs.writeFileSync(path.join(repo, "local-note.txt"), "preserve me\n");
 
   const output = run("bash", [waitScript, "41"], {
     cwd: first.taskPath,
-    env: waitEnvironment(first.headSha, 41),
+    env: waitEnvironment(first.headSha, 41, ["first.txt", "patch-notes/2026-07-20/wait-pr-41.md"]),
   });
 
   assert.match(output, /refreshing local main checkout/);
+  assert.match(output, /Discord webhook not configured/);
+  assert.ok(
+    output.indexOf("Discord webhook not configured") < output.indexOf("refreshing local main checkout"),
+    "patch-note delivery should happen after merge verification and before cleanup",
+  );
   assert.match(output, /local main is current/);
   assert.equal(
     git(["rev-parse", "main"]).trim(),

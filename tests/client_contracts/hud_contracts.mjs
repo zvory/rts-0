@@ -997,8 +997,8 @@ withFakeHudDocument(({ FakeElement }) => {
   }));
   assert(
     buttonByAction(artilleryScoutPlaneCard, "setupAntiTankGuns")?.slotIndex === 6 &&
-      buttonByLabel(artilleryScoutPlaneCard, "Point Fire")?.slotIndex === 7 &&
-      buttonByLabel(artilleryScoutPlaneCard, "Blanket Fire")?.slotIndex === 8,
+      buttonByLabel(artilleryScoutPlaneCard, "Fire")?.slotIndex === 7 &&
+      !buttonByLabel(artilleryScoutPlaneCard, "Blanket Fire"),
     "mixed Artillery plus Scout Plane selection ignores the plane and preserves support-weapon controls",
   );
   assert(!buttonByAction(artilleryScoutPlaneCard, "dismissScoutPlane"), "mixed support-weapon plus Scout Plane selection does not expose dismiss");
@@ -1272,12 +1272,11 @@ withFakeHudDocument(({ FakeElement }) => {
     entities: [{ id: 40, owner: 1, kind: KIND.STEELWORKS }, artillery],
     resources: { steel: 0, oil: 0 },
   }));
-  const pointFire = buttonByLabel(pointFireCard, "Point Fire");
-  assert(pointFire.unaffordable, "unaffordable ability should stay clickable");
+  const pointFire = buttonByLabel(pointFireCard, "Fire");
+  assert(pointFire.unaffordable, "unaffordable Artillery Fire should stay clickable");
   assert(pointFire.onUnavailableIntent.type === "playNotEnough", "unaffordable ability should play resource notice");
-  const blanketFire = buttonByLabel(pointFireCard, "Blanket Fire");
-  assert(blanketFire.unaffordable, "Blanket Fire shares artillery ammunition affordability");
-  assert(blanketFire.intent.targetMode === "worldPoint", "Blanket Fire always arms a world-point target");
+  assert(pointFire.intent.targetMode === "worldPoint", "Artillery Fire arms a world-point target");
+  assert(!buttonByLabel(pointFireCard, "Blanket Fire"), "legacy Blanket Fire stays off the command card");
 
   const packedArtillery = {
     ...artillery,
@@ -1289,10 +1288,8 @@ withFakeHudDocument(({ FakeElement }) => {
     entities: [{ id: 40, owner: 1, kind: KIND.STEELWORKS }, packedArtillery],
     resources: { steel: 1000, oil: 1000 },
   }));
-  const packedPointFire = buttonByLabel(packedPointFireCard, "Point Fire");
-  const packedBlanketFire = buttonByLabel(packedPointFireCard, "Blanket Fire");
-  assert(packedPointFire.enabled, "packed artillery Point Fire should be enabled for auto-setup");
-  assert(packedBlanketFire.enabled, "packed artillery Blanket Fire should be enabled for auto-setup");
+  const packedPointFire = buttonByLabel(packedPointFireCard, "Fire");
+  assert(packedPointFire.enabled, "packed Artillery Fire should be enabled for auto-setup");
   const redeployingArtillery = {
     ...artillery,
     id: 33,
@@ -1304,7 +1301,7 @@ withFakeHudDocument(({ FakeElement }) => {
     entities: [{ id: 40, owner: 1, kind: KIND.STEELWORKS }, redeployingArtillery],
     resources: { steel: 1000, oil: 1000 },
   }));
-  const redeployingPointFire = buttonByLabel(redeployingPointFireCard, "Point Fire");
+  const redeployingPointFire = buttonByLabel(redeployingPointFireCard, "Fire");
   assert(
     redeployingPointFire.enabled,
     "artillery already redeploying for Point Fire should allow retargeting",
