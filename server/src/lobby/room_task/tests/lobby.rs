@@ -1,5 +1,70 @@
 use super::support::*;
 
+fn two_player_countdown_task(room: &str) -> (RoomTask, ConnectionWriter, ConnectionWriter) {
+    let mut task = summary_task(room);
+    let host_writer = {
+        let player = task.players.get_mut(&1).unwrap();
+        let (msg_tx, writer) = ConnectionSink::new();
+        player.msg_tx = msg_tx;
+        writer
+    };
+    let guest_writer = add_test_room_player(&mut task, 2, false);
+    task.assign_missing_team_for(2);
+    task.assign_missing_faction_for(2);
+    task.on_ready(1, true);
+    task.on_ready(2, true);
+    (task, host_writer, guest_writer)
+}
+
+#[test]
+fn countdown_starts_only_after_every_active_human_loaded() {
+    let (mut task, _host_writer, _guest_writer) = two_player_countdown_task("loaded-countdown");
+    task.on_start_request(1);
+    let countdown_id = task.match_countdown_id;
+
+    task.on_match_load_ready(1, countdown_id);
+    task.on_match_load_ready(2, countdown_id);
+    task.match_countdown_deadline = Some(TokioInstant::now());
+    task.on_tick(TokioInstant::now());
+
+    assert!(matches!(task.phase, Phase::InGame(_)));
+}
+
+#[test]
+fn countdown_returns_to_lobby_when_a_player_did_not_load() {
+    let (mut task, mut host_writer, _guest_writer) = two_player_countdown_task("failed-countdown");
+    task.on_start_request(1);
+    let countdown_id = task.match_countdown_id;
+
+    task.on_match_load_ready(1, countdown_id);
+    task.match_countdown_deadline = Some(TokioInstant::now());
+    task.on_tick(TokioInstant::now());
+
+    assert!(matches!(task.phase, Phase::Lobby));
+    assert!(task.match_countdown_deadline.is_none());
+    assert!(std::iter::from_fn(|| host_writer.reliable_rx.try_recv().ok()).any(|message| {
+        matches!(message, ServerMessage::Error { msg } if msg == "Player 2 failed to load the game.")
+    }));
+}
+
+#[test]
+fn stale_countdown_readiness_does_not_start_a_later_attempt() {
+    let (mut task, _host_writer, _guest_writer) = two_player_countdown_task("stale-countdown");
+    task.on_start_request(1);
+    let stale_id = task.match_countdown_id;
+    task.on_match_load_ready(1, stale_id);
+    task.on_match_load_ready(2, stale_id);
+
+    task.match_countdown_deadline = None;
+    task.start_match_countdown();
+    task.on_match_load_ready(1, stale_id);
+    task.on_match_load_ready(2, stale_id);
+    task.match_countdown_deadline = Some(TokioInstant::now());
+    task.on_tick(TokioInstant::now());
+
+    assert!(matches!(task.phase, Phase::Lobby));
+}
+
 #[test]
 fn lobby_name_update_changes_roster_and_host_summary() {
     let mut task = summary_task("rename-lobby");

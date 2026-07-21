@@ -732,7 +732,12 @@ export class Lobby {
     this.elStatus.classList.toggle("error", !!isError);
   }
 
+  isSpectator() {
+    return this._spectator;
+  }
+
   _handleServerError(message) {
+    if (this._countdownActive) this._clearCountdown();
     this.setStatus(message, true);
     if (!this._browserActionPending) return;
     this._browserActionPending = false;

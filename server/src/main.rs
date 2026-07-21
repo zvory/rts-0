@@ -30,9 +30,11 @@ mod interact_lab_artifacts;
 #[cfg(test)]
 mod main_replay_tests;
 mod map_handoffs;
+mod player_activity;
 mod stress_tests;
 mod wiki;
 
+use player_activity::is_player_activity;
 use rts_server::db::Db;
 use rts_server::lab_scenarios::{catalog_handler, MAX_LAB_SCENARIO_IMPORT_JSON_BYTES};
 use rts_server::lobby::{self, Lobby, RoomEvent};
@@ -100,40 +102,6 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 /// Automatic heartbeat and diagnostics traffic deliberately do not extend this deadline, so an
 /// abandoned lobby or match cannot keep the Fly Machine running indefinitely.
 const PLAYER_INACTIVITY_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-
-fn is_player_activity(message: &ClientMessage) -> bool {
-    match message {
-        ClientMessage::Ping { .. } | ClientMessage::NetReport { .. } => false,
-        ClientMessage::Join { .. }
-        | ClientMessage::SetName { .. }
-        | ClientMessage::Ready { .. }
-        | ClientMessage::Start
-        | ClientMessage::SetTeamPreset { .. }
-        | ClientMessage::SetTeam { .. }
-        | ClientMessage::SetFaction { .. }
-        | ClientMessage::AddAi { .. }
-        | ClientMessage::SetAiProfile { .. }
-        | ClientMessage::RemoveAi { .. }
-        | ClientMessage::SetSpectator { .. }
-        | ClientMessage::Command { .. }
-        | ClientMessage::GiveUp
-        | ClientMessage::PauseGame
-        | ClientMessage::UnpauseGame
-        | ClientMessage::ReturnToLobby
-        | ClientMessage::Activity
-        | ClientMessage::SetRoomTimeSpeed { .. }
-        | ClientMessage::StepRoomTime
-        | ClientMessage::SeekRoomTime { .. }
-        | ClientMessage::SeekRoomTimeTo { .. }
-        | ClientMessage::SetVisionSelection { .. }
-        | ClientMessage::Lab { .. }
-        | ClientMessage::RequestBranchFromTick
-        | ClientMessage::ClaimBranchSeat { .. }
-        | ClientMessage::ReleaseBranchSeat { .. }
-        | ClientMessage::StartBranch
-        | ClientMessage::SelectMap { .. } => true,
-    }
-}
 
 /// On deploy shutdown, keep the process alive long enough for in-progress matches to finish.
 /// Fly's shared-CPU `kill_timeout` caps at 300 seconds, so leave a few seconds for axum to stop
@@ -843,6 +811,9 @@ mod tests {
         assert!(!is_player_activity(&ClientMessage::NetReport {
             report: Box::default(),
         }));
+        assert!(!is_player_activity(&ClientMessage::MatchLoadReady {
+            countdown_id: 1,
+        }));
         assert!(is_player_activity(&ClientMessage::Activity));
         assert!(is_player_activity(&ClientMessage::Ready { ready: true }));
     }
@@ -1400,6 +1371,17 @@ async fn handle_client_message(
                 player_id,
                 current_room,
                 RoomEvent::Ready { player_id, ready },
+            )
+            .await;
+        }
+        ClientMessage::MatchLoadReady { countdown_id } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::MatchLoadReady {
+                    player_id,
+                    countdown_id,
+                },
             )
             .await;
         }

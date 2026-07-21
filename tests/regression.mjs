@@ -216,7 +216,11 @@ async function soloStart(room) {
     await A.waitFor((m) => m.t === "lobby" && m.players.length === 2);
     A.send({ t: "ready", ready: true }); B.send({ t: "ready", ready: true });
     await A.waitFor((m) => m.t === "lobby" && m.canStart);
-    A.send({ t: "start" }); await A.waitFor((m) => m.t === "start");
+    A.send({ t: "start" });
+    const countdown = await A.waitFor((m) => m.t === "matchCountdown");
+    A.send({ t: "matchLoadReady", countdownId: countdown.countdownId });
+    B.send({ t: "matchLoadReady", countdownId: countdown.countdownId });
+    await A.waitFor((m) => m.t === "start");
 
     // C tries to join the in-progress room -> should be rejected with an error.
     const C = new Client(); await C.open(); await C.waitFor((m) => m.t === "welcome");
@@ -252,6 +256,8 @@ async function soloStart(room) {
     for (const c of clients) c.send({ t: "ready", ready: true });
     await clients[0].waitFor((m) => m.t === "lobby" && m.canStart, 4000, "fog canStart");
     clients[0].send({ t: "start" });
+    const countdown = await clients[0].waitFor((m) => m.t === "matchCountdown", 4000, "fog countdown");
+    for (const c of clients) c.send({ t: "matchLoadReady", countdownId: countdown.countdownId });
     const starts = await Promise.all(clients.map((c) => c.waitFor((m) => m.t === "start", 8000, "fog start")));
     const snaps = await Promise.all(clients.map((c) => c.waitFor((m) => m.t === "snapshot" && m.entities.length > 0, 8000, "fog first snapshot")));
 

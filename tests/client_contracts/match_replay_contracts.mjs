@@ -146,6 +146,35 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert([...handlers.values()].every((set) => set.size === 0),
       "Match.create removes temporary startup listeners after initialization");
 
+    let preparedAttached = null;
+    let duplicateRendererCreates = 0;
+    class PreparedMatchFactoryProbe extends MatchFactoryProbe {}
+    const prepared = await Match.create.call(
+      PreparedMatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        rendererBackendBundle: {
+          async createRenderer() {
+            duplicateRendererCreates += 1;
+            return renderer;
+          },
+        },
+        rendererPreparation: {
+          renderer,
+          attach(match) { preparedAttached = match; },
+          destroy() {},
+        },
+      },
+    );
+    assert(duplicateRendererCreates === 0 && preparedAttached === prepared,
+      "Match.create adopts the countdown-warmed renderer without creating another worker");
+
     const protectedControlEvents = [];
     class SlowMatchFactoryProbe {
       constructor() {

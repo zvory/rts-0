@@ -69,6 +69,11 @@ pub enum ClientMessage {
     SetName { name: String },
     /// Toggle ready state in the lobby.
     Ready { ready: bool },
+    /// Confirm that this client's renderer finished warming for the active countdown.
+    MatchLoadReady {
+        #[serde(rename = "countdownId")]
+        countdown_id: u32,
+    },
     /// Host requests the match to begin.
     Start,
     /// Host selects a lobby team preset (lobby phase only).
@@ -721,18 +726,14 @@ pub fn serialize_messagepack_compact_snapshot(
 mod command_tests;
 
 #[cfg(test)]
+mod client_message_tests;
+
+#[cfg(test)]
 mod contract_tests;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn set_name_deserializes() {
-        let msg: ClientMessage =
-            serde_json::from_str(r#"{"t":"setName","name":"Renamed"}"#).unwrap();
-        assert!(matches!(msg, ClientMessage::SetName { name } if name == "Renamed"));
-    }
 
     #[test]
     fn client_net_report_deserializes() {
@@ -1114,61 +1115,6 @@ mod tests {
             }
             other => panic!("expected net report, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn seek_replay_to_deserializes_absolute_tick() {
-        let msg: ClientMessage = serde_json::from_str(r#"{"t":"seekRoomTimeTo","tick":4100}"#)
-            .expect("seekRoomTimeTo should deserialize");
-
-        match msg {
-            ClientMessage::SeekRoomTimeTo { tick } => assert_eq!(tick, 4_100),
-            other => panic!("expected seekRoomTimeTo, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn set_vision_selection_deserializes() {
-        let msg: ClientMessage = serde_json::from_str(
-            r#"{"t":"setVisionSelection","selection":{"mode":"player","playerId":7}}"#,
-        )
-        .expect("setVisionSelection should deserialize");
-
-        match msg {
-            ClientMessage::SetVisionSelection {
-                selection: VisionSelectionRequest::Player { player_id },
-            } => assert_eq!(player_id, 7),
-            other => panic!("expected setVisionSelection, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn request_branch_from_tick_deserializes() {
-        let msg: ClientMessage = serde_json::from_str(r#"{"t":"requestBranchFromTick"}"#)
-            .expect("requestBranchFromTick should deserialize");
-
-        assert!(matches!(msg, ClientMessage::RequestBranchFromTick));
-    }
-
-    #[test]
-    fn branch_staging_client_messages_deserialize() {
-        let claim: ClientMessage = serde_json::from_str(r#"{"t":"claimBranchSeat","playerId":7}"#)
-            .expect("claimBranchSeat should deserialize");
-        let release: ClientMessage =
-            serde_json::from_str(r#"{"t":"releaseBranchSeat","playerId":7}"#)
-                .expect("releaseBranchSeat should deserialize");
-        let start: ClientMessage =
-            serde_json::from_str(r#"{"t":"startBranch"}"#).expect("startBranch should deserialize");
-
-        assert!(matches!(
-            claim,
-            ClientMessage::ClaimBranchSeat { player_id: 7 }
-        ));
-        assert!(matches!(
-            release,
-            ClientMessage::ReleaseBranchSeat { player_id: 7 }
-        ));
-        assert!(matches!(start, ClientMessage::StartBranch));
     }
 
     #[test]

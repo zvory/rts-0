@@ -143,6 +143,7 @@ export const msg = Object.freeze({
   },
   setName: (name) => ({ t: C.SET_NAME, name }),
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
+  matchLoadReady: (countdownId) => ({ t: C.MATCH_LOAD_READY, countdownId }),
   start: () => ({ t: C.START }),
   setTeamPreset: (preset) => ({ t: C.SET_TEAM_PRESET, preset }),
   setTeam: (id, teamId) => ({ t: C.SET_TEAM, id, teamId }),

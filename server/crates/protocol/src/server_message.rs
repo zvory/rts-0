@@ -20,6 +20,7 @@ pub enum ServerMessage {
     },
     /// Reliable pre-match countdown shown to every lobby participant before the `start` payload.
     MatchCountdown {
+        countdown_id: u32,
         duration_ms: u32,
         words: Vec<String>,
     },

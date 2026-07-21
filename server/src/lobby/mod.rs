@@ -397,6 +397,8 @@ pub enum RoomEvent {
     Leave { player_id: u32 },
     /// A player toggled their lobby ready flag.
     Ready { player_id: u32, ready: bool },
+    /// A player's renderer finished warming for one exact pre-match countdown.
+    MatchLoadReady { player_id: u32, countdown_id: u32 },
     /// The host requested the match to begin (honored only from the host when `can_start`).
     StartRequest { player_id: u32 },
     /// Deprecated compatibility command. Team slots are host-managed via `SetTeam`.
