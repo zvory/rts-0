@@ -52,7 +52,7 @@ export class ObserverAnalysisOverlay {
     this.showButton = null;
     this.positioner = null;
     this.analysis = null;
-    this.buttonActivations = [];
+    this.buttonActivationBindings = [];
     this.onKeyDown = (ev) => this.handleKeyDown(ev);
     this.mount();
   }
@@ -155,12 +155,15 @@ export class ObserverAnalysisOverlay {
 
   bindButtonActivation(btn) {
     const activation = createImmediateTouchButtonActivation((event) => this.activateButton(btn, event));
-    btn.addEventListener("pointerdown", activation.pointerdown);
-    btn.addEventListener("pointerup", activation.pointerup);
-    btn.addEventListener("pointercancel", activation.pointercancel);
-    btn.addEventListener("pointerleave", activation.pointerleave);
-    btn.addEventListener("click", activation.click);
-    this.buttonActivations.push(activation);
+    const listeners = [
+      ["pointerdown", activation.pointerdown],
+      ["pointerup", activation.pointerup],
+      ["pointercancel", activation.pointercancel],
+      ["pointerleave", activation.pointerleave],
+      ["click", activation.click],
+    ];
+    for (const [type, handler] of listeners) btn.addEventListener(type, handler);
+    this.buttonActivationBindings.push([btn, activation, listeners]);
   }
 
   activateButton(btn, ev) {
@@ -562,8 +565,11 @@ export class ObserverAnalysisOverlay {
 
   destroy() {
     this.positioner?.destroy();
-    for (const activation of this.buttonActivations) activation.reset();
-    this.buttonActivations = [];
+    for (const [button, activation, listeners] of this.buttonActivationBindings) {
+      activation.reset();
+      for (const [type, handler] of listeners) button.removeEventListener(type, handler);
+    }
+    this.buttonActivationBindings = [];
     if (this.el) {
       this.el.removeEventListener("keydown", this.onKeyDown);
       this.el.remove();

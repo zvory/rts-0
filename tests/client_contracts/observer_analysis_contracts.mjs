@@ -408,6 +408,7 @@ import { textWithin } from "./dom_text.mjs";
     });
     assert(restored.visible === true, "observer analysis show action updates shared preferences");
     assert(restored.collapsed === false, "observer analysis show expands the panel");
+    const boundShowClick = show.listeners.click;
 
     restored.selectedTab = "production";
     overlay.render();
@@ -654,6 +655,10 @@ import { textWithin } from "./dom_text.mjs";
 
     overlay.destroy();
     assert(root.children.length === 0, "observer analysis overlay removes generated DOM on destroy");
+    assert(
+      !show.listeners.click && typeof boundShowClick === "function",
+      "observer analysis teardown removes direct button activation listeners",
+    );
   });
 
   withFakeOverlayDocument(({ FakeElement }) => {
