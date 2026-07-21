@@ -6,7 +6,7 @@ _2026-07-21_
 
 ## Changes
 
-- Replay analysis panels can now be dragged on mobile.
+- Observer and replay panels can now be dragged on mobile.
 - Replay analysis buttons respond immediately to touch.
 
 ## Playtest watch
