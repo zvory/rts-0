@@ -11,7 +11,9 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
 const defaultSchema = path.join(scriptDir, "patch-note-pass.schema.json");
 const MAX_DIFF_CHARS = 60000;
-const MAX_CHANGE_CHARS = 230;
+const MAX_DISCORD_BULLETS = 3;
+const MAX_DISCORD_MESSAGE_CHARS = 240;
+const OVERSIZED_DISCORD_FALLBACK = "• Gameplay changed; see the full patch notes for details.";
 
 export function parseArgs(argv) {
   const options = {
@@ -52,11 +54,20 @@ function run(command, args, options = {}) {
 function git(repoRoot, args) { return run("git", args, { cwd: repoRoot }); }
 
 export function renderDiscordMessage(decision) {
-  return decision.changes
+  const changes = cleanDiscordChanges(decision.changes);
+  if (changes.length > MAX_DISCORD_BULLETS) return OVERSIZED_DISCORD_FALLBACK;
+  const message = formatDiscordChanges(changes);
+  return message.length <= MAX_DISCORD_MESSAGE_CHARS ? message : OVERSIZED_DISCORD_FALLBACK;
+}
+
+function cleanDiscordChanges(changes) {
+  return changes
     .map((item) => item.replace(/^[-*•]\s+/, ""))
-    .map((item) => item.length > MAX_CHANGE_CHARS
-      ? `${item.slice(0, MAX_CHANGE_CHARS - 1).trimEnd()}…`
-      : item)
+    .filter(Boolean);
+}
+
+function formatDiscordChanges(changes) {
+  return changes
     .map((item) => `• ${item}`)
     .join("\n");
 }
@@ -158,16 +169,23 @@ export function isGameplayCandidate(pathname) {
 export function normalizeDecision(raw) {
   if (!raw || !["no_patch_note", "write_patch_note"].includes(raw.decision)) throw new Error("patch-note pass returned an invalid decision");
   const singleLine = (value) => String(value || "").replace(/\s+/g, " ").trim();
-  const strings = (value, max) => Array.isArray(value) ? value.map(singleLine).filter(Boolean).slice(0, max) : [];
+  const strings = (value) => Array.isArray(value) ? value.map(singleLine).filter(Boolean) : [];
+  const changes = strings(raw.changes);
+  if (raw.decision === "write_patch_note" && changes.length > MAX_DISCORD_BULLETS) {
+    throw new Error(`write_patch_note allows at most ${MAX_DISCORD_BULLETS} changes`);
+  }
   const decision = {
     decision: raw.decision,
     title: singleLine(raw.title),
-    changes: strings(raw.changes, 8),
-    playtestWatch: strings(raw.playtest_watch, 4),
+    changes,
+    playtestWatch: strings(raw.playtest_watch).slice(0, 4),
     reason: singleLine(raw.reason),
   };
   if (decision.decision === "write_patch_note" && (!decision.title || decision.changes.length === 0)) {
     throw new Error("write_patch_note requires a title and at least one factual change");
+  }
+  if (decision.decision === "write_patch_note" && formatDiscordChanges(cleanDiscordChanges(decision.changes)).length > MAX_DISCORD_MESSAGE_CHARS) {
+    throw new Error(`write_patch_note changes must fit one ${MAX_DISCORD_MESSAGE_CHARS}-character Discord message`);
   }
   return decision;
 }
@@ -199,9 +217,15 @@ gameplay changes: unit/building stats, costs, economy, combat behavior, availabl
 meaningful gameplay UI affordances, or other changes players should adapt to. Tests, refactors,
 developer tools, and fixes with no player-observable gameplay effect do not need a patch note.
 
-If a note is required, state exact factual changes, including old and new values when the diff proves
-them. Add concise playtest-watch bullets only where useful. Do not speculate. The outer helper will
-render your JSON into ${fragmentPath}; do not edit files or run commands.
+If a note is required, write an ultra-concise player summary: at most three change bullets whose
+rendered Discord message, including each "• " prefix and the newlines between bullets, is at most
+240 characters total. Prefer the general gist over completeness. It is fine to say only that a
+system was improved, simplified, or changed when the details do not fit; broad but accurate copy
+such as "Tank retreats improved" or "Formation system simplified" is acceptable. Do not enumerate
+internal implementation details or unchanged values. Use exact old/new values only when they are
+essential to understanding the player-facing change and still fit comfortably. Add concise
+playtest-watch bullets only where useful. Do not speculate. The outer helper will render your JSON
+into ${fragmentPath}; do not edit files or run commands.
 
 Branch: ${branch}
 Changed paths:
@@ -300,7 +324,10 @@ export function execute(options) {
     const decision = { changes: parseFragmentChanges(contents) };
     if (decision.changes.length === 0) throw new Error(`${existingRelativePath} has no change bullets to deliver`);
     if (options.dryRun) {
-      process.stdout.write(`patch-note-pass: would deliver ${decision.changes.length} final change bullet(s) to Discord if configured\n`);
+      const message = renderDiscordMessage(decision);
+      process.stdout.write(
+        `patch-note-pass: would deliver this bounded Discord message if configured\n${message}\n`,
+      );
       return decision;
     }
     const delivery = sendDiscordPatchNote({ branch, decision, repoRoot: options.repoRoot });

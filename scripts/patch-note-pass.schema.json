@@ -11,8 +11,8 @@
     "title": { "type": "string" },
     "changes": {
       "type": "array",
-      "items": { "type": "string" },
-      "maxItems": 8
+      "items": { "type": "string", "maxLength": 236 },
+      "maxItems": 3
     },
     "playtest_watch": {
       "type": "array",

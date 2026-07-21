@@ -98,18 +98,45 @@ assert.deepEqual(
 const maximumDiscordDecision = normalizeDecision({
   decision: "write_patch_note",
   title: "Bounded changes",
-  changes: Array.from({ length: 8 }, () => "x".repeat(300)),
+  changes: ["Infantry movement improved.", "Tank movement improved.", "Formation movement improved."],
   playtest_watch: [],
   reason: "Exercise the Discord content limit.",
 });
-assert.equal(maximumDiscordDecision.changes.every((item) => item.length === 300), true);
-assert(renderDiscordMessage(maximumDiscordDecision).length <= 2000, "Discord patch notes must fit one message");
-assert.equal(renderDiscordMessage(maximumDiscordDecision).includes("…"), true);
+assert.equal(maximumDiscordDecision.changes.length, 3);
+assert(renderDiscordMessage(maximumDiscordDecision).length <= 240, "Discord patch notes must fit 240 characters");
 assert.equal(
   renderFragment({ branch: "zvorygin/bounded", date: "2026-07-20", decision: maximumDiscordDecision })
-    .includes("x".repeat(300)),
+    .includes("Formation movement improved."),
   true,
-  "Discord limits must not truncate the canonical patch-note fragment",
+  "the canonical patch-note fragment should contain the bounded Discord changes",
+);
+assert.throws(
+  () => normalizeDecision({
+    decision: "write_patch_note",
+    title: "Too many changes",
+    changes: ["One.", "Two.", "Three.", "Four."],
+    playtest_watch: [],
+    reason: "Exercise the bullet-count limit.",
+  }),
+  /allows at most 3 changes/,
+);
+assert.throws(
+  () => normalizeDecision({
+    decision: "write_patch_note",
+    title: "Too verbose",
+    changes: ["x".repeat(236), "y"],
+    playtest_watch: [],
+    reason: "Exercise the whole-message limit.",
+  }),
+  /must fit one 240-character Discord message/,
+);
+const legacyOversizedMessage = renderDiscordMessage({ changes: Array.from({ length: 8 }, () => "x".repeat(300)) });
+assert.equal(legacyOversizedMessage, "• Gameplay changed; see the full patch notes for details.");
+assert.equal(legacyOversizedMessage.includes("…"), false, "legacy notes should not be cut off mid-sentence");
+assert.equal(
+  renderDiscordMessage({ changes: ["One.", "Two.", "Three.", "Four."] }),
+  "• Gameplay changed; see the full patch notes for details.",
+  "legacy notes with extra short bullets should not be silently shortened",
 );
 
 function run(command, args, cwd) {
