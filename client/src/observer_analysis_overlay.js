@@ -9,6 +9,7 @@ import {
   FloatingPanelPositioner,
   isMobileDebugPanelViewport,
 } from "./floating_panel_positioner.js";
+import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
 import { normalizeResourceWindows, renderResourcesMetric } from "./observer_analysis_resources.js";
 import { renderResearchMetric } from "./observer_analysis_research.js";
@@ -51,7 +52,7 @@ export class ObserverAnalysisOverlay {
     this.showButton = null;
     this.positioner = null;
     this.analysis = null;
-    this.onClick = (ev) => this.handleClick(ev);
+    this.buttonActivationBindings = [];
     this.onKeyDown = (ev) => this.handleKeyDown(ev);
     this.mount();
   }
@@ -62,7 +63,6 @@ export class ObserverAnalysisOverlay {
     this.el = document.createElement("aside");
     this.el.className = "replay-analysis-overlay";
     this.el.setAttribute("aria-label", "Observer analysis");
-    this.el.addEventListener("click", this.onClick);
     this.el.addEventListener("keydown", this.onKeyDown);
 
     this.panel = document.createElement("section");
@@ -111,6 +111,7 @@ export class ObserverAnalysisOverlay {
       btn.setAttribute("role", "tab");
       btn.setAttribute("aria-controls", "replay-analysis-body");
       btn.textContent = tab.label;
+      this.bindButtonActivation(btn);
       this.tabsEl.appendChild(btn);
     }
 
@@ -148,12 +149,24 @@ export class ObserverAnalysisOverlay {
     btn.title = label;
     btn.setAttribute("aria-label", label);
     Object.assign(btn.dataset, dataset);
+    this.bindButtonActivation(btn);
     return btn;
   }
 
-  handleClick(ev) {
-    const target = ev.target instanceof Element ? ev.target : null;
-    const btn = target?.closest("button");
+  bindButtonActivation(btn) {
+    const activation = createImmediateTouchButtonActivation((event) => this.activateButton(btn, event));
+    const listeners = [
+      ["pointerdown", activation.pointerdown],
+      ["pointerup", activation.pointerup],
+      ["pointercancel", activation.pointercancel],
+      ["pointerleave", activation.pointerleave],
+      ["click", activation.click],
+    ];
+    for (const [type, handler] of listeners) btn.addEventListener(type, handler);
+    this.buttonActivationBindings.push([btn, activation, listeners]);
+  }
+
+  activateButton(btn, ev) {
     if (!btn || !this.el?.contains(btn)) return;
     ev.preventDefault();
     ev.stopPropagation();
@@ -552,8 +565,12 @@ export class ObserverAnalysisOverlay {
 
   destroy() {
     this.positioner?.destroy();
+    for (const [button, activation, listeners] of this.buttonActivationBindings) {
+      activation.reset();
+      for (const [type, handler] of listeners) button.removeEventListener(type, handler);
+    }
+    this.buttonActivationBindings = [];
     if (this.el) {
-      this.el.removeEventListener("click", this.onClick);
       this.el.removeEventListener("keydown", this.onKeyDown);
       this.el.remove();
     }

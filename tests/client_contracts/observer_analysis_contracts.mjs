@@ -218,6 +218,7 @@ import { textWithin } from "./dom_text.mjs";
       globalThis.window.innerWidth = 390;
       globalThis.window.innerHeight = 844;
       globalThis.window.matchMedia = () => ({ matches: true });
+      draggablePrefs.position = { left: 300, top: 120 };
       dragHandle.listeners.pointerdown?.({
         button: 0,
         isPrimary: true,
@@ -225,13 +226,45 @@ import { textWithin } from "./dom_text.mjs";
         clientX: 40,
         clientY: 90,
         currentTarget: dragHandle,
-        preventDefault() {
-          throw new Error("mobile drag handle should not start a window move");
-        },
+        preventDefault() {},
+        stopPropagation() {},
       });
+      windowListeners.pointermove?.({
+        pointerId: 9,
+        clientX: 20,
+        clientY: 140,
+        preventDefault() {},
+      });
+      windowListeners.pointerup?.({ pointerId: 9 });
       assert(
-        overlayRoot.style.left === "" && overlayRoot.style.top === "",
-        "observer analysis leaves the mobile diagnostic layout under stylesheet control",
+        overlayRoot.style.left === "42px" && overlayRoot.style.top === "108px",
+        "observer analysis supports viewport-constrained touch dragging on mobile",
+      );
+      assert(
+        draggablePrefs.position?.left === 300 && draggablePrefs.position?.top === 120,
+        "observer analysis does not overwrite its saved desktop position from a mobile drag",
+      );
+      windowListeners.resize?.();
+      assert(
+        overlayRoot.style.left === "42px" && overlayRoot.style.top === "108px",
+        "observer analysis retains its session-local mobile position through a mobile resize",
+      );
+      globalThis.window.innerWidth = 1000;
+      globalThis.window.innerHeight = 800;
+      globalThis.window.matchMedia = () => ({ matches: false });
+      windowListeners.resize?.();
+      assert(
+        overlayRoot.style.left === "300px" && overlayRoot.style.top === "120px" &&
+          draggablePrefs.position?.left === 300 && draggablePrefs.position?.top === 120,
+        "observer analysis restores its saved desktop position after leaving the mobile layout",
+      );
+      globalThis.window.innerWidth = 390;
+      globalThis.window.innerHeight = 844;
+      globalThis.window.matchMedia = () => ({ matches: true });
+      windowListeners.resize?.();
+      assert(
+        overlayRoot.style.left === "42px" && overlayRoot.style.top === "108px",
+        "observer analysis restores its session-local mobile position after returning to mobile",
       );
       overlay.destroy();
       assert(!windowListeners.resize, "observer analysis teardown removes its viewport listener");
@@ -359,20 +392,46 @@ import { textWithin } from "./dom_text.mjs";
 
     const unitsTab = root.querySelector(".replay-analysis-tab");
     assert(unitsTab, "observer analysis renders tab buttons");
-    overlayRoot.listeners.click?.({ target: unitsTab, preventDefault() {}, stopPropagation() {} });
+    unitsTab.listeners.click?.({
+      target: unitsTab,
+      currentTarget: unitsTab,
+      preventDefault() {},
+      stopPropagation() {},
+    });
     assert(
       restored.selectedTab === unitsTab.dataset.tabId,
       "observer analysis tab clicks update shared preferences",
     );
 
     const hide = root.querySelector(".replay-analysis-hide");
-    overlayRoot.listeners.click?.({ target: hide, preventDefault() {}, stopPropagation() {} });
+    hide.listeners.pointerdown?.({
+      target: hide,
+      currentTarget: hide,
+      pointerType: "touch",
+      pointerId: 19,
+      button: 0,
+      isPrimary: true,
+    });
+    hide.listeners.pointerup?.({
+      target: hide,
+      currentTarget: hide,
+      pointerType: "touch",
+      pointerId: 19,
+      preventDefault() {},
+      stopPropagation() {},
+    });
     assert(restored.visible === false, "observer analysis hide action updates shared preferences");
 
     const show = root.querySelector(".replay-analysis-show");
-    overlayRoot.listeners.click?.({ target: show, preventDefault() {}, stopPropagation() {} });
+    show.listeners.click?.({
+      target: show,
+      currentTarget: show,
+      preventDefault() {},
+      stopPropagation() {},
+    });
     assert(restored.visible === true, "observer analysis show action updates shared preferences");
     assert(restored.collapsed === false, "observer analysis show expands the panel");
+    const boundShowClick = show.listeners.click;
 
     restored.selectedTab = "production";
     overlay.render();
@@ -619,6 +678,10 @@ import { textWithin } from "./dom_text.mjs";
 
     overlay.destroy();
     assert(root.children.length === 0, "observer analysis overlay removes generated DOM on destroy");
+    assert(
+      !show.listeners.click && typeof boundShowClick === "function",
+      "observer analysis teardown removes direct button activation listeners",
+    );
   });
 
   withFakeOverlayDocument(({ FakeElement }) => {

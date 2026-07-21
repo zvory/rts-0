@@ -37,6 +37,8 @@ export class FloatingPanelPositioner {
     this.windowListeners = [];
     this.activeListeners = [];
     this.drag = null;
+    this.mobilePosition = null;
+    this.viewportWasMobile = false;
   }
 
   mount(dragHandle, { restore = true } = {}) {
@@ -54,7 +56,7 @@ export class FloatingPanelPositioner {
   }
 
   beginDrag(event) {
-    if (this.isMobileViewport() || !isPrimaryPointer(event)) return;
+    if (!isPrimaryPointer(event)) return;
     const point = eventPoint(event);
     if (!point) return;
 
@@ -71,6 +73,7 @@ export class FloatingPanelPositioner {
       startY: point.y,
       rect: this.currentRect(),
       moved: false,
+      mobile: this.isMobileViewport(),
     };
     if (this.root.dataset) this.root.dataset.panelDragging = "true";
 
@@ -103,7 +106,14 @@ export class FloatingPanelPositioner {
 
   finishDrag(save) {
     this.clearActiveListeners();
-    if (save && this.drag?.moved) this.savePosition(this.currentRect());
+    if (save && this.drag?.moved) {
+      const position = this.currentRect();
+      if (this.drag.mobile) {
+        this.mobilePosition = { left: position.left, top: position.top };
+      } else {
+        this.savePosition(position);
+      }
+    }
     this.drag = null;
     if (this.root?.dataset) delete this.root.dataset.panelDragging;
   }
@@ -129,14 +139,18 @@ export class FloatingPanelPositioner {
 
   restorePosition() {
     if (this.isMobileViewport()) {
-      this.clearPositionStyles();
+      this.viewportWasMobile = true;
+      if (this.mobilePosition) this.applyPosition(this.mobilePosition);
+      else this.clearPositionStyles();
       return;
     }
+    this.viewportWasMobile = false;
     const position = this.readPosition();
     if (position) this.applyPosition(position);
   }
 
   resetPosition() {
+    this.mobilePosition = null;
     this.clearStoredPosition();
     this.clearPositionStyles();
     this.onReset();
@@ -146,7 +160,17 @@ export class FloatingPanelPositioner {
     if (!this.root || !this.canConstrain()) return;
     if (this.isMobileViewport()) {
       this.finishDrag(false);
+      this.viewportWasMobile = true;
+      if (this.mobilePosition) this.applyPosition(this.mobilePosition);
+      else this.clearPositionStyles();
+      return;
+    }
+    if (this.viewportWasMobile) {
+      this.finishDrag(false);
+      this.viewportWasMobile = false;
       this.clearPositionStyles();
+      const position = this.readPosition();
+      if (position) this.applyPosition(position);
       return;
     }
     const position = this.hasPositionStyles() ? this.currentRect() : this.readPosition();
