@@ -1696,7 +1696,12 @@ The replay lobby UI is group-watch only: future playable resume work needs separ
 controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
 `main.js` starts `App`; `app.js` owns the on-demand `Net` and persistent `Audio`, derives the ws url
-from `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. A bounded
+from `window.location`, and shows `Lobby`; when the local player becomes ready it prepares the
+selected renderer behind the still-visible lobby. During a normal multiplayer `matchCountdown` it
+sends `matchLoadReady` only after renderer initialization and required assets complete. `Match`
+adopts that exact prepared renderer on `start` instead of creating a second worker. Unready,
+failed, or superseded preparations are destroyed, and warmup failures are logged to the browser
+console. On `start` App creates `Match` or `ReplayViewer`. A bounded
 `?snapshotStream=<id>` developer launch injects `SnapshotStreamNet` instead: it fetches a same-origin
 `.rtsstream` artifact, emits its static start payload, and clocks the contained exact MessagePack
 snapshot frames through `Net._onMessage` without constructing a WebSocket. This local benchmark lane

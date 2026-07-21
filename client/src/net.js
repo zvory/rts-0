@@ -266,6 +266,12 @@ export class Net {
     this._send(msg.ready(isReady));
   }
 
+  /** Confirm that renderer warmup completed for the active server countdown. */
+  matchLoadReady(countdownId) {
+    if (!Number.isInteger(countdownId) || countdownId <= 0 || countdownId > 0xffffffff) return false;
+    return this._send(msg.matchLoadReady(countdownId));
+  }
+
   /** Ask the server to start the match (only honored from the room host). */
   start() {
     this._send(msg.start());

@@ -81,6 +81,8 @@ impl RoomTask {
 
     pub(super) fn start_match_countdown(&mut self) {
         let duration = match_countdown_duration();
+        self.match_countdown_id = self.match_countdown_id.wrapping_add(1).max(1);
+        self.match_load_ready.clear();
         self.match_countdown_deadline = Some(TokioInstant::now() + duration);
         if matches!(self.phase, Phase::BranchStaging(_)) {
             self.broadcast_branch_staging();
@@ -88,6 +90,7 @@ impl RoomTask {
             self.broadcast_lobby();
         }
         let msg = ServerMessage::MatchCountdown {
+            countdown_id: self.match_countdown_id,
             duration_ms: duration.as_millis() as u32,
             words: MATCH_COUNTDOWN_WORDS
                 .iter()
@@ -106,6 +109,32 @@ impl RoomTask {
             return true;
         }
         self.match_countdown_deadline = None;
+        let failed_names: Vec<_> = self
+            .players
+            .iter()
+            .filter(|(id, player)| !player.spectator && !self.match_load_ready.contains(id))
+            .map(|(_, player)| player.name.clone())
+            .collect();
+        if !failed_names.is_empty() {
+            self.match_load_ready.clear();
+            self.broadcast_lobby();
+            let subject = if failed_names.len() == 1 {
+                failed_names[0].clone()
+            } else {
+                failed_names.join(", ")
+            };
+            self.broadcast(&ServerMessage::Error {
+                msg: format!("{subject} failed to load the game."),
+            });
+            crate::log_info!(
+                room = %self.room,
+                countdown_id = self.match_countdown_id,
+                failed_players = ?failed_names,
+                "match countdown aborted; clients failed renderer warmup"
+            );
+            return true;
+        }
+        self.match_load_ready.clear();
         if self.can_start_now() {
             if matches!(self.phase, Phase::BranchStaging(_)) {
                 self.start_branch_live();
@@ -340,6 +369,7 @@ impl RoomTask {
 
     pub(super) fn prepare_live_match_launch(&mut self) {
         self.match_countdown_deadline = None;
+        self.match_load_ready.clear();
         self.reset_match_net_status();
         self.reset_live_pause_state();
         self.reset_room_time_state();
@@ -421,6 +451,7 @@ impl RoomTask {
         self.phase = Phase::Lobby;
         self.created_at_unix_ms = current_unix_ms();
         self.match_countdown_deadline = None;
+        self.match_load_ready.clear();
         self.match_player_count = 0;
         self.match_human_count = 0;
         self.outcome_sent.clear();

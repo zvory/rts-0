@@ -146,6 +146,35 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert([...handlers.values()].every((set) => set.size === 0),
       "Match.create removes temporary startup listeners after initialization");
 
+    let preparedAttached = null;
+    let duplicateRendererCreates = 0;
+    class PreparedMatchFactoryProbe extends MatchFactoryProbe {}
+    const prepared = await Match.create.call(
+      PreparedMatchFactoryProbe,
+      net,
+      {},
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        rendererBackendBundle: {
+          async createRenderer() {
+            duplicateRendererCreates += 1;
+            return renderer;
+          },
+        },
+        rendererPreparation: {
+          renderer,
+          attach(match) { preparedAttached = match; },
+          destroy() {},
+        },
+      },
+    );
+    assert(duplicateRendererCreates === 0 && preparedAttached === prepared,
+      "Match.create adopts the countdown-warmed renderer without creating another worker");
+
     const protectedControlEvents = [];
     class SlowMatchFactoryProbe {
       constructor() {
@@ -630,6 +659,28 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(app.reportPlayerActivity(30000), "eligible human input sends an activity notice");
     assert(!app.reportPlayerActivity(30001), "a sent activity notice re-arms the throttle");
     assert(activityCount === 1, "throttled activity emits one wire message");
+  }
+  {
+    const app = Object.create(App.prototype);
+    let warmed = 0;
+    let discarded = 0;
+    app.warmMatchRenderer = () => { warmed += 1; };
+    app.discardCountdownRendererPreparation = () => { discarded += 1; };
+    app.onLobbyReadyChange(true);
+    app.onLobbyReadyChange(false);
+    assert(warmed === 1 && discarded === 1,
+      "ready warms the match renderer and unready discards its preparation");
+  }
+  {
+    const app = Object.create(App.prototype);
+    const sent = [];
+    const state = { countdownId: 23, acknowledged: false, preparation: {} };
+    app.countdownRendererPreparation = state;
+    app.net = { matchLoadReady(id) { sent.push(id); } };
+    app.acknowledgeMatchLoadReady(state);
+    app.acknowledgeMatchLoadReady(state);
+    assert(sent.length === 1 && sent[0] === 23,
+      "a warmed renderer acknowledges each countdown generation once");
   }
   {
     const app = Object.create(App.prototype);

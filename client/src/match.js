@@ -16,6 +16,7 @@ import { MatchHealth } from "./match_health.js";
 import * as matchLabTools from "./match_lab_tools.js";
 import { PredictionController } from "./prediction_controller.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
+import { prepareRenderer } from "./renderer/preparation.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
@@ -124,15 +125,14 @@ export class Match {
     });
     let match = null;
     let renderer = null;
+    let rendererPreparation = options.rendererPreparation || null;
     try {
-      renderer = await backendBundle.createRenderer(dom.viewport, {
-        state: () => match?.state,
-        profiler: () => match?.frameProfiler,
-        visualProfile: () => match?.visualProfile,
-        staticMap: () => match?.presentationAssembler?.staticMap,
-      });
+      if (!rendererPreparation) {
+        rendererPreparation = await prepareRenderer(dom.viewport, backendBundle);
+      }
+      renderer = rendererPreparation.renderer;
       if (options.isStartCurrent?.() === false) {
-        renderer?.destroy?.();
+        rendererPreparation.destroy();
         renderer = null;
         return null;
       }
@@ -141,9 +141,10 @@ export class Match {
         rendererBackendBundle: backendBundle,
         rendererInstance: renderer,
       });
+      rendererPreparation.attach(match);
       renderer?.setRenderClock?.(match.renderClock);
     } catch (error) {
-      renderer?.destroy?.();
+      rendererPreparation?.destroy?.();
       throw error;
     } finally {
       for (const [type, handler] of pendingHandlers) net.off(type, handler);

@@ -188,6 +188,9 @@ export async function startMatch(host, participants, { timeoutMs = 6000 } = {}) 
   const countdowns = await Promise.all(participants.map((client) =>
     client.waitFor((msg) => msg.t === "matchCountdown", 3000, `${client.tag} countdown`)
   ));
+  participants.forEach((client, index) => {
+    client.send({ t: "matchLoadReady", countdownId: countdowns[index].countdownId });
+  });
   const starts = await Promise.all(participants.map((client) =>
     client.waitFor((msg) => msg.t === "start", timeoutMs, `${client.tag} start`)
   ));
@@ -245,6 +248,8 @@ export function assertLobbyProtocol(ok, lobby, { expectedPlayers, hostId } = {})
 
 export function assertCountdownProtocol(ok, countdown) {
   ok(countdown?.t === "matchCountdown", "COUNTDOWN: message has countdown tag");
+  ok(Number.isInteger(countdown.countdownId) && countdown.countdownId > 0,
+    `COUNTDOWN: carries a nonzero generation (${countdown.countdownId})`);
   ok(countdown.durationMs === 3000, `COUNTDOWN: duration is stable (${countdown.durationMs}ms)`);
   ok(Array.isArray(countdown.words) && countdown.words.join(" ") === "Drei! Zwei! Eins!",
     `COUNTDOWN: words are stable (${countdown.words?.join(" ")})`);

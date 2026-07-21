@@ -124,9 +124,13 @@ pub(super) struct RoomTask {
     /// replay artifact is finalized. This stays outside `Game` so final state cannot be mistaken
     /// for replay start state.
     replay_start: Option<ReplayStartComposition>,
-    /// Pre-match countdown deadline. While set, lobby membership/settings are frozen and the
-    /// match starts on the first room tick at or after this instant.
+    /// Pre-match countdown deadline. While set, lobby membership/settings are frozen. At the
+    /// deadline the match starts only if every active human finished renderer warmup.
     match_countdown_deadline: Option<TokioInstant>,
+    /// Monotonic nonzero identity for rejecting readiness from an earlier countdown attempt.
+    match_countdown_id: u32,
+    /// Active human connections whose renderer warmup completed for `match_countdown_id`.
+    match_load_ready: HashSet<u32>,
     drain: DrainHandle,
     match_tracked_for_drain: bool,
     lifecycle: Option<RoomLifecycle>,
@@ -180,6 +184,8 @@ impl RoomTask {
             match_participants: Vec::new(),
             replay_start: None,
             match_countdown_deadline: None,
+            match_countdown_id: 0,
+            match_load_ready: HashSet::new(),
             drain,
             match_tracked_for_drain: false,
             lifecycle: None,
@@ -373,6 +379,10 @@ impl RoomTask {
             RoomEvent::SetName { player_id, name } => self.on_set_name(player_id, name),
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
+            RoomEvent::MatchLoadReady {
+                player_id,
+                countdown_id,
+            } => self.on_match_load_ready(player_id, countdown_id),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
             RoomEvent::SetTeamPreset { player_id, preset } => {
                 self.on_set_team_preset(player_id, preset)

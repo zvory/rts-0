@@ -240,6 +240,18 @@ impl RoomTask {
         }
     }
 
+    pub(in crate::lobby) fn on_match_load_ready(&mut self, player_id: u32, countdown_id: u32) {
+        if self.match_countdown_deadline.is_none() || countdown_id != self.match_countdown_id {
+            return;
+        }
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        if !player.spectator {
+            self.match_load_ready.insert(player_id);
+        }
+    }
+
     pub(in crate::lobby) fn on_start_request(&mut self, player_id: u32) {
         if self.is_dev_watch() {
             return;

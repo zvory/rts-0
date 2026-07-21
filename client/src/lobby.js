@@ -123,7 +123,7 @@ export class Lobby {
    * @param {HTMLElement} rootEl the `#lobby-screen` section.
    * @param {import("./net.js").Net} net network seam (join/ready/start + event bus).
    * @param {import("./audio.js").Audio|null} [audio] shared app audio engine.
-   * @param {{ensureConnected?: Function, disconnectWhenIdle?: Function, autoRefreshLobbies?: boolean}} [options]
+   * @param {{ensureConnected?: Function, disconnectWhenIdle?: Function, autoRefreshLobbies?: boolean, onReadyChange?: Function}} [options]
    */
   constructor(rootEl, net, audio = null, options = {}) {
     this.root = rootEl;
@@ -187,6 +187,7 @@ export class Lobby {
     this._browserActionPending = false;
     this._pendingBrowserJoinRoom = "";
     this._browserAutoRefreshEnabled = options.autoRefreshLobbies !== false;
+    this._onReadyChange = typeof options.onReadyChange === "function" ? options.onReadyChange : () => {};
     this._browserActivityTracking = false;
     this._browserAutoRefreshTimer = undefined;
     this._nameUpdateTimer = undefined;
@@ -279,7 +280,7 @@ export class Lobby {
   resetToBrowser({ status = "" } = {}) {
     this._browserActivityTracking = false;
     this._joined = false;
-    this._ready = false;
+    this._setReadyState(false);
     this._spectator = false;
     this._hostId = null;
     this._canStart = false;
@@ -357,7 +358,7 @@ export class Lobby {
     // Ready: toggle local ready and tell the server.
     this.btnReady.addEventListener("click", () => {
       if (this._spectator || this._isReplayLobby()) return;
-      this._ready = !this._ready;
+      this._setReadyState(!this._ready);
       this.net.ready(this._ready);
       this._reflectReadyButton();
     });
@@ -626,7 +627,7 @@ export class Lobby {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     const mine = players.find((player) => player.id === myId);
     if (mine) {
-      this._ready = !!mine.ready;
+      this._setReadyState(!!mine.ready);
       this._spectator = !!mine.isSpectator;
     }
     this._reflectReadyButton();
@@ -719,6 +720,13 @@ export class Lobby {
     this.btnReady.setAttribute("aria-pressed", this._ready ? "true" : "false");
   }
 
+  _setReadyState(ready) {
+    const next = !!ready;
+    if (next === this._ready) return;
+    this._ready = next;
+    this._onReadyChange?.(next);
+  }
+
   // --- Status / errors -------------------------------------------------------
 
   /**
@@ -732,7 +740,12 @@ export class Lobby {
     this.elStatus.classList.toggle("error", !!isError);
   }
 
+  isSpectator() {
+    return this._spectator;
+  }
+
   _handleServerError(message) {
+    if (this._countdownActive) this._clearCountdown();
     this.setStatus(message, true);
     if (!this._browserActionPending) return;
     this._browserActionPending = false;

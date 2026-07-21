@@ -39,6 +39,18 @@ import { AI_PROFILES, LobbyRosterView } from "../../client/src/lobby_view.js";
 
 import { textWithin } from "./dom_text.mjs";
 
+{
+  const changes = [];
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    _ready: false,
+    _onReadyChange: (ready) => changes.push(ready),
+  });
+  lobby._setReadyState(true);
+  lobby._setReadyState(true);
+  lobby._setReadyState(false);
+  assertDeepEqual(changes, [true, false], "lobby reports each local ready transition once");
+}
+
 // ---------------------------------------------------------------------------
 // Lobby team UI helpers
 // ---------------------------------------------------------------------------

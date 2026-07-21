@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1711,
-      "reason": "FormationMove now carries the optional authoritative attack-move mode beside its existing queued flag; keep ratcheting until remaining protocol DTO and integration-test groups are split."
+      "lines": 1657,
+      "reason": "Client-message serde tests moved out of the oversized protocol root; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -60,8 +60,8 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1823,
-      "reason": "Snapshot lifecycle diagnostics added writer serialization/send timing to the existing oversized server shell; keep ratcheting until connection writer handling is split."
+      "lines": 1805,
+      "reason": "Player-activity classification moved out of the oversized server shell; keep ratcheting until more connection handling is split."
     },
     {
       "path": "server/src/structured_log.rs",

@@ -99,6 +99,16 @@ async fn start_two_player_match(lobby: &Lobby, room: &str) -> RoomHandle {
         .send(RoomEvent::StartRequest { player_id: 1 })
         .await
         .expect("room task should accept start request");
+    for player_id in [1, 2] {
+        handle
+            .event_tx
+            .send(RoomEvent::MatchLoadReady {
+                player_id,
+                countdown_id: 1,
+            })
+            .await
+            .expect("room task should accept renderer readiness");
+    }
     wait_for_active_match_count(lobby, 1).await;
     handle
 }

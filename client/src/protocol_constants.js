@@ -34,6 +34,7 @@ export const C = Object.freeze({
   JOIN: "join",
   SET_NAME: "setName",
   READY: "ready",
+  MATCH_LOAD_READY: "matchLoadReady",
   START: "start",
   SET_TEAM_PRESET: "setTeamPreset",
   SET_TEAM: "setTeam",
