@@ -47,7 +47,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         reissue_cadence_ticks: 120,
         stage_distance_tiles: 0.0,
         unit_kinds: &TURTLE_UNITS,
-        required_unit: None,
+        required_units: &[],
     },
     resources: AI_2_1.resources,
     expansion: Some(ExpansionPolicy {

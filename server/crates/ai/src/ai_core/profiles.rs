@@ -161,7 +161,13 @@ pub(crate) struct AttackPolicy {
     pub(crate) reissue_cadence_ticks: u32,
     pub(crate) stage_distance_tiles: f32,
     pub(crate) unit_kinds: &'static [EntityKind],
-    pub(crate) required_unit: Option<EntityKind>,
+    pub(crate) required_units: &'static [UnitCountRequirement],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct UnitCountRequirement {
+    pub(crate) kind: EntityKind,
+    pub(crate) count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -227,6 +233,7 @@ pub(crate) struct TankResourcePolicy {
 
 const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
+const NO_REQUIRED_UNITS: [UnitCountRequirement; 0] = [];
 const NO_UPGRADES: [UpgradeKind; 0] = [];
 const BASE_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const TANK_TECH_PATH: [EntityKind; 4] = [
@@ -275,7 +282,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         reissue_cadence_ticks: 120,
         stage_distance_tiles: 8.0,
         unit_kinds: &RIFLE_ONLY,
-        required_unit: None,
+        required_units: &NO_REQUIRED_UNITS,
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 5,
@@ -321,7 +328,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
             reissue_cadence_ticks: 120,
             stage_distance_tiles: 8.0,
             unit_kinds: &TANK_AND_RIFLE,
-            required_unit: None,
+            required_units: &NO_REQUIRED_UNITS,
         },
     }),
 };

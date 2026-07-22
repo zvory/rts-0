@@ -6,8 +6,8 @@ _2026-07-22_
 
 ## Changes
 
-- New Jeff's AI opponent fields a Machine Gunner screen, researches Entrenchment, scouts with armor, and builds toward five-Tank pressure.
+- Jeff's AI is now selectable in player lobbies. It opens behind a seven-Machine-Gunner screen, expands and researches Entrenchment, then waits for five ready Tanks and a Scout Car before launching its armored wave.
 
 ## Playtest watch
 
-- Watch its early defense and armored transition pacing.
+- Watch whether its early defense holds without making the five-Tank transition arrive too late.

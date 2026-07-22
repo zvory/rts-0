@@ -1,4 +1,5 @@
 use super::defense::main_steel_cluster_center;
+use super::frontal::FrontalWaveBlocker;
 use super::geometry::{building_center, normalized_direction, tile_center};
 use super::*;
 
@@ -6,7 +7,7 @@ use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiPlayerSummary,
     AiResourceSummary,
 };
-use crate::ai_core::profiles::AiProfile;
+use crate::ai_core::profiles::{AiProfile, JEFFS_AI};
 use rts_sim::game::command::SimCommand as Command;
 
 mod economy_manager_tests;
@@ -229,6 +230,57 @@ fn decide(
         },
         |_, tx, ty| tx < width && ty < height,
     )
+}
+
+#[test]
+fn jeffs_ai_waits_for_five_ready_tanks_and_a_scout_car() {
+    let mut observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 20,
+            supply_cap: 100,
+        },
+        vec![
+            combat(1, EntityKind::Tank),
+            combat(2, EntityKind::Tank),
+            combat(3, EntityKind::Tank),
+            combat(4, EntityKind::Tank),
+            combat(5, EntityKind::ScoutCar),
+            combat(6, EntityKind::Rifleman),
+            combat(7, EntityKind::Rifleman),
+        ],
+    );
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+    let attack = JEFFS_AI.tech_transition.expect("armored transition").attack;
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    let waiting = plan_frontal_wave(
+        &observation,
+        attack,
+        &mut memory,
+        &JEFFS_AI,
+        &BTreeSet::new(),
+    );
+
+    assert!(!waiting.required_units_ready);
+    assert!(waiting
+        .blockers
+        .contains(&FrontalWaveBlocker::WaitingForTank));
+    assert!(!waiting.should_attack());
+
+    observation.owned.push(combat(8, EntityKind::Tank));
+    let ready = plan_frontal_wave(
+        &observation,
+        attack,
+        &mut memory,
+        &JEFFS_AI,
+        &BTreeSet::new(),
+    );
+
+    assert!(ready.required_units_ready);
+    assert!(!ready.blockers.contains(&FrontalWaveBlocker::WaitingForTank));
+    assert!(ready.should_attack());
 }
 
 #[test]

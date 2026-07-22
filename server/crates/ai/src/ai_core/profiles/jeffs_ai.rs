@@ -1,7 +1,8 @@
 use super::{
     AiProfile, AttackPolicy, BarracksCurve, BuildingPolicy, DefensiveMachineGunnerPolicy,
     ExpansionPolicy, ExtraFactoryPolicy, FrontalWavePolicy, ProductionPolicy, Ratio,
-    ResourceFloatThreshold, ResourcePolicy, TankResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    ResourceFloatThreshold, ResourcePolicy, TankResourcePolicy, TechTransitionPolicy,
+    UnitCountRequirement, WorkerPolicy,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -15,6 +16,16 @@ const ARMORED_UNITS: [EntityKind; 4] = [
     EntityKind::ScoutCar,
     EntityKind::CommandCar,
     EntityKind::Rifleman,
+];
+const ARMORED_ATTACK_REQUIREMENTS: [UnitCountRequirement; 2] = [
+    UnitCountRequirement {
+        kind: EntityKind::Tank,
+        count: 5,
+    },
+    UnitCountRequirement {
+        kind: EntityKind::ScoutCar,
+        count: 1,
+    },
 ];
 const BASE_TECH_PATH: [EntityKind; 2] = [EntityKind::Barracks, EntityKind::TrainingCentre];
 const ARMORED_TECH_PATH: [EntityKind; 4] = [
@@ -68,7 +79,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         reissue_cadence_ticks: 450,
         stage_distance_tiles: 3.25,
         unit_kinds: &RIFLE_ONLY,
-        required_unit: None,
+        required_units: &[],
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 5,
@@ -111,13 +122,13 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
             balance_unit_priorities: false,
         },
         attack: AttackPolicy {
-            first_attack_size: 5,
+            first_attack_size: 6,
             wave_growth: 1,
             regroup_reset_ticks: 450,
             reissue_cadence_ticks: 450,
             stage_distance_tiles: 3.25,
             unit_kinds: &ARMORED_UNITS,
-            required_unit: Some(EntityKind::ScoutCar),
+            required_units: &ARMORED_ATTACK_REQUIREMENTS,
         },
     }),
 };
@@ -133,8 +144,20 @@ mod tests {
         assert_eq!(JEFFS_AI.workers.extra_oil_workers, 10);
         assert_eq!(JEFFS_AI.attack.first_attack_size, 4);
         assert_eq!(JEFFS_AI.attack.unit_kinds, &[EntityKind::Rifleman]);
-        assert_eq!(transition.attack.first_attack_size, 5);
-        assert_eq!(transition.attack.required_unit, Some(EntityKind::ScoutCar));
+        assert_eq!(transition.attack.first_attack_size, 6);
+        assert_eq!(
+            transition.attack.required_units,
+            &[
+                UnitCountRequirement {
+                    kind: EntityKind::Tank,
+                    count: 5,
+                },
+                UnitCountRequirement {
+                    kind: EntityKind::ScoutCar,
+                    count: 1,
+                },
+            ]
+        );
         assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 7);
     }
 }
