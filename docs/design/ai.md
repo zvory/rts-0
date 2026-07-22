@@ -10,9 +10,10 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports exactly one AI profile ID:
+The player-facing lobby supports two AI profile IDs:
 
 - ai_2_1 — AI 2.1, the default pressure profile.
+- jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -22,7 +23,7 @@ human match.
 
 Those IDs are concrete match profile IDs used by controllers and diagnostics. Live AI selection
 also accepts suite request IDs, such as ai_2_0, which resolve to concrete profiles for a match.
-The convenience inputs ai and default resolve to ai_2_1. The lobby exposes only AI 2.1;
+The convenience inputs ai and default resolve to ai_2_1. The lobby exposes AI 2.1 and Jeff's AI;
 unsupported or internal profile IDs fall back to AI 2.1 when adding a seat and are ignored when
 changing a seat in a player lobby.
 
@@ -109,9 +110,17 @@ the main choke first, can defend a second close-spawn choke, and reinforces unde
 Staged defenders emit HoldPosition once after reaching their defensive slot rather than repeating
 the command on every think.
 
-Both profiles are self-contained policy records in the same registry. Each profile selects whether
-to use the proposal economy manager; AI 2.1 and AI Turtle enable it. Neither inherits behavior
-from a retired version or resolves through a second profile name.
+All three profiles are self-contained policy records in the same registry. Each profile selects
+whether to use the proposal economy manager; AI 2.1, Jeff's AI, and AI Turtle enable it. None
+inherits behavior from a retired version or resolves through a second profile name.
+
+Jeff's AI is the server-authoritative port of the champion V3 policy developed and evaluated in
+the standalone local bot workspace. It keeps the local policy's 40-worker pre-second-Factory cap,
+ten-oil-worker cap, Rifleman and Machine Gunner opening, Entrenchment and Tank transition,
+Scout-supported five-Tank armored attack threshold, seven defensive/mobile Machine Gunners,
+3.25-tile formation spacing, and second-Factory float thresholds. It uses the shared profile
+decision and action layers, receives only fog-filtered observations, and issues ordinary validated
+player commands for spending, placement, production, and combat.
 
 ### Self-play and arena tools
 

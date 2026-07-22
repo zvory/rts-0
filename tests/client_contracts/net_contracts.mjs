@@ -431,10 +431,12 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
   assert(DEFAULT_AI_PROFILE_ID === "ai_2_1", "lobby defaults to AI 2.1");
   assert(
-    AI_PROFILES.length === 1 &&
+    AI_PROFILES.length === 2 &&
       AI_PROFILES[0].id === "ai_2_1" &&
-      AI_PROFILES[0].label === "AI 2.1",
-    "lobby exposes only the supported player-facing AI profile",
+      AI_PROFILES[0].label === "AI 2.1" &&
+      AI_PROFILES[1].id === "jeffs_ai" &&
+      AI_PROFILES[1].label === "Jeff's AI",
+    "lobby exposes both supported player-facing AI profiles",
   );
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(

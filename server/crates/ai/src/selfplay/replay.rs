@@ -984,7 +984,10 @@ mod tests {
             canonical_profile_id("default"),
             Some(DEFAULT_LIVE_PROFILE_ID)
         );
-        assert_eq!(available_profile_ids(), vec![AI_2_1_ID, AI_TURTLE_ID]);
+        assert_eq!(
+            available_profile_ids(),
+            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID]
+        );
         assert_eq!(canonical_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
         assert_eq!(canonical_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));
         assert_eq!(canonical_profile_id("unsupported_profile"), None);

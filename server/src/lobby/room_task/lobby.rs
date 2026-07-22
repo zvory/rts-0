@@ -421,7 +421,7 @@ impl RoomTask {
             .as_deref()
             .and_then(rts_ai::canonical_live_profile_id)
             .filter(|profile_id| {
-                self.active_human_count() == 0 || *profile_id == DEFAULT_LIVE_PROFILE_ID
+                self.active_human_count() == 0 || rts_ai::is_player_live_profile_id(profile_id)
             })
             .unwrap_or(DEFAULT_LIVE_PROFILE_ID);
         let team_id = if let Some(team_id) = requested_team_id {
@@ -471,7 +471,7 @@ impl RoomTask {
             );
             return;
         };
-        if self.active_human_count() > 0 && profile_id != DEFAULT_LIVE_PROFILE_ID {
+        if self.active_human_count() > 0 && !rts_ai::is_player_live_profile_id(profile_id) {
             crate::log_debug!(
                 room = %self.room,
                 target,
@@ -639,7 +639,7 @@ impl RoomTask {
             return;
         }
         for ai in &mut self.ai_players {
-            if ai.profile_id != DEFAULT_LIVE_PROFILE_ID {
+            if !rts_ai::is_player_live_profile_id(ai.profile_id) {
                 crate::log_warn!(
                     room = %self.room,
                     ai_id = ai.id,

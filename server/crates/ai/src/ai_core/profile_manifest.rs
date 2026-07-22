@@ -4,7 +4,7 @@ use serde::Serialize;
 
 #[cfg(test)]
 use super::profiles::required_profiles;
-use super::profiles::{profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID};
+use super::profiles::{profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,6 +119,19 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "anti_tank_emplacements",
             ],
         ),
+        JEFFS_AI_ID => (
+            "Jeff's AI",
+            "Server-authoritative port of the locally evaluated V3 champion policy with a Machine Gunner screen, Entrenchment, armored scouting, and five-Tank pressure.",
+            vec![
+                "economy_manager",
+                "local_v3_policy",
+                "machine_gunner_screen",
+                "entrenchment_research",
+                "armored_scout",
+                "five_tank_pressure",
+                "second_factory",
+            ],
+        ),
         _ => (
             "AI Profile",
             "Developer AI profile resolved through the shared profile registry.",
@@ -167,7 +180,7 @@ mod tests {
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert_eq!(identities.len(), 2);
+        assert_eq!(identities.len(), 3);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
