@@ -966,7 +966,7 @@ mod tests {
         available_profile_ids, canonical_profile_id, command_stats_by_player,
         run_profile_matchup_result, ProfileMatchupOptions, ScorecardCollector,
     };
-    use crate::ai_core::profiles::{AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID};
+    use crate::ai_core::profiles::{AI_2_1_ID, AI_TURTLE_ID};
     use crate::DEFAULT_LIVE_PROFILE_ID;
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
@@ -986,7 +986,7 @@ mod tests {
         );
         assert_eq!(
             available_profile_ids(),
-            vec![AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID]
+            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID]
         );
         assert_eq!(canonical_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
         assert_eq!(canonical_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));

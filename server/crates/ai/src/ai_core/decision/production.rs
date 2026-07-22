@@ -1,5 +1,4 @@
 use super::*;
-use crate::ai_core::profiles::UnitCountRequirement;
 
 pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 4] = [
     EntityKind::Factory,
@@ -188,32 +187,6 @@ pub(super) fn production_uses_building(production: ProductionPolicy, building: E
         .iter()
         .copied()
         .any(|unit| producer_for_unit(unit) == Some(building))
-}
-
-pub(super) fn prioritize_required_units(
-    unit_priorities: &[EntityKind],
-    requirements: &[UnitCountRequirement],
-    current_counts: &[(EntityKind, usize)],
-) -> Vec<EntityKind> {
-    let current_counts: BTreeMap<EntityKind, usize> = current_counts.iter().copied().collect();
-    let is_missing = |unit: EntityKind| {
-        requirements.iter().any(|requirement| {
-            requirement.kind == unit
-                && current_counts.get(&unit).copied().unwrap_or(0) < requirement.count
-        })
-    };
-
-    unit_priorities
-        .iter()
-        .copied()
-        .filter(|unit| is_missing(*unit))
-        .chain(
-            unit_priorities
-                .iter()
-                .copied()
-                .filter(|unit| !is_missing(*unit)),
-        )
-        .collect()
 }
 
 pub(super) fn unit_counts_for_priorities(

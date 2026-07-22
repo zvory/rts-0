@@ -17,7 +17,7 @@ pub(super) struct FrontalWavePlan {
     pub(super) ready_units: Vec<u32>,
     pub(super) desired_size: usize,
     pub(super) attack_due: bool,
-    pub(super) required_units_ready: bool,
+    pub(super) required_unit_ready: bool,
     pub(super) methamphetamines_ready: bool,
     pub(super) blockers: Vec<FrontalWaveBlocker>,
 }
@@ -51,22 +51,15 @@ pub(super) fn plan_frontal_wave(
     );
     let desired_size = memory.desired_attack_size_for(profile, attack, observation.tick);
     let attack_due = memory.attack_due_for(profile, attack, observation.tick);
-    let missing_required_units: Vec<EntityKind> = attack
-        .required_units
-        .iter()
-        .filter(|requirement| {
+    let required_unit_ready = attack
+        .required_unit
+        .map(|kind| {
             observation
                 .owned
                 .iter()
-                .filter(|entity| {
-                    entity.kind == requirement.kind && ready_units.contains(&entity.id)
-                })
-                .count()
-                < requirement.count
+                .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
         })
-        .map(|requirement| requirement.kind)
-        .collect();
-    let required_units_ready = missing_required_units.is_empty();
+        .unwrap_or(true);
     let methamphetamines_ready = !attack.unit_kinds.contains(&EntityKind::Tank)
         || observation
             .upgrades
@@ -76,13 +69,9 @@ pub(super) fn plan_frontal_wave(
     if ready_units.len() < desired_size {
         blockers.push(FrontalWaveBlocker::WaitingForUnits);
     }
-    if missing_required_units.contains(&EntityKind::Tank) {
+    if !required_unit_ready && attack.required_unit == Some(EntityKind::Tank) {
         blockers.push(FrontalWaveBlocker::WaitingForTank);
-    }
-    if missing_required_units
-        .iter()
-        .any(|kind| *kind != EntityKind::Tank)
-    {
+    } else if !required_unit_ready {
         blockers.push(FrontalWaveBlocker::WaitingForUnits);
     }
     if !methamphetamines_ready {
@@ -98,7 +87,7 @@ pub(super) fn plan_frontal_wave(
         ready_units,
         desired_size,
         attack_due,
-        required_units_ready,
+        required_unit_ready,
         methamphetamines_ready,
         blockers,
     }

@@ -1,5 +1,4 @@
 use super::defense::main_steel_cluster_center;
-use super::frontal::FrontalWaveBlocker;
 use super::geometry::{building_center, normalized_direction, tile_center};
 use super::*;
 
@@ -7,7 +6,7 @@ use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiPlayerSummary,
     AiResourceSummary,
 };
-use crate::ai_core::profiles::{AiProfile, JEFFS_AI};
+use crate::ai_core::profiles::AiProfile;
 use rts_sim::game::command::SimCommand as Command;
 
 mod economy_manager_tests;
@@ -230,98 +229,6 @@ fn decide(
         },
         |_, tx, ty| tx < width && ty < height,
     )
-}
-
-#[test]
-fn jeffs_ai_waits_for_five_ready_tanks_and_a_scout_car() {
-    let mut observation = observation(
-        AiEconomy {
-            steel: 1_000,
-            oil: 1_000,
-            supply_used: 20,
-            supply_cap: 100,
-        },
-        vec![
-            combat(1, EntityKind::Tank),
-            combat(2, EntityKind::Tank),
-            combat(3, EntityKind::Tank),
-            combat(4, EntityKind::Tank),
-            combat(5, EntityKind::ScoutCar),
-            combat(6, EntityKind::Rifleman),
-            combat(7, EntityKind::Rifleman),
-        ],
-    );
-    observation.upgrades.push(UpgradeKind::Methamphetamines);
-    let attack = JEFFS_AI.tech_transition.expect("armored transition").attack;
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-
-    let waiting = plan_frontal_wave(
-        &observation,
-        attack,
-        &mut memory,
-        &JEFFS_AI,
-        &BTreeSet::new(),
-    );
-
-    assert!(!waiting.required_units_ready);
-    assert!(waiting
-        .blockers
-        .contains(&FrontalWaveBlocker::WaitingForTank));
-    assert!(!waiting.should_attack());
-
-    observation.owned.push(combat(8, EntityKind::Tank));
-    let ready = plan_frontal_wave(
-        &observation,
-        attack,
-        &mut memory,
-        &JEFFS_AI,
-        &BTreeSet::new(),
-    );
-
-    assert!(ready.required_units_ready);
-    assert!(!ready.blockers.contains(&FrontalWaveBlocker::WaitingForTank));
-    assert!(ready.should_attack());
-}
-
-#[test]
-fn jeffs_ai_trains_the_missing_scout_required_by_its_armored_wave() {
-    let mut observation = observation(
-        AiEconomy {
-            steel: 10_000,
-            oil: 10_000,
-            supply_used: 20,
-            supply_cap: 100,
-        },
-        vec![
-            building(10, EntityKind::Barracks, Some(0)),
-            building(11, EntityKind::TrainingCentre, Some(0)),
-            building(12, EntityKind::ResearchComplex, Some(0)),
-            building(13, EntityKind::Factory, Some(0)),
-            combat(20, EntityKind::Tank),
-            combat(21, EntityKind::Tank),
-            combat(22, EntityKind::Tank),
-            combat(23, EntityKind::Tank),
-            combat(24, EntityKind::Tank),
-        ],
-    );
-    observation.upgrades.extend([
-        UpgradeKind::Methamphetamines,
-        UpgradeKind::Entrenchment,
-        UpgradeKind::TankUnlock,
-    ]);
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-
-    let decision = decide(&observation, &JEFFS_AI, &mut memory);
-
-    assert!(decision.commands.iter().any(|command| {
-        matches!(
-            command,
-            Command::Train {
-                unit: EntityKind::ScoutCar,
-                ..
-            }
-        )
-    }));
 }
 
 #[test]
