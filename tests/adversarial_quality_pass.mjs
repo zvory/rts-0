@@ -49,6 +49,8 @@ assert.match(prompt, /Correctness bugs/);
 assert.match(prompt, /Architectural issues/);
 assert.match(prompt, /provided clean branch worktree/);
 assert.match(prompt, /outer helper handles pushing and PR creation/);
+assert.match(prompt, /AI behavior is outside your authority: do not create, alter, or approve it/);
+assert.match(prompt, /Refactor AI code only\nwhen behavior is preserved exactly/);
 assert.match(prompt, /Ignore missing documentation updates/);
 assert.match(prompt, /complete, coherent,\nworking state/);
 assert.doesNotMatch(prompt, /fail the gate/i);

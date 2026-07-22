@@ -143,6 +143,9 @@ return; do not run PR lifecycle helpers yourself.
 
 Review the diff from ${baseRef} to ${headRef}.
 
+AI behavior is outside your authority: do not create, alter, or approve it. Refactor AI code only
+when behavior is preserved exactly.
+
 Focus on:
 1. Correctness bugs.
 2. Architectural issues where the implementer made the locally easiest change instead of the change
