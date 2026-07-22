@@ -6,7 +6,7 @@ _2026-07-22_
 
 ## Changes
 
-- New Jeff's AI opponent fields a Machine Gunner screen, researches Entrenchment, scouts with armor, and builds toward five-Tank pressure.
+- New Jeff's AI opponent is available in the lobby, with a Machine Gunner screen, Entrenchment research, and a Tank-led armored transition.
 
 ## Playtest watch
 
