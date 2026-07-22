@@ -1,8 +1,10 @@
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
+mod jeffs_ai;
 mod turtle;
 
+pub(crate) use self::jeffs_ai::{JEFFS_AI, JEFFS_AI_ID};
 pub(crate) use self::turtle::AI_TURTLE;
 
 /// Canonical identities are also the only accepted persisted/profile-selection ids.
@@ -324,8 +326,8 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 2] {
-    [&AI_2_1, &AI_TURTLE]
+pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
+    [&AI_2_1, &JEFFS_AI, &AI_TURTLE]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -342,7 +344,7 @@ mod tests {
     fn required_profile_ids_are_canonical_and_deterministic() {
         assert_eq!(
             required_profiles().map(|profile| profile.id),
-            [AI_2_1_ID, AI_TURTLE_ID]
+            [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID]
         );
         assert_eq!(profile_by_id(AI_2_1_ID).unwrap().id, AI_2_1_ID);
         assert_eq!(profile_by_id(AI_TURTLE_ID).unwrap().id, AI_TURTLE_ID);

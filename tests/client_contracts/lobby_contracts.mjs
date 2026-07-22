@@ -68,8 +68,11 @@ import { textWithin } from "./dom_text.mjs";
   );
   assertDeepEqual(
     AI_PROFILES,
-    [{ id: "ai_2_1", label: "AI 2.1" }],
-    "lobby AI profile selector exposes only the supported player opponent",
+    [
+      { id: "ai_2_1", label: "AI 2.1" },
+      { id: "jeffs_ai", label: "Jeff's AI" },
+    ],
+    "lobby AI profile selector exposes both supported player opponents",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
@@ -233,7 +236,12 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes an AI 2.1 profile selector",
     );
     assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
-    assert(profileSelectors[0].children.length === 1, "host lobby does not expose internal AI profiles");
+    assert(profileSelectors[0].children.length === 2, "host lobby exposes both player-facing AI profiles");
+    assert(
+      profileSelectors[0].children[1].value === "jeffs_ai" &&
+        profileSelectors[0].children[1].textContent === "Jeff's AI",
+      "host lobby exposes the locally developed Jeff's AI profile",
+    );
 
     const turtleRoot = document.createElement("div");
     const turtleView = new LobbyRosterView(turtleRoot);
@@ -264,7 +272,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(
       staleProfileSelectors.length === 1 &&
         staleProfileSelectors[0].value === "ai_2_1" &&
-        staleProfileSelectors[0].children.length === 1,
+        staleProfileSelectors[0].children.length === 2,
       "player lobby does not expose an internal Turtle profile received from stale state",
     );
   });

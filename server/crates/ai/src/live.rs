@@ -11,7 +11,9 @@ use crate::ai_core::decision::{
 };
 use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
-use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID};
+use crate::ai_core::profiles::{
+    profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
+};
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::{
@@ -32,11 +34,12 @@ pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
-pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_2_1_ID, AI_TURTLE_ID];
+pub const LIVE_PROFILE_IDS: [&str; 3] = [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" | AI_2_1_ID => Some(AI_2_1_ID),
+        JEFFS_AI_ID => Some(JEFFS_AI_ID),
         AI_TURTLE_ID => Some(AI_TURTLE_ID),
         _ => None,
     }
@@ -45,9 +48,14 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
 pub fn live_profile_label(profile_id: &str) -> &'static str {
     match canonical_live_profile_id(profile_id) {
         Some(AI_2_1_ID) => "AI 2.1",
+        Some(JEFFS_AI_ID) => "Jeff's AI",
         Some(AI_TURTLE_ID) => "AI Turtle",
         _ => "AI",
     }
+}
+
+pub fn is_player_live_profile_id(profile_id: &str) -> bool {
+    matches!(profile_id, AI_2_1_ID | JEFFS_AI_ID)
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
@@ -514,7 +522,7 @@ mod tests {
 
     #[test]
     fn live_adapter_knows_public_and_internal_profiles() {
-        assert_eq!(LIVE_PROFILE_IDS, [AI_2_1_ID, AI_TURTLE_ID]);
+        assert_eq!(LIVE_PROFILE_IDS, [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID]);
     }
 
     #[test]
@@ -529,7 +537,10 @@ mod tests {
         for _ in 0..32 {
             selected.insert(random_live_profile_id(&mut rng));
         }
-        assert_eq!(selected, BTreeSet::from([AI_2_1_ID, AI_TURTLE_ID]));
+        assert_eq!(
+            selected,
+            BTreeSet::from([AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID])
+        );
     }
 
     #[test]
@@ -550,6 +561,7 @@ mod tests {
             Some(DEFAULT_LIVE_PROFILE_ID)
         );
         assert_eq!(canonical_live_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
+        assert_eq!(canonical_live_profile_id(JEFFS_AI_ID), Some(JEFFS_AI_ID));
         assert_eq!(canonical_live_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));
         assert_eq!(canonical_live_profile_id("unsupported_profile"), None);
     }
@@ -557,6 +569,7 @@ mod tests {
     #[test]
     fn live_profile_ids_resolve_to_their_canonical_match_profiles() {
         assert_eq!(resolve_live_profile_id_for_match(AI_2_1_ID), AI_2_1_ID);
+        assert_eq!(resolve_live_profile_id_for_match(JEFFS_AI_ID), JEFFS_AI_ID);
         assert_eq!(
             resolve_live_profile_id_for_match(AI_TURTLE_ID),
             AI_TURTLE_ID
@@ -566,6 +579,7 @@ mod tests {
     #[test]
     fn live_profile_labels_match_lobby_selector_names() {
         assert_eq!(live_profile_label(AI_2_1_ID), "AI 2.1");
+        assert_eq!(live_profile_label(JEFFS_AI_ID), "Jeff's AI");
         assert_eq!(live_profile_label(AI_TURTLE_ID), "AI Turtle");
         assert_eq!(live_profile_label("default"), "AI 2.1");
         assert_eq!(live_profile_label("unsupported_profile"), "AI");

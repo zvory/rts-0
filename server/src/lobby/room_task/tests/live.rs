@@ -87,6 +87,32 @@ fn player_lobby_replaces_internal_ai_profile_with_supported_opponent() {
 }
 
 #[test]
+fn player_lobby_launches_jeffs_ai_as_a_supported_opponent() {
+    let mut task = RoomTask::new(
+        "live-jeffs-ai-profile-selection-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let host_id = next_player_id();
+    task.host_id = Some(host_id);
+    add_test_room_player(&mut task, host_id, true);
+
+    task.on_add_ai(host_id, Some(2), Some("jeffs_ai".to_string()));
+    assert_eq!(
+        task.ai_players.first().map(|ai| ai.profile_id),
+        Some("jeffs_ai")
+    );
+    assert_eq!(ai_slot_names(&task), vec!["Jeff's AI"]);
+
+    task.start_match();
+
+    assert_eq!(task.ai_controllers.len(), 1);
+    assert_eq!(task.ai_controllers[0].profile_id(), "jeffs_ai");
+}
+
+#[test]
 fn match_start_cannot_launch_internal_ai_profile_against_human() {
     let mut task = RoomTask::new(
         "live-ai-profile-launch-guard-test".to_string(),
