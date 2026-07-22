@@ -6,7 +6,7 @@ _2026-07-22_
 
 ## Changes
 
-- Jeff's AI is now available as a live opponent, defending with Machine Gunners before expanding, researching Entrenchment, and launching five Tanks with a Scout Car.
+- Jeff's AI is now available as a live opponent, defending with Machine Gunners before expanding, researching Entrenchment, and prioritizing the five Tanks and Scout Car required for its armored attack.
 
 ## Playtest watch
 

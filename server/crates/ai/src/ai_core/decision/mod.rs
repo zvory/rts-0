@@ -53,9 +53,10 @@ use self::policies::{
     active_required_tech_path, active_tech_transition,
 };
 use self::production::{
-    production_building_order, production_uses_building, should_build_extra_factory,
-    should_build_extra_turtle_gun_works, should_save_for_first_tech_unit,
-    should_save_for_required_tech_building, try_build_kind, unit_counts_for_priorities,
+    prioritize_required_units, production_building_order, production_uses_building,
+    should_build_extra_factory, should_build_extra_turtle_gun_works,
+    should_save_for_first_tech_unit, should_save_for_required_tech_building, try_build_kind,
+    unit_counts_for_priorities,
 };
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
@@ -694,6 +695,11 @@ where
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, &effective_unit_priorities);
+    let effective_unit_priorities = prioritize_required_units(
+        &effective_unit_priorities,
+        attack_policy.required_units,
+        &production_unit_counts,
+    );
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
