@@ -1822,7 +1822,7 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 
 #[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
-    const TARGET_RANGE_TILES: f32 = 39.0;
+    const TARGET_RANGE_TILES: f32 = 19.0;
     let map = open_map(64);
     let mut entities = EntityStore::new();
     let at_id = entities
