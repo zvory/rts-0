@@ -20,8 +20,9 @@ use rayon::prelude::*;
 
 use super::collision::COLLISION_EPS_PX;
 use super::pivot_drive::{
-    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
-    PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
+    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND,
+    ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK, PIVOT_VEHICLE_LOOKAHEAD_PX,
+    VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
 use super::scout_car::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
@@ -4466,11 +4467,14 @@ fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
     let e = entities
         .get(anti_tank_gun)
         .expect("anti-tank gun should exist");
+    let expected_tick_turn =
+        ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND.to_radians() / config::TICK_HZ as f32;
     assert!(
-        e.facing() > 0.0 && e.facing() <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
-        "anti-tank gun body should turn by at most the support-weapon turn-rate constant, got {:.4}",
+        (e.facing() - expected_tick_turn).abs() <= 0.0001,
+        "anti-tank gun body should turn at 50 degrees per second, got {:.4} radians after one tick",
         e.facing()
     );
+    assert!((e.facing() - ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK).abs() <= 0.0001);
     assert!(
         moved_distance((sx, sy), (e.pos_x, e.pos_y)) < 0.01,
         "anti-tank gun should pivot before driving when the target is far off its facing"
