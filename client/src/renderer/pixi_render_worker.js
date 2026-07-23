@@ -16,14 +16,44 @@ let visualTimeMs = 0;
 let compatibility = null;
 let visualProfile = null;
 let destroyed = false;
+let activeMessage = null;
 const presentation = createWorkerPresentationState();
 let messageQueue = Promise.resolve();
 
 self.addEventListener("message", (event) => {
   const candidate = event.data;
   messageQueue = messageQueue
-    .then(() => handleMessage(candidate))
+    .then(async () => {
+      activeMessage = candidate;
+      try {
+        await handleMessage(candidate);
+      } finally {
+        activeMessage = null;
+      }
+    })
     .catch((error) => fatal(error, candidate));
+});
+self.addEventListener("messageerror", (event) => {
+  event.preventDefault?.();
+  fatal(codedError("workerMessageError", "Pixi render worker could not decode a host message."), activeMessage);
+});
+self.addEventListener("unhandledrejection", (event) => {
+  event.preventDefault?.();
+  fatal(codedError(
+    "workerUnhandledRejection",
+    event.reason?.message || event.reason || "Unhandled Pixi render worker rejection.",
+  ), activeMessage);
+});
+self.addEventListener("error", (event) => {
+  event.preventDefault?.();
+  const error = codedError(
+    "workerUncaughtError",
+    event.error?.message || event.message || "Uncaught Pixi render worker error.",
+  );
+  error.source = event.filename || "";
+  error.line = event.lineno || 0;
+  error.column = event.colno || 0;
+  fatal(error, activeMessage);
 });
 
 async function handleMessage(candidate) {
@@ -75,6 +105,7 @@ async function initialize(message) {
   generation = message.generation;
   presentation.reset(generation);
   surface = message.payload.configuration?.surface === "mapEditor" ? "mapEditor" : "match";
+  message.payload.canvas.addEventListener?.("webglcontextlost", onWebGlContextLost);
   installPixiWorkerEnvironment(message.payload.canvas, message.payload);
   const pixi = await import(PIXI_WORKER_URL);
   configurePixiForWorker(pixi);
@@ -110,10 +141,14 @@ async function initialize(message) {
     }, { renderer });
     await waitForRendererAssets();
   }
+  const gl = renderer.app.renderer.gl;
   respond(RENDER_WORKER_RESPONSE.READY, generation, {
     backend: "webgl",
     pixiVersion: pixi.VERSION,
-    contextAttributes: renderer.app.renderer.gl?.getContextAttributes?.() || null,
+    contextAttributes: gl?.getContextAttributes?.() || null,
+    glVendor: safeGlParameter(gl, gl?.VENDOR),
+    glRenderer: safeGlParameter(gl, gl?.RENDERER),
+    glVersion: safeGlParameter(gl, gl?.VERSION),
     resolution: renderer.app.renderer.resolution,
     width: renderer.app.renderer.width,
     height: renderer.app.renderer.height,
@@ -159,6 +194,9 @@ async function presentFrame(message) {
     if (terminal?.status !== "presented") {
       throw new Error(terminal?.error?.message || `Pixi frame ${frameId} was not presented.`);
     }
+  }
+  if (renderer?.app?.renderer?.gl?.isContextLost?.()) {
+    throw codedError("webglContextLost", "Pixi render worker WebGL context is lost.");
   }
   const timing = adapter.lastTiming || { workerUpdateMs: performance.now() - startedAt, workerPresentMs: 0 };
   const presentedAtEpochMs = epochNow();
@@ -239,11 +277,45 @@ function fatal(error, candidate) {
   try {
     respond(RENDER_WORKER_RESPONSE.FAILED, candidate?.generation || generation || 1, {
       frameId: candidate?.payload?.frame?.frameId || candidate?.payload?.editor?.frameId || 0,
-      code: "renderWorkerFailure",
+      code: boundedCode(error?.code),
       message,
+      stack: String(error?.stack || "").slice(0, 1_000),
+      source: String(error?.source || "").slice(0, 200),
+      line: boundedLocation(error?.line),
+      column: boundedLocation(error?.column),
     });
   } finally {
     destroy(candidate?.generation || generation || 1);
+  }
+}
+
+function onWebGlContextLost(event) {
+  event.preventDefault?.();
+  fatal(codedError("webglContextLost", "Pixi render worker WebGL context was lost."), activeMessage);
+}
+
+function codedError(code, message) {
+  const error = new Error(String(message || "Unknown Pixi render worker failure."));
+  error.code = boundedCode(code);
+  return error;
+}
+
+function boundedCode(value) {
+  const code = String(value || "renderWorkerFailure").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 80);
+  return code || "renderWorkerFailure";
+}
+
+function boundedLocation(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? Math.min(number, 1_000_000) : 0;
+}
+
+function safeGlParameter(gl, parameter) {
+  if (!gl || parameter == null) return "";
+  try {
+    return String(gl.getParameter(parameter) || "").slice(0, 200);
+  } catch {
+    return "";
   }
 }
 

@@ -242,6 +242,17 @@ update/present timings, `superseded`, bounded `failed`, and `destroyed`. The mes
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
 usable and unchanged.
 
+The worker treats an observed WebGL context loss as a terminal presentation failure; it does not
+silently keep acknowledging black frames. Worker uncaught errors, unhandled rejections, message
+decode failures, and context loss return a bounded stable code plus available source location.
+Terminal responses also carry a bounded stack when the browser provides one.
+The ready response also carries bounded WebGL vendor/renderer/version context. The host retains
+those details with submitted/presented ids, in-flight/pending ids and ages, and last-message age.
+`MatchNetReporter` includes that state in its normal bounded report and immediately emits one
+report for a new terminal incident. A visible-tab frame that remains unacknowledged for at least
+two seconds is notable server-side even when no worker error event arrives; hidden-tab throttling
+does not classify as a worker stall.
+
 The production `PixiWorkerPresentationAdapter` transfers the sole visible canvas during
 construction. It admits one in-flight frame plus one latest pending frame. Replacing the pending
 frame settles its exact id as `superseded`; durable decal messages have an independent retained

@@ -237,6 +237,14 @@ export function validateRenderWorkerResponse(message) {
     if (typeof payload?.message !== "string" || payload.message.length > 500) {
       throw new TypeError("failed response message exceeds its bound");
     }
+    if (payload?.stack != null && (typeof payload.stack !== "string" || payload.stack.length > 1_000)) {
+      throw new TypeError("failed response stack exceeds its bound");
+    }
+    if (payload?.source != null && (typeof payload.source !== "string" || payload.source.length > 200)) {
+      throw new TypeError("failed response source exceeds its bound");
+    }
+    requireOptionalLocation(payload?.line, "failed response line");
+    requireOptionalLocation(payload?.column, "failed response column");
   }
   return message;
 }
@@ -352,4 +360,11 @@ function positiveFinite(value, label) {
 function boundedDpr(value) {
   if (!Number.isFinite(value) || value <= 0 || value > 8) throw new RangeError("dpr must be in (0, 8]");
   return value;
+}
+
+function requireOptionalLocation(value, label) {
+  if (value == null) return;
+  if (!Number.isSafeInteger(value) || value < 0 || value > 1_000_000) {
+    throw new RangeError(`${label} must be a bounded non-negative integer`);
+  }
 }

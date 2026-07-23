@@ -225,6 +225,31 @@ in a match:
   clientFramePhases: [{ label: string, count: u32, maxMs: u16, p95Ms: u16 }], // top 5 allowlisted frame phases
   rendererFramePhases: [{ label: string, count: u32, maxMs: u16, p95Ms: u16 }], // top 5 allowlisted renderer.* phases
   renderDiagnosticCounters: [{ label: string, samples: u32, frames: u32, total: u32, maxFrame: u32 }], // top 5 grouped counters
+  renderWorkerMode: string, // active worker presentation route
+  renderWorkerSubmitted: u32, // cumulative host frame submissions
+  renderWorkerPresented: u32, // cumulative acknowledged presentations
+  renderWorkerFailureCount: u32, // new terminal worker failures since the prior report
+  renderWorkerContextLostCount: u32, // new WebGL context-loss failures since the prior report
+  renderWorkerInFlight: bool,
+  renderWorkerInFlightFrameId: u32,
+  renderWorkerInFlightAgeMs: u32, // age of the unacknowledged in-flight frame
+  renderWorkerPending: bool,
+  renderWorkerPendingFrameId: u32,
+  renderWorkerLastPresentedFrameId: u32,
+  renderWorkerLastPresentedAgeMs: u32,
+  renderWorkerLastMessageAgeMs: u32,
+  renderWorkerErrorCode: string, // bounded stable worker/host failure category
+  renderWorkerErrorMessage: string, // bounded terminal failure detail
+  renderWorkerErrorStack: string, // bounded worker/host stack with control characters flattened
+  renderWorkerErrorSource: string, // bounded worker error-event source when available
+  renderWorkerErrorLine: u32,
+  renderWorkerErrorColumn: u32,
+  renderWorkerBackend: string,
+  renderWorkerPixiVersion: string,
+  renderWorkerGlVendor: string,
+  renderWorkerGlRenderer: string,
+  renderWorkerGlVersion: string,
+  renderWorkerUserAgent: string,
   entityCount: u32,         // latest client-visible entity count context
   selectedCount: u16,       // latest local selection size context
   visibleTileCount: u32,    // latest visible-tile count context

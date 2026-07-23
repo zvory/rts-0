@@ -9,6 +9,8 @@ use crate::lobby::{
 };
 use crate::protocol::ClientNetReport;
 
+mod render_worker;
+
 static NEXT_MATCH_RUN_ID: AtomicU64 = AtomicU64::new(1);
 
 #[macro_export]
@@ -212,45 +214,7 @@ pub fn log_client_net_report(
         "frame_unattributed_p95_ms",
         report.frame_unattributed_p95_ms
     );
-    field!("slow_frame_count", report.slow_frame_count);
-    field!(
-        "frame_work_budget_miss_count",
-        report.frame_work_budget_miss_count
-    );
-    field!(
-        "present_budget_miss_count",
-        report.present_budget_miss_count
-    );
-    text_field!("worst_frame_phase", &report.worst_frame_phase);
-    field!("worst_frame_phase_ms", report.worst_frame_phase_ms);
-    field!("renderer_max_ms", report.renderer_max_ms);
-    field!("renderer_p95_ms", report.renderer_p95_ms);
-    field!("renderer_update_max_ms", report.renderer_update_max_ms);
-    field!("renderer_update_p95_ms", report.renderer_update_p95_ms);
-    field!("renderer_present_max_ms", report.renderer_present_max_ms);
-    field!("renderer_present_p95_ms", report.renderer_present_p95_ms);
-    text_field!("top_renderer_phase", &report.top_renderer_phase);
-    field!("top_renderer_phase_ms", report.top_renderer_phase_ms);
-    text_field!(
-        "top_render_diagnostic_group",
-        &report.top_render_diagnostic_group
-    );
-    field!(
-        "top_render_diagnostic_group_count",
-        report.top_render_diagnostic_group_count
-    );
-    text_field!(
-        "client_frame_phases",
-        &format_client_frame_phases(&report.client_frame_phases)
-    );
-    text_field!(
-        "renderer_frame_phases",
-        &format_client_frame_phases(&report.renderer_frame_phases)
-    );
-    text_field!(
-        "render_diagnostic_counters",
-        &format_client_render_counters(&report.render_diagnostic_counters)
-    );
+    render_worker::append_fields(&mut line, &report);
     field!("entity_count", report.entity_count);
     field!("selected_count", report.selected_count);
     field!("visible_tile_count", report.visible_tile_count);
@@ -779,6 +743,7 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.renderer_present_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
         || report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
+        || render_worker::is_notable(report)
         || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
         || report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS
         || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
@@ -814,7 +779,9 @@ pub fn classify_client_net_report(
     report: &ClientNetReport,
     outbound: &ConnectionReportStats,
 ) -> &'static str {
-    if report.command_rejected > 0 {
+    if let Some(classification) = render_worker::classification(report) {
+        classification
+    } else if report.command_rejected > 0 {
         "command_rejected"
     } else if report.command_issue_to_socket_send_accepted_max_ms
         >= NET_REPORT_COMMAND_SOCKET_SEND_ISSUE_MS
@@ -1163,6 +1130,31 @@ mod tests {
             client_frame_phases: Vec::new(),
             renderer_frame_phases: Vec::new(),
             render_diagnostic_counters: Vec::new(),
+            render_worker_mode: "pixi-webgl-module-worker".to_string(),
+            render_worker_submitted: 600,
+            render_worker_presented: 590,
+            render_worker_failure_count: 0,
+            render_worker_context_lost_count: 0,
+            render_worker_in_flight: false,
+            render_worker_in_flight_frame_id: 0,
+            render_worker_in_flight_age_ms: 0,
+            render_worker_pending: false,
+            render_worker_pending_frame_id: 0,
+            render_worker_last_presented_frame_id: 600,
+            render_worker_last_presented_age_ms: 8,
+            render_worker_last_message_age_ms: 8,
+            render_worker_error_code: String::new(),
+            render_worker_error_message: String::new(),
+            render_worker_error_stack: String::new(),
+            render_worker_error_source: String::new(),
+            render_worker_error_line: 0,
+            render_worker_error_column: 0,
+            render_worker_backend: "webgl".to_string(),
+            render_worker_pixi_version: "8.19.0".to_string(),
+            render_worker_gl_vendor: "WebKit".to_string(),
+            render_worker_gl_renderer: "WebKit WebGL".to_string(),
+            render_worker_gl_version: "WebGL 2.0".to_string(),
+            render_worker_user_agent: "test".to_string(),
             entity_count: 120,
             selected_count: 0,
             visible_tile_count: 500,

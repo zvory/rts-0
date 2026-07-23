@@ -167,7 +167,7 @@ export class Net {
   unpauseGame()
   returnToLobby()
   ping()
-  netReport(report)
+  netReport(report) -> bool                // true only when WebSocket.send accepted the upload
   createSnapshotReportStats()
   consumeSnapshotReportStats()
   noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
@@ -552,7 +552,10 @@ revisioned map/grid/durable lifetimes and keeps one in-flight plus one latest pe
 worker-owned `PixiPresentationAdapter` reconstructs only its ratcheted frame-local compatibility
 facade, updates Pixi-owned staging, and times that work separately from exactly one actual
 `app.render()`. The outer main-thread `match.renderer` phase covers submission only; worker update
-and present timings are returned in the acknowledgment and exposed in worker diagnostics. The Match-owned
+and present timings are returned in the acknowledgment and exposed in worker diagnostics. The
+Match-owned network reporter samples those lifecycle diagnostics, uploads new terminal failures
+immediately, and includes in-flight age plus bounded WebGL/Pixi/error context in periodic reports
+so deployed black-screen incidents are recoverable from server logs. The Match-owned
 `PresentationCoordinator` keeps pending selection/decal metadata keyed by generation and frame id.
 The worker reports durable decal retention independently, and only an asynchronous matching
 `presented` outcome advances the displayed counter or publishes selection; failed/superseded frames
