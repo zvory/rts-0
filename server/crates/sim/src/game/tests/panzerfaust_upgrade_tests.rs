@@ -211,6 +211,12 @@ fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
     let mut game = empty_flat_game(&players());
     let rifleman = spawn_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
     let tank = spawn_on_tile(&mut game, 2, EntityKind::Tank, 18, 8);
+    // Keep this pursuit test independent of the target Tank's return fire.
+    game.state
+        .entities
+        .get_mut(rifleman)
+        .expect("rifleman")
+        .set_invulnerable(true);
     refresh_world(&mut game);
     let start = game
         .state
