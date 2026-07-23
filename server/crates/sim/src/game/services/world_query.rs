@@ -228,7 +228,8 @@ pub(crate) fn unit_explicit_attack_target_valid(
         return false;
     }
     matches!(entities.get(target_id),
-        Some(target) if explicit_attack_target_inside_fixed_arc(attacker, target)
+        Some(target) if crate::rules::target::default_weapon_can_target(attacker.kind, target.kind)
+            && explicit_attack_target_inside_fixed_arc(attacker, target)
             && is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
             && projection::team_visible_world(
                 attacker_owner,

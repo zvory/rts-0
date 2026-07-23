@@ -432,9 +432,10 @@ pub fn default_weapon_target_fit(
     }
 }
 
-/// Miss probability [0.0, 1.0) for an attack. Anti-Tank Gun shells have a 90% miss rate against
-/// infantry-sized targets, while Tank cannon shells have a 50% miss rate against humanoid infantry.
-/// A miss flies straight through without finding anyone; hits that connect deal full damage.
+/// Miss probability [0.0, 1.0) for an attack. Incidental Anti-Tank Gun shell intersections have a
+/// 90% miss rate against infantry-sized targets, while Tank cannon shells have a 50% miss rate
+/// against humanoid infantry. A miss flies straight through without finding anyone; hits that
+/// connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
     default_weapon_profile(attacker_kind)
         .map(|profile| miss_chance_for_weapon(profile, victim_kind))
@@ -443,7 +444,11 @@ pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
 
 pub fn miss_chance_for_weapon(profile: &WeaponProfile, victim_kind: EntityKind) -> f32 {
     match profile.miss_policy {
-        MissPolicy::AntiTankGunVsInfantrySized if anti_tank_gun_miss_target(victim_kind) => 0.90,
+        MissPolicy::AntiTankGunVsInfantrySized
+            if crate::target::is_anti_tank_gun_infantry_target(victim_kind) =>
+        {
+            0.90
+        }
         MissPolicy::TankCannonVsInfantry if tank_cannon_miss_target(victim_kind) => 0.50,
         _ => 0.0,
     }
@@ -477,17 +482,6 @@ pub fn area_damage_after_entrenchment(
     }
     let multiplier = (1.0 - crate::balance::ENTRENCHMENT_AREA_DAMAGE_REDUCTION).clamp(0.0, 1.0);
     ((damage as f32) * multiplier).round().max(0.0) as u32
-}
-
-fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Worker
-            | EntityKind::Golem
-            | EntityKind::Rifleman
-            | EntityKind::Panzerfaust
-            | EntityKind::MachineGunner
-    )
 }
 
 fn tank_cannon_miss_target(kind: EntityKind) -> bool {
