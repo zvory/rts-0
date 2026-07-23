@@ -6,7 +6,7 @@ _2026-07-23_
 
 ## Changes
 
-- Anti-tank guns now ignore infantry for auto-targeting and direct attack orders; support weapons, vehicles, and buildings remain valid targets.
+- Anti-tank guns no longer auto-target or accept direct attack orders against Workers, Golems, Riflemen, Panzerfausts, or Machine Gunners; other target types remain legal.
 
 ## Playtest watch
 
