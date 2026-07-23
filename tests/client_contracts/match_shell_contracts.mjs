@@ -78,13 +78,36 @@ import {
     const pings = [];
     const reports = [];
     const diagnostics = [];
+    let acceptReports = true;
     let resetStats = 0;
     let resetFrame = 0;
     let resetSnapshot = 0;
+    const renderWorkerStats = {
+      mode: "pixi-webgl-module-worker",
+      submitted: 12,
+      presented: 11,
+      failed: 0,
+      contextLost: 0,
+      inFlight: true,
+      inFlightFrameId: 12,
+      inFlightAgeMs: 45,
+      pending: false,
+      pendingFrameId: 0,
+      lastPresentedFrameId: 11,
+      lastPresentedAgeMs: 50,
+      lastWorkerMessageAgeMs: 50,
+      backendInfo: {
+        backend: "webgl",
+        pixiVersion: "8.19.0",
+        glVendor: "WebKit",
+        glRenderer: "WebKit WebGL",
+        glVersion: "WebGL 2.0",
+      },
+    };
     const net = {
       bufferedAmount: 456,
       ping() { pings.push("ping"); },
-      netReport(report) { reports.push(report); },
+      netReport(report) { reports.push(report); return acceptReports; },
       consumeSnapshotReportStats() {
         return {
           snapshotBytesTotal: 1024,
@@ -164,6 +187,7 @@ import {
       matchRunId: "match-run-7",
       getLastSnapshotTick: () => 77,
       getPredictionReportFields: () => ({ predictionMode: "predicting", pendingCommandCount: 4 }),
+      getRenderWorkerDiagnostics: () => renderWorkerStats,
     });
 
     reporter.startMatchPings();
@@ -203,14 +227,47 @@ import {
       reports[0].renderDiagnosticCounters[0].label === "renderer.pixi.displayObject",
       "match net reporter includes grouped render diagnostics",
     );
+    assert(
+      reports[0].renderWorkerInFlightFrameId === 12 &&
+        reports[0].renderWorkerInFlightAgeMs === 45 &&
+        reports[0].renderWorkerPixiVersion === "8.19.0",
+      "match net reporter includes bounded render-worker lifecycle and backend diagnostics",
+    );
     assert(reports[0].hidden === true && reports[0].focused === false, "match net reporter includes document state");
     assert(resetStats === 1 && resetFrame === 1 && resetSnapshot === 1, "match net reporter resets report windows after upload");
     assert(
       diagnostics[0]?.name === "client.send.netReport" && diagnostics[0].payload.pendingCommandCount === 4,
       "match net reporter preserves diagnostics counters",
     );
+    renderWorkerStats.failed = 1;
+    renderWorkerStats.contextLost = 1;
+    renderWorkerStats.inFlight = false;
+    renderWorkerStats.inFlightAgeMs = 0;
+    renderWorkerStats.lastErrorCode = "webglContextLost";
+    renderWorkerStats.lastError = "Pixi render worker WebGL context was lost.";
+    acceptReports = false;
+    reporter.sendRenderWorkerIncident();
+    assert(
+      reports[1].renderWorkerFailureCount === 1 &&
+        reports[1].renderWorkerContextLostCount === 1 &&
+        reports[1].renderWorkerErrorCode === "webglContextLost",
+      "a terminal render-worker incident uploads immediately with delta-counted failure context",
+    );
+    acceptReports = true;
+    reporter.sendNetReport();
+    assert(
+      reports[2].renderWorkerFailureCount === 1 && reports[2].renderWorkerContextLostCount === 1,
+      "a blocked immediate upload preserves the render-worker incident for the next accepted report",
+    );
+    reporter.sendNetReport();
+    assert(
+      reports[3].renderWorkerFailureCount === 0 && reports[3].renderWorkerContextLostCount === 0,
+      "periodic reports do not repeat an accepted terminal render-worker incident",
+    );
     reporter.stopNetReports();
     assert(cleared.includes(2), "match net reporter clears the net-report timer");
+    reporter.sendRenderWorkerIncident();
+    assert(reports.length === 4, "stopped match reporters ignore late render-worker incidents");
   } finally {
     if (priorWindow === undefined) delete globalThis.window;
     else globalThis.window = priorWindow;

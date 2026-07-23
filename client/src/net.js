@@ -365,7 +365,7 @@ export class Net {
    * @param {object} report bounded aggregate metrics
    */
   netReport(report) {
-    this._send(msg.netReport(report));
+    return this._send(msg.netReport(report));
   }
 
   /** Report recent human input separately from automatic connection traffic. */

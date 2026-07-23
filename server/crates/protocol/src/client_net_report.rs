@@ -308,6 +308,56 @@ pub struct ClientNetReport {
     #[serde(default, deserialize_with = "deserialize_client_render_counters")]
     pub render_diagnostic_counters: Vec<ClientRenderCounterReport>,
     #[serde(default)]
+    pub render_worker_mode: String,
+    #[serde(default)]
+    pub render_worker_submitted: u32,
+    #[serde(default)]
+    pub render_worker_presented: u32,
+    #[serde(default)]
+    pub render_worker_failure_count: u32,
+    #[serde(default)]
+    pub render_worker_context_lost_count: u32,
+    #[serde(default)]
+    pub render_worker_in_flight: bool,
+    #[serde(default)]
+    pub render_worker_in_flight_frame_id: u32,
+    #[serde(default)]
+    pub render_worker_in_flight_age_ms: u32,
+    #[serde(default)]
+    pub render_worker_pending: bool,
+    #[serde(default)]
+    pub render_worker_pending_frame_id: u32,
+    #[serde(default)]
+    pub render_worker_last_presented_frame_id: u32,
+    #[serde(default)]
+    pub render_worker_last_presented_age_ms: u32,
+    #[serde(default)]
+    pub render_worker_last_message_age_ms: u32,
+    #[serde(default)]
+    pub render_worker_error_code: String,
+    #[serde(default)]
+    pub render_worker_error_message: String,
+    #[serde(default)]
+    pub render_worker_error_stack: String,
+    #[serde(default)]
+    pub render_worker_error_source: String,
+    #[serde(default)]
+    pub render_worker_error_line: u32,
+    #[serde(default)]
+    pub render_worker_error_column: u32,
+    #[serde(default)]
+    pub render_worker_backend: String,
+    #[serde(default)]
+    pub render_worker_pixi_version: String,
+    #[serde(default)]
+    pub render_worker_gl_vendor: String,
+    #[serde(default)]
+    pub render_worker_gl_renderer: String,
+    #[serde(default)]
+    pub render_worker_gl_version: String,
+    #[serde(default)]
+    pub render_worker_user_agent: String,
+    #[serde(default)]
     pub entity_count: u32,
     #[serde(default)]
     pub selected_count: u16,

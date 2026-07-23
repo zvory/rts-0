@@ -80,6 +80,8 @@ export class PixiWorkerPresentationAdapter {
     this._lastPresentedFrameId = 0;
     this._lastCapturedPixels = null;
     this._renderFrameCount = 0;
+    this._lastPresentedAtMs = 0;
+    this._lastWorkerMessageAtMs = 0;
     this._lastReadiness = { frame: 0, assets: [], ready: false, failedAssets: [], pendingAssets: [] };
     this._backendInfo = null;
     this._stats = freshStats();
@@ -88,9 +90,22 @@ export class PixiWorkerPresentationAdapter {
       renderer: { width: canvas.width, height: canvas.height, gl: null, type: "webgl-worker" },
     };
     this._onMessage = (event) => this._handleMessage(event.data);
-    this._onError = (event) => this._failFatal(event.error || new Error(event.message || "Pixi render worker failed."));
+    this._onError = (event) => this._failFatal(
+      event.error || new Error(event.message || "Pixi render worker failed."),
+      {
+        code: "workerErrorEvent",
+        source: event.filename,
+        line: event.lineno,
+        column: event.colno,
+      },
+    );
+    this._onMessageError = () => this._failFatal(
+      new Error("Pixi render worker returned an unreadable message."),
+      { code: "workerMessageErrorEvent" },
+    );
     worker.addEventListener("message", this._onMessage);
     worker.addEventListener("error", this._onError);
+    worker.addEventListener("messageerror", this._onMessageError);
     this._control = {
       reset: () => this._resetStats(),
       snapshot: () => this.diagnostics(),
@@ -115,7 +130,7 @@ export class PixiWorkerPresentationAdapter {
       this._schedule(job);
     } catch (error) {
       this._settleJob(job, PRESENTATION_OUTCOME.FAILED, error);
-      this._failFatal(error);
+      this._failFatal(error, { code: "hostRenderFailure" });
     }
     return job.submission;
   }
@@ -390,18 +405,25 @@ export class PixiWorkerPresentationAdapter {
 
   _handleMessage(candidate) {
     if (this._destroyed) return;
+    this._lastWorkerMessageAtMs = epochNow();
     let message;
     try {
       message = validateRenderWorkerResponse(candidate);
     } catch (error) {
-      this._failFatal(error);
+      this._failFatal(error, { code: "workerProtocolFailure" });
       return;
     }
     // Worker failures are lifecycle-wide, not generation-local. The worker sends
     // FAILED and then closes, so ignoring an older generation here would strand
     // any current-generation job that was queued behind the failed frame.
     if (message.type === RENDER_WORKER_RESPONSE.FAILED) {
-      this._failFatal(new Error(message.payload.message || "Pixi render worker failed."));
+      this._failFatal(new Error(message.payload.message || "Pixi render worker failed."), {
+        code: message.payload.code,
+        stack: message.payload.stack,
+        source: message.payload.source,
+        line: message.payload.line,
+        column: message.payload.column,
+      });
       return;
     }
     if (message.generation !== this._generation) {
@@ -448,7 +470,10 @@ export class PixiWorkerPresentationAdapter {
   _acceptPresented(message) {
     const job = this._inFlight;
     if (!job || job.frameId !== message.payload.frameId || job.generation !== message.generation) {
-      this._failFatal(new Error(`Unexpected worker presentation ${message.generation}:${message.payload.frameId}.`));
+      this._failFatal(
+        new Error(`Unexpected worker presentation ${message.generation}:${message.payload.frameId}.`),
+        { code: "workerProtocolFailure" },
+      );
       return;
     }
     queueMicrotask(() => this._commitPresented(message, job));
@@ -458,6 +483,7 @@ export class PixiWorkerPresentationAdapter {
     if (this._destroyed || this._fatal || this._inFlight !== job || message.generation !== this._generation) return;
     this._inFlight = null;
     this._lastPresentedFrameId = job.frameId;
+    this._lastPresentedAtMs = epochNow();
     if (message.payload.rgba instanceof ArrayBuffer) {
       this._lastCapturedPixels = {
         frameId: job.frameId,
@@ -516,11 +542,17 @@ export class PixiWorkerPresentationAdapter {
     return pending;
   }
 
-  _failFatal(error) {
+  _failFatal(error, details = {}) {
     if (this._fatal || this._destroyed) return;
     this._fatal = error instanceof Error ? error : new Error(String(error));
     this._stats.failed += 1;
     this._stats.lastError = this._fatal.message.slice(0, 500);
+    this._stats.lastErrorCode = boundedDiagnosticText(details.code || "hostFailure", 80, "hostFailure");
+    this._stats.lastErrorStack = boundedDiagnosticText(details.stack || this._fatal.stack, 1_000);
+    this._stats.lastErrorSource = boundedDiagnosticText(details.source, 200);
+    this._stats.lastErrorLine = boundedLocation(details.line);
+    this._stats.lastErrorColumn = boundedLocation(details.column);
+    if (this._stats.lastErrorCode === "webglContextLost") this._stats.contextLost += 1;
     this._settleJob(this._inFlight, PRESENTATION_OUTCOME.FAILED, this._fatal);
     this._settleJob(this._pending, PRESENTATION_OUTCOME.FAILED, this._fatal);
     this._inFlight = null;
@@ -532,8 +564,14 @@ export class PixiWorkerPresentationAdapter {
     this._showFatal(this._fatal.message);
     this._teardownWorker();
     this._recordCounter("renderWorker.frames.failed");
-    console.error("[RTS_RENDER_WORKER] fatal renderer error", this._fatal);
     this._publishStats();
+    const incident = this._publicStats();
+    queueMicrotask(() => {
+      try {
+        this._sources?.renderIncident?.(incident);
+      } catch {}
+    });
+    console.error("[RTS_RENDER_WORKER] fatal renderer error", this._fatal);
   }
 
   _settleDecalWaiters(value) {
@@ -564,6 +602,7 @@ export class PixiWorkerPresentationAdapter {
     this._workerTerminated = true;
     this._worker.removeEventListener("message", this._onMessage);
     this._worker.removeEventListener("error", this._onError);
+    this._worker.removeEventListener("messageerror", this._onMessageError);
     this._worker.terminate();
     this._canvas.remove();
   }
@@ -589,6 +628,12 @@ export class PixiWorkerPresentationAdapter {
       destroyed: this._destroyed,
       backendInfo: this._backendInfo,
       lastError: this._stats.lastError,
+      lastErrorCode: this._stats.lastErrorCode,
+      lastErrorStack: this._stats.lastErrorStack,
+      lastErrorSource: this._stats.lastErrorSource,
+      lastErrorLine: this._stats.lastErrorLine,
+      lastErrorColumn: this._stats.lastErrorColumn,
+      contextLost: this._stats.contextLost,
     };
     this._stats = freshStats();
     Object.assign(this._stats, active);
@@ -596,6 +641,7 @@ export class PixiWorkerPresentationAdapter {
   }
 
   _publicStats() {
+    const now = epochNow();
     return {
       mode: "pixi-webgl-module-worker",
       surface: this.surface,
@@ -609,11 +655,22 @@ export class PixiWorkerPresentationAdapter {
       longFrames: this._stats.longFrames,
       staleResponses: this._stats.staleResponses,
       lastError: this._stats.lastError,
+      lastErrorCode: this._stats.lastErrorCode,
+      lastErrorStack: this._stats.lastErrorStack,
+      lastErrorSource: this._stats.lastErrorSource,
+      lastErrorLine: this._stats.lastErrorLine,
+      lastErrorColumn: this._stats.lastErrorColumn,
+      contextLost: this._stats.contextLost,
       inFlight: !!this._inFlight,
+      inFlightFrameId: this._inFlight?.frameId || 0,
+      inFlightAgeMs: this._inFlight ? Math.max(0, now - this._inFlight.enqueuedAtMs) : 0,
       pending: !!this._pending,
+      pendingFrameId: this._pending?.frameId || 0,
       captureMode: this._captureMode,
       clonedBytes: this._stats.clonedBytes,
       lastPresentedFrameId: this._lastPresentedFrameId,
+      lastPresentedAgeMs: this._lastPresentedAtMs ? Math.max(0, now - this._lastPresentedAtMs) : 0,
+      lastWorkerMessageAgeMs: this._lastWorkerMessageAtMs ? Math.max(0, now - this._lastWorkerMessageAtMs) : 0,
       destroyed: this._destroyed,
       backendInfo: this._backendInfo,
       mainSubmitMs: summarize(this._stats.mainSubmitMs),
@@ -780,10 +837,26 @@ function freshStats() {
     staleResponses: 0,
     clonedBytes: 0,
     lastError: "",
+    lastErrorCode: "",
+    lastErrorStack: "",
+    lastErrorSource: "",
+    lastErrorLine: 0,
+    lastErrorColumn: 0,
+    contextLost: 0,
     mainSubmitMs: [],
     queueAgeMs: [],
     displayAgeMs: [],
     workerUpdateMs: [],
     workerPresentMs: [],
   };
+}
+
+function boundedDiagnosticText(value, maxLength, fallback = "") {
+  const text = String(value || "").replace(/[\u0000-\u001f\u007f]/g, "_").slice(0, maxLength);
+  return text || fallback;
+}
+
+function boundedLocation(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? Math.min(number, 1_000_000) : 0;
 }

@@ -239,6 +239,7 @@ export class Match {
       matchRunId: this.matchRunId,
       getLastSnapshotTick: () => this.lastSnapshotTick,
       getPredictionReportFields: () => this.predictionReportFields(),
+      getRenderWorkerDiagnostics: () => this.renderer?.diagnostics?.() || {},
     });
     this.commandIssuer = {
       issueCommand: (command, options = {}) => {

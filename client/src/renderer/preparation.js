@@ -8,6 +8,7 @@ export async function prepareRenderer(canvasParent, backendBundle) {
     profiler: () => source.match?.frameProfiler,
     visualProfile: () => source.match?.visualProfile,
     staticMap: () => source.match?.presentationAssembler?.staticMap,
+    renderIncident: () => source.match?.netReporter?.sendRenderWorkerIncident?.(),
   });
   return {
     backendBundle: resolvedBackendBundle,

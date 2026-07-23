@@ -17,6 +17,7 @@ export class MatchNetReporter {
     matchRunId = "",
     getLastSnapshotTick = () => 0,
     getPredictionReportFields = () => ({}),
+    getRenderWorkerDiagnostics = () => ({}),
   }) {
     this.net = net;
     this.health = health;
@@ -26,6 +27,9 @@ export class MatchNetReporter {
     this.matchRunId = matchRunId;
     this.getLastSnapshotTick = getLastSnapshotTick;
     this.getPredictionReportFields = getPredictionReportFields;
+    this.getRenderWorkerDiagnostics = getRenderWorkerDiagnostics;
+    this.renderWorkerBaseline = { failed: 0, contextLost: 0 };
+    this.nextRenderWorkerBaseline = this.renderWorkerBaseline;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
   }
@@ -53,6 +57,11 @@ export class MatchNetReporter {
       clearInterval(this.netReportTimer);
       this.netReportTimer = undefined;
     }
+  }
+
+  sendRenderWorkerIncident() {
+    if (this.netReportTimer === undefined) return;
+    this.sendNetReport();
   }
 
   sendNetReport() {
@@ -89,6 +98,7 @@ export class MatchNetReporter {
       frameGapMaxMs: clampU16(stats.frameGapMaxMs),
       fpsEstimate: clampU16(avgFrameMs > 0 ? 1000 / avgFrameMs : 0),
       ...clientPerfReportFields(this.frameProfiler),
+      ...this.consumeRenderWorkerReportFields(),
       commandBurstBucketMs: clampU16(stats.commandBurstBucketMs),
       commandBurstMax: clampU16(stats.commandBurstMax),
       commandBurstFrameGapMaxMs: clampU16(stats.commandBurstFrameGapMaxMs),
@@ -104,7 +114,8 @@ export class MatchNetReporter {
       headOfLineCount: clampU32(metrics.issues.headOfLine.count),
       ...this.getPredictionReportFields(),
     };
-    this.net.netReport(report);
+    const accepted = this.net.netReport(report);
+    if (accepted !== false) this.renderWorkerBaseline = this.nextRenderWorkerBaseline;
     this.diagnostics?.count("client.send.netReport", {
       rttMs: report.rttMs,
       rttMaxMs: report.rttMaxMs,
@@ -126,11 +137,58 @@ export class MatchNetReporter {
       worstFramePhase: report.worstFramePhase,
       topRendererPhase: report.topRendererPhase,
       topRenderDiagnosticGroup: report.topRenderDiagnosticGroup,
+      renderWorkerFailureCount: report.renderWorkerFailureCount,
+      renderWorkerContextLostCount: report.renderWorkerContextLostCount,
+      renderWorkerInFlightAgeMs: report.renderWorkerInFlightAgeMs,
+      renderWorkerErrorCode: report.renderWorkerErrorCode,
     });
     this.health.resetReportStats();
     this.frameProfiler?.resetReportWindow?.();
     this.snapshotProcessingReport.reset();
   }
+
+  consumeRenderWorkerReportFields() {
+    const stats = this.getRenderWorkerDiagnostics?.() || {};
+    const failed = clampU32(stats.failed);
+    const contextLost = clampU32(stats.contextLost);
+    const fields = renderWorkerReportFields(stats, {
+      failureCount: Math.max(0, failed - this.renderWorkerBaseline.failed),
+      contextLostCount: Math.max(0, contextLost - this.renderWorkerBaseline.contextLost),
+    });
+    this.nextRenderWorkerBaseline = { failed, contextLost };
+    return fields;
+  }
+}
+
+export function renderWorkerReportFields(stats = {}, deltas = {}) {
+  const backend = stats.backendInfo || {};
+  return {
+    renderWorkerMode: clampReportLabel(stats.mode),
+    renderWorkerSubmitted: clampU32(stats.submitted),
+    renderWorkerPresented: clampU32(stats.presented),
+    renderWorkerFailureCount: clampU32(deltas.failureCount),
+    renderWorkerContextLostCount: clampU32(deltas.contextLostCount),
+    renderWorkerInFlight: !!stats.inFlight,
+    renderWorkerInFlightFrameId: clampU32(stats.inFlightFrameId),
+    renderWorkerInFlightAgeMs: clampU32(stats.inFlightAgeMs),
+    renderWorkerPending: !!stats.pending,
+    renderWorkerPendingFrameId: clampU32(stats.pendingFrameId),
+    renderWorkerLastPresentedFrameId: clampU32(stats.lastPresentedFrameId),
+    renderWorkerLastPresentedAgeMs: clampU32(stats.lastPresentedAgeMs),
+    renderWorkerLastMessageAgeMs: clampU32(stats.lastWorkerMessageAgeMs),
+    renderWorkerErrorCode: clampReportLabel(stats.lastErrorCode),
+    renderWorkerErrorMessage: clampDiagnosticText(stats.lastError, 500),
+    renderWorkerErrorStack: clampDiagnosticText(stats.lastErrorStack, 1_000),
+    renderWorkerErrorSource: clampDiagnosticText(stats.lastErrorSource, 200),
+    renderWorkerErrorLine: clampU32(stats.lastErrorLine),
+    renderWorkerErrorColumn: clampU32(stats.lastErrorColumn),
+    renderWorkerBackend: clampReportLabel(backend.backend),
+    renderWorkerPixiVersion: clampReportLabel(backend.pixiVersion),
+    renderWorkerGlVendor: clampDiagnosticText(backend.glVendor, 200),
+    renderWorkerGlRenderer: clampDiagnosticText(backend.glRenderer, 200),
+    renderWorkerGlVersion: clampDiagnosticText(backend.glVersion, 200),
+    renderWorkerUserAgent: clampDiagnosticText(globalThis.navigator?.userAgent, 300),
+  };
 }
 
 export function predictionReportFields({ prediction, predictionAdapter } = {}) {
@@ -316,6 +374,10 @@ function stableDisableReasonBucket(reason) {
 
 function clampReportLabel(value) {
   return String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 64);
+}
+
+function clampDiagnosticText(value, maxLength) {
+  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, "_").slice(0, maxLength);
 }
 
 function clampU16(value) {

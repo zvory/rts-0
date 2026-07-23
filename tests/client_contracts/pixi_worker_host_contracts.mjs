@@ -132,8 +132,12 @@ async function generationAndFatalContracts() {
     console.error = () => {};
     staleFailureFixture.worker.emit(response(RENDER_WORKER_RESPONSE.FAILED, 1, {
       frameId: staleFailureOldFrame.frameId,
-      code: "renderWorkerFailure",
+      code: "webglContextLost",
       message: "old generation render failed",
+      stack: "Error: old generation render failed\n    at pixi_render_worker.js:42:7",
+      source: "pixi_render_worker.js",
+      line: 42,
+      column: 7,
     }));
   } finally {
     console.error = savedConsoleError;
@@ -143,6 +147,15 @@ async function generationAndFatalContracts() {
   assert(staleFailureFixture.adapter.terminalFailure()?.message === "old generation render failed"
       && staleFailureFixture.worker.terminated === 1,
     "stale-generation worker failure remains lifecycle-fatal instead of leaving a dead worker active");
+  await Promise.resolve();
+  assert(
+    staleFailureFixture.adapter.diagnostics().lastErrorCode === "webglContextLost" &&
+      staleFailureFixture.adapter.diagnostics().contextLost === 1 &&
+      staleFailureFixture.adapter.diagnostics().lastErrorStack.includes("pixi_render_worker.js:42:7") &&
+      staleFailureFixture.adapter.diagnostics().lastErrorSource === "pixi_render_worker.js" &&
+      staleFailureFixture.incidents.length === 1,
+    "worker failures preserve bounded cause/source diagnostics and immediately notify the match reporter",
+  );
   staleFailureFixture.adapter.destroy();
 
   const postFailureFixture = createFixture();
@@ -250,11 +263,13 @@ function createFixture({ surface = "match" } = {}) {
       };
     },
   };
+  const incidents = [];
   const adapter = new PixiWorkerPresentationAdapter(root, canvas, worker, {
     state: () => ({ resources: {}, _curById: new Map(), _prevById: new Map() }),
     staticMap: () => assembler.staticMap,
+    renderIncident: (incident) => incidents.push(incident),
   }, { surface });
-  return { adapter, worker, canvas, root, assembler, map };
+  return { adapter, worker, canvas, root, assembler, map, incidents };
 }
 
 function assemble(assembler, tick) {
