@@ -230,6 +230,9 @@ const approvedCurrentFactionFiles = new Set([
   // helper is the rules API that downstream sim/client mirrors consume.
   "server/crates/rules/src/balance/entrenchment.rs",
   "server/crates/rules/src/balance/stats.rs",
+  // Support-weapon setup and teardown durations are intrinsic per-kind balance policy shared by
+  // command, combat, movement, and order-execution paths.
+  "server/crates/rules/src/balance/support_weapons.rs",
   // Catalog dump tool projects current catalog stats for parity checks.
   "server/crates/rules/src/bin/dump-faction-catalog.rs",
   "server/crates/rules/src/combat.rs",
