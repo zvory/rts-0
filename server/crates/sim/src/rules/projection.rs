@@ -191,6 +191,11 @@ pub fn attack_event_visible_to_team(
         || team_visible_world(viewer, target_x, target_y, fog, teams)
 }
 
+/// Whether a direct shot exposes its attacker through transient and actionable firing reveals.
+pub(crate) fn shot_reveals_attacker(victim_kind: EntityKind) -> bool {
+    victim_kind != EntityKind::TankTrap
+}
+
 pub fn event_visible_to_with_smoke(
     viewer: u32,
     event_origin_x: f32,

@@ -304,6 +304,91 @@ fn tank_firing_from_fog_projects_as_actionable_snapshot_entity() {
 }
 
 #[test]
+fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let trap_pos = game.state.map.tile_center(10, 10);
+    let shooter_pos = (trap_pos.0 + config::TILE_SIZE as f32 * 5.0, trap_pos.1);
+    let spotter_pos = (trap_pos.0 - config::TILE_SIZE as f32 * 8.0, trap_pos.1);
+    let trap = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
+        .expect("tank trap should spawn");
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("spotter should spawn");
+    let shooter = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Tank, shooter_pos.0, shooter_pos.1)
+        .expect("enemy tank should spawn");
+    if let Some(shooter_entity) = game.state.entities.get_mut(shooter) {
+        let facing = (trap_pos.1 - shooter_entity.pos_y).atan2(trap_pos.0 - shooter_entity.pos_x);
+        shooter_entity.set_facing(facing);
+        shooter_entity.set_weapon_facing(facing);
+        shooter_entity.set_order(Order::attack(trap));
+        shooter_entity.set_target_id(Some(trap));
+    }
+    refresh_visibility_for_test(&mut game);
+
+    assert!(
+        game.state.fog.is_visible_world(1, trap_pos.0, trap_pos.1),
+        "fixture requires the Tank Trap owner to see the attacked tile"
+    );
+    assert!(
+        !game
+            .state
+            .fog
+            .is_visible_world(1, shooter_pos.0, shooter_pos.1),
+        "fixture requires the attacker to begin hidden from the Tank Trap owner",
+    );
+
+    let trap_hp = game
+        .state
+        .entities
+        .get(trap)
+        .expect("tank trap should exist")
+        .hp;
+    let events = game.tick();
+    advance_to_fog_refresh(&mut game);
+
+    assert!(
+        game.state
+            .entities
+            .get(trap)
+            .is_some_and(|entity| entity.hp < trap_hp),
+        "the hidden attacker must actually shoot the Tank Trap in this fixture"
+    );
+    assert!(
+        events.iter().any(|(player, events)| {
+            *player == 1
+                && events.iter().any(|event| {
+                    matches!(
+                        event,
+                        Event::Attack {
+                            from,
+                            to,
+                            reveal: None,
+                            ..
+                        } if *from == shooter && *to == trap
+                    )
+                })
+        }),
+        "the visible Tank Trap hit must deliver an attack event without a transient shooter reveal"
+    );
+    assert!(
+        !game
+            .snapshot_for(1)
+            .entities
+            .iter()
+            .any(|entity| entity.id == shooter),
+        "shooting a Tank Trap must not grant its owner actionable sight of the attacker"
+    );
+}
+
+#[test]
 fn third_party_combat_does_not_make_hidden_shooter_actionable() {
     let players = three_player_combat_fixture();
     let mut game = empty_flat_game(&players);

@@ -95,7 +95,7 @@ pub(super) fn fire_tank_coax_system(
                 continue;
             }
         }
-        let shot_victim_owner = apply_damage(
+        let shot_victim = apply_damage(
             map,
             entities,
             blockers,
@@ -117,14 +117,14 @@ pub(super) fn fire_tank_coax_system(
             0.0,
             tick,
         );
-        if let Some(victim_owner) = shot_victim_owner {
+        if let Some(shot) = shot_victim.filter(|shot| shot.reveals_attacker) {
             let player_ids = events.keys().copied().collect::<Vec<_>>();
             record_firing_reveals_for_victim_team(
                 firing_reveals,
                 player_ids,
                 fog,
                 teams,
-                victim_owner,
+                shot.victim_owner,
                 snapshot.owner,
                 id,
                 (snapshot.pos_x, snapshot.pos_y),

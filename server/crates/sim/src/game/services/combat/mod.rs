@@ -471,7 +471,7 @@ pub(in crate::game) fn combat_system(
                 } else {
                     let extra_miss_chance =
                         entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
-                    let shot_victim_owner = apply_damage(
+                    let shot_victim = apply_damage(
                         map,
                         entities,
                         &blockers,
@@ -494,14 +494,14 @@ pub(in crate::game) fn combat_system(
                         tick,
                     );
                     if is_unit {
-                        if let Some(victim_owner) = shot_victim_owner {
+                        if let Some(shot) = shot_victim.filter(|shot| shot.reveals_attacker) {
                             let player_ids = events.keys().copied().collect::<Vec<_>>();
                             record_firing_reveals_for_victim_team(
                                 firing_reveals,
                                 player_ids,
                                 fog,
                                 teams,
-                                victim_owner,
+                                shot.victim_owner,
                                 owner,
                                 id,
                                 (px, py),
