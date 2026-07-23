@@ -497,3 +497,25 @@ pub struct ClientNetReport {
     #[serde(default)]
     pub prediction_replay_budget_exceeded_count: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ClientNetReport;
+
+    #[test]
+    fn render_worker_fields_deserialize_and_default() {
+        let report: ClientNetReport = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 1, "elapsedMs": 0, "matchTick": 0, "rttMs": 0,
+            "rttMaxMs": 0, "badRttSamples": 0, "snapshotJitterMs": 0,
+            "snapshotGapMaxMs": 0, "jitterSamples": 0, "snapshots": 0,
+            "frameGapMaxMs": 0, "fpsEstimate": 0, "hidden": false,
+            "focused": true, "wsBufferedBytes": 0, "serverTickMs": 0,
+            "serverLagMs": 0, "slowTickCount": 0, "headOfLineCount": 0,
+            "renderWorkerFailureCount": 1, "renderWorkerErrorCode": "workerUncaughtError"
+        }))
+        .expect("net report");
+        assert_eq!(report.render_worker_failure_count, 1);
+        assert_eq!(report.render_worker_error_code, "workerUncaughtError");
+        assert_eq!(report.render_worker_context_lost_count, 0);
+    }
+}

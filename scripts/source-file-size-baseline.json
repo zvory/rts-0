@@ -65,8 +65,8 @@
     },
     {
       "path": "server/src/structured_log.rs",
-      "lines": 1538,
-      "reason": "Frame-budget Phase 1 adds stable update, present, RAF-dispatch, unattributed-work, and 60 FPS budget diagnostics to the centralized structured-log classifier; keep ratcheting until net-report classification is extracted."
+      "lines": 1530,
+      "reason": "Render-worker diagnostics extracted their logging and classification into a focused module; keep ratcheting until the remaining net-report classification is extracted."
     },
     {
       "path": "tests/minimap_input_contracts.mjs",

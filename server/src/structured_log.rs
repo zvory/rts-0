@@ -9,6 +9,8 @@ use crate::lobby::{
 };
 use crate::protocol::ClientNetReport;
 
+mod render_worker;
+
 static NEXT_MATCH_RUN_ID: AtomicU64 = AtomicU64::new(1);
 
 #[macro_export]
@@ -62,7 +64,6 @@ pub const NET_REPORT_FRAME_WORK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_FRAME_WORK_P95_ISSUE_MS: u16 = 24;
 pub const NET_REPORT_RENDERER_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_RENDERER_P95_ISSUE_MS: u16 = 16;
-pub const NET_REPORT_RENDER_WORKER_STALL_ISSUE_MS: u32 = 2_000;
 pub const NET_REPORT_WS_BUFFERED_BYTES_ISSUE: u32 = 64 * 1024;
 pub const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
@@ -213,112 +214,7 @@ pub fn log_client_net_report(
         "frame_unattributed_p95_ms",
         report.frame_unattributed_p95_ms
     );
-    field!("slow_frame_count", report.slow_frame_count);
-    field!(
-        "frame_work_budget_miss_count",
-        report.frame_work_budget_miss_count
-    );
-    field!(
-        "present_budget_miss_count",
-        report.present_budget_miss_count
-    );
-    text_field!("worst_frame_phase", &report.worst_frame_phase);
-    field!("worst_frame_phase_ms", report.worst_frame_phase_ms);
-    field!("renderer_max_ms", report.renderer_max_ms);
-    field!("renderer_p95_ms", report.renderer_p95_ms);
-    field!("renderer_update_max_ms", report.renderer_update_max_ms);
-    field!("renderer_update_p95_ms", report.renderer_update_p95_ms);
-    field!("renderer_present_max_ms", report.renderer_present_max_ms);
-    field!("renderer_present_p95_ms", report.renderer_present_p95_ms);
-    text_field!("top_renderer_phase", &report.top_renderer_phase);
-    field!("top_renderer_phase_ms", report.top_renderer_phase_ms);
-    text_field!(
-        "top_render_diagnostic_group",
-        &report.top_render_diagnostic_group
-    );
-    field!(
-        "top_render_diagnostic_group_count",
-        report.top_render_diagnostic_group_count
-    );
-    text_field!(
-        "client_frame_phases",
-        &format_client_frame_phases(&report.client_frame_phases)
-    );
-    text_field!(
-        "renderer_frame_phases",
-        &format_client_frame_phases(&report.renderer_frame_phases)
-    );
-    text_field!(
-        "render_diagnostic_counters",
-        &format_client_render_counters(&report.render_diagnostic_counters)
-    );
-    text_field!("render_worker_mode", &report.render_worker_mode);
-    field!("render_worker_submitted", report.render_worker_submitted);
-    field!("render_worker_presented", report.render_worker_presented);
-    field!(
-        "render_worker_failure_count",
-        report.render_worker_failure_count
-    );
-    field!(
-        "render_worker_context_lost_count",
-        report.render_worker_context_lost_count
-    );
-    field!("render_worker_in_flight", report.render_worker_in_flight);
-    field!(
-        "render_worker_in_flight_frame_id",
-        report.render_worker_in_flight_frame_id
-    );
-    field!(
-        "render_worker_in_flight_age_ms",
-        report.render_worker_in_flight_age_ms
-    );
-    field!("render_worker_pending", report.render_worker_pending);
-    field!(
-        "render_worker_pending_frame_id",
-        report.render_worker_pending_frame_id
-    );
-    field!(
-        "render_worker_last_presented_frame_id",
-        report.render_worker_last_presented_frame_id
-    );
-    field!(
-        "render_worker_last_presented_age_ms",
-        report.render_worker_last_presented_age_ms
-    );
-    field!(
-        "render_worker_last_message_age_ms",
-        report.render_worker_last_message_age_ms
-    );
-    text_field!("render_worker_error_code", &report.render_worker_error_code);
-    text_field!(
-        "render_worker_error_message",
-        &report.render_worker_error_message
-    );
-    text_field!(
-        "render_worker_error_stack",
-        &report.render_worker_error_stack
-    );
-    text_field!(
-        "render_worker_error_source",
-        &report.render_worker_error_source
-    );
-    field!("render_worker_error_line", report.render_worker_error_line);
-    field!(
-        "render_worker_error_column",
-        report.render_worker_error_column
-    );
-    text_field!("render_worker_backend", &report.render_worker_backend);
-    text_field!(
-        "render_worker_pixi_version",
-        &report.render_worker_pixi_version
-    );
-    text_field!("render_worker_gl_vendor", &report.render_worker_gl_vendor);
-    text_field!(
-        "render_worker_gl_renderer",
-        &report.render_worker_gl_renderer
-    );
-    text_field!("render_worker_gl_version", &report.render_worker_gl_version);
-    text_field!("render_worker_user_agent", &report.render_worker_user_agent);
+    render_worker::append_fields(&mut line, &report);
     field!("entity_count", report.entity_count);
     field!("selected_count", report.selected_count);
     field!("visible_tile_count", report.visible_tile_count);
@@ -847,11 +743,7 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.renderer_present_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
         || report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
-        || report.render_worker_failure_count > 0
-        || report.render_worker_context_lost_count > 0
-        || (report.render_worker_in_flight
-            && !report.hidden
-            && report.render_worker_in_flight_age_ms >= NET_REPORT_RENDER_WORKER_STALL_ISSUE_MS)
+        || render_worker::is_notable(report)
         || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
         || report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS
         || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
@@ -887,18 +779,8 @@ pub fn classify_client_net_report(
     report: &ClientNetReport,
     outbound: &ConnectionReportStats,
 ) -> &'static str {
-    if report.render_worker_context_lost_count > 0
-        || (report.render_worker_failure_count > 0
-            && report.render_worker_error_code == "webglContextLost")
-    {
-        "client_render_worker_context_lost"
-    } else if report.render_worker_failure_count > 0 {
-        "client_render_worker_failure"
-    } else if report.render_worker_in_flight
-        && !report.hidden
-        && report.render_worker_in_flight_age_ms >= NET_REPORT_RENDER_WORKER_STALL_ISSUE_MS
-    {
-        "client_render_worker_stall"
+    if let Some(classification) = render_worker::classification(report) {
+        classification
     } else if report.command_rejected > 0 {
         "command_rejected"
     } else if report.command_issue_to_socket_send_accepted_max_ms
@@ -1413,31 +1295,6 @@ mod tests {
         report.slow_frame_count = 1;
         assert!(notable(&report));
         assert_eq!(classify(&report), "client_frame_stall");
-    }
-
-    #[test]
-    fn net_report_prioritizes_render_worker_failures_and_visible_stalls() {
-        let mut context_lost = clean_report();
-        context_lost.render_worker_failure_count = 1;
-        context_lost.render_worker_context_lost_count = 1;
-        context_lost.render_worker_error_code = "webglContextLost".to_string();
-        assert!(notable(&context_lost));
-        assert_eq!(classify(&context_lost), "client_render_worker_context_lost");
-
-        let mut failed = clean_report();
-        failed.render_worker_failure_count = 1;
-        failed.render_worker_error_code = "workerUncaughtError".to_string();
-        assert!(notable(&failed));
-        assert_eq!(classify(&failed), "client_render_worker_failure");
-
-        let mut stalled = clean_report();
-        stalled.render_worker_in_flight = true;
-        stalled.render_worker_in_flight_age_ms = NET_REPORT_RENDER_WORKER_STALL_ISSUE_MS;
-        assert!(notable(&stalled));
-        assert_eq!(classify(&stalled), "client_render_worker_stall");
-
-        stalled.hidden = true;
-        assert!(!notable(&stalled));
     }
 
     #[test]

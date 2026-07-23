@@ -809,31 +809,6 @@ mod tests {
                 "clientFramePhases":[{"label":"match.renderer","count":12,"maxMs":20,"p95Ms":16}],
                 "rendererFramePhases":[{"label":"renderer.units","count":12,"maxMs":15,"p95Ms":12}],
                 "renderDiagnosticCounters":[{"label":"renderer.pixi.displayObject","samples":18,"frames":9,"total":18,"maxFrame":4}],
-                "renderWorkerMode":"pixi-webgl-module-worker",
-                "renderWorkerSubmitted":640,
-                "renderWorkerPresented":633,
-                "renderWorkerFailureCount":1,
-                "renderWorkerContextLostCount":1,
-                "renderWorkerInFlight":false,
-                "renderWorkerInFlightFrameId":0,
-                "renderWorkerInFlightAgeMs":0,
-                "renderWorkerPending":false,
-                "renderWorkerPendingFrameId":0,
-                "renderWorkerLastPresentedFrameId":633,
-                "renderWorkerLastPresentedAgeMs":24,
-                "renderWorkerLastMessageAgeMs":20,
-                "renderWorkerErrorCode":"webglContextLost",
-                "renderWorkerErrorMessage":"Pixi render worker WebGL context was lost.",
-                "renderWorkerErrorStack":"Error: context lost at pixi_render_worker.js:42:7",
-                "renderWorkerErrorSource":"pixi_render_worker.js",
-                "renderWorkerErrorLine":42,
-                "renderWorkerErrorColumn":7,
-                "renderWorkerBackend":"webgl",
-                "renderWorkerPixiVersion":"8.19.0",
-                "renderWorkerGlVendor":"WebKit",
-                "renderWorkerGlRenderer":"WebKit WebGL",
-                "renderWorkerGlVersion":"WebGL 2.0",
-                "renderWorkerUserAgent":"test-browser",
                 "entityCount":325,
                 "selectedCount":9,
                 "visibleTileCount":918,
@@ -939,15 +914,6 @@ mod tests {
                 assert_eq!(report.client_frame_phases[0].label, "match.renderer");
                 assert_eq!(report.renderer_frame_phases[0].max_ms, 15);
                 assert_eq!(report.render_diagnostic_counters[0].total, 18);
-                assert_eq!(report.render_worker_failure_count, 1);
-                assert_eq!(report.render_worker_context_lost_count, 1);
-                assert_eq!(report.render_worker_error_code, "webglContextLost");
-                assert!(report
-                    .render_worker_error_stack
-                    .contains("pixi_render_worker.js"));
-                assert_eq!(report.render_worker_last_presented_frame_id, 633);
-                assert_eq!(report.render_worker_pixi_version, "8.19.0");
-                assert_eq!(report.render_worker_gl_renderer, "WebKit WebGL");
                 assert_eq!(report.entity_count, 325);
                 assert_eq!(report.device_pixel_ratio_x100, 200);
                 assert_eq!(report.command_burst_bucket_ms, 250);
@@ -1026,11 +992,6 @@ mod tests {
                 assert!(report.client_frame_phases.is_empty());
                 assert!(report.renderer_frame_phases.is_empty());
                 assert!(report.render_diagnostic_counters.is_empty());
-                assert_eq!(report.render_worker_failure_count, 0);
-                assert_eq!(report.render_worker_context_lost_count, 0);
-                assert_eq!(report.render_worker_in_flight_age_ms, 0);
-                assert_eq!(report.render_worker_error_code, "");
-                assert_eq!(report.render_worker_error_stack, "");
                 assert_eq!(report.entity_count, 0);
                 assert_eq!(report.snapshot_bytes_total, 0);
                 assert_eq!(report.snapshot_byte_source, "");
