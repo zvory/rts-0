@@ -65,10 +65,11 @@ pub(crate) fn execute_anti_tank_gun_setup(
         e.set_emplacement_facing(Some(facing));
         e.set_desired_weapon_facing(facing);
     } else {
+        let Some(ticks) = config::support_weapon_teardown_ticks(e.kind) else {
+            return false;
+        };
         e.set_pending_redeploy_facing(Some(facing));
-        e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
-            ticks: teardown_ticks_for(e.kind),
-        });
+        e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks });
     }
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
@@ -142,10 +143,11 @@ fn start_artillery_fire_from_target(
             e.set_desired_weapon_facing(target.facing);
         }
         WeaponSetup::Deployed => {
+            let Some(ticks) = config::support_weapon_teardown_ticks(e.kind) else {
+                return false;
+            };
             e.set_pending_redeploy_facing(Some(target.facing));
-            e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
-                ticks: setup_ticks_for(e.kind),
-            });
+            e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks });
         }
         WeaponSetup::TearingDownToRedeploy { .. } => {
             e.set_pending_redeploy_facing(Some(target.facing));
@@ -173,19 +175,4 @@ fn start_artillery_fire_from_target(
         }
     }
     true
-}
-
-fn setup_ticks_for(kind: EntityKind) -> u16 {
-    match kind {
-        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
-        _ => config::ANTI_TANK_GUN_SETUP_TICKS,
-    }
-}
-
-fn teardown_ticks_for(kind: EntityKind) -> u16 {
-    match kind {
-        EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
-        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_TEARDOWN_TICKS,
-        _ => setup_ticks_for(kind),
-    }
 }

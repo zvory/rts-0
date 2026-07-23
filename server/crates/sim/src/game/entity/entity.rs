@@ -1042,16 +1042,12 @@ impl Entity {
     /// Start or continue the weapon transition required before this entity can move.
     /// Returns whether the entity is already packed and may move immediately.
     pub(in crate::game) fn begin_weapon_teardown_for_movement(&mut self) -> bool {
-        let teardown_ticks = match self.kind {
-            EntityKind::MachineGunner => config::MACHINE_GUNNER_SETUP_TICKS,
-            EntityKind::AntiTankGun => config::ANTI_TANK_GUN_TEARDOWN_TICKS,
-            EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
-            EntityKind::Artillery => {
-                self.reset_artillery_blanket_sequence();
-                config::ARTILLERY_SETUP_TICKS
-            }
-            _ => return true,
+        let Some(teardown_ticks) = config::support_weapon_teardown_ticks(self.kind) else {
+            return true;
         };
+        if self.kind == EntityKind::Artillery {
+            self.reset_artillery_blanket_sequence();
+        }
         if supports_manual_emplacement(self.kind) {
             self.set_emplacement_facing(None);
             self.set_pending_redeploy_facing(None);

@@ -6,8 +6,9 @@ _2026-07-23_
 
 ## Changes
 
-- Tank cannons now reliably hit infantry instead of missing half their shots.
-- Anti-Tank Guns now take 2.5s to set up and 1.5s to pack up.
+- Tank cannons no longer have a 50% miss roll against Workers, Riflemen, Panzerfausts, and Machine
+  Gunners.
+- Anti-Tank Gun setup time increased from 1.5s to 2.5s; packing up remains 1.5s.
 
 ## Playtest watch
 
