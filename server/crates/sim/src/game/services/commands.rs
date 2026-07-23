@@ -1,4 +1,4 @@
-use crate::config;
+use crate::config::{self, support_weapon_teardown_ticks};
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
@@ -395,7 +395,7 @@ pub(in crate::game) fn apply_commands(
                         e.clear_orders();
                         e.set_path_goal(None);
                         e.set_weapon_setup(WeaponSetup::TearingDown {
-                            ticks: config::ANTI_TANK_GUN_TEARDOWN_TICKS,
+                            ticks: support_weapon_teardown_ticks(e.kind).unwrap_or_default(),
                         });
                     } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
                         e.set_emplacement_facing(None);
