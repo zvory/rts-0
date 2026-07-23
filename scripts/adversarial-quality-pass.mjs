@@ -396,11 +396,17 @@ class Runner {
       ["diff", "--name-only", "--no-renames", beforeHead, "--", "patch-notes"],
       repoRoot,
     ).split("\n").filter(Boolean);
+    const committedChanges = this.git(
+      ["log", "--format=", "--name-only", "--no-renames", `${beforeHead}..HEAD`, "--", "patch-notes"],
+      repoRoot,
+    ).split("\n").filter(Boolean);
     const untrackedChanges = this.git(
       ["ls-files", "--others", "--exclude-standard", "--", "patch-notes"],
       repoRoot,
     ).split("\n").filter(Boolean);
-    const changedPaths = [...new Set([...trackedChanges, ...untrackedChanges])].sort();
+    const changedPaths = [
+      ...new Set([...trackedChanges, ...committedChanges, ...untrackedChanges]),
+    ].sort();
     if (changedPaths.length > 0) {
       throw new Error(
         "adversarial quality pass must not modify specialist-owned patch notes:\n" +

@@ -270,10 +270,12 @@ fi
 if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
   printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
 fi
-if [ "\${CODEX_MUTATE_PATCH_NOTE:-}" = "1" ]; then
+if [ "\${CODEX_MUTATE_AND_RESTORE_PATCH_NOTE:-}" = "1" ]; then
   printf '\\n- Adversarial rewrite.\\n' >> patch-notes/fixture.md
   git add patch-notes/fixture.md
   git commit -m "Illegally rewrite patch note"
+  git checkout HEAD^ -- patch-notes/fixture.md
+  git commit -m "Restore patch note"
 fi
 cat >"$report_file" <<'JSON'
 {
@@ -408,7 +410,7 @@ done
       cwd: workPath,
       encoding: "utf8",
       env: testEnv({
-        CODEX_MUTATE_PATCH_NOTE: "1",
+        CODEX_MUTATE_AND_RESTORE_PATCH_NOTE: "1",
         PATH: `${binPath}:${process.env.PATH}`,
       }),
     },
@@ -416,10 +418,15 @@ done
   assert.notEqual(protectedPass.status, 0, "quality pass must reject patch-note mutations");
   assert.match(protectedPass.stderr, /must not modify specialist-owned patch notes/);
   assert.match(protectedPass.stderr, /patch-notes\/fixture\.md/);
+  assert.equal(
+    fs.readFileSync(path.join(workPath, "patch-notes", "fixture.md"), "utf8"),
+    "# Specialist output\n",
+    "fixture proves edit-and-restore commits leave the final patch-note tree unchanged",
+  );
   assert.notEqual(
     run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim(),
     protectedHead,
-    "fixture proves committed Codex mutations are detected",
+    "fixture proves edit-and-restore Codex commits are detected",
   );
   assert.equal(
     run("git", ["ls-remote", "--heads", "origin", "zvorygin/patch-note-boundary"], { cwd: workPath }).stdout.trim(),
