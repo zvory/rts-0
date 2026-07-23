@@ -146,9 +146,10 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
     match e.weapon_setup() {
         WeaponSetup::Deployed => true,
         WeaponSetup::Packed => {
-            e.set_weapon_setup(WeaponSetup::SettingUp {
-                ticks: setup_ticks_for(e.kind),
-            });
+            let Some(ticks) = config::support_weapon_setup_ticks(e.kind) else {
+                return false;
+            };
+            e.set_weapon_setup(WeaponSetup::SettingUp { ticks });
             false
         }
         WeaponSetup::SettingUp { .. }
@@ -178,15 +179,6 @@ pub(super) fn update_attack_move_no_target_teardown(entities: &mut EntityStore, 
         .unwrap_or(false);
     if teardown_due {
         deployed_weapon_ready_to_move(entities, id);
-    }
-}
-
-pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
-    match kind {
-        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
-        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
-        EntityKind::MortarTeam => config::MORTAR_TEAM_SETUP_TICKS,
-        _ => config::MACHINE_GUNNER_SETUP_TICKS,
     }
 }
 
@@ -391,8 +383,9 @@ fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
         ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
     };
     if angle_delta(current, target).abs() <= tolerance {
-        e.set_weapon_setup(WeaponSetup::SettingUp {
-            ticks: setup_ticks_for(e.kind),
-        });
+        let Some(ticks) = config::support_weapon_setup_ticks(e.kind) else {
+            return;
+        };
+        e.set_weapon_setup(WeaponSetup::SettingUp { ticks });
     }
 }

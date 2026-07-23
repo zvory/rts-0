@@ -36,14 +36,16 @@ fn deployed_anti_tank_gun_does_not_turn_or_fire_at_target_outside_arc() {
 
 #[test]
 fn support_weapon_redeploy_rotates_after_teardown_completes() {
-    for (kind, setup_ticks, label) in [
+    for (kind, setup_ticks, teardown_ticks, label) in [
         (
             EntityKind::AntiTankGun,
             config::ANTI_TANK_GUN_SETUP_TICKS,
+            config::ANTI_TANK_GUN_TEARDOWN_TICKS,
             "anti-tank gun",
         ),
         (
             EntityKind::Artillery,
+            config::ARTILLERY_SETUP_TICKS,
             config::ARTILLERY_SETUP_TICKS,
             "artillery",
         ),
@@ -58,7 +60,9 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
             unit.set_pending_redeploy_facing(Some(target));
             unit.set_facing(0.0);
             unit.set_weapon_facing(0.0);
-            unit.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks: setup_ticks });
+            unit.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
+                ticks: teardown_ticks,
+            });
         }
 
         run_combat_tick(&mut entities);
@@ -74,7 +78,7 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
             WeaponSetup::TearingDownToRedeploy { .. }
         ));
 
-        for _ in 1..setup_ticks {
+        for _ in 1..teardown_ticks {
             run_combat_tick(&mut entities);
         }
 

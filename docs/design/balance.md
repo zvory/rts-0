@@ -306,6 +306,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   including passability, construction, cover, concealment, and line of sight.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
+- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 75` (~2.5s) and
+  `ANTI_TANK_GUN_TEARDOWN_TICKS = 45` (~1.5s).
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
   `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
@@ -409,11 +411,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
   normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Entrenchment does not add a direct-shot
-  miss chance. Tank cannon direct shots give Workers, Riflemen, Panzerfausts, and Machine Gunners a
-  50% dodge chance. Anti-Tank Guns cannot choose infantry-sized units as primary targets; their
-  existing 90% infantry miss roll still applies to incidental overpenetration candidates. Each
-  roll happens before the entrenched direct-damage reduction, and every overpenetration candidate
-  rolls separately. The trench radius is 0.375 tile.
+  miss chance. Tank cannon direct shots have no intrinsic infantry dodge chance. Anti-Tank Guns
+  cannot choose infantry-sized units as primary targets; their existing 90% infantry miss roll
+  still applies to incidental overpenetration candidates. Each Anti-Tank Gun roll happens before
+  the entrenched direct-damage reduction, and every overpenetration candidate rolls separately.
+  The trench radius is 0.375 tile.
   The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,

@@ -484,10 +484,12 @@ fn teardown_anti_tank_guns_only_affects_setting_up_or_deployed_anti_tank_guns() 
         )],
     );
 
-    assert!(matches!(
+    assert_eq!(
         entities.get(deployed).unwrap().weapon_setup(),
-        WeaponSetup::TearingDown { .. }
-    ));
+        WeaponSetup::TearingDown {
+            ticks: config::ANTI_TANK_GUN_TEARDOWN_TICKS
+        }
+    );
     assert_eq!(
         entities.get(packed).unwrap().weapon_setup(),
         WeaponSetup::Packed
@@ -532,10 +534,12 @@ fn move_order_tears_down_deployed_anti_tank_guns_before_moving() {
     );
 
     let deployed = entities.get(deployed).expect("at gun should exist");
-    assert!(matches!(
+    assert_eq!(
         deployed.weapon_setup(),
-        WeaponSetup::TearingDown { .. }
-    ));
+        WeaponSetup::TearingDown {
+            ticks: config::ANTI_TANK_GUN_TEARDOWN_TICKS
+        }
+    );
     assert_eq!(
         deployed.facing(),
         0.25,

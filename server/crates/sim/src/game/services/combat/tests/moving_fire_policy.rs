@@ -355,7 +355,7 @@ fn fully_stationary_tank_can_fire_at_extended_range() {
             .expect("tank owner events should exist")
             .iter()
             .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == tank_id && *to == target_id)),
-        "stationary tank should fire at a target inside the 14-tile ramped range, even when the shell's infantry dodge roll misses"
+        "stationary tank should fire at a target inside the 14-tile ramped range"
     );
 }
 
