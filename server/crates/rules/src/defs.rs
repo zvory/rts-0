@@ -356,7 +356,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::CityCentre,
         stats: balance::BuildingStats {
-            hp: 600,
+            hp: 300,
             sight_tiles: 1,
             cost_steel: 450,
             cost_oil: 150,
@@ -432,7 +432,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::TrainingCentre,
         stats: balance::BuildingStats {
-            hp: 300,
+            hp: 200,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 50,
@@ -451,7 +451,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Factory,
         stats: balance::BuildingStats {
-            hp: 360,
+            hp: 200,
             sight_tiles: 1,
             cost_steel: 125,
             cost_oil: 125,
@@ -489,7 +489,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Steelworks,
         stats: balance::BuildingStats {
-            hp: 300,
+            hp: 200,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 100,
