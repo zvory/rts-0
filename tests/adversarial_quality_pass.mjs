@@ -52,6 +52,10 @@ assert.match(prompt, /outer helper handles pushing and PR creation/);
 assert.match(prompt, /AI behavior is outside your authority: do not create, alter, or approve it/);
 assert.match(prompt, /Refactor AI code only\nwhen behavior is preserved exactly/);
 assert.match(prompt, /Ignore missing documentation updates/);
+assert.match(prompt, /Patch-note generation is outside your authority/);
+assert.match(prompt, /sole\nowner of every path under patch-notes\//);
+assert.match(prompt, /Do not create, edit, delete, stage, or commit those paths/);
+assert.doesNotMatch(prompt, /Accuracy and completeness of any player-facing patch-note/);
 assert.match(prompt, /complete, coherent,\nworking state/);
 assert.doesNotMatch(prompt, /fail the gate/i);
 assert.doesNotMatch(prompt, /close the PR/i);
@@ -266,6 +270,13 @@ fi
 if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
   printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
 fi
+if [ "\${CODEX_MUTATE_AND_RESTORE_PATCH_NOTE:-}" = "1" ]; then
+  printf '\\n- Adversarial rewrite.\\n' >> patch-notes/fixture.md
+  git add patch-notes/fixture.md
+  git commit -m "Illegally rewrite patch note"
+  git checkout HEAD^ -- patch-notes/fixture.md
+  git commit -m "Restore patch note"
+fi
 cat >"$report_file" <<'JSON'
 {
   "verdict": "improved",
@@ -376,6 +387,52 @@ done
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
   assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
   assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
+
+  run("git", ["checkout", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/patch-note-boundary"], { cwd: workPath });
+  fs.mkdirSync(path.join(workPath, "patch-notes"), { recursive: true });
+  fs.writeFileSync(path.join(workPath, "patch-notes", "fixture.md"), "# Specialist output\n");
+  fs.mkdirSync(path.join(workPath, "server", "src"), { recursive: true });
+  fs.writeFileSync(path.join(workPath, "server", "src", "boundary.rs"), "fn boundary() {}\n");
+  run("git", ["add", "patch-notes/fixture.md", "server/src/boundary.rs"], { cwd: workPath });
+  run("git", ["commit", "-m", "Add specialist output fixture"], { cwd: workPath });
+  const protectedHead = run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim();
+  const protectedPass = spawnSync(
+    "scripts/adversarial-quality-pass.mjs",
+    [
+      "--repo", workPath,
+      "--head-branch", "zvorygin/patch-note-boundary",
+      "--codex-command", path.join(binPath, "codex"),
+      "--no-fetch",
+      "--push",
+    ],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        CODEX_MUTATE_AND_RESTORE_PATCH_NOTE: "1",
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.notEqual(protectedPass.status, 0, "quality pass must reject patch-note mutations");
+  assert.match(protectedPass.stderr, /must not modify specialist-owned patch notes/);
+  assert.match(protectedPass.stderr, /patch-notes\/fixture\.md/);
+  assert.equal(
+    fs.readFileSync(path.join(workPath, "patch-notes", "fixture.md"), "utf8"),
+    "# Specialist output\n",
+    "fixture proves edit-and-restore commits leave the final patch-note tree unchanged",
+  );
+  assert.notEqual(
+    run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim(),
+    protectedHead,
+    "fixture proves edit-and-restore Codex commits are detected",
+  );
+  assert.equal(
+    run("git", ["ls-remote", "--heads", "origin", "zvorygin/patch-note-boundary"], { cwd: workPath }).stdout.trim(),
+    "",
+    "a forbidden patch-note mutation must fail before push",
+  );
 
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });

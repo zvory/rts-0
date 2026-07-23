@@ -253,7 +253,10 @@ canary runs own a private server; the browser shard passes its existing loopback
   Each pass may select its own model through the manifest's `modelEnv`; the patch-note pass uses
   `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
   branches without runtime paths that may affect players, and qualifying branches receive one
-  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review.
+  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review. The specialist
+  patch-note pass is the sole owner of that tree: the adversarial pass is instructed not to edit
+  `patch-notes/`, and a post-pass tree-and-history check fails before push if it creates, edits,
+  deletes, or commits and restores a fragment.
   After `scripts/wait-pr.sh` confirms the PR merged and its head is reachable from `origin/main`,
   when `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the process environment, the current
   worktree `.env`, or the primary checkout `.env`, the waiter sends only the PR-changed merged

@@ -13,8 +13,9 @@ The normal agent lifecycle is:
    change to an active participant's experience in an ordinary live match. Spectator/observer,
    replay, match-history, Lab/dev, lobby/setup, and analysis-only changes are explicitly excluded,
    even when they are user-facing. Each configured pass can select its own Codex model through its
-   `modelEnv` setting. The final adversarial pass runs after all specialist edits and verifies any
-   generated patch note against the final diff.
+   `modelEnv` setting. The final adversarial pass runs after all specialist edits but does not own
+   patch-note generation: every path under `patch-notes/` is protected from that pass, and the
+   workflow fails before push if the pass changes one.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
    `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
    `adversarial-quality-pass` status with a docs-only skip description, and writes the skip report
