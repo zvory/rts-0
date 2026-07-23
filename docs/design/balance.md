@@ -273,7 +273,10 @@ then buildings and other non-unit cleanup targets. Small-arms default weapons pr
 (`ArmorClass::Small`) over armored targets within the same target group, but they
 still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
 units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
-prefer anti-armor threats and armored units over ordinary soft units. Tanks keep a narrower
+prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
+auto-acquire or accept direct Attack orders against infantry-sized targets: Workers, Golems,
+Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons and other non-infantry targets
+remain legal. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
@@ -405,9 +408,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   reduces incoming area damage by 25% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Entrenchment does not add a direct-shot
   miss chance. Tank cannon direct shots give Workers, Riflemen, Panzerfausts, and Machine Gunners a
-  50% dodge chance; Anti-Tank Gun direct shots give infantry-sized targets a 90% dodge chance.
-  Each roll happens before the entrenched direct-damage reduction, and the primary target
-  and every overpenetration candidate roll separately. The trench radius is 0.375 tile.
+  50% dodge chance. Anti-Tank Guns cannot choose infantry-sized units as primary targets; their
+  existing 90% infantry miss roll still applies to incidental overpenetration candidates. Each
+  roll happens before the entrenched direct-damage reduction, and every overpenetration candidate
+  rolls separately. The trench radius is 0.375 tile.
   The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,

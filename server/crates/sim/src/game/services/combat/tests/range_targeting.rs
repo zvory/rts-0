@@ -26,7 +26,7 @@ fn automatic_acquisition_considers_only_targets_in_weapon_range() {
         },
         Case {
             attacker: EntityKind::AntiTankGun,
-            fireable_target: EntityKind::Rifleman,
+            fireable_target: EntityKind::MortarTeam,
             out_of_range_target: EntityKind::Tank,
         },
     ] {

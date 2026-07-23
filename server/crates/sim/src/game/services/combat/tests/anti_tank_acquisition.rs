@@ -40,6 +40,56 @@ fn packed_anti_tank_gun_cannot_fire() {
 }
 
 #[test]
+fn anti_tank_gun_auto_acquisition_skips_all_infantry() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    for (index, kind) in [
+        EntityKind::Worker,
+        EntityKind::Golem,
+        EntityKind::Rifleman,
+        EntityKind::Panzerfaust,
+        EntityKind::MachineGunner,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        entities
+            .spawn_unit(2, kind, 132.0 + index as f32 * 20.0, 100.0)
+            .expect("infantry target should spawn");
+    }
+
+    assert_eq!(
+        resolve_test_target(
+            &map,
+            &entities,
+            &default_team_relations(),
+            anti_tank_gun,
+            256.0,
+        ),
+        None,
+        "anti-tank guns must not auto-acquire any infantry target"
+    );
+
+    let mortar = entities
+        .spawn_unit(2, EntityKind::MortarTeam, 244.0, 100.0)
+        .expect("mortar team should spawn");
+    assert_eq!(
+        resolve_test_target(
+            &map,
+            &entities,
+            &default_team_relations(),
+            anti_tank_gun,
+            256.0,
+        ),
+        Some(mortar),
+        "crewed support weapons should remain legal anti-tank gun targets"
+    );
+}
+
+#[test]
 fn deployed_anti_tank_gun_auto_acquisition_skips_out_of_arc_priority_target() {
     let map = open_map(16);
     let mut entities = EntityStore::new();
