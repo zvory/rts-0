@@ -35,8 +35,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
-      "lines": 3344,
-      "reason": "Panzerfaust shot persistence adds detached shot-store plumbing to the existing oversized sim combat test harness; keep ratcheting until combat tests are split."
+      "lines": 3283,
+      "reason": "Anti-tank range coverage moved into its focused module; keep ratcheting until the remaining combat tests are split."
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
