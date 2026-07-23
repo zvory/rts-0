@@ -715,7 +715,8 @@ Full-world diagnostic projections are the explicit exception: they may project t
 planning and setup details through each entity's real owner so lab/dev inspection overlays are
 complete for every player.
 Anti-Tank Guns that fire from fog create actionable temporary live fog for the recipients that see
-the attack event. The revealed gun is projected as a normal non-`visionOnly` snapshot entity and
+the attack event, except when the resolved shot victim is a Tank Trap. The revealed gun is
+projected as a normal non-`visionOnly` snapshot entity and
 can validate direct attack commands or combat target acquisition until the firing reveal expires.
 Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and does not enter
 `exploredTiles`; clients infer the explicit above-fog `shotReveal` presentation when a projected
@@ -1065,7 +1066,9 @@ alert feedback but suppress notice alert audio. `alert:under_attack` is emitted 
 unit's position to the victim owner only; same-team recipients may still see the attack event through
 shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
 does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
-recipients whose team can currently see the shooter or target point. A missed direct shot
+recipients whose team can currently see the shooter or target point. Shots resolved against Tank
+Traps carry no shooter `reveal` and grant no actionable firing reveal to the Tank Trap's team. A
+missed direct shot
 additionally emits a `miss` event to the same recipient set, carrying only the receiving entity id;
 clients anchor the tiny text feedback to the already projected entity and ignore the event if the
 target is absent. Attack events include `reveal` so a shooter

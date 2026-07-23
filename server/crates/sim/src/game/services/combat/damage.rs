@@ -21,9 +21,15 @@ use super::projection::{resolve_shot_victim, shot_blocker_intersection};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::RANGE_SLACK;
 
+#[derive(Clone, Copy)]
+pub(super) struct ShotOutcome {
+    pub(super) victim_owner: u32,
+    pub(super) reveals_attacker: bool,
+}
+
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
-/// Returns the resolved shot victim owner when a shot was emitted. Death itself is handled by the
-/// death system (we only zero hp here).
+/// Returns the resolved shot outcome when a shot was emitted. Death itself is
+/// handled by the death system (we only zero hp here).
 #[allow(clippy::too_many_arguments)]
 pub(super) fn apply_damage(
     map: &Map,
@@ -46,7 +52,7 @@ pub(super) fn apply_damage(
     range_px: f32,
     extra_miss_chance: f32,
     tick: u32,
-) -> Option<u32> {
+) -> Option<ShotOutcome> {
     if entities
         .get(victim)
         .map(|e| !e.is_targetable())
@@ -70,9 +76,12 @@ pub(super) fn apply_damage(
         .get(shot_victim)
         .map(|e| (e.pos_x, e.pos_y))
         .unwrap_or((vx, vy));
-    let reveal = attack_reveal_for(entities.get(attacker));
     let victim = entities.get(shot_victim);
     let victim_kind = victim.map(|e| e.kind);
+    let reveals_attacker = victim_kind != Some(EntityKind::TankTrap);
+    let reveal = reveals_attacker
+        .then(|| attack_reveal_for(entities.get(attacker)))
+        .flatten();
     let victim_facing = victim.map(|e| e.facing());
     let victim_entrenched = victim.is_some_and(entrenchment_combat::is_actively_entrenched);
     let victim_owner = entities.get(shot_victim).map(|e| e.owner).unwrap_or(0);
@@ -181,7 +190,10 @@ pub(super) fn apply_damage(
             tick,
         );
     }
-    Some(victim_owner)
+    victim_kind.map(|_| ShotOutcome {
+        victim_owner,
+        reveals_attacker,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
