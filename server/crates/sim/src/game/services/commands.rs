@@ -392,11 +392,11 @@ pub(in crate::game) fn apply_commands(
                         e.weapon_setup(),
                         WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
                     ) {
-                        e.clear_orders();
-                        e.set_path_goal(None);
-                        e.set_weapon_setup(WeaponSetup::TearingDown {
-                            ticks: support_weapon_teardown_ticks(e.kind).unwrap_or_default(),
-                        });
+                        if let Some(ticks) = support_weapon_teardown_ticks(e.kind) {
+                            e.clear_orders();
+                            e.set_path_goal(None);
+                            e.set_weapon_setup(WeaponSetup::TearingDown { ticks });
+                        }
                     } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
                         e.set_emplacement_facing(None);
                         e.set_pending_redeploy_facing(None);
