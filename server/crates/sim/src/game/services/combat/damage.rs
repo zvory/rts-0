@@ -78,7 +78,7 @@ pub(super) fn apply_damage(
         .unwrap_or((vx, vy));
     let victim = entities.get(shot_victim);
     let victim_kind = victim.map(|e| e.kind);
-    let reveals_attacker = victim_kind != Some(EntityKind::TankTrap);
+    let reveals_attacker = victim_kind.is_some_and(projection_rules::shot_reveals_attacker);
     let reveal = reveals_attacker
         .then(|| attack_reveal_for(entities.get(attacker)))
         .flatten();

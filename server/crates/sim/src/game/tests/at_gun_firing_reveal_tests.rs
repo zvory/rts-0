@@ -309,11 +309,16 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
     let mut game = empty_flat_game(&players);
     let trap_pos = game.state.map.tile_center(10, 10);
     let shooter_pos = (trap_pos.0 + config::TILE_SIZE as f32 * 5.0, trap_pos.1);
+    let spotter_pos = (trap_pos.0 - config::TILE_SIZE as f32 * 8.0, trap_pos.1);
     let trap = game
         .state
         .entities
         .spawn_building(1, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
         .expect("tank trap should spawn");
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("spotter should spawn");
     let shooter = game
         .state
         .entities
@@ -329,11 +334,15 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
     refresh_visibility_for_test(&mut game);
 
     assert!(
+        game.state.fog.is_visible_world(1, trap_pos.0, trap_pos.1),
+        "fixture requires the Tank Trap owner to see the attacked tile"
+    );
+    assert!(
         !game
             .state
             .fog
             .is_visible_world(1, shooter_pos.0, shooter_pos.1),
-        "fixture requires the attacker to begin hidden from the Tank Trap owner"
+        "fixture requires the attacker to begin hidden from the Tank Trap owner",
     );
 
     let trap_hp = game
@@ -353,21 +362,21 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
         "the hidden attacker must actually shoot the Tank Trap in this fixture"
     );
     assert!(
-        events
-            .iter()
-            .filter(|(player, _)| *player == 1)
-            .flat_map(|(_, events)| events)
-            .all(|event| {
-                !matches!(
-                    event,
-                    Event::Attack {
-                        from,
-                        reveal: Some(_),
-                        ..
-                    } if *from == shooter
-                )
-            }),
-        "the Tank Trap owner must not receive a transient shooter reveal"
+        events.iter().any(|(player, events)| {
+            *player == 1
+                && events.iter().any(|event| {
+                    matches!(
+                        event,
+                        Event::Attack {
+                            from,
+                            to,
+                            reveal: None,
+                            ..
+                        } if *from == shooter && *to == trap
+                    )
+                })
+        }),
+        "the visible Tank Trap hit must deliver an attack event without a transient shooter reveal"
     );
     assert!(
         !game

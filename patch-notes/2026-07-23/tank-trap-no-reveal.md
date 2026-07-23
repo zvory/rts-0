@@ -6,8 +6,8 @@ _2026-07-23_
 
 ## Changes
 
-- Attacking a Tank Trap no longer reveals a hidden firing unit to the trap’s owner.
+- Attacking a Tank Trap no longer reveals a hidden firing unit to the trap owner’s team.
 
 ## Playtest watch
 
-- Tank Trap counterplay and hidden ambushes.
+- Whether Tank Trap users still get enough attack feedback without exposing hidden attackers.
