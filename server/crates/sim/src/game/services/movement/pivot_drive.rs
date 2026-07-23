@@ -18,7 +18,7 @@ use super::traffic::{
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
-pub(super) const ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND: f32 = 50.0;
+const ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND: f32 = 50.0;
 pub(super) const ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 =
     ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND.to_radians() / config::TICK_HZ as f32;
 pub(super) const PIVOT_VEHICLE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
@@ -228,9 +228,7 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
     match kind {
         EntityKind::MortarTeam => std::f32::consts::TAU,
-        EntityKind::AntiTankGun | EntityKind::Artillery => {
-            ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK
-        }
+        EntityKind::AntiTankGun => ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
         _ => TANK_BODY_TURN_RATE_RAD_PER_TICK,
     }
 }
