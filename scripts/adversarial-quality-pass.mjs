@@ -150,12 +150,15 @@ Focus on:
 1. Correctness bugs.
 2. Architectural issues where the implementer made the locally easiest change instead of the change
    that leaves the overall system simplest.
-3. Accuracy and completeness of any player-facing patch-note fragment relative to the final diff.
-4. Anything else important enough to improve before merge.
+3. Anything else important enough to improve before merge.
 
 Ignore missing documentation updates and contract-documentation updates unless the omission directly
-creates a correctness or architecture problem. The earlier agent PR passes own patch-note creation;
-when a patch-note fragment exists, correct it if your changes or the existing diff make it inaccurate.
+creates a correctness or architecture problem.
+
+Patch-note generation is outside your authority. The earlier specialist patch-note pass is the sole
+owner of every path under patch-notes/. Do not create, edit, delete, stage, or commit those paths.
+Do not treat a patch-note concern as authorization to change the branch; leave patch-note content
+untouched.
 
 You may rewrite the branch. Prefer the simplest resulting system, not the smallest diff. If a better
 path is clear and you can complete it coherently, take it. If the ideal rewrite is too large to finish
@@ -388,6 +391,24 @@ class Runner {
     }
   }
 
+  assertPatchNotesUnchanged(repoRoot, beforeHead) {
+    const trackedChanges = this.git(
+      ["diff", "--name-only", "--no-renames", beforeHead, "--", "patch-notes"],
+      repoRoot,
+    ).split("\n").filter(Boolean);
+    const untrackedChanges = this.git(
+      ["ls-files", "--others", "--exclude-standard", "--", "patch-notes"],
+      repoRoot,
+    ).split("\n").filter(Boolean);
+    const changedPaths = [...new Set([...trackedChanges, ...untrackedChanges])].sort();
+    if (changedPaths.length > 0) {
+      throw new Error(
+        "adversarial quality pass must not modify specialist-owned patch notes:\n" +
+        changedPaths.map((pathname) => `- ${pathname}`).join("\n"),
+      );
+    }
+  }
+
   commitDirtyFinalState(repoRoot, report) {
     const status = this.git(["status", "--porcelain=v1"], repoRoot);
     if (!status) return false;
@@ -464,6 +485,7 @@ class Runner {
 
     this.log(`quality-pass: running Codex final quality pass for ${headBranch}`);
     this.runInherit(options.codexCommand, codexArgs, { cwd: repoRoot, env: { [QUALITY_PASS_ENV]: "1" } });
+    this.assertPatchNotesUnchanged(repoRoot, beforeHead);
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
