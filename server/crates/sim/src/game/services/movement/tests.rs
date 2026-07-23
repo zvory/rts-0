@@ -26,6 +26,7 @@ use super::pivot_drive::{
 use super::scout_car::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
 };
+mod pivot_drive;
 mod static_repath;
 mod vehicle_traffic;
 
@@ -4442,38 +4443,6 @@ fn tank_body_facing_turns_gradually_along_path() {
     assert!(
         facing > 0.0 && facing <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
         "tank body should turn by at most the turn-rate constant, got {facing:.4}"
-    );
-}
-
-#[test]
-fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let (sx, sy) = map.tile_center(20, 20);
-    let (_, gy) = map.tile_center(20, 26);
-    let anti_tank_gun = entities
-        .spawn_unit(1, EntityKind::AntiTankGun, sx, sy)
-        .expect("anti-tank gun should spawn");
-    if let Some(e) = entities.get_mut(anti_tank_gun) {
-        e.set_facing(0.0);
-    }
-    set_path_direct(&mut entities, anti_tank_gun, vec![(sx, gy)]);
-
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let e = entities
-        .get(anti_tank_gun)
-        .expect("anti-tank gun should exist");
-    assert!(
-        e.facing() > 0.0 && e.facing() <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
-        "anti-tank gun body should turn by at most the support-weapon turn-rate constant, got {:.4}",
-        e.facing()
-    );
-    assert!(
-        moved_distance((sx, sy), (e.pos_x, e.pos_y)) < 0.01,
-        "anti-tank gun should pivot before driving when the target is far off its facing"
     );
 }
 

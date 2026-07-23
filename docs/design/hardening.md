@@ -148,6 +148,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate (`TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.035`) on
   movement paths; badly misaligned tanks pivot in place instead of sliding sideways at full speed.
+  Packed Anti-Tank Guns use the same pivot-drive policy with a separate exact 50-degree-per-second
+  body cap (`ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 50`).
   The current locomotion model is stateless per tick: it does not store velocity or acceleration,
   but it does brake by scaling the tick movement budget for hull misalignment, frontal traffic, and
   oil starvation. Tank hull movement intent uses the shared oriented-vehicle route lookahead:
