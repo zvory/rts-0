@@ -344,7 +344,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Barracks exposes the standalone Panzerfaust unit",
   );
   assert(
-    STATS[KIND.RIFLEMAN].cost.steel === 50 &&
+    STATS[KIND.RIFLEMAN].cost.steel === 52 &&
       STATS[KIND.RIFLEMAN].cost.oil === 0 &&
       STATS[KIND.PANZERFAUST].cost.steel === 55 &&
       STATS[KIND.PANZERFAUST].cost.oil === 5 &&
