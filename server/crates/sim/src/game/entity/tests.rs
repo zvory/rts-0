@@ -262,16 +262,16 @@ fn unfinished_buildings_add_construction_state_only() {
 
 #[test]
 fn unfinished_buildings_start_at_ten_percent_hp() {
-    let cases = [
-        (EntityKind::Depot, 11),
-        (EntityKind::Barracks, 17),
-        (EntityKind::CityCentre, 60),
+    let kinds = [
+        EntityKind::Depot,
+        EntityKind::Barracks,
+        EntityKind::CityCentre,
     ];
 
-    for (kind, expected_start_hp) in cases {
+    for kind in kinds {
         let entity =
             Entity::new_building(1, kind, 10.0, 20.0, false).expect("building kind should spawn");
-        assert_eq!(entity.hp, expected_start_hp, "{kind:?}");
+        assert_eq!(entity.hp, entity.max_hp.div_ceil(10), "{kind:?}");
         assert!(entity.hp < entity.max_hp, "{kind:?}");
         assert!(entity.under_construction(), "{kind:?}");
     }
@@ -307,14 +307,15 @@ fn construction_damage_permanently_reduces_completion_hp() {
         .as_ref()
         .expect("city centre should be under construction")
         .total;
+    let damage = original_max_hp / 2;
 
     assert!(entity.set_construction_progress(total / 2));
-    assert!(entity.apply_damage(300, Some((2, (30.0, 40.0), 7))));
-    assert_eq!(entity.max_hp, original_max_hp - 300);
+    assert!(entity.apply_damage(damage, Some((2, (30.0, 40.0), 7))));
+    assert_eq!(entity.max_hp, original_max_hp - damage);
     assert!(entity.set_construction_progress(total.saturating_sub(1)));
     assert_eq!(entity.advance_construction(), Some(true));
-    assert_eq!(entity.hp, original_max_hp - 300);
-    assert_eq!(entity.max_hp, original_max_hp - 300);
+    assert_eq!(entity.hp, original_max_hp - damage);
+    assert_eq!(entity.max_hp, original_max_hp - damage);
 }
 
 #[test]
@@ -335,16 +336,16 @@ fn construction_progress_cannot_outpace_cumulative_damage() {
     let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
         .expect("city centre should spawn");
     let original_max_hp = entity.max_hp;
+    let first_damage = original_max_hp / 2;
+    let final_damage = original_max_hp - first_damage;
 
-    for shot in 1..=6 {
-        assert!(entity.apply_damage(100, Some((2, (30.0, 40.0), shot))));
-        if shot < 6 {
-            assert!(entity.max_hp > 0);
-            assert_ne!(entity.advance_construction(), None);
-        }
-    }
+    assert!(entity.apply_damage(first_damage, Some((2, (30.0, 40.0), 1))));
+    assert_eq!(entity.max_hp, original_max_hp - first_damage);
+    assert_ne!(entity.advance_construction(), None);
+    assert!(entity.hp > 0);
 
-    assert_eq!(entity.max_hp, original_max_hp.saturating_sub(600));
+    assert!(entity.apply_damage(final_damage, Some((2, (30.0, 40.0), 2))));
+    assert_eq!(entity.max_hp, 0);
     assert_eq!(entity.hp, 0);
 }
 
@@ -369,9 +370,11 @@ fn damage_to_completed_building_does_not_reduce_max_hp() {
     let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, true)
         .expect("city centre should spawn");
     let original_max_hp = entity.max_hp;
+    let damage = original_max_hp / 2;
 
-    assert!(entity.apply_damage(300, None));
-    assert_eq!(entity.hp, original_max_hp - 300);
+    assert!(entity.apply_damage(damage, None));
+    assert_eq!(entity.hp, original_max_hp - damage);
+    assert!(entity.hp > 0);
     assert_eq!(entity.max_hp, original_max_hp);
 }
 
