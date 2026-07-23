@@ -6,7 +6,7 @@ _2026-07-23_
 
 ## Changes
 
-- Tank cannons no longer have a 50% miss chance against Workers, Riflemen, Panzerfausts, and Machine Gunners.
+- Tank cannons no longer have a 50% miss chance against infantry.
 - Anti-Tank Gun setup increased from 1.5s to 2.5s; packing remains 1.5s.
 
 ## Playtest watch
