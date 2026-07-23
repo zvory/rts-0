@@ -1297,6 +1297,7 @@ fn tank_attack_move_stops_when_it_reaches_an_enemy() {
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
         .expect("enemy should spawn");
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
     if let Some(tank) = entities.get_mut(tank_id) {
         tank.set_facing(0.0);
         tank.set_weapon_facing(0.0);
@@ -1308,7 +1309,11 @@ fn tank_attack_move_stops_when_it_reaches_an_enemy() {
     run_combat_tick(&mut entities);
 
     let tank = entities.get(tank_id).expect("tank should exist");
-    assert_eq!(tank.target_id(), Some(enemy_id));
+    assert_eq!(tank.target_id(), None);
+    assert!(
+        entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
+        "the tank's guaranteed cannon hit should damage the Rifleman"
+    );
     assert!(
         tank.path_is_empty(),
         "attack-moving tank should stop to engage the enemy"
@@ -1324,6 +1329,7 @@ fn tank_move_order_fires_without_leaving_move_path() {
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
         .expect("enemy should spawn");
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
     if let Some(tank) = entities.get_mut(tank_id) {
         tank.set_facing(0.0);
         tank.set_weapon_facing(0.0);
@@ -1335,7 +1341,11 @@ fn tank_move_order_fires_without_leaving_move_path() {
     run_combat_tick(&mut entities);
 
     let tank = entities.get(tank_id).expect("tank should exist");
-    assert_eq!(tank.target_id(), Some(enemy_id));
+    assert_eq!(tank.target_id(), None);
+    assert!(
+        entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
+        "the tank's guaranteed cannon hit should damage the Rifleman"
+    );
     assert!(
         tank.attack_cd() > 0,
         "aligned moving tank turret should fire"

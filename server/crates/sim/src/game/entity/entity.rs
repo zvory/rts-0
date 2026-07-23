@@ -1044,7 +1044,7 @@ impl Entity {
     pub(in crate::game) fn begin_weapon_teardown_for_movement(&mut self) -> bool {
         let teardown_ticks = match self.kind {
             EntityKind::MachineGunner => config::MACHINE_GUNNER_SETUP_TICKS,
-            EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
+            EntityKind::AntiTankGun => config::ANTI_TANK_GUN_TEARDOWN_TICKS,
             EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
             EntityKind::Artillery => {
                 self.reset_artillery_blanket_sequence();

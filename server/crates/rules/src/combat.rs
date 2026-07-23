@@ -83,7 +83,6 @@ impl WeaponKind {
 pub enum MissPolicy {
     None,
     AntiTankGunVsInfantrySized,
-    TankCannonVsInfantry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -228,7 +227,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 72,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
-        miss_policy: MissPolicy::TankCannonVsInfantry,
+        miss_policy: MissPolicy::None,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
     },
@@ -433,9 +432,8 @@ pub fn default_weapon_target_fit(
 }
 
 /// Miss probability [0.0, 1.0) for an attack. Incidental Anti-Tank Gun shell intersections have a
-/// 90% miss rate against infantry-sized targets, while Tank cannon shells have a 50% miss rate
-/// against humanoid infantry. A miss flies straight through without finding anyone; hits that
-/// connect deal full damage.
+/// 90% miss rate against infantry-sized targets. A miss flies straight through without finding
+/// anyone; hits that connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
     default_weapon_profile(attacker_kind)
         .map(|profile| miss_chance_for_weapon(profile, victim_kind))
@@ -449,7 +447,6 @@ pub fn miss_chance_for_weapon(profile: &WeaponProfile, victim_kind: EntityKind) 
         {
             0.90
         }
-        MissPolicy::TankCannonVsInfantry if tank_cannon_miss_target(victim_kind) => 0.50,
         _ => 0.0,
     }
 }
@@ -482,16 +479,6 @@ pub fn area_damage_after_entrenchment(
     }
     let multiplier = (1.0 - crate::balance::ENTRENCHMENT_AREA_DAMAGE_REDUCTION).clamp(0.0, 1.0);
     ((damage as f32) * multiplier).round().max(0.0) as u32
-}
-
-fn tank_cannon_miss_target(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Worker
-            | EntityKind::Rifleman
-            | EntityKind::Panzerfaust
-            | EntityKind::MachineGunner
-    )
 }
 
 /// Applies the AP/armor damage formula. The miss_chance roll is handled at the call site.
@@ -897,7 +884,7 @@ mod tests {
 
         let tank_cannon = weapon_profile(WeaponKind::TankCannon).expect("tank cannon profile");
         assert_eq!(tank_cannon.armor_penetration, FULL_ARMOR_PENETRATION);
-        assert_eq!(tank_cannon.miss_policy, MissPolicy::TankCannonVsInfantry);
+        assert_eq!(tank_cannon.miss_policy, MissPolicy::None);
         assert_eq!(
             tank_cannon.facing_damage_policy,
             FacingDamagePolicy::TankArmorFacing
@@ -992,7 +979,7 @@ mod tests {
         );
         assert_eq!(
             miss_chance_for_weapon(tank_cannon, EntityKind::Rifleman),
-            0.50
+            0.0
         );
     }
 
@@ -1332,17 +1319,12 @@ mod tests {
     }
 
     #[test]
-    fn tank_cannon_misses_humanoid_infantry_half_the_time() {
+    fn tank_cannon_has_no_intrinsic_miss_chance() {
         for victim in [
             EntityKind::Worker,
             EntityKind::Rifleman,
             EntityKind::Panzerfaust,
             EntityKind::MachineGunner,
-        ] {
-            assert_eq!(miss_chance(EntityKind::Tank, victim), 0.50);
-        }
-
-        for victim in [
             EntityKind::Golem,
             EntityKind::ScoutCar,
             EntityKind::AntiTankGun,

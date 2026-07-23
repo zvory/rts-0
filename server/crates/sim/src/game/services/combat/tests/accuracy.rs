@@ -59,7 +59,7 @@ fn apply_test_damage_with_seed(
 }
 
 #[test]
-fn tank_cannon_seeded_shot_can_miss_infantry_without_missing_scout_cars() {
+fn tank_cannon_seeded_shot_hits_infantry_and_scout_cars() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -105,66 +105,64 @@ fn tank_cannon_seeded_shot_can_miss_infantry_without_missing_scout_cars() {
 
     assert_eq!(
         entities.get(infantry).expect("infantry should exist").hp,
-        infantry_hp,
-        "seeded tank shell should miss an infantry-sized target"
+        infantry_hp.saturating_sub(60),
+        "tank shells should no longer give infantry an intrinsic dodge roll"
     );
     assert_eq!(
         entities.get(scout_car).expect("scout car should exist").hp,
         scout_car_hp.saturating_sub(60),
-        "scout cars are vehicles and must not receive an infantry dodge roll"
+        "scout cars should continue taking direct tank-shell damage"
     );
 }
 
 #[test]
-fn tank_and_at_gun_primary_dodge_do_not_cancel_secondary_overpenetration_roll() {
-    for attacker_kind in [EntityKind::Tank, EntityKind::AntiTankGun] {
-        let mut entities = EntityStore::new();
-        let attacker = entities
-            .spawn_unit(1, attacker_kind, 100.0, 100.0)
-            .expect("attacker should spawn");
-        let primary = entities
-            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
-            .expect("primary should spawn");
-        let secondary = entities
-            .spawn_unit(2, EntityKind::Worker, 165.0, 100.0)
-            .expect("secondary should spawn");
-        let primary_hp = entities.get(primary).expect("primary should exist").hp;
-        let secondary_hp = entities.get(secondary).expect("secondary should exist").hp;
-        let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
-        let miss_chance = combat_rules::miss_chance(attacker_kind, EntityKind::Rifleman);
-        let rng_seed = seed_with_primary_miss_and_secondary_hit(miss_chance);
+fn at_gun_primary_dodge_does_not_cancel_secondary_overpenetration_roll() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let primary = entities
+        .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+        .expect("primary should spawn");
+    let secondary = entities
+        .spawn_unit(2, EntityKind::Worker, 165.0, 100.0)
+        .expect("secondary should spawn");
+    let primary_hp = entities.get(primary).expect("primary should exist").hp;
+    let secondary_hp = entities.get(secondary).expect("secondary should exist").hp;
+    let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+    let miss_chance = combat_rules::miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman);
+    let rng_seed = seed_with_primary_miss_and_secondary_hit(miss_chance);
 
-        apply_test_damage_with_seed(
-            &mut entities,
-            &mut events,
-            attacker,
-            primary,
-            100,
-            1,
-            100.0,
-            100.0,
-            140.0,
-            100.0,
-            160.0,
-            rng_seed,
-        );
+    apply_test_damage_with_seed(
+        &mut entities,
+        &mut events,
+        attacker,
+        primary,
+        100,
+        1,
+        100.0,
+        100.0,
+        140.0,
+        100.0,
+        160.0,
+        rng_seed,
+    );
 
-        assert_eq!(
-            entities.get(primary).expect("primary should exist").hp,
-            primary_hp,
-            "the selected seed should make the primary infantry target dodge {attacker_kind:?}"
-        );
-        assert!(
-            entities.get(secondary).expect("secondary should exist").hp < secondary_hp,
-            "the primary dodge must not cancel {attacker_kind:?}'s independent secondary roll"
-        );
-        assert!(
-            events
-                .get(&1)
-                .expect("attacker events should exist")
-                .iter()
-                .any(|event| matches!(event, Event::Overpenetration { to } if *to == secondary)),
-            "the independently hit secondary should emit overpenetration feedback for {attacker_kind:?}"
-        );
-    }
+    assert_eq!(
+        entities.get(primary).expect("primary should exist").hp,
+        primary_hp,
+        "the selected seed should make the primary infantry target dodge the anti-tank gun"
+    );
+    assert!(
+        entities.get(secondary).expect("secondary should exist").hp < secondary_hp,
+        "the primary dodge must not cancel the anti-tank gun's independent secondary roll"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Overpenetration { to } if *to == secondary)),
+        "the independently hit secondary should emit anti-tank-gun overpenetration feedback"
+    );
 }

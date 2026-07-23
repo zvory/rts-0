@@ -10,6 +10,7 @@ pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
 pub(super) fn teardown_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::MortarTeam => config::MORTAR_TEAM_TEARDOWN_TICKS,
+        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_TEARDOWN_TICKS,
         _ => setup_ticks_for(kind),
     }
 }

@@ -188,7 +188,7 @@ fn attack_move_deployed_anti_tank_gun_tears_down_after_no_target_grace() {
         "attack-move destination should be re-requested while teardown is pending"
     );
 
-    for _ in 0..config::ANTI_TANK_GUN_SETUP_TICKS {
+    for _ in 0..config::ANTI_TANK_GUN_TEARDOWN_TICKS {
         run_combat_tick_on_map(&mut entities, &[player_state(1, false)], &map);
     }
     assert_eq!(
