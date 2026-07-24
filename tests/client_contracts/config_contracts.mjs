@@ -35,6 +35,7 @@ import {
   ARTILLERY_UNLOCK_RESEARCH_TICKS,
   ABILITIES,
   STATS,
+  TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES,
   TICK_HZ,
   UPGRADES,
   WORKER_BUILDABLE,
@@ -161,6 +162,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "SNAPSHOT_MS",
   "STATS",
   "TANK_BODY",
+  "TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES",
   "TANK_UNLOCK_RESEARCH_TICKS",
   "TICK_HZ",
   "UPGRADES",
@@ -186,6 +188,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     MORTAR_MIN_RANGE_TILES === 5 && MORTAR_RANGE_TILES === 17,
     "client mirrors the server mortar five-to-seventeen-tile range band",
+  );
+  assert(
+    TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES === 4,
+    "client mirrors the server Tank Trap cluster attack radius",
   );
   assert(
     STATS[KIND.CITY_CENTRE].cost.steel === 450 &&
