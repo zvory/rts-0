@@ -96,11 +96,13 @@ export function _refreshLabToolPreview() {
   const tool = intent?.activeLabTool || null;
   if (!tool) {
     intent?.updateLabToolPreview?.(null);
+    intent?.updateLabRulerCursor?.(null);
     return null;
   }
   const screen = this.mouse;
   if (!finitePoint(screen)) {
     intent?.updateLabToolPreview?.(null);
+    intent?.updateLabRulerCursor?.(null);
     return null;
   }
   const entity = _labToolEntityAtScreen.call(this, screen, tool);
@@ -109,8 +111,10 @@ export function _refreshLabToolPreview() {
   );
   if (!world) {
     intent?.updateLabToolPreview?.(null);
+    intent?.updateLabRulerCursor?.(null);
     return null;
   }
+  intent?.updateLabRulerCursor?.(tool.kind === "ruler" ? world : null);
   return intent?.updateLabToolPreview?.({ toolId: tool.id, x: world.x, y: world.y }) || null;
 }
 

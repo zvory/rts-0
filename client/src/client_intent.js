@@ -31,6 +31,8 @@ export class ClientIntent {
     this.activeLabTool = null;
     /** @type {null | {toolId:string,kind:string,payload?:object,x:number,y:number}} */
     this.labToolPreview = null;
+    /** @type {{start:null|{x:number,y:number},end:null|{x:number,y:number},cursor:null|{x:number,y:number}}} */
+    this.labRuler = { start: null, end: null, cursor: null };
     this._nextLabToolId = 1;
     /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
     this.lastCommandTargetArm = null;
@@ -441,6 +443,7 @@ export class ClientIntent {
     if (tool?.keepArmedOnBoxSelection) active.keepArmedOnBoxSelection = true;
     this.activeLabTool = active;
     this.labToolPreview = null;
+    if (kind !== "ruler") this.updateLabRulerCursor(null);
     return active;
   }
 
@@ -476,19 +479,56 @@ export class ClientIntent {
     return next;
   }
 
+  /** Track the ruler cursor independently from the currently saved measurement. */
+  updateLabRulerCursor(point) {
+    this.labRuler.cursor = finiteIntentPoint(point);
+    return this.labRuler.cursor;
+  }
+
+  /**
+   * Add the next ruler point. A click after a completed measurement starts a
+   * fresh one, while the second click fixes the current segment.
+   */
+  placeLabRulerPoint(point) {
+    const next = finiteIntentPoint(point);
+    if (!next) return null;
+    if (!this.labRuler.start || this.labRuler.end) {
+      this.labRuler.start = next;
+      this.labRuler.end = null;
+    } else {
+      this.labRuler.end = next;
+    }
+    this.labRuler.cursor = next;
+    return this.labRuler;
+  }
+
+  /** Clear saved ruler points without disarming the ruler tool. */
+  clearLabRuler() {
+    this.labRuler.start = null;
+    this.labRuler.end = null;
+    return this.labRuler;
+  }
+
 
   /** Clear the active lab setup tool, if any. */
   cancelLabTool(reason = "cancelled") {
     const active = this.activeLabTool;
     this.activeLabTool = null;
     this.labToolPreview = null;
+    this.updateLabRulerCursor(null);
     return active ? { ...active, reason } : null;
   }
 
   _clearActiveLabTool() {
     this.activeLabTool = null;
     this.labToolPreview = null;
+    this.updateLabRulerCursor(null);
   }
+}
+
+function finiteIntentPoint(point) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return null;
+  return { x: point.x, y: point.y };
 }
 
 function commandOrderStage(command, clientSeq, createdAt) {

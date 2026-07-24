@@ -75,8 +75,9 @@ import { textWithin } from "./dom_text.mjs";
     "lab mobile CSS moves the Options window below expanded room-time controls",
   );
   assert(
-    /\.lab-tools-window\s*\{[^}]*top:\s*326px\b/s.test(labMobileStyles),
-    "lab mobile CSS keeps the Tools window header on a separate tap row",
+    /\.lab-spawn-window\s*\{[^}]*top:\s*326px\b/s.test(labMobileStyles) &&
+      /\.lab-tools-window\s*\{[^}]*top:\s*420px\b/s.test(labMobileStyles),
+    "lab mobile CSS keeps the Spawn and Tools window headers on separate tap rows",
   );
   assert(
     /\.lab-panel-collapse\s*\{[^}]*min-height:\s*36px\b[^}]*touch-action:\s*manipulation\b/s.test(labMobileStyles),
@@ -462,6 +463,12 @@ await withFakeDocument(async () => {
       if (cancelled) panelRef.panel?.applyLabToolChange({ type: "cancelled", reason, tool: cancelled });
       return cancelled;
     },
+    placeLabRulerPoint(point) {
+      return this.clientIntent.placeLabRulerPoint(point);
+    },
+    clearLabRuler() {
+      return this.clientIntent.clearLabRuler();
+    },
   });
   const startPayload = {
     map: { name: "Chokes" },
@@ -573,6 +580,12 @@ await withFakeDocument(async () => {
       if (cancelled) panel?.applyLabToolChange({ type: "cancelled", reason, tool: cancelled });
       return cancelled;
     },
+    placeLabRulerPoint(point) {
+      return this.clientIntent.placeLabRulerPoint(point);
+    },
+    clearLabRuler() {
+      return this.clientIntent.clearLabRuler();
+    },
   };
   labClient.setInitialState({
     room: "__lab__:sandbox:map=Chokes",
@@ -640,30 +653,36 @@ await withFakeDocument(async () => {
   };
 
   const optionsPanel = panelByClass("lab-options-window");
+  const spawnPanelWindow = panelByClass("lab-spawn-window");
   const toolsPanel = panelByClass("lab-tools-window");
-  assert(root.children.length === 2, "LabPanel mounts separate options and tools windows inside the app-owned root");
-  assert(optionsPanel && toolsPanel && !toolsPanel.hidden, "LabPanel shows both floating windows for operators");
+  assert(root.children.length === 3, "LabPanel mounts separate Options, Spawn, and Tools windows inside the app-owned root");
+  assert(
+    optionsPanel && spawnPanelWindow && toolsPanel && !spawnPanelWindow.hidden && !toolsPanel.hidden,
+    "LabPanel shows all three floating windows for operators",
+  );
   assert(
     findFakes(root, (el) => String(el.className).split(/\s+/).includes("lab-panel-reset")).length === 0,
     "LabPanel omits reset buttons from its movable panels",
   );
   assert(
-    [optionsPanel, toolsPanel].every((child) => child.children.some((grandchild) => grandchild.className === "lab-panel-resize-handle")),
-    "LabPanel exposes visible resize handles for both windows",
+    [optionsPanel, spawnPanelWindow, toolsPanel].every((child) => child.children.some((grandchild) => grandchild.className === "lab-panel-resize-handle")),
+    "LabPanel exposes visible resize handles for all windows",
   );
   assert(
-    findFakes(root, (el) => el.tagName === "BUTTON" && el.dataset?.labPanelCollapse === "true").length >= 2,
-    "LabPanel exposes collapse arrow affordances for both windows",
+    findFakes(root, (el) => el.tagName === "BUTTON" && el.dataset?.labPanelCollapse === "true").length >= 3,
+    "LabPanel exposes collapse arrow affordances for all windows",
   );
   const headerKickers = findFakes(root, (el) => el.className === "lab-panel-kicker").map((el) => el.textContent);
   assert(
     headerKickers.includes("Options") &&
+      headerKickers.includes("Spawn") &&
       headerKickers.includes("Tools") &&
       !headerKickers.some((text) => /^Lab /.test(text)),
-    "LabPanel window headers use compact Options and Tools labels",
+    "LabPanel window headers use compact Options, Spawn, and Tools labels",
   );
   assert(
     findFakes(optionsPanel, (el) => el.tagName === "H2").length === 0 &&
+      findFakes(spawnPanelWindow, (el) => el.tagName === "H2").length === 0 &&
       findFakes(toolsPanel, (el) => el.tagName === "H2").length === 0,
     "LabPanel window headers omit the room/map title",
   );
@@ -696,6 +715,29 @@ await withFakeDocument(async () => {
       playerButtonById(2)?.dataset.selected === "false",
     "LabPanel marks the selected target player button",
   );
+  assert(buttonByText("Clear").disabled, "LabPanel disables ruler clearing before a point is placed");
+  buttonByText("Ruler").listeners.click();
+  assert(armedTool?.kind === "ruler", "LabPanel arms the ruler through the normal Match tool seam");
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, world: { x: 64, y: 96 }, x: 64, y: 96 });
+  assert(
+    match.clientIntent.labRuler.start?.x === 64 &&
+      match.clientIntent.labRuler.start?.y === 96 &&
+      match.clientIntent.labRuler.end === null,
+    "the first ruler click starts a live measurement",
+  );
+  assert(!buttonByText("Clear").disabled, "LabPanel enables ruler clearing after the first point");
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, world: { x: 160, y: 224 }, x: 160, y: 224 });
+  assert(
+    match.clientIntent.labRuler.end?.x === 160 &&
+      match.clientIntent.labRuler.end?.y === 224,
+    "the second ruler click fixes the endpoint",
+  );
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, world: { x: 32, y: 48 }, x: 32, y: 48 });
+  assert(
+    match.clientIntent.labRuler.start?.x === 32 &&
+      match.clientIntent.labRuler.end === null,
+    "a third ruler click replaces the completed measurement",
+  );
   assert(!textWithin(root).includes("Advanced Spawn"), "LabPanel omits the advanced spawn form");
   assert(
     textWithin(root).includes("Unit Spawn") && textWithin(root).includes("Building Spawn"),
@@ -715,14 +757,14 @@ await withFakeDocument(async () => {
     "LabPanel leaves observer vision to the shared room controls and groups Lab-only controls in Options",
   );
   assert(
-    textWithin(sectionByClass("lab-tools")).includes("Unit Spawn") &&
-      textWithin(sectionByClass("lab-tools")).includes("Building Spawn") &&
-      textWithin(sectionByClass("lab-tools")).includes("Player State") &&
-      textWithin(sectionByClass("lab-tools")).includes("Remove entities") &&
-      !textWithin(sectionByClass("lab-tools")).includes("Unlimited commands") &&
-      !textWithin(sectionByClass("lab-tools")).includes("Checkpoint Setup") &&
-      !textWithin(sectionByClass("lab-tools")).includes("Lab Replay"),
-    "LabPanel groups placement tools in the Tools section",
+    textWithin(sectionByClass("lab-spawn")).includes("Unit Spawn") &&
+      textWithin(sectionByClass("lab-spawn")).includes("Building Spawn") &&
+      textWithin(sectionByClass("lab-spawn")).includes("Player State") &&
+      textWithin(sectionByClass("lab-spawn")).includes("Remove entities") &&
+      !textWithin(sectionByClass("lab-spawn")).includes("Unlimited commands") &&
+      !textWithin(sectionByClass("lab-spawn")).includes("Checkpoint Setup") &&
+      !textWithin(sectionByClass("lab-spawn")).includes("Lab Replay"),
+    "LabPanel groups setup and placement tools in the Spawn section",
   );
   assert(
     buttonByText("Export setup JSON") &&
@@ -738,18 +780,20 @@ await withFakeDocument(async () => {
     "LabPanel renders distinct lab replay save/open affordances outside the setup JSON wire controls",
   );
   assert(
-    findFakes(sectionByClass("lab-tools"), (el) => el.tagName === "H3" && el.textContent === "Tools").length === 0,
+    findFakes(sectionByClass("lab-tools"), (el) => el.tagName === "H3" && el.textContent === "Tools").length === 0 &&
+      buttonByText("Ruler") &&
+      buttonByText("Clear"),
     "LabPanel does not repeat the Tools title inside the Tools window",
   );
   assert(
-    !textWithin(sectionByClass("lab-tools")).includes("Target Player") &&
-      !findFakes(sectionByClass("lab-tools"), (el) => String(el.className).split(/\s+/).includes("lab-player-label")).length &&
-      sectionByClass("lab-tools").children.includes(playerButtonGroup()),
+    !textWithin(sectionByClass("lab-spawn")).includes("Target Player") &&
+      !findFakes(sectionByClass("lab-spawn"), (el) => String(el.className).split(/\s+/).includes("lab-player-label")).length &&
+      sectionByClass("lab-spawn").children.includes(playerButtonGroup()),
     "LabPanel renders target player buttons directly without the old labels or fieldset",
   );
   assert(
-    textWithin(sectionByClass("lab-tools").children.at(-1)).includes("Player State"),
-    "LabPanel places Player State at the bottom of the Tools section",
+    textWithin(sectionByClass("lab-spawn").children.at(-1)).includes("Player State"),
+    "LabPanel places Player State at the bottom of the Spawn section",
   );
   assert(!textWithin(root).includes("Map Tools"), "LabPanel removes the old Map Tools section label");
   assert(!buttonByText("Move to point") && !buttonByText("Set owner"), "LabPanel removes the old selected move and owner tools");
@@ -840,6 +884,15 @@ await withFakeDocument(async () => {
     "LabPanel restores every player-specific control when switching back",
   );
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
+  assert(
+    match.clientIntent.labRuler.start?.x === 32,
+    "arming a Spawn tool preserves the saved ruler measurement",
+  );
+  panel.clearRuler();
+  assert(
+    match.clientIntent.labRuler.start === null && match.clientIntent.labRuler.end === null,
+    "LabPanel Clear removes the saved ruler without depending on the active tool",
+  );
   assert(
     armedTool?.kind === "spawnEntity" && armedTool.payload.owner === 1,
     "LabPanel initially arms the spawn tool for the selected target player",

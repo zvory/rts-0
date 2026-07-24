@@ -18,7 +18,8 @@ import {
 
 const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
-const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
+const SPAWN_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
+const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.rulerTools.window.v1";
 
 export class LabPanel {
   constructor({
@@ -67,11 +68,15 @@ export class LabPanel {
     this.unsubscribeState = null;
     this.unsubscribeResult = null;
     this.optionsEl = this.createPanelElement("lab-options-panel", "lab-options-window", "Lab options and room information");
-    this.toolsEl = this.createPanelElement("lab-tools-panel", "lab-tools-window", "Lab setup tools");
+    this.spawnEl = this.createPanelElement("lab-spawn-panel", "lab-spawn-window", "Lab spawn tools");
+    this.toolsEl = this.createPanelElement("lab-tools-panel", "lab-tools-window", "Lab measurement tools");
     this.el = this.optionsEl;
-    this.root.append(this.optionsEl, this.toolsEl);
+    this.root.append(this.optionsEl, this.spawnEl, this.toolsEl);
     this.optionsWindowChrome = new LabPanelWindowChrome(this.optionsEl, {
       storageKey: OPTIONS_PANEL_STORAGE_KEY,
+    });
+    this.spawnWindowChrome = new LabPanelWindowChrome(this.spawnEl, {
+      storageKey: SPAWN_PANEL_STORAGE_KEY,
     });
     this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
       storageKey: TOOLS_PANEL_STORAGE_KEY,
@@ -99,10 +104,12 @@ export class LabPanel {
     if (this.destroyed) return;
     this.removeListeners();
     this.optionsWindowChrome.clearRenderListeners();
+    this.spawnWindowChrome.clearRenderListeners();
     this.toolsWindowChrome.clearRenderListeners();
     this.fields.clear();
 
     this.renderOptionsWindow();
+    this.renderSpawnWindow();
     this.renderToolsWindow();
   }
 
@@ -127,6 +134,26 @@ export class LabPanel {
 
     this.optionsEl.appendChild(body);
     this.optionsEl.appendChild(this.optionsWindowChrome.renderResizeHandle());
+  }
+
+  renderSpawnWindow() {
+    if (!this.canOperate()) {
+      this.spawnEl.hidden = true;
+      this.spawnEl.replaceChildren();
+      return;
+    }
+
+    this.spawnEl.hidden = false;
+    this.spawnEl.replaceChildren();
+    this.spawnEl.appendChild(this.spawnWindowChrome.renderHeader({
+      kicker: "Spawn",
+      collapseLabel: "spawn panel",
+    }));
+
+    const body = this.panelBody();
+    body.appendChild(this.renderSpawnPanel());
+    this.spawnEl.appendChild(body);
+    this.spawnEl.appendChild(this.spawnWindowChrome.renderResizeHandle());
   }
 
   renderToolsWindow() {
@@ -215,10 +242,10 @@ export class LabPanel {
     }
   }
 
-  renderToolsPanel() {
+  renderSpawnPanel() {
     const root = document.createElement("section");
-    root.className = "lab-panel-section lab-tools";
-    root.setAttribute("aria-label", "Tools");
+    root.className = "lab-panel-section lab-spawn";
+    root.setAttribute("aria-label", "Spawn");
 
     root.appendChild(this.renderActiveToolStatus());
     root.appendChild(this.renderTargetPlayer());
@@ -228,6 +255,52 @@ export class LabPanel {
     root.appendChild(this.renderPlayerStatePanel());
 
     return root;
+  }
+
+  renderToolsPanel() {
+    const root = document.createElement("section");
+    root.className = "lab-panel-section lab-tools";
+    root.setAttribute("aria-label", "Tools");
+    const active = this.activeLabTool()?.kind === "ruler";
+    root.appendChild(this.button("Ruler", () => this.armRulerTool(), {
+      title: "Measure a tile distance between two map points",
+      dataset: { active: active ? "true" : "false" },
+    }));
+    root.appendChild(this.button("Clear", () => this.clearRuler(), {
+      title: "Clear the saved ruler measurement",
+      disabled: !this.hasRulerMeasurement(),
+    }));
+    return root;
+  }
+
+  armRulerTool() {
+    if (typeof this.match?.armLabTool !== "function") return null;
+    const armed = this.match.armLabTool(
+      {
+        kind: "ruler",
+        label: "Ruler",
+        keepArmedOnWorldClick: true,
+      },
+      {
+        onWorldClick: (event) => {
+          const result = this.match?.clientIntent?.placeLabRulerPoint?.(event?.world || event);
+          this.render();
+          return result;
+        },
+      },
+    );
+    this.render();
+    return armed;
+  }
+
+  clearRuler() {
+    const cleared = this.match?.clientIntent?.clearLabRuler?.();
+    this.render();
+    return cleared;
+  }
+
+  hasRulerMeasurement() {
+    return !!this.match?.clientIntent?.labRuler?.start;
   }
 
   renderCommandOptions() {
@@ -1191,8 +1264,10 @@ export class LabPanel {
     this.unsubscribeResult?.();
     this.removeListeners();
     this.optionsWindowChrome.destroy();
+    this.spawnWindowChrome.destroy();
     this.toolsWindowChrome.destroy();
     this.optionsEl.remove();
+    this.spawnEl.remove();
     this.toolsEl.remove();
   }
 }

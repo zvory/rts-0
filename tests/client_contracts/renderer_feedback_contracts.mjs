@@ -39,6 +39,7 @@ import {
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
 import { drawLabToolPreview } from "../../client/src/renderer/lab_tool_preview.js";
+import { LabRulerOverlay } from "../../client/src/renderer/lab_ruler_overlay.js";
 import { _drawMissToasts } from "../../client/src/renderer/miss_toasts.js";
 import {
   _drawPanzerfaustImpacts,
@@ -619,6 +620,11 @@ function nearPoint(call, point, epsilon = 0.001) {
   const feedbackIntent = {
     placement: { building: KIND.CITY_CENTRE, tileX: 2, tileY: 3, valid: true },
     labToolPreview: { toolId: "tool-1", kind: "unitSpawn", x: 120, y: 120 },
+    labRuler: {
+      start: { x: 64, y: 96 },
+      end: { x: 160, y: 224 },
+      cursor: { x: 192, y: 256 },
+    },
     antiTankGunSetupPreview: {
       source: "viewport",
       mouseX: 180,
@@ -673,6 +679,7 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(feedbackView.abilityTargetPreview?.ability === ABILITY.SMOKE, "feedback view exposes ability target preview");
   assert(feedbackView.attackTargetPreview?.targetId === 88, "feedback view exposes attack target hover preview");
   assert(feedbackView.resourceMiningPreview?.resourceId === 200, "feedback view exposes resource mining preview");
+  assert(feedbackView.labRuler?.end?.x === 160, "feedback view carries the persistent Lab ruler");
   assert(feedbackView.abilityObjects.length === 1, "feedback view exposes ability objects");
   assert(feedbackView.panzerfaustShots.length === 1, "feedback view exposes Panzerfaust launch/travel effects");
   assert(feedbackView.panzerfaustImpacts.length === 1, "feedback view exposes Panzerfaust impact effects");
@@ -685,6 +692,10 @@ function nearPoint(call, point, epsilon = 0.001) {
   });
   assert(minimapView.placement === null && minimapView.labToolPreview === null,
     "minimap hover hides placement and Lab ghosts projected through the covered battlefield");
+  assert(
+    minimapView.labRuler?.end?.x === 160 && minimapView.labRuler?.cursor === null,
+    "covered UI preserves a fixed ruler segment while hiding its cursor coordinate",
+  );
   assert(
     minimapView.attackTargetPreview === null &&
       minimapView.resourceMiningPreview === null &&
@@ -1393,4 +1404,50 @@ function nearPoint(call, point, epsilon = 0.001) {
     feedbackView.labToolPreview?.kind === "removeSelectableUnits",
     "renderer feedback view carries the active Lab tool preview across the intent boundary",
   );
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const layer = new PIXI.Container();
+    const overlay = new LabRulerOverlay({ layer, pixi: PIXI });
+    overlay.render({
+      start: { x: 64, y: 96 },
+      end: null,
+      cursor: { x: 160, y: 224 },
+    }, { tileSize: 32, zoom: 2 });
+    assert(
+      overlay.graphics.calls.some((call) => call[0] === "lineTo" && call[1] === 160 && call[2] === 224),
+      "Lab ruler draws the live segment from its first point to the cursor",
+    );
+    assert(
+      overlay.labels.some((label) => label.visible && label.text === "5 tiles"),
+      "Lab ruler labels Euclidean segment length in tiles",
+    );
+    assert(
+      overlay.labels.some((label) => label.visible && label.text === "X 2  Y 3") &&
+        overlay.labels.some((label) => label.visible && label.text === "X 5  Y 7"),
+      "Lab ruler labels both endpoint tile coordinates",
+    );
+    assert(
+      overlay.labels.filter((label) => label.visible).every((label) => label.scaleX === 0.5),
+      "Lab ruler labels compensate for camera zoom",
+    );
+    overlay.render({
+      start: { x: 64, y: 96 },
+      end: { x: 160, y: 224 },
+      cursor: null,
+    }, { tileSize: 32, zoom: 1 });
+    assert(
+      overlay.labels.some((label) => label.visible && label.text === "5 tiles"),
+      "Lab ruler keeps the fixed segment label after its cursor leaves",
+    );
+    overlay.destroy();
+    assert(
+      overlay.graphics.destroyed && overlay.labels.every((label) => label.destroyed),
+      "Lab ruler tears down every Pixi resource",
+    );
+  } finally {
+    restorePixi();
+  }
 }

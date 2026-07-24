@@ -64,6 +64,7 @@ export function buildRendererFeedbackView(
     placement: previewSurface ? null : intent?.placement || null,
     formationMovePreview: previewSurface ? null : intent?.formationMovePreview || null,
     labToolPreview: previewSurface ? null : intent?.labToolPreview || null,
+    labRuler: labRulerView(intent?.labRuler, !!previewSurface),
     commandFeedback,
     attackTargetPreview: previewSurface ? null : intent?.attackTargetPreview || null,
     selectedEntities: () => selected,
@@ -178,6 +179,15 @@ function isThreatEnemyOwner(players, perspectivePlayerId, owner) {
   const ownTeam = teamIdForPlayer(players, perspectivePlayerId);
   const ownerTeam = teamIdForPlayer(players, ownerId);
   return ownTeam != null && ownerTeam != null && ownTeam !== ownerTeam;
+}
+
+function labRulerView(ruler, suppressCursor) {
+  if (!ruler) return null;
+  return {
+    start: ruler.start || null,
+    end: ruler.end || null,
+    cursor: suppressCursor ? null : ruler.cursor || null,
+  };
 }
 
 function buildControlOwnerReadModel(state, selected, policy = null) {
