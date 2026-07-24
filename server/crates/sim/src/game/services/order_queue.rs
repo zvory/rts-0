@@ -136,7 +136,10 @@ pub(crate) fn promote_ready_orders(
             .and_then(|e| active_ability_order_ready(&e.order()))
         {
             clear_completed_active_order(entities, id);
-            artillery::discard_failed_fire_intent(entities, id, ability, x, y);
+            if let Some(mode) = crate::game::services::order_execution::artillery_fire_mode(ability)
+            {
+                artillery::discard_failed_fire_intent(entities, id, mode, x, y);
+            }
         } else if let Some((ability, x, y, MovePhase::Arrived)) = entities
             .get(id)
             .and_then(|e| active_ability_order_ready(&e.order()))

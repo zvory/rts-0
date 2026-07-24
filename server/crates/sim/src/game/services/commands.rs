@@ -46,7 +46,6 @@ use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 use std::collections::HashMap;
 const MAX_RALLY_STAGES: usize = 4;
 const MIN_FORMATION_POINT_DISTANCE_PX: f32 = 2.0;
-mod artillery_fire;
 mod artillery_scatter;
 mod cancel;
 mod command_helpers;
@@ -55,7 +54,6 @@ mod planner_facts;
 mod production_repeat;
 mod scout_plane_ability;
 mod support_weapon_setup;
-use self::artillery_fire::order_artillery_point_fire;
 use self::artillery_scatter::artillery_blanket_point;
 use self::command_helpers::{
     choose_smoke_caster, clear_queued_orders, clear_staged_anti_tank_gun_setup,
@@ -66,6 +64,7 @@ use self::guards::{
     unit_can_accept_stop_command, CommandAdmissionPolicy,
 };
 use self::planner_facts::{
+    ability_from_planner, ability_to_planner, build_kind_code, build_kind_from_code,
     entity_order_intent_from_planner, issue_mode, planner_config, planner_facts, AbilityFactInput,
 };
 struct CommandExecutionContext<'a, 'pathing> {
@@ -1215,25 +1214,6 @@ fn gather_unit_can_use_node(
         && gather_node_valid(entities, player, node)
 }
 
-fn build_kind_code(kind: EntityKind) -> planner::BuildKind {
-    EntityKind::ALL
-        .iter()
-        .position(|candidate| *candidate == kind)
-        .unwrap_or(usize::MAX) as planner::BuildKind
-}
-
-fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
-    EntityKind::ALL.get(code as usize).copied()
-}
-
-fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
-    planner::AbilityId(ability::planner_code(ability))
-}
-
-fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
-    ability::from_planner_code(ability.0)
-}
-
 fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryFireMode> {
     match ability {
         AbilityKind::PointFire => Some(ArtilleryFireMode::Point),
@@ -1431,6 +1411,72 @@ fn use_ability(
         &order,
         request.max_units_per_command,
     );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn order_artillery_point_fire(
+    map: &Map,
+    entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
+    players: &mut [PlayerState],
+    teams: &TeamRelations,
+    fog: &Fog,
+    artillery_shells: &mut ArtilleryShellStore,
+    firing_reveals: &mut Vec<FiringRevealSource>,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+    tick: u32,
+    mode: ArtilleryFireMode,
+    radius_tiles: f32,
+) -> bool {
+    let Some(target) = artillery_point_fire_target(
+        map,
+        entities,
+        player,
+        unit,
+        x,
+        y,
+        ArtilleryPointFireAcceptance::Command,
+    ) else {
+        return false;
+    };
+    if !target.in_range {
+        let blanket_radius = matches!(mode, ArtilleryFireMode::Blanket).then_some(radius_tiles);
+        return ability_orders::queue_artillery_fire_reposition(
+            map,
+            entities,
+            coordinator,
+            unit,
+            (x, y),
+            crate::game::services::order_execution::artillery_ability(mode),
+            blanket_radius,
+        );
+    }
+    if !start_artillery_fire_command_order(entities, unit, target, mode, radius_tiles) {
+        return false;
+    }
+    if !target.inside_field_of_fire {
+        return true;
+    }
+    try_fire_artillery(
+        entities,
+        players,
+        teams,
+        fog,
+        artillery_shells,
+        firing_reveals,
+        events,
+        player,
+        unit,
+        target.x,
+        target.y,
+        tick,
+        mode,
+        radius_tiles,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

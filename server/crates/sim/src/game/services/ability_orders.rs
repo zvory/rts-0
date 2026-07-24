@@ -7,7 +7,7 @@ use crate::game::ability::{
 use crate::game::ability_runtime::{
     AbilityObjectPayload, AbilityRuntime, AbilityWorldObjectKind, AbilityWorldObjectSpec,
 };
-use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
+use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, OrderIntent};
 use crate::game::fog::Fog;
 use crate::game::hero_abilities;
 use crate::game::map::Map;
@@ -907,4 +907,29 @@ pub(crate) fn active_ability_order_ready(
         )),
         _ => None,
     }
+}
+
+pub(super) fn queue_artillery_fire_reposition(
+    map: &Map,
+    entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
+    unit: u32,
+    point: (f32, f32),
+    ability: AbilityKind,
+    blanket_radius_tiles: Option<f32>,
+) -> bool {
+    let Some(staging) = staging_point(map, entities, unit, ability, point.0, point.1) else {
+        return false;
+    };
+    if let Some(entity) = entities.get_mut(unit) {
+        entity.clear_orders();
+    }
+    coordinator.order_ability(entities, unit, ability, point, staging);
+    let intent = match blanket_radius_tiles {
+        Some(radius_tiles) => OrderIntent::blanket_fire(point.0, point.1, radius_tiles),
+        None => OrderIntent::point_fire(point.0, point.1),
+    };
+    entities
+        .get_mut(unit)
+        .is_some_and(|entity| entity.append_queued_order(intent))
 }

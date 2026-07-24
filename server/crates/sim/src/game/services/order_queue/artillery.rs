@@ -48,23 +48,16 @@ pub(super) fn execute(
         return false;
     };
     if !target.in_range {
-        let ability = match mode {
-            ArtilleryFireMode::Point => AbilityKind::PointFire,
-            ArtilleryFireMode::Blanket => AbilityKind::BlanketFire,
-        };
-        let Some(staging) =
-            crate::game::services::ability_orders::staging_point(map, entities, id, ability, x, y)
-        else {
-            return false;
-        };
-        coordinator.order_ability(entities, id, ability, (x, y), staging);
-        let intent = match mode {
-            ArtilleryFireMode::Point => OrderIntent::point_fire(x, y),
-            ArtilleryFireMode::Blanket => OrderIntent::blanket_fire(x, y, radius_tiles),
-        };
-        return entities
-            .get_mut(id)
-            .is_some_and(|entity| entity.append_queued_order(intent));
+        let blanket_radius = matches!(mode, ArtilleryFireMode::Blanket).then_some(radius_tiles);
+        return crate::game::services::ability_orders::queue_artillery_fire_reposition(
+            map,
+            entities,
+            coordinator,
+            id,
+            point,
+            crate::game::services::order_execution::artillery_ability(mode),
+            blanket_radius,
+        );
     }
     start_artillery_fire_promoted_order(entities, id, target, mode, radius_tiles)
 }
@@ -72,16 +65,16 @@ pub(super) fn execute(
 pub(super) fn discard_failed_fire_intent(
     entities: &mut EntityStore,
     id: u32,
-    ability: AbilityKind,
+    mode: ArtilleryFireMode,
     x: f32,
     y: f32,
 ) {
     let matches_failed_reposition = entities
         .get(id)
         .and_then(|entity| entity.queued_orders().first())
-        .is_some_and(|intent| match (ability, intent) {
-            (AbilityKind::PointFire, OrderIntent::PointFire(point))
-            | (AbilityKind::BlanketFire, OrderIntent::BlanketFire { point, .. }) => {
+        .is_some_and(|intent| match (mode, intent) {
+            (ArtilleryFireMode::Point, OrderIntent::PointFire(point))
+            | (ArtilleryFireMode::Blanket, OrderIntent::BlanketFire { point, .. }) => {
                 point.x.to_bits() == x.to_bits() && point.y.to_bits() == y.to_bits()
             }
             _ => false,
