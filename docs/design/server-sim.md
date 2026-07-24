@@ -1393,8 +1393,9 @@ General rules:
   target behind them; tanks and normal buildings still block shots.
   Tank Trap scaffolds remain player-owned through construction, then become owner-0 neutral
   obstacles on completion. Neutral obstacles keep attack/deconstruct, area-damage, and cleanup
-  behavior without owner vision, alerts, scoring, or elimination survival. Infantry Move steering
-  treats Tank Traps as passable but applies a small local avoidance
+  behavior without owner vision, alerts, scoring, or elimination survival. Idle units exclude
+  neutral obstacles from autonomous acquisition; direct Attack and active Attack Move orders can
+  still target them. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition considers only currently fireable targets inside weapon range. Setup weapons that
   stopped to engage during an unfinished attack-move keep their

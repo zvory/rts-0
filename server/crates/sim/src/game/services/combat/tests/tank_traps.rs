@@ -30,6 +30,30 @@ fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
 }
 
 #[test]
+fn idle_units_do_not_auto_acquire_neutral_tank_traps() {
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let trap = entities
+        .spawn_building(1, EntityKind::TankTrap, 150.0, 100.0, true)
+        .expect("tank trap should spawn");
+    let trap_hp = entities.get(trap).expect("trap should exist").hp;
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &open_map(12),
+    );
+
+    assert_eq!(
+        entities.get(tank).expect("tank should exist").target_id(),
+        None
+    );
+    assert_eq!(entities.get(trap).expect("trap should exist").hp, trap_hp);
+}
+
+#[test]
 fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
     for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
         let mut entities = EntityStore::new();

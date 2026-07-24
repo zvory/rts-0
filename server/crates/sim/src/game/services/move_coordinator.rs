@@ -477,6 +477,27 @@ impl<'a> MoveCoordinator<'a> {
         }
     }
 
+    /// Issue one direct order that clears a captured set of completed Tank Traps in sequence.
+    pub fn order_attack_cluster(&mut self, entities: &mut EntityStore, id: u32, targets: Vec<u32>) {
+        let Some(&target) = targets.first() else {
+            return;
+        };
+        if entities.get(target).is_none() {
+            return;
+        }
+        let Some(order) = Order::attack_cluster(targets) else {
+            return;
+        };
+        entities.release_miner(id);
+        if let Some(e) = entities.get_mut(id) {
+            e.replace_active_order(order);
+            e.set_target_id(Some(target));
+            e.reset_gather_state();
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
+        }
+    }
+
     /// Issue a gather order. Sets the order and requests an initial path (budget permitting).
     pub fn order_gather(&mut self, entities: &mut EntityStore, id: u32, node: u32) {
         let (nx, ny) = match entities.get(node) {

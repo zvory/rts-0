@@ -1497,6 +1497,23 @@ function buttonByLabel(card, label) {
   );
 
   targetedInput.clientIntent.beginCommandTarget("attack");
+  targetedInput._entityAtScreen = () => ({
+    id: 100,
+    owner: 0,
+    kind: KIND.TANK_TRAP,
+    x: 304,
+    y: 304,
+  });
+  clickTarget(targetedInput, { x: 304, y: 304 });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(
+    lastSent.c === "attack" &&
+      lastSent.target === 100 &&
+      lastSent.tankTrapCluster === true,
+    "A-clicking a neutral Tank Trap requests one authoritative cluster attack",
+  );
+
+  targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput.clientIntent.holdCommandTarget("attack", "KeyA", true);
   targetedInput._entityAtScreen = () => null;
   clickTarget(targetedInput, { x: 320, y: 320 }, { shiftKey: true });

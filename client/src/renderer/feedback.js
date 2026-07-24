@@ -213,16 +213,33 @@ export function _drawAttackTargetPreview(view) {
   const p = view?.attackTargetPreview;
   if (!p || !finiteNumber(p.x) || !finiteNumber(p.y)) return;
   const g = this._feedbackGfx;
-  const ring = typeof this._ringRadius === "function"
-    ? this._ringRadius({ kind: p.kind })
-    : { rx: 16, ry: 11, cy: 4 };
-  const rx = Number.isFinite(ring?.rx) ? ring.rx : 16;
-  const ry = Number.isFinite(ring?.ry) ? ring.ry : 11;
-  const cy = Number.isFinite(ring?.cy) ? ring.cy : 4;
-  gfxStroke(g, 4, COLORS.selectEnemy, 0.3);
-  gfxEllipse(g, p.x, p.y + cy, rx + 2, ry + 2);
-  gfxStroke(g, 2, COLORS.selectEnemy, 0.98);
-  gfxEllipse(g, p.x, p.y + cy, rx, ry);
+  const targets = Array.isArray(p.targets) && p.targets.length ? p.targets : [p];
+  if (finiteNumber(p.radiusTiles) && p.radiusTiles > 0) {
+    const tileSize = view?.map?.tileSize || 32;
+    drawDashedCircle(
+      g,
+      p.x,
+      p.y,
+      p.radiusTiles * tileSize,
+      14,
+      2,
+      COLORS.selectEnemy,
+      0.62,
+    );
+  }
+  for (const target of targets) {
+    if (!finiteNumber(target?.x) || !finiteNumber(target?.y)) continue;
+    const ring = typeof this._ringRadius === "function"
+      ? this._ringRadius({ kind: target.kind })
+      : { rx: 16, ry: 11, cy: 4 };
+    const rx = Number.isFinite(ring?.rx) ? ring.rx : 16;
+    const ry = Number.isFinite(ring?.ry) ? ring.ry : 11;
+    const cy = Number.isFinite(ring?.cy) ? ring.cy : 4;
+    gfxStroke(g, 4, COLORS.selectEnemy, 0.3);
+    gfxEllipse(g, target.x, target.y + cy, rx + 2, ry + 2);
+    gfxStroke(g, 2, COLORS.selectEnemy, 0.98);
+    gfxEllipse(g, target.x, target.y + cy, rx, ry);
+  }
 }
 
 export function _drawOrderPlan(state) {
