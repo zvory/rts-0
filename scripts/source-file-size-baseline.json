@@ -30,7 +30,7 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1657,
+      "lines": 1630,
       "reason": "Client-message serde tests moved out of the oversized protocol root; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
     },
     {
@@ -40,7 +40,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 1970,
+      "lines": 1968,
       "reason": "Artillery Fire admission and execution now apply the research-dependent minimum radius beside the existing authoritative command validation; keep ratcheting until artillery command handling is extracted."
     },
     {
