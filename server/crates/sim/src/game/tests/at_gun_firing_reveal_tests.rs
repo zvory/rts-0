@@ -336,7 +336,7 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
 
     assert!(
         game.state.fog.is_visible_world(1, trap_pos.0, trap_pos.1),
-        "fixture requires the Tank Trap owner to see the attacked tile"
+        "fixture requires an observer to see the attacked tile"
     );
     assert!(
         !game
@@ -378,6 +378,12 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
                 })
         }),
         "the visible Tank Trap hit must deliver an attack event without a transient shooter reveal"
+    );
+    assert!(
+        events.iter().all(|(_, events)| events.iter().all(
+            |event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")
+        )),
+        "neutral Tank Traps must not emit owner under-attack alerts"
     );
     assert!(
         !game

@@ -268,7 +268,7 @@ node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --sec
 The server command restores the canonical four-player 2v2 scenario (Players 1 and 3 versus Players
 2 and 4) and measures each direct API round
 trip as `Game::tick()` plus one full-world snapshot, production compaction, and MessagePack
-encoding. Before each tick it also measures deterministic Hellhole driver work: one 43-of-85 move
+encoding. Before each tick it also measures deterministic Hellhole driver work: one 43-of-86 move
 command per shuttle player every 30 ticks and a bounded nearest-center respawn batch for missing
 central units. It runs as fast as the server can complete work, reports aggregate
 average/p95/p99/max timings, payload size, command/selection/death/respawn counters, and the minimum
@@ -367,7 +367,7 @@ The snapshot-stream workload is the client-only isolation lane. It fetches the g
 `client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
 MessagePack snapshots into the normal decoder and renderer at 30 Hz. The stream is the ordinary
 fog-filtered projection for active Player 1 on the 1+3 team, including the server-authored 126x126
-visibility grid and only Player 1's recipient event bucket. It starts with 416 projected entities
+visibility grid and only Player 1's recipient event bucket. It starts with 420 projected entities
 and retains at least 408 through the deterministic death/respawn churn. Its setup assertion fails
 unless the page reports Player 1, non-spectator mode, team ids `[1,2,1,2]`, the complete visibility
 grid, no WebSocket, and no live simulation. Regenerate the thirty-second, 900-frame artifact

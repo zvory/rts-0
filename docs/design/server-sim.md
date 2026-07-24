@@ -631,14 +631,14 @@ for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
 The churn driver runs before every tick. Players 1 and 2 are mortal; the driver tracks their
 authoritative unit ids and original kinds, preserves spent Panzerfaust kinds, and restores
-each owner's canonical 85-unit roster. A replacement that dies during its first tick is recovered by
+each owner's canonical 86-unit roster. A replacement that dies during its first tick is recovered by
 the owner-count backstop even though the driver never observed its id. Placement considers at most
 504 nearest-center candidates, builds body occupancy once per missing request, accounts for earlier
 planned spawns, and emits at most one spawn batch. Unresolved requests are reported and retried.
 `Game::lab_owned_units` and `Game::lab_plan_unit_spawns` are the typed Lab queries at this seam;
 callers do not inspect simulation stores.
 
-Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 85
+Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 86
 ids from scenario seed, player, epoch, and id, selects exactly 43, and sends one unqueued move to a
 deterministically selected passable integer tile in the active diagonal endpoint corridor. The
 endpoint leg still changes every 900 ticks. Request ids, selection, jitter, and replay operations are
@@ -984,7 +984,7 @@ command planning, so commands do not spend resources, start cooldowns, or replac
 orders. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
 cooldowns, or events are applied. Artillery point fire derives the target direction from the raw click with `atan2`, locks even very
-large finite click coordinates to the issuing gun's valid 25-to-55 tile range band, stores that
+large finite click coordinates to the issuing gun's valid 10-to-35 tile range band, stores that
 effective point, and owns any needed in-place setup or redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
 players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
 suppression used by other actionable firing reveals. Non-targetable Scout Planes are excluded from splash damage, projectile impacts, and Magic Anchor effects.
@@ -1217,7 +1217,7 @@ Deployed anti-tank guns rank in-field automatic target candidates ahead of out-o
 
 Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, stops to fire, and repaths if the same target moves out of range; it never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
 
-Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a City Centre requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 20-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
+Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a City Centre requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
 Group move formation assignment checks cached reachability components before issuing per-unit goals,
 avoiding command-time A* probes outside the move coordinator pathing budget. A blocked or unreachable
@@ -1391,8 +1391,10 @@ General rules:
   step enters the target tile, while preserving opaque-target handling and the two-stone corner
   blocker behavior. Tank Traps are not combat shot blockers, so damage continues to the
   target behind them; tanks and normal buildings still block shots.
-  Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
-  survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
+  Tank Trap scaffolds remain player-owned through construction, then become owner-0 neutral
+  obstacles on completion. Neutral obstacles keep attack/deconstruct, area-damage, and cleanup
+  behavior without owner vision, alerts, scoring, or elimination survival. Infantry Move steering
+  treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition considers only currently fireable targets inside weapon range. Setup weapons that
   stopped to engage during an unfinished attack-move keep their
@@ -1453,7 +1455,7 @@ General rules:
   policy. Within a target group, small-arms weapons prefer soft targets while keeping armored
   targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
   armored units, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
-  Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
+  Vehicle-body units rank neutral Tank Traps as high-priority breach targets only when
   `services::occupancy` reports that the trap is on the current bounded route segment or forms a
   closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose
   to real combat targets. The obstruction query is read-only, uses the current waypoint, `path_goal`,
@@ -1555,9 +1557,8 @@ Allocation rules:
   resume the scaffold through the normal build intent without paying again. Queued orders prefer
   the lowest work assignment load, then closest worker.
   Work assignment load is the worker's current queued-order count plus one when its active order is
-  already a build or deconstruct intent. Deconstruct targets must be completed Tank
-  Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
-  must be visible when accepted or promoted. Deconstruction takes half of the Tank Trap's build
+  already a build or deconstruct intent. Every completed Tank Trap is neutral and must be visible
+  when a deconstruct order is accepted or promoted. Deconstruction takes half of the Tank Trap's build
   time, is not accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap
   cost to the deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains

@@ -814,16 +814,21 @@ impl Game {
 
     fn lab_set_entity_owner(&mut self, input: LabSetEntityOwner) -> Result<LabOpOutcome, LabError> {
         self.validate_owner(input.owner)?;
-        let kind = self
+        let entity = self
             .state
             .entities
             .get(input.entity_id)
             .ok_or(LabError::StaleEntity {
                 entity_id: input.entity_id,
-            })?
-            .kind;
+            })?;
+        let kind = entity.kind;
         if !kind.is_unit() && !kind.is_building() {
             return Err(invalid_kind(kind, "setEntityOwner"));
+        }
+        if entity.is_neutral_obstacle() {
+            return Err(LabError::InvalidCommand {
+                reason: "completed Tank Traps are neutral and cannot be reassigned".to_string(),
+            });
         }
 
         if let Some(entity) = self.state.entities.get_mut(input.entity_id) {

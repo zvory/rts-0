@@ -107,7 +107,7 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
     "checked-in Hellhole snapshot stream contains the expected 30 seconds at 30 Hz",
   );
   assert(
-    checkedArtifact.header.initialEntityCount === 416 &&
+    checkedArtifact.header.initialEntityCount === 420 &&
       checkedArtifact.header.start?.playerId === 1 &&
       checkedArtifact.header.start?.spectator === false &&
       checkedArtifact.header.start?.players?.length === 4 &&

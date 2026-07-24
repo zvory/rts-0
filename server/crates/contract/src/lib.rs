@@ -562,7 +562,7 @@ pub struct ScoutPlaneStateView {
 #[serde(rename_all = "camelCase")]
 pub struct EntityView {
     pub id: u32,
-    /// 0 = neutral (resource nodes), otherwise the owning player id.
+    /// 0 = neutral (resource nodes and completed field obstacles), otherwise the owning player id.
     pub owner: u32,
     pub kind: String,
     pub x: f32,

@@ -1,6 +1,5 @@
 use super::*;
 use crate::game::state::TrackedRng;
-
 mod attack_move_reload;
 mod dev_scenario_setup;
 mod dispatch;
@@ -8,6 +7,7 @@ mod dynamic_construction_path_block;
 mod factory_wall_rally_spawn;
 mod layouts;
 mod replay_142_vehicle_lock;
+mod scout_car_open_ground_l_path;
 mod tank_coax;
 mod tank_retreat;
 

@@ -238,15 +238,12 @@ pub(crate) fn construction_system(
                     continue;
                 }
             };
+            let completion = (b.owner, b.kind, b.pos_x, b.pos_y);
             let completed = b.advance_construction().unwrap_or(false);
             active_construction_sites.insert(site);
-            completed
+            completed.then_some(completion)
         };
-        if completed {
-            let (owner, kind, x, y) = entities
-                .get(site)
-                .map(|b| (b.owner, b.kind, b.pos_x, b.pos_y))
-                .unwrap_or((0, EntityKind::Worker, 0.0, 0.0));
+        if let Some((owner, kind, x, y)) = completed {
             for pid in events.keys().copied().collect::<Vec<_>>() {
                 if !teams.same_team_or_same_owner(pid, owner)
                     && !projection::team_visible_world(pid, x, y, fog, &teams)

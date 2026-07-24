@@ -34,13 +34,13 @@ pub const METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS: u16 =
 pub const ARTILLERY_SETUP_TICKS: u16 = (TICK_HZ as u16) * 6;
 pub const ARTILLERY_RELOAD_TICKS: u32 = TICK_HZ * 3;
 pub const ARTILLERY_SHELL_DELAY_TICKS: u32 = TICK_HZ * 5;
-pub const ARTILLERY_MIN_RANGE_TILES: u32 = 25;
-pub const ARTILLERY_MAX_RANGE_TILES: u32 = 55;
-pub const ARTILLERY_FIELD_OF_FIRE_RAD: f32 = 20.0_f32 * std::f32::consts::PI / 180.0;
+pub const ARTILLERY_MIN_RANGE_TILES: u32 = 10;
+pub const ARTILLERY_MAX_RANGE_TILES: u32 = 35;
+pub const ARTILLERY_FIELD_OF_FIRE_RAD: f32 = 30.0_f32 * std::f32::consts::PI / 180.0;
 pub const ARTILLERY_AMMO_COST_STEEL: u32 = 10;
 pub const ARTILLERY_INNER_RADIUS_TILES: f32 = 1.0;
 pub const ARTILLERY_OUTER_RADIUS_TILES: f32 = 3.0;
-pub const ARTILLERY_INNER_DAMAGE: u32 = 75;
+pub const ARTILLERY_INNER_DAMAGE: u32 = 45;
 pub const ARTILLERY_OUTER_MIN_DAMAGE: u32 = 5;
 
 pub const fn support_weapon_setup_ticks(kind: EntityKind) -> Option<u16> {

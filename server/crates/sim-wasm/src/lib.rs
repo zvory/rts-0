@@ -12,7 +12,7 @@ use rts_contract::{
     EntityView, MapInfo, OrderPlanMarker, Snapshot, SnapshotNetStatus, StartPayload,
 };
 use rts_protocol::Command;
-use rts_rules::{balance, EntityKind};
+use rts_rules::{balance, static_blocker_class, EntityKind, StaticBlockerClass};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -50,7 +50,7 @@ impl OwnedPredictionBaseline {
         for entity in &snapshot.entities {
             if entity.owner == player_id {
                 owned_entities.push(OwnedEntityBaseline::from_view(entity));
-            } else if entity.owner != 0 {
+            } else if is_visible_prediction_obstacle(entity) {
                 visible_obstacles.push(VisibleObstacle::from_view(entity));
             }
         }
@@ -65,6 +65,14 @@ impl OwnedPredictionBaseline {
             visible_obstacles,
         }
     }
+}
+
+fn is_visible_prediction_obstacle(entity: &EntityView) -> bool {
+    entity.owner != 0
+        || entity
+            .kind
+            .parse()
+            .is_ok_and(|kind| static_blocker_class(kind) != StaticBlockerClass::None)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -896,6 +904,8 @@ mod tests {
             x: 100.0,
             y: 100.0,
         }];
+        let neutral_tank_trap =
+            EntityView::new(303, 0, "tank_trap", 300.0, 300.0, 100, 100, "idle");
         Snapshot {
             tick: 10,
             world_combat_position: None,
@@ -903,7 +913,7 @@ mod tests {
             oil: 0,
             supply_used: 1,
             supply_cap: 10,
-            entities: vec![owned, hidden_shape],
+            entities: vec![owned, hidden_shape, neutral_tank_trap],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             ability_objects: Vec::new(),
@@ -926,7 +936,11 @@ mod tests {
         assert_eq!(baseline.owned_entities.len(), 1);
         assert_eq!(baseline.owned_entities[0].id, 101);
         assert_eq!(baseline.owned_entities[0].order_plan.len(), 1);
-        assert_eq!(baseline.visible_obstacles.len(), 1);
+        assert_eq!(baseline.visible_obstacles.len(), 2);
+        assert!(baseline
+            .visible_obstacles
+            .iter()
+            .any(|obstacle| obstacle.kind == "tank_trap"));
         let json = serde_json::to_value(&baseline).unwrap();
         let serialized = serde_json::to_string(&json).unwrap();
         assert!(!serialized.contains("202"));
@@ -957,7 +971,7 @@ mod tests {
         assert!(diagnostics
             .unsupported_fields
             .contains(&"fogReconstruction".to_string()));
-        assert_eq!(diagnostics.visible_obstacle_count, 1);
+        assert_eq!(diagnostics.visible_obstacle_count, 2);
     }
 
     #[test]

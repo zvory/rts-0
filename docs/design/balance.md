@@ -172,7 +172,7 @@ or regime-specific iconography.
 
 MVP scope:
 - No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Command Car
-  Scout Plane ability. Each sortie has a 20-second total lifetime from launch, flies to a targeted
+  Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies to a targeted
   orbit, provides vision throughout transit and any remaining orbit time, and then disappears.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
   early delayed-area fire tool.
@@ -209,7 +209,8 @@ Core unit roles:
   is provisionally set to zero ticks for balance improvement, it cannot shoot while moving, and it
   lands delayed area shells that punish static positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
-  gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
+  gameplay footprint but renders at 75% of its prior authored size as an exposed field piece, must
+  deploy into a narrow firing arc,
   cannot shoot inside its minimum range, and spends steel on each long-range Fire shell.
 
 Terrain rules:
@@ -347,8 +348,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   launcher, exact vehicle whitelist, and disposable state; the entity remains a Panzerfaust throughout.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
-- Artillery uses `ARTILLERY_MIN_RANGE_TILES = 25`, `ARTILLERY_MAX_RANGE_TILES = 55`,
-  `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
+- Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 35`,
+  `ARTILLERY_FIELD_OF_FIRE_RAD = 30 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`. It moves at 1.6 px/tick, slightly faster than the
   Anti-Tank Gun's 1.52 px/tick speed.
@@ -358,10 +359,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   is no separate range-based error, accuracy sequence, or repeated-shot tightening. Artillery Fire
   Control costs 100 steel and 150 oil, takes 20 seconds, requires Artillery, and reduces the
   minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3`.
-  Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
-  long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
-  footprint. Impacts deal
-  75 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 5 damage at
+  Its body length, width, clearance, and selection radius match the Tank, while the rendered rig is
+  scaled to 75%; its exposed carriage, long barrel, large wheels, and deployed spades carry the
+  visual distinction without changing its gameplay footprint. Impacts deal
+  45 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 5 damage at
   3 tiles, including friendly fire.
 - `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original
   96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
@@ -371,9 +372,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   cars, and command cars cannot advance while their owner has zero oil.
 - Scout Plane constants for the Command Car Scout Plane ability:
   `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 75`,
-  `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 16`,
-  `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.0`, `SCOUT_PLANE_SUPPLY = 0`,
-  `SCOUT_PLANE_ORBIT_RADIUS_TILES = 2`, `SCOUT_PLANE_LIFETIME_TICKS = 600`,
+  `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 19`,
+  `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.6`, `SCOUT_PLANE_SUPPLY = 0`,
+  `SCOUT_PLANE_ORBIT_RADIUS_TILES = 2`, `SCOUT_PLANE_LIFETIME_TICKS = 900`,
   and `SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = 900`. It has no default weapon and a zero-radius
   authoritative movement/collision body, so it neither reserves nor blocks ground pathing. The
   client mirror uses a 48x34 px body and 17 px render size. Command Cars keep Breakthrough and add
@@ -558,14 +559,14 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 396 (~13.2s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 50  | 0   | 1   | 300 (~10s) |
+| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 25  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.52 | 9    | 150 | 40  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
+| artillery       | 200 | 45 AP inner / 45-5 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in R&D Complex; rendered at 75% of its prior size with an unchanged tank-sized gameplay footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 20-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed R&D Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |

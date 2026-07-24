@@ -209,7 +209,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     STATS[KIND.SCOUT_PLANE].cost.steel === 50 &&
       STATS[KIND.SCOUT_PLANE].cost.oil === 75 &&
-      STATS[KIND.SCOUT_PLANE].sight === 16 &&
+      configExports.SCOUT_PLANE_SPEED_PX_PER_TICK === 2.6 &&
+      STATS[KIND.SCOUT_PLANE].sight === 19 &&
       STATS[KIND.SCOUT_PLANE].supply === 0 &&
       STATS[KIND.SCOUT_PLANE].buildTicks === 0 &&
       STATS[KIND.SCOUT_PLANE].body.length === 48 &&
@@ -224,7 +225,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.SCOUT_PLANE].requires == null &&
       ABILITIES[ABILITY.SCOUT_PLANE].cost.steel === 50 &&
       ABILITIES[ABILITY.SCOUT_PLANE].cost.oil === 75 &&
-      ABILITIES[ABILITY.SCOUT_PLANE].durationTicks === 600,
+      ABILITIES[ABILITY.SCOUT_PLANE].durationTicks === 900,
     "Command Car command card exposes Scout Plane as the C-slot ability",
   );
   assert(
@@ -344,7 +345,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Barracks exposes the standalone Panzerfaust unit",
   );
   assert(
-    STATS[KIND.RIFLEMAN].cost.steel === 50 &&
+    STATS[KIND.RIFLEMAN].cost.steel === 25 &&
       STATS[KIND.RIFLEMAN].cost.oil === 0 &&
       STATS[KIND.PANZERFAUST].cost.steel === 55 &&
       STATS[KIND.PANZERFAUST].cost.oil === 5 &&
@@ -361,10 +362,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and unit unlock",
   );
   assert(
-    STATS[KIND.ARTILLERY].cost.steel === 300 &&
+      STATS[KIND.ARTILLERY].cost.steel === 300 &&
       STATS[KIND.ARTILLERY].cost.oil === 100 &&
-      STATS[KIND.ARTILLERY].supply === 5,
-    "Artillery cost and supply mirror server",
+      STATS[KIND.ARTILLERY].supply === 4 &&
+      STATS[KIND.ARTILLERY].buildTicks === TICK_HZ * 20,
+    "Artillery cost, four-supply footprint, and 20-second production time mirror server",
   );
   assert(
     STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ARTILLERY_UNLOCK,

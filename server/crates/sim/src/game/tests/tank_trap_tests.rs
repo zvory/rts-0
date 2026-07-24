@@ -2,6 +2,66 @@ use super::fixtures::*;
 use super::*;
 
 #[test]
+fn completed_tank_traps_have_no_player_owner() {
+    let prebuilt = Entity::new_building(1, EntityKind::TankTrap, 10.0, 20.0, true)
+        .expect("Tank Trap should spawn");
+    assert_eq!(prebuilt.owner, 0);
+    assert!(prebuilt.is_neutral_obstacle());
+
+    let mut constructed = Entity::new_building(2, EntityKind::TankTrap, 10.0, 20.0, false)
+        .expect("Tank Trap scaffold should spawn");
+    let total = constructed
+        .construction
+        .as_ref()
+        .expect("Tank Trap should be under construction")
+        .total;
+    assert_eq!(constructed.owner, 2);
+    assert!(constructed.set_construction_progress(total.saturating_sub(1)));
+    assert_eq!(constructed.advance_construction(), Some(true));
+    assert_eq!(constructed.owner, 0);
+    assert!(constructed.is_neutral_obstacle());
+}
+
+#[test]
+fn legacy_owned_tank_trap_checkpoint_restores_as_neutral() {
+    let mut game = Game::new_for_replay(&human_vs_ai_players(), 0x1234_5678);
+    let trap = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::TankTrap, 320.0, 320.0, true)
+        .expect("Tank Trap should spawn");
+    let text = game
+        .checkpoint_payload_text_for_test()
+        .expect("checkpoint should serialize");
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&text).expect("checkpoint should be JSON");
+    let legacy_trap = payload["entities"]["entities"]
+        .as_array_mut()
+        .expect("checkpoint entities")
+        .iter_mut()
+        .find(|entity| entity["id"] == trap)
+        .expect("Tank Trap should be serialized");
+    legacy_trap["owner"] = serde_json::json!(2);
+
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &serde_json::to_string(&payload).expect("legacy checkpoint should serialize"),
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .expect("legacy completed Tank Trap should normalize on restore");
+
+    assert_eq!(
+        restored
+            .state
+            .entities
+            .get(trap)
+            .expect("restored Tank Trap should exist")
+            .owner,
+        0
+    );
+}
+
+#[test]
 fn ai_with_building_but_no_units_is_eliminated() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0x1234_5678);
@@ -134,13 +194,15 @@ fn tank_trap_grants_no_local_sight() {
         !game.state.fog.is_visible_world(1, x, y),
         "fixture should place the far corner outside opening fog"
     );
-    game.state
+    let trap = game
+        .state
         .entities
         .spawn_building(1, EntityKind::TankTrap, x, y, true)
         .expect("Tank Trap should spawn");
     game.state
         .fog
         .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    game.rebuild_final_spatial();
 
     assert!(
         !game.state.fog.is_visible_world(1, x, y),
@@ -152,6 +214,37 @@ fn tank_trap_grants_no_local_sight() {
             .fog
             .is_visible_world(1, x - config::TILE_SIZE as f32, y),
         "Tank Traps should not reveal adjacent tiles"
+    );
+    assert!(
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .all(|entity| entity.id != trap),
+        "the former builder should receive no live Tank Trap state outside vision"
+    );
+
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, x, y)
+        .expect("spotter should spawn");
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    game.rebuild_final_spatial();
+    let visible = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == trap)
+        .expect("a currently visible Tank Trap should be projected");
+    assert_eq!(visible.owner, 0);
+    assert_eq!(
+        visible.hp,
+        game.state
+            .entities
+            .get(trap)
+            .expect("Tank Trap should exist")
+            .hp
     );
 }
 

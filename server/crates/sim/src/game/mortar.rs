@@ -194,7 +194,10 @@ fn resolve(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.owner == 0 || target.hp == 0 || !target.is_targetable() {
+        if (target.owner == 0 && !target.is_neutral_obstacle())
+            || target.hp == 0
+            || !target.is_targetable()
+        {
             continue;
         }
         let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);

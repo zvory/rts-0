@@ -82,7 +82,10 @@ fn resolve_shell(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.owner == 0 || target.hp == 0 || !target.is_targetable() {
+        if (target.owner == 0 && !target.is_neutral_obstacle())
+            || target.hp == 0
+            || !target.is_targetable()
+        {
             continue;
         }
         let d2 = impact_distance2_to_target(shell.x, shell.y, target);
@@ -121,12 +124,9 @@ fn resolve_shell(
 
 fn artillery_damage(victim_kind: EntityKind, d2: f32, inner2: f32, outer2: f32) -> u32 {
     if d2 <= inner2 {
-        return combat::effective_damage(
-            EntityKind::Artillery,
-            victim_kind,
-            config::ARTILLERY_INNER_DAMAGE,
-            Some(TerrainKind::Open),
-        );
+        // The direct blast core is fully armor-piercing. Entrenchment's area-damage
+        // reduction is applied by the caller after this zone-specific armor policy.
+        return config::ARTILLERY_INNER_DAMAGE;
     }
     if d2 > outer2 {
         return 0;
@@ -295,8 +295,16 @@ mod tests {
         resolve_shell(&mut entities, &teams, &fog, &mut events, &shell, 10);
 
         let after = entities.get(victim).expect("victim should survive").hp;
+        let inner = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
+        let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
+        let expected_base = artillery_damage(
+            EntityKind::Rifleman,
+            64.0_f32.powi(2),
+            inner.powi(2),
+            outer.powi(2),
+        );
         let expected_damage =
-            combat::area_damage_after_entrenchment(EntityKind::Rifleman, 40, true);
+            combat::area_damage_after_entrenchment(EntityKind::Rifleman, expected_base, true);
         assert_eq!(
             before - after,
             expected_damage,

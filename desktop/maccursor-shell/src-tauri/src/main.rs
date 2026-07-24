@@ -134,6 +134,7 @@ struct RuntimePolicy {
     native_cursor_capture: bool,
     pointer_lock_disabled: bool,
     aggressive_cursor_lock: bool,
+    disable_native_drag_drop_handler: bool,
 }
 
 impl RuntimePolicy {
@@ -145,6 +146,7 @@ impl RuntimePolicy {
             native_cursor_capture: native_cursor,
             pointer_lock_disabled: native_cursor,
             aggressive_cursor_lock: native_cursor,
+            disable_native_drag_drop_handler: platform == ShellPlatform::Windows,
         }
     }
 
@@ -260,8 +262,9 @@ fn run() -> ShellResult<()> {
                 app.manage(native_cursor.clone());
                 native_cursor
             };
+            let runtime_policy = RuntimePolicy::current();
             let runtime_script = desktop_runtime_script(&RuntimeScriptOptions {
-                policy: RuntimePolicy::current(),
+                policy: runtime_policy,
                 developer_server_url: initial_navigation.developer_url().map(str::to_string),
                 autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
                 autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
@@ -271,7 +274,7 @@ fn run() -> ShellResult<()> {
             let navigation_policy_diagnostics = diagnostics.clone();
             let page_load_diagnostics = diagnostics.clone();
             let page_load_monitor = navigation_monitor.clone();
-            let window = WebviewWindowBuilder::new(app, WINDOW_LABEL, initial_webview_url)
+            let window_builder = WebviewWindowBuilder::new(app, WINDOW_LABEL, initial_webview_url)
                 .title("Bewegungskrieg")
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(960.0, 640.0)
@@ -288,8 +291,14 @@ fn run() -> ShellResult<()> {
                 })
                 .on_page_load(move |window, payload| {
                     handle_page_load(&page_load_diagnostics, &page_load_monitor, &window, payload);
-                })
-                .build()?;
+                });
+            let window_builder = if runtime_policy.disable_native_drag_drop_handler {
+                // Tauri's native file-drop handler suppresses frontend HTML5 drag/drop on Windows.
+                window_builder.disable_drag_drop_handler()
+            } else {
+                window_builder
+            };
+            let window = window_builder.build()?;
             #[cfg(target_os = "macos")]
             {
                 native_cursor.install(&window);
@@ -1378,13 +1387,15 @@ mod tests {
 
     #[test]
     fn windows_runtime_script_uses_raw_browser_pointer_lock_without_native_bridge() {
+        let policy = RuntimePolicy::for_platform(ShellPlatform::Windows);
         let script = desktop_runtime_script(&RuntimeScriptOptions {
-            policy: RuntimePolicy::for_platform(ShellPlatform::Windows),
+            policy,
             developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
             autostart: false,
             autolock: false,
         });
 
+        assert!(policy.disable_native_drag_drop_handler);
         assert!(script.contains("platform: \"windows\""));
         assert!(script.contains("nativeCursorBackend: false"));
         assert!(script.contains("nativeCursorCapture: false"));
@@ -1398,6 +1409,19 @@ mod tests {
         assert!(!script.contains("requestPointerLock"));
         assert!(!script.contains(NATIVE_CURSOR_SCRIPT_BEGIN));
         assert!(!script.contains(NATIVE_CURSOR_SCRIPT_END));
+    }
+
+    #[test]
+    fn native_drag_drop_handler_is_only_disabled_on_windows() {
+        assert!(
+            RuntimePolicy::for_platform(ShellPlatform::Windows).disable_native_drag_drop_handler
+        );
+        assert!(
+            !RuntimePolicy::for_platform(ShellPlatform::Macos).disable_native_drag_drop_handler
+        );
+        assert!(
+            !RuntimePolicy::for_platform(ShellPlatform::Other).disable_native_drag_drop_handler
+        );
     }
 
     #[test]

@@ -1185,7 +1185,7 @@ hiding minimap-authored setup cones or issued-command feedback. HUD command-targ
 Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
 current and queued origins as Shift changes. Armed Artillery Fire previews
 compute advisory per-artillery locked effective points from the current gun origin, the authoritative
-or local pending planned origin, the 25-to-55 tile range band, the current or planned setup facing
+or local pending planned origin, the 10-to-35 tile range band, the current or planned setup facing
 fallback, and same-ray map clamping when map bounds are available; command feedback marks those
 locked points when the client can compute them while the server still receives and authoritatively
 validates the raw clicked point. Local planned setup/fire stages are reconciled on snapshots using

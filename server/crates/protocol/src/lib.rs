@@ -21,8 +21,8 @@ pub use client_net_report::{
 #[cfg(test)]
 use contract_metadata::kind_code;
 pub use contract_metadata::{
-    abilities, ability_code, ability_object_kinds, kinds, lobby_kinds, protocol_contract, states,
-    terrain, upgrade_code, upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes,
+    abilities, ability_code, ability_object_kinds, kinds, lobby_kinds, notices, protocol_contract,
+    states, terrain, upgrade_code, upgrades, weapons, CompactSlotSchemas, ProtocolCompactCodes,
     ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, SlotField, SnapshotCodecContract,
     COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, PREDICTION_PROTOCOL_VERSION,
     SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION,

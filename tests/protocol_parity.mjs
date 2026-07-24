@@ -23,6 +23,7 @@ import {
   LAB_VISION,
   LOBBY_KIND,
   MOVEMENT_PATH_DIAGNOSTICS,
+  NOTICE,
   NOTICE_SEVERITY,
   NOTICE_SEVERITY_CODE,
   ORDER_STAGE,
@@ -114,6 +115,7 @@ const STABLE_JS_PROTOCOL_EXPORTS = [
   "LAB_VISION",
   "LOBBY_KIND",
   "MOVEMENT_PATH_DIAGNOSTICS",
+  "NOTICE",
   "NOTICE_SEVERITY",
   "NOTICE_SEVERITY_CODE",
   "ORDER_STAGE",
@@ -224,6 +226,7 @@ assertSameMap(
 assertSameMap("lobby kind vocabulary", protocolContract.vocabularies.lobbyKinds, LOBBY_KIND);
 assertSameMap("upgrade vocabulary", protocolContract.vocabularies.upgrades, UPGRADE);
 assertSameMap("weapon kind vocabulary", protocolContract.vocabularies.weaponKinds, WEAPON_KIND);
+assertSameMap("notice vocabulary", protocolContract.vocabularies.notices, NOTICE);
 assertSameMap("notice severity vocabulary", protocolContract.vocabularies.noticeSeverities, NOTICE_SEVERITY);
 assertSameMap("order stage vocabulary", protocolContract.vocabularies.orderStages, ORDER_STAGE);
 assertSameMap("terrain", protocolContract.compactCodes.terrain, TERRAIN);

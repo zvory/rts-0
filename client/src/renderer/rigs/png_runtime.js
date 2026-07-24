@@ -1,9 +1,8 @@
 import { hexToInt, lightenColor } from "../shared.js";
-import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
+import { createRigAnimationStage, rigContainerScale, sampleRigAnimationInto } from "./animation.js";
 import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { isImmutablePartSelection, normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
-const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const ATLAS_SPRITES_CACHE = new WeakMap();
 const ROUTE_COVERAGE_CACHE = new WeakMap();
 const ALL_ROUTE_PARTS = Object.freeze({});
@@ -176,7 +175,7 @@ class PngAtlasRigInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? 1;
     setPoint(this.container.position, entity.x ?? 0, entity.y ?? 0);
-    const scale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
+    const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 

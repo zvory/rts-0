@@ -1235,7 +1235,7 @@ function buttonByLabel(card, label) {
     "Shift terrain right-click should send queued move",
   );
 
-  const enemyUnit = { id: 41, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 180 };
+  const enemyUnit = { id: 41, owner: 0, kind: KIND.TANK_TRAP, x: 180, y: 180 };
   input.state.entitiesInterpolated = () => [moveUnit, enemyUnit];
   publishSelectionTestScene(input);
   rightClickCommands.length = 0;
@@ -1244,10 +1244,10 @@ function buttonByLabel(card, label) {
     rightClickCommands.length === 1 &&
       rightClickCommands[0].c === "attack" &&
       rightClickCommands[0].queued === true,
-    "Shift right-click on enemies should send queued attack",
+    "Shift right-click on a neutral Tank Trap should send queued attack",
   );
   const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
-  const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
+  const enemyTankTrap = { id: 43, owner: 0, kind: KIND.TANK_TRAP, x: 180, y: 180 };
   input.state = {
     playerId: 1,
     map: { tileSize: 32 },

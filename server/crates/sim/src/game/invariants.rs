@@ -57,6 +57,14 @@ impl Game {
                     by_key.id, e.id
                 );
             }
+            if e.kind == EntityKind::TankTrap {
+                assert_eq!(
+                    e.under_construction(),
+                    e.owner != NEUTRAL,
+                    "invariant: Tank Trap ownership does not match construction state; {}",
+                    entity_context(&self.state.map, e)
+                );
+            }
         }
 
         // ------------------------------------------------------------------
@@ -367,18 +375,26 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 10. Snapshots never expose hidden enemy ids through entities or targets
+        // 10. Snapshots never expose hidden non-owned ids through entities or targets
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             let snap = self.snapshot_for(pid);
             let live_fog = self.invariant_team_current_fog_for(pid, &self.state.fog);
             for v in &snap.entities {
-                if v.owner == pid || v.owner == NEUTRAL || self.same_team_owner(pid, v.owner) {
+                let fog_gated_neutral = self
+                    .state
+                    .entities
+                    .get(v.id)
+                    .is_some_and(Entity::is_neutral_obstacle);
+                if v.owner == pid
+                    || self.same_team_owner(pid, v.owner)
+                    || (v.owner == NEUTRAL && !fog_gated_neutral)
+                {
                     continue;
                 }
                 let live_visible = live_fog.is_visible_world(pid, v.x, v.y);
-                // Enemy entities must either be live-visible or explicitly marked as legacy/special
-                // render-only intel.
+                // Fog-gated entities must either be live-visible or explicitly marked as
+                // legacy/special render-only intel.
                 if v.vision_only {
                     assert!(
                         !live_visible,

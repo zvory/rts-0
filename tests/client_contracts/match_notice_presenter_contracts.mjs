@@ -3,10 +3,10 @@
 
 import { assert } from "./assertions.mjs";
 import {
+  ARTILLERY_STEEL_SHORTAGE_THROTTLE_MS,
   MatchNoticePresenter,
-  STEEL_SHORTAGE_COOLDOWN_MS,
 } from "../../client/src/match_notice_presenter.js";
-import { NOTICE_SEVERITY } from "../../client/src/protocol.js";
+import { NOTICE, NOTICE_SEVERITY } from "../../client/src/protocol.js";
 
 function createSurfaces() {
   const toasts = [];
@@ -71,22 +71,55 @@ function underAttack(x, y) {
     "admitted under-attack voices bypass generic cooldown and explicitly duck the mix",
   );
 
-  presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO });
-  const steelShortageStartedAt = now;
+  assert(
+    presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO }),
+    "ordinary steel shortage is admitted",
+  );
   const infoVoice = surfaces.plays.at(-1);
   assert(infoVoice.id === "notice_steel", "existing informational notice voice still plays");
   assert(infoVoice.opts.category === "ui", "informational notice keeps informational audio priority");
   assert(infoVoice.opts.duck === true, "informational spoken notice explicitly ducks the mix");
-  now = steelShortageStartedAt + STEEL_SHORTAGE_COOLDOWN_MS - 1;
-  presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO });
-  assert(surfaces.toasts.length === 3, "steel shortage repeats are suppressed for one minute");
-  assert(surfaces.plays.length === 3, "suppressed steel shortage repeats do not replay the voice");
-  presenter.present({ msg: "Not enough oil", severity: NOTICE_SEVERITY.INFO });
-  assert(surfaces.toasts.length === 4, "other resource notices remain immediately available");
-  now = steelShortageStartedAt + STEEL_SHORTAGE_COOLDOWN_MS;
-  presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO });
-  assert(surfaces.toasts.length === 5, "steel shortage is admitted again after one minute");
-  assert(surfaces.plays.at(-1).id === "notice_steel", "readmitted steel shortage replays its voice");
+  assert(
+    presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO }),
+    "ordinary steel shortage can repeat within the same minute",
+  );
+
+  assert(
+    presenter.present({
+      msg: NOTICE.ARTILLERY_STEEL_SHORTAGE,
+      severity: NOTICE_SEVERITY.INFO,
+    }),
+    "first artillery steel shortage is admitted",
+  );
+  const artilleryShortageStartedAt = now;
+  assert(
+    surfaces.toasts.at(-1) === "Not enough steel",
+    "artillery shortage id renders the ordinary player-facing text",
+  );
+  now = artilleryShortageStartedAt + ARTILLERY_STEEL_SHORTAGE_THROTTLE_MS - 1;
+  assert(
+    !presenter.present({
+      msg: NOTICE.ARTILLERY_STEEL_SHORTAGE,
+      severity: NOTICE_SEVERITY.INFO,
+    }),
+    "artillery steel shortage repeats are throttled for one minute",
+  );
+  assert(
+    presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO }),
+    "ordinary steel shortages remain available during the artillery throttle",
+  );
+  now = artilleryShortageStartedAt + ARTILLERY_STEEL_SHORTAGE_THROTTLE_MS;
+  assert(
+    presenter.present({
+      msg: NOTICE.ARTILLERY_STEEL_SHORTAGE,
+      severity: NOTICE_SEVERITY.INFO,
+    }),
+    "artillery steel shortage is admitted again after one minute",
+  );
+  assert(
+    surfaces.plays.at(-1).id === "notice_steel",
+    "readmitted artillery shortage replays the steel voice",
+  );
 }
 
 {

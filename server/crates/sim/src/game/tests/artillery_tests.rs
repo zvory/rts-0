@@ -512,13 +512,11 @@ fn artillery_shell_inside_building_footprint_deals_full_inner_ap_damage() {
     resolve_test_artillery_shell(&mut game, 160.0, 160.0);
 
     let after = game.state.entities.get(depot).expect("depot survives").hp;
-    let expected = combat::effective_damage(
-        EntityKind::Artillery,
-        EntityKind::Depot,
+    assert_eq!(
+        before - after,
         config::ARTILLERY_INNER_DAMAGE,
-        Some(TerrainKind::Open),
+        "inner artillery splash should bypass armored-building damage reduction"
     );
-    assert_eq!(before - after, expected);
 }
 
 #[test]
