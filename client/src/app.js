@@ -22,12 +22,14 @@ import {
   labHandoffLaunchConfig,
   devWatchConfig,
   diagnostics,
+  desktopMainScreenAvailable,
   dom,
   formatScore,
   labLaunchConfig,
   replaceLabCatalogRoute,
   replaceReplayPermalink,
   replayLaunchConfig,
+  returnToDesktopMainScreen,
   wsUrl,
 } from "./bootstrap.js";
 import { Match } from "./match.js";
@@ -202,6 +204,7 @@ export class App {
     this.connectionPromise = null;
     this.intentionalIdleDisconnect = false;
     this.lastPlayerActivityReportMs = Number.NEGATIVE_INFINITY;
+    this.desktopMainScreenAvailable = desktopMainScreenAvailable();
 
     // Bind handlers once so we can off() them symmetrically.
     this.onStart = this.onStart.bind(this);
@@ -220,6 +223,7 @@ export class App {
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
+    this.onReturnToDesktopMainScreen = this.onReturnToDesktopMainScreen.bind(this);
     this.onPlayerActivity = () => this.reportPlayerActivity();
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
@@ -234,6 +238,10 @@ export class App {
     /** AI observation id received at match resolution and retained through replay playback. */
     this.lastObservationRunId = "";
     this.mountLobbySettings();
+    if (dom.lobbyMainScreen) {
+      dom.lobbyMainScreen.hidden = !this.desktopMainScreenAvailable;
+      dom.lobbyMainScreen.addEventListener("click", this.onReturnToDesktopMainScreen);
+    }
     if (this.labCatalogLaunch) this.lobby.hide();
   }
 
@@ -331,6 +339,18 @@ export class App {
     if (!this.net.activity()) return false;
     this.lastPlayerActivityReportMs = nowMs;
     return true;
+  }
+
+  async onReturnToDesktopMainScreen() {
+    if (!this.desktopMainScreenAvailable) return;
+    if (dom.lobbyMainScreen) dom.lobbyMainScreen.disabled = true;
+    try {
+      await returnToDesktopMainScreen();
+    } catch (error) {
+      if (dom.lobbyMainScreen) dom.lobbyMainScreen.disabled = false;
+      this.labCatalog?.setStatus("Could not return to the desktop main screen.", { error: true });
+      this.showToast(error?.message || "Could not return to the desktop main screen.");
+    }
   }
 
   async prepareLabHandoff() {
@@ -518,6 +538,7 @@ export class App {
     this.labCatalog = new LabCatalogScreen({
       root: dom.labEntryScreen,
       initialRoom: this.labCatalogLaunch?.room || "default",
+      onBack: this.desktopMainScreenAvailable ? this.onReturnToDesktopMainScreen : null,
       onStart: (selection) => {
         this.labLaunch = {
           ...buildLabLaunchConfig({

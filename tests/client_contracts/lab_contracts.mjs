@@ -205,6 +205,26 @@ await withFakeDocument(() => {
   );
 });
 
+await withFakeDocument(() => {
+  const root = document.createElement("section");
+  let backCount = 0;
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "sandbox",
+    onBack: () => { backCount += 1; },
+  });
+  screen.setConnected(true);
+  const backButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Back",
+  )[0];
+  assert(!!backButton, "LabCatalogScreen renders the optional desktop Back button");
+  backButton.listeners.click();
+  assert(backCount === 1, "LabCatalogScreen sends Back to its app-owned navigation callback");
+  assert(textWithin(root).includes("Returning to main screen"),
+    "LabCatalogScreen reports the desktop transition while navigation begins");
+});
+
 {
   const sent = [];
   const net = new Net("ws://example.test/ws");

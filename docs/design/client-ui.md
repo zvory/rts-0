@@ -655,7 +655,7 @@ export const labVision                   // all(), team(teamId)
 ```js
 export function normalizeLabScenarioEntry(entry)
 export class LabCatalogScreen {
-  constructor({ root, fetchImpl?, initialRoom?, onStart })
+  constructor({ root, fetchImpl?, initialRoom?, onBack?, onStart })
   mount()                                // fetches GET /api/lab-scenarios and renders choices
   setConnected(connected)
   setStatus(status, options?)
@@ -669,6 +669,12 @@ the visible URL makes catalog-launched blank and bundled Labs reloadable with La
 as `visualProfile` and `rtsRenderer`.
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
+
+When the client is loaded by the Tauri desktop shell, the ordinary lobby and bare `/lab` catalog
+show a **Back** action. `App` owns both affordances and calls the capability-gated
+`desktop_return_to_startup` shell command; normal browser sessions do not render the action. The
+shell accepts the command only from a built-in release origin or an allowed loopback developer
+game and navigates the existing WebView back to its bundled startup selector.
 
 `interact_bridge.js`
 ```js

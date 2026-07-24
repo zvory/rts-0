@@ -164,6 +164,9 @@ struct RuntimeScriptOptions {
 }
 
 #[derive(Clone, Default)]
+struct DeveloperNavigationUrl(Option<tauri::Url>);
+
+#[derive(Clone, Default)]
 struct NavigationMonitor {
     inner: Arc<Mutex<NavigationMonitorState>>,
 }
@@ -226,14 +229,16 @@ fn run() -> ShellResult<()> {
         desktop_log_info,
         desktop_reveal_logs,
         desktop_log_client_event,
-        desktop_open_profile
+        desktop_open_profile,
+        desktop_return_to_startup
     ]);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         desktop_log_info,
         desktop_reveal_logs,
         desktop_log_client_event,
-        desktop_open_profile
+        desktop_open_profile,
+        desktop_return_to_startup
     ]);
 
     builder
@@ -256,6 +261,7 @@ fn run() -> ShellResult<()> {
                         "invalid developer server URL from {SERVER_URL_ENV}: {err}"
                     ))
                 })?;
+            app.manage(DeveloperNavigationUrl(developer_navigation_url.clone()));
             #[cfg(target_os = "macos")]
             let native_cursor = {
                 let native_cursor = NativeCursorBackend::with_diagnostics(diagnostics.clone());
@@ -438,6 +444,25 @@ fn desktop_open_profile(
         .map_err(|err| format!("failed to open release channel {}: {err}", profile.label))
 }
 
+#[tauri::command]
+fn desktop_return_to_startup(
+    window: WebviewWindow,
+    diagnostics: tauri::State<'_, ShellDiagnostics>,
+    developer_navigation_url: tauri::State<'_, DeveloperNavigationUrl>,
+) -> Result<(), String> {
+    ensure_game_context(&window, developer_navigation_url.0.as_ref())?;
+    let current_url = window
+        .url()
+        .ok()
+        .map(|url| redact_url_for_log(url.as_str()));
+    let startup_url =
+        tauri::Url::parse(STARTUP_ERROR_URL).map_err(|err| format!("bad startup URL: {err}"))?;
+    diagnostics.log_event("return_to_startup", json!({ "fromUrl": current_url }));
+    window
+        .navigate(startup_url)
+        .map_err(|err| format!("failed to return to the desktop main screen: {err}"))
+}
+
 fn ensure_startup_context(window: &WebviewWindow) -> Result<(), String> {
     let url = window
         .url()
@@ -446,6 +471,20 @@ fn ensure_startup_context(window: &WebviewWindow) -> Result<(), String> {
         Ok(())
     } else {
         Err("log-path commands are available only on the startup or shell error screen".to_string())
+    }
+}
+
+fn ensure_game_context(
+    window: &WebviewWindow,
+    developer_navigation_url: Option<&tauri::Url>,
+) -> Result<(), String> {
+    let url = window
+        .url()
+        .map_err(|err| format!("failed to read current WebView URL: {err}"))?;
+    if game_url_allowed(&url, developer_navigation_url) {
+        Ok(())
+    } else {
+        Err("returning to the main screen is available only from a loaded game channel".to_string())
     }
 }
 
@@ -675,8 +714,11 @@ fn normalize_developer_server_url(value: &str) -> ShellResult<String> {
 }
 
 fn navigation_allowed(url: &tauri::Url, developer_url: Option<&tauri::Url>) -> bool {
-    app_url_allowed(url)
-        || release_profile_for_url(url).is_some()
+    app_url_allowed(url) || game_url_allowed(url, developer_url)
+}
+
+fn game_url_allowed(url: &tauri::Url, developer_url: Option<&tauri::Url>) -> bool {
+    release_profile_for_url(url).is_some()
         || developer_url
             .map(|developer_url| same_origin(url, developer_url))
             .unwrap_or(false)
@@ -1320,6 +1362,26 @@ mod tests {
         assert!(navigation_allowed(&developer_path, Some(&developer_url)));
         assert!(!navigation_allowed(&other_port, Some(&developer_url)));
         assert!(!navigation_allowed(&unrelated, None));
+    }
+
+    #[test]
+    fn return_to_startup_context_accepts_release_and_configured_developer_origins_only() {
+        let beta_url: tauri::Url = "https://rts-0-zvorygin-beta.fly.dev/lab".parse().unwrap();
+        let developer_url: tauri::Url = "http://localhost:41231/".parse().unwrap();
+        let developer_path: tauri::Url = "http://localhost:41231/lab".parse().unwrap();
+        let other_developer_port: tauri::Url = "http://localhost:41232/".parse().unwrap();
+        let startup_url: tauri::Url = "tauri://localhost/index.html".parse().unwrap();
+        let unrelated_url: tauri::Url = "https://example.com/".parse().unwrap();
+
+        assert!(game_url_allowed(&beta_url, None));
+        assert!(game_url_allowed(&developer_path, Some(&developer_url)));
+        assert!(!game_url_allowed(&developer_path, None));
+        assert!(!game_url_allowed(
+            &other_developer_port,
+            Some(&developer_url)
+        ));
+        assert!(!game_url_allowed(&startup_url, Some(&developer_url)));
+        assert!(!game_url_allowed(&unrelated_url, Some(&developer_url)));
     }
 
     #[test]

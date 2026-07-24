@@ -22,7 +22,7 @@
   <body>
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
-        Lobby:  #lobby-screen, #lab-entry-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
+        Lobby:  #lobby-screen, #lab-entry-screen, #lobby-main-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
                 #lobby-create, #lobby-lab-open, #lobby-players, #lobby-ready,
                 #lobby-start, #lobby-status
                 #lobby-room and #lobby-join remain hidden compatibility controls, not visible
@@ -64,9 +64,18 @@
                 <h1 class="logo">Bewegungskrieg!</h1>
                 <p class="subtitle">War of Movement</p>
               </div>
-              <div class="lobby-room-chip" aria-label="Current room">
-                <span>Room</span>
-                <strong id="lobby-room-display">main</strong>
+              <div class="lobby-masthead-actions">
+                <button
+                  id="lobby-main-screen"
+                  class="btn"
+                  type="button"
+                  aria-label="Back to desktop main screen"
+                  hidden
+                >Back</button>
+                <div class="lobby-room-chip" aria-label="Current room">
+                  <span>Room</span>
+                  <strong id="lobby-room-display">main</strong>
+                </div>
               </div>
             </header>
 
