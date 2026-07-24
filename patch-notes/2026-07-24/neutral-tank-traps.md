@@ -6,9 +6,9 @@ _2026-07-24_
 
 ## Changes
 
-- Completed Tank Traps are now neutral, granting no vision or under-attack alerts.
+- Completed Tank Traps become neutral, granting no vision or under-attack alerts.
 - All players can attack Tank Traps; vehicles auto-engage them, and right-click or Attack commands can target them.
 
 ## Playtest watch
 
-- Watch vehicle target selection around friendly-built Tank Traps and confirm fog behavior feels clear.
+- Watch vehicle targeting around formerly friendly Tank Traps and confirm fog behavior feels clear.
