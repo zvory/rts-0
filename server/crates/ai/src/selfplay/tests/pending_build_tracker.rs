@@ -67,6 +67,7 @@ fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
+        remembered_anti_tank_guns: Vec::new(),
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),

@@ -676,7 +676,19 @@ export function drawRotatedLine(g, cx, cy, x1, y1, x2, y2, a, width, color, alph
   gfxStrokeLine(g, cx + p1.x, cy + p1.y, cx + p2.x, cy + p2.y, width, color, alpha);
 }
 
-export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha, lineAlpha, innerRadius = 0) {
+export function drawFacingWedge(
+  g,
+  x,
+  y,
+  radius,
+  facing,
+  width,
+  color,
+  fillAlpha,
+  lineAlpha,
+  innerRadius = 0,
+  lineWidth = 1.5,
+) {
   const half = width / 2;
   const start = facing - half;
   const end = facing + half;
@@ -688,8 +700,8 @@ export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha
       if (inner > 0) g.circle(x, y, inner).cut();
     }
     if (lineAlpha > 0) {
-      g.circle(x, y, radius).stroke({ width: 1.5, color, alpha: lineAlpha });
-      if (inner > 0) g.circle(x, y, inner).stroke({ width: 1.5, color, alpha: lineAlpha });
+      g.circle(x, y, radius).stroke({ width: lineWidth, color, alpha: lineAlpha });
+      if (inner > 0) g.circle(x, y, inner).stroke({ width: lineWidth, color, alpha: lineAlpha });
     }
     return;
   }
@@ -712,7 +724,7 @@ export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha
     g.lineTo(x, y);
   }
   if (fillAlpha > 0) g.fill({ color, alpha: fillAlpha });
-  if (lineAlpha > 0) g.stroke({ width: 1.5, color, alpha: lineAlpha });
+  if (lineAlpha > 0) g.stroke({ width: lineWidth, color, alpha: lineAlpha });
 }
 
 export function finiteNumber(value) {

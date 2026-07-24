@@ -313,6 +313,7 @@ pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
+        remembered_anti_tank_guns: Vec::new(),
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),

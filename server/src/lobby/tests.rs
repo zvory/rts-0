@@ -227,6 +227,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
+        remembered_anti_tank_guns: Vec::new(),
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
@@ -1211,6 +1212,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
+        remembered_anti_tank_guns: Vec::new(),
         events: vec![Event::Notice {
             msg: "hello".to_string(),
             x: None,
@@ -1257,6 +1259,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
+        remembered_anti_tank_guns: Vec::new(),
         events: vec![Event::Death {
             id: 200,
             x: 30.0,

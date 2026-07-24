@@ -96,6 +96,28 @@ const feedback = {
   smokes: [{ id: 8, x: 32, y: 32, radiusTiles: 2 }],
   abilityObjects: [{ id: 9, kind: "return_marker", owner: 1, x: 36, y: 36 }],
   missToasts: [{ id: 11, to: 1, createdAt: 120 }],
+  enemyAntiTankGunThreats: () => [
+    {
+      id: 12,
+      kind: "anti_tank_gun",
+      owner: 2,
+      x: 48,
+      y: 32,
+      setupState: "deployed",
+      weaponFacing: Math.PI,
+      threatMemory: true,
+    },
+    {
+      id: 13,
+      kind: "anti_tank_gun",
+      owner: 2,
+      x: 80,
+      y: 32,
+      setupState: "deployed",
+      weaponFacing: 0,
+      threatMemory: false,
+    },
+  ],
 };
 const frame = assembler.assemble({
   map,
@@ -169,6 +191,16 @@ assert(frame.layers.aboveFogReveal[0]?.type === "shotRevealEntity", "explicit sh
 assert(frame.layers.rememberedWorld[0]?.type === "rememberedBuilding", "remembered buildings remain a distinct category");
 assert(frame.layers.fogGatedWorld.some((record) => record.type === "smoke"), "smoke objects cross as already-filtered world records");
 assert(frame.layers.tacticalFeedback.some((record) => record.type === "placement"), "placement feedback is assembled once into tactical feedback");
+assert(
+  frame.layers.tacticalFeedback.some((record) =>
+    record.type === "enemyAntiTankGunThreat" && record.id === 12 && record.threatMemory === true),
+  "remembered enemy anti-tank warnings cross the backend-neutral tactical-feedback boundary as stale",
+);
+assert(
+  frame.layers.tacticalFeedback.some((record) =>
+    record.type === "enemyAntiTankGunThreat" && record.id === 13 && record.threatMemory === false),
+  "currently visible enemy anti-tank warnings cross the backend-neutral tactical-feedback boundary as live",
+);
 assert(
   frame.layers.tacticalFeedback.some((record) => record.type === "formationMovePreview" && record.points.length === 2 && record.slots.length === 1),
   "formation stroke and destination slots cross the backend-neutral tactical-feedback boundary",

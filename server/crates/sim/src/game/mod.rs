@@ -13,6 +13,7 @@ pub(crate) mod ability_projectile;
 mod ability_projection;
 pub(crate) mod ability_runtime;
 mod analysis;
+mod anti_tank_gun_memory;
 mod apm;
 mod artillery;
 mod building_memory;
@@ -290,8 +291,7 @@ impl Game {
                 self.recompute_live_fog(&player_ids);
             });
         }
-        self.refresh_building_memory(&player_ids);
-        self.refresh_trench_memory(&player_ids);
+        self.refresh_fog_memories(&player_ids);
 
         // In debug builds, assert that the world state is internally consistent.
         // Panics here mean a system violated a documented invariant.
@@ -447,8 +447,7 @@ impl Game {
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
         let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
-        self.refresh_building_memory(&ids);
-        self.refresh_trench_memory(&ids);
+        self.refresh_fog_memories(&ids);
     }
 
     pub fn tick_count(&self) -> u32 {
@@ -468,8 +467,7 @@ impl Game {
         )?;
         let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
-        self.refresh_building_memory(&ids);
-        self.refresh_trench_memory(&ids);
+        self.refresh_fog_memories(&ids);
         Some(id)
     }
 
@@ -563,6 +561,24 @@ impl Game {
             &teams,
             self.state.tick,
         );
+    }
+
+    fn refresh_anti_tank_gun_memory(&mut self, player_ids: &[u32]) {
+        let teams = self.team_relations();
+        self.state.anti_tank_gun_memory.refresh(
+            player_ids,
+            &self.state.entities,
+            &self.state.fog,
+            &self.state.smokes,
+            &teams,
+            self.state.tick,
+        );
+    }
+
+    pub(in crate::game) fn refresh_fog_memories(&mut self, player_ids: &[u32]) {
+        self.refresh_building_memory(player_ids);
+        self.refresh_anti_tank_gun_memory(player_ids);
+        self.refresh_trench_memory(player_ids);
     }
 
     pub(in crate::game) fn refresh_trench_memory(&mut self, player_ids: &[u32]) {

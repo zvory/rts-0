@@ -31,6 +31,7 @@ const FEEDBACK_ARRAY_TYPES = Object.freeze({
   panzerfaustImpact: "panzerfaustImpacts",
   muzzleFlash: "muzzleFlashes",
   missToast: "missToasts",
+  enemyAntiTankGunThreat: "enemyAntiTankGunThreats",
 });
 
 const FEEDBACK_SINGLETON_TYPES = Object.freeze({
@@ -337,6 +338,7 @@ function buildFeedbackView(frame, entities, { smokes, abilityObjects, resourceSi
     smokes,
     map: { resources: resourceEntities },
     selectedEntities: () => selected,
+    enemyAntiTankGunThreats: () => arrays.enemyAntiTankGunThreats,
     entityById: (id) => entityLookup.get(id),
     canControlOwner: (owner) => feedbackOwnerSet.has(Number(owner)),
     isFeedbackOwner: (owner) => feedbackOwnerSet.has(Number(owner)),

@@ -140,10 +140,14 @@ export class GameState extends VisualEffectBackedState {
     this.trenches = [];
     /** @type {Array<{id:number,owner:number,kind:string,x:number,y:number,footprint:Array<[number,number]>,observedTick:number}>} */
     this.rememberedBuildings = [];
+    /** @type {Array<{id:number,owner:number,x:number,y:number,facing:number,observedTick:number}>} */
+    this.rememberedAntiTankGuns = [];
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
     this.visibleTiles = [];
     /** @type {number[]|Uint8Array} row-major server-authoritative exploration history. */
     this.exploredTiles = [];
+    /** @type {object|null} current server-authoritative player-relative observer projection. */
+    this.observerView = startInfo.observerView || null;
 
     this.groundDecals = new GroundDecalBuffer();
     /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
@@ -182,6 +186,7 @@ export class GameState extends VisualEffectBackedState {
     this.abilityObjects = [];
     this.trenches = [];
     this.rememberedBuildings = [];
+    this.rememberedAntiTankGuns = [];
     this.visibleTiles = [];
     this.exploredTiles = [];
     this.groundDecals = new GroundDecalBuffer();
@@ -336,6 +341,9 @@ export class GameState extends VisualEffectBackedState {
     this.rememberedBuildings = Array.isArray(msg.rememberedBuildings)
       ? msg.rememberedBuildings
       : [];
+    this.rememberedAntiTankGuns = Array.isArray(msg.rememberedAntiTankGuns)
+      ? msg.rememberedAntiTankGuns
+      : [];
     this.visibleTiles = visibleTiles;
     this.exploredTiles = Array.isArray(msg.exploredTiles) || msg.exploredTiles instanceof Uint8Array
       ? msg.exploredTiles
@@ -345,6 +353,11 @@ export class GameState extends VisualEffectBackedState {
     this._pruneControlGroups({ controlPolicy });
 
     this.visualEffects.applySnapshotEvents(this.events, visualNow, (id) => this.entityById(id));
+  }
+
+  setObserverView(observerView = null) {
+    this.observerView =
+      observerView && typeof observerView === "object" ? { ...observerView } : null;
   }
 
   consumePendingGroundDecals() {

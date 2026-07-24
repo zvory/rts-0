@@ -1004,8 +1004,7 @@ impl Game {
         self.reset_derived_state();
         let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
-        self.refresh_building_memory(&ids);
-        self.refresh_trench_memory(&ids);
+        self.refresh_fog_memories(&ids);
         #[cfg(debug_assertions)]
         self.assert_invariants();
     }

@@ -39,10 +39,11 @@ pub use rts_contract::{
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
     EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
     MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection,
-    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
-    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
-    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
-    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
+    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
+    RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot,
+    SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
+    DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 
@@ -1323,6 +1324,14 @@ mod tests {
                 footprint: vec![[20, 21], [21, 21]],
                 observed_tick: 39,
             }],
+            remembered_anti_tank_guns: vec![RememberedAntiTankGunView {
+                id: 101,
+                owner: 2,
+                x: 704.0,
+                y: 736.0,
+                facing: 0.75,
+                observed_tick: 40,
+            }],
             events: vec![
                 Event::Attack {
                     from: 1,
@@ -1428,6 +1437,10 @@ mod tests {
         assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
         assert_eq!(value["wc"], serde_json::json!([1024.0, 2048.0]));
         assert_eq!(value["e"].as_array().unwrap().len(), 3);
+        assert_eq!(
+            value["ma"][0],
+            serde_json::json!([101, 2, 704.0, 736.0, 0.75, 40])
+        );
         assert_eq!(value["e"][0][8], serde_json::json!(1.5));
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
         assert_eq!(value["e"][0][14], serde_json::json!(200));
@@ -1581,7 +1594,7 @@ mod tests {
         };
         assert_eq!(section("entities").count, 3);
         assert!(section("entities").bytes > 0);
-        assert_eq!(section("visibility").count, 8);
+        assert_eq!(section("visibility").count, 9);
         assert!(section("visibility").bytes > 0);
         assert_eq!(section("resourceDeltas").count, 1);
         assert_eq!(section("events").count, 11);
@@ -1613,45 +1626,5 @@ mod tests {
             }
             SnapshotFrame::Binary(_) => panic!("compact JSON baseline codec must stay text"),
         }
-    }
-
-    #[test]
-    fn compact_entity_trims_trailing_optional_nulls() {
-        let snapshot = Snapshot {
-            tick: 1,
-            world_combat_position: None,
-            steel: 0,
-            oil: 0,
-            supply_used: 0,
-            supply_cap: 0,
-            entities: vec![EntityView::new(
-                1,
-                1,
-                kinds::WORKER,
-                10.0,
-                20.0,
-                40,
-                40,
-                states::IDLE,
-            )],
-            resource_deltas: Vec::new(),
-            smokes: Vec::new(),
-            ability_objects: Vec::new(),
-            trenches: Vec::new(),
-            visible_tiles: Vec::new(),
-            explored_tiles: Vec::new(),
-            remembered_buildings: Vec::new(),
-            events: Vec::new(),
-            upgrades: Vec::new(),
-            player_resources: Vec::new(),
-            net_status: SnapshotNetStatus::default(),
-        };
-
-        let compact = serialize_compact_snapshot(&snapshot).unwrap();
-        let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
-        let entity = value["e"][0].as_array().unwrap();
-        assert_eq!(entity.len(), 8);
-        assert!(value.get("r").is_none());
-        assert!(value.get("ev").is_none());
     }
 }

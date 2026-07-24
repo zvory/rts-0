@@ -3,11 +3,12 @@ use std::collections::BTreeSet;
 use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
 
 use super::{
-    ability_runtime::AbilityRuntime, artillery::ArtilleryShellStore,
-    building_memory::BuildingMemory, commands, firing_reveal::FiringRevealSource, fog::Fog,
-    fog::LingeringSightSource, map::Map, mortar::MortarShellStore, replay::CommandLogEntry,
-    setup::StartingLoadout, smoke::SmokeCloudStore, trench::TrenchStore, EntityStore, MapMetadata,
-    PlayerStartingLoadout, PlayerState,
+    ability_runtime::AbilityRuntime, anti_tank_gun_memory::AntiTankGunMemory,
+    artillery::ArtilleryShellStore, building_memory::BuildingMemory, commands,
+    firing_reveal::FiringRevealSource, fog::Fog, fog::LingeringSightSource, map::Map,
+    mortar::MortarShellStore, replay::CommandLogEntry, setup::StartingLoadout,
+    smoke::SmokeCloudStore, trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout,
+    PlayerState,
 };
 
 #[derive(Clone)]
@@ -16,6 +17,7 @@ pub(in crate::game) struct GameState {
     pub(in crate::game) entities: EntityStore,
     pub(in crate::game) fog: Fog,
     pub(in crate::game) building_memory: BuildingMemory,
+    pub(in crate::game) anti_tank_gun_memory: AntiTankGunMemory,
     pub(in crate::game) players: Vec<PlayerState>,
     pub(in crate::game) pending: Vec<commands::PendingCommand>,
     pub(in crate::game) command_log: Vec<CommandLogEntry>,
@@ -120,6 +122,7 @@ impl GameState {
             entities,
             fog,
             building_memory: BuildingMemory::default(),
+            anti_tank_gun_memory: AntiTankGunMemory::default(),
             players,
             pending: Vec::new(),
             command_log: Vec::new(),

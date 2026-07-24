@@ -26,6 +26,7 @@ export class RoomTimeControls {
     this.label = label || (this.replayViewer ? "Replay" : "Room time");
     this.visionSelection = visionSelectionIds(initialVisionSelection, this.state?.players);
     this.omniscientVision = initialVisionSelection?.mode === VISION_SELECTION.OMNISCIENT;
+    this.state?.setObserverView?.(this.visionSelectionRequest());
     this.roomTimeState = null;
     this.roomTimeSeekPending = false;
     this.roomTimeSeekTargetTick = null;
@@ -580,14 +581,14 @@ export class RoomTimeControls {
     if (btn.dataset.vision === "all") {
       this.omniscientVision = false;
       this.visionSelection.clear();
-      this.net.setVisionSelection(this.visionSelectionRequest());
+      this.sendVisionSelection();
       this.syncVisionSelectionButtons();
       return;
     }
     if (btn.dataset.vision === "omniscient") {
       this.omniscientVision = true;
       this.visionSelection.clear();
-      this.net.setVisionSelection(this.visionSelectionRequest());
+      this.sendVisionSelection();
       this.syncVisionSelectionButtons();
       return;
     }
@@ -602,8 +603,14 @@ export class RoomTimeControls {
       this.visionSelection.clear();
       this.visionSelection.add(id);
     }
-    this.net.setVisionSelection(this.visionSelectionRequest());
+    this.sendVisionSelection();
     this.syncVisionSelectionButtons();
+  }
+
+  sendVisionSelection() {
+    const selection = this.visionSelectionRequest();
+    this.state?.setObserverView?.(selection);
+    this.net.setVisionSelection(selection);
   }
 
   syncVisionSelectionButtons() {

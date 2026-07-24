@@ -233,6 +233,10 @@ const replayNet = {
   },
 };
 const roomTimeState = {
+  observerViews: [],
+  setObserverView(view) {
+    this.observerViews.push(view);
+  },
   players: [
     { id: 1, name: "Alpha", color: "#f00" },
     { id: 2, name: "Bravo", color: "#0f0" },
@@ -283,6 +287,10 @@ assert(
 assert(
   JSON.stringify(replayUi.visionSelectionRequest()) === JSON.stringify({ mode: "players", playerIds: [1, 2] }),
   "vision controls expose a canonical selection for a replacement match",
+);
+assert(
+  roomTimeState.observerViews.at(-1).mode === "players",
+  "vision controls publish their initial observer perspective to client display memory",
 );
 dragHandle._listeners.get("pointerdown")({
   button: 0,
@@ -461,6 +469,11 @@ assert(
   replayNet.selections.at(-1).mode === "player" &&
     replayNet.selections.at(-1).playerId === 1,
   "single replay fog click sends a per-viewer player vision request",
+);
+assert(
+  roomTimeState.observerViews.at(-1).mode === "player" &&
+    roomTimeState.observerViews.at(-1).playerId === 1,
+  "single-player vision updates client display memory before the projected snapshot arrives",
 );
 visionButtons[2]._listeners.get("click")({ shiftKey: true });
 assert(

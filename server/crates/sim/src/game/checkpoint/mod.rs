@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use super::ability_runtime::{AbilityRuntime, MAX_ACTIVE_ABILITY_OBJECTS};
 use super::artillery::ArtilleryShellStore;
@@ -20,27 +20,19 @@ use super::trench::TrenchStore;
 use super::world_combat;
 use super::{setup, Game, MapMetadata, PlayerStartingLoadout};
 
+mod anti_tank_gun_memory;
+mod conversion;
 mod error;
 mod metadata;
 mod player_dto;
 mod validation;
 
+use anti_tank_gun_memory::AntiTankGunMemoryV1;
+use conversion::serde_convert;
 pub(in crate::game) use error::CheckpointPayloadError;
 use metadata::{CheckpointCompatibilityV1, CommandLogMetadataV1, MapBindingV1, RngDescriptorV1};
 use player_dto::PlayerStateV1;
 use validation::*;
-
-fn serde_convert<T, U>(value: T) -> Result<U, CheckpointPayloadError>
-where
-    T: Serialize,
-    U: DeserializeOwned,
-{
-    serde_json::from_value(
-        serde_json::to_value(value)
-            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))?,
-    )
-    .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,7 +104,6 @@ impl Game {
     ) -> Result<String, CheckpointPayloadError> {
         self.checkpoint_payload_text()
     }
-
     #[cfg(test)]
     pub(in crate::game) fn restore_checkpoint_payload_text_for_test(
         text: &str,
@@ -150,6 +141,8 @@ struct GameCheckpointV1 {
     command_log_metadata: CommandLogMetadataV1,
     fog: FogStateV1,
     building_memory: BuildingMemoryV1,
+    #[serde(default)]
+    anti_tank_gun_memory: AntiTankGunMemoryV1,
     lingering_sight: Vec<LingeringSightSource>,
     firing_reveals: Vec<FiringRevealSource>,
     smokes: SmokeCloudStore,
@@ -202,6 +195,7 @@ impl GameCheckpointV1 {
             command_log_metadata: CommandLogMetadataV1::from_command_log(&state.command_log),
             fog: FogStateV1::from_fog(&state.fog),
             building_memory: BuildingMemoryV1::from_memory(&state.building_memory),
+            anti_tank_gun_memory: AntiTankGunMemoryV1::from_memory(&state.anti_tank_gun_memory),
             lingering_sight: state.lingering_sight.clone(),
             firing_reveals: state.firing_reveals.clone(),
             smokes: state.smokes.clone(),
@@ -257,6 +251,7 @@ impl GameCheckpointV1 {
             entities,
             fog: self.fog.into_fog(),
             building_memory: self.building_memory.into_memory(),
+            anti_tank_gun_memory: self.anti_tank_gun_memory.into_memory(),
             players: serde_convert(&self.players)?,
             pending: self.pending_commands,
             command_log: self.command_log,
@@ -374,6 +369,7 @@ impl GameCheckpointV1 {
             &self.fog,
         )?;
         validate_building_memory(&self.building_memory, &player_ids)?;
+        validate_anti_tank_gun_memory(&self.anti_tank_gun_memory, &player_ids, map, self.tick)?;
         validate_pending_commands(&self.pending_commands, &player_ids)?;
         validate_command_log(&self.command_log, self.tick, &player_ids)?;
         self.command_log_metadata

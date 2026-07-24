@@ -659,6 +659,7 @@ transport decode:
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
   exploredTiles?: u8[],          // row-major server-owned exploration history for this perspective
   rememberedBuildings?: RememberedBuilding[], // stale enemy building intel for projected players
+  rememberedAntiTankGuns?: {id, owner, x, y, facing, observedTick}[], // stale deployed enemy AT-gun arcs for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
   playerResources?: {id, steel, oil, supplyUsed, supplyCap, apm, upgrades?}[], // projected players; observer modes only; upgrades are that real owner's completed research
@@ -756,7 +757,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 45. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 46. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -782,7 +783,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 45,
+  "v": 46,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -804,6 +805,7 @@ adds an explicit application compression envelope.
   "eg": [firstValue, runLen, ...], // RLE exploredTiles; omitted when empty/no-fog
   "wc": [1024, 2048],             // worldCombatPosition; omitted when inactive
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
+  "ma": [[id, owner, x, y, facing, observedTick]], // rememberedAntiTankGuns; omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap, apm, [upgradeCode...]]], // projected observer playerResources; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,

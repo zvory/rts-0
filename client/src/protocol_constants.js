@@ -300,7 +300,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 45;
+export const COMPACT_SNAPSHOT_VERSION = 46;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -507,6 +507,7 @@ export const MAX_COMPACT_ABILITIES = 8;
 export const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 export const MAX_COMPACT_VISIBLE_TILES = 65536;
 export const MAX_COMPACT_REMEMBERED_BUILDINGS = 20000;
+export const MAX_COMPACT_REMEMBERED_ANTI_TANK_GUNS = 20000;
 export const MAX_COMPACT_BUILDING_FOOTPRINT = 64;
 
 function reverseCodes(table) {

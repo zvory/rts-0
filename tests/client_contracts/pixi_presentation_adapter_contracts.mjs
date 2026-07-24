@@ -70,6 +70,28 @@ const frameInputs = {
     feedbackOwnerIds: [1],
     showUnitRangesEnabled: true,
     commandFeedback: [{ kind: "move", x: 30, y: 30 }],
+    enemyAntiTankGunThreats: () => [
+      {
+        id: 8,
+        kind: "anti_tank_gun",
+        owner: 2,
+        x: 48,
+        y: 24,
+        setupState: "deployed",
+        weaponFacing: Math.PI,
+        threatMemory: true,
+      },
+      {
+        id: 9,
+        kind: "anti_tank_gun",
+        owner: 2,
+        x: 72,
+        y: 24,
+        setupState: "deployed",
+        weaponFacing: 0,
+        threatMemory: false,
+      },
+    ],
     formationMovePreview: {
       points: [{ x: 8, y: 10 }, { x: 40, y: 42 }],
       slots: [{ unitId: 7, x: 30, y: 32, radius: 14 }],
@@ -144,6 +166,14 @@ assert(
   engine.renders[0].options.feedbackView.formationMovePreview?.points.length === 2
     && engine.renders[0].options.feedbackView.formationMovePreview?.slots.length === 1,
   "Pixi receives formation stroke and destination slots from the immutable presentation frame",
+);
+assert(
+  engine.renders[0].options.feedbackView.enemyAntiTankGunThreats()[0]?.threatMemory === true,
+  "Pixi receives stale anti-tank warning state from the immutable presentation frame",
+);
+assert(
+  engine.renders[0].options.feedbackView.enemyAntiTankGunThreats()[1]?.threatMemory === false,
+  "Pixi receives live anti-tank warning state from the immutable presentation frame",
 );
 
 const nextFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 516, sourceTick: 10, groundDecals: [], groundDecalRevision: 0 });

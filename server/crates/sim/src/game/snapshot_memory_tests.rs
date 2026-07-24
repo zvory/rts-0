@@ -1,5 +1,6 @@
 use super::*;
-use crate::game::entity::EntityKind;
+use crate::game::entity::{EntityKind, WeaponSetup};
+use crate::game::lab::{LabOp, LabSpawnEntity};
 use crate::game::{systems, SmokeCloudStore};
 use crate::protocol::terrain;
 
@@ -75,6 +76,7 @@ fn empty_flat_game_with_players(players: &[PlayerInit]) -> Game {
         .fog
         .recompute(&ids, &game.state.entities, &game.state.map);
     game.refresh_building_memory(&ids);
+    game.refresh_anti_tank_gun_memory(&ids);
     game
 }
 
@@ -367,4 +369,186 @@ fn keeps_destroyed_hidden_building_as_stale_intel_until_scouted() {
         .remembered_buildings
         .iter()
         .all(|building| building.id != depot));
+}
+
+#[test]
+fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
+    let mut game = empty_flat_game();
+    let scout_pos = game.state.map.tile_center(20, 20);
+    let gun_pos = game.state.map.tile_center(22, 20);
+    let scout = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
+        .expect("Bravo scout should spawn");
+    let gun = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
+        .expect("Alpha anti-tank gun should spawn");
+    let facing = 0.75;
+    let gun_entity = game
+        .state
+        .entities
+        .get_mut(gun)
+        .expect("anti-tank gun should exist");
+    gun_entity.set_weapon_setup(WeaponSetup::Deployed);
+    gun_entity.set_emplacement_facing(Some(facing));
+    gun_entity.set_facing(facing);
+    gun_entity.set_weapon_facing(facing);
+    advance_to_next_fog_refresh(&mut game);
+
+    assert!(
+        game.snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .entities
+            .iter()
+            .any(|entity| entity.id == gun),
+        "Bravo should initially receive the live scouted gun"
+    );
+
+    game.state.entities.remove(scout);
+    let far = game.state.map.tile_center(40, 40);
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::ScoutCar, far.0, far.1)
+        .expect("far Bravo scout should spawn");
+    advance_to_next_fog_refresh(&mut game);
+
+    let bravo_memory = game.snapshot_for_observer(&ObserverView::Players(vec![2]));
+    let remembered = bravo_memory
+        .remembered_anti_tank_guns
+        .iter()
+        .find(|memory| memory.id == gun)
+        .expect("Bravo observer view should receive stale AT-gun memory");
+    assert_eq!(remembered.owner, 1);
+    assert_eq!(
+        (remembered.x, remembered.y, remembered.facing),
+        (gun_pos.0, gun_pos.1, facing)
+    );
+    assert!(
+        game.snapshot_for_observer(&ObserverView::Players(vec![1]))
+            .remembered_anti_tank_guns
+            .iter()
+            .all(|memory| memory.id != gun),
+        "Alpha observer view must not receive a friendly threat memory"
+    );
+    let checkpoint = game
+        .checkpoint_payload_text_for_test()
+        .expect("AT-gun memory checkpoint should serialize");
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .expect("AT-gun memory checkpoint should restore");
+    assert!(
+        restored
+            .snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .remembered_anti_tank_guns
+            .iter()
+            .any(|memory| memory.id == gun),
+        "checkpoint restore should preserve per-player AT-gun memory for Lab time travel"
+    );
+    restored
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 2,
+            kind: EntityKind::ScoutCar,
+            x: scout_pos.0,
+            y: scout_pos.1,
+            completed: true,
+        }))
+        .expect("Lab scout should spawn within sight of the remembered gun");
+    restored
+        .apply_lab_op(LabOp::DeleteEntity { entity_id: gun })
+        .expect("Lab should delete the now-visible gun");
+    assert!(
+        restored
+            .snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .remembered_anti_tank_guns
+            .iter()
+            .all(|memory| memory.id != gun),
+        "paused Lab edits must repair AT-gun memory without waiting for a simulation tick"
+    );
+
+    game.state
+        .entities
+        .get_mut(gun)
+        .expect("anti-tank gun should exist")
+        .set_weapon_setup(WeaponSetup::Packed);
+    advance_to_next_fog_refresh(&mut game);
+    assert!(
+        game.snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .remembered_anti_tank_guns
+            .iter()
+            .any(|memory| memory.id == gun),
+        "hidden Alpha teardown must not mutate Bravo's remembered knowledge"
+    );
+
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::ScoutCar, gun_pos.0, gun_pos.1)
+        .expect("Bravo re-scout should spawn");
+    advance_to_next_fog_refresh(&mut game);
+    assert!(
+        game.snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .remembered_anti_tank_guns
+            .iter()
+            .all(|memory| memory.id != gun),
+        "seeing the remembered gun packed should clear Bravo's server memory"
+    );
+}
+
+#[test]
+fn smoke_obscuration_does_not_clear_remembered_anti_tank_gun_intel() {
+    let mut game = empty_flat_game();
+    let scout_pos = game.state.map.tile_center(20, 20);
+    let gun_pos = game.state.map.tile_center(22, 20);
+    let smoke_pos = game.state.map.tile_center(24, 20);
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
+        .expect("Bravo scout should spawn");
+    let gun = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
+        .expect("Alpha anti-tank gun should spawn");
+    let gun_entity = game
+        .state
+        .entities
+        .get_mut(gun)
+        .expect("anti-tank gun should exist");
+    gun_entity.set_weapon_setup(WeaponSetup::Deployed);
+    gun_entity.set_emplacement_facing(Some(0.75));
+    gun_entity.set_facing(0.75);
+    gun_entity.set_weapon_facing(0.75);
+    advance_to_next_fog_refresh(&mut game);
+    assert!(
+        game.snapshot_for(2)
+            .entities
+            .iter()
+            .any(|entity| entity.id == gun),
+        "Bravo should initially see the deployed gun"
+    );
+
+    game.spawn_smoke_cloud_for_test(smoke_pos.0, smoke_pos.1)
+        .expect("smoke should spawn with the gun on its near edge");
+    assert!(
+        game.state
+            .fog
+            .is_visible_without_firing_reveal_world(2, gun_pos.0, gun_pos.1),
+        "the near smoke edge should leave terrain visibility on the gun tile"
+    );
+    let obscured = game.snapshot_for(2);
+    assert!(
+        obscured.entities.iter().all(|entity| entity.id != gun),
+        "smoke should hide the live gun"
+    );
+    assert!(
+        obscured
+            .remembered_anti_tank_guns
+            .iter()
+            .any(|memory| memory.id == gun),
+        "smoke must preserve the last observed arc instead of revealing hidden absence or movement"
+    );
 }

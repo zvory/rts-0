@@ -176,7 +176,7 @@ fn stable_rust_public_surface_compiles() {
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 45);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 46);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
@@ -252,6 +252,7 @@ fn compact_snapshot_encodes_appended_entity_state() {
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
+        remembered_anti_tank_guns: Vec::new(),
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),

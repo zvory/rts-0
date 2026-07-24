@@ -14,8 +14,9 @@ use crate::{
 };
 use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
-    DebugPathView, EntityView, Event, OrderPlanMarker, RememberedBuildingView, ScoutPlaneStateView,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, TrenchView,
+    DebugPathView, EntityView, Event, OrderPlanMarker, RememberedAntiTankGunView,
+    RememberedBuildingView, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus,
+    TrenchView,
 };
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
@@ -142,6 +143,16 @@ impl Serialize for CompactSnapshot<'_> {
                     .remembered_buildings
                     .iter()
                     .map(CompactRememberedBuilding)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        if !snapshot.remembered_anti_tank_guns.is_empty() {
+            map.serialize_entry(
+                "ma",
+                &snapshot
+                    .remembered_anti_tank_guns
+                    .iter()
+                    .map(CompactRememberedAntiTankGun)
                     .collect::<Vec<_>>(),
             )?;
         }
@@ -299,7 +310,8 @@ fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
                     .filter(|tile| **tile != 0)
                     .count(),
             )
-            .saturating_add(snapshot.remembered_buildings.len()),
+            .saturating_add(snapshot.remembered_buildings.len())
+            .saturating_add(snapshot.remembered_anti_tank_guns.len()),
     );
     insert_count(
         &mut counts,
@@ -340,7 +352,7 @@ fn add_u32(counts: &mut BTreeMap<&'static str, u32>, section: &'static str, valu
 fn section_for_compact_key(key: &str) -> &'static str {
     match key {
         "e" => SECTION_ENTITIES,
-        "fg" | "eg" | "mb" => SECTION_VISIBILITY,
+        "fg" | "eg" | "mb" | "ma" => SECTION_VISIBILITY,
         "r" => SECTION_RESOURCE_DELTAS,
         "ev" => SECTION_EVENTS,
         "sm" => SECTION_SMOKES,
@@ -441,6 +453,25 @@ impl Serialize for CompactRememberedBuilding<'_> {
         seq.serialize_element(&building.y)?;
         seq.serialize_element(&building.footprint)?;
         seq.serialize_element(&building.observed_tick)?;
+        seq.end()
+    }
+}
+
+struct CompactRememberedAntiTankGun<'a>(&'a RememberedAntiTankGunView);
+
+impl Serialize for CompactRememberedAntiTankGun<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let gun = self.0;
+        let mut seq = serializer.serialize_seq(Some(6))?;
+        seq.serialize_element(&gun.id)?;
+        seq.serialize_element(&gun.owner)?;
+        seq.serialize_element(&gun.x)?;
+        seq.serialize_element(&gun.y)?;
+        seq.serialize_element(&gun.facing)?;
+        seq.serialize_element(&gun.observed_tick)?;
         seq.end()
     }
 }
@@ -1185,5 +1216,52 @@ impl Serialize for CompactAttackReveal<'_> {
             seq.serialize_element(&setup_state)?;
         }
         seq.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{kinds, states};
+
+    #[test]
+    fn compact_entity_trims_trailing_optional_nulls() {
+        let snapshot = Snapshot {
+            tick: 1,
+            world_combat_position: None,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            entities: vec![EntityView::new(
+                1,
+                1,
+                kinds::WORKER,
+                10.0,
+                20.0,
+                40,
+                40,
+                states::IDLE,
+            )],
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            ability_objects: Vec::new(),
+            trenches: Vec::new(),
+            visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            remembered_anti_tank_guns: Vec::new(),
+            events: Vec::new(),
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        };
+
+        let compact = serialize_compact_snapshot(&snapshot).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
+        let entity = value["e"][0].as_array().unwrap();
+        assert_eq!(entity.len(), 8);
+        assert!(value.get("r").is_none());
+        assert!(value.get("ev").is_none());
     }
 }
