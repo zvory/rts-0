@@ -65,6 +65,10 @@ import { textWithin } from "./dom_text.mjs";
 
 {
   const styles = fs.readFileSync(new URL("../../client/styles.css", import.meta.url), "utf8");
+  assert(
+    /\.lab-tools-window\s*\{[^}]*right:\s*min\(676px,\s*calc\(100vw\s*-\s*272px\)\)/s.test(styles),
+    "lab desktop CSS keeps the Tools window on-screen above the mobile breakpoint",
+  );
   const labMobileStart = styles.indexOf("@media (max-width: 720px) {", styles.indexOf(".lab-result[data-state=\"ok\"]"));
   const labMobileEnd = styles.indexOf("/* --- Settings menu --- */", labMobileStart);
   const labMobileStyles = labMobileStart >= 0 && labMobileEnd > labMobileStart

@@ -1961,7 +1961,7 @@ input[type="text"]:focus {
 }
 .lab-spawn-window { top: 58px; right: 344px; }
 .lab-tools-window {
-  top: 232px; right: 676px;
+  top: 232px; right: min(676px, calc(100vw - 272px));
   width: min(260px, calc(100vw - 24px)); min-width: min(220px, calc(100vw - 24px));
 }
 .lab-map-window {
