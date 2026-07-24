@@ -34,7 +34,7 @@ const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
   formationMove: ["c", "units", "points", "attackMove", "queued"],
   attackMove: ["c", "units", "x", "y", "queued"],
-  attack: ["c", "units", "target", "tankTrapCluster", "queued"],
+  attack: ["c", "units", "target", "queued"],
   deconstruct: ["c", "units", "target", "queued"],
   setupAntiTankGuns: ["c", "units", "x", "y", "queued"],
   tearDownAntiTankGuns: ["c", "units"],
@@ -470,7 +470,6 @@ function validateGameCommand(value: unknown) {
   if (value.kind != null && (typeof value.kind !== "string" || !["move", "attackMove", "attack", "gather", "build"].includes(value.kind))) invalid("order.command.kind", "is unsupported");
   optionalBoolean(value.queued, "order.command.queued");
   optionalBoolean(value.attackMove, "order.command.attackMove");
-  optionalBoolean(value.tankTrapCluster, "order.command.tankTrapCluster");
   if (allowed.includes("enabled")) optionalBoolean(value.enabled, "order.command.enabled", false);
 }
 

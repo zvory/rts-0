@@ -66,7 +66,7 @@ enum PromotedIntent {
     PointMove(PointPromotionKey),
     HoldPosition,
     Attack {
-        targets: Vec<u32>,
+        target: u32,
     },
     Gather {
         node: u32,
@@ -203,12 +203,8 @@ pub(crate) fn promote_ready_orders(
                     entity.clear_worker_carry();
                 }
             }
-            PromotedIntent::Attack { targets } => {
-                if targets.len() == 1 {
-                    coordinator.order_attack(entities, id, targets[0]);
-                } else {
-                    coordinator.order_attack_cluster(entities, id, targets);
-                }
+            PromotedIntent::Attack { target } => {
+                coordinator.order_attack(entities, id, target);
             }
             PromotedIntent::Gather { node } => {
                 coordinator.order_gather(entities, id, node);
@@ -432,18 +428,11 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::Attack(attack) => {
-                let mut targets = std::iter::once(attack.target)
-                    .chain(attack.remaining_targets)
-                    .filter(|target| {
-                        attack_intent_valid(entities, teams, fog, Some(smokes), owner, id, *target)
-                    })
-                    .collect::<Vec<_>>();
-                if !targets.is_empty() {
-                    if let Some(index) = targets.iter().position(|target| *target == attack.target)
-                    {
-                        targets.swap(0, index);
-                    }
-                    return Some(PromotedIntent::Attack { targets });
+                if attack_intent_valid(entities, teams, fog, Some(smokes), owner, id, attack.target)
+                {
+                    return Some(PromotedIntent::Attack {
+                        target: attack.target,
+                    });
                 }
             }
             OrderIntent::WorldAbility(ability) => {

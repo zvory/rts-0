@@ -1,5 +1,5 @@
 {
-  "reason": "Tank Trap cluster orders require serialized target lists and planner coverage",
+  "reason": "Remove Tank Trap cluster-order state while preserving current command and movement boundaries",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -51,7 +51,7 @@
     },
     {
       "path": "checkpoint/validation.rs",
-      "lines": 510
+      "lines": 429
     },
     {
       "path": "command.rs",
@@ -67,7 +67,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "lines": 1425
+      "lines": 1386
     },
     {
       "path": "entity/kind.rs",
@@ -215,7 +215,7 @@
     },
     {
       "path": "services/combat/acquisition.rs",
-      "lines": 396
+      "lines": 311
     },
     {
       "path": "services/combat/activation.rs",
@@ -267,7 +267,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 3722
+      "lines": 3223
     },
     {
       "path": "services/combat/tests/anti_tank_acquisition.rs",
@@ -439,7 +439,7 @@
     },
     {
       "path": "services/move_coordinator.rs",
-      "lines": 1884
+      "lines": 1806
     },
     {
       "path": "services/move_coordinator/formation.rs",
@@ -507,11 +507,11 @@
     },
     {
       "path": "services/order_planner.rs",
-      "lines": 1260
+      "lines": 1139
     },
     {
       "path": "services/order_queue.rs",
-      "lines": 1524
+      "lines": 1500
     },
     {
       "path": "services/order_queue/attack.rs",
@@ -1897,7 +1897,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "count": 131
+      "count": 113
     },
     {
       "path": "entity/mod.rs",
@@ -1905,7 +1905,7 @@
     },
     {
       "path": "entity/order.rs",
-      "count": 64
+      "count": 59
     },
     {
       "path": "entity/state.rs",
@@ -2021,7 +2021,7 @@
     },
     {
       "path": "services/move_coordinator.rs",
-      "count": 16
+      "count": 15
     },
     {
       "path": "services/movement/collision.rs",

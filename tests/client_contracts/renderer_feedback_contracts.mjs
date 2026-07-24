@@ -642,14 +642,9 @@ function nearPoint(call, point, epsilon = 0.001) {
     },
     attackTargetPreview: {
       targetId: 88,
-      kind: KIND.TANK_TRAP,
+      kind: KIND.RIFLEMAN,
       x: 144,
       y: 160,
-      radiusTiles: 4,
-      targets: [
-        { targetId: 88, kind: KIND.TANK_TRAP, x: 144, y: 160 },
-        { targetId: 89, kind: KIND.TANK_TRAP, x: 208, y: 160 },
-      ],
     },
     resourceMiningPreview: {
       resourceId: 200,
@@ -751,11 +746,6 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(
     feedbackGfx.calls.some((call) => call[0] === "drawEllipse" && call[1] === 144 && call[2] === 165 && call[3] === 18),
     "renderer feedback draws attack target hover rings through the feedback view",
-  );
-  assert(
-    feedbackGfx.calls.some((call) => call[0] === "drawEllipse" && call[1] === 208 && call[2] === 165) &&
-      feedbackGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 272 && call[2] === 160),
-    "Tank Trap cluster preview rings every captured trap and draws its four-tile boundary",
   );
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");

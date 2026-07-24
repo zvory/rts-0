@@ -29,35 +29,6 @@ fn formation_move_accepts_attack_move_mode() {
 }
 
 #[test]
-fn attack_command_round_trips_tank_trap_cluster_mode() {
-    let clustered: Command =
-        serde_json::from_str(r#"{"c":"attack","units":[3,4],"target":9,"tankTrapCluster":true}"#)
-            .expect("Tank Trap cluster attack should deserialize");
-    assert!(matches!(
-        clustered,
-        Command::Attack {
-            tank_trap_cluster: true,
-            queued: false,
-            ..
-        }
-    ));
-    assert_eq!(
-        serde_json::to_string(&clustered).expect("serialize Tank Trap cluster attack"),
-        r#"{"c":"attack","units":[3,4],"target":9,"tankTrapCluster":true}"#
-    );
-
-    let ordinary: Command = serde_json::from_str(r#"{"c":"attack","units":[3],"target":9}"#)
-        .expect("ordinary attack should keep the default");
-    assert!(matches!(
-        ordinary,
-        Command::Attack {
-            tank_trap_cluster: false,
-            ..
-        }
-    ));
-}
-
-#[test]
 fn command_messages_require_client_sequence_envelope() {
     let msg: ClientMessage = serde_json::from_str(
         r#"{"t":"command","clientSeq":7,"cmd":{"c":"move","units":[1,2],"x":10.0,"y":20.0}}"#,
