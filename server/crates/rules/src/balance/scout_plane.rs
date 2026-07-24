@@ -4,7 +4,7 @@ use super::TICK_HZ;
 
 pub const SCOUT_PLANE_HP: u32 = 40;
 pub const SCOUT_PLANE_SIGHT_TILES: u32 = 19;
-pub const SCOUT_PLANE_SPEED_PX_PER_TICK: f32 = 2.0;
+pub const SCOUT_PLANE_SPEED_PX_PER_TICK: f32 = 2.6;
 pub const SCOUT_PLANE_COST_STEEL: u32 = 50;
 pub const SCOUT_PLANE_COST_OIL: u32 = 75;
 pub const SCOUT_PLANE_SUPPLY: u32 = 0;
