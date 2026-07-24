@@ -150,11 +150,15 @@ mod tests {
         let scout_id = setup.units[0];
         let goal = setup.goal;
         let command = setup.command();
+        let issue_after_ticks = setup.issue_after_ticks;
         let mut game = setup.game;
+        for _ in 0..issue_after_ticks {
+            game.tick();
+        }
         game.enqueue(setup.player_id, command);
 
         let mut arrival_tick = None;
-        for tick in 1..=config::TICK_HZ * 60 {
+        for elapsed_ticks in 1..=config::TICK_HZ * 60 {
             game.tick();
             let scout = game
                 .state
@@ -163,20 +167,20 @@ mod tests {
                 .expect("scenario scout car should remain");
 
             let body = unit_body_for_entity(scout).expect("scout car should have a body");
-            for ty in 0..game.state.map.size {
-                for tx in 0..game.state.map.size {
-                    let index = game.state.map.index(tx, ty);
-                    if game.state.map.terrain[index] == crate::protocol::terrain::WATER {
-                        assert!(
-                            !unit_body_intersects_rect(body, tile_rect(tx as i32, ty as i32)),
-                            "scout car body should not overlap lake tile {tx},{ty} at tick {tick}"
-                        );
-                    }
+            let lake_min_x = game.state.map.size / 2 - LAKE_SIZE_TILES / 2;
+            let lake_min_y = game.state.map.size / 2 - LAKE_SIZE_TILES / 2;
+            for ty in lake_min_y..lake_min_y + LAKE_SIZE_TILES {
+                for tx in lake_min_x..lake_min_x + LAKE_SIZE_TILES {
+                    assert!(
+                        !unit_body_intersects_rect(body, tile_rect(tx as i32, ty as i32)),
+                        "scout car body should not overlap lake tile {tx},{ty} at tick {}",
+                        game.tick_count()
+                    );
                 }
             }
 
             if matches!(scout.order(), Order::Idle) && scout.path_is_empty() {
-                arrival_tick = Some(tick);
+                arrival_tick = Some(elapsed_ticks);
                 break;
             }
         }
