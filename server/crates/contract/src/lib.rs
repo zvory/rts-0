@@ -353,6 +353,9 @@ pub struct Snapshot {
     /// entities: clients may render them as non-interactive fog silhouettes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remembered_buildings: Vec<RememberedBuildingView>,
+    /// Recipient-only last-observed deployed enemy Anti-Tank Gun firing arcs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remembered_anti_tank_guns: Vec<RememberedAntiTankGunView>,
     pub events: Vec<Event>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub upgrades: Vec<String>,
@@ -406,6 +409,17 @@ pub struct RememberedBuildingView {
     pub x: f32,
     pub y: f32,
     pub footprint: Vec<[u32; 2]>,
+    pub observed_tick: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RememberedAntiTankGunView {
+    pub id: u32,
+    pub owner: u32,
+    pub x: f32,
+    pub y: f32,
+    pub facing: f32,
     pub observed_tick: u32,
 }
 

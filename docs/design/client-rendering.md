@@ -159,7 +159,12 @@ Presented entity records include backend-neutral `visualBounds` (`class`, `width
 `heightPx`) derived from the mirrored entity stats. Placement feedback includes a detached
 tile-footprint descriptor. Freehand formation feedback crosses `tacticalFeedback` as one detached
 `formationMovePreview` record containing the sampled world-space `points` and provisional unit
-`slots`; every backend renders both the stroke and admitted slots. These are presentation hints only: `SelectionSceneV1` remains the sole
+`slots`; every backend renders both the stroke and admitted slots. Live and server-remembered
+deployed enemy Anti-Tank Gun warnings cross the same boundary as detached
+`enemyAntiTankGunThreat` records, including an explicit stale-memory presentation flag, so a backend
+can render current amber-orange hatching and thinner very-pale-pink frozen hatching without consulting
+mutable gameplay state. Friendly selected field-of-fire wedges remain unhatched. These are
+presentation hints only: `SelectionSceneV1` remains the sole
 entity/ground interaction authority.
 
 The main thread keeps this rich `ProjectionSnapshotV1` for input, audio, minimap, and selection.

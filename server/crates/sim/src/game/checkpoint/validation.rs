@@ -18,6 +18,7 @@ use super::{
 };
 
 mod ability_charges;
+mod anti_tank_gun_memory;
 mod firing_reveal;
 pub(super) use firing_reveal::validate_reaction_gates_against_visibility;
 use firing_reveal::{validate_firing_reveal_reaction_gates, validate_firing_reveal_visibility};
@@ -295,6 +296,8 @@ pub(super) fn validate_building_memory(
     }
     Ok(())
 }
+
+pub(super) use anti_tank_gun_memory::validate as validate_anti_tank_gun_memory;
 
 pub(super) fn validate_pending_commands(
     pending: &[PendingCommand],

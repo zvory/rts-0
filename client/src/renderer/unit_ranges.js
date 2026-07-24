@@ -22,13 +22,23 @@ const UNIT_RANGE_LINE_ALPHA = 0.68;
 const UNIT_RANGE_MIN_LINE_ALPHA = 0.56;
 const UNIT_FIELD_OF_FIRE_FILL_ALPHA = 0.07;
 const UNIT_FIELD_OF_FIRE_LINE_ALPHA = 0.36;
+const ENEMY_AT_THREAT_COLOR = 0xffb000;
+const ENEMY_AT_THREAT_DARK_COLOR = 0x3d2b00;
+const ENEMY_AT_MEMORY_COLOR = 0xffdce5;
+const ENEMY_AT_MEMORY_DARK_COLOR = 0x65424c;
+const ENEMY_AT_THREAT_HATCH_SPACING_PX = 60;
+const ENEMY_AT_THREAT_HATCH_ANGLE = Math.PI / 4;
+const ENEMY_AT_THREAT_ARC_STEP_PX = 42;
+const ENEMY_AT_THREAT_OUTLINE_WIDTH = 1.95;
 
 export function _drawSelectedMortarRanges(state) {
   return _drawSelectedUnitRanges.call(this, state);
 }
 
 export function _drawSelectedUnitRanges(state) {
-  if (!state || typeof state.selectedEntities !== "function") return;
+  if (!state) return;
+  drawEnemyAntiTankGunThreats(this._feedbackGfx, state, (this._map && this._map.tileSize) || 32);
+  if (typeof state.selectedEntities !== "function") return;
   const drawAllRanges = !!state.showUnitRangesEnabled;
   const drawSelectedFieldOfFire = !!state.showSelectedFieldOfFireEnabled;
   if (!drawAllRanges && !drawSelectedFieldOfFire) return;
@@ -63,6 +73,126 @@ export function _drawSelectedUnitRanges(state) {
       }
     }
   }
+}
+
+function drawEnemyAntiTankGunThreats(g, state, tileSize) {
+  if (typeof state.enemyAntiTankGunThreats !== "function") return;
+  const weapon = fieldOfFireProfile(KIND.ANTI_TANK_GUN, tileSize);
+  if (!weapon) return;
+
+  for (const entity of state.enemyAntiTankGunThreats()) {
+    const facing = firstFinite(entity?.setupFacing, entity?.weaponFacing, entity?.facing);
+    if (!finiteNumber(entity?.x) || !finiteNumber(entity?.y) || !finiteNumber(facing)) continue;
+    const paths = hatchedWedgePaths(
+      entity.x,
+      entity.y,
+      weapon.maxRadius,
+      facing,
+      weapon.arc,
+      ENEMY_AT_THREAT_HATCH_SPACING_PX,
+      ENEMY_AT_THREAT_HATCH_ANGLE,
+    );
+    const remembered = entity?.threatMemory === true;
+    const color = remembered ? ENEMY_AT_MEMORY_COLOR : ENEMY_AT_THREAT_COLOR;
+    const darkColor = remembered ? ENEMY_AT_MEMORY_DARK_COLOR : ENEMY_AT_THREAT_DARK_COLOR;
+    const darkAlpha = remembered ? 0.1 : 0.26;
+    const hatchAlpha = remembered ? 0.32 : 0.78;
+    const hatchWidth = remembered ? 0.8 : 1.3;
+    const keylineWidth = remembered ? 1.8 : 2.8;
+    const outlineAlpha = remembered ? 0.26 : 0.68;
+    // Luminance and stroke weight distinguish live threats from stale intel even
+    // without red/green hue perception. The dark keyline remains legible on snow.
+    gfxStrokePaths(g, paths, keylineWidth, darkColor, darkAlpha);
+    gfxStrokePaths(g, paths, hatchWidth, color, hatchAlpha);
+    drawFacingWedge(
+      g,
+      entity.x,
+      entity.y,
+      weapon.maxRadius,
+      facing,
+      weapon.arc,
+      color,
+      0,
+      outlineAlpha,
+      0,
+      ENEMY_AT_THREAT_OUTLINE_WIDTH,
+    );
+  }
+}
+
+function hatchedWedgePaths(cx, cy, radius, facing, arc, spacing, hatchAngle) {
+  if (!(radius > 0) || !(arc > 0) || !(spacing > 0)) return [];
+  const polygon = wedgePolygon(cx, cy, radius, facing, arc);
+  const direction = { x: Math.cos(hatchAngle), y: Math.sin(hatchAngle) };
+  const normal = { x: -direction.y, y: direction.x };
+  const reach = radius * 2;
+  const paths = [];
+  for (let offset = -radius; offset <= radius; offset += spacing) {
+    const midX = cx + normal.x * offset;
+    const midY = cy + normal.y * offset;
+    const clipped = clipSegmentToConvexPolygon(
+      [midX - direction.x * reach, midY - direction.y * reach],
+      [midX + direction.x * reach, midY + direction.y * reach],
+      polygon,
+    );
+    if (clipped) paths.push(clipped);
+  }
+  return paths;
+}
+
+function wedgePolygon(cx, cy, radius, facing, arc) {
+  const start = facing - arc / 2;
+  const steps = Math.max(8, Math.ceil((radius * arc) / ENEMY_AT_THREAT_ARC_STEP_PX));
+  const points = [[cx, cy]];
+  for (let i = 0; i <= steps; i += 1) {
+    const angle = start + (arc * i) / steps;
+    points.push([cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius]);
+  }
+  return points;
+}
+
+function clipSegmentToConvexPolygon(start, end, polygon) {
+  const winding = polygonSignedArea(polygon) >= 0 ? 1 : -1;
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  let enter = 0;
+  let exit = 1;
+
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    const edgeX = b[0] - a[0];
+    const edgeY = b[1] - a[1];
+    const startSide = winding * (edgeX * (start[1] - a[1]) - edgeY * (start[0] - a[0]));
+    const deltaSide = winding * (edgeX * dy - edgeY * dx);
+    if (Math.abs(deltaSide) < 1e-9) {
+      if (startSide < 0) return null;
+      continue;
+    }
+    const crossing = -startSide / deltaSide;
+    if (deltaSide > 0) enter = Math.max(enter, crossing);
+    else exit = Math.min(exit, crossing);
+    if (enter > exit) return null;
+  }
+
+  if (exit < 0 || enter > 1) return null;
+  const t0 = Math.max(0, enter);
+  const t1 = Math.min(1, exit);
+  if (t1 - t0 <= 1e-6) return null;
+  return [
+    [start[0] + dx * t0, start[1] + dy * t0],
+    [start[0] + dx * t1, start[1] + dy * t1],
+  ];
+}
+
+function polygonSignedArea(points) {
+  let twiceArea = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    twiceArea += a[0] * b[1] - b[0] * a[1];
+  }
+  return twiceArea / 2;
 }
 
 function selectedUnitRangeProfile(e, tileSize) {

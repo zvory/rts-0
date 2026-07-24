@@ -23,6 +23,7 @@ fn refresh_visibility_for_test(game: &mut Game) {
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
     game.recompute_live_fog(&ids);
     game.refresh_building_memory(&ids);
+    game.refresh_anti_tank_gun_memory(&ids);
 }
 
 fn hidden_enemy_at_gun_fixture() -> (Game, u32, u32) {
@@ -574,12 +575,16 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
         fired_at_tick + reveal_ticks,
         "test should advance to the first expired reveal tick"
     );
+    let hidden = game.snapshot_for(1);
     assert!(
-        !game
-            .snapshot_for(1)
-            .entities
-            .iter()
-            .any(|entity| entity.id == enemy_at),
+        !hidden.entities.iter().any(|entity| entity.id == enemy_at),
         "AT gun should disappear from snapshots once the firing reveal expires"
+    );
+    assert!(
+        hidden
+            .remembered_anti_tank_guns
+            .iter()
+            .any(|memory| memory.id == enemy_at),
+        "an expired firing reveal should leave authoritative stale AT-gun memory"
     );
 }

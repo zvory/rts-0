@@ -1976,7 +1976,17 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   selected. When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
-  field-of-fire overlays. A Command Car's faint speed-boost aura ring is visible only while that
+  field-of-fire overlays. An enemy deployed Anti-Tank Gun observed through ordinary vision or an
+  above-fog firing reveal draws its field-of-fire wedge as sparse amber-orange diagonal hatching
+  with a contrasting keyline and no blanket fill. Friendly selected field-of-fire wedges retain
+  their unhatched blue treatment. Losing vision freezes the last enemy position and facing as
+  thinner, lower-contrast very-pale-pink stale-intel hatching, so live/stale state does not depend on
+  red-green hue perception alone. Server-authoritative per-player memory clears when that player's
+  team observes the remembered position empty or observes the same gun moved, packed, or destroyed.
+  Lab and replay observer switches select the requested player's independent memory store, including
+  through checkpoint-backed time travel; the browser does not accumulate or invalidate this intel.
+  Lab threat relationships follow the shared player-vision selector rather than the operator's
+  spectator identity. A Command Car's faint speed-boost aura ring is visible only while that
   Command Car is selected; active Breakthrough always shows the bright ring. In Lab scenario
   authoring, deployed
   Anti-Tank Gun and artillery

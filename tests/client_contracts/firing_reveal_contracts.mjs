@@ -49,4 +49,29 @@ assert(
   "an actionable above-fog firing reveal remains available to click targeting",
 );
 
+state.applySnapshot({
+  tick: 2,
+  steel: 0,
+  oil: 0,
+  supplyUsed: 0,
+  supplyCap: 10,
+  visibleTiles: new Array(16).fill(0),
+  exploredTiles: new Array(16).fill(0),
+  entities: [{ id: 101, owner: 1, kind: KIND.RIFLEMAN, x: 48, y: 16, hp: 45, maxHp: 45, state: STATE.IDLE }],
+  rememberedAntiTankGuns: [{
+    id: 100,
+    owner: 2,
+    x: 16,
+    y: 16,
+    facing: 0.5,
+    observedTick: 1,
+  }],
+  events: [],
+});
+assert(
+  state.rememberedAntiTankGuns[0]?.id === 100
+    && state.rememberedAntiTankGuns[0]?.observedTick === 1,
+  "GameState replaces AT-gun memory from the server snapshot instead of accumulating it locally",
+);
+
 console.log("firing_reveal_contracts: ok");

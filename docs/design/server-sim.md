@@ -23,6 +23,7 @@ crates/
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
     building_memory.rs # server-only per-player last-seen enemy building records
+    anti_tank_gun_memory.rs # server-only per-player last-seen deployed enemy AT-gun arcs
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction/deconstruction, death, entrenchment, occupancy, supply, pathing, geometry, standability, line_of_sight
     replay.rs    # tick-stamped command log replay harness for determinism checks
@@ -274,6 +275,7 @@ architecture failures.
 | `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
 | `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` atomically records whether each sampled revealed entity needed its firing reveal before stamping the actionable tile. Combat, commands, and entity projection consume that held sample; snapshot `visibleTiles` removes reveal-only stamps so presentation fog remains covered. Phase 0.5 compares per-player actionable tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
+| `anti_tank_gun_memory` | `authoritative/serialized` | Serialize last-observed deployed enemy Anti-Tank Gun position, facing, owner, and observation tick per player. | `AntiTankGunMemory::refresh` records ordinary team sight and actionable firing reveals, retains stale records through hidden movement/teardown/destruction, and clears them only when that player's team observes the gun changed or the remembered position empty; observer snapshots select the requested players' stores. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, and snapshot resource rows are all read from `players`. |
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
 | `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, schema 3 replay artifacts finalize the stored launch-time `ReplayStartComposition` with this log, and tick logic only appends/applies new pending commands instead of reading old log entries. |
@@ -542,6 +544,7 @@ Field map for Phase 2 DTO conversion:
 | `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state (including whether an unfinished scaffold's construction cost was paid), combat cooldowns, targets, bounded reveal-reaction gates, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
 | `fog` | `FogStateV1` latest sampled visibility grids plus bounded per-viewer firing-reveal provenance. The sampled provenance may lead or trail the current source list by one simulation tick, and ids remain bounded by the entity allocator high-water mark. |
 | `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
+| `anti_tank_gun_memory` | `AntiTankGunMemoryV1` remembered deployed enemy Anti-Tank Gun position/facing entries per player, preserving fog knowledge across replay and Lab keyframe restore. |
 | `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, and completed upgrades. |
 | `pending` | `pendingCommands` entries with issuer, command DTO, admission/lab context, and original order. Import preserves them so the first post-restore tick drains them exactly once. |
 | `command_log` | `commandLog` plus `commandLogMetadata`. It is compatibility metadata, installed but not replayed by normal import. |
@@ -1703,6 +1706,15 @@ building intel while the source remains active. If a remembered building no long
 record remains while its footprint is hidden from the viewer's team and is removed once that team
 scouts any remembered footprint tile. This keeps hidden destruction stale until the location is
 checked without adding any wire-protocol fields.
+
+`game::anti_tank_gun_memory::AntiTankGunMemory` is the corresponding server-authoritative
+per-player knowledge store for deployed enemy Anti-Tank Gun firing arcs. It refreshes from ordinary
+team sight and actionable firing-reveal fog, freezes last-observed position/facing while hidden,
+and does not react to authoritative movement, teardown, or destruction that the viewer cannot see.
+Observing the same gun packed or moved updates or removes the record, and scouting the remembered
+position empty removes stale intel. Selected-player observer snapshots project that player's store,
+so Lab and replay vision switches restore perspective-specific knowledge instead of depending on
+which views one browser previously rendered.
 
 `services::geometry` owns shared body primitives: infantry unit bodies are circles centered on
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their

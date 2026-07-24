@@ -166,8 +166,10 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 - Local visual inspection through Tailscale: Tailscale links are the default delivery channel
   whenever the user needs to view a locally served game, browser result, replay, or other visual
   artifact. Interact screenshots and videos already return an opaque Tailnet Preview URL: share
-  that URL directly, never offer the raw `target/interact/lab` path, and do not start a separate
-  game server for that artifact. Do not infer the user's device: they may be on a phone or desktop.
+  that URL directly. Provide Tailnet Preview artifacts as normal clickable Markdown links, never
+  embedded image syntax, because private Tailnet resources may not load through the app image
+  renderer. Never offer the raw `target/interact/lab` path, and do not start a separate game server
+  for that artifact. Do not infer the user's device: they may be on a phone or desktop.
   Verify Tailscale state with `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run
   --release` if port 8080 is not already served, then provide an `http://<Tailscale-IP>:8080/...`
   link rather than requiring a beta deployment. For a live spectator AI matchup, use the existing

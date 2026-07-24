@@ -1,3 +1,5 @@
+import { KIND, SETUP } from "../protocol.js";
+
 const EMPTY_ARRAY = Object.freeze([]);
 
 /**
@@ -8,7 +10,7 @@ const EMPTY_ARRAY = Object.freeze([]);
  * transient effect markers stay behind one explicit boundary.
  *
  * @param {object} state GameState-compatible browser model.
- * @param {{clientIntent?:object|null, controlPolicy?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, now?:number}=} options
+ * @param {{clientIntent?:object|null, controlPolicy?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, rememberedEnemyAntiTankGunThreats?:Array<object>, observerView?:object|null, now?:number}=} options
  * @returns {object}
  */
 export function buildRendererFeedbackView(
@@ -19,6 +21,8 @@ export function buildRendererFeedbackView(
     previewSurface = null,
     entities = EMPTY_ARRAY,
     selectedEntities = null,
+    rememberedEnemyAntiTankGunThreats = EMPTY_ARRAY,
+    observerView = null,
     now = defaultNow(),
   } = {},
 ) {
@@ -29,6 +33,11 @@ export function buildRendererFeedbackView(
     : EMPTY_ARRAY;
   const selected = selectRenderedEntities(entities, selectedStateEntities);
   const entityLookup = buildEntityLookup(entities, selected);
+  const enemyAntiTankGunThreats = visibleEnemyAntiTankGunThreats(state, entities, {
+    allowSpectator: observerView?.mode === "player",
+    rememberedThreats: rememberedEnemyAntiTankGunThreats,
+    observerView,
+  });
   const intent = clientIntent || null;
   const controlOwner = buildControlOwnerReadModel(state, selected, controlPolicy);
 
@@ -58,6 +67,7 @@ export function buildRendererFeedbackView(
     commandFeedback,
     attackTargetPreview: previewSurface ? null : intent?.attackTargetPreview || null,
     selectedEntities: () => selected,
+    enemyAntiTankGunThreats: () => enemyAntiTankGunThreats,
     showUnitRangesEnabled: state?.showUnitRangesEnabled !== false,
     showSelectedFieldOfFireEnabled: controlOwner.showSelectedFieldOfFireEnabled,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
@@ -114,6 +124,60 @@ export function buildRendererFeedbackView(
       return false;
     },
   };
+}
+
+function visibleEnemyAntiTankGunThreats(
+  state,
+  entities,
+  { allowSpectator = false, rememberedThreats = EMPTY_ARRAY, observerView = null } = {},
+) {
+  const perspectivePlayerId = resolveThreatPerspectivePlayerId({
+    players: state?.players,
+    playerId: state?.playerId,
+    observerView,
+    allowObserverPerspective: allowSpectator,
+  });
+  if (
+    !Array.isArray(entities) ||
+    (state?.spectator && !allowSpectator) ||
+    perspectivePlayerId == null
+  ) return EMPTY_ARRAY;
+  const liveThreats = entities.filter((entity) =>
+    entity?.kind === KIND.ANTI_TANK_GUN &&
+    entity?.setupState === SETUP.DEPLOYED &&
+    isThreatEnemyOwner(state?.players, perspectivePlayerId, entity?.owner));
+  const liveIds = new Set(liveThreats.map((entity) => Number(entity.id)));
+  const staleThreats = arrayOrEmpty(rememberedThreats).filter((memory) =>
+    !liveIds.has(Number(memory?.id)) &&
+    isThreatEnemyOwner(state?.players, perspectivePlayerId, memory?.owner));
+  if (liveThreats.length === 0 && staleThreats.length === 0) return EMPTY_ARRAY;
+  return [
+    ...liveThreats.map((entity) => ({ ...entity, threatMemory: false })),
+    ...staleThreats.map((memory) => ({ ...memory, threatMemory: true })),
+  ];
+}
+
+function resolveThreatPerspectivePlayerId({
+  players = EMPTY_ARRAY,
+  playerId = null,
+  observerView = null,
+  allowObserverPerspective = false,
+} = {}) {
+  if (allowObserverPerspective && observerView?.mode === "player") {
+    const observedPlayerId = normalizeOwner(observerView.playerId);
+    if (teamIdForPlayer(players, observedPlayerId) != null) return observedPlayerId;
+  }
+  const localPlayerId = normalizeOwner(playerId);
+  if (teamIdForPlayer(players, localPlayerId) != null) return localPlayerId;
+  return null;
+}
+
+function isThreatEnemyOwner(players, perspectivePlayerId, owner) {
+  const ownerId = normalizeOwner(owner);
+  if (ownerId == null || ownerId === perspectivePlayerId) return false;
+  const ownTeam = teamIdForPlayer(players, perspectivePlayerId);
+  const ownerTeam = teamIdForPlayer(players, ownerId);
+  return ownTeam != null && ownerTeam != null && ownTeam !== ownerTeam;
 }
 
 function buildControlOwnerReadModel(state, selected, policy = null) {
@@ -232,6 +296,7 @@ function isAllyForPlayer(players, playerId, owner) {
 }
 
 function teamIdForPlayer(players, id) {
+  if (!Array.isArray(players)) return null;
   return players.find((player) => Number(player?.id) === Number(id))?.teamId ?? null;
 }
 

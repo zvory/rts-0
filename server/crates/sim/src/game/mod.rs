@@ -13,6 +13,7 @@ pub(crate) mod ability_projectile;
 mod ability_projection;
 pub(crate) mod ability_runtime;
 mod analysis;
+mod anti_tank_gun_memory;
 mod apm;
 mod artillery;
 mod building_memory;
@@ -291,6 +292,7 @@ impl Game {
             });
         }
         self.refresh_building_memory(&player_ids);
+        self.refresh_anti_tank_gun_memory(&player_ids);
         self.refresh_trench_memory(&player_ids);
 
         // In debug builds, assert that the world state is internally consistent.
@@ -448,6 +450,7 @@ impl Game {
         let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
         self.refresh_building_memory(&ids);
+        self.refresh_anti_tank_gun_memory(&ids);
         self.refresh_trench_memory(&ids);
     }
 
@@ -559,6 +562,18 @@ impl Game {
             &self.state.entities,
             &self.state.fog,
             &self.state.map,
+            &self.state.smokes,
+            &teams,
+            self.state.tick,
+        );
+    }
+
+    fn refresh_anti_tank_gun_memory(&mut self, player_ids: &[u32]) {
+        let teams = self.team_relations();
+        self.state.anti_tank_gun_memory.refresh(
+            player_ids,
+            &self.state.entities,
+            &self.state.fog,
             &self.state.smokes,
             &teams,
             self.state.tick,

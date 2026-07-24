@@ -121,6 +121,8 @@ function runMatchFrame(match, now, { capture = false } = {}) {
         previewSurface: match.inputRouter?.activePreviewSurface?.(),
         entities: frameViews.interpolatedEntities,
         selectedEntities: frameViews.selectedEntities,
+        rememberedEnemyAntiTankGunThreats: match.state.rememberedAntiTankGuns || [],
+        observerView: match.state.observerView || null,
         now: visualTimeMs,
       }),
     );

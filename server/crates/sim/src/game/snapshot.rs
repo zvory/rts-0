@@ -151,6 +151,11 @@ impl Game {
         } else {
             Vec::new()
         };
+        let remembered_anti_tank_guns = if fogged {
+            self.remembered_anti_tank_gun_views_for(player, memory_players, fog, &teams)
+        } else {
+            Vec::new()
+        };
         let mut smokes = if fogged && !omniscient {
             self.state
                 .smokes
@@ -247,6 +252,7 @@ impl Game {
                 Vec::new()
             },
             remembered_buildings,
+            remembered_anti_tank_guns,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
             upgrades: match player_resource_projection {
@@ -280,13 +286,7 @@ impl Game {
         let mut views: Vec<RememberedBuildingView> = Vec::new();
         for &memory_player in memory_players {
             for entry in self.state.building_memory.entries_for_player(memory_player) {
-                if self.live_entity_projects_for_remembered_building(
-                    player,
-                    memory_players,
-                    entry.id,
-                    fog,
-                    teams,
-                ) {
+                if self.live_entity_projects(player, memory_players, entry.id, fog, teams) {
                     continue;
                 }
                 let view = RememberedBuildingView {
@@ -311,7 +311,7 @@ impl Game {
         views
     }
 
-    fn live_entity_projects_for_remembered_building(
+    pub(in crate::game) fn live_entity_projects(
         &self,
         player: u32,
         selected_players: &[u32],

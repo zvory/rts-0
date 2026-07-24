@@ -1,7 +1,7 @@
 // tests/client_contracts/renderer_feedback_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
-import { assert, assertApprox } from "./assertions.mjs";
+import { assert, assertApprox, assertDeepEqual } from "./assertions.mjs";
 import { COLORS } from "../../client/src/config.js";
 import {
   ABILITY,
@@ -106,6 +106,192 @@ function polygonCenter(points) {
 
 function nearPoint(call, point, epsilon = 0.001) {
   return Math.abs(call[1] - point.x) <= epsilon && Math.abs(call[2] - point.y) <= epsilon;
+}
+
+{
+  const visibleEntities = [
+    {
+      id: 301,
+      owner: 2,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 320,
+      y: 256,
+      facing: 0,
+      setupState: SETUP.DEPLOYED,
+    },
+    {
+      id: 302,
+      owner: 2,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 384,
+      y: 256,
+      facing: 0,
+      setupState: SETUP.PACKED,
+    },
+    {
+      id: 303,
+      owner: 3,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 448,
+      y: 256,
+      facing: 0,
+      setupState: SETUP.DEPLOYED,
+    },
+    {
+      id: 304,
+      owner: 1,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 512,
+      y: 256,
+      facing: 0,
+      setupState: SETUP.DEPLOYED,
+    },
+    {
+      id: 305,
+      owner: 2,
+      kind: KIND.ARTILLERY,
+      x: 576,
+      y: 256,
+      facing: 0,
+      setupState: SETUP.DEPLOYED,
+    },
+  ];
+  const state = {
+    playerId: 1,
+    players: [
+      { id: 1, teamId: 1 },
+      { id: 2, teamId: 2 },
+      { id: 3, teamId: 1 },
+    ],
+    selectedEntities() { return []; },
+  };
+  const feedbackView = buildRendererFeedbackView(state, { entities: visibleEntities });
+  assertDeepEqual(
+    feedbackView.enemyAntiTankGunThreats().map((entity) => entity.id),
+    [301],
+    "only fog-filtered, deployed enemy anti-tank guns become persistent threat previews",
+  );
+
+  const threatGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: threatGfx, _map: { tileSize: 32 } },
+    feedbackView,
+  );
+  assert(
+    threatGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.3 && call[2] === 0xffb000 && call[3] === 0.78),
+    "live enemy anti-tank threat cone uses a colorblind-legible amber hatch stroke",
+  );
+  assert(
+    threatGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.95 && call[2] === 0xffb000 && call[3] === 0.68),
+    "enemy anti-tank threat cone boundary is 30% thicker without changing hatch width",
+  );
+  const liveHatchMoves = threatGfx.calls.filter((call) => call[0] === "moveTo").length;
+  assert(
+    liveHatchMoves > 6 && liveHatchMoves < 60,
+    "enemy anti-tank threat cone contains the reduced-density clipped hatching plus its boundary",
+  );
+  assert(
+    !threatGfx.calls.some((call) => call[0] === "beginFill"),
+    "enemy anti-tank threat cone never blankets the terrain with a tint",
+  );
+
+  const spectatorView = buildRendererFeedbackView(
+    { ...state, spectator: true },
+    { entities: visibleEntities },
+  );
+  assert(
+    spectatorView.enemyAntiTankGunThreats().length === 0,
+    "spectators do not receive player-relative enemy threat cones",
+  );
+  const labSpectatorView = buildRendererFeedbackView(
+    { ...state, spectator: true },
+    {
+      entities: visibleEntities,
+      observerView: { mode: "player", playerId: 1 },
+      controlPolicy: createControlPolicyProjection(createLabControlPolicy({
+        metadata: { role: LAB_ROLE.OPERATOR },
+      })),
+    },
+  );
+  assert(
+    labSpectatorView.enemyAntiTankGunThreats().length === 1,
+    "Lab operators can visually review the player-relative enemy threat cone",
+  );
+  const labBravoView = buildRendererFeedbackView(
+    { ...state, spectator: true },
+    {
+      entities: visibleEntities,
+      observerView: { mode: "player", playerId: 2 },
+      controlPolicy: createControlPolicyProjection(createLabControlPolicy({
+        metadata: { role: LAB_ROLE.OPERATOR },
+      })),
+    },
+  );
+  assert(
+    labBravoView.enemyAntiTankGunThreats().some((entity) => entity.id === 304),
+    "Lab Bravo vision overrides a colliding operator id and classifies Player 1's gun as enemy",
+  );
+
+  const staleFeedbackView = buildRendererFeedbackView(state, {
+    entities: [],
+    rememberedEnemyAntiTankGunThreats: [{
+      id: 306,
+      owner: 2,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 320,
+      y: 256,
+      weaponFacing: 0,
+      setupState: SETUP.DEPLOYED,
+    }],
+  });
+  const staleGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: staleGfx, _map: { tileSize: 32 } },
+    staleFeedbackView,
+  );
+  assert(
+    staleGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 0.8 && call[2] === 0xffdce5 && call[3] === 0.32),
+    "remembered anti-tank cones use thinner, lower-contrast very pale pink hatching",
+  );
+  assert(
+    !staleGfx.calls.some((call) => call[0] === "beginFill"),
+    "remembered anti-tank cones remain unfilled",
+  );
+
+  const friendlyGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: friendlyGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 1,
+      showUnitRangesEnabled: false,
+      showSelectedFieldOfFireEnabled: true,
+      enemyAntiTankGunThreats: () => [],
+      selectedEntities: () => [{
+        id: 307,
+        owner: 1,
+        kind: KIND.ANTI_TANK_GUN,
+        x: 320,
+        y: 256,
+        facing: 0,
+        setupFacing: 0,
+        setupState: SETUP.DEPLOYED,
+      }],
+    },
+  );
+  assert(
+    friendlyGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.5 && call[2] === 0x8eb7ff && call[3] === 0.36),
+    "friendly selected anti-tank guns retain the blue field-of-fire outline",
+  );
+  assert(
+    friendlyGfx.calls.filter((call) => call[0] === "moveTo").length === 1
+      && !friendlyGfx.calls.some((call) =>
+        call[0] === "lineStyle" && (call[2] === 0xffb000 || call[2] === 0xc3cbd0)),
+    "friendly anti-tank field-of-fire wedges never receive enemy cross-hatching",
+  );
 }
 
 {

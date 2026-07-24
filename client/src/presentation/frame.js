@@ -23,6 +23,7 @@ const FEEDBACK_ARRAYS = Object.freeze([
   ["panzerfaustImpacts", "panzerfaustImpact"],
   ["muzzleFlashes", "muzzleFlash"],
   ["missToasts", "missToast"],
+  ["enemyAntiTankGunThreats", "enemyAntiTankGunThreat"],
 ]);
 
 const FEEDBACK_SINGLETONS = Object.freeze([
@@ -144,7 +145,10 @@ export class PresentationFrameAssembler {
     pushTypedRecords(layers, "fogGatedWorld", "abilityObject", feedback?.abilityObjects, diagnostics);
 
     for (const [field, type] of FEEDBACK_ARRAYS) {
-      pushTypedRecords(layers, "tacticalFeedback", type, feedback?.[field], diagnostics);
+      const value = typeof feedback?.[field] === "function"
+        ? feedback[field]()
+        : feedback?.[field];
+      pushTypedRecords(layers, "tacticalFeedback", type, value, diagnostics);
     }
     for (const [field, type] of FEEDBACK_SINGLETONS) {
       if (feedback?.[field] != null) {

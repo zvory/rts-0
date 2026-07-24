@@ -11,6 +11,7 @@ import {
   MAX_COMPACT_EVENTS,
   MAX_COMPACT_ORDER_PLAN,
   MAX_COMPACT_REMEMBERED_BUILDINGS,
+  MAX_COMPACT_REMEMBERED_ANTI_TANK_GUNS,
   MAX_COMPACT_RESOURCE_DELTAS,
   MAX_COMPACT_SMOKES,
   MAX_COMPACT_VISIBLE_TILES,
@@ -61,6 +62,11 @@ export function decodeCompactSnapshot(raw) {
       "rememberedBuildings",
       MAX_COMPACT_REMEMBERED_BUILDINGS,
     ).map(decodeCompactRememberedBuilding),
+    rememberedAntiTankGuns: readOptionalArray(
+      raw.ma,
+      "rememberedAntiTankGuns",
+      MAX_COMPACT_REMEMBERED_ANTI_TANK_GUNS,
+    ).map(decodeCompactRememberedAntiTankGun),
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
@@ -115,6 +121,21 @@ function decodeCompactRememberedBuilding(record, index) {
       ];
     }),
     observedTick: readU32(fields[6], "rememberedBuilding.observedTick"),
+  };
+}
+
+function decodeCompactRememberedAntiTankGun(record, index) {
+  const fields = readArray(record, `remembered anti-tank gun ${index}`, 6);
+  if (fields.length !== 6) {
+    throw new Error(`remembered anti-tank gun ${index} field count mismatch`);
+  }
+  return {
+    id: readU32(fields[0], "rememberedAntiTankGun.id"),
+    owner: readU32(fields[1], "rememberedAntiTankGun.owner"),
+    x: readNumber(fields[2], "rememberedAntiTankGun.x"),
+    y: readNumber(fields[3], "rememberedAntiTankGun.y"),
+    facing: readNumber(fields[4], "rememberedAntiTankGun.facing"),
+    observedTick: readU32(fields[5], "rememberedAntiTankGun.observedTick"),
   };
 }
 
