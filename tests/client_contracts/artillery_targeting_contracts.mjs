@@ -260,9 +260,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
   assert(
     ARTILLERY_MIN_RANGE_TILES === 10 &&
-      ARTILLERY_MAX_RANGE_TILES === 40 &&
+      ARTILLERY_MAX_RANGE_TILES === 35 &&
       ARTILLERY_FIELD_OF_FIRE_RAD === 30 * Math.PI / 180,
-    "Artillery targeting mirrors the 10-40 tile range band and 30-degree field of fire",
+    "Artillery targeting mirrors the 10-35 tile range band and 30-degree field of fire",
   );
 
   pointFireInput.state.selectedEntities = () => [queuedMovingArtillery];
