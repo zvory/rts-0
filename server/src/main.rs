@@ -22,7 +22,7 @@ use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
-mod client_optional_assets;
+mod client_assets;
 mod connection_writer;
 mod dev_replay_pages;
 mod dev_scenario_pages;
@@ -113,8 +113,7 @@ const DEPLOY_DRAIN_TIMEOUT: Duration = Duration::from_secs(295);
 struct AppState {
     lobby: Lobby,
     version: String,
-    /// `index.html` with `?v=<build id>` appended to all JS/CSS asset URLs, computed once at
-    /// startup so cache-busting survives browser caches without a hard refresh.
+    /// Versioned `index.html`; static responses revalidate worker imports that lack import maps.
     index_html: String,
     maps_dir: String,
     /// Optional database for match history and explicitly gated diagnostics. `None` when
@@ -178,8 +177,7 @@ async fn main() {
     let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
     // single-page client loads, but missing asset URLs stay 404 so packaging errors are visible.
-    let static_service = ServeDir::new(&client_dir)
-        .fallback(get(client_spa_fallback_handler).with_state(state.clone()));
+    let static_service = client_assets::service(&client_dir, state.clone());
 
     let app = Router::new()
         .route("/", get(index_handler))
@@ -363,7 +361,7 @@ async fn stress_test_index_handler(State(state): State<AppState>) -> impl IntoRe
 }
 
 async fn client_spa_fallback_handler(uri: Uri, State(state): State<AppState>) -> impl IntoResponse {
-    if let Some(response) = client_optional_assets::fallback(uri.path()) {
+    if let Some(response) = client_assets::fallback(uri.path()) {
         return response;
     }
     if is_client_asset_path(uri.path()) {
@@ -694,9 +692,8 @@ async fn dev_replay_artifact_handler(
 /// Read `index.html`, inject a versioned import map for all `/src/*.js` modules, and append
 /// `?v=<version>` to the top-level cacheable app asset URLs.
 ///
-/// The import map causes the browser to rewrite every `import "./foo.js"` inside ES modules to
-/// `./foo.js?v=<version>`, so sub-modules (hud.js, net.js, …) are cache-busted alongside
-/// main.js without a build step.
+/// The import map versions document-owned modules without a build step. Module workers do not
+/// inherit it, so the static service requires their stable child-module URLs to revalidate.
 fn build_versioned_index(client_dir: &str, version: &str) -> String {
     let path = format!("{client_dir}/index.html");
     let html = std::fs::read_to_string(&path).unwrap_or_else(|err| {
