@@ -606,6 +606,9 @@ await withFakeDocument(async () => {
     },
   });
   const buttonByText = (label) => findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === label)[0];
+  const buttonByUpgrade = (upgrade) => findFakes(root, (el) => (
+    el.tagName === "BUTTON" && el.dataset?.upgrade === upgrade
+  ))[0];
   const playerButtonById = (id) => findFakes(root, (el) => (
     el.tagName === "BUTTON" && el.dataset?.playerId === String(id)
   ))[0];
@@ -782,16 +785,17 @@ await withFakeDocument(async () => {
     "LabPanel does not expose advanced spawn or completion toggles",
   );
   assert(
-    buttonByText("Medium Guns")?.dataset.researched === "true" &&
-      buttonByText("Medium Guns")?.dataset.available === "true" &&
-      buttonByText("Medium Guns")?.["aria-pressed"] === "true",
+    buttonByText("AT Guns")?.dataset.researched === "true" &&
+      buttonByText("AT Guns")?.dataset.available === "true" &&
+      buttonByText("AT Guns")?.["aria-pressed"] === "true",
     "LabPanel renders completed research as a depressed available button",
   );
   assert(
-    buttonByText("Heavy Guns")?.dataset.researched === "false" &&
-      buttonByText("Heavy Guns")?.dataset.available === "false" &&
-      buttonByText("Heavy Guns")?.["aria-pressed"] === "false",
-    "LabPanel renders incomplete Heavy Guns as an up unavailable button",
+    buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.textContent === "Artillery" &&
+      buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.dataset.researched === "false" &&
+      buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.dataset.available === "false" &&
+      buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.["aria-pressed"] === "false",
+    "LabPanel renders incomplete Artillery as an up unavailable button",
   );
   assert(
     buttonByText("Tank Production")?.dataset.researched === "false" &&
@@ -819,8 +823,8 @@ await withFakeDocument(async () => {
     "LabPanel refreshes resource fields from the newly selected player",
   );
   assert(
-    buttonByText("Medium Guns")?.dataset.researched === "false" &&
-      buttonByText("Medium Guns")?.["aria-pressed"] === "false",
+    buttonByText("AT Guns")?.dataset.researched === "false" &&
+      buttonByText("AT Guns")?.["aria-pressed"] === "false",
     "LabPanel refreshes completed research for the newly selected player",
   );
   assert(
@@ -831,7 +835,7 @@ await withFakeDocument(async () => {
   assert(
     panel.fields.get("resource-steel").value === "500" &&
       panel.fields.get("resource-oil").value === "200" &&
-      buttonByText("Medium Guns")?.dataset.researched === "true" &&
+      buttonByText("AT Guns")?.dataset.researched === "true" &&
       panel.fields.get("player-god-mode").checked === true,
     "LabPanel restores every player-specific control when switching back",
   );

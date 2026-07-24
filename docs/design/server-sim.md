@@ -949,7 +949,7 @@ Standing repeat production deliberately does not use unpaid entries: it continue
 ordinary queue is empty and inserts a normal paid item only after cost and supply succeed.
 Dependent research is admissible when its prerequisite is complete or already earlier in the same
 building's FIFO. Owner/team projections expose the ordered `prodUpgradeQueue`, allowing the command
-card to enable Heavy Guns behind queued Medium Guns. The FIFO completion path remains the authority
+card to enable Artillery behind queued AT Guns. The FIFO completion path remains the authority
 for when each prerequisite actually takes effect.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)

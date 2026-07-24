@@ -356,7 +356,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ARTILLERY_MIN_FIRE_RADIUS_TILES = 6` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
   locked center. Every shell lands at a point sampled uniformly by area inside that circle. There
   is no separate range-based error, accuracy sequence, or repeated-shot tightening. Artillery Fire
-  Control costs 100 steel and 150 oil, takes 20 seconds, requires Heavy Guns, and reduces the
+  Control costs 100 steel and 150 oil, takes 20 seconds, requires Artillery, and reduces the
   minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3`.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
   long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
@@ -421,13 +421,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,
   and occupied benefits as a player-facing status only; the server remains authoritative for actual
   occupation and combat modifiers.
-- **Medium Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 100 steel /
+- **AT Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 100 steel /
   50 oil and takes 300 ticks (~10s). Once complete, that player can train Anti-Tank Guns from Gun
-  Works. Medium Guns keeps its own R&D command-card slot while incomplete.
-- **Heavy Guns** (R&D Complex research, protocol id `artillery_unlock`): costs 200 steel / 100 oil
-  and takes 750 ticks (~25s). It has its own permanent R&D slot and requires Medium Guns either
+  Works. AT Guns keeps its own R&D command-card slot while incomplete.
+- **Artillery** (R&D Complex research, protocol id `artillery_unlock`): costs 200 steel / 100 oil
+  and takes 750 ticks (~25s). It has its own permanent R&D slot and requires AT Guns either
   completed or earlier in that R&D Complex's queue when ordered. Research begins only after the
-  earlier Medium Guns item completes. Once complete, that player can train Artillery from Gun Works.
+  earlier AT Guns item completes. Once complete, that player can train Artillery from Gun Works.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
@@ -562,8 +562,8 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.52 | 9    | 150 | 40  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Medium Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Heavy Guns (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
+| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.52 | 9    | 150 | 40  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
+| artillery       | 200 | 75 AP inner / 75-5 outer AOE | 25-55 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.0   | 15    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 20-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
@@ -581,9 +581,9 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a City Centre |
 | training_centre            | Training Centre    | 200 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Medium Guns, Heavy Guns, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after Medium Guns, and Artillery after Heavy Guns; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed City Centre/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 

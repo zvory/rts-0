@@ -144,10 +144,10 @@ function ekatCard() {
   assert(
     catalog.commands.some((command) =>
       command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
-        command.label === "Heavy Guns" &&
+        command.label === "Artillery" &&
         command.slotIndex === 1
     ),
-    "hotkey command catalog keeps Heavy Guns research in its permanent W slot",
+    "hotkey command catalog keeps Artillery research in its permanent W slot",
   );
   assert(
     catalog.commands.some((command) =>
