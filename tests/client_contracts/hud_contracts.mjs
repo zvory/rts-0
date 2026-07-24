@@ -826,7 +826,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
     playerResources: [
       { id: 1, steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
-      { id: 2, steel: 25, oil: 0, supplyUsed: 4, supplyCap: 50,
+      { id: 2, steel: 24, oil: 0, supplyUsed: 4, supplyCap: 50,
         upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] },
     ],
     upgrades: [],

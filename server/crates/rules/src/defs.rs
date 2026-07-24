@@ -139,7 +139,7 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: 16,
             speed: 1.6,
             sight_tiles: 11,
-            cost_steel: 50,
+            cost_steel: 25,
             cost_oil: 0,
             supply: 1,
             build_ticks: 300,
