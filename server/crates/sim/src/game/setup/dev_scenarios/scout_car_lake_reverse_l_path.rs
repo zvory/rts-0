@@ -78,6 +78,9 @@ impl Game {
 mod tests {
     use super::*;
     use crate::game::entity::Order;
+    use crate::game::services::geometry::{
+        tile_rect, unit_body_for_entity, unit_body_intersects_rect,
+    };
 
     #[test]
     fn scenario_authors_centered_lake_and_wrong_facing_cross_map_order() {
@@ -140,39 +143,56 @@ mod tests {
     }
 
     #[test]
-    fn scenario_reproduces_long_initial_reverse_toward_grid_waypoint() {
+    fn scenario_scout_car_routes_around_lake_and_arrives() {
         let setup =
             Game::new_scout_car_lake_reverse_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_0724)
                 .expect("scenario setup should succeed");
         let scout_id = setup.units[0];
+        let goal = setup.goal;
         let command = setup.command();
         let mut game = setup.game;
         game.enqueue(setup.player_id, command);
 
-        let mut reverse_distance = 0.0;
-        for _ in 0..config::TICK_HZ * 10 {
+        let mut arrival_tick = None;
+        for tick in 1..=config::TICK_HZ * 60 {
             game.tick();
             let scout = game
                 .state
                 .entities
                 .get(scout_id)
                 .expect("scenario scout car should remain");
-            let movement = scout
-                .movement
-                .as_ref()
-                .expect("scout car should have movement");
-            let forward_x = movement.facing.cos();
-            let forward_y = movement.facing.sin();
-            let signed_progress =
-                movement.last_move_delta.0 * forward_x + movement.last_move_delta.1 * forward_y;
-            if signed_progress < 0.0 {
-                reverse_distance += movement.last_move_delta.0.hypot(movement.last_move_delta.1);
+
+            let body = unit_body_for_entity(scout).expect("scout car should have a body");
+            for ty in 0..game.state.map.size {
+                for tx in 0..game.state.map.size {
+                    let index = game.state.map.index(tx, ty);
+                    if game.state.map.terrain[index] == crate::protocol::terrain::WATER {
+                        assert!(
+                            !unit_body_intersects_rect(body, tile_rect(tx as i32, ty as i32)),
+                            "scout car body should not overlap lake tile {tx},{ty} at tick {tick}"
+                        );
+                    }
+                }
+            }
+
+            if matches!(scout.order(), Order::Idle) && scout.path_is_empty() {
+                arrival_tick = Some(tick);
+                break;
             }
         }
 
+        let arrival_tick =
+            arrival_tick.expect("scout car should route around the lake and arrive within 60s");
+        let scout = game
+            .state
+            .entities
+            .get(scout_id)
+            .expect("scenario scout car should remain");
         assert!(
-            reverse_distance >= config::TILE_SIZE as f32 * 5.0,
-            "fixture should reproduce at least five tiles of reverse travel, got {reverse_distance:.2}px"
+            (scout.pos_x - goal.0).abs() <= 0.001 && (scout.pos_y - goal.1).abs() <= 0.001,
+            "scout car should finish at the exact goal by tick {arrival_tick}, got ({:.3}, {:.3})",
+            scout.pos_x,
+            scout.pos_y
         );
     }
 }

@@ -12,7 +12,7 @@ const LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
 pub(super) const SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "scout_car_lake_reverse_l_path",
     title: "Scout Car Lake Reverse L Path",
-    description: "After five seconds, one east-facing Scout Car starts 20 tiles northeast of a centered 15-by-15 lake and receives a move order 20 tiles southwest of it. The current bug makes the wrong-facing car reverse for a long grid-aligned leg before routing around the lake.",
+    description: "After five seconds, one east-facing Scout Car starts 20 tiles northeast of a centered 15-by-15 lake and receives a move order 20 tiles southwest of it. This guards the established route around the lake against unsafe waypoint collapse and permanent corner stalls.",
     launches: &LAUNCHES,
 };
 
