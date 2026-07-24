@@ -6,8 +6,8 @@ _2026-07-24_
 
 ## Changes
 
-- Scout Planes now last 30s (up from 20s) and reveal 19 tiles (up from 16).
+- Scout Planes now fly 30% faster, last 30s (up from 20s), and reveal 19 tiles (up from 16).
 
 ## Playtest watch
 
-- Whether the added vision and uptime make enemy positions too easy to track.
+- Whether the added speed, vision, and uptime make enemy positions too easy to track.
