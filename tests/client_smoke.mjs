@@ -117,6 +117,46 @@ try {
   const workerBackend = await page.evaluate(() => window.__rtsRenderWorkerStats);
   ok(workerBackend.mode === "pixi-webgl-module-worker" && workerBackend.backendInfo.pixiVersion === "8.19.0",
     `sole Pixi module worker owns WebGL (v${workerBackend.backendInfo.pixiVersion})`);
+  const pixiAnnulus = await page.evaluate(async () => {
+    const [{ PIXI_WORKER_URL }, { drawFacingWedge }] = await Promise.all([
+      import("/src/renderer/worker_environment.js"),
+      import("/src/renderer/shared.js"),
+    ]);
+    const pixi = await import(PIXI_WORKER_URL);
+    const canvas = document.createElement("canvas");
+    const app = new pixi.Application();
+    try {
+      await app.init({
+        canvas,
+        width: 256,
+        height: 256,
+        preference: "webgl",
+        autoStart: false,
+        antialias: false,
+        backgroundAlpha: 0,
+      });
+      const graphics = new pixi.Graphics();
+      app.stage.addChild(graphics);
+      drawFacingWedge(graphics, 128, 128, 90, 0, Math.PI * 2, 0x8eb7ff, 0.35, 0.7, 40);
+      app.render();
+      const gl = app.renderer.gl;
+      const center = new Uint8Array(4);
+      const band = new Uint8Array(4);
+      gl.readPixels(128, 128, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, center);
+      gl.readPixels(188, 128, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, band);
+      return { rendered: true, centerAlpha: center[3], bandAlpha: band[3] };
+    } catch (error) {
+      return { rendered: false, error: error?.stack || error?.message || String(error) };
+    } finally {
+      app.destroy();
+    }
+  });
+  ok(
+    pixiAnnulus.rendered && pixiAnnulus.centerAlpha === 0 && pixiAnnulus.bandAlpha > 0,
+    pixiAnnulus.rendered
+      ? `Pixi full-circle mortar range preserves a transparent dead zone (center=${pixiAnnulus.centerAlpha}, band=${pixiAnnulus.bandAlpha})`
+      : `Pixi full-circle mortar range renders without a worker-stopping geometry error (${pixiAnnulus.error})`,
+  );
   const canvas = await page.evaluate(() => { const c = document.querySelector("#viewport canvas"); return c ? { w: c.width, h: c.height } : null; });
   ok(canvas && canvas.w > 0 && canvas.h > 0, `canvas mounted and sized (${canvas?.w}x${canvas?.h})`);
 

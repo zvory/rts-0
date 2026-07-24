@@ -706,9 +706,10 @@ function nearPoint(call, point, epsilon = 0.001) {
     "selected deployed mortar draws a seamless full-circle range band without requiring facing metadata",
   );
   assert(
-    mortarRangeGfx.calls.findIndex((call) => call[0] === "cut") <
-      mortarRangeGfx.calls.findIndex((call) => call[0] === "beginFill"),
-    "the v8 hole cut is recorded on the path before the range band is filled",
+    mortarRangeGfx.calls.findIndex((call) => call[0] === "beginFill") <
+      mortarRangeGfx.calls.findIndex((call) => call[0] === "cut") &&
+      mortarRangeGfx.calls.filter((call) => call[0] === "lineStyle").length === 2,
+    "the v8 hole cut attaches to a completed fill and both annulus boundaries are stroked",
   );
 
   const workerRangeGfx = new RecordingGraphics();

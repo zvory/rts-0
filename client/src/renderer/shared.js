@@ -683,10 +683,14 @@ export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha
   const inner = Math.max(0, Math.min(innerRadius || 0, radius));
 
   if (width >= Math.PI * 2) {
-    g.circle(x, y, radius);
-    if (inner > 0) g.circle(x, y, inner).cut();
-    if (fillAlpha > 0) g.fill({ color, alpha: fillAlpha });
-    if (lineAlpha > 0) g.stroke({ width: 1.5, color, alpha: lineAlpha });
+    if (fillAlpha > 0) {
+      g.circle(x, y, radius).fill({ color, alpha: fillAlpha });
+      if (inner > 0) g.circle(x, y, inner).cut();
+    }
+    if (lineAlpha > 0) {
+      g.circle(x, y, radius).stroke({ width: 1.5, color, alpha: lineAlpha });
+      if (inner > 0) g.circle(x, y, inner).stroke({ width: 1.5, color, alpha: lineAlpha });
+    }
     return;
   }
 
