@@ -497,3 +497,58 @@ fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
         "seeing the remembered gun packed should clear Bravo's server memory"
     );
 }
+
+#[test]
+fn smoke_obscuration_does_not_clear_remembered_anti_tank_gun_intel() {
+    let mut game = empty_flat_game();
+    let scout_pos = game.state.map.tile_center(20, 20);
+    let gun_pos = game.state.map.tile_center(22, 20);
+    let smoke_pos = game.state.map.tile_center(24, 20);
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
+        .expect("Bravo scout should spawn");
+    let gun = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
+        .expect("Alpha anti-tank gun should spawn");
+    let gun_entity = game
+        .state
+        .entities
+        .get_mut(gun)
+        .expect("anti-tank gun should exist");
+    gun_entity.set_weapon_setup(WeaponSetup::Deployed);
+    gun_entity.set_emplacement_facing(Some(0.75));
+    gun_entity.set_facing(0.75);
+    gun_entity.set_weapon_facing(0.75);
+    advance_to_next_fog_refresh(&mut game);
+    assert!(
+        game.snapshot_for(2)
+            .entities
+            .iter()
+            .any(|entity| entity.id == gun),
+        "Bravo should initially see the deployed gun"
+    );
+
+    game.spawn_smoke_cloud_for_test(smoke_pos.0, smoke_pos.1)
+        .expect("smoke should spawn with the gun on its near edge");
+    assert!(
+        game.state
+            .fog
+            .is_visible_without_firing_reveal_world(2, gun_pos.0, gun_pos.1),
+        "the near smoke edge should leave terrain visibility on the gun tile"
+    );
+    let obscured = game.snapshot_for(2);
+    assert!(
+        obscured.entities.iter().all(|entity| entity.id != gun),
+        "smoke should hide the live gun"
+    );
+    assert!(
+        obscured
+            .remembered_anti_tank_guns
+            .iter()
+            .any(|memory| memory.id == gun),
+        "smoke must preserve the last observed arc instead of revealing hidden absence or movement"
+    );
+}

@@ -75,9 +75,10 @@ impl AntiTankGunMemory {
             if viewer != player_id || observed_ids.contains(&entity_id) {
                 return true;
             }
-            !team_players.iter().copied().any(|team_player| {
+            let remembered_position_visible = team_players.iter().copied().any(|team_player| {
                 fog.is_visible_without_firing_reveal_world(team_player, memory.x, memory.y)
-            })
+            });
+            !remembered_position_visible || smokes.point_inside(memory.x, memory.y)
         });
     }
 
