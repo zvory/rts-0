@@ -1,6 +1,37 @@
 use super::*;
 
 #[test]
+fn tank_trap_cluster_flag_falls_back_to_direct_attack_for_other_targets() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 160.0, 160.0)
+        .expect("tank should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Tank, 256.0, 160.0)
+        .expect("target should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::AttackTankTrapCluster {
+                units: vec![tank],
+                target,
+                queued: false,
+            },
+        )],
+    );
+
+    let Order::Attack(order) = entities.get(tank).expect("tank should survive").order() else {
+        panic!("cluster flag should preserve a direct attack on other target kinds");
+    };
+    assert_eq!(order.intent.target, target);
+    assert!(order.intent.remaining_targets.is_empty());
+}
+
+#[test]
 fn tank_trap_cluster_attack_captures_visible_traps_inside_four_tiles() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

@@ -1203,12 +1203,12 @@ fn tank_trap_cluster_targets(
     player: u32,
     anchor: u32,
 ) -> Vec<u32> {
-    let Some(anchor_entity) = entities
-        .get(anchor)
-        .filter(|entity| entity.hp > 0 && entity.is_neutral_obstacle())
-    else {
+    let Some(anchor_entity) = entities.get(anchor).filter(|entity| entity.hp > 0) else {
         return Vec::new();
     };
+    if !anchor_entity.is_neutral_obstacle() {
+        return vec![anchor];
+    }
     if !rules::projection::team_visible_world(
         player,
         anchor_entity.pos_x,
