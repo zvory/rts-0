@@ -928,7 +928,6 @@ mod tests {
             .collect();
         assert_eq!(tanks.len(), 3);
         assert_eq!(traps.len(), 10);
-
         let anchor = traps
             .iter()
             .find(|entity| entity.id == 168)
