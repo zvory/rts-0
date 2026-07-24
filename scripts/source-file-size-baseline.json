@@ -54,6 +54,11 @@
       "reason": "Existing oversized movement test module before repo-wide source-size gate."
     },
     {
+      "path": "server/crates/sim/src/game/services/order_queue.rs",
+      "lines": 1511,
+      "reason": "Concurrent artillery fire-position and Tank Trap cluster merges grew queued-order scheduling above the cap; keep ratcheting while cluster and ability queue policy move into focused modules."
+    },
+    {
       "path": "server/crates/sim/src/game/services/pathing.rs",
       "lines": 1848,
       "reason": "Game-state Phase 2 routes pathing through the DerivedState shell and exposes internal config preservation for reset; keep ratcheting until pathing diagnostics are split."
