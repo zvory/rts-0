@@ -983,9 +983,10 @@ normal death cleanup. The reserved Blanket Fire hook returns before
 command planning, so commands do not spend resources, start cooldowns, or replace artillery
 orders. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
-cooldowns, or events are applied. Artillery point fire derives the target direction from the raw click with `atan2`, locks even very
-large finite click coordinates to the issuing gun's valid 10-to-35 tile range band, stores that
-effective point, and owns any needed in-place setup or redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
+cooldowns, or events are applied. Artillery point fire preserves an in-map raw clicked center. A gun
+already inside its valid 10-to-35 tile range band owns any needed in-place setup or redeploy before
+the first shot; a gun outside that band packs up, paths to a legal staging point inside the band,
+sets up facing the stored center, and then enters the same repeating fire order. It records temporary live-fog firing reveal sources for enemy
 players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
 suppression used by other actionable firing reveals. Non-targetable Scout Planes are excluded from splash damage, projectile impacts, and Magic Anchor effects.
 The hook is deliberately not a generic script engine. Phase 11 signature abilities
@@ -1584,14 +1585,15 @@ Allocation rules:
   treat queued setup as terminal: they finish preceding orders, set up in place, and reject later
   queued stages. Mixed selections ignore non-setup-capable units for setup but keep them for later
   compatible orders.
-- Artillery Fire is a queueable, terminal per-gun fire order. Issue-time admission stores a locked
-  effective center and a radius clamped from 6 to 15 tiles, or 3 to 15 after Artillery Fire
-  Control, not merely the raw pointer gesture. Immediate
+- Artillery Fire is a queueable, terminal per-gun fire order. Issue-time admission stores the
+  clicked in-map center and a radius clamped from 6 to 15 tiles, or 3 to 15 after Artillery Fire
+  Control. Immediate
   fire commands can accept packed artillery and
-  set it up in place, or redeploy already-deployed artillery when the effective point is outside the
-  current cone. Queued fire commands lock from the active or queued future move destination when
-  available, use a preceding queued setup stage as the zero-length fallback facing, and promote into
-  the same setup/redeploy-owned fire order. Promotion and firing recheck liveness, ownership, kind,
+  set it up in place, or redeploy already-deployed artillery when the clicked center is outside the
+  current cone. If the center is outside the gun's range band, immediate or promoted fire first
+  creates an artillery movement stage to a legal firing position, preserving the clicked center and
+  terminal fire intent across movement, teardown, setup, and deployment. Queued fire evaluates from
+  the active or queued future move destination when available. Promotion and firing recheck liveness, ownership, kind,
   construction state, path state, faction ability eligibility, stored target map/range/cone
   validity, ammo, and deployment before any shell is launched.
 - Client world-view and minimap previews may temporarily combine local pending move/setup/fire
@@ -1621,9 +1623,9 @@ Examples:
   facing point. The setup stage promotes after movement and computes facing from the gun's actual
   arrived position toward the stored world point.
 - **Move then queued artillery fire.** The player orders artillery to move, then Shift-arms Point
-  Fire or Blanket Fire and clicks a target. The queued stage stores the effective fire point or
-  blanket center locked from the future move destination; when promoted, the gun sets up or
-  redeploys in place and never walks to repair range.
+  Fire or Blanket Fire and clicks a target. The queued stage stores the clicked center. When
+  promoted from the future move destination, the gun sets up/redeploys there if it is in range;
+  otherwise it continues to a legal firing position before setting up and firing.
 - **Reactive moving smoke.** A scout car already moving past cover receives an immediate Smoke
   command for an in-range point. The planner emits a noninterrupting ability execution, so the
   smoke launches without dropping the car's current move order or queued future orders.

@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn queued_artillery_point_fire_locks_from_future_move_destination() {
+fn queued_artillery_point_fire_preserves_clicked_center_after_future_move() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let pos = (320.0, 320.0);
@@ -29,21 +29,15 @@ fn queued_artillery_point_fire_locks_from_future_move_destination() {
         .move_intent()
         .expect("move command should store an authoritative future destination");
     let raw_click = (future.0 + config::TILE_SIZE as f32 * 5.0, future.1);
-    let expected_x = future.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-
     queue_point_fire(&map, &mut entities, artillery, raw_click);
 
     let point = queued_point_fire(&entities, artillery);
-    assert!(
-        (point.x - expected_x).abs() < 0.001,
-        "expected locked x {expected_x}, got {}",
-        point.x
-    );
-    assert!((point.y - future.1).abs() < 0.001);
+    assert!((point.x - raw_click.0).abs() < 0.001);
+    assert!((point.y - raw_click.1).abs() < 0.001);
 }
 
 #[test]
-fn queued_artillery_blanket_fire_locks_center_from_future_move_destination() {
+fn queued_artillery_blanket_fire_preserves_center_after_future_move() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let pos = (320.0, 320.0);
@@ -71,8 +65,6 @@ fn queued_artillery_blanket_fire_locks_center_from_future_move_destination() {
         .move_intent()
         .expect("move command should store an authoritative future destination");
     let raw_click = (future.0 + config::TILE_SIZE as f32 * 5.0, future.1);
-    let expected_x = future.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-
     apply(
         &map,
         &mut entities,
@@ -92,12 +84,8 @@ fn queued_artillery_blanket_fire_locks_center_from_future_move_destination() {
     let [OrderIntent::BlanketFire { point, .. }] = unit.queued_orders() else {
         panic!("queued Blanket Fire should be stored behind the move");
     };
-    assert!(
-        (point.x - expected_x).abs() < 0.001,
-        "expected locked center x {expected_x}, got {}",
-        point.x
-    );
-    assert!((point.y - future.1).abs() < 0.001);
+    assert!((point.x - raw_click.0).abs() < 0.001);
+    assert!((point.y - raw_click.1).abs() < 0.001);
 }
 
 #[test]
@@ -138,21 +126,15 @@ fn queued_artillery_point_fire_accepts_deployed_move_teardown() {
         .move_intent()
         .expect("move command should store an authoritative future destination");
     let raw_click = (future.0 + config::TILE_SIZE as f32 * 5.0, future.1);
-    let expected_x = future.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-
     queue_point_fire(&map, &mut entities, artillery, raw_click);
 
     let point = queued_point_fire(&entities, artillery);
-    assert!(
-        (point.x - expected_x).abs() < 0.001,
-        "expected locked x {expected_x}, got {}",
-        point.x
-    );
-    assert!((point.y - future.1).abs() < 0.001);
+    assert!((point.x - raw_click.0).abs() < 0.001);
+    assert!((point.y - raw_click.1).abs() < 0.001);
 }
 
 #[test]
-fn queued_artillery_point_fire_zero_click_uses_planned_setup_facing() {
+fn queued_artillery_point_fire_at_future_origin_preserves_clicked_center() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let pos = (320.0, 320.0);
@@ -180,8 +162,6 @@ fn queued_artillery_point_fire_zero_click_uses_planned_setup_facing() {
         .move_intent()
         .expect("move command should store an authoritative future destination");
     let setup_face = (future.0, future.1 + config::TILE_SIZE as f32 * 10.0);
-    let expected_y = future.1 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-
     apply(
         &map,
         &mut entities,
@@ -217,7 +197,7 @@ fn queued_artillery_point_fire_zero_click_uses_planned_setup_facing() {
         );
     };
     assert!((point.x - future.0).abs() < 0.001);
-    assert!((point.y - expected_y).abs() < 0.001);
+    assert!((point.y - future.1).abs() < 0.001);
 }
 
 fn queue_point_fire(map: &Map, entities: &mut EntityStore, artillery: u32, raw_click: (f32, f32)) {

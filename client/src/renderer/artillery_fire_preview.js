@@ -28,7 +28,27 @@ export function drawArtilleryFireTargetPreview(g, preview, map) {
   const targetColor = preview.hoverInRange ? COLORS.selectOwn : COLORS.selectNeutral;
   for (const lock of locks) {
     if (!finiteNumber(lock.x) || !finiteNumber(lock.y)) continue;
-    if (lock.needsRedeploy && finiteNumber(lock.originX) && finiteNumber(lock.originY)) {
+    if (lock.needsMove &&
+        finiteNumber(lock.moveFromX) &&
+        finiteNumber(lock.moveFromY) &&
+        finiteNumber(lock.originX) &&
+        finiteNumber(lock.originY)) {
+      dashedLine(
+        g,
+        lock.moveFromX,
+        lock.moveFromY,
+        lock.originX,
+        lock.originY,
+        10,
+        7,
+        2,
+        0xffd15c,
+        0.8,
+      );
+    }
+    if ((lock.needsMove || lock.needsRedeploy) &&
+        finiteNumber(lock.originX) &&
+        finiteNumber(lock.originY)) {
       drawFacingWedge(
         g,
         lock.originX,
@@ -41,13 +61,6 @@ export function drawArtilleryFireTargetPreview(g, preview, map) {
         0.38,
         lock.minRangePx || weapon.minRadius,
       );
-    }
-    if (
-      finiteNumber(lock.rawX) &&
-      finiteNumber(lock.rawY) &&
-      Math.hypot(lock.rawX - lock.x, lock.rawY - lock.y) > 1
-    ) {
-      dashedLine(g, lock.rawX, lock.rawY, lock.x, lock.y, 8, 6, 1.5, 0xffd15c, 0.48);
     }
     drawLockedArtilleryTarget(
       g,

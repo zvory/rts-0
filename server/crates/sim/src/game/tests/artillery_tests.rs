@@ -450,7 +450,7 @@ fn manually_deployed_artillery_can_point_fire() {
 }
 
 #[test]
-fn artillery_point_fire_inside_minimum_range_locks_to_range_floor() {
+fn artillery_point_fire_inside_minimum_range_repositions_and_fires_at_clicked_point() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let initial_steel = game.state.players[0].steel;
@@ -475,26 +475,122 @@ fn artillery_point_fire_inside_minimum_range_locks_to_range_floor() {
         },
     );
     let events = game.tick();
-
-    assert_eq!(
-        game.state.players[0].steel,
-        initial_steel - config::ARTILLERY_AMMO_COST_STEEL
-    );
     let entity = game
         .state
         .entities
         .get(artillery)
         .expect("artillery exists");
-    let Order::ArtilleryPointFire(order) = entity.order() else {
-        panic!("minimum-range click should be accepted as point fire");
-    };
-    assert!((order.intent.x - (pos.0 + min_px)).abs() < 0.001);
-    assert!((order.intent.y - pos.1).abs() < 0.001);
+    assert!(matches!(entity.order(), Order::Ability(_)));
+    assert_eq!(game.state.players[0].steel, initial_steel);
     assert!(
-        events.iter().flat_map(|(_, events)| events).any(
-            |event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)
-        ),
-        "minimum-range locking should fire at the stored effective point"
+        events
+            .iter()
+            .flat_map(|(_, events)| events)
+            .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
+        "repositioning artillery should not fire before it reaches a legal firing position"
+    );
+
+    let mut fired = false;
+    for _ in 0..1200 {
+        for (pid, events) in game.tick() {
+            fired |= pid == 1
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery));
+        }
+        if fired {
+            break;
+        }
+    }
+    let entity = game
+        .state
+        .entities
+        .get(artillery)
+        .expect("artillery exists");
+    assert!(
+        (entity.pos_x - pos.0).hypot(entity.pos_y - pos.1) > 1.0,
+        "artillery should move out of its minimum range before setting up"
+    );
+    assert!(
+        fired,
+        "artillery should eventually fire at the clicked point; pos=({}, {}), order={:?}, setup={:?}, queued={:?}",
+        entity.pos_x,
+        entity.pos_y,
+        entity.order(),
+        entity.weapon_setup(),
+        entity.queued_orders(),
+    );
+    let Order::ArtilleryPointFire(order) = entity.order() else {
+        panic!("artillery should retain its repeating point-fire order");
+    };
+    assert!((order.intent.x - too_close.0).abs() < 0.001);
+    assert!((order.intent.y - too_close.1).abs() < 0.001);
+    assert!(game.state.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL);
+}
+
+#[test]
+fn artillery_point_fire_beyond_maximum_range_moves_sets_up_and_fires_at_clicked_point() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(55, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+    assert!(matches!(
+        game.state
+            .entities
+            .get(artillery)
+            .expect("artillery exists")
+            .order(),
+        Order::Ability(_)
+    ));
+
+    let mut fired = false;
+    for _ in 0..1600 {
+        for (pid, events) in game.tick() {
+            fired |= pid == 1
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery));
+        }
+        if fired {
+            break;
+        }
+    }
+
+    let entity = game
+        .state
+        .entities
+        .get(artillery)
+        .expect("artillery exists");
+    let distance_to_target = (entity.pos_x - target.0).hypot(entity.pos_y - target.1);
+    let min_range = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let max_range = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    assert!(distance_to_target >= min_range && distance_to_target <= max_range);
+    assert!(matches!(entity.weapon_setup(), WeaponSetup::Deployed));
+    let Order::ArtilleryPointFire(order) = entity.order() else {
+        panic!("artillery should retain its repeating point-fire order");
+    };
+    assert!((order.intent.x - target.0).abs() < 0.001);
+    assert!((order.intent.y - target.1).abs() < 0.001);
+    assert!(
+        fired,
+        "artillery should eventually fire at the clicked point"
     );
 }
 
