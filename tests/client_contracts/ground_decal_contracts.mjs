@@ -10,6 +10,7 @@ import {
   groundDecalClassForImpactEvent,
   normalizeGroundDecalEvent,
 } from "../../client/src/state_ground_decals.js";
+import { VisualEffectBuffers } from "../../client/src/state_visual_effects.js";
 import { stampGroundDecal } from "../../client/src/renderer/decals.js";
 import { EVENT, KIND } from "../../client/src/protocol.js";
 
@@ -119,6 +120,22 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
   assert(artillery.decalClass === GROUND_DECAL_CLASS.ARTILLERY_BLAST, "artillery impact normalizes to an artillery decal");
   assert(artillery.kind === KIND.ARTILLERY, "artillery impact uses only its public event type for artwork selection");
   assert(artillery.radiusWorld === 120, "artillery impact converts its authoritative radius with the map tile size");
+  const artilleryFallback = normalizeGroundDecalEvent(
+    { e: EVENT.ARTILLERY_IMPACT, x: 288, y: 192 },
+    { tick: 42, eventIndex: 4, tileSize: 40 },
+  );
+  assert(
+    artilleryFallback.radiusTiles === 2 && artilleryFallback.radiusWorld === 80,
+    "artillery impact fallback mirrors the current authoritative outer radius",
+  );
+  const visualEffects = new VisualEffectBuffers();
+  visualEffects.addArtilleryTarget({ x: 288, y: 192 }, 900);
+  visualEffects.addArtilleryImpact({ x: 288, y: 192 }, 1000);
+  assert(
+    visualEffects.artilleryTargets[0].radiusTiles === 2 &&
+      visualEffects.artilleryImpacts[0].radiusTiles === 2,
+    "artillery target and impact visual fallbacks mirror the current authoritative outer radius",
+  );
   assert(
     mortar.seed === normalizeGroundDecalEvent(
       { e: EVENT.MORTAR_IMPACT, x: 160, y: 224, radiusTiles: 1.5 },
@@ -263,7 +280,7 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
   });
   const impacts = [
     { e: EVENT.MORTAR_IMPACT, x: 64, y: 96, radiusTiles: 1.5 },
-    { e: EVENT.ARTILLERY_IMPACT, x: 128, y: 128, radiusTiles: 3 },
+    { e: EVENT.ARTILLERY_IMPACT, x: 128, y: 128, radiusTiles: 2 },
   ];
   state.applySnapshot({
     tick: 2,
@@ -277,7 +294,7 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
   const decals = state.consumePendingGroundDecals();
   assert(decals.length === 2, "GameState queues only the fog-filtered impact events it received");
   assert(decals[0].radiusWorld === 48, "GameState supplies its map tile size to mortar decal normalization");
-  assert(decals[1].radiusWorld === 96, "GameState supplies its map tile size to artillery decal normalization");
+  assert(decals[1].radiusWorld === 64, "GameState supplies its map tile size to artillery decal normalization");
   state.applySnapshot({
     tick: 2,
     steel: 0,
