@@ -413,7 +413,7 @@ fn pop_next_valid_intent(
             }
             OrderIntent::Attack(attack) => {
                 let mut targets = std::iter::once(attack.target)
-                    .chain(attack.remaining_targets.into_iter())
+                    .chain(attack.remaining_targets)
                     .filter(|target| {
                         attack_intent_valid(entities, teams, fog, Some(smokes), owner, id, *target)
                     })
