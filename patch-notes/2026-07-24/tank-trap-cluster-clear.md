@@ -6,7 +6,7 @@ _2026-07-24_
 
 ## Changes
 
-- Attack a Tank Trap to clear visible completed traps within 4 tiles in sequence; the full cluster is previewed before issuing the order.
+- Explicitly attack a Tank Trap to clear visible completed traps within 4 tiles in sequence; the cluster is previewed before issuing the order.
 - Idle units no longer automatically attack neutral Tank Traps.
 
 ## Playtest watch
