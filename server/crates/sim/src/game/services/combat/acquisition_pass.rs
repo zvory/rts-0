@@ -1,4 +1,4 @@
-use crate::game::entity::{Entity, EntityStore, Order};
+use crate::game::entity::{EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
@@ -15,7 +15,6 @@ pub(super) fn acquire(
     entities: &EntityStore,
     blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
-    occ: &crate::game::services::occupancy::Occupancy,
     spatial: &crate::game::services::spatial::SpatialIndex,
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
     fog: &Fog,
@@ -33,9 +32,6 @@ pub(super) fn acquire(
     require_safe_mortar_target: bool,
     tick: u32,
 ) -> Option<u32> {
-    let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-        occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
-    };
     resolve_target(
         map,
         entities,
@@ -45,7 +41,6 @@ pub(super) fn acquire(
         los,
         fog,
         smokes,
-        &tank_trap_obstructs_vehicle_route,
         id,
         owner,
         px,
@@ -76,7 +71,6 @@ pub(super) fn select(
     entities: &EntityStore,
     blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
-    occ: &crate::game::services::occupancy::Occupancy,
     spatial: &crate::game::services::spatial::SpatialIndex,
     los: &crate::game::services::line_of_sight::LineOfSight<'_>,
     fog: &Fog,
@@ -133,7 +127,6 @@ pub(super) fn select(
         py,
         acquire_px,
         mode,
-        can_move_fire,
         range_px,
         ready,
         &target_filter,
@@ -146,7 +139,6 @@ pub(super) fn select(
         entities,
         blockers,
         teams,
-        occ,
         spatial,
         los,
         fog,
@@ -181,7 +173,6 @@ fn retained_target(
     py: f32,
     acquire_px: f32,
     mode: CombatMode,
-    attacker_can_fire_while_moving: bool,
     weapon_range_px: f32,
     require_weapon_range: bool,
     target_filter: &dyn Fn(u32) -> bool,
@@ -233,8 +224,6 @@ fn retained_target(
         py,
         acquire_px,
         weapon_range_px,
-        attacker.kind,
-        attacker_can_fire_while_moving,
         target,
     )?;
     if ((require_weapon_range || mode == CombatMode::Opportunistic) && !legality.in_weapon_range)

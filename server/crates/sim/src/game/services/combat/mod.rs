@@ -7,8 +7,6 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
-#[cfg(test)]
-use crate::game::entity::Entity;
 use crate::game::entity::{AttackPhase, EntityKind, EntityStore, Order};
 use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
@@ -19,7 +17,6 @@ use crate::game::panzerfaust_shot::PanzerfaustShotStore;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
@@ -43,7 +40,7 @@ mod weapons;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-use acquisition::{combat_mode, resolve_target as resolve_target_with_obstruction};
+use acquisition::{combat_mode, resolve_target as resolve_target_for_test};
 use acquisition::{combat_mode_with_moving_fire, CombatMode};
 use damage::apply_damage;
 use shot_blocker_index::ShotBlockerIndex;
@@ -73,16 +70,12 @@ fn resolve_target(
     acquire_px: f32,
     mode: CombatMode,
 ) -> Option<u32> {
-    let occ = Occupancy::build(map, entities);
     let blockers = ShotBlockerIndex::build(map, entities);
-    let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-        occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
-    };
     let attacker_can_fire_while_moving = entities
         .get(self_id)
         .map(|e| can_fire_while_moving(e, false))
         .unwrap_or(false);
-    resolve_target_with_obstruction(
+    resolve_target_for_test(
         map,
         entities,
         &blockers,
@@ -91,7 +84,6 @@ fn resolve_target(
         los,
         fog,
         smokes,
-        &tank_trap_obstructs_vehicle_route,
         self_id,
         owner,
         px,
@@ -119,7 +111,6 @@ pub(in crate::game) fn combat_system(
     teams: &TeamRelations,
     mortar_autocast_researched: &dyn Fn(u32) -> bool,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
-    occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
@@ -159,7 +150,6 @@ pub(in crate::game) fn combat_system(
             &blockers,
             teams,
             methamphetamines_researched,
-            occ,
             spatial,
             &mut |entities, attacker, target, min_range_px, max_range_px| {
                 coordinator.request_direct_attack_path(
@@ -266,7 +256,6 @@ pub(in crate::game) fn combat_system(
             entities,
             &blockers,
             teams,
-            occ,
             spatial,
             &los,
             fog,
@@ -534,7 +523,6 @@ pub(in crate::game) fn combat_system(
                     entities,
                     &blockers,
                     teams,
-                    occ,
                     spatial,
                     &los,
                     fog,

@@ -102,7 +102,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   order: descriptor("Issue one normal authoritative game command as a selected player.", "{sessionId:string,playerId:u32,command:game-command,ignoreCommandLimits?:boolean}", {
     sceneMutation: true,
-    variants: ["move|formationMove|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|adjustProductionRepeat|research|cancel|stop|holdPosition|setRally", "formationMove {c,units,points:[{x,y}],attackMove?,queued?} accepts 2-64 finite world-space points", "adjustProductionRepeat {c,buildings,unit,delta:-1|1} changes auto-build on one of 1-100 producers", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
+    variants: ["move|formationMove|attackMove|attack|deconstruct|setupAntiTankGuns|tearDownAntiTankGuns|charge|useAbility|recastAbility|setAutocast|gather|build|train|adjustProductionRepeat|research|cancel|stop|holdPosition|setRally", "attack {c,units,target,tankTrapCluster?:boolean,queued?} may capture one visible Tank Trap cluster", "formationMove {c,units,points:[{x,y}],attackMove?,queued?} accepts 2-64 finite world-space points", "adjustProductionRepeat {c,buildings,unit,delta:-1|1} changes auto-build on one of 1-100 producers", "success reports authoritative enqueue admission and queuedAtTick, not effect completion"],
     defaults: ["ignoreCommandLimits=false", "queued omitted unless supplied by the command variant"], bounds: ["1-100 entity references", "command bridge JSON <=16 KiB"],
     example: { sessionId: "<lab-session-id>", playerId: 1, command: { c: "move", units: ["subject"], x: 1100, y: 960 } },
   }),

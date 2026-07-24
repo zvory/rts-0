@@ -909,6 +909,53 @@ mod tests {
     }
 
     #[test]
+    fn tank_trap_cluster_clear_scenario_preserves_radius_controls() {
+        let loaded = load_lab_scenario_by_id("tank-trap-cluster-clear")
+            .expect("bundled Tank Trap cluster scenario should load");
+        let game = loaded
+            .build_game()
+            .expect("Tank Trap cluster scenario should restore through Lab APIs");
+        let snapshot = game.snapshot_full_for(1);
+        let tanks: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == "tank" && entity.owner == 1)
+            .collect();
+        let traps: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == "tank_trap" && entity.owner == 0)
+            .collect();
+        assert_eq!(tanks.len(), 3);
+        assert_eq!(traps.len(), 10);
+        let anchor = traps
+            .iter()
+            .find(|entity| entity.id == 168)
+            .expect("scenario anchor Tank Trap");
+        let radius = rts_rules::balance::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES
+            * rts_rules::balance::TILE_SIZE as f32;
+        let in_radius = traps
+            .iter()
+            .filter(|entity| {
+                let dx = entity.x - anchor.x;
+                let dy = entity.y - anchor.y;
+                dx * dx + dy * dy <= radius * radius
+            })
+            .count();
+        assert_eq!(in_radius, 8);
+        assert_eq!(traps.len() - in_radius, 2);
+
+        let lab = lab_scenario_payload_lab_metadata(&loaded.scenario);
+        assert_eq!(
+            lab.initial_camera,
+            Some(InitialCamera {
+                center_x: 800,
+                center_y: 624,
+            })
+        );
+    }
+
+    #[test]
     fn render_preview_anti_tank_guns_emit_attack_events() {
         let loaded = load_lab_scenario_by_id("render-preview")
             .expect("bundled render-preview scenario should load");

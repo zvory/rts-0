@@ -260,7 +260,7 @@ currently inside weapon range and pass hostile, visibility, smoke, line-of-sight
 checks, but it cannot replace the commanded destination with an enemy-directed path. Non-moving-fire
 `AttackMove` units pause for fireable in-range targets and then resume the original destination.
 Direct `Attack` orders and post-arrival behavior remain stationary. Tank auto-targeting first checks
-in-range Anti-Tank Guns, Tanks, Tank Traps, and Mortar Teams, in that order, before generic
+in-range Anti-Tank Guns, Tanks, and Mortar Teams, in that order, before generic
 acquisition. This priority applies when the tank acquires after firing or when its committed target
 stops being fireable; a still-fireable target prepared during reload is not reranked on the ready
 tick. Priority never considers out-of-range targets or overrides explicit player attack orders.
@@ -272,17 +272,17 @@ Default auto-acquisition groups already-legal targets before applying weapon fit
 unit attackers prefer non-economy combat units, then economy workers (`Worker` and `Golem`),
 then buildings and other non-unit cleanup targets. Small-arms default weapons prefer soft targets
 (`ArmorClass::Small`) over armored targets within the same target group, but they
-still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
-units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
+still fire at armor or buildings when no better legal target exists. Completed Tank Traps are
+excluded from automatic acquisition for every unit and weapon, including ground Attack Move and
+route obstruction; only a direct Attack on a Tank Trap may target it. That explicit command captures
+the visible completed Tank Trap cluster within 4 tiles, while vehicle pathfinding continues routing
+around the obstacles. Anti-armor default weapons
 prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
 auto-acquire or accept direct Attack orders against infantry-sized targets: Workers, Golems,
 Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons and other non-infantry targets
 remain legal. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
-Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
-the unit's current short route window or helps close a vehicle-body gap across that route; nearby
-irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
 `EntityKind`, including the Tank coax infantry-priority group. The live coax policy ranks Riflemen
 and Machine Gunners first, economy workers (`Worker` and `Golem`) second, and fallback legal
@@ -587,7 +587,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a City Centre and Training Centre |
-| tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
+| tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | pump_jack                  | Pump Jack          | 50  | 1     | 50 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed City Centre/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and

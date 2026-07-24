@@ -1,7 +1,4 @@
-use crate::game::entity::{
-    movement_body_class, Entity, EntityKind, EntityStore, MovePhase, MovementBodyClass, Order,
-    WeaponSetup,
-};
+use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -79,7 +76,6 @@ pub(super) fn resolve_target(
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
-    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -106,7 +102,6 @@ pub(super) fn resolve_target(
         los,
         fog,
         smokes,
-        tank_trap_obstructs_vehicle_route,
         self_id,
         owner,
         px,
@@ -133,7 +128,6 @@ pub(super) fn resolve_target_for_weapon(
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
-    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -180,8 +174,6 @@ pub(super) fn resolve_target_for_weapon(
         policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };
-    let attacker_is_vehicle_body =
-        movement_body_class(attacker.kind) == MovementBodyClass::VehicleBody;
     let candidates = legal_target_candidates(
         map,
         entities,
@@ -197,10 +189,6 @@ pub(super) fn resolve_target_for_weapon(
         py,
         acquire_px,
         weapon_range_px,
-        &context,
-        attacker.kind,
-        attacker_is_vehicle_body,
-        tank_trap_obstructs_vehicle_route,
         attacker.target_id(),
     );
     if mode_requires_currently_fireable_targets(mode)
@@ -250,23 +238,20 @@ fn legal_target_candidates(
     py: f32,
     acquire_px: f32,
     weapon_range_px: f32,
-    context: &AttackPriorityContext,
-    attacker_kind: EntityKind,
-    attacker_is_vehicle_body: bool,
-    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     retained_target_id: Option<u32>,
 ) -> Vec<TargetCandidate> {
     let mut candidates = Vec::new();
-    let attacker = entities.get(self_id);
     for id in spatial.ids_in_circle_bbox(px, py, acquire_px) {
         let Some(target) = entities.get(id) else {
             continue;
         };
+        if target.is_neutral_obstacle() {
+            continue;
+        }
         // Retained target status is only a ranker fact. It must still pass the
         // same hostile, visible, smoke, LOS, and blocker checks as any other
         // auto-acquired candidate.
         let retained_target = retained_target_id == Some(id);
-        let retained_moving_fire_target = context.can_retain_moving_target && retained_target;
         let Some(legality) = auto_target_legality(
             map,
             entities,
@@ -281,20 +266,10 @@ fn legal_target_candidates(
             py,
             acquire_px,
             weapon_range_px,
-            attacker_kind,
-            retained_moving_fire_target,
             target,
         ) else {
             continue;
         };
-        let tank_trap_obstructs_vehicle_route =
-            if target.kind == EntityKind::TankTrap && attacker_is_vehicle_body {
-                attacker
-                    .map(|attacker| tank_trap_obstructs_vehicle_route(attacker, target))
-                    .unwrap_or(false)
-            } else {
-                false
-            };
         candidates.push(TargetCandidate {
             id,
             owner: target.owner,
@@ -303,7 +278,6 @@ fn legal_target_candidates(
             distance_sq: legality.distance_sq,
             facts: target_rules::target_facts(target.kind),
             in_weapon_range: legality.in_weapon_range,
-            tank_trap_obstructs_vehicle_route,
             retained_target,
         });
     }
