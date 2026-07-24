@@ -103,6 +103,32 @@ fn deployed_anti_tank_gun_does_not_turn_or_fire_at_target_outside_arc() {
 }
 
 #[test]
+fn deployed_anti_tank_gun_rotation_rejects_target_outside_fixed_arc() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let at = entities.get_mut(at_id).expect("anti-tank gun should exist");
+    at.set_weapon_setup(WeaponSetup::Deployed);
+    at.set_emplacement_facing(Some(0.0));
+    at.set_facing(0.0);
+    at.set_weapon_facing(0.0);
+
+    assert!(
+        !rotate_anti_tank_gun_for_combat(at, std::f32::consts::FRAC_PI_2),
+        "a target outside the fixed field must not become fireable"
+    );
+    assert!(
+        at.facing().abs() <= f32::EPSILON,
+        "an out-of-cone target must not rotate the gun body"
+    );
+    assert!(
+        at.weapon_facing().unwrap_or_default().abs() <= f32::EPSILON,
+        "an out-of-cone target must not rotate the gun barrel"
+    );
+}
+
+#[test]
 fn support_weapon_redeploy_rotates_after_teardown_completes() {
     for (kind, setup_ticks, teardown_ticks, label) in [
         (

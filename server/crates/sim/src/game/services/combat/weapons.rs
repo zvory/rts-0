@@ -74,11 +74,10 @@ pub(super) fn mirror_weapon_to_body(e: &mut Entity, angle: f32) {
 }
 
 pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
-    if !target_angle.is_finite() {
+    if !target_angle.is_finite() || !anti_tank_gun_target_inside_field_of_fire(e, target_angle) {
         return false;
     }
-    let desired = deployed_anti_tank_gun_desired_facing(e, target_angle);
-    e.set_desired_weapon_facing(desired);
+    e.set_desired_weapon_facing(target_angle);
     let current = e
         .weapon_facing()
         .filter(|facing| facing.is_finite())
@@ -90,15 +89,14 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
                 0.0
             }
         });
-    let rotated = rotate_toward(current, desired, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, target_angle, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     } else {
         return false;
     }
-    anti_tank_gun_target_inside_field_of_fire(e, target_angle)
-        && angle_delta(rotated, target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
+    angle_delta(rotated, target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
 }
 
 pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
@@ -271,22 +269,6 @@ pub(super) fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle
 /// Automatic retention only constrains deployed anti-tank guns to their fixed firing field.
 pub(super) fn auto_retention_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
     e.kind != EntityKind::AntiTankGun || anti_tank_gun_target_inside_field_of_fire(e, target_angle)
-}
-
-fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
-    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
-        return target_angle;
-    }
-    let Some(center) = anti_tank_gun_field_center(e) else {
-        return target_angle;
-    };
-    let half = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
-    let delta = angle_delta(center, target_angle);
-    if delta.abs() <= half {
-        target_angle
-    } else {
-        center + delta.signum() * half
-    }
 }
 
 pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
