@@ -438,11 +438,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
     let scenarios = [
         Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_direct_reverse_order_scenario(EntityKind::Tank, 1, 0x5150_030d),
-        Game::new_scout_car_open_ground_l_path_scenario(
-            EntityKind::ScoutCar,
-            1,
-            0x5150_030d,
-        ),
+        Game::new_scout_car_open_ground_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_030d),
         Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
         Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
