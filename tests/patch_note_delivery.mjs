@@ -6,6 +6,7 @@ import fs from "node:fs";
 import {
   DELIVERY_STATUS_CONTEXT,
   deliverMergedPullRequest,
+  parseCliArgs,
   postDiscordWithRetry,
   run,
 } from "../scripts/deliver-merged-patch-notes.mjs";
@@ -18,6 +19,7 @@ assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}
 assert.match(workflow, /persist-credentials: false/);
 assert.match(workflow, /statuses: write/);
 assert.match(workflow, /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: \$\{\{ secrets\.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL \}\}/);
+assert.match(workflow, /\[ "\$REQUESTED_PR_NUMBER" != "0" \]/, "an omitted numeric dispatch input must reconcile recent merges");
 assert.doesNotMatch(workflow, /\bcodex\b|\bopenai\b/i, "delivery workflow must never invoke an LLM");
 
 const waiter = fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8");
@@ -78,6 +80,15 @@ function mergedPull(number = 17) {
   };
 }
 
+assert.deepEqual(parseCliArgs(["--pr", "17"]), { pullNumber: 17 });
+for (const args of [["--pr"], ["--pr", ""], ["--pr", "nope"], ["--pr", "0"], ["--pr", "-1"]]) {
+  assert.throws(
+    () => parseCliArgs(args),
+    /--pr requires a positive integer/,
+    `invalid explicit selection ${JSON.stringify(args)} must not fall back to broad reconciliation`,
+  );
+}
+
 {
   const { api, calls } = fixtureApi();
   const delivered = [];
@@ -125,15 +136,44 @@ function mergedPull(number = 17) {
 
 {
   const merged = mergedPull(21);
+  const olderMerged = {
+    ...mergedPull(20),
+    merged_at: "2026-07-23T12:00:00Z",
+  };
   const open = { ...mergedPull(22), merged_at: null };
   const { api } = fixtureApi({
-    pulls: [open, merged],
+    pulls: [open, merged, olderMerged],
     files: [],
   });
   const logs = [];
   const results = await run({ api, eventPath: "", log: (line) => logs.push(line) });
-  assert.deepEqual(results.map((result) => result.number), [21]);
-  assert.match(logs[0], /PR #21 no-note/);
+  assert.deepEqual(results.map((result) => result.number), [20, 21]);
+  assert.match(logs[0], /PR #20 no-note/);
+}
+
+{
+  const pulls = [mergedPull(30), mergedPull(31)];
+  const attempted = [];
+  const api = async (pathname, options = {}) => {
+    if (pathname.startsWith("/pulls?")) return pulls;
+    const number = Number(pathname.match(/^\/pulls\/(\d+)\/files/)?.[1]);
+    if (number) {
+      attempted.push(number);
+      if (number === 30) throw new Error("fixture failure");
+      return [];
+    }
+    if (pathname.startsWith("/commits/") && pathname.includes("/status?")) return { statuses: [] };
+    if (pathname.startsWith("/statuses/") && options.method === "POST") return {};
+    throw new Error(`unexpected API call ${pathname}`);
+  };
+  const logs = [];
+  await assert.rejects(
+    run({ api, eventPath: "", log: (line) => logs.push(line) }),
+    /1 patch-note reconciliation failure/,
+  );
+  assert.deepEqual(attempted, [30, 31], "one bad PR must not starve later reconciliation candidates");
+  assert.match(logs[0], /PR #30 failed: fixture failure/);
+  assert.match(logs[1], /PR #31 no-note/);
 }
 
 {

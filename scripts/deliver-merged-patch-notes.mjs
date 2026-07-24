@@ -186,18 +186,22 @@ export async function deliverMergedPullRequest({
   return { status: "sent", number: pull.number, path: fragment.filename };
 }
 
-function parseCliArgs(argv) {
+export function parseCliArgs(argv) {
   let pullNumber = 0;
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--pr") {
-      pullNumber = Number(argv[index + 1]);
+      const value = argv[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        throw new Error("--pr requires a positive integer");
+      }
+      pullNumber = Number(value);
+      if (!Number.isInteger(pullNumber) || pullNumber <= 0) {
+        throw new Error("--pr requires a positive integer");
+      }
       index += 1;
     } else {
       throw new Error(`unknown argument: ${argv[index]}`);
     }
-  }
-  if (pullNumber && (!Number.isInteger(pullNumber) || pullNumber <= 0)) {
-    throw new Error("--pr requires a positive integer");
   }
   return { pullNumber };
 }
@@ -213,7 +217,9 @@ async function pullsToReconcile(api, explicitNumber, eventPath) {
   const eventPull = eventPullRequest(eventPath);
   if (eventPull) return [eventPull];
   const closed = await api(`/pulls?state=closed&sort=updated&direction=desc&per_page=${DEFAULT_RECONCILIATION_LIMIT}`);
-  return closed.filter((pull) => pull?.merged_at);
+  return closed
+    .filter((pull) => pull?.merged_at)
+    .sort((left, right) => Date.parse(left.merged_at) - Date.parse(right.merged_at));
 }
 
 export async function run({
@@ -224,12 +230,23 @@ export async function run({
   postDiscord,
   webhookUrl,
 } = {}) {
+  const isTargetedRun = explicitNumber > 0 || Boolean(eventPullRequest(eventPath));
   const pulls = await pullsToReconcile(api, explicitNumber, eventPath);
   const results = [];
+  const failures = [];
   for (const pull of pulls) {
-    const result = await deliverMergedPullRequest({ api, postDiscord, pull, webhookUrl });
-    results.push(result);
-    log(`patch-note-delivery: PR #${pull.number} ${result.status}${result.path ? ` (${result.path})` : ""}`);
+    try {
+      const result = await deliverMergedPullRequest({ api, postDiscord, pull, webhookUrl });
+      results.push(result);
+      log(`patch-note-delivery: PR #${pull.number} ${result.status}${result.path ? ` (${result.path})` : ""}`);
+    } catch (error) {
+      failures.push(error);
+      log(`patch-note-delivery: PR #${pull.number} failed: ${error.message}`);
+      if (isTargetedRun) throw error;
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `${failures.length} patch-note reconciliation failure(s)`);
   }
   return results;
 }

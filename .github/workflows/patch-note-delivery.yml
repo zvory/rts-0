@@ -49,7 +49,7 @@ jobs:
         shell: bash
         run: |
           args=()
-          if [ -n "${REQUESTED_PR_NUMBER:-}" ]; then
+          if [ -n "${REQUESTED_PR_NUMBER:-}" ] && [ "$REQUESTED_PR_NUMBER" != "0" ]; then
             args+=(--pr "$REQUESTED_PR_NUMBER")
           fi
           node scripts/deliver-merged-patch-notes.mjs "${args[@]}"
