@@ -64,6 +64,7 @@ use self::guards::{
     unit_can_accept_stop_command, CommandAdmissionPolicy,
 };
 use self::planner_facts::{
+    ability_from_planner, ability_to_planner, build_kind_code, build_kind_from_code,
     entity_order_intent_from_planner, issue_mode, planner_config, planner_facts, AbilityFactInput,
 };
 struct CommandExecutionContext<'a, 'pathing> {
@@ -299,6 +300,35 @@ pub(in crate::game) fn apply_commands(
                     mode: issue_mode(queued),
                     order: planner::RequestedOrder::AttackTarget {
                         target,
+                        target_valid,
+                    },
+                };
+                apply_planned!(
+                    player,
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
+                );
+            }
+            SimCommand::AttackTankTrapCluster {
+                units,
+                target,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                let targets =
+                    tank_trap_cluster_targets(entities, &teams, fog, smokes, player, target);
+                let target_valid = !targets.is_empty()
+                    && attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::AttackCluster {
+                        targets,
                         target_valid,
                     },
                 };
@@ -854,6 +884,20 @@ mod planned_actions {
                             coordinator.order_attack(entities, unit, target);
                         }
                     }
+                    planner::OrderIntent::AttackCluster(targets) => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            let targets = attack_cluster_targets_for_unit(
+                                entities, teams, fog, smokes, player, unit, &targets,
+                            );
+                            if !targets.is_empty() {
+                                if let Some(e) = entities.get_mut(unit) {
+                                    e.clear_queued_orders();
+                                }
+                                clear_staged_anti_tank_gun_setup(entities, &[unit]);
+                                coordinator.order_attack_cluster(entities, unit, targets);
+                            }
+                        }
+                    }
                     planner::OrderIntent::Gather(node) => {
                         if gather_unit_can_use_node(entities, players, player, unit, node) {
                             if let Some(e) = entities.get_mut(unit) {
@@ -916,6 +960,7 @@ mod planned_actions {
                             order_artillery_point_fire(
                                 map,
                                 entities,
+                                coordinator,
                                 players,
                                 teams,
                                 fog,
@@ -1063,6 +1108,7 @@ mod planned_actions {
                                 order_artillery_point_fire(
                                     map,
                                     entities,
+                                    coordinator,
                                     players,
                                     teams,
                                     fog,
@@ -1152,6 +1198,88 @@ fn attack_target_valid(
     })
 }
 
+fn tank_trap_cluster_targets(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    anchor: u32,
+) -> Vec<u32> {
+    let Some(anchor_entity) = entities.get(anchor).filter(|entity| entity.hp > 0) else {
+        return Vec::new();
+    };
+    if !anchor_entity.is_neutral_obstacle() {
+        return vec![anchor];
+    }
+    if !rules::projection::team_visible_world(
+        player,
+        anchor_entity.pos_x,
+        anchor_entity.pos_y,
+        fog,
+        teams,
+    ) || smokes.point_inside(anchor_entity.pos_x, anchor_entity.pos_y)
+    {
+        return Vec::new();
+    }
+
+    let center = (anchor_entity.pos_x, anchor_entity.pos_y);
+    let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
+    let radius_sq = radius * radius;
+    let mut targets: Vec<(u32, f32)> = entities
+        .iter()
+        .filter(|entity| entity.hp > 0 && entity.is_neutral_obstacle())
+        .filter_map(|entity| {
+            let dx = entity.pos_x - center.0;
+            let dy = entity.pos_y - center.1;
+            let distance_sq = dx * dx + dy * dy;
+            (distance_sq <= radius_sq
+                && rules::projection::team_visible_world(
+                    player,
+                    entity.pos_x,
+                    entity.pos_y,
+                    fog,
+                    teams,
+                )
+                && !smokes.point_inside(entity.pos_x, entity.pos_y))
+            .then_some((entity.id, distance_sq))
+        })
+        .collect();
+    targets.sort_by(|a, b| {
+        (a.0 != anchor)
+            .cmp(&(b.0 != anchor))
+            .then_with(|| a.1.total_cmp(&b.1))
+            .then_with(|| a.0.cmp(&b.0))
+    });
+    targets.into_iter().map(|(id, _)| id).collect()
+}
+
+fn attack_cluster_targets_for_unit(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    unit: u32,
+    targets: &[u32],
+) -> Vec<u32> {
+    targets
+        .iter()
+        .copied()
+        .filter(|target| {
+            world_query::unit_explicit_attack_target_valid(
+                entities,
+                teams,
+                fog,
+                Some(smokes),
+                player,
+                unit,
+                *target,
+            )
+        })
+        .collect()
+}
+
 fn deconstruct_target_valid(
     entities: &EntityStore,
     teams: &TeamRelations,
@@ -1209,25 +1337,6 @@ fn gather_unit_can_use_node(
     immediate_unit_can_replace(entities, player, unit)
         && matches!(entities.get(unit), Some(e) if rules::economy::can_gather_for_faction(&faction_id, e.kind))
         && gather_node_valid(entities, player, node)
-}
-
-fn build_kind_code(kind: EntityKind) -> planner::BuildKind {
-    EntityKind::ALL
-        .iter()
-        .position(|candidate| *candidate == kind)
-        .unwrap_or(usize::MAX) as planner::BuildKind
-}
-
-fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
-    EntityKind::ALL.get(code as usize).copied()
-}
-
-fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
-    planner::AbilityId(ability::planner_code(ability))
-}
-
-fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
-    ability::from_planner_code(ability.0)
 }
 
 fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryFireMode> {
@@ -1338,6 +1447,7 @@ fn use_ability(
                 order_artillery_point_fire(
                     map,
                     entities,
+                    ctx.coordinator,
                     players,
                     teams,
                     fog,
@@ -1432,6 +1542,7 @@ fn use_ability(
 fn order_artillery_point_fire(
     map: &Map,
     entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
     players: &mut [PlayerState],
     teams: &TeamRelations,
     fog: &Fog,
@@ -1457,6 +1568,18 @@ fn order_artillery_point_fire(
     ) else {
         return false;
     };
+    if !target.in_range {
+        let blanket_radius = matches!(mode, ArtilleryFireMode::Blanket).then_some(radius_tiles);
+        return ability_orders::queue_artillery_fire_reposition(
+            map,
+            entities,
+            coordinator,
+            unit,
+            (x, y),
+            crate::game::services::order_execution::artillery_ability(mode),
+            blanket_radius,
+        );
+    }
     if !start_artillery_fire_command_order(entities, unit, target, mode, radius_tiles) {
         return false;
     }

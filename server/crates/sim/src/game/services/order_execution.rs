@@ -1,4 +1,5 @@
 use crate::config;
+use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     supports_manual_emplacement, Entity, EntityKind, EntityStore, Order, WeaponSetup,
 };
@@ -17,6 +18,21 @@ pub(crate) enum FutureOrderMode {
 pub(crate) enum ArtilleryFireMode {
     Point,
     Blanket,
+}
+
+pub(crate) fn artillery_ability(mode: ArtilleryFireMode) -> AbilityKind {
+    match mode {
+        ArtilleryFireMode::Point => AbilityKind::PointFire,
+        ArtilleryFireMode::Blanket => AbilityKind::BlanketFire,
+    }
+}
+
+pub(crate) fn artillery_fire_mode(ability: AbilityKind) -> Option<ArtilleryFireMode> {
+    match ability {
+        AbilityKind::PointFire => Some(ArtilleryFireMode::Point),
+        AbilityKind::BlanketFire => Some(ArtilleryFireMode::Blanket),
+        _ => None,
+    }
 }
 
 pub(crate) fn execute_anti_tank_gun_setup(
@@ -156,8 +172,9 @@ fn start_artillery_fire_from_target(
             e.set_emplacement_facing(Some(target.facing));
             e.set_desired_weapon_facing(target.facing);
         }
-        WeaponSetup::TearingDown { .. } => {
-            return false;
+        WeaponSetup::TearingDown { ticks } => {
+            e.set_pending_redeploy_facing(Some(target.facing));
+            e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks });
         }
     }
     match mode {

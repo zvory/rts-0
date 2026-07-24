@@ -1,0 +1,55 @@
+name: Deliver merged gameplay patch notes
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to reconcile; omit to check recent merges
+        required: false
+        type: number
+  schedule:
+    - cron: "17 * * * *"
+
+concurrency:
+  group: patch-note-discord-delivery
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  deliver:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.18.0"
+
+      - name: Deliver or reconcile merged patch notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: ${{ secrets.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL }}
+          REQUESTED_PR_NUMBER: ${{ inputs.pr_number }}
+        shell: bash
+        run: |
+          args=()
+          if [ -n "${REQUESTED_PR_NUMBER:-}" ] && [ "$REQUESTED_PR_NUMBER" != "0" ]; then
+            args+=(--pr "$REQUESTED_PR_NUMBER")
+          fi
+          node scripts/deliver-merged-patch-notes.mjs "${args[@]}"

@@ -68,6 +68,10 @@ impl Order {
         Order::Attack(AttackOrder::new(target))
     }
 
+    pub fn attack_cluster(targets: Vec<u32>) -> Option<Self> {
+        AttackOrder::new_cluster(targets).map(Order::Attack)
+    }
+
     pub fn gather(node: u32) -> Self {
         Order::Gather(GatherOrder::new(node))
     }
@@ -155,7 +159,7 @@ pub enum OrderIntent {
     AttackMove(PointIntent),
     /// Terminal future stance: clear the active order and stand ground when promoted.
     HoldPosition,
-    Attack(TargetIntent),
+    Attack(AttackIntent),
     Gather(GatherIntent),
     Build(BuildIntent),
     Deconstruct(TargetIntent),
@@ -183,7 +187,11 @@ impl OrderIntent {
     }
 
     pub fn attack(target: u32) -> Self {
-        OrderIntent::Attack(TargetIntent { target })
+        OrderIntent::Attack(AttackIntent::single(target))
+    }
+
+    pub fn attack_cluster(targets: Vec<u32>) -> Option<Self> {
+        AttackIntent::cluster(targets).map(OrderIntent::Attack)
     }
 
     pub fn gather(node: u32) -> Self {
@@ -325,20 +333,56 @@ pub struct TargetIntent {
     pub target: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttackIntent {
+    pub(crate) target: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) remaining_targets: Vec<u32>,
+}
+
+impl AttackIntent {
+    fn single(target: u32) -> Self {
+        AttackIntent {
+            target,
+            remaining_targets: Vec::new(),
+        }
+    }
+
+    fn cluster(mut targets: Vec<u32>) -> Option<Self> {
+        if targets.is_empty() {
+            return None;
+        }
+        let target = targets.remove(0);
+        Some(AttackIntent {
+            target,
+            remaining_targets: targets,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttackOrder {
-    pub intent: TargetIntent,
+    pub(crate) intent: AttackIntent,
     pub execution: AttackExecution,
 }
 
 impl AttackOrder {
     fn new(target: u32) -> Self {
         AttackOrder {
-            intent: TargetIntent { target },
+            intent: AttackIntent::single(target),
             execution: AttackExecution {
                 phase: AttackPhase::Waiting,
             },
         }
+    }
+
+    fn new_cluster(targets: Vec<u32>) -> Option<Self> {
+        Some(AttackOrder {
+            intent: AttackIntent::cluster(targets)?,
+            execution: AttackExecution {
+                phase: AttackPhase::Waiting,
+            },
+        })
     }
 }
 

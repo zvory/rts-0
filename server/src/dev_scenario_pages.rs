@@ -281,6 +281,7 @@ mod tests {
         assert!(html.contains("Scout Car Snaking Corridor"));
         assert!(html.contains("Direct Reverse Order"));
         assert!(html.contains("Scout Car Open-Ground L Path"));
+        assert!(html.contains("Scout Car Lake Reverse L Path"));
         assert!(html.contains("Replay 112 Vehicle Lock"));
         assert!(html.contains("Vehicle Wall Chokepoint"));
         assert!(html.contains("Vehicle Corner Wall"));
@@ -295,6 +296,9 @@ mod tests {
         assert!(html.contains("/dev/scenarios?id=direct_reverse_order&unit=tank&count=1"));
         assert!(
             html.contains("/dev/scenarios?id=scout_car_open_ground_l_path&unit=scout_car&count=1")
+        );
+        assert!(
+            html.contains("/dev/scenarios?id=scout_car_lake_reverse_l_path&unit=scout_car&count=1")
         );
         assert!(html.contains("/dev/scenarios?id=replay_142_vehicle_lock&unit=scout_car&count=2"));
         assert!(

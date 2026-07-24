@@ -1,86 +1,70 @@
 use super::*;
+use crate::game::entity::{EntityKind, EntityStore};
+use crate::protocol::terrain;
 
-const TILE: f32 = 32.0;
-const WORLD: f32 = 64.0 * TILE;
-const ORIGIN: (f32, f32) = (32.0 * TILE, 32.0 * TILE);
-const MIN: f32 = config::ARTILLERY_MIN_RANGE_TILES as f32 * TILE;
-const MAX: f32 = config::ARTILLERY_MAX_RANGE_TILES as f32 * TILE;
-
-fn lock(raw_click: (f32, f32)) -> LockedArtilleryFireTarget {
-    lock_artillery_fire_target(WORLD, ORIGIN, Some(0.0), 0.0, MIN, MAX, raw_click)
-        .expect("target should lock")
+fn fixture() -> (Map, EntityStore, u32, (f32, f32)) {
+    let size = 64;
+    let map = Map {
+        size,
+        terrain: vec![terrain::GRASS; (size * size) as usize],
+        starts: vec![(4, 4)],
+        base_sites: Vec::new(),
+    };
+    let origin = map.tile_center(20, 20);
+    let mut entities = EntityStore::new();
+    let artillery = entities
+        .spawn_unit(1, EntityKind::Artillery, origin.0, origin.1)
+        .expect("artillery should spawn");
+    (map, entities, artillery, origin)
 }
 
 #[test]
-fn target_lock_preserves_points_inside_range_band() {
-    let target = lock((ORIGIN.0 + 30.0 * TILE, ORIGIN.1));
+fn raw_target_preserves_an_inside_range_click() {
+    let (map, entities, artillery, origin) = fixture();
+    let clicked = (
+        origin.0 + config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32 + 16.0,
+        origin.1,
+    );
 
-    assert!((target.x - (ORIGIN.0 + 30.0 * TILE)).abs() < 0.001);
-    assert!((target.y - ORIGIN.1).abs() < 0.001);
-}
-
-#[test]
-fn target_lock_pushes_close_clicks_to_minimum_range() {
-    let target = lock((ORIGIN.0 + 3.0 * TILE, ORIGIN.1));
-
-    assert!((target.x - (ORIGIN.0 + MIN)).abs() < 0.001);
-    assert!((target.y - ORIGIN.1).abs() < 0.001);
-}
-
-#[test]
-fn target_lock_pulls_far_clicks_to_maximum_or_map_edge() {
-    let target = lock((ORIGIN.0 + 80.0 * TILE, ORIGIN.1));
-
-    assert!((target.x - (WORLD - 1.0)).abs() < 0.001);
-    assert!((target.y - ORIGIN.1).abs() < 0.001);
-}
-
-#[test]
-fn target_lock_keeps_large_finite_click_direction() {
-    let target = lock_artillery_fire_target(
-        WORLD,
-        ORIGIN,
-        Some(std::f32::consts::FRAC_PI_2),
-        std::f32::consts::FRAC_PI_2,
-        MIN,
-        MAX,
-        (1.0e20, ORIGIN.1),
+    let target = artillery_point_fire_target(
+        &map,
+        &entities,
+        1,
+        artillery,
+        clicked.0,
+        clicked.1,
+        ArtilleryPointFireAcceptance::Command,
     )
-    .expect("large finite click should still lock along its ray");
+    .expect("inside-range target should be accepted");
 
-    assert!((target.x - (WORLD - 1.0)).abs() < 0.001);
-    assert!((target.y - ORIGIN.1).abs() < 0.001);
+    assert!(target.in_range);
+    assert!((target.x - clicked.0).abs() < 0.001);
+    assert!((target.y - clicked.1).abs() < 0.001);
 }
 
 #[test]
-fn zero_length_target_uses_setup_facing_fallback() {
-    let target = lock_artillery_fire_target(
-        WORLD,
-        ORIGIN,
-        Some(std::f32::consts::FRAC_PI_2),
-        0.0,
-        MIN,
-        MAX,
-        ORIGIN,
-    )
-    .expect("zero-length click should lock along setup facing");
+fn raw_target_preserves_out_of_range_clicks_for_repositioning() {
+    let (map, entities, artillery, origin) = fixture();
+    for clicked in [
+        (origin.0 + 16.0, origin.1),
+        (
+            origin.0 + (config::ARTILLERY_MAX_RANGE_TILES as f32 + 4.0) * config::TILE_SIZE as f32,
+            origin.1,
+        ),
+    ] {
+        let target = artillery_point_fire_target(
+            &map,
+            &entities,
+            1,
+            artillery,
+            clicked.0,
+            clicked.1,
+            ArtilleryPointFireAcceptance::Command,
+        )
+        .expect("in-map target should be accepted for repositioning");
 
-    assert!((target.x - ORIGIN.0).abs() < 0.001);
-    assert!((target.y - (ORIGIN.1 + MIN)).abs() < 0.001);
-}
-
-#[test]
-fn target_lock_rejects_rays_without_an_in_map_range_point() {
-    let origin = (4.0 * TILE, 4.0 * TILE);
-
-    assert!(lock_artillery_fire_target(
-        WORLD,
-        origin,
-        Some(std::f32::consts::PI),
-        std::f32::consts::PI,
-        MIN,
-        MAX,
-        origin,
-    )
-    .is_none());
+        assert!(!target.in_range);
+        assert!((target.x - clicked.0).abs() < 0.001);
+        assert!((target.y - clicked.1).abs() < 0.001);
+    }
 }

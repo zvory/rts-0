@@ -27,9 +27,13 @@ The normal agent lifecycle is:
    head SHA reachable from `origin/main`, and the local `main` checkout fast-forwarded with an
    ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic
    merged-worktree cleanup, including when `main` was already current and Git's `post-merge` hook
-   therefore did not fire. After proving merge reachability and before cleanup, the waiter delivers
-   any patch-note fragment changed by that PR to Discord. Rerunning `scripts/agent-pr.sh` during CI
-   recovery only regenerates the fragment; it does not notify Discord.
+   therefore did not fire. Patch-note delivery no longer depends on this foreground waiter:
+   `.github/workflows/patch-note-delivery.yml` deterministically reads any merged fragment and sends
+   it to Discord without an LLM. Hourly and manual reconciliation recover missed runs, and a success
+   status on the immutable PR head suppresses duplicate delivery. `scripts/wait-pr.sh` does not
+   deliver notes, so the foreground waiter cannot race the GitHub workflow. Rerunning
+   `scripts/agent-pr.sh` during CI recovery only regenerates the fragment; it does not notify
+   Discord.
 
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
 the `Main test gate` workflow. The workflow runs split coverage jobs for server build, Rust

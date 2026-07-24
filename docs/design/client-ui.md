@@ -1191,12 +1191,11 @@ active preview surface: while the minimap is hovered it
 suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
 hiding minimap-authored setup cones or issued-command feedback. HUD command-target arming preserves
 Shift, and the frame refresh reads live keyboard state so stationary minimap previews switch between
-current and queued origins as Shift changes. Armed Artillery Fire previews
-compute advisory per-artillery locked effective points from the current gun origin, the authoritative
-or local pending planned origin, the 10-to-35 tile range band, the current or planned setup facing
-fallback, and same-ray map clamping when map bounds are available; command feedback marks those
-locked points when the client can compute them while the server still receives and authoritatively
-validates the raw clicked point. Local planned setup/fire stages are reconciled on snapshots using
+current and queued origins as Shift changes. Armed Artillery Fire previews compute advisory
+per-artillery firing positions from the current gun origin or authoritative/local pending planned
+origin and the 10-to-35 tile range band. Out-of-range previews retain the literal center, draw the
+projected movement leg and future setup cone, and command feedback marks the clicked point while the
+server authoritatively validates and executes the movement/setup plan. Local planned setup/fire stages are reconciled on snapshots using
 the owner-only `orderPlan` and command acknowledgement metadata, and are cleared on deselection,
 Stop/Hold, replacement commands, rejected command receipts, and match teardown. If Tank Traps are
 re-enabled, their placement previews keep normal terrain, resource, building, and map-bounds checks,
@@ -1778,9 +1777,9 @@ as a side effect.
 abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ kind: "ability", ability })`,
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
-  carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor
-  or can lock the raw cursor into the Artillery range band from the authoritative origin or the
-  origin projected from queued movement and setup stages, update `ClientIntent.abilityTargetPreview`
+  carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
+  and for Artillery project the firing position it will path to from the authoritative origin or the
+  origin projected from queued movement stages; update `ClientIntent.abilityTargetPreview`
   for renderer feedback. The Smoke preview radius uses the active command owner's completed
   upgrades, including during Lab control, so Smoke Plus previews the server-created 4-tile cloud.
 - Left-click normally builds a `useAbility` command with the ability name, filtered carrier ids,
@@ -1788,8 +1787,9 @@ the input module enters targeted cursor mode:
   press-drag-release: the initial press/click fixes the raw center, pointer distance selects a
   radius from 6 to 15 tiles (3 to 15 after Artillery Fire Control), and the second click or drag
   release sends `artilleryFire`. The battlefield and minimap use the same gesture semantics. The
-  server owns center locking and radius clamping. The local
-  feedback marker uses the client-computed locked point when available. Clear cursor mode unless the resolved
+  server owns movement/setup execution and radius clamping. The local feedback marker stays on the
+  clicked center, while out-of-range previews show the projected movement leg and future setup cone.
+  Clear cursor mode unless the resolved
   command-card hotkey is still held for repeated world-point targeting.
 - Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
   armed until the first unqueued world click. That click issues the ability and clears targeting
@@ -1817,9 +1817,9 @@ small local planned-stage map keyed by unit id. The local map stores only pendin
 setup, and Artillery Fire stages needed for queued preview origins; it is not serialized
 and never replaces server `orderPlan`. `abilityTargetPreview` is null or `{ ability, mouseX, mouseY,
 carriers, rangeOrigins, pathOrigins, returnMarkers, hoverInRange, artilleryLocks? }`.
-`artilleryLocks` is advisory client data for selected Artillery only: per-gun origin, locked
-effective point, future/redeploy facing, and whether the locked point is inside the deployed current
-cone. `commandTarget` is a transient UI state;
+`artilleryLocks` is advisory client data for selected Artillery only: per-gun current/projected
+origin, clicked center, projected firing position, future/redeploy facing, whether movement is
+needed, and whether the center is inside the deployed current cone. `commandTarget` is a transient UI state;
 `abilityTargetPreview` is rebuilt every mouse move from the cursor world position and the current
 selection. Server-projected complex
 ability world objects are stored separately as `state.abilityObjects` from
@@ -1835,8 +1835,9 @@ Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
   Command Car-to-cursor Scout Plane route and can add server-projected origins such as Magic Anchors
   for multi-origin line-shot previews.
 - `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
-- Artillery Fire draws the current artillery cone when the locked point is inside a deployed gun's
-  cone, otherwise it draws the future setup/redeploy cone toward the locked point. After the first
+- Artillery Fire draws the current artillery cone when the clicked center is in range and inside a
+  deployed gun's cone. Otherwise it draws the future setup/redeploy cone toward the center, plus a
+  dashed movement leg when the gun must enter range. After the first
   click it draws a flat translucent light-blue target area, a dashed boundary, and a center-to-pointer
   guide. The circle begins at six tiles, or three after Artillery Fire Control, and grows only when
   the pointer moves farther than that minimum from the center, up to 15 tiles.
@@ -2108,6 +2109,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
+  While Attack targeting is armed over a completed neutral Tank Trap, every visible trap captured
+  by the authoritative four-tile cluster-clear radius receives the red attack-target ring and a
+  dashed red boundary shows the radius before the click.
 - Renderer failures must fail soft: one broken entity or feedback effect should log a throttled
   `[RTS_RENDER]` error, skip that visual path, and let the rest of the frame continue. Broken
   entity art draws a magenta/black checkerboard fallback instead of stopping the match loop; the

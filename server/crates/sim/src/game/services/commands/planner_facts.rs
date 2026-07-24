@@ -11,13 +11,30 @@ use crate::rules;
 use super::guards::{
     dedupe_cap_units, unit_can_accept_ground_command, unit_can_accept_player_command,
 };
-use super::{ability_from_planner, build_kind_from_code};
-
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
     planner::PlannerConfig {
         max_units_per_command,
         max_queue_len: MAX_QUEUED_ORDERS,
     }
+}
+
+pub(super) fn build_kind_code(kind: EntityKind) -> planner::BuildKind {
+    EntityKind::ALL
+        .iter()
+        .position(|candidate| *candidate == kind)
+        .unwrap_or(usize::MAX) as planner::BuildKind
+}
+
+pub(super) fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
+    EntityKind::ALL.get(code as usize).copied()
+}
+
+pub(super) fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
+    planner::AbilityId(ability::planner_code(ability))
+}
+
+pub(super) fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
+    ability::from_planner_code(ability.0)
 }
 
 pub(super) fn issue_mode(queued: bool) -> planner::IssueMode {
@@ -38,6 +55,7 @@ pub(super) fn entity_order_intent_from_planner(
         }
         planner::OrderIntent::HoldPosition => Some(OrderIntent::hold_position()),
         planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
+        planner::OrderIntent::AttackCluster(targets) => OrderIntent::attack_cluster(targets),
         planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
         planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),
         planner::OrderIntent::Build {

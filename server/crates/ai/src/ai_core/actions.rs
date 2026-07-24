@@ -235,6 +235,16 @@ fn command_trace_label(command: &Command) -> String {
             target,
             queued
         ),
+        Command::AttackTankTrapCluster {
+            units,
+            target,
+            queued,
+        } => format!(
+            "attack_tank_trap_cluster units={} target={} queued={}",
+            id_list(units),
+            target,
+            queued
+        ),
         Command::AttackMove {
             units,
             x,

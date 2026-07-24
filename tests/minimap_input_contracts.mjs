@@ -9,7 +9,6 @@ import { Minimap } from "../client/src/minimap.js";
 import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
-  ARTILLERY_MIN_RANGE_TILES,
 } from "../client/src/config.js";
 import { ABILITY, cmd, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN, UPGRADE } from "../client/src/protocol.js";
 
@@ -673,10 +672,10 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   assert(
     h.clientIntent.commandFeedback[0]?.kind === "artillery" &&
-      h.clientIntent.commandFeedback[0].x === artillery.x + ARTILLERY_MIN_RANGE_TILES &&
-      h.clientIntent.commandFeedback[0].y === artillery.y &&
+      h.clientIntent.commandFeedback[0].x === center.x &&
+      h.clientIntent.commandFeedback[0].y === center.y &&
       h.clientIntent.commandFeedback[0].radiusTiles === 6,
-    "minimap Artillery Fire feedback uses the locked center and selected radius",
+    "minimap Artillery Fire feedback preserves the clicked center and selected radius",
   );
   h.minimap.destroy();
 }
@@ -947,9 +946,9 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   assertApprox(
     h.clientIntent.commandFeedback[0]?.y,
-    plannedOrigin.y + ARTILLERY_MIN_RANGE_TILES,
+    plannedOrigin.y,
     0.001,
-    "minimap queued Point Fire feedback locks from the frozen setup facing",
+    "minimap queued Point Fire feedback preserves the clicked center",
   );
   h.minimap.destroy();
 }

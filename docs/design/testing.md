@@ -147,6 +147,10 @@ Current scenario ids:
   receives a far southwest move across empty grass. The current bug makes it reverse west along the
   cardinal portion of its grid route before turning southwest; a corrected build should begin one
   continuous forward turn toward the final goal.
+- `scout_car_lake_reverse_l_path` — after a five-second inspection pause, one east-facing Scout Car
+  starts 20 tiles northeast of a centered 15-by-15 lake and receives a move order 20 tiles southwest
+  of it. The regression requires the car to route around the lake without body overlap and reach
+  the exact destination instead of stalling at a corner.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.
@@ -261,14 +265,14 @@ canary runs own a private server; the browser shard passes its existing loopback
   patch-note pass is the sole owner of that tree: the adversarial pass is instructed not to edit
   `patch-notes/`, and a post-pass tree-and-history check fails before push if it creates, edits,
   deletes, or commits and restores a fragment.
-  After `scripts/wait-pr.sh` confirms the PR merged and its head is reachable from `origin/main`,
-  when `RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL` is available in the process environment, the current
-  worktree `.env`, or the primary checkout `.env`, the waiter sends only the PR-changed merged
-  fragment's `## Changes` bullets to Discord before refreshing and cleaning up the worktree. It
-  omits the fragment title, date, playtest-watch section, and PR metadata. A hash of the destination and
-  content under the shared Git directory suppresses duplicate deliveries
-  when the waiter is rerun. Review-time and CI-recovery reruns of `scripts/agent-pr.sh` never
-  deliver the webhook. Generated notes use at most three change bullets and must fit the complete
+  `.github/workflows/patch-note-delivery.yml` sends only a merged PR fragment's `## Changes`
+  bullets to Discord. It checks out trusted `main`, uses no LLM, retries transient webhook errors,
+  and records `patch-note-delivery` success on the immutable PR head. Hourly reconciliation and
+  manual dispatch recover missed merge events; the success status suppresses ordinary reruns.
+  `scripts/wait-pr.sh` does not deliver notes, avoiding a race between local and GitHub delivery.
+  The workflow omits the fragment title, date, playtest-watch section, and PR metadata.
+  Review-time and CI-recovery reruns of `scripts/agent-pr.sh` never deliver the webhook. Generated
+  notes use at most three change bullets and must fit the complete
   Discord post within 240 characters. The classifier favors a general player-facing gist over
   exhaustive detail; legacy oversized fragments fall back to a short generic notice instead of
   being cut off mid-sentence. Delivery dry-runs print the exact bounded message without contacting

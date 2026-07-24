@@ -14,6 +14,7 @@ import {
   MINING_CC_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
+  TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES,
   isProducerBuilding,
 } from "../config.js";
 import { DEFAULT_TILE_SIZE } from "./constants.js";
@@ -180,7 +181,13 @@ export function _issueTargetedCommand(p, ev = {}) {
 
   const target = pickedTarget;
   if (explicitAttackCommandTarget(this.state, target, this.controlPolicy)) {
-    const issuedAttack = issueTargetAttackForLandUnits(this, landUnits, target, !!ev.shiftKey);
+    const issuedAttack = issueTargetAttackForLandUnits(
+      this,
+      landUnits,
+      target,
+      !!ev.shiftKey,
+      isNeutralObstacle(target),
+    );
     if (issuedAttack) {
       this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     }
@@ -372,9 +379,14 @@ function issueNormalRightClickAction(input, action, queued) {
   }
 }
 
-function issueTargetAttackForLandUnits(input, landUnits, target, queued) {
+function issueTargetAttackForLandUnits(input, landUnits, target, queued, tankTrapCluster = false) {
   if (landUnits.length > 0) {
-    input.commandInteraction.issueCommand(cmd.attack(landUnits, target.id, queued));
+    input.commandInteraction.issueCommand(cmd.attack(
+      landUnits,
+      target.id,
+      queued,
+      tankTrapCluster,
+    ));
     return true;
   }
   return false;
@@ -418,6 +430,48 @@ function attackTargetPreviewForRightClickAction(action) {
     x: action.target.x,
     y: action.target.y,
   };
+}
+
+function attackTargetPreviewForEntity(
+  target,
+  clusterEntities = [],
+  tileSize = DEFAULT_TILE_SIZE,
+) {
+  const clustered = isNeutralObstacle(target);
+  const targets = clustered
+    ? tankTrapClusterPreviewTargets(target, clusterEntities, tileSize)
+    : [target];
+  return {
+    targetId: target.id,
+    kind: target.kind,
+    x: target.x,
+    y: target.y,
+    targets: targets.map((entity) => ({
+      targetId: entity.id,
+      kind: entity.kind,
+      x: entity.x,
+      y: entity.y,
+    })),
+    ...(clustered ? { radiusTiles: TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES } : {}),
+  };
+}
+
+function tankTrapClusterPreviewTargets(anchor, entities, tileSize) {
+  const radiusPx = TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * tileSize;
+  const radiusSq = radiusPx * radiusPx;
+  return entities
+    .filter((entity) => isNeutralObstacle(entity))
+    .map((entity) => ({
+      entity,
+      distanceSq: (entity.x - anchor.x) ** 2 + (entity.y - anchor.y) ** 2,
+    }))
+    .filter(({ distanceSq }) => distanceSq <= radiusSq)
+    .sort((a, b) => (
+      Number(a.entity.id !== anchor.id) - Number(b.entity.id !== anchor.id) ||
+      a.distanceSq - b.distanceSq ||
+      a.entity.id - b.entity.id
+    ))
+    .map(({ entity }) => entity);
 }
 
 export function _selectedOwnUnitIds() {
@@ -792,16 +846,29 @@ export function _refreshAttackTargetPreview() {
     this._drag ||
     intent?.activeLabTool ||
     intent?.placement ||
-    intent?.commandTarget ||
+    (intent?.commandTarget && intent.commandTarget !== "attack") ||
     !this.mouse
   ) {
     intent?.updateAttackTargetPreview?.(null);
     return;
   }
 
-  intent.updateAttackTargetPreview(attackTargetPreviewForRightClickAction(
-    normalRightClickAction(this, this.mouse),
-  ));
+  if (intent.commandTarget === "attack") {
+    const target = this._entityAtScreen(this.mouse, /*ownPreferred=*/ false);
+    intent.updateAttackTargetPreview(
+      explicitAttackCommandTarget(this.state, target, this.controlPolicy)
+        ? attackTargetPreviewForEntity(
+          target,
+          this._selectionEntities(),
+          this.state.map?.tileSize || DEFAULT_TILE_SIZE,
+        )
+        : null,
+    );
+    return;
+  }
+  intent.updateAttackTargetPreview(
+    attackTargetPreviewForRightClickAction(normalRightClickAction(this, this.mouse)),
+  );
 }
 
 export function _nearestCompletedMiningAnchor(x, y, includeAllies = false) {

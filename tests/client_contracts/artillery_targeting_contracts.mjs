@@ -16,6 +16,7 @@ import { Input } from "../../client/src/input/index.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
+  buildArtilleryTargetLocks,
 } from "../../client/src/input/artillery_targeting.js";
 import {
   ABILITY,
@@ -44,6 +45,59 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
         artilleryMinFireRadiusTiles([UPGRADE.BALLISTIC_TABLES]),
       ) === ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
     "Artillery Fire radius selection uses the six-tile base minimum and three-tile Fire Control minimum",
+  );
+}
+
+{
+  const target = { x: 8, y: 1024 };
+  const [lock] = buildArtilleryTargetLocks({
+    ability: ABILITY.POINT_FIRE,
+    carriers: [{
+      id: 1,
+      kind: KIND.ARTILLERY,
+      x: 4,
+      y: target.y,
+      facing: Math.PI,
+      setupState: SETUP.PACKED,
+    }],
+    rawX: target.x,
+    rawY: target.y,
+    map: { width: 64, height: 64 },
+    tileSize: 32,
+    definition: ABILITIES[ABILITY.POINT_FIRE],
+  });
+  const stagingDistance = Math.hypot(lock.originX - target.x, lock.originY - target.y);
+  assert(
+    lock.needsMove &&
+      stagingDistance >= ARTILLERY_MIN_RANGE_TILES * 32 &&
+      stagingDistance <= ARTILLERY_MAX_RANGE_TILES * 32,
+    "Artillery staging preview finds an in-range firing position for close map-edge targets",
+  );
+}
+
+{
+  const center = { x: 1024, y: 1024 };
+  const [lock] = buildArtilleryTargetLocks({
+    ability: ABILITY.POINT_FIRE,
+    carriers: [{
+      id: 1,
+      kind: KIND.ARTILLERY,
+      x: center.x,
+      y: center.y,
+      facing: Math.PI / 2,
+      setupState: SETUP.PACKED,
+    }],
+    rawX: center.x,
+    rawY: center.y,
+    map: { width: 64, height: 64 },
+    tileSize: 32,
+    definition: ABILITIES[ABILITY.POINT_FIRE],
+  });
+  assert(
+    lock.needsMove &&
+      Math.abs(lock.originX - center.x) < 0.001 &&
+      lock.originY > center.y,
+    "Artillery staging preview matches the server facing fallback at the exact map center",
   );
 }
 
@@ -176,9 +230,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   assert(
     artilleryFeedback[0]?.kind === "artillery" &&
       artilleryFeedback[0].radiusTiles === 6 &&
-      artilleryFeedback[0].x === selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 &&
+      artilleryFeedback[0].x === closeRawPoint.x &&
       artilleryFeedback[0].y === selectedArtillery.y,
-    "Artillery Fire targeting shows the selected circle at the locked effective center",
+    "Artillery Fire targeting keeps the selected circle on the clicked center",
   );
 
   pointFireInput.clientIntent.endCommandTarget();
@@ -197,8 +251,8 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   assert(
     artilleryFeedback[1]?.kind === "artillery" &&
       artilleryFeedback[1].radiusTiles === ARTILLERY_BLANKET_RADIUS_TILES &&
-      artilleryFeedback[1].x === selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32,
-    "Blanket Fire command feedback marks the locked center and blanket radius",
+      artilleryFeedback[1].x === farRawPoint.x,
+    "Blanket Fire command feedback marks the clicked center and blanket radius",
   );
 
   const futureOrigin = { x: 640, y: 100 };
@@ -229,9 +283,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
   assertApprox(
     artilleryFeedback[2]?.x,
-    futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32,
+    queuedRawPoint.x,
     0.001,
-    "Queued Artillery Fire feedback locks from the projected movement endpoint",
+    "Queued Artillery Fire feedback keeps the clicked center",
   );
 
   pointFireInput.clientIntent.endCommandTarget();
@@ -254,9 +308,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
   assertApprox(
     pointFireInput.clientIntent.abilityTargetPreview.mouseX,
-    selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32,
+    pointFireInput.mouse.x,
     0.001,
-    "Point Fire preview reticle locks inside-minimum hovers to the effective point",
+    "Point Fire preview reticle stays on inside-minimum hovers while showing repositioning",
   );
   assert(
     ARTILLERY_MIN_RANGE_TILES === 10 &&
@@ -271,21 +325,22 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   pointFireInput.mouse = queuedRawPoint;
   pointFireInput._refreshAbilityTargetPreview();
   assert(
-    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.originX === futureOrigin.x,
-    "Queued Point Fire preview uses the projected movement endpoint as the lock origin",
+    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.moveFromX === futureOrigin.x &&
+      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.needsMove === true,
+    "Queued Point Fire preview starts repositioning from the projected movement endpoint",
   );
   assertApprox(
     pointFireInput.clientIntent.abilityTargetPreview.mouseX,
-    futureOrigin.x + ARTILLERY_MIN_RANGE_TILES * 32,
+    queuedRawPoint.x,
     0.001,
-    "Queued Point Fire preview reticle locks from the projected movement endpoint",
+    "Queued Point Fire preview reticle stays on the clicked center",
   );
   pointFireInput._shiftKeyDown = false;
   pointFireInput._refreshAbilityTargetPreview();
   assert(
-    pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === false &&
-      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.length === 0,
-    "Unqueued Point Fire preview does not lock a gun whose active order-plan marker is movement",
+    pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true &&
+      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.moveFromX === queuedMovingArtillery.x,
+    "Unqueued Point Fire preview shows that a moving gun will replace its route and reposition",
   );
 
   const locallyPlannedArtillery = {
@@ -313,15 +368,15 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   pointFireInput.mouse = { x: localMove.x, y: localMove.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(
-    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.originX === localMove.x &&
-      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.originY === localMove.y,
+    pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.moveFromX === localMove.x &&
+      pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.moveFromY === localMove.y,
     "Queued Point Fire preview uses local movement before authoritative orderPlan echo",
   );
   assertApprox(
     pointFireInput.clientIntent.abilityTargetPreview?.mouseY,
-    localMove.y + ARTILLERY_MIN_RANGE_TILES * 32,
+    localMove.y,
     0.001,
-    "Queued Point Fire preview uses the frozen setup facing for zero-length target rays",
+    "Queued Point Fire preview keeps a zero-length click as the requested center",
   );
   pointFireInput.clientIntent.recordPlannedCommand(
     cmd.blanketFire([locallyPlannedArtillery.id], localMove.x, localMove.y, 6, true),
@@ -462,9 +517,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   );
   assertApprox(
     pointFireInput.clientIntent.abilityTargetPreview.mouseX,
-    selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32,
+    pointFireInput.mouse.x,
     0.001,
-    "Point Fire preview reticle locks beyond-maximum hovers to the effective point",
+    "Point Fire preview reticle stays on beyond-maximum hovers while showing repositioning",
   );
   const targetingConeGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
@@ -523,8 +578,8 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   pointFireInput._refreshAbilityTargetPreview();
   assert(
     pointFireInput.clientIntent.abilityTargetPreview?.artilleryLocks?.[0]?.x ===
-      selectedArtillery.x + ARTILLERY_MAX_RANGE_TILES * 32,
-    "Blanket Fire preview locks the blanket center per artillery gun",
+      pointFireInput.mouse.x,
+    "Blanket Fire preview keeps the blanket center at the clicked location",
   );
   assert(
     pointFireInput.clientIntent.abilityTargetPreview?.radiusPx === ARTILLERY_BLANKET_RADIUS_TILES * 32,
@@ -542,7 +597,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
           pointFireInput.clientIntent.abilityTargetPreview.mouseX +
             ARTILLERY_BLANKET_RADIUS_TILES * 32 &&
         call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY),
-    "Blanket Fire preview draws the 15-tile blanket radius around the locked center",
+    "Blanket Fire preview draws the 15-tile blanket radius around the clicked center",
   );
 }
 
