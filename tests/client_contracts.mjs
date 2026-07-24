@@ -72,6 +72,7 @@ await import("./client_contracts/miss_toast_contracts.mjs");
 await import("./client_contracts/selection_projection_contracts.mjs");
 await import("./client_contracts/firing_reveal_contracts.mjs");
 await import("./client_contracts/pump_jack_input_contracts.mjs");
+await import("./client_contracts/tank_trap_placement_index_contracts.mjs");
 await import("./client_contracts/state_input_contracts.mjs");
 await import("./client_contracts/client_intent_order_queue_contracts.mjs");
 await import("./client_contracts/control_group_camera_contracts.mjs");
