@@ -21,15 +21,17 @@ use super::world_combat;
 use super::{setup, Game, MapMetadata, PlayerStartingLoadout};
 
 mod anti_tank_gun_memory;
+mod conversion;
 mod error;
 mod metadata;
 mod player_dto;
 mod validation;
 
 use anti_tank_gun_memory::AntiTankGunMemoryV1;
+use conversion::serde_convert;
 pub(in crate::game) use error::CheckpointPayloadError;
 use metadata::{CheckpointCompatibilityV1, CommandLogMetadataV1, MapBindingV1, RngDescriptorV1};
-use player_dto::{serde_convert, PlayerStateV1};
+use player_dto::PlayerStateV1;
 use validation::*;
 
 #[derive(Serialize)]
