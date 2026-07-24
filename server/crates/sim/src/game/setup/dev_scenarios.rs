@@ -7,10 +7,10 @@ mod dynamic_construction_path_block;
 mod factory_wall_rally_spawn;
 mod layouts;
 mod replay_142_vehicle_lock;
+mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_coax;
 mod tank_retreat;
-
 use dev_scenario_setup::{DevScenarioOrder, DevScenarioSetup};
 use layouts::*;
 
