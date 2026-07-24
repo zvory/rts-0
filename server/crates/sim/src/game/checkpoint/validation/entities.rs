@@ -1,6 +1,17 @@
+use std::collections::BTreeSet;
+
 use crate::game::entity::{Entity, EntityKind};
 
 use super::CheckpointPayloadError;
+
+pub(in crate::game::checkpoint) fn normalize_completed_tank_traps(
+    entities: &mut [Entity],
+) -> BTreeSet<u32> {
+    entities
+        .iter_mut()
+        .filter_map(|entity| entity.neutralize_completed_tank_trap().then_some(entity.id))
+        .collect()
+}
 
 pub(super) fn validate_ownership(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     if entity.kind == EntityKind::TankTrap && entity.under_construction() == (entity.owner == 0) {

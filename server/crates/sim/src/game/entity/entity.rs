@@ -1109,9 +1109,7 @@ impl Entity {
         c.progress = c.total;
         self.hp = self.max_hp;
         self.construction = None;
-        if self.kind == EntityKind::TankTrap {
-            self.owner = NEUTRAL;
-        }
+        self.neutralize_completed_tank_trap();
         Some(true)
     }
 
@@ -1119,6 +1117,14 @@ impl Entity {
     /// player. Resource nodes remain neutral but are not obstacles.
     pub fn is_neutral_obstacle(&self) -> bool {
         self.owner == NEUTRAL && self.kind == EntityKind::TankTrap && !self.under_construction()
+    }
+
+    pub(in crate::game) fn neutralize_completed_tank_trap(&mut self) -> bool {
+        let completed_tank_trap = self.kind == EntityKind::TankTrap && !self.under_construction();
+        if completed_tank_trap {
+            self.owner = NEUTRAL;
+        }
+        completed_tank_trap
     }
 
     pub fn set_construction_progress(&mut self, progress: u32) -> bool {

@@ -23,6 +23,45 @@ fn completed_tank_traps_have_no_player_owner() {
 }
 
 #[test]
+fn legacy_owned_tank_trap_checkpoint_restores_as_neutral() {
+    let mut game = Game::new_for_replay(&human_vs_ai_players(), 0x1234_5678);
+    let trap = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::TankTrap, 320.0, 320.0, true)
+        .expect("Tank Trap should spawn");
+    let text = game
+        .checkpoint_payload_text_for_test()
+        .expect("checkpoint should serialize");
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&text).expect("checkpoint should be JSON");
+    let legacy_trap = payload["entities"]["entities"]
+        .as_array_mut()
+        .expect("checkpoint entities")
+        .iter_mut()
+        .find(|entity| entity["id"] == trap)
+        .expect("Tank Trap should be serialized");
+    legacy_trap["owner"] = serde_json::json!(2);
+
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &serde_json::to_string(&payload).expect("legacy checkpoint should serialize"),
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .expect("legacy completed Tank Trap should normalize on restore");
+
+    assert_eq!(
+        restored
+            .state
+            .entities
+            .get(trap)
+            .expect("restored Tank Trap should exist")
+            .owner,
+        0
+    );
+}
+
+#[test]
 fn ai_with_building_but_no_units_is_eliminated() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0x1234_5678);

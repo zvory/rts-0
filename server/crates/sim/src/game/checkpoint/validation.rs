@@ -20,6 +20,7 @@ use super::{
 mod ability_charges;
 mod entities;
 mod firing_reveal;
+pub(super) use entities::normalize_completed_tank_traps;
 pub(super) use firing_reveal::validate_reaction_gates_against_visibility;
 use firing_reveal::{validate_firing_reveal_reaction_gates, validate_firing_reveal_visibility};
 
