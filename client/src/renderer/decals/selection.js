@@ -7,7 +7,7 @@ const DECAL_CLASS_ARTILLERY_BLAST = "artilleryBlast";
 const NEUTRAL_COLOR = "#9aa0a8";
 const TWO_PI = Math.PI * 2;
 const MORTAR_BLAST_RADIUS_WORLD = 48;
-const ARTILLERY_BLAST_RADIUS_WORLD = 96;
+const ARTILLERY_BLAST_RADIUS_WORLD = 64;
 
 export const GROUND_DECAL_ASSET_COUNTS = Object.freeze({
   infantry: GROUND_DECAL_ASSET_MANIFEST.infantry.length,

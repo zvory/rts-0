@@ -919,11 +919,27 @@ function buttonByLabel(card, label) {
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
   assert(STATS[KIND.ANTI_TANK_GUN].body.length === 42.0, "anti-tank gun client body length mirrors server");
   assert(STATS[KIND.ANTI_TANK_GUN].body.width === 24.0, "anti-tank gun client body width mirrors server");
-  assert(STATS[KIND.ARTILLERY].size === STATS[KIND.TANK].size, "Artillery selection size should match tank size");
   assert(
-    STATS[KIND.ARTILLERY].body.length === STATS[KIND.TANK].body.length &&
-      STATS[KIND.ARTILLERY].body.width === STATS[KIND.TANK].body.width,
-    "Artillery client body should match tank footprint",
+    STATS[KIND.ARTILLERY].size === STATS[KIND.TANK].size * 0.75,
+    "Artillery selection size should match its 75% presentation scale",
+  );
+  assertApprox(
+    STATS[KIND.ARTILLERY].body.length,
+    STATS[KIND.TANK].body.length * 0.75,
+    0.001,
+    "Artillery client body length should match its 75% presentation scale",
+  );
+  assertApprox(
+    STATS[KIND.ARTILLERY].body.width,
+    STATS[KIND.TANK].body.width * 0.75,
+    0.001,
+    "Artillery client body width should match its 75% presentation scale",
+  );
+  assertApprox(
+    STATS[KIND.ARTILLERY].body.clearance,
+    STATS[KIND.TANK].body.clearance * 0.75,
+    0.001,
+    "Artillery client body clearance should match its 75% presentation scale",
   );
 
   const input = Object.create(Input.prototype);

@@ -148,7 +148,7 @@ for (const asset of allAssets) {
     id: 100,
     kind: KIND.ARTILLERY,
     decalClass: "artilleryBlast",
-    radiusWorld: 96,
+    radiusWorld: 64,
     seed: 882244,
   };
   const mortarPlan = createGroundDecalStampPlan(mortar);
@@ -164,7 +164,7 @@ for (const asset of allAssets) {
     "artillery blast uses the authored artillery mask",
   );
   assert(mortarPlan.scale > 0.94 && mortarPlan.scale < 1.06, "mortar blast preserves its 1.5-tile authored footprint");
-  assert(artilleryPlan.scale > 0.94 && artilleryPlan.scale < 1.06, "artillery blast preserves its 3-tile authored footprint");
+  assert(artilleryPlan.scale > 0.94 && artilleryPlan.scale < 1.06, "artillery blast preserves its 2-tile authored footprint");
   assert(mortarPlan.charScale < 0.83, "mortar blast keeps its smaller air-burst center compact");
   assert(artilleryPlan.charScale > mortarPlan.charScale, "artillery retains the broader central crater treatment");
 }

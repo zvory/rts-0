@@ -18,9 +18,9 @@ export const ANTI_TANK_GUN_BODY = Object.freeze({
   clearance: 1.0,
 });
 export const ARTILLERY_BODY = Object.freeze({
-  length: TANK_BODY.length,
-  width: TANK_BODY.width,
-  clearance: TANK_BODY.clearance,
+  length: 37.800003,
+  width: 21.599998,
+  clearance: 1.125,
 });
 export const SCOUT_CAR_BODY = Object.freeze({
   length: 40.8,
@@ -49,7 +49,7 @@ export const ARTILLERY_MAX_RANGE_TILES = 35;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
 export const ARTILLERY_SETUP_TICKS = TICK_HZ * 6;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
-export const ARTILLERY_OUTER_RADIUS_TILES = 3;
+export const ARTILLERY_OUTER_RADIUS_TILES = 2;
 export const ARTILLERY_BLANKET_RADIUS_TILES = 15;
 export const ARTILLERY_MIN_FIRE_RADIUS_TILES = 6;
 export const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3;
@@ -141,9 +141,9 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
     description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D." },
-  [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 7, body: ARTILLERY_BODY,
+  [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 13.5, sight: 7, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
-    cost: { steel: 300, oil: 100 }, supply: 4, buildTicks: TICK_HZ * 20,
+    cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
