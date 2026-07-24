@@ -1,4 +1,4 @@
-import { STATS } from "./config.js";
+import { ARTILLERY_OUTER_RADIUS_TILES, STATS } from "./config.js";
 import { EVENT, KIND, isBuilding } from "./protocol.js";
 
 export const GROUND_DECAL_CLASS = Object.freeze({
@@ -204,7 +204,9 @@ function normalizeGroundImpactDecalEvent(ev, { tick, eventIndex, tileSize }) {
     ? KIND.MORTAR_TEAM
     : KIND.ARTILLERY;
   const seed = groundImpactDecalSeed(ev, tick, eventIndex, kind);
-  const fallbackRadiusTiles = decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST ? 1.5 : 3;
+  const fallbackRadiusTiles = decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST
+    ? 1.5
+    : ARTILLERY_OUTER_RADIUS_TILES;
   const radiusTiles = Number.isFinite(ev.radiusTiles) && ev.radiusTiles > 0
     ? ev.radiusTiles
     : fallbackRadiusTiles;

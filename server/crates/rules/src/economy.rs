@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(cost(EntityKind::AntiTankGun), (150, 40));
         assert_eq!(supply_cost(EntityKind::AntiTankGun), 3);
-        assert_eq!(cost(EntityKind::Artillery), (300, 100));
+        assert_eq!(cost(EntityKind::Artillery), (150, 50));
         assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 4);
         assert_eq!(supply_cost(EntityKind::ScoutPlane), 0);
@@ -333,18 +333,18 @@ mod tests {
         );
         assert_eq!(
             defs::unit_def(EntityKind::Artillery).map(|d| d.stats.radius),
-            defs::unit_def(EntityKind::Tank).map(|d| d.stats.radius),
-            "artillery should use the same selection/collision radius as tanks"
+            Some(crate::balance::ARTILLERY_SELECTION_RADIUS_PX),
+            "artillery selection/collision radius should match its 75% presentation scale"
         );
         assert_eq!(
             crate::balance::ARTILLERY_BODY_LENGTH_PX,
-            crate::balance::TANK_BODY_LENGTH_PX,
-            "artillery body length should match tanks"
+            crate::balance::TANK_BODY_LENGTH_PX * crate::balance::ARTILLERY_BODY_SCALE,
+            "artillery body length should be 75% of tanks"
         );
         assert_eq!(
             crate::balance::ARTILLERY_BODY_WIDTH_PX,
-            crate::balance::TANK_BODY_WIDTH_PX,
-            "artillery body width should match tanks"
+            crate::balance::TANK_BODY_WIDTH_PX * crate::balance::ARTILLERY_BODY_SCALE,
+            "artillery body width should be 75% of tanks"
         );
         assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
         assert_eq!(supply_cost(EntityKind::MortarTeam), 3);

@@ -180,7 +180,7 @@ function makeDecalBatch(baseId, count) {
       color: infantry ? "#4878c8" : "#c85050",
       facing: (i % 32) * 0.12,
       weaponFacing: (i % 32) * 0.12,
-      radiusWorld: mortar ? 48 : decalType === 3 ? 96 : undefined,
+      radiusWorld: mortar ? 48 : decalType === 3 ? 64 : undefined,
       seed: 910000 + i,
       variant: i % 4,
     });

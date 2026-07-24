@@ -362,11 +362,11 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and unit unlock",
   );
   assert(
-      STATS[KIND.ARTILLERY].cost.steel === 300 &&
-      STATS[KIND.ARTILLERY].cost.oil === 100 &&
+      STATS[KIND.ARTILLERY].cost.steel === 150 &&
+      STATS[KIND.ARTILLERY].cost.oil === 50 &&
       STATS[KIND.ARTILLERY].supply === 4 &&
       STATS[KIND.ARTILLERY].buildTicks === TICK_HZ * 20,
-    "Artillery cost, four-supply footprint, and 20-second production time mirror server",
+    "Artillery halved cost, four-supply footprint, and 20-second production time mirror server",
   );
   assert(
     STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ARTILLERY_UNLOCK,
