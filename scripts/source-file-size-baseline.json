@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1659,
-      "reason": "The Attack DTO gained the optional Tank Trap cluster flag beside its mirrored queued flag; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
+      "lines": 1657,
+      "reason": "Client-message serde tests moved out of the oversized protocol root; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -40,13 +40,13 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 2095,
-      "reason": "Tank Trap cluster admission captures a fog-safe authoritative target set and applies per-unit weapon legality through the shared planner; keep ratcheting by extracting cohesive targeted-command admission and execution."
+      "lines": 1970,
+      "reason": "Artillery Fire admission and execution now apply the research-dependent minimum radius beside the existing authoritative command validation; keep ratcheting until artillery command handling is extracted."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1827,
-      "reason": "Cluster clearing adds a coordinator entry point that installs one serialized multi-target Attack order while preserving normal attack setup; keep ratcheting until coordinator order-entry policy is split."
+      "lines": 1806,
+      "reason": "Freehand formation moves share coordinator entry points for move and attack-move slot assignment while geometry remains split into the formation module; keep ratcheting until coordinator policy is split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
@@ -75,8 +75,8 @@
     },
     {
       "path": "tests/client_contracts/state_input_contracts.mjs",
-      "lines": 1928,
-      "reason": "The existing targeted-command fixture now proves A-clicking a neutral Tank Trap emits the cluster flag; keep ratcheting until targeted-command contracts are split from the broad state/input fixture."
+      "lines": 1911,
+      "reason": "Input-command coverage remains in the existing oversized state/input fixture; keep ratcheting until remaining state/input fixtures are split."
     }
   ]
 }

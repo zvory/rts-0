@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rand::Rng;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, Order};
+use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -32,7 +32,6 @@ struct TankCoaxSnapshot {
     pos_y: f32,
     weapon_facing: f32,
     range_px: f32,
-    allow_neutral_obstacle: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -160,7 +159,6 @@ fn tank_coax_snapshot(
         pos_y: tank.pos_y,
         weapon_facing,
         range_px,
-        allow_neutral_obstacle: !matches!(tank.order(), Order::Idle),
     })
 }
 
@@ -211,9 +209,6 @@ fn tank_coax_target_candidates(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.is_neutral_obstacle() && !snapshot.allow_neutral_obstacle {
-            continue;
-        }
         if !crate::game::services::world_query::is_enemy_targetable(
             target,
             teams,

@@ -154,9 +154,7 @@ fn combat_intent_units(intents: &[AiIntent]) -> BTreeSet<u32> {
 
 pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSet<u32>) -> bool {
     match command {
-        Command::Attack { .. }
-        | Command::AttackTankTrapCluster { .. }
-        | Command::AttackMove { .. } => true,
+        Command::Attack { .. } | Command::AttackMove { .. } => true,
         Command::FormationMove {
             attack_move: true, ..
         } => true,

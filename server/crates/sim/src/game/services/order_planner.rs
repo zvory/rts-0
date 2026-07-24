@@ -127,7 +127,7 @@ pub enum AbilityTarget {
     WorldPoint(Point),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RequestedOrder {
     Move {
         to: Point,
@@ -138,10 +138,6 @@ pub enum RequestedOrder {
     HoldPosition,
     AttackTarget {
         target: EntityId,
-        target_valid: bool,
-    },
-    AttackCluster {
-        targets: Vec<EntityId>,
         target_valid: bool,
     },
     Gather {
@@ -191,13 +187,12 @@ impl Default for PlannerConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OrderIntent {
     Move(Point),
     AttackMove(Point),
     HoldPosition,
     AttackTarget(EntityId),
-    AttackCluster(Vec<EntityId>),
     Gather(EntityId),
     Build {
         kind: BuildKind,
@@ -217,7 +212,7 @@ pub enum OrderIntent {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PlannedAction {
     /// Replace the active order and clear queued future orders for this unit.
     ReplaceActive { unit: UnitId, intent: OrderIntent },
@@ -257,7 +252,7 @@ pub fn plan_order(
         .filter(|u| u.can_receive_orders)
         .collect();
 
-    match request.order.clone() {
+    match request.order {
         RequestedOrder::Move { to } if to.valid() => {
             plan_simple_point(config, request.mode, &ordered_facts, OrderIntent::Move(to))
         }
@@ -284,16 +279,6 @@ pub fn plan_order(
             &ordered_facts,
             |u| u.can_attack,
             OrderIntent::AttackTarget(target),
-        ),
-        RequestedOrder::AttackCluster {
-            targets,
-            target_valid: true,
-        } if !targets.is_empty() => plan_filtered_units(
-            config,
-            request.mode,
-            &ordered_facts,
-            |u| u.can_attack,
-            OrderIntent::AttackCluster(targets),
         ),
         RequestedOrder::Gather {
             node,
@@ -366,11 +351,11 @@ fn plan_filtered_units(
                 if unit.can_replace_active {
                     out.actions.push(PlannedAction::ReplaceActive {
                         unit: unit.id,
-                        intent: intent.clone(),
+                        intent,
                     });
                 }
             }
-            IssueMode::Queue => append_or_notice(config, &mut out, unit, intent.clone()),
+            IssueMode::Queue => append_or_notice(config, &mut out, unit, intent),
         }
     }
     out

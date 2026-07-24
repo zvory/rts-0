@@ -5,10 +5,6 @@ use crate::EntityKind;
 
 use super::TILE_SIZE;
 
-/// A direct attack issued on a completed Tank Trap captures the other visible completed traps
-/// inside this radius as one cluster-clearing order.
-pub const TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES: f32 = 4.0;
-
 #[derive(Debug, Clone, Copy)]
 pub struct UnitStats {
     pub hp: u32,

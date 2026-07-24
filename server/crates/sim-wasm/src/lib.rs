@@ -986,7 +986,6 @@ mod tests {
             Command::Attack {
                 units: vec![101],
                 target: 202,
-                tank_trap_cluster: false,
                 queued: false,
             },
         );

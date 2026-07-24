@@ -730,7 +730,6 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         | rts_sim::game::command::SimCommand::FormationMove { units, .. }
         | rts_sim::game::command::SimCommand::AttackMove { units, .. }
         | rts_sim::game::command::SimCommand::Attack { units, .. }
-        | rts_sim::game::command::SimCommand::AttackTankTrapCluster { units, .. }
         | rts_sim::game::command::SimCommand::SetupAntiTankGuns { units, .. }
         | rts_sim::game::command::SimCommand::TearDownAntiTankGuns { units }
         | rts_sim::game::command::SimCommand::UseAbility { units, .. }
@@ -756,7 +755,6 @@ fn is_attack_command(command: &rts_sim::game::command::SimCommand) -> bool {
         command,
         rts_sim::game::command::SimCommand::AttackMove { .. }
             | rts_sim::game::command::SimCommand::Attack { .. }
-            | rts_sim::game::command::SimCommand::AttackTankTrapCluster { .. }
             | rts_sim::game::command::SimCommand::FormationMove {
                 attack_move: true,
                 ..

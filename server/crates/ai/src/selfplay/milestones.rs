@@ -466,7 +466,6 @@ impl PlayerMilestones {
         let attack_units = match command {
             Command::AttackMove { units, .. }
             | Command::Attack { units, .. }
-            | Command::AttackTankTrapCluster { units, .. }
             | Command::FormationMove {
                 units,
                 attack_move: true,

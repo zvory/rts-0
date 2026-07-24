@@ -376,24 +376,6 @@ import {
     attackHoverInput.clientIntent.attackTargetPreview === null,
     "attack target preview stays hidden when worker right-click would deconstruct a Tank Trap",
   );
-
-  const nearbyTrap = { id: 44, owner: 0, kind: KIND.TANK_TRAP, x: 244, y: 180 };
-  const edgeTrap = { id: 45, owner: 0, kind: KIND.TANK_TRAP, x: 340, y: 180 };
-  attackHoverInput.state = {
-    playerId: 1,
-    map: { tileSize: 32 },
-    entitiesInterpolated: () => [moveUnit, enemyTankTrap, nearbyTrap, edgeTrap],
-    selectedEntities: () => [moveUnit],
-  };
-  attackHoverInput._selectionEntities = () => [moveUnit, enemyTankTrap, nearbyTrap, edgeTrap];
-  attackHoverInput._entityAtScreen = () => enemyTankTrap;
-  attackHoverInput.clientIntent.beginCommandTarget("attack");
-  attackHoverInput._refreshAttackTargetPreview();
-  assert(
-    attackHoverInput.clientIntent.attackTargetPreview?.targets?.map((target) => target.targetId).join(",") === "43,44" &&
-      attackHoverInput.clientIntent.attackTargetPreview.radiusTiles === 4,
-    "A-hover on a Tank Trap previews only the traps captured inside the four-tile radius",
-  );
 }
 
 {

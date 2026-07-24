@@ -228,7 +228,7 @@ export class ClientIntent {
 
   /**
    * Set or clear the enemy unit/entity under the cursor that a normal right-click would attack.
-   * @param {null | {targetId:number, kind:string, x:number, y:number, targets?:Array<object>, radiusTiles?:number}} preview
+   * @param {null | {targetId:number, kind:string, x:number, y:number}} preview
    */
   updateAttackTargetPreview(preview) {
     this.attackTargetPreview = preview;

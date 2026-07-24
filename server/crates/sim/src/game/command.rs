@@ -34,11 +34,6 @@ pub enum SimCommand {
         target: u32,
         queued: bool,
     },
-    AttackTankTrapCluster {
-        units: Vec<u32>,
-        target: u32,
-        queued: bool,
-    },
     Deconstruct {
         units: Vec<u32>,
         target: u32,
@@ -185,23 +180,12 @@ impl SimCommand {
             protocol::Command::Attack {
                 units,
                 target,
-                tank_trap_cluster,
                 queued,
-            } => {
-                if tank_trap_cluster {
-                    SimCommand::AttackTankTrapCluster {
-                        units,
-                        target,
-                        queued,
-                    }
-                } else {
-                    SimCommand::Attack {
-                        units,
-                        target,
-                        queued,
-                    }
-                }
-            }
+            } => SimCommand::Attack {
+                units,
+                target,
+                queued,
+            },
             protocol::Command::Deconstruct {
                 units,
                 target,
@@ -425,17 +409,6 @@ impl SimCommand {
             } => protocol::Command::Attack {
                 units: units.clone(),
                 target: *target,
-                tank_trap_cluster: false,
-                queued: *queued,
-            },
-            SimCommand::AttackTankTrapCluster {
-                units,
-                target,
-                queued,
-            } => protocol::Command::Attack {
-                units: units.clone(),
-                target: *target,
-                tank_trap_cluster: true,
                 queued: *queued,
             },
             SimCommand::Deconstruct {

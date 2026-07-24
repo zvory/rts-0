@@ -128,49 +128,30 @@ pub(crate) fn death_system(
     // Clean up dangling orders that reference removed entities (build sites, attack targets)
     // so units don't keep stale combat intent. Gather orders self-heal via `retarget_or_idle`.
     for id in entities.ids() {
-        let (stale, next_cluster_target) = {
+        let stale = {
             let Some(e) = entities.get(id) else { continue };
             match e.order() {
-                Order::Attack(order) => {
-                    let stale = !entities.contains(order.intent.target);
-                    let next = stale
-                        .then(|| {
-                            order
-                                .intent
-                                .remaining_targets
-                                .iter()
-                                .copied()
-                                .find(|target| {
-                                    entities.get(*target).is_some_and(|target| {
-                                        target.hp > 0 && target.is_neutral_obstacle()
-                                    })
-                                })
-                        })
-                        .flatten();
-                    (stale, next)
-                }
+                Order::Attack(_) => e
+                    .order()
+                    .attack_target()
+                    .map(|target| !entities.contains(target))
+                    .unwrap_or(false),
                 Order::Build(_) => e
                     .order()
                     .build_site()
                     .map(|site| !entities.contains(site))
-                    .map(|stale| (stale, None))
-                    .unwrap_or((false, None)),
+                    .unwrap_or(false),
                 Order::Deconstruct(_) => e
                     .order()
                     .deconstruct_target()
                     .map(|target| !entities.contains(target))
-                    .map(|stale| (stale, None))
-                    .unwrap_or((false, None)),
-                _ => (false, None),
+                    .unwrap_or(false),
+                _ => false,
             }
         };
         if stale {
             if let Some(e) = entities.get_mut(id) {
-                if !next_cluster_target
-                    .is_some_and(|target| e.advance_attack_cluster_target(target))
-                {
-                    e.clear_active_order();
-                }
+                e.clear_active_order();
             }
         }
     }

@@ -203,8 +203,6 @@ pub enum Command {
         units: Vec<u32>,
         target: u32,
         #[serde(default, skip_serializing_if = "is_false")]
-        tank_trap_cluster: bool,
-        #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
     Deconstruct {

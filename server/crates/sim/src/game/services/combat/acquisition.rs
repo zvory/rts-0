@@ -258,15 +258,10 @@ fn legal_target_candidates(
 ) -> Vec<TargetCandidate> {
     let mut candidates = Vec::new();
     let attacker = entities.get(self_id);
-    let allow_neutral_obstacle =
-        attacker.is_some_and(|entity| !matches!(entity.order(), Order::Idle));
     for id in spatial.ids_in_circle_bbox(px, py, acquire_px) {
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.is_neutral_obstacle() && !allow_neutral_obstacle {
-            continue;
-        }
         // Retained target status is only a ranker fact. It must still pass the
         // same hostile, visible, smoke, LOS, and blocker checks as any other
         // auto-acquired candidate.
