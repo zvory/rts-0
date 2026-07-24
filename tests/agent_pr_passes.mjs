@@ -24,10 +24,10 @@ assert.doesNotMatch(
   /--deliver-discord/,
   "agent-pr must never deliver patch notes before merge",
 );
-assert.match(
+assert.doesNotMatch(
   fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8"),
-  /--delivery-ref.*--deliver-discord/s,
-  "wait-pr owns immutable post-merge patch-note delivery",
+  /--deliver-discord/,
+  "wait-pr must not race the post-merge GitHub delivery workflow",
 );
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).baseRef, "upstream/main");
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, true);

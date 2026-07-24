@@ -159,9 +159,11 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "scripts/agent-pr-passes.mjs" ||
     pathname === "scripts/agent-pr-passes.json" ||
     pathname === "scripts/patch-note-pass.mjs" ||
+    pathname === "scripts/deliver-merged-patch-notes.mjs" ||
     pathname === "scripts/patch-note-pass.schema.json" ||
     pathname === "scripts/agent-pr.sh" ||
     pathname === "scripts/wait-pr.sh" ||
+    pathname === ".github/workflows/patch-note-delivery.yml" ||
     pathname === "scripts/archive-completed-plans.mjs" ||
     pathname === "scripts/plan-phase-status.mjs" ||
     pathname === "scripts/format-touched-rust.sh" ||
@@ -169,6 +171,7 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "tests/adversarial_quality_pass.mjs" ||
     pathname === "tests/agent_pr_passes.mjs" ||
     pathname === "tests/wait_pr.mjs" ||
+    pathname === "tests/patch_note_delivery.mjs" ||
     pathname === "tests/run-all.sh"
   );
 }
@@ -553,13 +556,16 @@ function verify() {
     [["scripts/agent-pr-passes.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr-passes.json"], ["agent-workflow-quality-pass"]],
     [["scripts/patch-note-pass.mjs"], ["agent-workflow-quality-pass"]],
+    [["scripts/deliver-merged-patch-notes.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/patch-note-pass.schema.json"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
     [["scripts/wait-pr.sh"], ["agent-workflow-quality-pass"]],
+    [[".github/workflows/patch-note-delivery.yml"], ["agent-workflow-quality-pass"]],
     [["scripts/archive-completed-plans.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/plan-phase-status.mjs"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["scripts/format-touched-rust.sh"], ["agent-workflow-quality-pass"]],
     [["tests/wait_pr.mjs"], ["agent-workflow-quality-pass"]],
+    [["tests/patch_note_delivery.mjs"], ["agent-workflow-quality-pass"]],
     [["tests/run-all.sh"], ["agent-workflow-phase-runner", "agent-workflow-quality-pass"]],
     [["server/crates/rules/src/faction.rs"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity"]],
     [["client/src/lobby_view.js"], ["client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
