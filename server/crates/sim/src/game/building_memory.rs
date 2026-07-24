@@ -137,11 +137,7 @@ fn visible_enemy_building(
             })
 }
 
-fn enemy_building_memory_eligible(
-    player_id: u32,
-    entity: &Entity,
-    teams: &TeamRelations,
-) -> bool {
+fn enemy_building_memory_eligible(player_id: u32, entity: &Entity, teams: &TeamRelations) -> bool {
     !teams.same_team_or_same_owner(player_id, entity.owner)
         && entity.owner != NEUTRAL
         && entity.is_building()
