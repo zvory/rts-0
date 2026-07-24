@@ -211,7 +211,9 @@ export class VisualEffectBuffers {
     this.artilleryTargets.push({
       x: ev.x,
       y: ev.y,
-      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 3,
+      radiusTiles: Number.isFinite(ev.radiusTiles)
+        ? ev.radiusTiles
+        : ARTILLERY_OUTER_RADIUS_TILES,
       delayTicks: Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0,
       seed: Math.floor(ev.x * 17 + ev.y * 11 + now) >>> 0,
       createdAt: now,

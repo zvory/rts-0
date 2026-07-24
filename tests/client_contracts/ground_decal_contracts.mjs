@@ -129,10 +129,12 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
     "artillery impact fallback mirrors the current authoritative outer radius",
   );
   const visualEffects = new VisualEffectBuffers();
+  visualEffects.addArtilleryTarget({ x: 288, y: 192 }, 900);
   visualEffects.addArtilleryImpact({ x: 288, y: 192 }, 1000);
   assert(
-    visualEffects.artilleryImpacts[0].radiusTiles === 2,
-    "artillery visual-effect fallback mirrors the current authoritative outer radius",
+    visualEffects.artilleryTargets[0].radiusTiles === 2 &&
+      visualEffects.artilleryImpacts[0].radiusTiles === 2,
+    "artillery target and impact visual fallbacks mirror the current authoritative outer radius",
   );
   assert(
     mortar.seed === normalizeGroundDecalEvent(
