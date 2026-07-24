@@ -782,31 +782,36 @@ fn small_arms_falls_back_to_armored_or_hard_targets() {
 }
 
 #[test]
-fn own_and_allied_tank_traps_are_not_hostile_targets() {
-    let cases = [
-        ("own", 1, team_relations(&[(1, 1), (2, 2)])),
-        ("allied", 2, team_relations(&[(1, 7), (2, 7)])),
-    ];
+fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let trap = entities
+        .spawn_building(1, EntityKind::TankTrap, 150.0, 100.0, true)
+        .expect("tank trap should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 100.0));
 
-    for (label, trap_owner, teams) in cases {
-        let map = open_map(8);
-        let mut entities = EntityStore::new();
-        let attacker = entities
-            .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
-            .expect("attacker should spawn");
-        let trap = entities
-            .spawn_building(trap_owner, EntityKind::TankTrap, 150.0, 100.0, true)
-            .expect("tank trap should spawn");
-        entities
-            .get_mut(attacker)
-            .expect("attacker should exist")
-            .set_order(Order::attack_move_to(300.0, 100.0));
-
-        let target = resolve_test_target(&map, &entities, &teams, attacker, 192.0);
-
-        assert_eq!(target, None, "{label} Tank Trap should not be acquired");
-        assert_ne!(target, Some(trap));
-    }
+    assert_eq!(
+        entities.get(trap).map(|trap| trap.owner),
+        Some(0),
+        "a prebuilt Tank Trap should have no player owner"
+    );
+    assert_eq!(
+        resolve_test_target(
+            &map,
+            &entities,
+            &team_relations(&[(1, 7), (2, 7)]),
+            attacker,
+            192.0
+        ),
+        Some(trap),
+        "neutral Tank Traps should obstruct and engage vehicles regardless of former team"
+    );
 }
 
 #[test]
@@ -2970,7 +2975,7 @@ fn infantry_like_auto_acquisition_ignores_enemy_tank_traps() {
 }
 
 #[test]
-fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
+fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
     for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
         let mut entities = EntityStore::new();
         let attacker = entities
@@ -2996,7 +3001,7 @@ fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
                 .expect("attacker should exist")
                 .target_id(),
             Some(trap),
-            "{kind:?} should still auto-acquire enemy Tank Traps"
+            "{kind:?} should auto-acquire neutral Tank Traps"
         );
     }
 }

@@ -205,7 +205,7 @@ impl Fog {
         };
         for e in store.iter() {
             if e.owner == 0 {
-                continue; // neutral resource nodes do not grant a player vision
+                continue; // neutral world entities do not grant player vision
             }
             if !entity_grants_standard_sight(e) {
                 continue;

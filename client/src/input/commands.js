@@ -253,7 +253,11 @@ function normalRightClickAction(input, p) {
       feedback: rightClickFeedback("move", target.x, target.y),
     };
   }
-  if (target && enemyOwner(input.state, target.owner, input.controlPolicy) && isAttackableEntityTarget(target)) {
+  if (
+    target &&
+    (enemyOwner(input.state, target.owner, input.controlPolicy) || isNeutralObstacle(target)) &&
+    isAttackableEntityTarget(target)
+  ) {
     return {
       kind: "attack",
       units: landUnits,
@@ -391,11 +395,19 @@ function rightClickFeedback(kind, x, y) {
 function explicitAttackCommandTarget(state, target, controlPolicy = null) {
   return !!target &&
     isAttackableEntityTarget(target) &&
-    (ownOwner(state, target.owner, controlPolicy) || enemyOwner(state, target.owner, controlPolicy));
+    (
+      ownOwner(state, target.owner, controlPolicy) ||
+      enemyOwner(state, target.owner, controlPolicy) ||
+      isNeutralObstacle(target)
+    );
 }
 
 function isAttackableEntityTarget(target) {
   return !!target && !isResource(target.kind) && target.kind !== KIND.SCOUT_PLANE;
+}
+
+function isNeutralObstacle(target) {
+  return Number(target?.owner) === 0 && target?.kind === KIND.TANK_TRAP;
 }
 
 function attackTargetPreviewForRightClickAction(action) {

@@ -1388,8 +1388,10 @@ General rules:
   step enters the target tile, while preserving opaque-target handling and the two-stone corner
   blocker behavior. Tank Traps are not combat shot blockers, so damage continues to the
   target behind them; tanks and normal buildings still block shots.
-  Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
-  survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
+  Tank Trap scaffolds remain player-owned through construction, then become owner-0 neutral
+  obstacles on completion. Neutral obstacles keep attack/deconstruct, area-damage, and cleanup
+  behavior without owner vision, alerts, scoring, or elimination survival. Infantry Move steering
+  treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition considers only currently fireable targets inside weapon range. Setup weapons that
   stopped to engage during an unfinished attack-move keep their
@@ -1450,7 +1452,7 @@ General rules:
   policy. Within a target group, small-arms weapons prefer soft targets while keeping armored
   targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
   armored units, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
-  Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
+  Vehicle-body units rank neutral Tank Traps as high-priority breach targets only when
   `services::occupancy` reports that the trap is on the current bounded route segment or forms a
   closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose
   to real combat targets. The obstruction query is read-only, uses the current waypoint, `path_goal`,
@@ -1552,9 +1554,8 @@ Allocation rules:
   resume the scaffold through the normal build intent without paying again. Queued orders prefer
   the lowest work assignment load, then closest worker.
   Work assignment load is the worker's current queued-order count plus one when its active order is
-  already a build or deconstruct intent. Deconstruct targets must be completed Tank
-  Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
-  must be visible when accepted or promoted. Deconstruction takes half of the Tank Trap's build
+  already a build or deconstruct intent. Every completed Tank Trap is neutral and must be visible
+  when a deconstruct order is accepted or promoted. Deconstruction takes half of the Tank Trap's build
   time, is not accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap
   cost to the deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains

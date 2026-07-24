@@ -330,14 +330,15 @@ pub(in crate::game) fn combat_system(
         };
 
         // Distance to chosen target.
-        let (tx, ty, t_owner) = match entities.get(tid) {
-            Some(t) => (t.pos_x, t.pos_y, t.owner),
+        let (tx, ty, t_owner, neutral_obstacle) = match entities.get(tid) {
+            Some(t) => (t.pos_x, t.pos_y, t.owner, t.is_neutral_obstacle()),
             None => continue,
         };
-        if !(teams.is_enemy_owner(owner, t_owner)
+        if !(neutral_obstacle
+            || teams.is_enemy_owner(owner, t_owner)
             || mode == CombatMode::Ordered && t_owner == owner)
         {
-            continue; // auto-acquisition stays hostile-only; explicit self-attacks are ordered.
+            continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let commanded_direct_target = mode == CombatMode::Ordered

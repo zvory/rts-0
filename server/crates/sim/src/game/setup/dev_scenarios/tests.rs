@@ -556,7 +556,7 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::AntiTankGun), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Artillery), 1);
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::Depot), 1);
-    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 1);
+    assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::TankTrap), 1);
     assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Steel), 1);
     assert_eq!(owned_kind_count(&setup.game, 0, EntityKind::Oil), 1);
     assert_eq!(setup.game.state.smokes.iter().count(), 1);
@@ -752,7 +752,7 @@ fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
 }
 
 #[test]
-fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
+fn tank_trap_friendly_reroute_wall_uses_neutral_blockers() {
     let setup = Game::new_tank_trap_pathing_scenario(
         "friendly_vehicle_reroute",
         EntityKind::Tank,
@@ -762,8 +762,13 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
     .expect("scenario setup should succeed");
     assert_eq!(setup.game.team_of_player(1), Some(1));
     assert_eq!(setup.game.team_of_player(2), Some(1));
-    assert!(owned_kind_count(&setup.game, 1, EntityKind::TankTrap) > 0);
-    assert!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap) > 0);
+    assert!(setup
+        .game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::TankTrap)
+        .all(|entity| entity.owner == 0));
 
     let occ =
         services::occupancy::Occupancy::build(&setup.game.state.map, &setup.game.state.entities);
@@ -777,7 +782,7 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
     let (tx, ty) = setup.game.state.map.tile_of(trap.pos_x, trap.pos_y);
     assert!(
         !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Tank),
-        "own/allied Tank Traps should remain physical vehicle-body blockers"
+        "neutral Tank Traps should remain physical vehicle-body blockers"
     );
     assert!(
         occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Rifleman),
@@ -796,7 +801,16 @@ fn tank_trap_enemy_reroute_scenario_closes_sparse_vehicle_gaps() {
     .expect("scenario setup should succeed");
     assert_eq!(setup.game.team_of_player(1), Some(1));
     assert_eq!(setup.game.team_of_player(2), Some(2));
-    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 7);
+    assert_eq!(
+        setup
+            .game
+            .state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::TankTrap)
+            .count(),
+        7
+    );
 
     let occ =
         services::occupancy::Occupancy::build(&setup.game.state.map, &setup.game.state.entities);
@@ -805,7 +819,7 @@ fn tank_trap_enemy_reroute_scenario_closes_sparse_vehicle_gaps() {
         .state
         .entities
         .iter()
-        .filter(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
+        .filter(|entity| entity.owner == 0 && entity.kind == EntityKind::TankTrap)
         .map(|entity| setup.game.state.map.tile_of(entity.pos_x, entity.pos_y))
         .collect();
     enemy_trap_tiles.sort_unstable();
@@ -844,8 +858,8 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
             .state
             .entities
             .iter()
-            .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
-            .expect("enemy trap should exist")
+            .find(|entity| entity.owner == 0 && entity.kind == EntityKind::TankTrap)
+            .expect("neutral trap should exist")
             .pos_x;
         game.enqueue(
             setup.player_id,
@@ -906,8 +920,8 @@ fn tank_trap_explicit_rifleman_attack_order_remains_valid() {
         .state
         .entities
         .iter()
-        .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
-        .expect("enemy Tank Trap should exist")
+        .find(|entity| entity.owner == 0 && entity.kind == EntityKind::TankTrap)
+        .expect("neutral Tank Trap should exist")
         .id;
 
     game.enqueue(

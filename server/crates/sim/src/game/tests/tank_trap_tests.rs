@@ -2,6 +2,27 @@ use super::fixtures::*;
 use super::*;
 
 #[test]
+fn completed_tank_traps_have_no_player_owner() {
+    let prebuilt = Entity::new_building(1, EntityKind::TankTrap, 10.0, 20.0, true)
+        .expect("Tank Trap should spawn");
+    assert_eq!(prebuilt.owner, 0);
+    assert!(prebuilt.is_neutral_obstacle());
+
+    let mut constructed = Entity::new_building(2, EntityKind::TankTrap, 10.0, 20.0, false)
+        .expect("Tank Trap scaffold should spawn");
+    let total = constructed
+        .construction
+        .as_ref()
+        .expect("Tank Trap should be under construction")
+        .total;
+    assert_eq!(constructed.owner, 2);
+    assert!(constructed.set_construction_progress(total.saturating_sub(1)));
+    assert_eq!(constructed.advance_construction(), Some(true));
+    assert_eq!(constructed.owner, 0);
+    assert!(constructed.is_neutral_obstacle());
+}
+
+#[test]
 fn ai_with_building_but_no_units_is_eliminated() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0x1234_5678);
@@ -134,13 +155,15 @@ fn tank_trap_grants_no_local_sight() {
         !game.state.fog.is_visible_world(1, x, y),
         "fixture should place the far corner outside opening fog"
     );
-    game.state
+    let trap = game
+        .state
         .entities
         .spawn_building(1, EntityKind::TankTrap, x, y, true)
         .expect("Tank Trap should spawn");
     game.state
         .fog
         .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    game.rebuild_final_spatial();
 
     assert!(
         !game.state.fog.is_visible_world(1, x, y),
@@ -152,6 +175,37 @@ fn tank_trap_grants_no_local_sight() {
             .fog
             .is_visible_world(1, x - config::TILE_SIZE as f32, y),
         "Tank Traps should not reveal adjacent tiles"
+    );
+    assert!(
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .all(|entity| entity.id != trap),
+        "the former builder should receive no live Tank Trap state outside vision"
+    );
+
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, x, y)
+        .expect("spotter should spawn");
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    game.rebuild_final_spatial();
+    let visible = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == trap)
+        .expect("a currently visible Tank Trap should be projected");
+    assert_eq!(visible.owner, 0);
+    assert_eq!(
+        visible.hp,
+        game.state
+            .entities
+            .get(trap)
+            .expect("Tank Trap should exist")
+            .hp
     );
 }
 

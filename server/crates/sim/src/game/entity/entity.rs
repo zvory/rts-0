@@ -33,7 +33,7 @@ const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 pub struct Entity {
     /// Stable unique id (never reused).
     pub id: u32,
-    /// Owning player id, or [`NEUTRAL`] (0) for resource nodes.
+    /// Owning player id, or [`NEUTRAL`] (0) for resources and completed field obstacles.
     pub owner: u32,
     /// Entity kind.
     pub kind: EntityKind,
@@ -117,7 +117,11 @@ impl Entity {
         let s = config::building_stats(kind)?;
         Some(Entity {
             id: 0,
-            owner,
+            owner: if finished && kind == EntityKind::TankTrap {
+                NEUTRAL
+            } else {
+                owner
+            },
             kind,
             pos_x: x,
             pos_y: y,
@@ -1105,7 +1109,16 @@ impl Entity {
         c.progress = c.total;
         self.hp = self.max_hp;
         self.construction = None;
+        if self.kind == EntityKind::TankTrap {
+            self.owner = NEUTRAL;
+        }
         Some(true)
+    }
+
+    /// Completed neutral field obstacles can be attacked and damaged without belonging to a
+    /// player. Resource nodes remain neutral but are not obstacles.
+    pub fn is_neutral_obstacle(&self) -> bool {
+        self.owner == NEUTRAL && self.kind == EntityKind::TankTrap && !self.under_construction()
     }
 
     pub fn set_construction_progress(&mut self, progress: u32) -> bool {
