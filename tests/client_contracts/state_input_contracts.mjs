@@ -919,28 +919,12 @@ function buttonByLabel(card, label) {
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
   assert(STATS[KIND.ANTI_TANK_GUN].body.length === 42.0, "anti-tank gun client body length mirrors server");
   assert(STATS[KIND.ANTI_TANK_GUN].body.width === 24.0, "anti-tank gun client body width mirrors server");
-  assert(
-    STATS[KIND.ARTILLERY].size === STATS[KIND.TANK].size * 0.75,
-    "Artillery selection size should match its 75% presentation scale",
-  );
-  assertApprox(
-    STATS[KIND.ARTILLERY].body.length,
-    STATS[KIND.TANK].body.length * 0.75,
-    0.001,
-    "Artillery client body length should match its 75% presentation scale",
-  );
-  assertApprox(
-    STATS[KIND.ARTILLERY].body.width,
-    STATS[KIND.TANK].body.width * 0.75,
-    0.001,
-    "Artillery client body width should match its 75% presentation scale",
-  );
-  assertApprox(
-    STATS[KIND.ARTILLERY].body.clearance,
-    STATS[KIND.TANK].body.clearance * 0.75,
-    0.001,
-    "Artillery client body clearance should match its 75% presentation scale",
-  );
+  const artilleryStats = STATS[KIND.ARTILLERY];
+  const tankStats = STATS[KIND.TANK];
+  assert(artilleryStats.size === tankStats.size * 0.75, "Artillery selection size matches its 75% scale");
+  assertApprox(artilleryStats.body.length, tankStats.body.length * 0.75, 0.001, "Artillery body length matches its 75% scale");
+  assertApprox(artilleryStats.body.width, tankStats.body.width * 0.75, 0.001, "Artillery body width matches its 75% scale");
+  assertApprox(artilleryStats.body.clearance, tankStats.body.clearance * 0.75, 0.001, "Artillery clearance matches its 75% scale");
 
   const input = Object.create(Input.prototype);
   input.state = {
