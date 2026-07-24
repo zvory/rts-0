@@ -40,7 +40,7 @@ into issue/PR text.
 - Logs are JSON. Use `rg` for quick filtering.
 - Useful patterns include `error`, `panic`, `database connected`, `match recorded`,
   `RTS_RECORD_MATCHES`, `performance tick summary`, `WebSocket`, `room`, and `lobby`.
-- Prefer `recent` first. Use bounded `tail` only when reproducing an issue live.
+- Finished matches use historical `search`; live checks use `recent`.
 
 ## Report Back
 
