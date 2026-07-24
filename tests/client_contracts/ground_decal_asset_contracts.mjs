@@ -164,7 +164,10 @@ for (const asset of allAssets) {
     "artillery blast uses the authored artillery mask",
   );
   assert(mortarPlan.scale > 0.94 && mortarPlan.scale < 1.06, "mortar blast preserves its 1.5-tile authored footprint");
-  assert(artilleryPlan.scale > 0.94 && artilleryPlan.scale < 1.06, "artillery blast preserves its 2-tile authored footprint");
+  assert(
+    artilleryPlan.scale > 0.63 && artilleryPlan.scale < 0.71,
+    "artillery blast scales its unchanged three-tile authored mask to the new two-tile footprint",
+  );
   assert(mortarPlan.charScale < 0.83, "mortar blast keeps its smaller air-burst center compact");
   assert(artilleryPlan.charScale > mortarPlan.charScale, "artillery retains the broader central crater treatment");
 }

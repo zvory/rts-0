@@ -7,7 +7,10 @@ const DECAL_CLASS_ARTILLERY_BLAST = "artilleryBlast";
 const NEUTRAL_COLOR = "#9aa0a8";
 const TWO_PI = Math.PI * 2;
 const MORTAR_BLAST_RADIUS_WORLD = 48;
-const ARTILLERY_BLAST_RADIUS_WORLD = 64;
+// The unchanged artillery mask was authored for the former three-tile (96 px)
+// footprint. Keep that calibration independent of the current gameplay radius
+// so radiusWorld scales the asset instead of redefining its native size.
+const ARTILLERY_BLAST_AUTHORED_RADIUS_WORLD = 96;
 
 export const GROUND_DECAL_ASSET_COUNTS = Object.freeze({
   infantry: GROUND_DECAL_ASSET_MANIFEST.infantry.length,
@@ -44,7 +47,7 @@ export function createGroundDecalStampPlan(decal, {
 
   if (decal.decalClass === DECAL_CLASS_MORTAR_BLAST || decal.decalClass === DECAL_CLASS_ARTILLERY_BLAST) {
     const artillery = decal.decalClass === DECAL_CLASS_ARTILLERY_BLAST;
-    const baseRadius = artillery ? ARTILLERY_BLAST_RADIUS_WORLD : MORTAR_BLAST_RADIUS_WORLD;
+    const baseRadius = artillery ? ARTILLERY_BLAST_AUTHORED_RADIUS_WORLD : MORTAR_BLAST_RADIUS_WORLD;
     const radiusWorld = Number.isFinite(decal.radiusWorld) && decal.radiusWorld > 0
       ? decal.radiusWorld
       : baseRadius;
