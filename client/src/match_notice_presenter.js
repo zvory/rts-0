@@ -9,6 +9,8 @@ import { NOTICE_SEVERITY } from "./protocol.js";
 
 export const UNDER_ATTACK_BUCKET_PX = 960;
 export const UNDER_ATTACK_COOLDOWN_MS = 10000;
+export const STEEL_SHORTAGE_NOTICE = "Not enough steel";
+export const STEEL_SHORTAGE_COOLDOWN_MS = 60000;
 
 /**
  * Match-scoped presentation policy for existing server Notice events.
@@ -32,6 +34,7 @@ export class MatchNoticePresenter {
     this.pointInViewport = pointInViewport;
     this.now = now;
     this.lastUnderAttackByBucket = new Map();
+    this.lastSteelShortageAt = null;
   }
 
   present(ev) {
@@ -43,6 +46,7 @@ export class MatchNoticePresenter {
     const isAlert = severity === NOTICE_SEVERITY.ALERT || !!alertId;
 
     if (alertId === UNDER_ATTACK_ID && !this._admitUnderAttack(ev, hasPos)) return false;
+    if (ev.msg === STEEL_SHORTAGE_NOTICE && !this._admitSteelShortage()) return false;
 
     this.toast?.(noticeDisplayText(ev.msg));
     if (isAlert) {
@@ -85,6 +89,18 @@ export class MatchNoticePresenter {
     const last = this.lastUnderAttackByBucket.get(bucket);
     if (last != null && now - last < UNDER_ATTACK_COOLDOWN_MS) return false;
     this.lastUnderAttackByBucket.set(bucket, now);
+    return true;
+  }
+
+  _admitSteelShortage() {
+    const now = this.now();
+    if (
+      this.lastSteelShortageAt != null &&
+      now - this.lastSteelShortageAt < STEEL_SHORTAGE_COOLDOWN_MS
+    ) {
+      return false;
+    }
+    this.lastSteelShortageAt = now;
     return true;
   }
 }
