@@ -1218,3 +1218,50 @@ impl Serialize for CompactAttackReveal<'_> {
         seq.end()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{kinds, states};
+
+    #[test]
+    fn compact_entity_trims_trailing_optional_nulls() {
+        let snapshot = Snapshot {
+            tick: 1,
+            world_combat_position: None,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            entities: vec![EntityView::new(
+                1,
+                1,
+                kinds::WORKER,
+                10.0,
+                20.0,
+                40,
+                40,
+                states::IDLE,
+            )],
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            ability_objects: Vec::new(),
+            trenches: Vec::new(),
+            visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            remembered_anti_tank_guns: Vec::new(),
+            events: Vec::new(),
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        };
+
+        let compact = serialize_compact_snapshot(&snapshot).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
+        let entity = value["e"][0].as_array().unwrap();
+        assert_eq!(entity.len(), 8);
+        assert!(value.get("r").is_none());
+        assert!(value.get("ev").is_none());
+    }
+}
