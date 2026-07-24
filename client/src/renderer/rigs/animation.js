@@ -6,6 +6,7 @@ import { normalizedPartSet } from "./part_selection.js";
 const RIG_CONTEXT_READY = Symbol("rtsRigContextReady");
 const RIG_ANIMATION_STAGE = Symbol("rtsRigAnimationStage");
 const ARTILLERY_VISUAL_SCALE = 0.75;
+const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 
 const BINDING_VISIBLE = 0;
 const BINDING_TINT_SLOT = 1;
@@ -136,6 +137,11 @@ export function transformedRigAnchorPoint(definition, entity, anchorName, render
     x: entity.x + (anchor.x * c - anchor.y * s) * visualScale,
     y: entity.y + (anchor.x * s + anchor.y * c) * visualScale,
   };
+}
+
+export function rigContainerScale(renderContext = {}) {
+  const trenchScale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
+  return trenchScale * Math.max(0.01, finite(renderContext.visualScale, 1));
 }
 
 function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {

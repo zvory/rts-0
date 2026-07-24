@@ -3,6 +3,7 @@ import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
+import { rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -26,6 +27,9 @@ function restoreGlobal(name, value) {
   if (value === undefined) delete globalThis[name];
   else globalThis[name] = value;
 }
+
+assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 * 0.85,
+  "rig presentation scale composes with occupied-trench scale");
 
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");

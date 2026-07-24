@@ -1,7 +1,6 @@
 import { SETUP, STATE } from "../../protocol.js";
 import { hexToInt, lightenColor } from "../shared.js";
-
-const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
+import { rigContainerScale } from "./animation.js";
 
 export function renderFrameStripUnit(renderer, entity, strip, texture, options = {}) {
   if (!strip || !texture || !options.poolName || !options.layerName) return null;
@@ -184,9 +183,8 @@ class FrameStripUnitInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? options.alpha ?? 1;
     setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
-    const occupiedScale = (renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1)
-      * Math.max(0.01, finite(renderContext.visualScale, 1));
-    setPoint(this.container.scale, occupiedScale, occupiedScale);
+    const scale = rigContainerScale(renderContext);
+    setPoint(this.container.scale, scale, scale);
     this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext);
 
     const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext);
