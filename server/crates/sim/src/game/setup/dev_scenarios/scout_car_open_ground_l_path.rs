@@ -107,4 +107,41 @@ mod tests {
             command => panic!("scenario should issue a move command, got {command:?}"),
         }
     }
+
+    #[test]
+    #[ignore = "known bug: Scout Car follows a cardinal-first L path on open ground"]
+    fn scenario_scout_car_begins_one_continuous_turn_toward_goal() {
+        let setup =
+            Game::new_scout_car_open_ground_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_0724)
+                .expect("scenario setup should succeed");
+        let scout_id = setup.units[0];
+        let start = setup
+            .game
+            .state
+            .entities
+            .get(scout_id)
+            .map(|scout| (scout.pos_x, scout.pos_y))
+            .expect("scenario scout car should exist");
+        let command = setup.command();
+        let mut game = setup.game;
+        game.enqueue(setup.player_id, command);
+
+        for _ in 0..120 {
+            game.tick();
+        }
+
+        let scout = game
+            .state
+            .entities
+            .get(scout_id)
+            .expect("scenario scout car should remain alive");
+        assert!(
+            scout.pos_x < start.0 - config::TILE_SIZE as f32,
+            "scout car should make westward progress toward the goal"
+        );
+        assert!(
+            scout.pos_y > start.1 + config::TILE_SIZE as f32,
+            "scout car should turn south instead of reversing along a cardinal west leg"
+        );
+    }
 }

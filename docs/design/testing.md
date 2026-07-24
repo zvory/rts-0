@@ -147,6 +147,10 @@ Current scenario ids:
   receives a far southwest move across empty grass. The current bug makes it reverse west along the
   cardinal portion of its grid route before turning southwest; a corrected build should begin one
   continuous forward turn toward the final goal.
+- `scout_car_lake_reverse_l_path` — after a five-second inspection pause, one east-facing Scout Car
+  starts 20 tiles northeast of a centered 15-by-15 lake and receives a move order 20 tiles southwest
+  of it. The regression requires the car to route around the lake without body overlap and reach
+  the exact destination instead of stalling at a corner.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.

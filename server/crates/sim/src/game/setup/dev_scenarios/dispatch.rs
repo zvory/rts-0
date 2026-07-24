@@ -28,6 +28,9 @@ impl Game {
             "scout_car_open_ground_l_path" => {
                 Self::new_scout_car_open_ground_l_path_scenario(unit, unit_count, seed)
             }
+            "scout_car_lake_reverse_l_path" => {
+                Self::new_scout_car_lake_reverse_l_path_scenario(unit, unit_count, seed)
+            }
             "replay_142_vehicle_lock" => {
                 Self::new_replay_142_vehicle_lock_scenario(unit, unit_count, seed)
             }
