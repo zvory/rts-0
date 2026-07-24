@@ -74,15 +74,9 @@ pub(super) fn mirror_weapon_to_body(e: &mut Entity, angle: f32) {
 }
 
 pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
-    if !target_angle.is_finite() {
+    if !target_angle.is_finite() || !anti_tank_gun_target_inside_field_of_fire(e, target_angle) {
         return false;
     }
-    if matches!(e.weapon_setup(), WeaponSetup::Deployed) {
-        // Deployment fixes the entire gun in place. Targets anywhere inside the setup cone can be
-        // fired upon without slewing the body or barrel; changing that cone requires redeployment.
-        return anti_tank_gun_target_inside_field_of_fire(e, target_angle);
-    }
-
     e.set_desired_weapon_facing(target_angle);
     let current = e
         .weapon_facing()

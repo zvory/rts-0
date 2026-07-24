@@ -1214,9 +1214,10 @@ spatial indexes across later mutations.
 
 Entrenchment research takes 20 seconds.
 
-Deployed anti-tank guns acquire and retain only targets inside their fixed setup cone. The gun body
-and barrel do not track even an in-cone target; being inside the cone is sufficient to fire, and
-changing the cone requires teardown and redeployment.
+Deployed anti-tank guns acquire and retain only targets inside their fixed setup cone. Their body
+and barrel turn together to track an in-cone target before firing, while the setup cone itself
+remains fixed. Targets outside the cone do not cause rotation and require teardown and redeployment
+before the gun can engage them.
 
 Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, stops to fire, and repaths if the same target moves out of range; it never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
 

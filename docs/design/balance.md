@@ -334,10 +334,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   while manual fire remains unrestricted.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 degrees total`; packed, setting-up, and tearing-down guns
-  cannot fire. Once deployed, both the gun body and barrel remain fixed at the setup facing:
-  targets anywhere inside the cone can be fired upon without visual tracking, while targets outside
-  it require teardown and redeployment. While packed and mobile, an Anti-Tank Gun moves at
-  1.52 px/tick and turns its body at
+  cannot fire. A deployed gun's setup cone remains fixed while its body and barrel turn together at
+  `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.035` to track targets inside that cone;
+  targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
+  Anti-Tank Gun moves at 1.52 px/tick and turns its body at
   `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 50`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible

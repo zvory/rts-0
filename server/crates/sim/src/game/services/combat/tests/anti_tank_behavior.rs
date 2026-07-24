@@ -1,13 +1,20 @@
 use super::*;
 
 #[test]
-fn deployed_anti_tank_gun_fires_inside_arc_without_tracking_target() {
+fn deployed_anti_tank_gun_tracks_target_inside_fixed_arc_before_firing() {
     let mut entities = EntityStore::new();
     let at_id = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
         .expect("anti-tank gun should spawn");
+    let target_angle = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.45;
+    let target_distance = 80.0;
     let enemy_id = entities
-        .spawn_unit(2, EntityKind::Tank, 180.0, 110.0)
+        .spawn_unit(
+            2,
+            EntityKind::Tank,
+            100.0 + target_angle.cos() * target_distance,
+            100.0 + target_angle.sin() * target_distance,
+        )
         .expect("enemy tank should spawn");
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
     if let Some(at) = entities.get_mut(at_id) {
@@ -19,18 +26,41 @@ fn deployed_anti_tank_gun_fires_inside_arc_without_tracking_target() {
 
     run_combat_tick(&mut entities);
 
-    let at = entities.get(at_id).expect("at should exist");
+    let at = entities.get(at_id).expect("anti-tank gun should exist");
     assert!(
-        at.facing().abs() <= 0.001,
-        "deployed anti-tank gun body must remain fixed while firing in arc"
+        (at.facing() - ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK).abs() <= 0.001,
+        "deployed anti-tank gun should slew toward an in-cone target at its turn-rate cap"
     );
     assert!(
-        at.weapon_facing().unwrap_or_default().abs() <= 0.001,
-        "deployed anti-tank gun barrel must remain fixed while firing in arc"
+        (at.weapon_facing().unwrap_or_default() - at.facing()).abs() <= 0.001,
+        "anti-tank gun body and barrel should track together"
+    );
+    assert!(
+        at.emplacement_facing().unwrap_or_default().abs() <= 0.001,
+        "in-cone tracking must not move the fixed setup cone"
+    );
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "anti-tank gun should wait until its body and barrel align"
+    );
+
+    for _ in 0..20 {
+        run_combat_tick(&mut entities);
+    }
+
+    let at = entities.get(at_id).expect("anti-tank gun should exist");
+    assert!(
+        angle_delta(at.facing(), target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD,
+        "anti-tank gun should finish tracking the in-cone target"
+    );
+    assert!(
+        at.emplacement_facing().unwrap_or_default().abs() <= 0.001,
+        "tracking and firing must leave the setup cone fixed"
     );
     assert!(
         entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
-        "an in-arc target should be hit without requiring visual target tracking"
+        "anti-tank gun should fire after tracking the in-cone target"
     );
 }
 
@@ -69,6 +99,32 @@ fn deployed_anti_tank_gun_does_not_turn_or_fire_at_target_outside_arc() {
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp,
         "anti-tank gun should not fire outside its deployed field of fire"
+    );
+}
+
+#[test]
+fn deployed_anti_tank_gun_rotation_rejects_target_outside_fixed_arc() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let at = entities.get_mut(at_id).expect("anti-tank gun should exist");
+    at.set_weapon_setup(WeaponSetup::Deployed);
+    at.set_emplacement_facing(Some(0.0));
+    at.set_facing(0.0);
+    at.set_weapon_facing(0.0);
+
+    assert!(
+        !rotate_anti_tank_gun_for_combat(at, std::f32::consts::FRAC_PI_2),
+        "a target outside the fixed field must not become fireable"
+    );
+    assert!(
+        at.facing().abs() <= f32::EPSILON,
+        "an out-of-cone target must not rotate the gun body"
+    );
+    assert!(
+        at.weapon_facing().unwrap_or_default().abs() <= f32::EPSILON,
+        "an out-of-cone target must not rotate the gun barrel"
     );
 }
 
