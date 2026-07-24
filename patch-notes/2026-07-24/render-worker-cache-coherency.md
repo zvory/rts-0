@@ -6,7 +6,7 @@ _2026-07-24_
 
 ## Changes
 
-- Fixed live matches failing to render after an update due to stale cached files.
+- Fixed live matches sometimes failing to render after an update due to stale cached files.
 
 ## Playtest watch
 
