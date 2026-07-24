@@ -439,7 +439,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
   can still turn autocast off per selected Mortar Team.
 - **Smoke Plus** (R&D Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
-  takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 3-tile
+  takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
   catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
@@ -477,7 +477,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   sequential recharge queue: one missing charge returns after 15 seconds, and a second missing
   charge returns after another 15 seconds. Target range: 14 tiles from the caster. Launch delay: up
   to 100 ms at max range, scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration:
-  5 seconds. After Smoke Plus research, future casts by that player use a 3-tile
+  5 seconds. After Smoke Plus research, future casts by that player use a 4-tile
   radius and 10-second duration.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
