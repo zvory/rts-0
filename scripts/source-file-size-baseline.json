@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1659,
-      "reason": "The Attack DTO gained the optional Tank Trap cluster flag beside its mirrored queued flag; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
+      "lines": 1632,
+      "reason": "Client-message serde tests moved out of the oversized protocol root while the Attack DTO gained the optional Tank Trap cluster flag; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -40,7 +40,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 2095,
+      "lines": 2093,
       "reason": "Tank Trap cluster admission captures a fog-safe authoritative target set and applies per-unit weapon legality through the shared planner; keep ratcheting by extracting cohesive targeted-command admission and execution."
     },
     {
