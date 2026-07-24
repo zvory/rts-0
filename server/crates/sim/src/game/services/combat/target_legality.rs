@@ -1,6 +1,4 @@
-use crate::game::entity::{
-    movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass,
-};
+use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::rules::terrain::{self, TerrainKind};
 
 use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
@@ -45,12 +43,13 @@ pub(super) fn direct_fire_target_legal(
             attacker,
         )
     } else {
-        crate::game::services::world_query::is_enemy_targetable(
-            target_entity,
-            teams,
-            attacker_owner,
-            attacker,
-        )
+        !target_entity.is_neutral_obstacle()
+            && crate::game::services::world_query::is_enemy_targetable(
+                target_entity,
+                teams,
+                attacker_owner,
+                attacker,
+            )
     };
     if !targetable {
         return false;
@@ -108,14 +107,10 @@ pub(super) fn auto_target_legality(
     py: f32,
     acquire_px: f32,
     weapon_range_px: f32,
-    attacker_kind: EntityKind,
-    allow_irrelevant_retained_target: bool,
     target: &Entity,
 ) -> Option<AutoTargetLegality> {
-    if !crate::game::services::world_query::is_enemy_targetable(target, teams, owner, self_id)
-        || (!allow_irrelevant_retained_target
-            && movement_body_class(attacker_kind) == MovementBodyClass::InfantryLike
-            && target.kind == EntityKind::TankTrap)
+    if target.is_neutral_obstacle()
+        || !crate::game::services::world_query::is_enemy_targetable(target, teams, owner, self_id)
     {
         return None;
     }

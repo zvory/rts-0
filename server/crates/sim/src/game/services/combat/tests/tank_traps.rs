@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
+fn completed_tank_traps_are_valid_only_as_explicit_attack_targets() {
     let map = open_map(8);
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -13,7 +13,7 @@ fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
     entities
         .get_mut(attacker)
         .expect("attacker should exist")
-        .set_order(Order::attack_move_to(300.0, 100.0));
+        .set_order(Order::attack(trap));
 
     assert_eq!(entities.get(trap).map(|trap| trap.owner), Some(0));
     assert_eq!(
@@ -25,7 +25,7 @@ fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
             192.0,
         ),
         Some(trap),
-        "neutral Tank Traps should obstruct and engage vehicles regardless of former team"
+        "a direct Attack order should retain its neutral Tank Trap target"
     );
 }
 
@@ -92,7 +92,7 @@ fn move_orders_do_not_auto_acquire_neutral_tank_traps() {
 }
 
 #[test]
-fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
+fn ground_attack_move_does_not_auto_acquire_neutral_tank_traps() {
     for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
         let mut entities = EntityStore::new();
         let attacker = entities
@@ -105,6 +105,11 @@ fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
         let trap = entities
             .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
             .expect("tank trap should spawn");
+        let trap_hp = entities.get(trap).expect("trap should exist").hp;
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_target_id(Some(trap));
 
         run_combat_tick_on_map(
             &mut entities,
@@ -117,14 +122,19 @@ fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
                 .get(attacker)
                 .expect("attacker should exist")
                 .target_id(),
-            Some(trap),
-            "{kind:?} should auto-acquire neutral Tank Traps"
+            None,
+            "{kind:?} should drop even a stale Tank Trap target during ground Attack Move"
+        );
+        assert_eq!(
+            entities.get(trap).expect("trap should exist").hp,
+            trap_hp,
+            "{kind:?} should not damage a neutral Tank Trap during ground Attack Move"
         );
     }
 }
 
 #[test]
-fn vehicle_body_auto_acquisition_prefers_soft_target_over_irrelevant_tank_trap() {
+fn ground_attack_move_ignores_tank_trap_while_acquiring_enemy_unit() {
     let mut entities = EntityStore::new();
     let scout = entities
         .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
@@ -134,8 +144,9 @@ fn vehicle_body_auto_acquisition_prefers_soft_target_over_irrelevant_tank_trap()
         scout.set_path_goal(Some((300.0, 100.0)));
     }
     let trap = entities
-        .spawn_building(2, EntityKind::TankTrap, 150.0, 160.0, true)
-        .expect("irrelevant tank trap should spawn");
+        .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+        .expect("tank trap should spawn");
+    let trap_hp = entities.get(trap).expect("trap should exist").hp;
     let worker = entities
         .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
         .expect("worker should spawn");
@@ -153,46 +164,18 @@ fn vehicle_body_auto_acquisition_prefers_soft_target_over_irrelevant_tank_trap()
     assert_eq!(
         target,
         Some(worker),
-        "vehicle should not waste priority on a Tank Trap away from its route"
+        "ground Attack Move should acquire the enemy unit and ignore the Tank Trap"
     );
     assert_ne!(target, Some(trap));
-}
-
-#[test]
-fn vehicle_body_auto_acquisition_prioritizes_obstructing_tank_trap_over_soft_target() {
-    let mut entities = EntityStore::new();
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
-        .expect("scout car should spawn");
-    if let Some(scout) = entities.get_mut(scout) {
-        scout.set_order(Order::attack_move_to(300.0, 100.0));
-        scout.set_path_goal(Some((300.0, 100.0)));
-    }
-    let trap = entities
-        .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
-        .expect("obstructing tank trap should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Worker, 180.0, 130.0)
-        .expect("worker should spawn");
-
-    run_combat_tick_on_map(
-        &mut entities,
-        &[player_state(1, false), player_state(2, false)],
-        &open_map(12),
-    );
-
     assert_eq!(
-        entities
-            .get(scout)
-            .expect("scout car should exist")
-            .target_id(),
-        Some(trap),
-        "vehicle should breach a Tank Trap that is on its route"
+        entities.get(trap).expect("trap should exist").hp,
+        trap_hp,
+        "route obstruction must not make the Tank Trap an automatic target"
     );
 }
 
 #[test]
-fn tank_prioritizes_anti_tank_gun_over_irrelevant_nearby_tank_trap() {
+fn tank_attack_move_ignores_tank_trap_while_acquiring_anti_tank_gun() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let tank = entities
@@ -225,6 +208,13 @@ fn tank_destroys_tank_trap_on_second_shot() {
     let trap = entities
         .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
         .expect("tank trap should spawn");
+    let uncommanded_trap = entities
+        .spawn_building(2, EntityKind::TankTrap, 130.0, 100.0, true)
+        .expect("uncommanded tank trap should spawn");
+    let uncommanded_trap_hp = entities
+        .get(uncommanded_trap)
+        .expect("uncommanded trap should exist")
+        .hp;
     entities
         .get_mut(tank)
         .expect("tank should exist")
@@ -251,6 +241,14 @@ fn tank_destroys_tank_trap_on_second_shot() {
         entities.get(trap).expect("trap should exist").hp,
         tank_shot - coax_damage,
         "first Tank shot should leave the trap alive after one cannon shot plus coax fallback damage"
+    );
+    assert_eq!(
+        entities
+            .get(uncommanded_trap)
+            .expect("uncommanded trap should exist")
+            .hp,
+        uncommanded_trap_hp,
+        "the coax must not broaden an explicit attack to another neutral Tank Trap"
     );
 
     for _ in 0..tank_cooldown {

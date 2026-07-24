@@ -260,7 +260,7 @@ currently inside weapon range and pass hostile, visibility, smoke, line-of-sight
 checks, but it cannot replace the commanded destination with an enemy-directed path. Non-moving-fire
 `AttackMove` units pause for fireable in-range targets and then resume the original destination.
 Direct `Attack` orders and post-arrival behavior remain stationary. Tank auto-targeting first checks
-in-range Anti-Tank Guns, Tanks, Tank Traps, and Mortar Teams, in that order, before generic
+in-range Anti-Tank Guns, Tanks, and Mortar Teams, in that order, before generic
 acquisition. This priority applies when the tank acquires after firing or when its committed target
 stops being fireable; a still-fireable target prepared during reload is not reranked on the ready
 tick. Priority never considers out-of-range targets or overrides explicit player attack orders.
@@ -272,19 +272,17 @@ Default auto-acquisition groups already-legal targets before applying weapon fit
 unit attackers prefer non-economy combat units, then economy workers (`Worker` and `Golem`),
 then buildings and other non-unit cleanup targets. Small-arms default weapons prefer soft targets
 (`ArmorClass::Small`) over armored targets within the same target group, but they
-still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
-units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
+still fire at armor or buildings when no better legal target exists. Completed Tank Traps are
+excluded from automatic acquisition for every unit and weapon, including ground Attack Move and
+route obstruction; only a direct Attack on a Tank Trap may target it. That explicit command captures
+the visible completed Tank Trap cluster within 4 tiles, while vehicle pathfinding continues routing
+around the obstacles. Anti-armor default weapons
 prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
 auto-acquire or accept direct Attack orders against infantry-sized targets: Workers, Golems,
 Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons and other non-infantry targets
 remain legal. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
-Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
-the unit's current short route window or helps close a vehicle-body gap across that route; nearby
-irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets. Idle
-units and units following ordinary Move orders do not auto-acquire neutral Tank Traps; direct
-Attack and active Attack Move orders retain their explicit clearing/breaching behavior.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
 `EntityKind`, including the Tank coax infantry-priority group. The live coax policy ranks Riflemen
 and Machine Gunners first, economy workers (`Worker` and `Golem`) second, and fallback legal

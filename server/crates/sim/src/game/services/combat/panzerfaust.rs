@@ -8,8 +8,7 @@ use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 use super::weapons::mirror_weapon_to_body;
 use super::{
-    dist2, Fog, LineOfSight, Map, Occupancy, SmokeCloudStore, SpatialIndex, TeamRelations,
-    RANGE_SLACK,
+    dist2, Fog, LineOfSight, Map, SmokeCloudStore, SpatialIndex, TeamRelations, RANGE_SLACK,
 };
 
 mod events;
@@ -24,7 +23,6 @@ pub(super) fn handle_combat_if_panzerfaust(
     blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
-    occ: &Occupancy,
     spatial: &SpatialIndex,
     request_direct_attack_path: &mut dyn FnMut(&mut EntityStore, u32, u32, f32, f32),
     fog: &Fog,
@@ -43,7 +41,6 @@ pub(super) fn handle_combat_if_panzerfaust(
             blockers,
             teams,
             methamphetamines_researched,
-            occ,
             spatial,
             request_direct_attack_path,
             fog,
@@ -61,7 +58,6 @@ fn handle_loaded_combat(
     blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
-    occ: &Occupancy,
     spatial: &SpatialIndex,
     request_direct_attack_path: &mut dyn FnMut(&mut EntityStore, u32, u32, f32, f32),
     fog: &Fog,
@@ -82,8 +78,8 @@ fn handle_loaded_combat(
 
     let los = LineOfSight::with_smoke(map, smokes);
     let target = resolve_panzerfaust_target(
-        map, entities, blockers, teams, occ, spatial, &los, fog, smokes, id, owner, px, py,
-        range_px, acquire_px, mode,
+        map, entities, blockers, teams, spatial, &los, fog, smokes, id, owner, px, py, range_px,
+        acquire_px, mode,
     );
     let Some(target) = target else {
         return false;
@@ -177,7 +173,6 @@ fn resolve_panzerfaust_target(
     entities: &EntityStore,
     blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
-    occ: &Occupancy,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
     fog: &Fog,
@@ -198,9 +193,6 @@ fn resolve_panzerfaust_target(
                 panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, *target)
             });
     }
-    let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
-        occ.tank_trap_obstructs_vehicle_route(attacker, target, teams)
-    };
     resolve_target_for_weapon(
         map,
         entities,
@@ -210,7 +202,6 @@ fn resolve_panzerfaust_target(
         los,
         fog,
         smokes,
-        &tank_trap_obstructs_vehicle_route,
         id,
         owner,
         px,

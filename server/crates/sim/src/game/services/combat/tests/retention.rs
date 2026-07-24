@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::entity::Entity;
 use crate::game::fog::LingeringSightSource;
-use crate::game::services::combat::acquisition::resolve_target as resolve_target_with_obstruction;
+use crate::game::services::combat::acquisition::resolve_target as resolve_target_for_test;
 
 fn tank_with_retained_target(
     map: &Map,
@@ -125,7 +125,7 @@ fn lingering_death_vision_feeds_auto_acquisition() {
 
     assert!(live_fog.is_visible_world(1, target_pos.0, target_pos.1));
     assert_eq!(
-        resolve_target_with_obstruction(
+        resolve_target_for_test(
             &map,
             &entities,
             &blockers,
@@ -134,7 +134,6 @@ fn lingering_death_vision_feeds_auto_acquisition() {
             &los,
             &live_fog,
             &smokes,
-            &|_, _| false,
             attacker,
             1,
             attacker_pos.0,

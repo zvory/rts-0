@@ -14,7 +14,6 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::acquisition::order_allows_neutral_obstacle_acquisition;
 use super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
@@ -33,7 +32,7 @@ struct TankCoaxSnapshot {
     pos_y: f32,
     weapon_facing: f32,
     range_px: f32,
-    allow_neutral_obstacle: bool,
+    explicit_neutral_obstacle_target: Option<u32>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -161,7 +160,7 @@ fn tank_coax_snapshot(
         pos_y: tank.pos_y,
         weapon_facing,
         range_px,
-        allow_neutral_obstacle: order_allows_neutral_obstacle_acquisition(tank.order()),
+        explicit_neutral_obstacle_target: tank.order().attack_target(),
     })
 }
 
@@ -212,7 +211,9 @@ fn tank_coax_target_candidates(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.is_neutral_obstacle() && !snapshot.allow_neutral_obstacle {
+        if target.is_neutral_obstacle()
+            && snapshot.explicit_neutral_obstacle_target != Some(target.id)
+        {
             continue;
         }
         if !crate::game::services::world_query::is_enemy_targetable(
@@ -260,7 +261,6 @@ fn tank_coax_target_candidates(
             distance_sq,
             facts: target_rules::target_facts(target.kind),
             in_weapon_range: true,
-            tank_trap_obstructs_vehicle_route: false,
             retained_target: false,
         });
     }

@@ -7,7 +7,6 @@ use crate::rules::target::TargetFacts;
 pub(super) struct TargetPriorityPolicy {
     candidate_eligibility: CandidateEligibility,
     immediate_threats: ImmediateThreatPolicy,
-    route_obstruction: RouteObstructionPolicy,
     target_group: TargetGroupPolicy,
     weapon_fit: WeaponFitPolicy,
     retention: RetentionPolicy,
@@ -23,12 +22,6 @@ enum CandidateEligibility {
 enum ImmediateThreatPolicy {
     None,
     TankCannon,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RouteObstructionPolicy {
-    None,
-    VehicleTankTrap,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,7 +49,6 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::DefaultWeapon => Self {
                 candidate_eligibility: CandidateEligibility::All,
                 immediate_threats: ImmediateThreatPolicy::None,
-                route_obstruction: RouteObstructionPolicy::None,
                 target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
                 weapon_fit: WeaponFitPolicy::DefaultWeapon,
                 retention: RetentionPolicy::MovingFireEqualRank,
@@ -64,7 +56,6 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::VehicleDefaultWeapon => Self {
                 candidate_eligibility: CandidateEligibility::All,
                 immediate_threats: ImmediateThreatPolicy::None,
-                route_obstruction: RouteObstructionPolicy::VehicleTankTrap,
                 target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
                 weapon_fit: WeaponFitPolicy::DefaultWeapon,
                 retention: RetentionPolicy::MovingFireEqualRank,
@@ -72,7 +63,6 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::TankCannon => Self {
                 candidate_eligibility: CandidateEligibility::All,
                 immediate_threats: ImmediateThreatPolicy::TankCannon,
-                route_obstruction: RouteObstructionPolicy::None,
                 target_group: TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits,
                 weapon_fit: WeaponFitPolicy::TankCannonDefaultWeapon,
                 retention: RetentionPolicy::MovingFireEqualRank,
@@ -80,7 +70,6 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::TankCoaxMachineGun => Self {
                 candidate_eligibility: CandidateEligibility::ExcludeResourceNodes,
                 immediate_threats: ImmediateThreatPolicy::None,
-                route_obstruction: RouteObstructionPolicy::None,
                 target_group: TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback,
                 weapon_fit: WeaponFitPolicy::None,
                 retention: RetentionPolicy::None,
@@ -99,7 +88,6 @@ impl TargetPriorityPolicy {
         self,
         facts: TargetFacts,
         in_weapon_range: bool,
-        tank_trap_obstructs_vehicle_route: bool,
     ) -> Option<u8> {
         if self.immediate_threats != ImmediateThreatPolicy::TankCannon || !in_weapon_range {
             return None;
@@ -109,30 +97,10 @@ impl TargetPriorityPolicy {
         } else {
             match facts.threat_role {
                 combat_rules::TargetThreatRole::AntiArmorThreat => Some(1),
-                combat_rules::TargetThreatRole::FieldObstacle
-                    if facts.kind == EntityKind::TankTrap && tank_trap_obstructs_vehicle_route =>
-                {
-                    Some(2)
-                }
                 combat_rules::TargetThreatRole::SupportWeapon => Some(3),
                 combat_rules::TargetThreatRole::FieldObstacle
                 | combat_rules::TargetThreatRole::Ordinary => None,
             }
-        }
-    }
-
-    pub(super) fn vehicle_route_obstruction_order(
-        self,
-        facts: TargetFacts,
-        tank_trap_obstructs_vehicle_route: bool,
-    ) -> Option<u8> {
-        if self.route_obstruction == RouteObstructionPolicy::VehicleTankTrap
-            && facts.kind == EntityKind::TankTrap
-            && tank_trap_obstructs_vehicle_route
-        {
-            Some(0)
-        } else {
-            None
         }
     }
 

@@ -284,7 +284,6 @@ pub(crate) fn run_tick(
             &teams,
             &mortar_autocast_researched,
             &methamphetamines_researched,
-            &post_movement.occupancy,
             &post_movement.spatial,
             &mut coordinator,
             fog,

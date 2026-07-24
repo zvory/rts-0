@@ -29,7 +29,6 @@ pub(super) struct TargetCandidate {
     pub distance_sq: f32,
     pub facts: TargetFacts,
     pub in_weapon_range: bool,
-    pub tank_trap_obstructs_vehicle_route: bool,
     pub retained_target: bool,
 }
 
@@ -88,17 +87,9 @@ fn rank_candidate(
     if !policy.allows_candidate(candidate.facts) {
         return None;
     }
-    let (priority_bucket, target_group_order, weapon_fit_order) = if let Some(order) = policy
-        .immediate_threat_order(
-            candidate.facts,
-            candidate.in_weapon_range,
-            candidate.tank_trap_obstructs_vehicle_route,
-        ) {
-        (0, order, 0)
-    } else if let Some(order) = policy.vehicle_route_obstruction_order(
-        candidate.facts,
-        candidate.tank_trap_obstructs_vehicle_route,
-    ) {
+    let (priority_bucket, target_group_order, weapon_fit_order) = if let Some(order) =
+        policy.immediate_threat_order(candidate.facts, candidate.in_weapon_range)
+    {
         (0, order, 0)
     } else {
         (
@@ -163,15 +154,7 @@ mod tests {
             distance_sq,
             facts: crate::rules::target::target_facts(kind),
             in_weapon_range: true,
-            tank_trap_obstructs_vehicle_route: false,
             retained_target,
-        }
-    }
-
-    fn obstructing_tank_trap(id: u32, distance_sq: f32) -> TargetCandidate {
-        TargetCandidate {
-            tank_trap_obstructs_vehicle_route: true,
-            ..candidate(id, EntityKind::TankTrap, distance_sq, false)
         }
     }
 
@@ -317,45 +300,6 @@ mod tests {
     }
 
     #[test]
-    fn scout_car_prefers_soft_target_over_nearer_irrelevant_tank_trap() {
-        let candidates = [
-            candidate(10, EntityKind::TankTrap, 400.0, false),
-            candidate(11, EntityKind::Worker, 2_500.0, false),
-        ];
-
-        assert_eq!(
-            choose_target(&context(EntityKind::ScoutCar), &candidates),
-            Some(11)
-        );
-    }
-
-    #[test]
-    fn vehicle_body_prefers_obstructing_tank_trap_over_soft_target() {
-        let candidates = [
-            obstructing_tank_trap(10, 900.0),
-            candidate(11, EntityKind::Worker, 400.0, false),
-        ];
-
-        assert_eq!(
-            choose_target(&context(EntityKind::ScoutCar), &candidates),
-            Some(10)
-        );
-    }
-
-    #[test]
-    fn tank_keeps_anti_tank_gun_above_obstructing_tank_trap() {
-        let candidates = [
-            obstructing_tank_trap(10, 400.0),
-            candidate(11, EntityKind::AntiTankGun, 2_500.0, false),
-        ];
-
-        assert_eq!(
-            choose_target(&context(EntityKind::Tank), &candidates),
-            Some(11)
-        );
-    }
-
-    #[test]
     fn equal_rank_targets_use_distance_then_id_tie_breaks() {
         let farther = candidate(10, EntityKind::Worker, 2_500.0, false);
         let nearer = candidate(11, EntityKind::Worker, 400.0, false);
@@ -401,7 +345,7 @@ mod tests {
         let candidates = [
             candidate(10, EntityKind::Tank, 2_500.0, false),
             candidate(11, EntityKind::Barracks, 900.0, false),
-            obstructing_tank_trap(12, 400.0),
+            candidate(12, EntityKind::TankTrap, 400.0, false),
         ];
 
         assert_eq!(choose_target(&coax_context(), &candidates), Some(12));
