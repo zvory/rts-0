@@ -1525,14 +1525,14 @@ fn try_fire_artillery(
     let min_fire_radius_tiles =
         artillery_min_fire_radius_tiles(ps.has_upgrade(UpgradeKind::BallisticTables));
     if !ps.can_afford(ammo_cost.steel, ammo_cost.oil) {
-        notice(events, player, "Not enough steel");
+        notice(events, player, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
         if let Some(e) = entities.get_mut(unit) {
             e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
         }
         return false;
     }
     if !ps.spend_cost(ammo_cost) {
-        notice(events, player, "Not enough steel");
+        notice(events, player, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
         return false;
     }
     let (target_x, target_y) = {

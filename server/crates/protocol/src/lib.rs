@@ -46,6 +46,10 @@ pub use rts_contract::{
 };
 pub use server_message::ServerMessage;
 
+pub mod notices {
+    pub const ARTILLERY_STEEL_SHORTAGE: &str = "notice:artillery_steel_shortage";
+}
+
 // ---------------------------------------------------------------------------
 // Client -> Server
 // ---------------------------------------------------------------------------

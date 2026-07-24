@@ -246,6 +246,10 @@ export const NOTICE_SEVERITY = Object.freeze({
   ALERT: "alert",
 });
 
+export const NOTICE = Object.freeze({
+  ARTILLERY_STEEL_SHORTAGE: "notice:artillery_steel_shortage",
+});
+
 export const ABILITY = Object.freeze({
   CHARGE: "charge",
   SMOKE: "smoke",

@@ -1065,7 +1065,10 @@ present, or pulse the minimap border when absent. Replay viewers and live specta
 alert feedback but suppress notice alert audio. `alert:under_attack` is emitted at the damaged enemy
 unit's position to the victim owner only; same-team recipients may still see the attack event through
 shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
-does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
+does not emit under-attack alerts. `notice:artillery_steel_shortage` identifies artillery-ammo
+shortages so clients can render the ordinary “Not enough steel” feedback while throttling only that
+automatic retry source; ordinary `Not enough steel` notices remain unthrottled. Unit attack events
+are sent to the attacker's team and to enemy
 recipients whose team can currently see the shooter or target point. Shots resolved against Tank
 Traps carry no shooter `reveal` and grant no actionable firing reveal to the Tank Trap's team. A
 missed direct shot
