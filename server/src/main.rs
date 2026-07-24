@@ -11,8 +11,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State};
-use axum::http::{header, StatusCode, Uri};
-use axum::response::{IntoResponse, Redirect};
+use axum::http::{header, HeaderValue, Request, StatusCode, Uri};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
@@ -114,7 +115,8 @@ struct AppState {
     lobby: Lobby,
     version: String,
     /// `index.html` with `?v=<build id>` appended to all JS/CSS asset URLs, computed once at
-    /// startup so cache-busting survives browser caches without a hard refresh.
+    /// startup. Static responses also require revalidation so module-worker child imports, which
+    /// do not inherit the document import map, cannot retain code from an older build.
     index_html: String,
     maps_dir: String,
     /// Optional database for match history and explicitly gated diagnostics. `None` when
@@ -178,8 +180,12 @@ async fn main() {
     let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
     // single-page client loads, but missing asset URLs stay 404 so packaging errors are visible.
-    let static_service = ServeDir::new(&client_dir)
-        .fallback(get(client_spa_fallback_handler).with_state(state.clone()));
+    let static_service = Router::new()
+        .fallback_service(
+            ServeDir::new(&client_dir)
+                .fallback(get(client_spa_fallback_handler).with_state(state.clone())),
+        )
+        .layer(middleware::from_fn(revalidate_client_assets));
 
     let app = Router::new()
         .route("/", get(index_handler))
@@ -360,6 +366,20 @@ async fn stress_test_index_handler(State(state): State<AppState>) -> impl IntoRe
         ],
         state.index_html,
     )
+}
+
+/// Require cached static responses to be revalidated before use.
+///
+/// The document import map versions page-owned modules, but import maps do not apply inside module
+/// workers. Their relative child imports have stable URLs, so allowing heuristic browser caching
+/// can combine modules from different deploys and fail named-export linking at worker startup.
+async fn revalidate_client_assets(request: Request<axum::body::Body>, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    response
+        .headers_mut()
+        .entry(header::CACHE_CONTROL)
+        .or_insert(HeaderValue::from_static("no-cache"));
+    response
 }
 
 async fn client_spa_fallback_handler(uri: Uri, State(state): State<AppState>) -> impl IntoResponse {
@@ -694,9 +714,10 @@ async fn dev_replay_artifact_handler(
 /// Read `index.html`, inject a versioned import map for all `/src/*.js` modules, and append
 /// `?v=<version>` to the top-level cacheable app asset URLs.
 ///
-/// The import map causes the browser to rewrite every `import "./foo.js"` inside ES modules to
-/// `./foo.js?v=<version>`, so sub-modules (hud.js, net.js, …) are cache-busted alongside
-/// main.js without a build step.
+/// The import map causes the browser to rewrite every `import "./foo.js"` inside document-owned ES
+/// modules to `./foo.js?v=<version>`, so sub-modules (hud.js, net.js, …) are cache-busted alongside
+/// main.js without a build step. Module workers do not inherit this map; the static response layer
+/// requires revalidation to keep their unversioned child imports coherent across deploys.
 fn build_versioned_index(client_dir: &str, version: &str) -> String {
     let path = format!("{client_dir}/index.html");
     let html = std::fs::read_to_string(&path).unwrap_or_else(|err| {
@@ -765,6 +786,7 @@ fn collect_js_modules(dir: &std::path::Path, prefix: &std::path::Path, out: &mut
 mod tests {
     use super::*;
     use std::sync::{Mutex, OnceLock};
+    use tower::ServiceExt;
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -1027,6 +1049,31 @@ mod tests {
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert!(html.contains("./live_pause.css?v=test-version\""));
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
+    }
+
+    #[tokio::test]
+    async fn client_assets_require_cache_revalidation_for_worker_module_coherency() {
+        let app = Router::new()
+            .route(
+                "/src/renderer/rigs/animation.js",
+                get(|| async { "export function rigContainerScale() {}" }),
+            )
+            .layer(middleware::from_fn(revalidate_client_assets));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/src/renderer/rigs/animation.js")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL),
+            Some(&HeaderValue::from_static("no-cache")),
+            "worker child modules must revalidate so a deploy cannot mix module versions"
+        );
     }
 
     #[test]
