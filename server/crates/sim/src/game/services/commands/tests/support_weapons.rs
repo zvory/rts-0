@@ -247,7 +247,7 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
         config::ARTILLERY_RELOAD_TICKS,
         "promotion-time ammo failure still applies the current reload penalty"
     );
-    assert_notice(&events, 1, "Not enough steel");
+    assert_notice(&events, 1, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
     assert!(
         events
             .values()
@@ -308,7 +308,7 @@ fn artillery_blanket_fire_system_rechecks_ammo_affordability() {
         config::ARTILLERY_RELOAD_TICKS,
         "promotion-time Blanket Fire ammo failure still applies the current reload penalty"
     );
-    assert_notice(&events, 1, "Not enough steel");
+    assert_notice(&events, 1, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
     assert!(
         events
             .values()
