@@ -1334,15 +1334,15 @@ withFakeHudDocument(({ FakeElement }) => {
     ],
     resources: { steel: 200, oil: 200 },
   }));
-  const mediumGuns = buttonByLabel(researchCard, "AT Guns");
-  assert(mediumGuns && mediumGuns.enabled, "available affordable upgrade should be enabled");
-  assert(mediumGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
-  assert(mediumGuns.intent.type === "research", "upgrade button should carry research intent");
-  const lockedHeavyGuns = buttonByLabel(researchCard, "Artillery");
-  assert(lockedHeavyGuns && !lockedHeavyGuns.enabled, "R&D should keep Artillery visible but locked before AT Guns");
-  assert(lockedHeavyGuns.slotIndex !== mediumGuns.slotIndex, "Artillery should keep a slot separate from AT Guns");
+  const atGuns = buttonByLabel(researchCard, "AT Guns");
+  assert(atGuns && atGuns.enabled, "available affordable upgrade should be enabled");
+  assert(atGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
+  assert(atGuns.intent.type === "research", "upgrade button should carry research intent");
+  const lockedArtillery = buttonByLabel(researchCard, "Artillery");
+  assert(lockedArtillery && !lockedArtillery.enabled, "R&D should keep Artillery visible but locked before AT Guns");
+  assert(lockedArtillery.slotIndex !== atGuns.slotIndex, "Artillery should keep a slot separate from AT Guns");
   assert(!buttonByLabel(researchCard, "Unlock Artillery"), "R&D should not expose a separate Artillery unlock");
-  const heavyGunsCard = buildCommandCardDescriptors(commandCardCtx({
+  const artilleryResearchCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [researchComplex],
     entities: [
       { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
@@ -1352,10 +1352,10 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 500, oil: 500 },
     upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
   }));
-  const heavyGuns = buttonByLabel(heavyGunsCard, "Artillery");
-  assert(heavyGuns && heavyGuns.enabled, "Artillery should enable after AT Guns is researched");
-  assert(heavyGuns.slotIndex === lockedHeavyGuns.slotIndex, "Artillery should retain its permanent button slot");
-  assert(heavyGuns.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Artillery should use the artillery unlock identity");
+  const artilleryResearch = buttonByLabel(artilleryResearchCard, "Artillery");
+  assert(artilleryResearch && artilleryResearch.enabled, "Artillery should enable after AT Guns is researched");
+  assert(artilleryResearch.slotIndex === lockedArtillery.slotIndex, "Artillery should retain its permanent button slot");
+  assert(artilleryResearch.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Artillery should use the artillery unlock identity");
   const catalog = buildCommandCardContextCatalog();
   assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");
   assert(catalog.every((entry) => duplicateCommandIdsForCard(entry.card).length === 0), "catalog contexts have unique command identities");

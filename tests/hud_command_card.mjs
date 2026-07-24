@@ -625,13 +625,13 @@ function buttonSlots(card) {
     "gun-works-train",
     "training-centre",
     "research-complex",
-    "research-complex-medium-guns",
+    "research-complex-at-guns",
     "ekat-unit",
     "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
-      entry.id === "research-complex-medium-guns" &&
+      entry.id === "research-complex-at-guns" &&
         entry.card.slots.some((slot) =>
           slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
         )

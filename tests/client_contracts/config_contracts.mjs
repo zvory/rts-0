@@ -1180,8 +1180,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const mortarButton = renderedButtons.find((button) => button.innerHTML.includes("Mortar Team"));
     const antiTankGunButton = renderedButtons.find((button) => button.innerHTML.includes("Anti-Tank Gun"));
     const artilleryButton = renderedButtons.find((button) => button.innerHTML.includes("Artillery"));
-    const heavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
-    const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
+    const separateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(
       mortarButton?.innerHTML.includes("Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D."),
@@ -1189,8 +1189,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
-    assert(!heavyGunsResearchButton, "Artillery research should stay out of Gun Works");
-    assert(!artilleryResearchButton, "Separate Artillery research should not appear in Gun Works");
+    assert(!artilleryResearchButton, "Artillery research should stay out of Gun Works");
+    assert(!separateArtilleryResearchButton, "Separate Artillery research should not appear in Gun Works");
 
     renderedButtons.length = 0;
     const selectedResearchComplex = {
@@ -1213,16 +1213,16 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     rdHud._cancelRoundRobin = new Map();
     rdHud._resourceIcons = {};
     renderCommandCard(rdHud);
-    const rdMediumGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG"));
-    const rdHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
+    const rdAtGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG"));
+    const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
     const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const rdSeparateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
-    assert(rdMediumGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in R&D Complex");
-    assert(rdHeavyGunsResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
-    assert(rdHeavyGunsResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
+    assert(rdAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in R&D Complex");
+    assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
+    assert(rdArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
     assert(rdArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in R&D Complex");
     assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
     assert(rdArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
@@ -1230,17 +1230,17 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
     assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
     assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "R&D Complex should not expose Command Car research");
-    assert(!rdArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
+    assert(!rdSeparateArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
     selectedResearchComplex.prodUpgradeQueue = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
-    const unlockedHeavyGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
-    const mediumUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedHeavyGunsResearchButton?.dataset.hotkey === "W", "Artillery should retain the W slot");
-    assert(unlockedHeavyGunsResearchButton && !unlockedHeavyGunsResearchButton.disabled, "Artillery should enable when AT Guns is queued");
-    assert(mediumUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Artillery after AT Guns is queued");
+    const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
+    const atGunsUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
+    assert(unlockedArtilleryResearchButton?.dataset.hotkey === "W", "Artillery should retain the W slot");
+    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery should enable when AT Guns is queued");
+    assert(atGunsUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Artillery after AT Guns is queued");
 
     renderedButtons.length = 0;
     selectedResearchComplex.prodUpgradeQueue = [
