@@ -377,8 +377,7 @@ async fn revalidate_client_assets(request: Request<axum::body::Body>, next: Next
     let mut response = next.run(request).await;
     response
         .headers_mut()
-        .entry(header::CACHE_CONTROL)
-        .or_insert(HeaderValue::from_static("no-cache"));
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     response
 }
 
@@ -1056,7 +1055,12 @@ mod tests {
         let app = Router::new()
             .route(
                 "/src/renderer/rigs/animation.js",
-                get(|| async { "export function rigContainerScale() {}" }),
+                get(|| async {
+                    (
+                        [(header::CACHE_CONTROL, "public, max-age=86400")],
+                        "export function rigContainerScale() {}",
+                    )
+                }),
             )
             .layer(middleware::from_fn(revalidate_client_assets));
         let response = app
