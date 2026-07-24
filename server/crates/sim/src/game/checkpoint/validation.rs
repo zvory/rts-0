@@ -13,14 +13,16 @@ use crate::rules;
 use rts_contract::LAB_MAX_UNITS_PER_COMMAND;
 
 use super::{
-    BuildingMemoryV1, CheckpointPayloadError, EntityStoreV1, FogStateV1, PlayerStateV1,
+    CheckpointPayloadError, EntityStoreV1, FogStateV1, PlayerStateV1,
     MAX_COMPLETED_UPGRADES_PER_PLAYER,
 };
 
 mod ability_charges;
 mod anti_tank_gun_memory;
+mod building_memory;
 mod entities;
 mod firing_reveal;
+pub(super) use building_memory::validate as validate_building_memory;
 pub(super) use entities::normalize_completed_tank_traps;
 pub(super) use firing_reveal::validate_reaction_gates_against_visibility;
 use firing_reveal::{validate_firing_reveal_reaction_gates, validate_firing_reveal_visibility};
@@ -270,33 +272,6 @@ pub(super) fn validate_fog(
         }
     }
     validate_firing_reveal_visibility(fog, player_ids, entity_next_id, tick)?;
-    Ok(())
-}
-
-pub(super) fn validate_building_memory(
-    memory: &BuildingMemoryV1,
-    player_ids: &BTreeSet<u32>,
-) -> Result<(), CheckpointPayloadError> {
-    let mut keys = BTreeSet::new();
-    for entry in &memory.entries {
-        if !player_ids.contains(&entry.player_id) {
-            return Err(CheckpointPayloadError::InvalidReference {
-                field: "buildingMemory.playerId",
-                id: entry.player_id,
-            });
-        }
-        if entry.entry.id != entry.building_id {
-            return Err(CheckpointPayloadError::InvalidValue {
-                field: "buildingMemory.entry.id",
-            });
-        }
-        if !keys.insert((entry.player_id, entry.building_id)) {
-            return Err(CheckpointPayloadError::DuplicateId {
-                field: "buildingMemory",
-                id: entry.building_id,
-            });
-        }
-    }
     Ok(())
 }
 

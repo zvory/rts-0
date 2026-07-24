@@ -1,6 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use super::CheckpointPayloadError;
+
+pub(super) fn serde_convert<T, U>(value: T) -> Result<U, CheckpointPayloadError>
+where
+    T: Serialize,
+    U: DeserializeOwned,
+{
+    serde_json::from_value(
+        serde_json::to_value(value)
+            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))?,
+    )
+    .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

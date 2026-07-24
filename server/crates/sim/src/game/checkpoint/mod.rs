@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use super::ability_runtime::{AbilityRuntime, MAX_ACTIVE_ABILITY_OBJECTS};
 use super::artillery::ArtilleryShellStore;
@@ -29,20 +29,8 @@ mod validation;
 use anti_tank_gun_memory::AntiTankGunMemoryV1;
 pub(in crate::game) use error::CheckpointPayloadError;
 use metadata::{CheckpointCompatibilityV1, CommandLogMetadataV1, MapBindingV1, RngDescriptorV1};
-use player_dto::PlayerStateV1;
+use player_dto::{serde_convert, PlayerStateV1};
 use validation::*;
-
-fn serde_convert<T, U>(value: T) -> Result<U, CheckpointPayloadError>
-where
-    T: Serialize,
-    U: DeserializeOwned,
-{
-    serde_json::from_value(
-        serde_json::to_value(value)
-            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))?,
-    )
-    .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
