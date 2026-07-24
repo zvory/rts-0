@@ -10,7 +10,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const waitScript = path.join(projectRoot, "scripts", "wait-pr.sh");
 const cleanupScript = path.join(projectRoot, "scripts", "cleanup-worktrees.sh");
-const patchNoteScript = path.join(projectRoot, "scripts", "patch-note-pass.mjs");
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-wait-pr-"));
 const repo = path.join(fixtureRoot, "repo");
 const origin = path.join(fixtureRoot, "origin.git");
@@ -99,13 +98,11 @@ fs.mkdirSync(path.join(repo, "scripts"), { recursive: true });
 fs.mkdirSync(worktreeRoot, { recursive: true });
 fs.copyFileSync(cleanupScript, path.join(repo, "scripts", "cleanup-worktrees.sh"));
 fs.chmodSync(path.join(repo, "scripts", "cleanup-worktrees.sh"), 0o755);
-fs.copyFileSync(patchNoteScript, path.join(repo, "scripts", "patch-note-pass.mjs"));
-fs.chmodSync(path.join(repo, "scripts", "patch-note-pass.mjs"), 0o755);
 git(["init", "--initial-branch=main"], { cwd: repo });
 configureIdentity(repo);
 commitFile(repo, "base.txt", "base");
 commitFile(repo, "local-note.txt", "committed local note");
-git(["add", "scripts/cleanup-worktrees.sh", "scripts/patch-note-pass.mjs"]);
+git(["add", "scripts/cleanup-worktrees.sh"]);
 git(["commit", "--amend", "--no-edit"]);
 git(["config", "branch.main.mergeOptions", "--no-ff"]);
 
@@ -128,11 +125,7 @@ try {
   });
 
   assert.match(output, /refreshing local main checkout/);
-  assert.match(output, /Discord webhook not configured/);
-  assert.ok(
-    output.indexOf("Discord webhook not configured") < output.indexOf("refreshing local main checkout"),
-    "patch-note delivery should happen after merge verification and before cleanup",
-  );
+  assert.doesNotMatch(output, /Discord/);
   assert.match(output, /local main is current/);
   assert.equal(
     git(["rev-parse", "main"]).trim(),

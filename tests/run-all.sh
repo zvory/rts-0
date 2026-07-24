@@ -672,6 +672,8 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/archive_completed_plans.mjs"
     run_suite_bg "Agent workflow: post-merge main refresh" \
       node "$SCRIPT_DIR/wait_pr.mjs"
+    run_suite_bg "Agent workflow: merged patch-note delivery" \
+      node "$SCRIPT_DIR/patch_note_delivery.mjs"
     run_suite_bg "Rust lint (cargo clippy)" \
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
