@@ -274,6 +274,26 @@ mod tests {
     }
 
     #[test]
+    fn artillery_damage_curve_uses_tuned_center_and_outer_edge_damage() {
+        let inner = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
+        let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
+
+        assert_eq!(
+            artillery_damage(EntityKind::Rifleman, 0.0, inner.powi(2), outer.powi(2)),
+            75
+        );
+        assert_eq!(
+            artillery_damage(
+                EntityKind::Rifleman,
+                outer.powi(2),
+                inner.powi(2),
+                outer.powi(2)
+            ),
+            20
+        );
+    }
+
+    #[test]
     fn artillery_outer_area_damage_is_reduced_against_entrenched_infantry() {
         let map = open_map(20);
         let mut entities = EntityStore::new();
