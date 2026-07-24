@@ -183,11 +183,12 @@ function isThreatEnemyOwner(players, perspectivePlayerId, owner) {
 
 function labRulerView(ruler, suppressCursor) {
   if (!ruler) return null;
-  return {
+  const view = {
     start: ruler.start || null,
     end: ruler.end || null,
     cursor: suppressCursor ? null : ruler.cursor || null,
   };
+  return view.start || view.end || view.cursor ? view : null;
 }
 
 function buildControlOwnerReadModel(state, selected, policy = null) {

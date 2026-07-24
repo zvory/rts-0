@@ -1407,6 +1407,14 @@ function nearPoint(call, point, epsilon = 0.001) {
 }
 
 {
+  const emptyRulerView = buildRendererFeedbackView({}, {
+    clientIntent: { labRuler: { start: null, end: null, cursor: null } },
+  });
+  assert(
+    emptyRulerView.labRuler === null,
+    "feedback view omits empty Lab ruler state from ordinary presentation frames",
+  );
+
   const restorePixi = installFakePixi();
   try {
     const layer = new PIXI.Container();
