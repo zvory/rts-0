@@ -247,6 +247,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/entrenchment.rs",
   // Inline projectile tests spawn current units directly.
   "server/crates/sim/src/game/ability_projectile.rs",
+  // Player intel memory is intentionally specific to the Anti-Tank Gun's persistent firing arc;
+  // it does not participate in faction admission, production, or generic roster selection.
+  "server/crates/sim/src/game/anti_tank_gun_memory.rs",
   "server/crates/sim/src/game/artillery.rs",
   "server/crates/sim/src/game/building_memory.rs",
   "server/crates/sim/src/game/command.rs",
