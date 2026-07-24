@@ -68,3 +68,27 @@ pub(super) fn execute(
     }
     start_artillery_fire_promoted_order(entities, id, target, mode, radius_tiles)
 }
+
+pub(super) fn discard_failed_fire_intent(
+    entities: &mut EntityStore,
+    id: u32,
+    ability: AbilityKind,
+    x: f32,
+    y: f32,
+) {
+    let matches_failed_reposition = entities
+        .get(id)
+        .and_then(|entity| entity.queued_orders().first())
+        .is_some_and(|intent| match (ability, intent) {
+            (AbilityKind::PointFire, OrderIntent::PointFire(point))
+            | (AbilityKind::BlanketFire, OrderIntent::BlanketFire { point, .. }) => {
+                point.x.to_bits() == x.to_bits() && point.y.to_bits() == y.to_bits()
+            }
+            _ => false,
+        });
+    if matches_failed_reposition {
+        if let Some(entity) = entities.get_mut(id) {
+            entity.pop_queued_order();
+        }
+    }
+}
