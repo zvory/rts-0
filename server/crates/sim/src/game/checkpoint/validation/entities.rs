@@ -3,9 +3,7 @@ use crate::game::entity::{Entity, EntityKind};
 use super::CheckpointPayloadError;
 
 pub(super) fn validate_ownership(entity: &Entity) -> Result<(), CheckpointPayloadError> {
-    if entity.kind == EntityKind::TankTrap
-        && entity.under_construction() == (entity.owner == 0)
-    {
+    if entity.kind == EntityKind::TankTrap && entity.under_construction() == (entity.owner == 0) {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.owner",
         });
