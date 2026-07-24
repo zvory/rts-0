@@ -709,7 +709,9 @@ fn lab_setup_error_text(reason: &str) -> String {
 mod tests {
     use super::*;
     use crate::protocol::Event;
-    use crate::tools::hellhole_spec::{INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT};
+    use crate::tools::hellhole_spec::{
+        INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT, SHUTTLE_UNIT_COUNT,
+    };
     use std::collections::BTreeMap;
 
     fn temp_catalog_dir(name: &str) -> PathBuf {
@@ -1097,7 +1099,7 @@ mod tests {
                 })
                 .count();
             assert_eq!(
-                central_unit_count, 85,
+                central_unit_count, SHUTTLE_UNIT_COUNT,
                 "non-shuttle player {player_id} must remain fully packed into the central scrum"
             );
         }
@@ -1179,7 +1181,7 @@ mod tests {
             ("mortar_team".to_string(), 9),
             ("research_complex".to_string(), 1),
             ("panzerfaust".to_string(), 9),
-            ("rifleman".to_string(), 9),
+            ("rifleman".to_string(), 10),
             ("scout_car".to_string(), 10),
             ("steelworks".to_string(), 1),
             ("tank".to_string(), 17),
