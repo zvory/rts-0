@@ -124,12 +124,9 @@ fn resolve_shell(
 
 fn artillery_damage(victim_kind: EntityKind, d2: f32, inner2: f32, outer2: f32) -> u32 {
     if d2 <= inner2 {
-        return combat::effective_damage(
-            EntityKind::Artillery,
-            victim_kind,
-            config::ARTILLERY_INNER_DAMAGE,
-            Some(TerrainKind::Open),
-        );
+        // The direct blast core is fully armor-piercing. Entrenchment's area-damage
+        // reduction is applied by the caller after this zone-specific armor policy.
+        return config::ARTILLERY_INNER_DAMAGE;
     }
     if d2 > outer2 {
         return 0;
