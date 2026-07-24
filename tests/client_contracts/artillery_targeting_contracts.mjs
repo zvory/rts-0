@@ -5,6 +5,7 @@ import { assert, assertApprox } from "./assertions.mjs";
 import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
+  ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_FIRE_RADIUS_TILES,
@@ -258,8 +259,10 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     "Point Fire preview reticle locks inside-minimum hovers to the effective point",
   );
   assert(
-    ARTILLERY_MIN_RANGE_TILES === 10 && ARTILLERY_MAX_RANGE_TILES === 40,
-    "Artillery point-fire range mirrors the 10-40 tile balance band",
+    ARTILLERY_MIN_RANGE_TILES === 10 &&
+      ARTILLERY_MAX_RANGE_TILES === 40 &&
+      ARTILLERY_FIELD_OF_FIRE_RAD === 30 * Math.PI / 180,
+    "Artillery targeting mirrors the 10-40 tile range band and 30-degree field of fire",
   );
 
   pointFireInput.state.selectedEntities = () => [queuedMovingArtillery];
