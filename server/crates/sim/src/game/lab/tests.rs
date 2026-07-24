@@ -707,6 +707,40 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
 }
 
 #[test]
+fn lab_cannot_reassign_completed_neutral_tank_trap() {
+    let mut game = new_game();
+    let (x, y) = tile_center(&game, 30, 30);
+    let LabOpOutcome::Spawned { entity_id } = game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 1,
+            kind: EntityKind::TankTrap,
+            x,
+            y,
+            completed: true,
+        }))
+        .expect("Tank Trap should spawn")
+    else {
+        panic!("unexpected outcome");
+    };
+
+    assert!(matches!(
+        game.apply_lab_op(LabOp::SetEntityOwner(LabSetEntityOwner {
+            entity_id,
+            owner: 2,
+        })),
+        Err(LabError::InvalidCommand { .. })
+    ));
+    assert_eq!(
+        game.state
+            .entities
+            .get(entity_id)
+            .expect("Tank Trap should remain")
+            .owner,
+        NEUTRAL
+    );
+}
+
+#[test]
 fn lab_owner_change_preserves_unit_panzerfaust_state() {
     let mut game = new_game();
 
