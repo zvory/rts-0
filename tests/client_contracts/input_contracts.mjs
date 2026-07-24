@@ -362,7 +362,7 @@ import {
   assert(attackHoverInput.clientIntent.attackTargetPreview === null, "attack target preview clears when right-click would move");
 
   const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
-  const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
+  const enemyTankTrap = { id: 43, owner: 0, kind: KIND.TANK_TRAP, x: 180, y: 180 };
   attackHoverInput.clientIntent.updateAttackTargetPreview({ targetId: enemyUnit.id, kind: enemyUnit.kind, x: enemyUnit.x, y: enemyUnit.y });
   attackHoverInput.state = {
     playerId: 1,

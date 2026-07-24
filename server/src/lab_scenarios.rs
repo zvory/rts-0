@@ -1199,10 +1199,6 @@ mod tests {
         }
         assert_eq!(counts_by_owner.len(), 4);
         for player_id in 1..=4 {
-            let mut expected_counts = expected_counts.clone();
-            if player_id == 1 {
-                expected_counts.insert("tank_trap".to_string(), SCATTERED_TANK_TRAP_COUNT);
-            }
             assert_eq!(
                 counts_by_owner.get(&player_id),
                 Some(&expected_counts),

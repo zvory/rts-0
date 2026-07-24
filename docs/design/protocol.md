@@ -111,8 +111,8 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `move`       | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. When `queued` is true, store future movement intent instead of replacing the active order. |
 | `formationMove` | `units: u32[]`, `points: {x:f32,y:f32}[]`, `attackMove?: bool`, `queued?: bool` | Move selected units into a freehand formation along a world-space polyline. `attackMove` gives every resolved unit goal attack-move semantics; absent/false preserves ordinary move behavior. The submitted stroke must contain 2–64 finite points; the server clamps points to map bounds and collapses near-duplicate neighbors. Long strokes distribute one rank across the full arc length, while short strokes create parallel ranks. Legal final goals remain authoritative and may shift from the stroke for body standability, uniqueness, terrain, reachability, or known-trench preference. Queued formation moves store one resolved move or attack-move point intent per accepted unit, not the polyline. |
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move toward a world point while engaging enemies that enter current weapon range. The unit may pause to fire, then resumes the player-issued destination; enemy sightings never replace that path with pursuit movement. When `queued` is true, store future attack-move intent instead of replacing the active order. |
-| `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Direct-target attack. The unit keeps this target locked, pursues it until it reaches its current weapon range band, then stops and fires; if the target moves back out of range, it resumes pursuit. It does not switch to a different target while this commanded target remains legal and visible. Explicit attack commands may target an enemy entity or an entity owned by the issuing player, allowing deliberate self-attacks on stuck friendly units/buildings. Allied teammates' entities are not valid self-attack targets, and automatic attack-move/idle acquisition remains enemy-only. When `queued` is true, store future attack intent instead of replacing the active order. |
-| `deconstruct` | `units: u32[]`, `target: u32`, `queued?: bool` | Send one selected worker to deconstruct a completed Tank Trap. The target may be friendly, allied, or enemy; enemy traps must be visible when the command is accepted or when a queued stage promotes. Deconstruction uses half of the Tank Trap build time (150 ticks / 5 seconds with current balance), cannot be sped up by multiple workers on the same trap, and refunds the Tank Trap cost to the deconstructing player's economy. When `queued` is true, store one future deconstruct intent using the same selected-worker allocation policy as build orders. |
+| `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Direct-target attack. The unit keeps this target locked, pursues it until it reaches its current weapon range band, then stops and fires; if the target moves back out of range, it resumes pursuit. It does not switch to a different target while this commanded target remains legal and visible. Explicit attack commands may target an enemy entity, a neutral completed Tank Trap, or an entity owned by the issuing player, allowing deliberate self-attacks on stuck friendly units/buildings. Allied teammates' entities are not valid self-attack targets, and automatic attack-move/idle acquisition remains enemy-only except for neutral vehicle-obstructing Tank Traps. When `queued` is true, store future attack intent instead of replacing the active order. |
+| `deconstruct` | `units: u32[]`, `target: u32`, `queued?: bool` | Send one selected worker to deconstruct a visible completed Tank Trap. Completed Tank Traps are neutral obstacles regardless of who built them. Deconstruction uses half of the Tank Trap build time (150 ticks / 5 seconds with current balance), cannot be sped up by multiple workers on the same trap, and refunds the Tank Trap cost to the deconstructing player's economy. When `queued` is true, store one future deconstruct intent using the same selected-worker allocation policy as build orders. |
 | `setupAntiTankGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned Anti-Tank Guns, Mortar Teams, and Artillery. Anti-Tank Guns and Artillery face the submitted world point. Mortar Teams retain their current facing, so the client issues setup directly from the command card without a target click. When `queued` is true, append a future setup intent for owned completed setup-capable support weapons only; queued Mortar Team setup is terminal, while the stored facing point for other weapons is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state and begins after alignment. Other selected units are ignored. |
 | `tearDownAntiTankGuns` | `units: u32[]` | Pack up owned Anti-Tank Guns, Mortar Teams, and Artillery that are `setting_up` or `deployed`, or cancel their staged setup facing while packed. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays as a parseable no-op; it has no eligible carriers, cooldown, or runtime status. |
@@ -703,6 +703,13 @@ fog, so allied units attacking hidden enemies do not reveal hidden target ids or
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.
 
+A Tank Trap scaffold belongs to its builder only while construction is in progress. Completion
+changes it to owner `0`, making it a neutral field obstacle. It grants no owner-private projection:
+outside current team vision no player receives its live entity, HP changes, attack alert, or death
+event. Any recipient with current vision receives its exact visible HP and ordinary visible impact
+feedback. Neutral Tank Traps remain explicit attack/deconstruct targets and vehicle breach targets,
+but a shot against one never creates a victim-owner firing reveal or under-attack alert.
+
 `worldCombatPosition` is the narrow global exception to fog-filtered combat detail. The server sets
 the same coarse world point for every active player, spectator, replay, Lab, and dev recipient.
 It changes only on 15-tick boundaries after hostile weapon fire/impact activity and remains present
@@ -973,7 +980,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 ```
 {
   id: u32,
-  owner: u32,                    // 0 = neutral (resources), else player id
+  owner: u32,                    // 0 = neutral (resources/completed Tank Traps), else player id
   kind: string,                  // EntityKind: "worker","golem","rifleman","panzerfaust","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","scout_plane","tank","command_car","ekat","city_centre","zamok","depot","barracks","training_centre","research_complex","factory","steelworks","tank_trap","pump_jack"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
@@ -1070,7 +1077,7 @@ shortages so clients can render the ordinary “Not enough steel” feedback whi
 automatic retry source; ordinary `Not enough steel` notices remain unthrottled. Unit attack events
 are sent to the attacker's team and to enemy
 recipients whose team can currently see the shooter or target point. Shots resolved against Tank
-Traps carry no shooter `reveal` and grant no actionable firing reveal to the Tank Trap's team. A
+Traps carry no shooter `reveal` and grant no actionable firing reveal to observers of the impact. A
 missed direct shot
 additionally emits a `miss` event to the same recipient set, carrying only the receiving entity id;
 clients anchor the tiny text feedback to the already projected entity and ignore the event if the

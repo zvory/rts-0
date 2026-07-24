@@ -42,7 +42,7 @@ impl BuildingMemory {
         tick: u32,
     ) {
         for &player_id in player_ids {
-            self.remove_scouted_destroyed(player_id, entities, fog, teams);
+            self.remove_ineligible_or_scouted_destroyed(player_id, entities, fog, teams);
             for entity in entities.iter() {
                 if !visible_enemy_building(player_id, entity, fog, smokes, teams) {
                     continue;
@@ -53,7 +53,7 @@ impl BuildingMemory {
         }
     }
 
-    fn remove_scouted_destroyed(
+    fn remove_ineligible_or_scouted_destroyed(
         &mut self,
         player_id: u32,
         entities: &EntityStore,
@@ -61,8 +61,11 @@ impl BuildingMemory {
         teams: &TeamRelations,
     ) {
         self.entries.retain(|(entry_player, entity_id), entry| {
-            if *entry_player != player_id || entities.contains(*entity_id) {
+            if *entry_player != player_id {
                 return true;
+            }
+            if let Some(entity) = entities.get(*entity_id) {
+                return enemy_building_memory_eligible(player_id, entity, teams);
             }
             !entry.footprint.iter().any(|&(tx, ty)| {
                 teams
@@ -125,15 +128,19 @@ fn visible_enemy_building(
     smokes: &SmokeCloudStore,
     teams: &TeamRelations,
 ) -> bool {
-    !teams.same_team_or_same_owner(player_id, entity.owner)
-        && entity.owner != NEUTRAL
-        && entity.is_building()
+    enemy_building_memory_eligible(player_id, entity, teams)
         && teams
             .same_team_player_ids(player_id)
             .into_iter()
             .any(|team_player| {
                 projection::entity_visible_to_with_smoke(team_player, entity, fog, smokes)
             })
+}
+
+fn enemy_building_memory_eligible(player_id: u32, entity: &Entity, teams: &TeamRelations) -> bool {
+    !teams.same_team_or_same_owner(player_id, entity.owner)
+        && entity.owner != NEUTRAL
+        && entity.is_building()
 }
 
 fn entry_from_entity(entity: &Entity, map: &Map, observed_tick: u32) -> BuildingMemoryEntry {
@@ -246,6 +253,41 @@ mod tests {
         refresh(&mut memory, &entities, &mut fog, &map, &smokes, 1);
 
         assert!(memory.get(1, depot).is_none());
+    }
+
+    #[test]
+    fn forgets_scouted_tank_trap_scaffold_when_it_becomes_neutral() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let mut fog = Fog::new(map.size);
+        let smokes = SmokeCloudStore::new();
+        let mut memory = BuildingMemory::default();
+        let scout_pos = map.tile_center(8, 8);
+        let trap_pos = map.tile_center(10, 8);
+        entities
+            .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+            .expect("scout should spawn");
+        let trap_id = entities
+            .spawn_building(2, EntityKind::TankTrap, trap_pos.0, trap_pos.1, false)
+            .expect("Tank Trap scaffold should spawn");
+
+        refresh(&mut memory, &entities, &mut fog, &map, &smokes, 1);
+        assert!(memory.get(1, trap_id).is_some());
+
+        let trap = entities.get_mut(trap_id).expect("Tank Trap should exist");
+        let total = trap
+            .construction
+            .as_ref()
+            .expect("Tank Trap should be under construction")
+            .total;
+        assert!(trap.set_construction_progress(total.saturating_sub(1)));
+        assert_eq!(trap.advance_construction(), Some(true));
+        refresh(&mut memory, &entities, &mut fog, &map, &smokes, 2);
+
+        assert!(
+            memory.get(1, trap_id).is_none(),
+            "completed neutral Tank Traps must not retain player-owned building memory"
+        );
     }
 
     #[test]

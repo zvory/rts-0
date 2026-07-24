@@ -8,7 +8,7 @@ use crate::lab_scenarios::load_lab_scenario_by_id;
 use crate::lobby::lab_scenario_driver::{
     lab_scenario_driver_for, LabScenarioAction, LabScenarioDriver,
 };
-use crate::protocol::{serialize_messagepack_compact_snapshot, Event};
+use crate::protocol::{serialize_messagepack_compact_snapshot, Event, Snapshot};
 use crate::tools::hellhole_spec::{CENTER, SCENARIO_ID};
 
 pub const STREAM_ID: &str = SCENARIO_ID;
@@ -69,7 +69,7 @@ pub fn generate_hellhole_snapshot_stream(
 
     let (mut game, mut driver) = build_hellhole_game()?;
 
-    let initial_entity_count = game.snapshot_for(1).entities.len();
+    let initial_entity_count = snapshot_for_stream(&game).entities.len();
     let mut start = serde_json::to_value(game.start_payload())
         .map_err(|err| format!("failed to serialize start payload: {err}"))?;
     let start_object = start
@@ -100,7 +100,7 @@ pub fn generate_hellhole_snapshot_stream(
     for index in 0..frame_count {
         action_counts.add(apply_hellhole_scenario_actions(&mut game, &mut driver)?);
         let event_sets = game.tick();
-        let mut snapshot = game.snapshot_for(1);
+        let mut snapshot = snapshot_for_stream(&game);
         snapshot.events = event_sets
             .into_iter()
             .find_map(|(player_id, events)| (player_id == 1).then_some(events))
@@ -163,6 +163,23 @@ pub fn generate_hellhole_snapshot_stream(
         minimum_entity_count,
     };
     Ok((bytes, summary))
+}
+
+/// Keeps the offline renderer workload stable when scenario-authored obstacles are fog-gated in
+/// live play. The stream is explicitly client-only and non-authoritative, so it includes every
+/// Tank Trap from the full Lab projection while retaining player 1's ordinary projection for all
+/// other entities and snapshot state.
+fn snapshot_for_stream(game: &rts_sim::game::Game) -> Snapshot {
+    let mut snapshot = game.snapshot_for(1);
+    let projected_ids: std::collections::BTreeSet<u32> =
+        snapshot.entities.iter().map(|entity| entity.id).collect();
+    snapshot.entities = game
+        .snapshot_full_for(1)
+        .entities
+        .into_iter()
+        .filter(|entity| projected_ids.contains(&entity.id) || entity.kind == "tank_trap")
+        .collect();
+    snapshot
 }
 
 pub(crate) fn build_hellhole_game() -> Result<(rts_sim::game::Game, LabScenarioDriver), String> {

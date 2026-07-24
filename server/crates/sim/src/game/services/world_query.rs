@@ -181,7 +181,8 @@ pub(crate) fn has_town_hall(entities: &EntityStore, player: u32) -> bool {
 // --- Targeting / proximity --------------------------------------------------
 
 /// Whether `candidate` is a legal hostile target for an attacker owned by `attacker_owner`.
-/// Filters out self, neutrals, friendlies, dead, and non-targetable kinds.
+/// Filters out self, friendlies, passive neutrals, dead, and non-targetable kinds. Completed
+/// neutral obstacles are hostile to every player's units.
 pub(crate) fn is_enemy_targetable(
     candidate: &Entity,
     teams: &TeamRelations,
@@ -189,8 +190,9 @@ pub(crate) fn is_enemy_targetable(
     attacker_id: u32,
 ) -> bool {
     candidate.id != attacker_id
-        && candidate.owner != NEUTRAL
-        && teams.is_enemy_owner(attacker_owner, candidate.owner)
+        && (candidate.is_neutral_obstacle()
+            || (candidate.owner != NEUTRAL
+                && teams.is_enemy_owner(attacker_owner, candidate.owner)))
         && candidate.is_targetable()
         && candidate.hp > 0
 }
@@ -205,9 +207,10 @@ pub(crate) fn is_explicit_attack_targetable(
     attacker_id: u32,
 ) -> bool {
     candidate.id != attacker_id
-        && candidate.owner != NEUTRAL
-        && (candidate.owner == attacker_owner
-            || teams.is_enemy_owner(attacker_owner, candidate.owner))
+        && (candidate.is_neutral_obstacle()
+            || (candidate.owner != NEUTRAL
+                && (candidate.owner == attacker_owner
+                    || teams.is_enemy_owner(attacker_owner, candidate.owner))))
         && candidate.is_targetable()
         && candidate.hp > 0
 }
@@ -424,7 +427,7 @@ mod tests {
         s.spawn_building(1, EntityKind::Depot, 164.0, 100.0, true)
             .unwrap();
 
-        assert_eq!(owned_buildings(&s, 1).count(), 3);
+        assert_eq!(owned_buildings(&s, 1).count(), 2);
         assert_eq!(
             owned_survival_buildings(&s, 1)
                 .map(|entity| entity.kind)

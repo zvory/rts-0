@@ -1168,7 +1168,7 @@ export class Match {
    * Entities used to drive the local fog overlay.
    * Spectators receive the server-filtered union of all players' visible entities, so every
    * non-resource entity in their snapshot contributes to the local overlay.
-   * Resource nodes (owner 0) never grant vision.
+   * Neutral entities (owner 0) never grant vision.
    * @returns {object[]}
    */
   ownEntities() {
