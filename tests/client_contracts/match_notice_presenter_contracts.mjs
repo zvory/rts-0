@@ -2,7 +2,10 @@
 // Match-scoped server notice presentation contracts.
 
 import { assert } from "./assertions.mjs";
-import { MatchNoticePresenter } from "../../client/src/match_notice_presenter.js";
+import {
+  MatchNoticePresenter,
+  STEEL_SHORTAGE_COOLDOWN_MS,
+} from "../../client/src/match_notice_presenter.js";
 import { NOTICE_SEVERITY } from "../../client/src/protocol.js";
 
 function createSurfaces() {
@@ -69,12 +72,21 @@ function underAttack(x, y) {
   );
 
   presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO });
+  const steelShortageStartedAt = now;
   const infoVoice = surfaces.plays.at(-1);
   assert(infoVoice.id === "notice_steel", "existing informational notice voice still plays");
   assert(infoVoice.opts.category === "ui", "informational notice keeps informational audio priority");
   assert(infoVoice.opts.duck === true, "informational spoken notice explicitly ducks the mix");
+  now = steelShortageStartedAt + STEEL_SHORTAGE_COOLDOWN_MS - 1;
   presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO });
-  assert(surfaces.toasts.length === 4, "ordinary informational notices are not incident-deduplicated");
+  assert(surfaces.toasts.length === 3, "steel shortage repeats are suppressed for one minute");
+  assert(surfaces.plays.length === 3, "suppressed steel shortage repeats do not replay the voice");
+  presenter.present({ msg: "Not enough oil", severity: NOTICE_SEVERITY.INFO });
+  assert(surfaces.toasts.length === 4, "other resource notices remain immediately available");
+  now = steelShortageStartedAt + STEEL_SHORTAGE_COOLDOWN_MS;
+  presenter.present({ msg: "Not enough steel", severity: NOTICE_SEVERITY.INFO });
+  assert(surfaces.toasts.length === 5, "steel shortage is admitted again after one minute");
+  assert(surfaces.plays.at(-1).id === "notice_steel", "readmitted steel shortage replays its voice");
 }
 
 {
