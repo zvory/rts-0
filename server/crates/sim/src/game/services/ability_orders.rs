@@ -814,7 +814,7 @@ pub(crate) fn caster_in_range(
     distance_sq >= min_range_px * min_range_px && distance_sq <= range_px * range_px
 }
 
-fn staging_point(
+pub(crate) fn staging_point(
     map: &Map,
     entities: &EntityStore,
     caster: u32,
@@ -833,7 +833,11 @@ fn staging_point(
     if !len.is_finite() {
         return None;
     }
-    let margin = (caster.radius() * 0.25).max(1.0);
+    let margin = if matches!(ability, AbilityKind::PointFire | AbilityKind::BlanketFire) {
+        config::TILE_SIZE as f32 * 0.75
+    } else {
+        (caster.radius() * 0.25).max(1.0)
+    };
     let staging_distance = if len < min_range_px {
         (min_range_px + margin).min(range_px)
     } else {

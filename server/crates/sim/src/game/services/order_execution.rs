@@ -156,8 +156,9 @@ fn start_artillery_fire_from_target(
             e.set_emplacement_facing(Some(target.facing));
             e.set_desired_weapon_facing(target.facing);
         }
-        WeaponSetup::TearingDown { .. } => {
-            return false;
+        WeaponSetup::TearingDown { ticks } => {
+            e.set_pending_redeploy_facing(Some(target.facing));
+            e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks });
         }
     }
     match mode {

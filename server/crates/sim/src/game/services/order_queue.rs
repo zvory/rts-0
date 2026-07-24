@@ -16,7 +16,7 @@ use crate::game::services::ability_orders::{
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::order_execution::targeting::{
-    stored_artillery_point_fire_target, ArtilleryPointFireAcceptance,
+    artillery_point_fire_target, ArtilleryPointFireAcceptance,
 };
 use crate::game::services::order_execution::{
     execute_promoted_support_weapon_setup, start_artillery_fire_promoted_order, ArtilleryFireMode,
@@ -216,16 +216,24 @@ pub(crate) fn promote_ready_orders(
                     continue;
                 };
                 if ability == AbilityKind::PointFire {
-                    artillery::execute(map, entities, id, x, y, ArtilleryFireMode::Point, 0.0);
+                    artillery::execute(
+                        map,
+                        entities,
+                        coordinator,
+                        id,
+                        (x, y),
+                        ArtilleryFireMode::Point,
+                        0.0,
+                    );
                     continue;
                 }
                 if ability == AbilityKind::BlanketFire {
                     artillery::execute(
                         map,
                         entities,
+                        coordinator,
                         id,
-                        x,
-                        y,
+                        (x, y),
                         ArtilleryFireMode::Blanket,
                         config::ARTILLERY_BLANKET_RADIUS_TILES,
                     );
@@ -273,15 +281,23 @@ pub(crate) fn promote_ready_orders(
                 execute_promoted_support_weapon_setup(entities, id, x, y);
             }
             PromotedIntent::PointFire { x, y } => {
-                artillery::execute(map, entities, id, x, y, ArtilleryFireMode::Point, 0.0);
+                artillery::execute(
+                    map,
+                    entities,
+                    coordinator,
+                    id,
+                    (x, y),
+                    ArtilleryFireMode::Point,
+                    0.0,
+                );
             }
             PromotedIntent::BlanketFire { x, y, radius_tiles } => {
                 artillery::execute(
                     map,
                     entities,
+                    coordinator,
                     id,
-                    x,
-                    y,
+                    (x, y),
                     ArtilleryFireMode::Blanket,
                     radius_tiles,
                 );

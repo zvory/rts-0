@@ -63,34 +63,40 @@ export function buildArtilleryTargetLocks({
     const currentFacing = currentArtilleryFieldFacing(carrier);
     const context = artilleryTargetContext(carrier, originX, originY, currentFacing, queued);
     if (!context) continue;
-    const locked = lockArtilleryFireTarget({
-      bounds,
-      originX: context.originX,
-      originY: context.originY,
+    if (bounds && !pointInsideBounds(bounds, rawX, rawY)) continue;
+    const firingPosition = artilleryFiringPosition(
+      context.originX,
+      context.originY,
       rawX,
       rawY,
-      setupFacing: context.setupFacing,
-      bodyFacing: context.bodyFacing,
       minRangePx,
       maxRangePx,
-    });
-    if (!locked) continue;
+      bounds,
+    );
+    if (!firingPosition) continue;
+    const facing = Math.atan2(rawY - firingPosition.y, rawX - firingPosition.x);
+    if (!Number.isFinite(facing)) continue;
+    const inRange = !firingPosition.needsMove;
     const insideCurrentCone = carrier.setupState === SETUP.DEPLOYED &&
+      inRange &&
       Number.isFinite(currentFacing) &&
-      Math.abs(angleDelta(currentFacing, locked.facing)) <= ARTILLERY_FIELD_OF_FIRE_RAD * 0.5 + 0.001;
+      Math.abs(angleDelta(currentFacing, facing)) <= ARTILLERY_FIELD_OF_FIRE_RAD * 0.5 + 0.001;
     locks.push({
       id: carrier.id,
       kind: carrier.kind,
-      originX: context.originX,
-      originY: context.originY,
-      x: locked.x,
-      y: locked.y,
+      originX: firingPosition.x,
+      originY: firingPosition.y,
+      moveFromX: context.originX,
+      moveFromY: context.originY,
+      x: rawX,
+      y: rawY,
       rawX,
       rawY,
-      facing: locked.facing,
+      facing,
       currentFacing,
       insideCurrentCone,
-      needsRedeploy: !insideCurrentCone,
+      needsMove: firingPosition.needsMove,
+      needsRedeploy: inRange && !insideCurrentCone,
       rangePx: maxRangePx,
       minRangePx,
     });
@@ -99,7 +105,6 @@ export function buildArtilleryTargetLocks({
 }
 
 function artilleryTargetContext(entity, originX, originY, currentFacing, queued) {
-  if (!queued && activeMovementOrderPlan(entity)) return null;
   const bodyFacing = numeric(entity?.facing, numeric(entity?.weaponFacing, currentFacing));
   const context = {
     originX,
@@ -109,11 +114,6 @@ function artilleryTargetContext(entity, originX, originY, currentFacing, queued)
   };
   if (!queued) return context;
   return queuedArtilleryTargetContext(entity, context);
-}
-
-function activeMovementOrderPlan(entity) {
-  const first = Array.isArray(entity?.orderPlan) ? entity.orderPlan[0] : null;
-  return first?.kind === ORDER_STAGE.MOVE || first?.kind === ORDER_STAGE.ATTACK_MOVE;
 }
 
 function queuedArtilleryTargetContext(entity, context) {
@@ -146,17 +146,7 @@ function queuedArtilleryTargetContext(entity, context) {
   return next;
 }
 
-function lockArtilleryFireTarget({
-  bounds,
-  originX,
-  originY,
-  rawX,
-  rawY,
-  setupFacing,
-  bodyFacing,
-  minRangePx,
-  maxRangePx,
-}) {
+function artilleryFiringPosition(originX, originY, rawX, rawY, minRangePx, maxRangePx, bounds) {
   if (
     !Number.isFinite(originX) ||
     !Number.isFinite(originY) ||
@@ -171,27 +161,30 @@ function lockArtilleryFireTarget({
   }
   const dx = rawX - originX;
   const dy = rawY - originY;
-  const hasClickDirection = Math.abs(dx) > Number.EPSILON || Math.abs(dy) > Number.EPSILON;
   const distance = Math.hypot(dx, dy);
-  const facing = hasClickDirection
-    ? Math.atan2(dy, dx)
-    : firstFinite(setupFacing, bodyFacing);
-  if (!Number.isFinite(facing)) return null;
-  const dirX = Math.cos(facing);
-  const dirY = Math.sin(facing);
-  if (!Number.isFinite(dirX) || !Number.isFinite(dirY)) return null;
-  const exitDistance = bounds ? rayMapExitDistance(bounds, originX, originY, dirX, dirY) : Infinity;
-  if (!Number.isFinite(exitDistance) && exitDistance !== Infinity) return null;
-  const maxValid = Math.min(maxRangePx, exitDistance);
-  if (maxValid < minRangePx) return null;
-  const desired = Number.isFinite(distance)
-    ? clamp(distance, minRangePx, maxRangePx)
-    : maxRangePx;
-  const lockedDistance = Math.max(minRangePx, Math.min(desired, maxValid));
-  const x = originX + dirX * lockedDistance;
-  const y = originY + dirY * lockedDistance;
-  if (bounds && !pointInsideBounds(bounds, x, y)) return null;
-  return { x, y, facing };
+  if (!Number.isFinite(distance)) return null;
+  if (distance >= minRangePx && distance <= maxRangePx) {
+    return { x: originX, y: originY, needsMove: false };
+  }
+  let dirX;
+  let dirY;
+  if (distance > Number.EPSILON) {
+    dirX = (originX - rawX) / distance;
+    dirY = (originY - rawY) / distance;
+  } else {
+    const centerX = bounds ? bounds.maxX * 0.5 : rawX + maxRangePx;
+    const centerY = bounds ? bounds.maxY * 0.5 : rawY;
+    const centerDistance = Math.hypot(centerX - rawX, centerY - rawY);
+    dirX = centerDistance > Number.EPSILON ? (centerX - rawX) / centerDistance : 1;
+    dirY = centerDistance > Number.EPSILON ? (centerY - rawY) / centerDistance : 0;
+  }
+  const margin = minRangePx * 0.075;
+  const stagingDistance = distance < minRangePx
+    ? Math.min(maxRangePx, minRangePx + margin)
+    : Math.max(minRangePx, maxRangePx - margin);
+  const x = clampToBounds(rawX + dirX * stagingDistance, bounds?.maxX);
+  const y = clampToBounds(rawY + dirY * stagingDistance, bounds?.maxY);
+  return { x, y, needsMove: true };
 }
 
 function worldBounds(map, tileSize) {
@@ -202,24 +195,6 @@ function worldBounds(map, tileSize) {
     maxX: Math.max(0, widthTiles * tileSize - 1),
     maxY: Math.max(0, heightTiles * tileSize - 1),
   };
-}
-
-function rayMapExitDistance(bounds, originX, originY, dirX, dirY) {
-  let enter = 0;
-  let exit = Infinity;
-  for (const [origin, dir, max] of [[originX, dirX, bounds.maxX], [originY, dirY, bounds.maxY]]) {
-    if (Math.abs(dir) <= Number.EPSILON) {
-      if (origin < 0 || origin > max) return null;
-      continue;
-    }
-    let near = (0 - origin) / dir;
-    let far = (max - origin) / dir;
-    if (near > far) [near, far] = [far, near];
-    enter = Math.max(enter, near);
-    exit = Math.min(exit, far);
-  }
-  if (!Number.isFinite(exit) || exit < enter || exit < 0) return null;
-  return Math.max(0, exit);
 }
 
 function pointInsideBounds(bounds, x, y) {
@@ -246,8 +221,9 @@ function angleDelta(a, b) {
   return d;
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function clampToBounds(value, max) {
+  if (!Number.isFinite(max)) return value;
+  return Math.max(0, Math.min(max, value));
 }
 
 function firstFinite(...values) {

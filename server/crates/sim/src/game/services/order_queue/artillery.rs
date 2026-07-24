@@ -11,7 +11,7 @@ pub(super) fn intent_valid(
     if x < 0.0 || y < 0.0 || x >= map.world_size_px() || y >= map.world_size_px() {
         return false;
     }
-    stored_artillery_point_fire_target(
+    artillery_point_fire_target(
         map,
         entities,
         owner,
@@ -26,16 +26,17 @@ pub(super) fn intent_valid(
 pub(super) fn execute(
     map: &Map,
     entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
     id: u32,
-    x: f32,
-    y: f32,
+    point: (f32, f32),
     mode: ArtilleryFireMode,
     radius_tiles: f32,
 ) -> bool {
+    let (x, y) = point;
     let Some(owner) = entities.get(id).map(|e| e.owner) else {
         return false;
     };
-    let Some(target) = stored_artillery_point_fire_target(
+    let Some(target) = artillery_point_fire_target(
         map,
         entities,
         owner,
@@ -46,5 +47,24 @@ pub(super) fn execute(
     ) else {
         return false;
     };
+    if !target.in_range {
+        let ability = match mode {
+            ArtilleryFireMode::Point => AbilityKind::PointFire,
+            ArtilleryFireMode::Blanket => AbilityKind::BlanketFire,
+        };
+        let Some(staging) =
+            crate::game::services::ability_orders::staging_point(map, entities, id, ability, x, y)
+        else {
+            return false;
+        };
+        coordinator.order_ability(entities, id, ability, (x, y), staging);
+        let intent = match mode {
+            ArtilleryFireMode::Point => OrderIntent::point_fire(x, y),
+            ArtilleryFireMode::Blanket => OrderIntent::blanket_fire(x, y, radius_tiles),
+        };
+        return entities
+            .get_mut(id)
+            .is_some_and(|entity| entity.append_queued_order(intent));
+    }
     start_artillery_fire_promoted_order(entities, id, target, mode, radius_tiles)
 }

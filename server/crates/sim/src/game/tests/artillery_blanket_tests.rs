@@ -195,7 +195,7 @@ fn blanket_fire_sampling_is_replay_stable_for_same_radius_after_fire_control() {
 }
 
 #[test]
-fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queueable() {
+fn queued_blanket_fire_mixed_selection_repositions_artillery_and_keeps_rifle_queueable() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
@@ -252,39 +252,15 @@ fn queued_blanket_fire_mixed_selection_locks_each_artillery_and_keeps_rifle_queu
         .entities
         .get(second_artillery)
         .expect("second artillery should exist");
-    let Order::ArtilleryBlanketFire {
-        order: first_order, ..
-    } = first_entity.order()
-    else {
-        panic!("first artillery should promote queued Blanket Fire");
-    };
-    let Order::ArtilleryBlanketFire {
-        order: second_order,
-        ..
-    } = second_entity.order()
-    else {
-        panic!("second artillery should promote queued Blanket Fire");
-    };
-
-    assert!(
-        first_entity.queued_orders().is_empty() && second_entity.queued_orders().is_empty(),
-        "later queued movement must not append behind terminal Blanket Fire for either gun"
-    );
-    assert!(
-        (first_order.intent.x - second_order.intent.x).abs() > 0.5
-            || (first_order.intent.y - second_order.intent.y).abs() > 0.5,
-        "different artillery origins should store different locked Blanket Fire centers"
-    );
-    let first_distance = ((first_order.intent.x - first_pos.0).powi(2)
-        + (first_order.intent.y - first_pos.1).powi(2))
-    .sqrt();
-    let second_distance = ((second_order.intent.x - second_pos.0).powi(2)
-        + (second_order.intent.y - second_pos.1).powi(2))
-    .sqrt();
-    assert!(
-        (first_distance - min_px).abs() < 0.001 && (second_distance - min_px).abs() < 0.001,
-        "inside-minimum mixed Blanket Fire clicks should lock each gun to its own range floor"
-    );
+    assert!(matches!(first_entity.order(), Order::Ability(_)));
+    assert!(matches!(second_entity.order(), Order::Ability(_)));
+    for entity in [first_entity, second_entity] {
+        let [OrderIntent::BlanketFire { point, .. }] = entity.queued_orders() else {
+            panic!("repositioning artillery should retain only its terminal fire intent");
+        };
+        assert!((point.x - raw_click.0).abs() < 0.001);
+        assert!((point.y - raw_click.1).abs() < 0.001);
+    }
 
     let rifle_entity = game
         .state

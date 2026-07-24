@@ -916,6 +916,7 @@ mod planned_actions {
                             order_artillery_point_fire(
                                 map,
                                 entities,
+                                coordinator,
                                 players,
                                 teams,
                                 fog,
@@ -1063,6 +1064,7 @@ mod planned_actions {
                                 order_artillery_point_fire(
                                     map,
                                     entities,
+                                    coordinator,
                                     players,
                                     teams,
                                     fog,
@@ -1338,6 +1340,7 @@ fn use_ability(
                 order_artillery_point_fire(
                     map,
                     entities,
+                    ctx.coordinator,
                     players,
                     teams,
                     fog,
@@ -1432,6 +1435,7 @@ fn use_ability(
 fn order_artillery_point_fire(
     map: &Map,
     entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
     players: &mut [PlayerState],
     teams: &TeamRelations,
     fog: &Fog,
@@ -1457,6 +1461,27 @@ fn order_artillery_point_fire(
     ) else {
         return false;
     };
+    if !target.in_range {
+        let ability = match mode {
+            ArtilleryFireMode::Point => AbilityKind::PointFire,
+            ArtilleryFireMode::Blanket => AbilityKind::BlanketFire,
+        };
+        let Some(staging) = ability_orders::staging_point(map, entities, unit, ability, x, y)
+        else {
+            return false;
+        };
+        if let Some(entity) = entities.get_mut(unit) {
+            entity.clear_orders();
+        }
+        coordinator.order_ability(entities, unit, ability, (x, y), staging);
+        let intent = match mode {
+            ArtilleryFireMode::Point => OrderIntent::point_fire(x, y),
+            ArtilleryFireMode::Blanket => OrderIntent::blanket_fire(x, y, radius_tiles),
+        };
+        return entities
+            .get_mut(unit)
+            .is_some_and(|entity| entity.append_queued_order(intent));
+    }
     if !start_artillery_fire_command_order(entities, unit, target, mode, radius_tiles) {
         return false;
     }
