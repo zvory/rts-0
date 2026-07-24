@@ -1321,12 +1321,8 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(antiTankGun && !antiTankGun.enabled, "upgrade-gated unit should be disabled before research");
   assert(antiTankGun.title.startsWith("Requires research in R&D Complex"), "upgrade-gated unit tooltip should name R&D research");
   assert(!buttonByLabel(upgradeCard, "AT Guns"), "Gun Works should not expose R&D research");
-  assert(
-    !commandButtons(upgradeCard).some((button) =>
-      button.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
-    ),
-    "Gun Works should not expose Artillery research",
-  );
+  const artilleryResearchId = defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK);
+  assert(!commandButtons(upgradeCard).some((button) => button.commandId === artilleryResearchId), "Gun Works should not expose Artillery research");
 
   const researchComplex = { id: 53, owner: 1, kind: KIND.RESEARCH_COMPLEX, buildProgress: null };
   const researchCard = buildCommandCardDescriptors(commandCardCtx({
