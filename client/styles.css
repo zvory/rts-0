@@ -1959,15 +1959,10 @@ input[type="text"]:focus {
   top: 58px;
   right: 12px;
 }
-.lab-spawn-window {
-  top: 58px;
-  right: 344px;
-}
+.lab-spawn-window { top: 58px; right: 344px; }
 .lab-tools-window {
-  top: 232px;
-  right: 676px;
-  width: min(260px, calc(100vw - 24px));
-  min-width: min(220px, calc(100vw - 24px));
+  top: 232px; right: 676px;
+  width: min(260px, calc(100vw - 24px)); min-width: min(220px, calc(100vw - 24px));
 }
 .lab-map-window {
   top: 58px;
@@ -2474,15 +2469,8 @@ input[type="text"]:focus {
     right: 12px;
   }
 
-  .lab-spawn-window {
-    top: 326px;
-    right: 12px;
-  }
-
-  .lab-tools-window {
-    top: 420px;
-    right: 12px;
-  }
+  .lab-spawn-window { top: 326px; right: 12px; }
+  .lab-tools-window { top: 420px; right: 12px; }
 
   .lab-map-window {
     top: 514px;
