@@ -145,6 +145,11 @@ pub mod weapons {
     pub const TANK_COAX: &str = "tank_coax";
 }
 
+/// Semantic `Event::Notice.msg` identifiers that require client-side policy.
+pub mod notices {
+    pub const ARTILLERY_STEEL_SHORTAGE: &str = "notice:artillery_steel_shortage";
+}
+
 /// Version for the array-shaped compact snapshot representation sent over WebSocket.
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
@@ -206,6 +211,7 @@ pub struct ProtocolVocabularies {
     lobby_kinds: BTreeMap<&'static str, &'static str>,
     upgrades: BTreeMap<&'static str, &'static str>,
     weapon_kinds: BTreeMap<&'static str, &'static str>,
+    notices: BTreeMap<&'static str, &'static str>,
     notice_severities: BTreeMap<&'static str, &'static str>,
     order_stages: BTreeMap<&'static str, &'static str>,
     resource_kinds: BTreeMap<&'static str, &'static str>,
@@ -570,6 +576,7 @@ pub fn protocol_contract() -> ProtocolContract {
             lobby_kinds: lobby_kind_vocabulary(),
             upgrades: upgrade_vocabulary(),
             weapon_kinds: weapon_kind_vocabulary(),
+            notices: notice_vocabulary(),
             notice_severities: notice_severity_vocabulary(),
             order_stages: order_stage_vocabulary(),
             resource_kinds: resource_kind_vocabulary(),
@@ -730,6 +737,13 @@ fn weapon_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
 
 fn notice_severity_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[("INFO", "info"), ("WARN", "warn"), ("ALERT", "alert")])
+}
+
+fn notice_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[(
+        "ARTILLERY_STEEL_SHORTAGE",
+        notices::ARTILLERY_STEEL_SHORTAGE,
+    )])
 }
 
 fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {

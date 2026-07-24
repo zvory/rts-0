@@ -11,8 +11,6 @@ export function noticeAlertId(msg) {
   return m.slice(ALERT_PREFIX.length).trim();
 }
 
-
-
 export function noticeDisplayText(msg) {
   const raw = String(msg || "");
   if (raw === NOTICE.ARTILLERY_STEEL_SHORTAGE) return "Not enough steel";
@@ -21,4 +19,3 @@ export function noticeDisplayText(msg) {
   if (id) return id.replaceAll("_", " ");
   return raw;
 }
-
