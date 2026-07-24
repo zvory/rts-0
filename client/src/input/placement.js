@@ -37,6 +37,47 @@ export function footprintPlacementBlocker(
   map,
   policy = placementPolicyForBuilding(null),
 ) {
+  return footprintPlacementBlockerFromSource(
+    () => entities,
+    allowedOverlapIds,
+    tileX,
+    tileY,
+    footW,
+    footH,
+    map,
+    policy,
+  );
+}
+
+export function createFootprintPlacementBlockerQuery(
+  entities,
+  allowedOverlapIds,
+  map,
+  policy = placementPolicyForBuilding(null),
+) {
+  const nearbyEntities = createPlacementEntityQuery(entities, allowedOverlapIds, map, policy);
+  return (tileX, tileY, footW, footH) => footprintPlacementBlockerFromSource(
+    (minX, minY, maxX, maxY) => nearbyEntities(minX, minY, maxX, maxY),
+    allowedOverlapIds,
+    tileX,
+    tileY,
+    footW,
+    footH,
+    map,
+    policy,
+  );
+}
+
+function footprintPlacementBlockerFromSource(
+  entitySource,
+  allowedOverlapIds,
+  tileX,
+  tileY,
+  footW,
+  footH,
+  map,
+  policy,
+) {
   if (tileX < 0 || tileY < 0) return "terrain";
   if (tileX + footW > map.width || tileY + footH > map.height) return "terrain";
   for (let ty = tileY; ty < tileY + footH; ty++) {
@@ -51,7 +92,7 @@ export function footprintPlacementBlocker(
   const maxX = (tileX + footW) * ts;
   const maxY = (tileY + footH) * ts;
   let contextualOilCenter = false;
-  for (const e of entities) {
+  for (const e of entitySource(minX, minY, maxX, maxY)) {
     if (e.shotReveal || e.visionOnly) continue;
     if (allowedOverlapIds?.has(e.id)) continue;
     if (resourceAllowedForPlacement(e, policy, minX, minY, maxX, maxY)) {
@@ -65,6 +106,105 @@ export function footprintPlacementBlocker(
   }
   if (policy?.resourceOverlap === "oilCenterRequired" && !contextualOilCenter) return "terrain";
   return null;
+}
+
+function createPlacementEntityQuery(entities, allowedOverlapIds, map, policy) {
+  const tileSize = map?.tileSize;
+  if (!(tileSize > 0) || !Number.isFinite(tileSize)) return () => entities;
+
+  const buckets = new Map();
+  let order = 0;
+  for (const entity of entities) {
+    const entityOrder = order++;
+    if (entity.shotReveal || entity.visionOnly || allowedOverlapIds?.has(entity.id)) continue;
+    if (!entityBlocksPlacement(entity, policy)) continue;
+    const bounds = placementEntityBounds(entity, tileSize);
+    if (!bounds) continue;
+    const minTileX = Math.floor(bounds.minX / tileSize);
+    const minTileY = Math.floor(bounds.minY / tileSize);
+    const maxTileX = Math.floor(bounds.maxX / tileSize);
+    const maxTileY = Math.floor(bounds.maxY / tileSize);
+    const entry = { entity, order: entityOrder };
+    for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
+        const key = `${tileX},${tileY}`;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = [];
+          buckets.set(key, bucket);
+        }
+        bucket.push(entry);
+      }
+    }
+  }
+
+  return (minX, minY, maxX, maxY) => {
+    const minTileX = Math.floor(minX / tileSize);
+    const minTileY = Math.floor(minY / tileSize);
+    const maxTileX = Math.floor(maxX / tileSize);
+    const maxTileY = Math.floor(maxY / tileSize);
+    if (minTileX === maxTileX && minTileY === maxTileY) {
+      return (buckets.get(`${minTileX},${minTileY}`) || []).map((entry) => entry.entity);
+    }
+    const entries = [];
+    const seenOrders = new Set();
+    for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
+        for (const entry of buckets.get(`${tileX},${tileY}`) || []) {
+          if (seenOrders.has(entry.order)) continue;
+          seenOrders.add(entry.order);
+          entries.push(entry);
+        }
+      }
+    }
+    entries.sort((a, b) => a.order - b.order);
+    return entries.map((entry) => entry.entity);
+  };
+}
+
+function placementEntityBounds(entity, tileSize) {
+  const stat = STATS[entity.kind];
+  if (!stat || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) return null;
+  if (isBuilding(entity.kind)) {
+    const halfW = ((stat.footW ? stat.footW : 1) * tileSize) / 2;
+    const halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
+    return {
+      minX: entity.x - halfW,
+      minY: entity.y - halfH,
+      maxX: entity.x + halfW,
+      maxY: entity.y + halfH,
+    };
+  }
+  if (entity.kind === KIND.ANTI_TANK_GUN) {
+    const radius = circularBodyRadius(entity);
+    return {
+      minX: entity.x - radius,
+      minY: entity.y - radius,
+      maxX: entity.x + radius,
+      maxY: entity.y + radius,
+    };
+  }
+  if (isVehicleBodyKind(entity.kind)) {
+    const body = vehicleBody(entity, 0);
+    if (!body) return null;
+    const c = Math.cos(body.facing);
+    const s = Math.sin(body.facing);
+    const halfW = Math.abs(c) * body.halfLen + Math.abs(s) * body.halfWidth;
+    const halfH = Math.abs(s) * body.halfLen + Math.abs(c) * body.halfWidth;
+    return {
+      minX: body.x - halfW,
+      minY: body.y - halfH,
+      maxX: body.x + halfW,
+      maxY: body.y + halfH,
+    };
+  }
+  const radius = stat.size ? stat.size : 0;
+  return {
+    minX: entity.x - radius,
+    minY: entity.y - radius,
+    maxX: entity.x + radius,
+    maxY: entity.y + radius,
+  };
 }
 
 export function placementPolicyForBuilding(kind) {
@@ -198,11 +338,19 @@ export function _refreshPlacement() {
     return;
   }
   if (this._placementDrag && place.building === KIND.TANK_TRAP) {
+    const chosenWorker = this._selectedWorkerIds()[0];
+    const allowed = chosenWorker === undefined ? new Set() : new Set([chosenWorker]);
+    const blockerAt = createFootprintPlacementBlockerQuery(
+      this._selectionEntities(),
+      allowed,
+      map,
+      placementPolicyForBuilding(place.building),
+    );
     const lineSites = buildTankTrapLineSites({
       start: this._placementDrag,
       end: { tileX, tileY },
       isValid: (siteX, siteY) => {
-        const blockedBy = inputFootprintPlacementBlocker(this, siteX, siteY, footW, footH, map, place.building);
+        const blockedBy = blockerAt(siteX, siteY, footW, footH);
         return { valid: blockedBy == null, blockedBy };
       },
     });
