@@ -6,8 +6,8 @@ _2026-07-24_
 
 ## Changes
 
-- Artillery can now fire from 10–40 tiles away, instead of 25–55.
+- Artillery range is now 10–40 tiles (was 25–55), with a wider firing arc.
 
 ## Playtest watch
 
-- Watch whether the shorter minimum range makes artillery too easy to defend at close range.
+- Whether closer targeting and the wider arc make artillery too hard to flank.
