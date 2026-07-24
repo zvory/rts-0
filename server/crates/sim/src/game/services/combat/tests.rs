@@ -782,39 +782,6 @@ fn small_arms_falls_back_to_armored_or_hard_targets() {
 }
 
 #[test]
-fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
-    let map = open_map(8);
-    let mut entities = EntityStore::new();
-    let attacker = entities
-        .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
-        .expect("attacker should spawn");
-    let trap = entities
-        .spawn_building(1, EntityKind::TankTrap, 150.0, 100.0, true)
-        .expect("tank trap should spawn");
-    entities
-        .get_mut(attacker)
-        .expect("attacker should exist")
-        .set_order(Order::attack_move_to(300.0, 100.0));
-
-    assert_eq!(
-        entities.get(trap).map(|trap| trap.owner),
-        Some(0),
-        "a prebuilt Tank Trap should have no player owner"
-    );
-    assert_eq!(
-        resolve_test_target(
-            &map,
-            &entities,
-            &team_relations(&[(1, 7), (2, 7)]),
-            attacker,
-            192.0
-        ),
-        Some(trap),
-        "neutral Tank Traps should obstruct and engage vehicles regardless of former team"
-    );
-}
-
-#[test]
 fn tank_target_priority_uses_threat_role_policy_for_targets_in_weapon_range() {
     use EntityKind::*;
 
@@ -2970,38 +2937,6 @@ fn infantry_like_auto_acquisition_ignores_enemy_tank_traps() {
             entities.get(trap).expect("trap should exist").hp,
             trap_hp_before,
             "{kind:?} should not damage enemy Tank Traps without a direct order"
-        );
-    }
-}
-
-#[test]
-fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
-    for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
-        let mut entities = EntityStore::new();
-        let attacker = entities
-            .spawn_unit(1, kind, 100.0, 100.0)
-            .expect("attacker should spawn");
-        entities
-            .get_mut(attacker)
-            .expect("attacker should exist")
-            .set_order(Order::attack_move_to(300.0, 100.0));
-        let trap = entities
-            .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
-            .expect("tank trap should spawn");
-
-        run_combat_tick_on_map(
-            &mut entities,
-            &[player_state(1, false), player_state(2, false)],
-            &open_map(12),
-        );
-
-        assert_eq!(
-            entities
-                .get(attacker)
-                .expect("attacker should exist")
-                .target_id(),
-            Some(trap),
-            "{kind:?} should auto-acquire neutral Tank Traps"
         );
     }
 }

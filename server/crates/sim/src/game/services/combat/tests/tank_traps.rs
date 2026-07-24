@@ -1,6 +1,67 @@
 use super::*;
 
 #[test]
+fn completed_tank_traps_are_neutral_hostile_obstacles_for_every_team() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let trap = entities
+        .spawn_building(1, EntityKind::TankTrap, 150.0, 100.0, true)
+        .expect("tank trap should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 100.0));
+
+    assert_eq!(entities.get(trap).map(|trap| trap.owner), Some(0));
+    assert_eq!(
+        resolve_test_target(
+            &map,
+            &entities,
+            &team_relations(&[(1, 7), (2, 7)]),
+            attacker,
+            192.0,
+        ),
+        Some(trap),
+        "neutral Tank Traps should obstruct and engage vehicles regardless of former team"
+    );
+}
+
+#[test]
+fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
+    for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("attacker should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_order(Order::attack_move_to(300.0, 100.0));
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+            .expect("tank trap should spawn");
+
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &open_map(12),
+        );
+
+        assert_eq!(
+            entities
+                .get(attacker)
+                .expect("attacker should exist")
+                .target_id(),
+            Some(trap),
+            "{kind:?} should auto-acquire neutral Tank Traps"
+        );
+    }
+}
+
+#[test]
 fn vehicle_body_auto_acquisition_prefers_soft_target_over_irrelevant_tank_trap() {
     let mut entities = EntityStore::new();
     let scout = entities
