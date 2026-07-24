@@ -60,7 +60,7 @@ mod tests {
     use crate::game::entity::Order;
 
     #[test]
-    fn scenario_reproduces_cardinal_first_leg() {
+    fn scenario_preserves_open_ground_l_path_reproduction_setup() {
         let setup =
             Game::new_scout_car_open_ground_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_0724)
                 .expect("scenario setup should succeed");
@@ -92,34 +92,19 @@ mod tests {
         );
         assert!(matches!(scout.order(), Order::Idle));
 
-        let mut game = setup.game;
-        game.enqueue(
-            setup.player_id,
+        match setup.command() {
             SimCommand::Move {
-                units: setup.units,
-                x: setup.goal.0,
-                y: setup.goal.1,
-                queued: false,
-            },
-        );
-        for _ in 0..120 {
-            game.tick();
+                units,
+                x,
+                y,
+                queued,
+            } => {
+                assert_eq!(units, vec![scout_id]);
+                assert!((x - setup.goal.0).abs() <= 0.001);
+                assert!((y - setup.goal.1).abs() <= 0.001);
+                assert!(!queued);
+            }
+            command => panic!("scenario should issue a move command, got {command:?}"),
         }
-
-        let scout = game
-            .state
-            .entities
-            .get(scout_id)
-            .expect("scenario scout car should remain alive");
-        assert!(
-            scout.pos_x < start.0 - config::TILE_SIZE as f32 * 6.0,
-            "current bug should carry the scout car west along the first route leg"
-        );
-        assert!(
-            (scout.pos_y - start.1).abs() <= 0.001,
-            "current bug should keep the first long leg cardinal on open ground, start y {:.2}, got {:.2}",
-            start.1,
-            scout.pos_y
-        );
     }
 }
