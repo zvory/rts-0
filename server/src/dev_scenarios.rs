@@ -1,10 +1,12 @@
 use rts_sim::game::entity::EntityKind;
 
 mod command_car_corner;
+mod scout_car_open_ground_l_path;
 mod tank_retreat;
 use command_car_corner::{
     COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
 };
+use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
 use tank_retreat::{TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -766,7 +768,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 20] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 21] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -786,6 +788,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 20] = [
             "Single vehicle faces east, then receives a move order 15 tiles directly behind it.",
         launches: &DIRECT_REVERSE_ORDER_LAUNCHES,
     },
+    SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC,
     DevScenarioSpec {
         id: "replay_142_vehicle_lock",
         title: "Replay 112 Vehicle Lock",

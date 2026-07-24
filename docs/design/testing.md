@@ -143,6 +143,10 @@ Current scenario ids:
   `slight_angle`, and `major_angle` cases cover static-obstruction recovery across approach angles.
 - `scout_car_snaking_corridor` — movement/pathing through the snaking stone corridor.
 - `direct_reverse_order` — one vehicle ordered directly behind its current facing.
+- `scout_car_open_ground_l_path` — after a five-second inspection pause, one east-facing Scout Car
+  receives a far southwest move across empty grass. The current bug makes it reverse west along the
+  cardinal portion of its grid route before turning southwest; a corrected build should begin one
+  continuous forward turn toward the final goal.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.
