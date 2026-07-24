@@ -30,6 +30,7 @@ const FEEDBACK_SINGLETONS = Object.freeze([
   ["placement", "placement"],
   ["formationMovePreview", "formationMovePreview"],
   ["labToolPreview", "labToolPreview"],
+  ["labRuler", "labRuler"],
   ["attackTargetPreview", "attackTargetPreview"],
   ["antiTankGunSetupPreview", "supportWeaponSetupPreview"],
   ["abilityTargetPreview", "abilityTargetPreview"],

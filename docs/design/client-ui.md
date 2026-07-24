@@ -52,6 +52,7 @@ src/
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
   renderer/lab_tool_preview.js # Armed Lab unit/remove-tool cursor ghosts
+  renderer/lab_ruler_overlay.js # Persistent Lab tile ruler geometry and screen-readable labels
   renderer/observer_map_analysis.js # Observer-only static AI map-analysis world overlay drawer
   fog.js          # Fog overlay: apply authoritative visible/explored grids; local stamping fallback
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -1073,8 +1074,9 @@ export class ClientIntent {
   recordPlannedCommand(command, selectedEntities, result?)
   plannedOrderPlanForEntity(entity), entityWithPlannedOrder(entity)
   reconcilePlannedOrders(entities, options?), clearPlannedOrdersForUnits(ids), clearPlannedOrders()
-  activeLabTool, labToolPreview
+  activeLabTool, labToolPreview, labRuler
   beginLabTool(tool), updateLabToolPreview(preview), cancelLabTool(reason?)
+  updateLabRulerCursor(point), placeLabRulerPoint(point), clearLabRuler()
 }
 ```
 
@@ -1144,8 +1146,14 @@ feedback for controlled-side selections and commands is issued as the selected c
 instead of the raw local player id. Lab command-card and targeted-command policy resolves resources,
 faction catalogs, per-owner upgrades when present, prerequisites, production helpers, self-ability
 hover origins, and hostility from the selected issue-as owner rather than the spectator/viewer id.
-Lab Options, Lab Tools, and floating room-time panel headers preserve drag, collapse, and keyboard
+Lab Options, Lab Spawn, Lab Tools, and floating room-time panel headers preserve drag, collapse, and keyboard
 geometry handling without visible reset actions.
+The Lab Spawn panel owns entity setup, removal, target-player, and player-state controls. The
+separate Lab Tools panel owns the browser-local Ruler. While armed, its hover point displays tile
+coordinates and its first click starts a live Euclidean tile-distance segment; the second click
+fixes that segment, and the next click replaces it. Fixed ruler geometry remains in
+`ClientIntent.labRuler` when another Lab tool is armed and is removed only by a new ruler start,
+the Tools-panel Clear action, or match teardown.
 
 Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
@@ -1912,7 +1920,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through City Centre), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 1.1-second red pulse with a crisp white inner rim.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
-  health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost →
+  health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost and Lab ruler →
   selection drag-box → (HUD is DOM, not Pixi). Occupied-trench shadows and lips render only when the
   snapshot's `occupiedTrenchId` matches authoritative trench terrain; orphaned ids do not synthesize
   client-only trench geometry. The below-unit occupied-trench berm cue uses stroked irregular

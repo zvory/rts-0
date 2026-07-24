@@ -65,6 +65,7 @@ import { _drawMissToasts } from "./miss_toasts.js";
 import { _drawSelectedMortarRanges, _drawSelectedUnitRanges } from "./unit_ranges.js";
 import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
+import { LabRulerOverlay } from "./lab_ruler_overlay.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
 import { _drawObserverMapAnalysisOverlay } from "./observer_map_analysis.js";
@@ -227,6 +228,10 @@ export class Renderer {
     this._lineProjectileTrails = new Map();
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
+    this._labRulerOverlay = new LabRulerOverlay({
+      layer: this.layers.placement,
+      pixi: PIXI,
+    });
 
     // Drag selection box lives in screen space (not affected by the camera).
     this._dragGfx = new PIXI.Graphics();
@@ -657,7 +662,13 @@ export class Renderer {
       this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView));
       this._drawSafely("missToasts", () => this._drawMissToasts(feedbackView));
     });
-    time("renderer.placement", () => this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog)));
+    time("renderer.placement", () => {
+      this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog));
+      this._drawSafely("labRuler", () => this._labRulerOverlay.render(feedbackView?.labRuler, {
+        tileSize: this._map?.tileSize,
+        zoom: camera?.zoom,
+      }));
+    });
   }
 
   _beginRenderFrame() {
@@ -1128,6 +1139,7 @@ export class Renderer {
     this._smokeGfx.destroy();
     this._abilityObjectGfx.destroy();
     this._placementGfx.destroy();
+    this._labRulerOverlay.destroy();
     this._dragGfx.destroy();
     this._groundDecals?.destroy();
     this._groundDecals = null;

@@ -187,6 +187,33 @@ function publishScene(input, entities) {
 
 {
   const input = Object.create(Input.prototype);
+  input.clientIntent = new ClientIntent();
+  const ruler = input.clientIntent.beginLabTool({
+    kind: "ruler",
+    keepArmedOnWorldClick: true,
+  });
+  input.mouse = { x: 24, y: 40 };
+  input._groundAtScreen = (x, y) => ({ x: x + 64, y: y + 96 });
+  input._refreshLabToolPreview();
+  assert(
+    input.clientIntent.labRuler.cursor?.x === 88 &&
+      input.clientIntent.labRuler.cursor?.y === 136,
+    "armed Lab ruler publishes the current world cursor coordinate",
+  );
+  input.clientIntent.placeLabRulerPoint({ x: 32, y: 64 });
+  input.clientIntent.placeLabRulerPoint({ x: 128, y: 192 });
+  input.clientIntent.beginLabTool({ kind: "spawnEntity", keepArmedOnWorldClick: true });
+  assert(
+    input.clientIntent.labRuler.start?.x === 32 &&
+      input.clientIntent.labRuler.end?.x === 128 &&
+      input.clientIntent.labRuler.cursor === null,
+    "arming another Lab tool hides the ruler cursor but preserves its fixed measurement",
+  );
+  assert(ruler.kind === "ruler", "Lab ruler uses the ordinary active-tool record");
+}
+
+{
+  const input = Object.create(Input.prototype);
   let cancelled = null;
   input.clientIntent = new ClientIntent();
   const tool = input.clientIntent.beginLabTool({ kind: "fieldPoint" });

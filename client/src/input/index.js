@@ -403,6 +403,8 @@ export class Input {
     this._flushPointerLockCursor();
     if (this.inputRouter?.activePreviewSurface?.()) {
       this._cancelFormationGesture();
+      this._intent()?.updateLabToolPreview?.(null);
+      this._intent()?.updateLabRulerCursor?.(null);
       return;
     }
     if (this._formationGesture?.promoted) {
@@ -418,6 +420,7 @@ export class Input {
       return;
     }
     this._intent()?.updateLabToolPreview?.(null);
+    this._intent()?.updateLabRulerCursor?.(null);
     if (this._placement()) {
       this._intent()?.updateAttackTargetPreview?.(null);
       this._intent()?.updateResourceMiningPreview?.(null);
