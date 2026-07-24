@@ -95,11 +95,7 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
                 0.0
             }
         });
-    let rotated = rotate_toward(
-        current,
-        target_angle,
-        ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
-    );
+    let rotated = rotate_toward(current, target_angle, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);

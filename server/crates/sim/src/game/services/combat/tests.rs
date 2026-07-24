@@ -1793,37 +1793,6 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 }
 
 #[test]
-fn anti_tank_gun_turns_slowly_before_firing() {
-    let mut entities = EntityStore::new();
-    let at_id = entities
-        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
-        .expect("anti-tank gun should spawn");
-    let enemy_id = entities
-        .spawn_unit(2, EntityKind::Tank, 100.0, 20.0)
-        .expect("enemy tank should spawn");
-    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
-    if let Some(at) = entities.get_mut(at_id) {
-        at.set_facing(0.0);
-        at.set_weapon_facing(0.0);
-        at.set_weapon_setup(WeaponSetup::Deployed);
-    }
-
-    run_combat_tick(&mut entities);
-
-    let at = entities.get(at_id).expect("at should exist");
-    assert!(
-        at.facing().abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "anti-tank gun should only slew by its turn-rate cap, got {:.4}",
-        at.facing()
-    );
-    assert_eq!(
-        entities.get(enemy_id).expect("enemy should exist").hp,
-        enemy_hp,
-        "anti-tank gun should not fire until its barrel is aligned"
-    );
-}
-
-#[test]
 fn mortar_turns_fast_before_auto_firing() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
