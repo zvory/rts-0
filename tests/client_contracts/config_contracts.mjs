@@ -499,7 +499,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(
     ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles === SMOKE_PLUS_CLOUD_RADIUS_TILES &&
       ABILITIES[ABILITY.SMOKE].upgradedDurationTicks === SMOKE_PLUS_CLOUD_DURATION_TICKS &&
-      SMOKE_PLUS_CLOUD_RADIUS_TILES === SMOKE_CLOUD_RADIUS_TILES * 1.5 &&
+      SMOKE_PLUS_CLOUD_RADIUS_TILES === SMOKE_CLOUD_RADIUS_TILES * 2 &&
       SMOKE_PLUS_CLOUD_DURATION_TICKS === SMOKE_CLOUD_DURATION_TICKS * 2,
     "Smoke Plus ability effect values mirror the base Smoke cloud upgrade",
   );
