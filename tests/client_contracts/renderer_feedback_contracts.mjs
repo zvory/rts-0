@@ -18,6 +18,7 @@ import {
   createLabControlPolicy,
 } from "../../client/src/lab_control_policy.js";
 import { createControlPolicyProjection } from "../../client/src/control_policy_projection.js";
+import { attackFeedbackOriginForWeapon } from "../../client/src/renderer/attack_feedback_origin.js";
 import { buildRendererFeedbackView } from "../../client/src/renderer/feedback_view_model.js";
 import { createLiveRigDefinitions } from "../../client/src/renderer/rigs/live_routing.js";
 import { _drawSelectionAndHp } from "../../client/src/renderer/entities.js";
@@ -47,6 +48,33 @@ import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.j
 import { muzzleFeedbackStyle } from "../../client/src/renderer/weapon_feedback_style.js";
 
 import { RecordingGraphics, installFakePixi } from "./pixi_fakes.mjs";
+
+{
+  const artillery = {
+    id: 89,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    facing: 0,
+    weaponFacing: 0,
+    setup: SETUP.DEPLOYED,
+  };
+  const origin = attackFeedbackOriginForWeapon({
+    definitionsByKind: createLiveRigDefinitions(),
+    attacker: artillery,
+    weaponKind: WEAPON_KIND.ARTILLERY_GUN,
+    targetPos: { x: 500, y: 100 },
+    state: {},
+    now: 0,
+    map: { tileSize: 32 },
+    stat: {},
+  });
+  assertApprox(origin.x, artillery.x + 45.864 * 0.75, 0.001,
+    "artillery feedback uses the scaled authored muzzle anchor");
+  assertApprox(origin.y, artillery.y, 0.001,
+    "artillery feedback keeps the scaled authored muzzle on the weapon axis");
+}
 
 {
   const selected = [
