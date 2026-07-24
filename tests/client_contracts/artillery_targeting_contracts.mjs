@@ -76,6 +76,32 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
 }
 
 {
+  const center = { x: 1024, y: 1024 };
+  const [lock] = buildArtilleryTargetLocks({
+    ability: ABILITY.POINT_FIRE,
+    carriers: [{
+      id: 1,
+      kind: KIND.ARTILLERY,
+      x: center.x,
+      y: center.y,
+      facing: Math.PI / 2,
+      setupState: SETUP.PACKED,
+    }],
+    rawX: center.x,
+    rawY: center.y,
+    map: { width: 64, height: 64 },
+    tileSize: 32,
+    definition: ABILITIES[ABILITY.POINT_FIRE],
+  });
+  assert(
+    lock.needsMove &&
+      Math.abs(lock.originX - center.x) < 0.001 &&
+      lock.originY > center.y,
+    "Artillery staging preview matches the server facing fallback at the exact map center",
+  );
+}
+
+{
   const artilleryPreviewInput = Object.create(Input.prototype);
   artilleryPreviewInput.mouse = { x: 500, y: 300 };
   artilleryPreviewInput.state = {

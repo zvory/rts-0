@@ -72,6 +72,7 @@ export function buildArtilleryTargetLocks({
       minRangePx,
       maxRangePx,
       bounds,
+      context.bodyFacing,
     );
     if (!firingPosition) continue;
     const facing = Math.atan2(rawY - firingPosition.y, rawX - firingPosition.x);
@@ -146,7 +147,16 @@ function queuedArtilleryTargetContext(entity, context) {
   return next;
 }
 
-function artilleryFiringPosition(originX, originY, rawX, rawY, minRangePx, maxRangePx, bounds) {
+function artilleryFiringPosition(
+  originX,
+  originY,
+  rawX,
+  rawY,
+  minRangePx,
+  maxRangePx,
+  bounds,
+  bodyFacing,
+) {
   if (
     !Number.isFinite(originX) ||
     !Number.isFinite(originY) ||
@@ -172,18 +182,23 @@ function artilleryFiringPosition(originX, originY, rawX, rawY, minRangePx, maxRa
     preferredDirX = (originX - rawX) / distance;
     preferredDirY = (originY - rawY) / distance;
   } else {
-    const centerX = bounds ? bounds.maxX * 0.5 : rawX + maxRangePx;
-    const centerY = bounds ? bounds.maxY * 0.5 : rawY;
+    const centerX = bounds ? (bounds.maxX + 1) * 0.5 : rawX + maxRangePx;
+    const centerY = bounds ? (bounds.maxY + 1) * 0.5 : rawY;
     const centerDistance = Math.hypot(centerX - rawX, centerY - rawY);
-    preferredDirX = centerDistance > Number.EPSILON ? (centerX - rawX) / centerDistance : 1;
-    preferredDirY = centerDistance > Number.EPSILON ? (centerY - rawY) / centerDistance : 0;
+    const hasFacing = Number.isFinite(bodyFacing);
+    preferredDirX = centerDistance > Number.EPSILON
+      ? (centerX - rawX) / centerDistance
+      : hasFacing ? Math.cos(bodyFacing) : 1;
+    preferredDirY = centerDistance > Number.EPSILON
+      ? (centerY - rawY) / centerDistance
+      : hasFacing ? Math.sin(bodyFacing) : 0;
   }
   const margin = minRangePx * 0.075;
   const stagingDistance = distance < minRangePx
     ? Math.min(maxRangePx, minRangePx + margin)
     : Math.max(minRangePx, maxRangePx - margin);
   const centerDirection = bounds
-    ? [bounds.maxX * 0.5 - rawX, bounds.maxY * 0.5 - rawY]
+    ? [(bounds.maxX + 1) * 0.5 - rawX, (bounds.maxY + 1) * 0.5 - rawY]
     : [preferredDirX, preferredDirY];
   const candidateDirections = [
     [preferredDirX, preferredDirY],
