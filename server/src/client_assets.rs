@@ -42,11 +42,24 @@ pub(crate) fn service(client_dir: &str, state: super::AppState) -> Router {
 /// Module workers do not inherit the document import map, so their stable child-module URLs must
 /// revalidate before use to prevent a browser from combining code from different deploys.
 async fn revalidate_assets(request: Request<axum::body::Body>, next: Next) -> Response {
+    let requires_revalidation = is_unversioned_javascript_module(request.uri());
     let mut response = next.run(request).await;
+    if requires_revalidation {
+        response
+            .headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    }
     response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
-    response
+}
+
+fn is_unversioned_javascript_module(uri: &axum::http::Uri) -> bool {
+    uri.path().ends_with(".js")
+        && !uri.query().is_some_and(|query| {
+            query.split('&').any(|part| {
+                part.split_once('=')
+                    .is_some_and(|(key, value)| key == "v" && !value.is_empty())
+            })
+        })
 }
 
 #[cfg(test)]
@@ -84,6 +97,7 @@ mod tests {
             )
             .layer(middleware::from_fn(revalidate_assets));
         let response = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .uri("/src/renderer/rigs/animation.js")
@@ -97,6 +111,22 @@ mod tests {
             response.headers().get(header::CACHE_CONTROL),
             Some(&HeaderValue::from_static("no-cache")),
             "worker child modules must revalidate so a deploy cannot mix module versions"
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/src/renderer/rigs/animation.js?v=current-build")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL),
+            Some(&HeaderValue::from_static("public, max-age=86400")),
+            "versioned document modules should preserve their existing cache policy"
         );
     }
 }
