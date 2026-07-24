@@ -295,8 +295,16 @@ mod tests {
         resolve_shell(&mut entities, &teams, &fog, &mut events, &shell, 10);
 
         let after = entities.get(victim).expect("victim should survive").hp;
+        let inner = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
+        let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
+        let expected_base = artillery_damage(
+            EntityKind::Rifleman,
+            64.0_f32.powi(2),
+            inner.powi(2),
+            outer.powi(2),
+        );
         let expected_damage =
-            combat::area_damage_after_entrenchment(EntityKind::Rifleman, 40, true);
+            combat::area_damage_after_entrenchment(EntityKind::Rifleman, expected_base, true);
         assert_eq!(
             before - after,
             expected_damage,

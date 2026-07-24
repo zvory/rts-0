@@ -628,14 +628,14 @@ for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
 The churn driver runs before every tick. Players 1 and 2 are mortal; the driver tracks their
 authoritative unit ids and original kinds, preserves spent Panzerfaust kinds, and restores
-each owner's canonical 85-unit roster. A replacement that dies during its first tick is recovered by
+each owner's canonical 86-unit roster. A replacement that dies during its first tick is recovered by
 the owner-count backstop even though the driver never observed its id. Placement considers at most
 504 nearest-center candidates, builds body occupancy once per missing request, accounts for earlier
 planned spawns, and emits at most one spawn batch. Unresolved requests are reported and retried.
 `Game::lab_owned_units` and `Game::lab_plan_unit_spawns` are the typed Lab queries at this seam;
 callers do not inspect simulation stores.
 
-Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 85
+Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 86
 ids from scenario seed, player, epoch, and id, selects exactly 43, and sends one unqueued move to a
 deterministically selected passable integer tile in the active diagonal endpoint corridor. The
 endpoint leg still changes every 900 ticks. Request ids, selection, jitter, and replay operations are

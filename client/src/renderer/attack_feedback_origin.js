@@ -70,9 +70,13 @@ function attackFeedbackRigOrigin(definitionsByKind, attacker, weaponKind, state,
 }
 
 function attackFeedbackAnchorNameForWeapon(attackerKind, weaponKind) {
-  if (attackerKind !== KIND.TANK) return null;
-  if (weaponKind === WEAPON_KIND.TANK_COAX) return "coaxMuzzle";
-  return "muzzle";
+  if (attackerKind === KIND.TANK) {
+    return weaponKind === WEAPON_KIND.TANK_COAX ? "coaxMuzzle" : "muzzle";
+  }
+  if (attackerKind === KIND.ARTILLERY && weaponKind === WEAPON_KIND.ARTILLERY_GUN) {
+    return "muzzle";
+  }
+  return null;
 }
 
 function fallbackAttackFeedbackOrigin(attacker, originKind, stat, facing, map) {

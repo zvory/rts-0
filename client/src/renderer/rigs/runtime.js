@@ -1,10 +1,9 @@
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxFill, gfxStroke } from "../native_graphics.js";
-import { createRigAnimationStage, sampleRigAnimationInto } from "./animation.js";
+import { createRigAnimationStage, rigContainerScale, sampleRigAnimationInto } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
 
-const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const SVG_RIG_DIAGNOSTIC_LABELS = Object.freeze([
   "renderer.rig.redraw.skipped.hidden",
   "renderer.rig.redraw.attempted",
@@ -121,7 +120,7 @@ export class UnitRigInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? 1;
     setPoint(this.container.position, entity.x ?? 0, entity.y ?? 0);
-    const scale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
+    const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 

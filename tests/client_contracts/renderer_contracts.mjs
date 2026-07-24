@@ -3,6 +3,7 @@ import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
+import { rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -26,6 +27,9 @@ function restoreGlobal(name, value) {
   if (value === undefined) delete globalThis[name];
   else globalThis[name] = value;
 }
+
+assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 * 0.85,
+  "rig presentation scale composes with occupied-trench scale");
 
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");
@@ -871,6 +875,55 @@ function restoreGlobal(name, value) {
       "infantry rig clears the dirt tint overlay after leaving a trench",
     );
     assert(emptyDrawn === 0, "empty trenches do not draw the occupied berm overlay");
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = await Renderer.create(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 507,
+      owner: 1,
+      kind: KIND.ARTILLERY,
+      x: 260,
+      y: 160,
+      hp: 200,
+      maxHp: 200,
+      state: "idle",
+    };
+    const colorByOwner = new Map([[1, 0x4878c8]]);
+    const state = {
+      playerId: 1,
+      selection: new Set(),
+      resources: {},
+    };
+
+    renderer._drawUnit(entity, colorByOwner, state);
+
+    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+    assert(
+      unitRig?.container.scaleX === 0.75 && unitRig.container.scaleY === 0.75,
+      "artillery unit rig renders 25% smaller",
+    );
+    assert(
+      shadowRig?.container.scaleX === 0.75 && shadowRig.container.scaleY === 0.75,
+      "artillery shadow scales with its smaller visual",
+    );
   } finally {
     restorePixi();
   }
