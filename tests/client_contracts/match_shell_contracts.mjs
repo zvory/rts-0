@@ -25,17 +25,18 @@ import {
     __RTS_DESKTOP_RUNTIME: {
       shell: "tauri",
       platform: "windows",
-      nativeCursorBackend: false,
+      nativeCursorBackend: true,
       nativeCursorCapture: false,
       pointerLockDisabled: false,
+      exclusiveFullscreenSupported: true,
     },
     __TAURI_INTERNALS__: { invoke() {} },
     __TAURI__: { core: { invoke() {} } },
   };
   const fields = cursorRuntimeReportFields(root);
   assert(fields.desktopRuntimePresent, "Windows net reports retain the desktop runtime flag");
-  assert(!fields.nativeCursorBridgePresent, "Windows net reports keep the macOS cursor bridge absent");
-  assert(!fields.nativeCursorSupported, "Windows net reports do not claim macOS native cursor support");
+  assert(fields.nativeCursorBridgePresent, "Windows net reports expose the installed raw-input bridge");
+  assert(!fields.nativeCursorSupported, "Windows raw input stays inactive while fullscreen is opted out");
   assert(!fields.nativeCursorActive, "Windows net reports do not claim native cursor capture is active");
   assert(fields.tauriInternalsPresent, "Windows net reports retain Tauri internals diagnostics");
   assert(fields.tauriGlobalPresent, "Windows net reports retain the Tauri global diagnostic");
@@ -478,6 +479,7 @@ withFakeSettingsDocument(() => {
   let pointerLockToggled = 0;
   let debugToggled = 0;
   let unitRangeToggled = 0;
+  let exclusiveFullscreenToggled = 0;
   const context = buildMatchSettingsContext({
     replayViewer: false,
     state: { spectator: false, debugPathOverlaysEnabled: true, showUnitRangesEnabled: false },
@@ -498,6 +500,8 @@ withFakeSettingsDocument(() => {
     onPointerLockToggle: () => { pointerLockToggled += 1; },
     onDebugPathToggle: () => { debugToggled += 1; },
     onUnitRangeToggle: () => { unitRangeToggled += 1; },
+    onExclusiveFullscreenToggle: () => { exclusiveFullscreenToggled += 1; },
+    exclusiveFullscreenEnabled: false,
     livePauseActionLabel: () => "Pause (2)",
     livePauseActionTitle: () => "2 pauses remaining.",
   });
@@ -517,11 +521,18 @@ withFakeSettingsDocument(() => {
   root.children.find((child) => child.id === "prediction-toggle").listeners.click();
   root.children.find((child) => child.id === "pointer-lock-toggle").listeners.click();
   root.children.find((child) => child.id === "unit-range-toggle").listeners.click();
+  const fullscreenButton = root.children.find((child) => child.id === "exclusive-fullscreen-toggle");
+  assert(
+    fullscreenButton.textContent === "Use fullscreen mode: off",
+    "Windows fullscreen setting is opt-in and defaults off",
+  );
+  fullscreenButton.listeners.click();
   debugTab.render(root, context);
   root.children.find((child) => child.id === "debug-path-toggle").listeners.click();
   assert(predictionToggled === false, "match settings context toggles prediction through the injected callback");
   assert(pointerLockToggled === 1, "match settings context toggles pointer lock through the injected callback");
   assert(unitRangeToggled === 1, "match settings context toggles unit ranges through the injected callback");
+  assert(exclusiveFullscreenToggled === 1, "match settings context toggles Windows fullscreen through the injected callback");
   assert(debugToggled === 1, "match settings context toggles debug paths through the injected callback");
 });
 

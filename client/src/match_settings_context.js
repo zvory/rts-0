@@ -21,6 +21,8 @@ export function buildMatchSettingsContextForMatch(match) {
     onPointerLockToggle: match.onPointerLockToggle,
     onDebugPathToggle: match.onDebugPathToggle,
     onUnitRangeToggle: match.onUnitRangeToggle,
+    onExclusiveFullscreenToggle: match.onExclusiveFullscreenToggle,
+    exclusiveFullscreenEnabled: match.exclusiveFullscreenEnabled,
     livePauseActionLabel: () => match.livePauseActionLabel(),
     livePauseActionTitle: () => match.livePauseActionTitle(),
   });
@@ -45,6 +47,8 @@ export function buildMatchSettingsContext({
   onPointerLockToggle,
   onDebugPathToggle,
   onUnitRangeToggle,
+  onExclusiveFullscreenToggle,
+  exclusiveFullscreenEnabled,
   livePauseActionLabel,
   livePauseActionTitle,
 }) {
@@ -108,6 +112,14 @@ export function buildMatchSettingsContext({
           }),
           onToggle: onUnitRangeToggle,
         } : null,
+        exclusiveFullscreen: {
+          state: () => ({
+            hidden: globalThis.__RTS_DESKTOP_RUNTIME?.exclusiveFullscreenSupported !== true,
+            supported: globalThis.__RTS_DESKTOP_RUNTIME?.exclusiveFullscreenSupported === true,
+            enabled: !!exclusiveFullscreenEnabled,
+          }),
+          onToggle: onExclusiveFullscreenToggle,
+        },
       },
       debug: {
         available: movementPathsAvailable,

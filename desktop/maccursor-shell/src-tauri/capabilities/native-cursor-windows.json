@@ -1,0 +1,27 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "native-cursor-windows",
+  "description": "Windows-only exclusive display mode and raw-input cursor permissions.",
+  "platforms": [
+    "windows"
+  ],
+  "remote": {
+    "urls": [
+      "https://rts-0-zvorygin-beta.fly.dev/*",
+      "https://rts-0-zvorygin.fly.dev/*",
+      "http://127.0.0.1:*",
+      "http://localhost:*"
+    ]
+  },
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-maccursor-start",
+    "allow-maccursor-configure",
+    "allow-maccursor-stop",
+    "allow-maccursor-diagnostics",
+    "allow-desktop-set-exclusive-fullscreen",
+    "allow-desktop-exclusive-fullscreen-diagnostics"
+  ]
+}

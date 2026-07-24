@@ -66,16 +66,26 @@ and whether movement is batched. The current visible cursor is a DOM cursor
 painted directly in the native event handler (`visual: "dom-event-time"`), not
 a native overlay.
 
-That native bridge is macOS-only. Windows injects the same installed-app/runtime and release-channel
-metadata with `platform: "windows"`, but reports no native cursor backend or capture requirement and
-does not replace the Pointer Lock API. Windows uses WebView2 Pointer Lock with raw
-`unadjustedMovement`; if raw input is unavailable, cursor lock fails instead of falling back to
-lower-quality adjusted movement.
+Windows keeps its native backend opt-in. **Settings > Game > Use fullscreen
+mode** starts disabled. Enabling it enters a temporary Win32
+`CDS_FULLSCREEN` display mode on the window's current monitor, removes the
+window chrome without using Tauri's borderless fullscreen API, and switches
+cursor lock to Win32 Raw Input. The shell hides and confines the physical
+cursor while captured; relative movement, buttons, and wheel input continue
+through the same `window.__RTS_NATIVE_CURSOR` event contract as macOS.
+WebView2 Pointer Lock remains available while the setting is off and is not
+used while the Windows native backend is active.
 
-Once a non-replay match starts in the Tauri shell, the web client aggressively
-requests native cursor capture, retries on focused unlocks, and grabs the cursor
-again after the window regains focus. Alt-Tab releases capture through the shell
-window blur handler; focusing the game window again re-captures it.
+Escape turns **Use fullscreen mode** off. Alt-Tab remains available: losing
+focus releases Raw Input capture, cursor hiding/confinement, and the temporary
+display mode. If the preference is still enabled, focusing the game restores
+the display mode and the match re-captures the native cursor.
+
+Once a non-replay match starts in a native-cursor mode, the web client
+aggressively requests native cursor capture, retries on focused unlocks, and
+grabs the cursor again after the window regains focus. Alt-Tab releases capture
+through the shell window blur handler; focusing the game window again
+re-captures it.
 
 Developer-only shortcuts for local debug runs:
 
@@ -191,9 +201,13 @@ Manual check:
 5. From the lobby, use **Open Lab** and confirm the lab opens in the same
    shell window and starts the lab room.
 6. Start a one-player sandbox or AI match from either release channel.
-7. Confirm the shell locks the cursor automatically in-match, then Alt-Tab away
-   and back to confirm it re-locks. Move over terrain/HUD/minimap, right-click
-   move units, box-select, and wheel zoom. Inspect
+7. Open **Settings > Game**, confirm **Use fullscreen mode** is off, then turn
+   it on and confirm the monitor enters temporary display-mode fullscreen.
+8. Confirm the shell locks the cursor automatically in-match, then Alt-Tab away
+   and back to confirm the display mode and cursor capture restore cleanly.
+   Move over terrain/HUD/minimap, right-click move units, box-select, drag, and
+   wheel zoom. Press Escape and confirm the cursor and display mode restore.
+   Inspect
    `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
-8. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
+9. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
    `shell.log` contains startup and selected-profile events.

@@ -1,12 +1,19 @@
+#[cfg(target_os = "windows")]
+use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
-use tauri::WebviewWindow;
+use tauri::{Manager, WebviewWindow};
 
 use crate::diagnostics::ShellDiagnostics;
 
+#[cfg(target_os = "macos")]
 const BACKEND: &str = "native-macos";
+#[cfg(target_os = "windows")]
+const BACKEND: &str = "native-windows-raw-input";
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+const BACKEND: &str = "native-unsupported";
 const VISUAL: &str = "dom-event-time";
 const DEFAULT_WIDTH: f64 = 1280.0;
 const DEFAULT_HEIGHT: f64 = 820.0;
@@ -135,7 +142,14 @@ impl NativeCursorBackend {
 
     pub fn install(&self, window: &WebviewWindow) {
         configure_window_for_mouse_motion(window);
-        install_native_event_monitor(self.clone());
+        install_native_event_monitor(self.clone(), window);
+    }
+
+    fn active(&self) -> bool {
+        self.inner
+            .lock()
+            .map(|session| session.active)
+            .unwrap_or(false)
     }
 
     fn start(
@@ -153,6 +167,22 @@ impl NativeCursorBackend {
         session.y = clamp(finite_or(y, session.height / 2.0), 0.0, session.height);
 
         if !session.active {
+            #[cfg(target_os = "windows")]
+            if !session
+                .window
+                .as_ref()
+                .map(|window| {
+                    window
+                        .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+                        .active()
+                })
+                .unwrap_or(false)
+            {
+                return Err(
+                    "Windows native cursor capture requires active exclusive fullscreen"
+                        .to_string(),
+                );
+            }
             eprintln!(
                 "maccursor-shell native capture start requested x={:.1} y={:.1} width={:.1} height={:.1}",
                 session.x, session.y, session.width, session.height
@@ -179,11 +209,22 @@ impl NativeCursorBackend {
                 Err(err) => {
                     session.last_reason = "capture-start-failed".to_string();
                     session.last_error = Some(err.clone());
+                    #[cfg(target_os = "windows")]
+                    let failed_window = session.window.clone();
                     eprintln!("maccursor-shell native capture failed: {err}");
                     self.log_event(
                         "native_cursor_capture_start_failed",
                         serde_json::json!({ "message": err }),
                     );
+                    #[cfg(target_os = "windows")]
+                    {
+                        drop(session);
+                        if let Some(window) = failed_window {
+                            let _ = window
+                                .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+                                .suspend(&window, "native cursor capture failed");
+                        }
+                    }
                     return Err(err);
                 }
             }
@@ -206,10 +247,20 @@ impl NativeCursorBackend {
             let was_active = session.active;
             if was_active {
                 restore_system_cursor(session.cursor_hidden, session.cursor_disconnected);
-                eprintln!("maccursor-shell native capture stopped reason={reason}");
+                eprintln!(
+                    "maccursor-shell native capture stopped reason={reason} native_events_received={} js_events_dispatched={} dropped_events={}",
+                    session.native_events_received,
+                    session.js_events_dispatched,
+                    session.dropped_events
+                );
                 self.log_event(
                     "native_cursor_capture_stopped",
-                    serde_json::json!({ "reason": reason }),
+                    serde_json::json!({
+                        "reason": reason,
+                        "nativeEventsReceived": session.native_events_received,
+                        "jsEventsDispatched": session.js_events_dispatched,
+                        "droppedEvents": session.dropped_events,
+                    }),
                 );
             }
             session.active = false;
@@ -392,7 +443,7 @@ pub fn maccursor_diagnostics(
 
 fn snapshot_from_session(session: &NativeCursorSession) -> NativeCursorSnapshot {
     NativeCursorSnapshot {
-        supported: cfg!(target_os = "macos"),
+        supported: cfg!(any(target_os = "macos", target_os = "windows")),
         backend: BACKEND,
         active: session.active,
         visual: VISUAL,
@@ -491,7 +542,15 @@ fn start_system_cursor_capture() -> Result<SystemCaptureState, String> {
 
 #[cfg(not(target_os = "macos"))]
 fn start_system_cursor_capture() -> Result<SystemCaptureState, String> {
-    Err("native cursor capture is only available on macOS".to_string())
+    #[cfg(target_os = "windows")]
+    {
+        return start_windows_cursor_capture();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("native cursor capture is only available on macOS and Windows".to_string())
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -509,7 +568,15 @@ fn restore_system_cursor(cursor_hidden: bool, cursor_disconnected: bool) {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn restore_system_cursor(_cursor_hidden: bool, _cursor_disconnected: bool) {}
+fn restore_system_cursor(cursor_hidden: bool, cursor_disconnected: bool) {
+    #[cfg(target_os = "windows")]
+    restore_windows_cursor(cursor_hidden, cursor_disconnected);
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (cursor_hidden, cursor_disconnected);
+    }
+}
 
 #[cfg(target_os = "macos")]
 fn configure_window_for_mouse_motion(window: &WebviewWindow) {
@@ -529,7 +596,7 @@ fn configure_window_for_mouse_motion(window: &WebviewWindow) {
 fn configure_window_for_mouse_motion(_window: &WebviewWindow) {}
 
 #[cfg(target_os = "macos")]
-fn install_native_event_monitor(backend: NativeCursorBackend) {
+fn install_macos_native_event_monitor(backend: NativeCursorBackend) {
     use std::ptr::NonNull;
 
     use block2::RcBlock;
@@ -642,7 +709,360 @@ fn install_native_event_monitor(backend: NativeCursorBackend) {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn install_native_event_monitor(_backend: NativeCursorBackend) {}
+fn install_native_event_monitor(backend: NativeCursorBackend, window: &WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    install_windows_raw_input(backend, window);
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (backend, window);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn install_native_event_monitor(backend: NativeCursorBackend, _window: &WebviewWindow) {
+    install_macos_native_event_monitor(backend);
+}
+
+#[cfg(target_os = "windows")]
+struct WindowsRawInputRuntime {
+    backend: NativeCursorBackend,
+    window: WebviewWindow,
+    hwnd: usize,
+    previous_wnd_proc: isize,
+}
+
+#[cfg(target_os = "windows")]
+static WINDOWS_RAW_INPUT: OnceLock<WindowsRawInputRuntime> = OnceLock::new();
+
+#[cfg(target_os = "windows")]
+fn install_windows_raw_input(backend: NativeCursorBackend, window: &WebviewWindow) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowLongPtrW, GWLP_WNDPROC};
+
+    if WINDOWS_RAW_INPUT.get().is_some() {
+        return;
+    }
+    let Ok(hwnd) = window.hwnd() else {
+        backend.log_event(
+            "native_cursor_raw_input_install_failed",
+            serde_json::json!({ "message": "failed to resolve Windows window handle" }),
+        );
+        return;
+    };
+    let raw_hwnd = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+    let previous_wnd_proc = unsafe {
+        SetWindowLongPtrW(
+            raw_hwnd,
+            GWLP_WNDPROC,
+            windows_raw_input_wnd_proc as *const () as usize as isize,
+        )
+    };
+    if previous_wnd_proc == 0 {
+        backend.log_event(
+            "native_cursor_raw_input_install_failed",
+            serde_json::json!({ "message": "SetWindowLongPtrW failed" }),
+        );
+        return;
+    }
+    let installed = WINDOWS_RAW_INPUT.set(WindowsRawInputRuntime {
+        backend: backend.clone(),
+        window: window.clone(),
+        hwnd: raw_hwnd as usize,
+        previous_wnd_proc,
+    });
+    if installed.is_err() {
+        unsafe {
+            SetWindowLongPtrW(raw_hwnd, GWLP_WNDPROC, previous_wnd_proc);
+        }
+        return;
+    }
+    backend.log_event(
+        "native_cursor_raw_input_installed",
+        serde_json::json!({ "platform": "windows" }),
+    );
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn windows_raw_input_wnd_proc(
+    hwnd: windows_sys::Win32::Foundation::HWND,
+    message: u32,
+    wparam: windows_sys::Win32::Foundation::WPARAM,
+    lparam: windows_sys::Win32::Foundation::LPARAM,
+) -> windows_sys::Win32::Foundation::LRESULT {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{CallWindowProcW, WM_INPUT, WM_KEYDOWN};
+
+    let Some(runtime) = WINDOWS_RAW_INPUT.get() else {
+        return 0;
+    };
+    if message == WM_INPUT && runtime.backend.active() {
+        handle_windows_raw_input(&runtime.backend, lparam);
+    }
+    if message == WM_KEYDOWN
+        && wparam == VK_ESCAPE as usize
+        && (lparam as usize & (1usize << 30)) == 0
+        && runtime
+            .window
+            .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+            .active()
+    {
+        let backend = runtime.backend.clone();
+        let window = runtime.window.clone();
+        std::thread::spawn(move || {
+            let _ = backend.stop("escape");
+            let _ = window
+                .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+                .set_enabled(&window, false);
+            let _ = window.eval(
+                "window.dispatchEvent(new CustomEvent('rts-exclusive-fullscreen-shell-exit', { detail: { reason: 'escape' } }));",
+            );
+        });
+    }
+    let previous: windows_sys::Win32::UI::WindowsAndMessaging::WNDPROC =
+        Some(std::mem::transmute(runtime.previous_wnd_proc));
+    CallWindowProcW(previous, hwnd, message, wparam, lparam)
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn handle_windows_raw_input(
+    backend: &NativeCursorBackend,
+    lparam: windows_sys::Win32::Foundation::LPARAM,
+) {
+    use windows_sys::Win32::UI::Input::{
+        GetRawInputData, MOUSE_MOVE_ABSOLUTE, RAWINPUT, RAWINPUTHEADER, RID_INPUT, RIM_TYPEMOUSE,
+    };
+
+    let mut raw = std::mem::MaybeUninit::<RAWINPUT>::zeroed();
+    let mut size = std::mem::size_of::<RAWINPUT>() as u32;
+    let copied = GetRawInputData(
+        lparam as windows_sys::Win32::UI::Input::HRAWINPUT,
+        RID_INPUT,
+        raw.as_mut_ptr().cast(),
+        &mut size,
+        std::mem::size_of::<RAWINPUTHEADER>() as u32,
+    );
+    if copied == u32::MAX || copied < std::mem::size_of::<RAWINPUT>() as u32 {
+        return;
+    }
+    let raw = raw.assume_init();
+    if raw.header.dwType != RIM_TYPEMOUSE {
+        return;
+    }
+    let mouse = raw.data.mouse;
+    if mouse.usFlags & MOUSE_MOVE_ABSOLUTE == 0 && (mouse.lLastX != 0 || mouse.lLastY != 0) {
+        backend.handle_native_event(windows_event(
+            "move",
+            f64::from(mouse.lLastX),
+            f64::from(mouse.lLastY),
+            None,
+            0.0,
+            0.0,
+        ));
+    }
+
+    let button_data = mouse.Anonymous.Anonymous.usButtonData;
+    let flags = u32::from(mouse.Anonymous.Anonymous.usButtonFlags);
+    for (event_type, button) in windows_button_events(flags) {
+        backend.handle_native_event(windows_event(
+            event_type,
+            0.0,
+            0.0,
+            dom_button_from_native(button),
+            0.0,
+            0.0,
+        ));
+    }
+    let (delta_x, delta_y) = windows_wheel_deltas(flags, button_data);
+    if delta_x != 0.0 || delta_y != 0.0 {
+        backend.handle_native_event(windows_event("wheel", 0.0, 0.0, None, delta_x, delta_y));
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_button_events(flags: u32) -> Vec<(&'static str, NativeMouseButton)> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        RI_MOUSE_BUTTON_4_DOWN, RI_MOUSE_BUTTON_4_UP, RI_MOUSE_BUTTON_5_DOWN, RI_MOUSE_BUTTON_5_UP,
+        RI_MOUSE_LEFT_BUTTON_DOWN, RI_MOUSE_LEFT_BUTTON_UP, RI_MOUSE_MIDDLE_BUTTON_DOWN,
+        RI_MOUSE_MIDDLE_BUTTON_UP, RI_MOUSE_RIGHT_BUTTON_DOWN, RI_MOUSE_RIGHT_BUTTON_UP,
+    };
+
+    [
+        (
+            RI_MOUSE_LEFT_BUTTON_DOWN,
+            "down",
+            NativeMouseButton::Primary,
+        ),
+        (RI_MOUSE_LEFT_BUTTON_UP, "up", NativeMouseButton::Primary),
+        (
+            RI_MOUSE_RIGHT_BUTTON_DOWN,
+            "down",
+            NativeMouseButton::Secondary,
+        ),
+        (RI_MOUSE_RIGHT_BUTTON_UP, "up", NativeMouseButton::Secondary),
+        (
+            RI_MOUSE_MIDDLE_BUTTON_DOWN,
+            "down",
+            NativeMouseButton::Other(2),
+        ),
+        (RI_MOUSE_MIDDLE_BUTTON_UP, "up", NativeMouseButton::Other(2)),
+        (RI_MOUSE_BUTTON_4_DOWN, "down", NativeMouseButton::Other(3)),
+        (RI_MOUSE_BUTTON_4_UP, "up", NativeMouseButton::Other(3)),
+        (RI_MOUSE_BUTTON_5_DOWN, "down", NativeMouseButton::Other(4)),
+        (RI_MOUSE_BUTTON_5_UP, "up", NativeMouseButton::Other(4)),
+    ]
+    .into_iter()
+    .filter_map(|(flag, event_type, button)| (flags & flag != 0).then_some((event_type, button)))
+    .collect()
+}
+
+#[cfg(target_os = "windows")]
+fn windows_wheel_deltas(flags: u32, button_data: u16) -> (f64, f64) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{RI_MOUSE_HWHEEL, RI_MOUSE_WHEEL};
+
+    let signed = f64::from(button_data as i16);
+    (
+        if flags & RI_MOUSE_HWHEEL != 0 {
+            signed
+        } else {
+            0.0
+        },
+        if flags & RI_MOUSE_WHEEL != 0 {
+            -signed
+        } else {
+            0.0
+        },
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn windows_event(
+    event_type: &'static str,
+    dx: f64,
+    dy: f64,
+    button: Option<i32>,
+    delta_x: f64,
+    delta_y: f64,
+) -> NativeCursorEventInput {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    };
+
+    NativeCursorEventInput {
+        event_type,
+        dx,
+        dy,
+        button,
+        delta_x,
+        delta_y,
+        shift_key: windows_key_down(VK_SHIFT),
+        ctrl_key: windows_key_down(VK_CONTROL),
+        meta_key: windows_key_down(VK_LWIN) || windows_key_down(VK_RWIN),
+        alt_key: windows_key_down(VK_MENU),
+        event_timestamp: now_ms(),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn start_windows_cursor_capture() -> Result<SystemCaptureState, String> {
+    use windows_sys::Win32::{
+        Foundation::{POINT, RECT},
+        Graphics::Gdi::ClientToScreen,
+        UI::{
+            Input::{
+                RegisterRawInputDevices, RAWINPUTDEVICE, RIDEV_CAPTUREMOUSE, RIDEV_INPUTSINK,
+                RIDEV_NOLEGACY,
+            },
+            WindowsAndMessaging::{ClipCursor, GetClientRect, ShowCursor},
+        },
+    };
+
+    let runtime = WINDOWS_RAW_INPUT
+        .get()
+        .ok_or_else(|| "Windows Raw Input window hook is not installed".to_string())?;
+    let hwnd = runtime.hwnd as windows_sys::Win32::Foundation::HWND;
+    let device = RAWINPUTDEVICE {
+        usUsagePage: 0x01,
+        usUsage: 0x02,
+        dwFlags: RIDEV_INPUTSINK | RIDEV_NOLEGACY | RIDEV_CAPTUREMOUSE,
+        hwndTarget: hwnd,
+    };
+    if unsafe { RegisterRawInputDevices(&device, 1, std::mem::size_of::<RAWINPUTDEVICE>() as u32) }
+        == 0
+    {
+        return Err("RegisterRawInputDevices failed".to_string());
+    }
+
+    let mut client = RECT::default();
+    if unsafe { GetClientRect(hwnd, &mut client) } == 0 {
+        unregister_windows_raw_input();
+        return Err("GetClientRect failed while confining the cursor".to_string());
+    }
+    let mut top_left = POINT {
+        x: client.left,
+        y: client.top,
+    };
+    let mut bottom_right = POINT {
+        x: client.right,
+        y: client.bottom,
+    };
+    if unsafe { ClientToScreen(hwnd, &mut top_left) } == 0
+        || unsafe { ClientToScreen(hwnd, &mut bottom_right) } == 0
+    {
+        unregister_windows_raw_input();
+        return Err("ClientToScreen failed while confining the cursor".to_string());
+    }
+    let clip = RECT {
+        left: top_left.x,
+        top: top_left.y,
+        right: bottom_right.x,
+        bottom: bottom_right.y,
+    };
+    if unsafe { ClipCursor(&clip) } == 0 {
+        unregister_windows_raw_input();
+        return Err("ClipCursor failed".to_string());
+    }
+    unsafe { while ShowCursor(0) >= 0 {} }
+    Ok(SystemCaptureState {
+        cursor_hidden: true,
+        cursor_disconnected: true,
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn restore_windows_cursor(cursor_hidden: bool, cursor_disconnected: bool) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{ClipCursor, ShowCursor};
+
+    if cursor_disconnected {
+        unsafe {
+            ClipCursor(std::ptr::null());
+        }
+        unregister_windows_raw_input();
+    }
+    if cursor_hidden {
+        unsafe { while ShowCursor(1) < 0 {} }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn unregister_windows_raw_input() {
+    use windows_sys::Win32::UI::Input::{RegisterRawInputDevices, RAWINPUTDEVICE, RIDEV_REMOVE};
+
+    let device = RAWINPUTDEVICE {
+        usUsagePage: 0x01,
+        usUsage: 0x02,
+        dwFlags: RIDEV_REMOVE,
+        hwndTarget: std::ptr::null_mut(),
+    };
+    unsafe {
+        RegisterRawInputDevices(&device, 1, std::mem::size_of::<RAWINPUTDEVICE>() as u32);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_key_down(vkey: u16) -> bool {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    unsafe { GetAsyncKeyState(i32::from(vkey)) < 0 }
+}
 
 #[cfg(test)]
 mod tests {
@@ -676,5 +1096,27 @@ mod tests {
         assert_eq!(dom_button_from_native(NativeMouseButton::Other(3)), Some(3));
         assert_eq!(dom_button_from_native(NativeMouseButton::Other(4)), Some(4));
         assert_eq!(dom_button_from_native(NativeMouseButton::Other(1)), None);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn raw_input_flags_preserve_button_order_and_wheel_direction() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            RI_MOUSE_LEFT_BUTTON_DOWN, RI_MOUSE_RIGHT_BUTTON_UP, RI_MOUSE_WHEEL,
+        };
+
+        let events = windows_button_events(RI_MOUSE_LEFT_BUTTON_DOWN | RI_MOUSE_RIGHT_BUTTON_UP);
+        assert_eq!(
+            events,
+            vec![
+                ("down", NativeMouseButton::Primary),
+                ("up", NativeMouseButton::Secondary),
+            ]
+        );
+        assert_eq!(windows_wheel_deltas(RI_MOUSE_WHEEL, 120), (0.0, -120.0));
+        assert_eq!(
+            windows_wheel_deltas(RI_MOUSE_WHEEL, (-120_i16) as u16),
+            (0.0, 120.0)
+        );
     }
 }
