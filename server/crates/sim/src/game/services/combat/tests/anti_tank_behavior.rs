@@ -1,6 +1,40 @@
 use super::*;
 
 #[test]
+fn deployed_anti_tank_gun_fires_inside_arc_without_tracking_target() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Tank, 180.0, 110.0)
+        .expect("enemy tank should spawn");
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+    if let Some(at) = entities.get_mut(at_id) {
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let at = entities.get(at_id).expect("at should exist");
+    assert!(
+        at.facing().abs() <= 0.001,
+        "deployed anti-tank gun body must remain fixed while firing in arc"
+    );
+    assert!(
+        at.weapon_facing().unwrap_or_default().abs() <= 0.001,
+        "deployed anti-tank gun barrel must remain fixed while firing in arc"
+    );
+    assert!(
+        entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
+        "an in-arc target should be hit without requiring visual target tracking"
+    );
+}
+
+#[test]
 fn deployed_anti_tank_gun_does_not_turn_or_fire_at_target_outside_arc() {
     let mut entities = EntityStore::new();
     let at_id = entities
@@ -26,6 +60,10 @@ fn deployed_anti_tank_gun_does_not_turn_or_fire_at_target_outside_arc() {
         at.facing().abs() <= 0.001,
         "anti-tank gun should not turn toward a target outside its fixed arc, got {:.4}",
         at.facing()
+    );
+    assert!(
+        at.weapon_facing().unwrap_or_default().abs() <= 0.001,
+        "anti-tank gun barrel should not turn toward a target outside its fixed arc"
     );
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
