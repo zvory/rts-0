@@ -492,10 +492,10 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(commandCarModel.cols === 24, "HUD budget grid grows visible columns for Command Car cap");
 
   const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
-  assert(artilleryShape.cols === 3 && artilleryShape.rows === 2 && artilleryShape.reservedCells === 1,
-    "HUD five-supply shape uses a deterministic near-rectangle with one reserved cell");
+  assert(artilleryShape.cols === 2 && artilleryShape.rows === 2 && artilleryShape.reservedCells == null,
+    "HUD four-supply artillery uses a deterministic two-by-two shape");
   const artilleryModel = selectionBudgetGridModel([artillery]);
-  assert(artilleryModel.blocks[0].reservedCells === 1, "HUD five-supply blocks expose their reserved visual cell");
+  assert(artilleryModel.blocks[0].reservedCells === 0, "HUD four-supply artillery has no reserved visual cell");
 
   withFakeHudDocument(({ FakeElement }) => {
     const panel = new FakeElement("section");

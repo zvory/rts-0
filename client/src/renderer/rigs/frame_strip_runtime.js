@@ -184,7 +184,8 @@ class FrameStripUnitInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? options.alpha ?? 1;
     setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
-    const occupiedScale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
+    const occupiedScale = (renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1)
+      * Math.max(0.01, finite(renderContext.visualScale, 1));
     setPoint(this.container.scale, occupiedScale, occupiedScale);
     this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext);
 

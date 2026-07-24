@@ -176,7 +176,9 @@ class PngAtlasRigInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? 1;
     setPoint(this.container.position, entity.x ?? 0, entity.y ?? 0);
-    const scale = renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1;
+    const visualScale = Number.isFinite(renderContext.visualScale) ? renderContext.visualScale : 1;
+    const scale = (renderContext.occupiedTrench ? OCCUPIED_TRENCH_UNIT_SCALE : 1)
+      * Math.max(0.01, visualScale);
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;
 

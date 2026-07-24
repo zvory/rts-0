@@ -209,7 +209,8 @@ Core unit roles:
   is provisionally set to zero ticks for balance improvement, it cannot shoot while moving, and it
   lands delayed area shells that punish static positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
-  gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
+  gameplay footprint but renders at 75% of its prior authored size as an exposed field piece, must
+  deploy into a narrow firing arc,
   cannot shoot inside its minimum range, and spends steel on each long-range Fire shell.
 
 Terrain rules:
@@ -358,10 +359,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   is no separate range-based error, accuracy sequence, or repeated-shot tightening. Artillery Fire
   Control costs 100 steel and 150 oil, takes 20 seconds, requires Artillery, and reduces the
   minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3`.
-  Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
-  long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
-  footprint. Impacts deal
-  75 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 5 damage at
+  Its body length, width, clearance, and selection radius match the Tank, while the rendered rig is
+  scaled to 75%; its exposed carriage, long barrel, large wheels, and deployed spades carry the
+  visual distinction without changing its gameplay footprint. Impacts deal
+  45 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 5 damage at
   3 tiles, including friendly fire.
 - `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original
   96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
@@ -563,7 +564,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 72 | 1.52 | 9    | 150 | 40  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 200 | 75 AP inner / 75-5 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint; soft target with no armor damage reduction |
+| artillery       | 200 | 45 AP inner / 45-5 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 300 | 100 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in R&D Complex; rendered at 75% of its prior size with an unchanged tank-sized gameplay footprint; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |

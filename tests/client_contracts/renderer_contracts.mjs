@@ -876,6 +876,55 @@ function restoreGlobal(name, value) {
   }
 }
 
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = await Renderer.create(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 507,
+      owner: 1,
+      kind: KIND.ARTILLERY,
+      x: 260,
+      y: 160,
+      hp: 200,
+      maxHp: 200,
+      state: "idle",
+    };
+    const colorByOwner = new Map([[1, 0x4878c8]]);
+    const state = {
+      playerId: 1,
+      selection: new Set(),
+      resources: {},
+    };
+
+    renderer._drawUnit(entity, colorByOwner, state);
+
+    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+    assert(
+      unitRig?.container.scaleX === 0.75 && unitRig.container.scaleY === 0.75,
+      "artillery unit rig renders 25% smaller",
+    );
+    assert(
+      shadowRig?.container.scaleX === 0.75 && shadowRig.container.scaleY === 0.75,
+      "artillery shadow scales with its smaller visual",
+    );
+  } finally {
+    restorePixi();
+  }
+}
+
 function polygonAfterFill(calls, fillColor) {
   for (let i = 0; i < calls.length - 1; i += 1) {
     if (calls[i][0] === "beginFill" && calls[i][1] === fillColor && calls[i + 1][0] === "drawPolygon") {

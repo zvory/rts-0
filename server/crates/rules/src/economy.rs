@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(supply_cost(EntityKind::AntiTankGun), 3);
         assert_eq!(cost(EntityKind::Artillery), (300, 100));
         assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
-        assert_eq!(supply_cost(EntityKind::Artillery), 5);
+        assert_eq!(supply_cost(EntityKind::Artillery), 4);
         assert_eq!(supply_cost(EntityKind::ScoutPlane), 0);
         assert_eq!(
             defs::unit_def(EntityKind::ScoutPlane).map(|d| d.stats.radius),
