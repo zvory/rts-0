@@ -833,7 +833,8 @@ pub(crate) fn staging_point(
     if !len.is_finite() {
         return None;
     }
-    let margin = if matches!(ability, AbilityKind::PointFire | AbilityKind::BlanketFire) {
+    let is_artillery_fire = matches!(ability, AbilityKind::PointFire | AbilityKind::BlanketFire);
+    let margin = if is_artillery_fire {
         config::TILE_SIZE as f32 * 0.75
     } else {
         (caster.radius() * 0.25).max(1.0)
@@ -843,7 +844,7 @@ pub(crate) fn staging_point(
     } else {
         (range_px - margin).max(min_range_px)
     };
-    let (dir_x, dir_y) = if len > f32::EPSILON {
+    let preferred_direction = if len > f32::EPSILON {
         (dx / len, dy / len)
     } else {
         let map_center = map.world_size_px() * 0.5;
@@ -861,8 +862,37 @@ pub(crate) fn staging_point(
             }
         }
     };
-    let (sx, sy) = (x + dir_x * staging_distance, y + dir_y * staging_distance);
-    SmokeCloudStore::clamp_point_to_map(map, sx, sy)
+    if !is_artillery_fire {
+        let sx = x + preferred_direction.0 * staging_distance;
+        let sy = y + preferred_direction.1 * staging_distance;
+        return SmokeCloudStore::clamp_point_to_map(map, sx, sy);
+    }
+    let map_center = map.world_size_px() * 0.5;
+    let center_direction = (map_center - x, map_center - y);
+    let candidate_directions = [
+        preferred_direction,
+        center_direction,
+        (1.0, 0.0),
+        (-1.0, 0.0),
+        (0.0, 1.0),
+        (0.0, -1.0),
+        (1.0, 1.0),
+        (1.0, -1.0),
+        (-1.0, 1.0),
+        (-1.0, -1.0),
+    ];
+    candidate_directions.into_iter().find_map(|(dir_x, dir_y)| {
+        let dir_len = dir_x.hypot(dir_y);
+        if !dir_len.is_finite() || dir_len <= f32::EPSILON {
+            return None;
+        }
+        let sx = x + dir_x / dir_len * staging_distance;
+        let sy = y + dir_y / dir_len * staging_distance;
+        let (sx, sy) = SmokeCloudStore::clamp_point_to_map(map, sx, sy)?;
+        let distance = (sx - x).hypot(sy - y);
+        (distance.is_finite() && distance >= min_range_px && distance <= range_px)
+            .then_some((sx, sy))
+    })
 }
 
 pub(crate) fn active_ability_order_ready(

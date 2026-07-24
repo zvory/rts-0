@@ -166,25 +166,54 @@ function artilleryFiringPosition(originX, originY, rawX, rawY, minRangePx, maxRa
   if (distance >= minRangePx && distance <= maxRangePx) {
     return { x: originX, y: originY, needsMove: false };
   }
-  let dirX;
-  let dirY;
+  let preferredDirX;
+  let preferredDirY;
   if (distance > Number.EPSILON) {
-    dirX = (originX - rawX) / distance;
-    dirY = (originY - rawY) / distance;
+    preferredDirX = (originX - rawX) / distance;
+    preferredDirY = (originY - rawY) / distance;
   } else {
     const centerX = bounds ? bounds.maxX * 0.5 : rawX + maxRangePx;
     const centerY = bounds ? bounds.maxY * 0.5 : rawY;
     const centerDistance = Math.hypot(centerX - rawX, centerY - rawY);
-    dirX = centerDistance > Number.EPSILON ? (centerX - rawX) / centerDistance : 1;
-    dirY = centerDistance > Number.EPSILON ? (centerY - rawY) / centerDistance : 0;
+    preferredDirX = centerDistance > Number.EPSILON ? (centerX - rawX) / centerDistance : 1;
+    preferredDirY = centerDistance > Number.EPSILON ? (centerY - rawY) / centerDistance : 0;
   }
   const margin = minRangePx * 0.075;
   const stagingDistance = distance < minRangePx
     ? Math.min(maxRangePx, minRangePx + margin)
     : Math.max(minRangePx, maxRangePx - margin);
-  const x = clampToBounds(rawX + dirX * stagingDistance, bounds?.maxX);
-  const y = clampToBounds(rawY + dirY * stagingDistance, bounds?.maxY);
-  return { x, y, needsMove: true };
+  const centerDirection = bounds
+    ? [bounds.maxX * 0.5 - rawX, bounds.maxY * 0.5 - rawY]
+    : [preferredDirX, preferredDirY];
+  const candidateDirections = [
+    [preferredDirX, preferredDirY],
+    centerDirection,
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ];
+  for (const [dirX, dirY] of candidateDirections) {
+    const dirLength = Math.hypot(dirX, dirY);
+    if (!Number.isFinite(dirLength) || dirLength <= Number.EPSILON) continue;
+    const x = clampToBounds(
+      rawX + dirX / dirLength * stagingDistance,
+      bounds?.maxX,
+    );
+    const y = clampToBounds(
+      rawY + dirY / dirLength * stagingDistance,
+      bounds?.maxY,
+    );
+    const targetDistance = Math.hypot(x - rawX, y - rawY);
+    if (targetDistance >= minRangePx && targetDistance <= maxRangePx) {
+      return { x, y, needsMove: true };
+    }
+  }
+  return null;
 }
 
 function worldBounds(map, tileSize) {

@@ -131,11 +131,12 @@ pub(crate) fn promote_ready_orders(
 
     let mut groups: BTreeMap<PointPromotionKey, Vec<u32>> = BTreeMap::new();
     for id in ready {
-        if let Some((_ability, _x, _y, MovePhase::PathFailed)) = entities
+        if let Some((ability, x, y, MovePhase::PathFailed)) = entities
             .get(id)
             .and_then(|e| active_ability_order_ready(&e.order()))
         {
             clear_completed_active_order(entities, id);
+            discard_failed_artillery_fire_intent(entities, id, ability, x, y);
         } else if let Some((ability, x, y, MovePhase::Arrived)) = entities
             .get(id)
             .and_then(|e| active_ability_order_ready(&e.order()))
@@ -355,6 +356,30 @@ fn waits_for_readiness(entities: &EntityStore, owner: u32, id: u32, ability: Abi
 fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
     if let Some(e) = entities.get_mut(id) {
         e.clear_active_order();
+    }
+}
+
+fn discard_failed_artillery_fire_intent(
+    entities: &mut EntityStore,
+    id: u32,
+    ability: AbilityKind,
+    x: f32,
+    y: f32,
+) {
+    let matches_failed_reposition = entities
+        .get(id)
+        .and_then(|entity| entity.queued_orders().first())
+        .is_some_and(|intent| match (ability, intent) {
+            (AbilityKind::PointFire, OrderIntent::PointFire(point))
+            | (AbilityKind::BlanketFire, OrderIntent::BlanketFire { point, .. }) => {
+                point.x.to_bits() == x.to_bits() && point.y.to_bits() == y.to_bits()
+            }
+            _ => false,
+        });
+    if matches_failed_reposition {
+        if let Some(entity) = entities.get_mut(id) {
+            entity.pop_queued_order();
+        }
     }
 }
 
@@ -1464,6 +1489,63 @@ mod tests {
             unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
             "queued point fire must not walk the active field of fire before redeploy"
         );
+    }
+
+    #[test]
+    fn failed_artillery_reposition_drops_its_terminal_fire_intent() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let pos = map.tile_center(10, 10);
+        let target = map.tile_center(50, 10);
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.replace_active_order(Order::ability(
+                AbilityKind::PointFire,
+                target.0,
+                target.1,
+                pos.0,
+                pos.1,
+            ));
+            unit.mark_move_phase(MovePhase::PathFailed);
+            unit.append_queued_order(OrderIntent::point_fire(target.0, target.1));
+        }
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(artillery).expect("artillery should exist");
+        assert!(matches!(unit.order(), Order::Idle));
+        assert!(
+            unit.queued_orders().is_empty(),
+            "a failed reposition must not recreate the same path request every tick"
+        );
+    }
+
+    #[test]
+    fn close_edge_artillery_target_gets_an_in_range_staging_point() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let target = (8.0, map.world_size_px() * 0.5);
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, 4.0, target.1)
+            .expect("artillery should spawn");
+
+        let staging = crate::game::services::ability_orders::staging_point(
+            &map,
+            &entities,
+            artillery,
+            AbilityKind::PointFire,
+            target.0,
+            target.1,
+        )
+        .expect("an in-map firing position should exist");
+
+        let distance = (staging.0 - target.0).hypot(staging.1 - target.1);
+        let min_range = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+        let max_range = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+        assert!(distance >= min_range && distance <= max_range);
     }
 
     #[test]

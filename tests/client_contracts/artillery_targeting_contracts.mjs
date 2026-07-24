@@ -16,6 +16,7 @@ import { Input } from "../../client/src/input/index.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
+  buildArtilleryTargetLocks,
 } from "../../client/src/input/artillery_targeting.js";
 import {
   ABILITY,
@@ -44,6 +45,33 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
         artilleryMinFireRadiusTiles([UPGRADE.BALLISTIC_TABLES]),
       ) === ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
     "Artillery Fire radius selection uses the six-tile base minimum and three-tile Fire Control minimum",
+  );
+}
+
+{
+  const target = { x: 8, y: 1024 };
+  const [lock] = buildArtilleryTargetLocks({
+    ability: ABILITY.POINT_FIRE,
+    carriers: [{
+      id: 1,
+      kind: KIND.ARTILLERY,
+      x: 4,
+      y: target.y,
+      facing: Math.PI,
+      setupState: SETUP.PACKED,
+    }],
+    rawX: target.x,
+    rawY: target.y,
+    map: { width: 64, height: 64 },
+    tileSize: 32,
+    definition: ABILITIES[ABILITY.POINT_FIRE],
+  });
+  const stagingDistance = Math.hypot(lock.originX - target.x, lock.originY - target.y);
+  assert(
+    lock.needsMove &&
+      stagingDistance >= ARTILLERY_MIN_RANGE_TILES * 32 &&
+      stagingDistance <= ARTILLERY_MAX_RANGE_TILES * 32,
+    "Artillery staging preview finds an in-range firing position for close map-edge targets",
   );
 }
 
