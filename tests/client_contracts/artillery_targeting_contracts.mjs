@@ -258,8 +258,8 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
     "Point Fire preview reticle locks inside-minimum hovers to the effective point",
   );
   assert(
-    ARTILLERY_MIN_RANGE_TILES === 25 && ARTILLERY_MAX_RANGE_TILES === 55,
-    "Artillery point-fire range mirrors the 25-55 tile balance band",
+    ARTILLERY_MIN_RANGE_TILES === 10 && ARTILLERY_MAX_RANGE_TILES === 40,
+    "Artillery point-fire range mirrors the 10-40 tile balance band",
   );
 
   pointFireInput.state.selectedEntities = () => [queuedMovingArtillery];

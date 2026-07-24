@@ -981,7 +981,7 @@ command planning, so commands do not spend resources, start cooldowns, or replac
 orders. The hook receives the owning player's faction id at execution time through the
 normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
 cooldowns, or events are applied. Artillery point fire derives the target direction from the raw click with `atan2`, locks even very
-large finite click coordinates to the issuing gun's valid 25-to-55 tile range band, stores that
+large finite click coordinates to the issuing gun's valid 10-to-40 tile range band, stores that
 effective point, and owns any needed in-place setup or redeploy before the first shot. It records temporary live-fog firing reveal sources for enemy
 players when a shell launches, using the firing-cycle-plus-half-second lifetime and smoke
 suppression used by other actionable firing reveals. Non-targetable Scout Planes are excluded from splash damage, projectile impacts, and Magic Anchor effects.
