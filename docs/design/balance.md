@@ -283,8 +283,8 @@ other anti-armor threats, armored obstacles, support weapons, and only then ordi
 Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
 the unit's current short route window or helps close a vehicle-body gap across that route; nearby
 irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets. Idle
-units do not auto-acquire neutral Tank Traps; direct Attack and active Attack Move orders retain
-their explicit clearing/breaching behavior.
+units and units following ordinary Move orders do not auto-acquire neutral Tank Traps; direct
+Attack and active Attack Move orders retain their explicit clearing/breaching behavior.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
 `EntityKind`, including the Tank coax infantry-priority group. The live coax policy ranks Riflemen
 and Machine Gunners first, economy workers (`Worker` and `Golem`) second, and fallback legal

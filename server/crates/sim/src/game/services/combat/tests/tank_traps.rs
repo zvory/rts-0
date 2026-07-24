@@ -54,6 +54,44 @@ fn idle_units_do_not_auto_acquire_neutral_tank_traps() {
 }
 
 #[test]
+fn move_orders_do_not_auto_acquire_neutral_tank_traps() {
+    for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("attacker should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_order(Order::move_to(300.0, 100.0));
+        let trap = entities
+            .spawn_building(1, EntityKind::TankTrap, 150.0, 100.0, true)
+            .expect("tank trap should spawn");
+        let trap_hp = entities.get(trap).expect("trap should exist").hp;
+
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &open_map(12),
+        );
+
+        assert_eq!(
+            entities
+                .get(attacker)
+                .expect("attacker should exist")
+                .target_id(),
+            None,
+            "{kind:?} should preserve a plain Move order near a neutral Tank Trap"
+        );
+        assert_eq!(
+            entities.get(trap).expect("trap should exist").hp,
+            trap_hp,
+            "{kind:?} should not damage a neutral Tank Trap during a plain Move order"
+        );
+    }
+}
+
+#[test]
 fn vehicle_body_auto_acquisition_keeps_neutral_tank_traps_targetable() {
     for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
         let mut entities = EntityStore::new();

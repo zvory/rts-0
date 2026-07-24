@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rand::Rng;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, Order};
+use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -14,6 +14,7 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 use crate::rules::terrain::{self, TerrainKind};
 
+use super::acquisition::order_allows_neutral_obstacle_acquisition;
 use super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
@@ -160,7 +161,7 @@ fn tank_coax_snapshot(
         pos_y: tank.pos_y,
         weapon_facing,
         range_px,
-        allow_neutral_obstacle: !matches!(tank.order(), Order::Idle),
+        allow_neutral_obstacle: order_allows_neutral_obstacle_acquisition(tank.order()),
     })
 }
 

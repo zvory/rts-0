@@ -68,6 +68,10 @@ fn is_passive_idle_unit(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Worker | EntityKind::Golem)
 }
 
+pub(super) fn order_allows_neutral_obstacle_acquisition(order: Order) -> bool {
+    matches!(order, Order::Attack(_) | Order::AttackMove(_))
+}
+
 /// Resolve which entity an attacker should engage this tick.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn resolve_target(
@@ -259,7 +263,7 @@ fn legal_target_candidates(
     let mut candidates = Vec::new();
     let attacker = entities.get(self_id);
     let allow_neutral_obstacle =
-        attacker.is_some_and(|entity| !matches!(entity.order(), Order::Idle));
+        attacker.is_some_and(|entity| order_allows_neutral_obstacle_acquisition(entity.order()));
     for id in spatial.ids_in_circle_bbox(px, py, acquire_px) {
         let Some(target) = entities.get(id) else {
             continue;
