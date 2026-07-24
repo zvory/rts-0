@@ -281,8 +281,13 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.FORMATION_MOVE, units, points, ...(attackMove ? { attackMove: true } : {}) }, queued),
   attackMove: (units, x, y, queued = false) =>
     withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
-  attack: (units, target, queued = false) =>
-    withQueued({ c: CMD.ATTACK, units, target }, queued),
+  attack: (units, target, queued = false, tankTrapCluster = false) =>
+    withQueued({
+      c: CMD.ATTACK,
+      units,
+      target,
+      ...(tankTrapCluster ? { tankTrapCluster: true } : {}),
+    }, queued),
   deconstruct: (units, target, queued = false) =>
     withQueued({ c: CMD.DECONSTRUCT, units, target }, queued),
   setupAntiTankGuns: (units, x, y, queued = false) =>

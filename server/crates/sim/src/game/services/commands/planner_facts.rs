@@ -38,6 +38,7 @@ pub(super) fn entity_order_intent_from_planner(
         }
         planner::OrderIntent::HoldPosition => Some(OrderIntent::hold_position()),
         planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
+        planner::OrderIntent::AttackCluster(targets) => OrderIntent::attack_cluster(targets),
         planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
         planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),
         planner::OrderIntent::Build {

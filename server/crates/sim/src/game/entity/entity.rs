@@ -380,6 +380,30 @@ impl Entity {
         }
     }
 
+    pub(crate) fn advance_attack_cluster_target(&mut self, next_target: u32) -> bool {
+        let Some(movement) = self.movement.as_mut() else {
+            return false;
+        };
+        let Order::Attack(order) = &mut movement.order else {
+            return false;
+        };
+        let Some(index) = order
+            .intent
+            .remaining_targets
+            .iter()
+            .position(|target| *target == next_target)
+        else {
+            return false;
+        };
+        order.intent.remaining_targets.remove(index);
+        order.intent.target = next_target;
+        order.execution.phase = AttackPhase::Waiting;
+        movement.path.clear();
+        movement.path_goal = None;
+        self.set_target_id(Some(next_target));
+        true
+    }
+
     pub fn mark_gather_phase(&mut self, phase: GatherPhase) {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Gather(order) = &mut m.order {

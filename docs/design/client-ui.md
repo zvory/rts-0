@@ -2090,6 +2090,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
+  While Attack targeting is armed over a completed neutral Tank Trap, every visible trap captured
+  by the authoritative four-tile cluster-clear radius receives the red attack-target ring and a
+  dashed red boundary shows the radius before the click.
 - Renderer failures must fail soft: one broken entity or feedback effect should log a throttled
   `[RTS_RENDER]` error, skip that visual path, and let the rest of the frame continue. Broken
   entity art draws a magenta/black checkerboard fallback instead of stopping the match loop; the

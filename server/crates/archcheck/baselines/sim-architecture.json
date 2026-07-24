@@ -1,5 +1,5 @@
 {
-  "reason": "Preserve authoritative per-unit attack-formation destinations and cover their order semantics",
+  "reason": "Tank Trap cluster orders require serialized target lists and planner coverage",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -51,7 +51,7 @@
     },
     {
       "path": "checkpoint/validation.rs",
-      "lines": 429
+      "lines": 510
     },
     {
       "path": "command.rs",
@@ -507,7 +507,7 @@
     },
     {
       "path": "services/order_planner.rs",
-      "lines": 1139
+      "lines": 1260
     },
     {
       "path": "services/order_queue.rs",
@@ -1905,7 +1905,7 @@
     },
     {
       "path": "entity/order.rs",
-      "count": 59
+      "count": 64
     },
     {
       "path": "entity/state.rs",
