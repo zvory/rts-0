@@ -135,19 +135,23 @@ function ekatCard() {
     catalog.commands.some((command) =>
       command.commandId === kriegsiaCommandId("ability", ABILITY.POINT_FIRE) &&
         command.slotIndex === 7
-    ) && catalog.commands.some((command) =>
-      command.commandId === kriegsiaCommandId("ability", ABILITY.BLANKET_FIRE) &&
-        command.slotIndex === 8
     ),
-    "hotkey command catalog keeps lower-priority artillery abilities discoverable",
+    "hotkey command catalog keeps the artillery Point Fire ability discoverable",
   );
   assert(
     catalog.commands.some((command) =>
       command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
-        command.label === "Heavy Guns" &&
+        command.label === "Artillery" &&
         command.slotIndex === 1
     ),
-    "hotkey command catalog keeps Heavy Guns research in its permanent W slot",
+    "hotkey command catalog keeps Artillery research in its permanent W slot",
+  );
+  assert(
+    catalog.contexts.some((context) =>
+      context.id === "research-complex-at-guns" &&
+        context.label === "R&D Complex (AT Guns researched)"
+    ),
+    "hotkey command catalog names the researched AT Guns context explicitly",
   );
   assert(
     catalog.commands.some((command) =>

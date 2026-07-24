@@ -82,9 +82,9 @@ function buttonSlots(card) {
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
   ]);
   assert.equal(rAndDCard().slots[1].enabled, false);
-  assert.equal(rAndDCard().slots[1].title, "Requires Medium Guns");
-  assert.equal(rAndDCard().slots[1].label, "Heavy Guns");
-  assert.equal(rAndDCard().slots[2].title, "Requires Heavy Guns");
+  assert.equal(rAndDCard().slots[1].title, "Requires AT Guns");
+  assert.equal(rAndDCard().slots[1].label, "Artillery");
+  assert.equal(rAndDCard().slots[2].title, "Requires Artillery");
   assert.equal(rAndDCard().slots[2].label, "Artillery Fire Control");
   assert.equal(rAndDCard().slots[2].icon, "AFC");
 }
@@ -93,10 +93,10 @@ function buttonSlots(card) {
   const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(card.slots[1].label, "Heavy Guns");
+  assert.equal(card.slots[1].label, "Artillery");
   assert.equal(card.slots[1].enabled, true);
   assert.equal(card.slots[2].enabled, false);
-  assert.equal(card.slots[2].title, "Requires Heavy Guns");
+  assert.equal(card.slots[2].title, "Requires Artillery");
 }
 
 {
@@ -625,13 +625,13 @@ function buttonSlots(card) {
     "gun-works-train",
     "training-centre",
     "research-complex",
-    "research-complex-medium-guns",
+    "research-complex-at-guns",
     "ekat-unit",
     "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
-      entry.id === "research-complex-medium-guns" &&
+      entry.id === "research-complex-at-guns" &&
         entry.card.slots.some((slot) =>
           slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
         )

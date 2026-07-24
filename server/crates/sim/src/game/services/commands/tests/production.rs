@@ -292,7 +292,7 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
 }
 
 #[test]
-fn heavy_guns_research_requires_medium_guns() {
+fn artillery_research_requires_at_guns() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
@@ -332,7 +332,7 @@ fn heavy_guns_research_requires_medium_guns() {
 }
 
 #[test]
-fn artillery_fire_control_requires_heavy_guns() {
+fn artillery_fire_control_requires_artillery_research() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);

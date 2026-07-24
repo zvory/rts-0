@@ -410,8 +410,8 @@ export const UPGRADES = Object.freeze({
   }),
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    label: "Medium Guns",
-    icon: "MD+",
+    label: "AT Guns",
+    icon: "ATG",
     cost: Object.freeze({ steel: 100, oil: 50 }),
     researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Anti-Tank Gun training",
@@ -419,14 +419,14 @@ export const UPGRADES = Object.freeze({
   }),
   [UPGRADE.ARTILLERY_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.ARTILLERY_UNLOCK,
-    label: "Heavy Guns",
-    icon: "HG+",
+    label: "Artillery",
+    icon: "ART",
     cost: Object.freeze({ steel: 200, oil: 100 }),
     researchTicks: ARTILLERY_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Artillery training",
     researchedAt: KIND.RESEARCH_COMPLEX,
     requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    requiresText: "Requires Medium Guns",
+    requiresText: "Requires AT Guns",
   }),
   [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
     upgrade: UPGRADE.BALLISTIC_TABLES,
@@ -437,7 +437,7 @@ export const UPGRADES = Object.freeze({
     description: "Reduce Artillery Fire minimum radius from 6 to 3 tiles",
     researchedAt: KIND.RESEARCH_COMPLEX,
     requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
-    requiresText: "Requires Heavy Guns",
+    requiresText: "Requires Artillery",
   }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.TANK_UNLOCK,

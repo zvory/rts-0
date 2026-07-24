@@ -200,7 +200,8 @@ export function buildCommandCardContextCatalog() {
     { id: "training-centre", card: buildCommandCardDescriptors(ctx([baseEntities[2]], { upgrades: [] })) },
     { id: "research-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
     {
-      id: "research-complex-medium-guns",
+      id: "research-complex-at-guns",
+      label: "R&D Complex (AT Guns researched)",
       card: buildCommandCardDescriptors(ctx([baseEntities[3]], {
         upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
       })),
