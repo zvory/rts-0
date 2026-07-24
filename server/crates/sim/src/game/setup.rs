@@ -357,8 +357,7 @@ impl Game {
         systems::recompute_supply(&mut game.state.players, &game.state.entities);
         let ids = game.state.player_ids();
         game.recompute_live_fog(&ids);
-        game.refresh_building_memory(&ids);
-        game.refresh_trench_memory(&ids);
+        game.refresh_fog_memories(&ids);
         game
     }
 

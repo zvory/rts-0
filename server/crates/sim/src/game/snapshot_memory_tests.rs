@@ -1,5 +1,6 @@
 use super::*;
 use crate::game::entity::{EntityKind, WeaponSetup};
+use crate::game::lab::{LabOp, LabSpawnEntity};
 use crate::game::{systems, SmokeCloudStore};
 use crate::protocol::terrain;
 
@@ -434,7 +435,7 @@ fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
     let checkpoint = game
         .checkpoint_payload_text_for_test()
         .expect("AT-gun memory checkpoint should serialize");
-    let restored = Game::restore_checkpoint_payload_text_for_test(
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
         &checkpoint,
         game.state.map.clone(),
         game.map_metadata().clone(),
@@ -447,6 +448,26 @@ fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
             .iter()
             .any(|memory| memory.id == gun),
         "checkpoint restore should preserve per-player AT-gun memory for Lab time travel"
+    );
+    restored
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 2,
+            kind: EntityKind::ScoutCar,
+            x: scout_pos.0,
+            y: scout_pos.1,
+            completed: true,
+        }))
+        .expect("Lab scout should spawn within sight of the remembered gun");
+    restored
+        .apply_lab_op(LabOp::DeleteEntity { entity_id: gun })
+        .expect("Lab should delete the now-visible gun");
+    assert!(
+        restored
+            .snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .remembered_anti_tank_guns
+            .iter()
+            .all(|memory| memory.id != gun),
+        "paused Lab edits must repair AT-gun memory without waiting for a simulation tick"
     );
 
     game.state

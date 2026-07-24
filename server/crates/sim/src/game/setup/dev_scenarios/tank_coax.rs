@@ -146,6 +146,5 @@ fn refresh_projection_after_smoke(game: &mut Game) {
         &game.state.map,
         &game.state.smokes,
     );
-    game.refresh_building_memory(&player_ids);
-    game.refresh_trench_memory(&player_ids);
+    game.refresh_fog_memories(&player_ids);
 }
