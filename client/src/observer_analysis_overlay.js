@@ -1,5 +1,5 @@
 import { STATS, UPGRADES } from "./config.js";
-import { isUnit } from "./protocol.js";
+import { calculateViewportArmyValue } from "./observer_analysis_army_value.js";
 import {
   createObserverAnalysisOverlayPreferences,
   isObserverAnalysisTabId,
@@ -11,7 +11,11 @@ import {
 } from "./floating_panel_positioner.js";
 import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
-import { normalizeResourceWindows, renderResourcesMetric } from "./observer_analysis_resources.js";
+import {
+  normalizeResourceWindows,
+  renderAliveResourcesMetric,
+  renderResourcesMetric,
+} from "./observer_analysis_resources.js";
 import { renderResearchMetric } from "./observer_analysis_research.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
 import { resourceValueElement } from "./resource_icons.js";
@@ -21,10 +25,12 @@ const PRODUCTION_TAB_ID = "production";
 const RESEARCH_TAB_ID = "research";
 const UNITS_TAB_ID = "units";
 const RESOURCES_TAB_ID = "resources";
+const ALIVE_RESOURCES_TAB_ID = "alive-resources";
 const UNITS_LOST_TAB_ID = "units-lost";
 const RESOURCES_LOST_TAB_ID = "resources-lost";
 
 export { createObserverAnalysisOverlayPreferences, OBSERVER_ANALYSIS_TABS };
+export { calculateViewportArmyValue };
 
 export function shouldMountObserverAnalysisOverlay({ capabilities } = {}) {
   return capabilities?.diagnostics?.observerAnalysis === true;
@@ -266,6 +272,7 @@ export class ObserverAnalysisOverlay {
       || selected === RESEARCH_TAB_ID
       || selected === UNITS_TAB_ID
       || selected === RESOURCES_TAB_ID
+      || selected === ALIVE_RESOURCES_TAB_ID
       || selected === UNITS_LOST_TAB_ID
       || selected === RESOURCES_LOST_TAB_ID
     ) {
@@ -281,6 +288,7 @@ export class ObserverAnalysisOverlay {
       research: RESEARCH_TAB_ID,
       units: UNITS_TAB_ID,
       resources: RESOURCES_TAB_ID,
+      aliveResources: ALIVE_RESOURCES_TAB_ID,
       unitsLost: UNITS_LOST_TAB_ID,
       resourcesLost: RESOURCES_LOST_TAB_ID,
       calculateViewportArmyValue,
@@ -434,6 +442,10 @@ export class ObserverAnalysisOverlay {
 
   renderResources(analysis) {
     return renderResourcesMetric({ analysis, players: this.getPlayers() });
+  }
+
+  renderAliveResources(analysis) {
+    return renderAliveResourcesMetric({ analysis, players: this.getPlayers() });
   }
 
   renderUnitsLost(analysis) {
@@ -682,80 +694,6 @@ function renderResourceLostRow({ className, name, color, steel, oil }) {
 
   row.append(swatch, nameEl, steelEl, oilEl);
   return row;
-}
-
-export function calculateViewportArmyValue({
-  entities = [],
-  cameraBounds = null,
-  players = [],
-  stats = STATS,
-} = {}) {
-  const rowsByOwner = new Map();
-  for (const player of players || []) {
-    const id = Number(player?.id);
-    if (!Number.isFinite(id) || id === 0) continue;
-    rowsByOwner.set(id, {
-      owner: id,
-      name: player?.name || `Player ${id}`,
-      color: player?.color || "#e7dfc5",
-      steel: 0,
-      oil: 0,
-    });
-  }
-
-  if (!cameraBounds || !Array.isArray(entities)) return [...rowsByOwner.values()];
-  const bounds = normalizeBounds(cameraBounds);
-  if (!bounds) return [...rowsByOwner.values()];
-
-  for (const entity of entities) {
-    if (!entity || entity.shotReveal || !isUnit(entity.kind)) continue;
-    const owner = Number(entity.owner);
-    if (!Number.isFinite(owner) || owner === 0) continue;
-    const x = Number(entity.x);
-    const y = Number(entity.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-
-    const stat = stats?.[entity.kind] || {};
-    const radius = Math.max(0, Number(stat.size) || 0);
-    if (!circleIntersectsBounds(x, y, radius, bounds)) continue;
-
-    const row = rowsByOwner.get(owner) || {
-      owner,
-      name: `Player ${owner}`,
-      color: "#e7dfc5",
-      steel: 0,
-      oil: 0,
-    };
-    const cost = stat.cost || {};
-    row.steel += Math.max(0, Number(cost.steel) || 0);
-    row.oil += Math.max(0, Number(cost.oil) || 0);
-    rowsByOwner.set(owner, row);
-  }
-
-  return [...rowsByOwner.values()].sort((a, b) => a.owner - b.owner);
-}
-
-function normalizeBounds(bounds) {
-  const left = Number(bounds.left ?? bounds.x);
-  const top = Number(bounds.top ?? bounds.y);
-  const width = Number(bounds.width ?? bounds.w);
-  const height = Number(bounds.height ?? bounds.h);
-  if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
-  return {
-    left,
-    top,
-    right: left + width,
-    bottom: top + height,
-  };
-}
-
-function circleIntersectsBounds(x, y, radius, bounds) {
-  return (
-    x + radius >= bounds.left
-    && x - radius <= bounds.right
-    && y + radius >= bounds.top
-    && y - radius <= bounds.bottom
-  );
 }
 
 function compareKindRows(stats) {
