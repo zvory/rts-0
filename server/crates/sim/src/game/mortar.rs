@@ -18,6 +18,22 @@ pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
 pub(crate) const HALF_TURN_TICKS: u32 = config::TICK_HZ / 5;
 pub(crate) const TURN_RATE_RAD_PER_TICK: f32 = std::f32::consts::PI / HALF_TURN_TICKS as f32;
 
+#[derive(Debug, Clone, Copy)]
+enum MortarFireMode {
+    Manual,
+    Autocast,
+}
+
+impl MortarFireMode {
+    fn scatters(self) -> bool {
+        matches!(self, Self::Autocast)
+    }
+
+    fn reveals_launch_to_enemies(self) -> bool {
+        matches!(self, Self::Autocast)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MortarShell {
     owner: u32,
@@ -84,7 +100,7 @@ impl MortarShellStore {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn schedule(
+    pub(crate) fn schedule_manual(
         &mut self,
         events: &mut HashMap<u32, Vec<Event>>,
         fog: &Fog,
@@ -96,9 +112,67 @@ impl MortarShellStore {
         x: f32,
         y: f32,
         tick: u32,
-        is_autocast: bool,
     ) {
-        let (impact_x, impact_y) = if is_autocast {
+        self.schedule(
+            events,
+            fog,
+            teams,
+            owner,
+            attacker,
+            from_x,
+            from_y,
+            x,
+            y,
+            tick,
+            MortarFireMode::Manual,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn schedule_autocast(
+        &mut self,
+        events: &mut HashMap<u32, Vec<Event>>,
+        fog: &Fog,
+        teams: &TeamRelations,
+        owner: u32,
+        attacker: u32,
+        from_x: f32,
+        from_y: f32,
+        x: f32,
+        y: f32,
+        tick: u32,
+    ) {
+        self.schedule(
+            events,
+            fog,
+            teams,
+            owner,
+            attacker,
+            from_x,
+            from_y,
+            x,
+            y,
+            tick,
+            MortarFireMode::Autocast,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn schedule(
+        &mut self,
+        events: &mut HashMap<u32, Vec<Event>>,
+        fog: &Fog,
+        teams: &TeamRelations,
+        owner: u32,
+        attacker: u32,
+        from_x: f32,
+        from_y: f32,
+        x: f32,
+        y: f32,
+        tick: u32,
+        fire_mode: MortarFireMode,
+    ) {
+        let (impact_x, impact_y) = if fire_mode.scatters() {
             scattered_mortar_impact(fog, teams, owner, attacker, x, y, tick)
         } else {
             (x, y)
@@ -120,7 +194,7 @@ impl MortarShellStore {
             from_y,
             impact_x,
             impact_y,
-            is_autocast,
+            fire_mode.reveals_launch_to_enemies(),
         );
     }
 
