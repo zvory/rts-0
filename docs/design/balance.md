@@ -325,10 +325,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   5-to-17-tile range band. Autocast uses normal idle/attack-move acquisition after Mortar Autocast
   research completes and fires only while fully deployed, at targets inside the same range band and
   its full 360-degree field of fire. Autocast aims at a target's current position and does not lead
-  movement. Manual and autocast shots scatter from the intended impact point: if the point is visible to the firing team,
-  the deterministic radial scatter has a one-tile median miss radius; otherwise it has a four-tile
-  median miss radius. Autocast prefers targets whose deterministic scattered impact avoids same-team
-  units/buildings when alternatives are available.
+  movement. Manual shots always land exactly on the clicked point, including in fog. Autocast shots
+  retain deterministic radial scatter with a one-tile median miss radius on visible targets and a
+  four-tile median miss radius otherwise. Autocast prefers targets whose deterministic scattered
+  impact avoids same-team units/buildings when alternatives are available.
   Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
   deterministic scattered impact points that would hit any same-team unit or building at its current position,
   while manual fire remains unrestricted.

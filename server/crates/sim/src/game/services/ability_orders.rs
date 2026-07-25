@@ -185,8 +185,8 @@ pub(crate) fn launch_world_ability(
                 e.set_path_goal(None);
             }
             e.set_attack_cd(mortar_fire_weapon_cooldown_ticks());
-            mortar_shells.schedule(
-                events, fog, teams, player, caster, from_x, from_y, x, y, tick, false,
+            mortar_shells.schedule_manual(
+                events, fog, teams, player, caster, from_x, from_y, x, y, tick,
             );
             true
         }

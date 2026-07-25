@@ -453,7 +453,7 @@ pub(in crate::game) fn combat_system(
                         continue;
                     }
                     mortar_shells
-                        .schedule(events, fog, teams, owner, id, px, py, tx, ty, tick, true);
+                        .schedule_autocast(events, fog, teams, owner, id, px, py, tx, ty, tick);
                     if let Some(e) = entities.get_mut(id) {
                         e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                     }

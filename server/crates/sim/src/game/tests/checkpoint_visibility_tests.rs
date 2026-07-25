@@ -288,7 +288,7 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         .get(shell_target)
         .expect("shell target should exist");
     let mut launch_events = event_map_for(&baseline);
-    baseline.state.mortar_shells.schedule(
+    baseline.state.mortar_shells.schedule_autocast(
         &mut launch_events,
         &baseline.state.fog,
         &baseline.team_relations(),
@@ -309,7 +309,6 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         target.pos_x,
         target.pos_y,
         baseline.tick_count(),
-        true,
     );
     baseline.state.artillery_shells.schedule(
         1,
