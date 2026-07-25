@@ -280,9 +280,40 @@ assert(
   const result = moveSymmetricDraftLocation(draft, {
     kind: "base", locationIndex: 1, tile: { x: 10, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
   });
-  assert.deepEqual(result, { ok: true, count: 1, removed: 1 });
+  assert.deepEqual(result, { ok: true, count: 2 });
+  assert.deepEqual(draft.baseSites, [{ x: 8, y: 8 }, { x: 10, y: 12 }, { x: 10, y: 19 }],
+    "a symmetric base move relocates its existing matching neutral base");
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Moved unpaired base", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 12 }],
+  });
+  const result = moveSymmetricDraftLocation(draft, {
+    kind: "base", locationIndex: 1, tile: { x: 10, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
+  });
+  assert.deepEqual(result, { ok: true, count: 1 });
   assert.deepEqual(draft.baseSites, [{ x: 8, y: 8 }, { x: 10, y: 12 }],
-    "a symmetric base move removes its matching neutral base instead of relocating it");
+    "a symmetric base move leaves a missing counterpart absent");
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Moved symmetric start bases", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }, { x: 8, y: 23 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 8, y: 23 }],
+  });
+  const result = moveSymmetricDraftLocation(draft, {
+    kind: "base", locationIndex: 0, tile: { x: 10, y: 8 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
+  });
+  assert.deepEqual(result, { ok: true, count: 2 });
+  assert.deepEqual(draft.baseSites, [{ x: 10, y: 8 }, { x: 10, y: 23 }]);
+  assert.deepEqual(draft.startLocations, draft.baseSites,
+    "moving symmetric start-backed bases keeps their start locations attached");
 }
 
 {
@@ -316,8 +347,8 @@ assert(
     onStatus() {},
   };
   MapEditorViewport.prototype.applySiteTool.call(viewport, { x: 10, y: 19 });
-  assert.equal(viewport.selectedBaseIndex, 1,
-    "removing an earlier symmetric base keeps the moved base selected by its new backing index");
+  assert.equal(viewport.selectedBaseIndex, 2,
+    "moving an earlier symmetric base keeps the selected base on its stable backing index");
 }
 
 {

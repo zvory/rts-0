@@ -346,9 +346,8 @@ export class MapEditorViewport {
       this.setSelectedBase(selectedBase?.index ?? null);
     }
     const extra = Math.max(0, Number(result?.count || 1) - 1);
-    const removed = Math.max(0, Number(result?.removed || 0));
     this.onStatus(
-      changed ? `${label}${extra ? ` and ${extra} symmetric location${extra === 1 ? "" : "s"}` : ""}${removed ? ` and removed ${removed} corresponding base${removed === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
+      changed ? `${label}${extra ? ` and ${extra} symmetric location${extra === 1 ? "" : "s"}` : ""}.` : result?.error || "No map change.",
       !changed,
     );
   }
