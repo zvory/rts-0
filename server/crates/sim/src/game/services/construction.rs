@@ -255,19 +255,26 @@ pub(crate) fn construction_system(
                     kind: crate::protocol::kind_to_wire(kind).to_string(),
                 });
             }
-            eject_worker_from_static_overlap(map, entities, worker);
-            if let Some(worker) = entities.get_mut(worker) {
-                worker.clear_active_order();
+            let builders = builders_for_site(entities, site).collect::<Vec<_>>();
+            for builder in builders {
+                eject_worker_from_static_overlap(map, entities, builder);
+                if let Some(worker) = entities.get_mut(builder) {
+                    worker.clear_active_order();
+                }
             }
         }
     }
 }
 
-fn active_builder_for_site(entities: &EntityStore, site: u32) -> Option<u32> {
-    entities.iter().find_map(|entity| {
+fn builders_for_site(entities: &EntityStore, site: u32) -> impl Iterator<Item = u32> + '_ {
+    entities.iter().filter_map(move |entity| {
         (entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(site))
             .then_some(entity.id)
     })
+}
+
+fn active_builder_for_site(entities: &EntityStore, site: u32) -> Option<u32> {
+    builders_for_site(entities, site).next()
 }
 
 fn notice_build_failure(events: &mut HashMap<u32, Vec<Event>>, owner: u32, msg: impl Into<String>) {
@@ -413,9 +420,6 @@ fn live_completed_tank_trap_position(entities: &EntityStore, target: u32) -> Opt
 }
 
 /// Return the matching unfinished scaffold only while it has no active builder.
-///
-/// Construction is single-worker: a build intent aimed at an occupied scaffold is invalid rather
-/// than joining or accelerating the existing work.
 pub(crate) fn unattended_site_for_build_intent(
     map: &Map,
     entities: &EntityStore,

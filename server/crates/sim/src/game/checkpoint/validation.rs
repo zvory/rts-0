@@ -112,6 +112,7 @@ pub(super) fn validate_entities(
     for entity in &entities.entities {
         validate_entity(entity, entities.next_id, player_ids, world, tick, &mut ids)?;
     }
+    entities::validate_single_builders(&entities.entities)?;
     Ok(ids)
 }
 

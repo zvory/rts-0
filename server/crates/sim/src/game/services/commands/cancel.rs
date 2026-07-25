@@ -19,12 +19,15 @@ pub(super) fn apply(
             (entity.owner == player && entity.is_building() && entity.under_construction())
                 .then_some((entity.kind, entity.construction_cost_paid()))
         })?;
-        let builder = entities.iter().find_map(|entity| {
-            (entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(building))
-                .then_some(entity.id)
-        });
+        let builders = entities
+            .iter()
+            .filter_map(|entity| {
+                (entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(building))
+                    .then_some(entity.id)
+            })
+            .collect::<Vec<_>>();
         entities.remove(building)?;
-        if let Some(builder) = builder {
+        for builder in builders {
             if let Some(worker) = entities.get_mut(builder) {
                 worker.clear_active_order();
             }
