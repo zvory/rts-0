@@ -242,7 +242,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   produce constant one-tick stuttering. Turret/combat behavior still runs through the combat system
   while movement is paused.
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
-  100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
+  100 steel / 25 oil and taking 600 ticks. Once completed, all current and future owned riflemen
   use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
