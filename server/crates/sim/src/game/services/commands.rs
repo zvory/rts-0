@@ -1357,6 +1357,21 @@ struct AbilityUse {
     max_units_per_command: usize,
 }
 
+fn upgrade_requirement_met(
+    players: &[PlayerState],
+    player: u32,
+    ability: AbilityKind,
+) -> bool {
+    ability::definition(ability)
+        .upgrade_requirement
+        .is_none_or(|required| {
+            players
+                .iter()
+                .find(|candidate| candidate.id == player)
+                .is_some_and(|candidate| candidate.has_upgrade(required))
+        })
+}
+
 fn use_ability(
     ctx: &mut CommandExecutionContext<'_, '_>,
     players: &mut [PlayerState],
@@ -1382,6 +1397,9 @@ fn use_ability(
         return;
     }
     if definition.effect_hook == AbilityEffectHook::ReservedNoop {
+        return;
+    }
+    if !upgrade_requirement_met(players, player, ability) {
         return;
     }
     if ability == AbilityKind::ScoutPlane {
