@@ -380,8 +380,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   and `SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = 900`. It has no default weapon and a zero-radius
   authoritative movement/collision body, so it neither reserves nor blocks ground pathing. The
   client mirror uses a 48x34 px body and 17 px render size. Command Cars keep Breakthrough and add
-  Scout Plane on the `C` grid slot; the ability launches instantly from the selected Command Car
-  without a City Centre requirement. Each Command Car tracks its own 30-second cooldown; active
+  Scout Plane on the `C` grid slot; after Scout Plane research completes, the ability launches
+  instantly from the selected Command Car without a City Centre requirement. Each Command Car
+  tracks its own 30-second cooldown; active
   sorties are otherwise independent and every plane contributes aerial sight.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
   `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; autonomous armor
@@ -442,9 +443,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - **Smoke Plus** (R&D Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
+- **Scout Plane** (R&D Complex research, protocol id `scout_plane_unlock`): costs 50 steel /
+  100 oil and takes 600 ticks (~20s). Once complete, Command Cars owned by that player can use
+  their Scout Plane ability.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
-  catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
-  autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
+  catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, building and
+  upgrade requirements, queueability, autocast support, and command-card affordances;
+  `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
@@ -584,7 +589,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a City Centre |
 | training_centre            | Training Centre    | 200 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, and Smoke Plus; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, Smoke Plus, and Scout Plane; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a City Centre and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |

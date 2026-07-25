@@ -26,6 +26,7 @@ pub enum UpgradeKind {
     TankUnlock,
     MortarAutocast,
     SmokePlus,
+    ScoutPlaneUnlock,
 }
 
 impl UpgradeKind {
@@ -39,6 +40,7 @@ impl UpgradeKind {
         Self::TankUnlock,
         Self::MortarAutocast,
         Self::SmokePlus,
+        Self::ScoutPlaneUnlock,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -52,6 +54,7 @@ impl UpgradeKind {
             Self::TankUnlock => "tank_unlock",
             Self::MortarAutocast => "mortar_autocast",
             Self::SmokePlus => "smoke_plus",
+            Self::ScoutPlaneUnlock => "scout_plane_unlock",
         }
     }
 
@@ -147,6 +150,7 @@ pub const BALLISTIC_TABLES_UPGRADE: &str = UpgradeKind::BallisticTables.stable_i
 pub const TANK_UNLOCK_UPGRADE: &str = UpgradeKind::TankUnlock.stable_id();
 pub const MORTAR_AUTOCAST_UPGRADE: &str = UpgradeKind::MortarAutocast.stable_id();
 pub const SMOKE_PLUS_UPGRADE: &str = UpgradeKind::SmokePlus.stable_id();
+pub const SCOUT_PLANE_UNLOCK_UPGRADE: &str = UpgradeKind::ScoutPlaneUnlock.stable_id();
 
 pub const SMOKE_ABILITY: &str = AbilityKind::Smoke.stable_id();
 pub const MORTAR_FIRE_ABILITY: &str = AbilityKind::MortarFire.stable_id();
@@ -276,7 +280,7 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -313,6 +317,10 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
         kind: UpgradeKind::SmokePlus,
         researched_at: EntityKind::ResearchComplex,
     },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::ScoutPlaneUnlock,
+        researched_at: EntityKind::ResearchComplex,
+    },
 ];
 
 const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
@@ -331,6 +339,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
         command_card: false,
@@ -355,6 +364,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
             balance::SMOKE_ABILITY_COST_OIL,
         ),
         tech_requirement: Some(EntityKind::ResearchComplex),
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -376,6 +386,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueWaitUntilReady,
         autocast: true,
         command_card: true,
@@ -397,6 +408,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -418,6 +430,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: false,
@@ -439,6 +452,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -463,6 +477,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
             balance::SCOUT_PLANE_COST_OIL,
         ),
         tech_requirement: None,
+        upgrade_requirement: Some(UpgradeKind::ScoutPlaneUnlock),
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -484,6 +499,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
         command_card: false,
@@ -511,6 +527,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -532,6 +549,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -553,6 +571,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -574,6 +593,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
         command_card: true,
@@ -686,6 +706,7 @@ pub struct AbilityCatalogEntry {
     pub charge_recharge_ticks: Option<u16>,
     pub cost: ResourceCost,
     pub tech_requirement: Option<EntityKind>,
+    pub upgrade_requirement: Option<UpgradeKind>,
     pub queue_policy: AbilityQueuePolicy,
     pub autocast: bool,
     pub command_card: bool,
@@ -857,7 +878,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus] =
+    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus, scout_plane_unlock] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
@@ -869,6 +890,7 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::MortarAutocast => mortar_autocast,
         UpgradeKind::SmokePlus => smoke_plus,
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
+        UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
     }
 }
 
@@ -994,6 +1016,13 @@ mod tests {
             )
         );
         assert!(smoke.command_card);
+
+        let scout_plane = CURRENT_CATALOG.ability(AbilityKind::ScoutPlane).unwrap();
+        assert_eq!(
+            scout_plane.upgrade_requirement,
+            Some(UpgradeKind::ScoutPlaneUnlock),
+            "Scout Plane should require its R&D upgrade"
+        );
 
         let point_fire = CURRENT_CATALOG.ability(AbilityKind::PointFire).unwrap();
         assert_eq!(point_fire.carriers, ARTILLERY_ABILITY_CARRIERS);

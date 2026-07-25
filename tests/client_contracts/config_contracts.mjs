@@ -40,6 +40,7 @@ import {
   UPGRADES,
   WORKER_BUILDABLE,
   WORKER_BUILD_CARD_SLOTS,
+  SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
   SMOKE_PLUS_RESEARCH_TICKS,
 } from "../../client/src/config.js";
 import {
@@ -149,6 +150,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "SCOUT_PLANE_LIFETIME_TICKS",
   "SCOUT_PLANE_ORBIT_RADIUS_TILES",
   "SCOUT_PLANE_SPEED_PX_PER_TICK",
+  "SCOUT_PLANE_UNLOCK_RESEARCH_TICKS",
   "SMOKE_ABILITY_COOLDOWN_TICKS",
   "SMOKE_ABILITY_COST",
   "SMOKE_ABILITY_RANGE_TILES",
@@ -229,6 +231,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.COMMAND_CAR) &&
       ABILITIES[ABILITY.SCOUT_PLANE].hotkey === "C" &&
       ABILITIES[ABILITY.SCOUT_PLANE].requires == null &&
+      ABILITIES[ABILITY.SCOUT_PLANE].upgradeRequirement === UPGRADE.SCOUT_PLANE_UNLOCK &&
       ABILITIES[ABILITY.SCOUT_PLANE].cost.steel === 50 &&
       ABILITIES[ABILITY.SCOUT_PLANE].cost.oil === 75 &&
       ABILITIES[ABILITY.SCOUT_PLANE].durationTicks === 900,
@@ -316,6 +319,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.SMOKE_PLUS] === 9, "Smoke Plus compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.PANZERFAUSTS] === 10, "Panzerfausts compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.SCOUT_PLANE_UNLOCK] === 11, "Scout Plane compact upgrade code should be reserved");
   assert(KIND_CODE[KIND.PANZERFAUST] === 24, "Panzerfaust compact entity-kind code should be restored");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
@@ -456,6 +460,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
+      UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
     "R&D Complex should expose the AT Guns, Artillery, and Fire Control chain before its independent research",
   );
@@ -501,6 +506,13 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       UPGRADES[UPGRADE.SMOKE_PLUS].researchTicks === SMOKE_PLUS_RESEARCH_TICKS &&
       SMOKE_PLUS_RESEARCH_TICKS === TICK_HZ * 20,
     "Smoke Plus research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK].cost.steel === 50 &&
+      UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK].cost.oil === 100 &&
+      UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK].researchTicks === SCOUT_PLANE_UNLOCK_RESEARCH_TICKS &&
+      SCOUT_PLANE_UNLOCK_RESEARCH_TICKS === TICK_HZ * 20,
+    "Scout Plane research cost and time mirror server",
   );
   assert(
     ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles === SMOKE_PLUS_CLOUD_RADIUS_TILES &&
@@ -1228,6 +1240,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
+    const rdScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
     assert(rdAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in R&D Complex");
     assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
     assert(rdArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
@@ -1237,6 +1250,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     assert(rdTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in R&D Complex");
     assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
     assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
+    assert(rdScoutPlaneButton?.dataset.hotkey === "Z", "Scout Plane research should appear in R&D Complex");
     assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "R&D Complex should not expose Command Car research");
     assert(!rdSeparateArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
 

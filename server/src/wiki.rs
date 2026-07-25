@@ -376,6 +376,7 @@ fn ability_table() -> StatsTable {
             "Steel",
             "Oil",
             "Tech",
+            "Upgrade",
             "Queue",
             "Autocast",
             "Command card",
@@ -398,6 +399,10 @@ fn ability_table() -> StatsTable {
                         ability.cost.steel.to_string(),
                         ability.cost.oil.to_string(),
                         optional_kind(ability.tech_requirement),
+                        ability
+                            .upgrade_requirement
+                            .map(|upgrade| upgrade.stable_id().to_string())
+                            .unwrap_or_else(|| "-".to_string()),
                         bool_text(ability.may_queue()),
                         bool_text(ability.autocast),
                         bool_text(ability.command_card),
@@ -1006,6 +1011,10 @@ mod tests {
                     ability.cost.steel.to_string(),
                     ability.cost.oil.to_string(),
                     optional_kind(ability.tech_requirement),
+                    ability
+                        .upgrade_requirement
+                        .map(|upgrade| upgrade.stable_id().to_string())
+                        .unwrap_or_else(|| "-".to_string()),
                     bool_text(ability.may_queue()),
                     bool_text(ability.autocast),
                     bool_text(ability.command_card),

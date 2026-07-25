@@ -31,6 +31,12 @@ pub(super) fn use_ability(
     };
     if definition.target_mode != AbilityTargetMode::WorldPoint
         || !tech_requirement_met(entities, player, ability)
+        || definition.upgrade_requirement.is_some_and(|required| {
+            !players
+                .iter()
+                .find(|candidate| candidate.id == player)
+                .is_some_and(|candidate| candidate.has_upgrade(required))
+        })
     {
         return;
     }

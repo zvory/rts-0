@@ -254,11 +254,12 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   Vehicle Works; and `mortar_autocast` for 150 steel / 150 oil
   over 600 ticks, enabling Mortar Team autocast for current and future owned Mortar Teams; and
   `smoke_plus` for 150 steel / 150 oil over 600 ticks, doubling future Scout Car Smoke radius and
-  duration.
+  duration; and `scout_plane_unlock` for 50 steel / 100 oil over 600 ticks, unlocking the Command
+  Car Scout Plane ability.
   Server-side research validation checks the research building and requires each prerequisite to
   be completed or already earlier in that same building's bounded FIFO research queue, while
-  train validation checks both the producer kind and completed player upgrade set, so clients cannot
-  bypass these locks by sending `research` or `train` commands directly.
+  train and ability validation check the completed player upgrade set, so clients cannot bypass
+  these locks by sending `research`, `train`, or `useAbility` commands directly.
 - **Tank armor facing**: tank and Anti-Tank Gun attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
