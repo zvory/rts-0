@@ -58,7 +58,7 @@ pub(crate) fn construction_system(
             None => continue,
         };
 
-        if let Some(site) = resumable_site_for_build_intent(map, entities, owner, kind, tx, ty) {
+        if let Some(site) = unattended_site_for_build_intent(map, entities, owner, kind, tx, ty) {
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_path();
                 w.set_target_id(Some(site));
@@ -255,31 +255,19 @@ pub(crate) fn construction_system(
                     kind: crate::protocol::kind_to_wire(kind).to_string(),
                 });
             }
-            let builders = builders_for_site(entities, site);
-            for builder in &builders {
-                eject_worker_from_static_overlap(map, entities, *builder);
+            eject_worker_from_static_overlap(map, entities, worker);
+            if let Some(worker) = entities.get_mut(worker) {
+                worker.clear_active_order();
             }
-            clear_build_orders(entities, &builders);
         }
     }
 }
 
-fn builders_for_site(entities: &EntityStore, site: u32) -> Vec<u32> {
-    entities
-        .iter()
-        .filter(|entity| {
-            entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(site)
-        })
-        .map(|entity| entity.id)
-        .collect()
-}
-
-fn clear_build_orders(entities: &mut EntityStore, builders: &[u32]) {
-    for builder in builders {
-        if let Some(worker) = entities.get_mut(*builder) {
-            worker.clear_active_order();
-        }
-    }
+fn active_builder_for_site(entities: &EntityStore, site: u32) -> Option<u32> {
+    entities.iter().find_map(|entity| {
+        (entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(site))
+            .then_some(entity.id)
+    })
 }
 
 fn notice_build_failure(events: &mut HashMap<u32, Vec<Event>>, owner: u32, msg: impl Into<String>) {
@@ -424,7 +412,11 @@ fn live_completed_tank_trap_position(entities: &EntityStore, target: u32) -> Opt
         .then_some((trap.pos_x, trap.pos_y))
 }
 
-pub(crate) fn resumable_site_for_build_intent(
+/// Return the matching unfinished scaffold only while it has no active builder.
+///
+/// Construction is single-worker: a build intent aimed at an occupied scaffold is invalid rather
+/// than joining or accelerating the existing work.
+pub(crate) fn unattended_site_for_build_intent(
     map: &Map,
     entities: &EntityStore,
     owner: u32,
@@ -437,6 +429,7 @@ pub(crate) fn resumable_site_for_build_intent(
         (entity.owner == owner
             && entity.kind == kind
             && entity.under_construction()
+            && active_builder_for_site(entities, entity.id).is_none()
             && (entity.pos_x - cx).abs() <= 0.01
             && (entity.pos_y - cy).abs() <= 0.01)
             .then_some(entity.id)
@@ -684,9 +677,13 @@ mod tests {
     }
 
     #[test]
-    fn arrival_to_existing_scaffold_resumes_without_spawning_or_repaying() {
+    fn unattended_scaffold_resumes_but_second_builder_is_rejected() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
         let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
         let site = entities
             .spawn_building(1, EntityKind::Depot, sx, sy, false)
@@ -745,6 +742,39 @@ mod tests {
             events.get(&1).is_none_or(Vec::is_empty),
             "resume should not emit a failure notice"
         );
+
+        let second_worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("second worker should spawn");
+        let fallback = (sx + 96.0, sy);
+        {
+            let worker = entities
+                .get_mut(second_worker)
+                .expect("second worker should exist");
+            worker.set_order(Order::build(EntityKind::Depot, 4, 4));
+            worker.append_queued_order(OrderIntent::move_to(fallback.0, fallback.1));
+        }
+
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
+
+        let first = entities.get(worker).expect("first worker should remain");
+        assert_eq!(first.build_phase(), Some(BuildPhase::Constructing { site }));
+        let second = entities
+            .get(second_worker)
+            .expect("second worker should remain");
+        assert!(matches!(second.order(), Order::Idle));
+        assert_eq!(
+            second.queued_orders(),
+            &[OrderIntent::move_to(fallback.0, fallback.1)]
+        );
+        assert_eq!(second.target_id(), None);
     }
 
     #[test]

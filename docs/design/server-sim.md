@@ -1255,7 +1255,7 @@ the command-supply budget and uses a larger bounded unit-id window for scenario-
 Lab scenario export and restore preserve stable active and queued order intent, including artillery
 point-fire and blanket-fire commands. Restore also hydrates the runtime state required for active
 movement, build, deconstruct, and artillery point-fire orders to resume execution.
-When construction completes, every worker targeting that scaffold clears its active Build order.
+When construction completes, its single active builder clears the active Build order.
 `services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
 economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:
@@ -1372,7 +1372,8 @@ derived from `TICK_HZ`. Otherwise-valid build orders may be issued and promoted 
 is short on resources; once the worker arrives, construction waits and retries until resources are
 available.
 Workers also wait through temporary unit blockers for that grace period, but cancel if permanent
-blockers claim the footprint. Existing owned scaffolds can be resumed without charging again.
+blockers claim the footprint. Existing owned scaffolds with no active builder can be resumed without
+charging again; occupied scaffolds reject another builder.
 
 General rules:
 
@@ -1496,19 +1497,23 @@ General rules:
 - Resource costs are paid at execution time, not queue time. Queued abilities that become
   unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
   require current affordability at issue or promotion time. Build promotion checks the worker,
-  faction/build requirements, map bounds, permanent footprint blockers, and resumable matching
+  faction/build requirements, map bounds, permanent footprint blockers, and unattended matching
   owned scaffolds; otherwise it records the build intent and walks the worker to an outside staging
-  point near the footprint.
+  point near the footprint. A scaffold that already has an active builder is a permanent blocker
+  for other build intents.
 - When a worker reaches build-arrival range, construction re-validates the intent against the live
-  world. Resuming an owned, matching scaffold at the footprint is free even if the owner cannot
-  currently afford a new building. New scaffolds charge resources only when spawned. If the
-  footprint is legal but the player lacks resources, the worker enters `WaitingAtSite`, clears its
-  path, emits one shortage notice when entering the wait, and retries silently until resources are
-  available. Waiting does not reserve resources, so another spend can still win the race before the
-  scaffold appears. Economy-created scaffolds persist a paid-cost receipt: canceling one removes the
-  site, releases every attached builder's active Build order while preserving queued handoffs, and
-  refunds the full building cost without counting a building loss. Lab/authored unpaid scaffolds can
-  still be removed through cancellation but never create resources or reverse structure score.
+  world. Each scaffold has at most one active builder. Resuming an owned, matching scaffold is free
+  only while it has no active builder, even if the owner cannot currently afford a new building.
+  Arriving at an occupied scaffold invalidates and drops that Build order; the worker becomes idle
+  or retains its later queued handoffs for normal promotion. New scaffolds charge resources only
+  when spawned. If the footprint is legal but the player lacks resources, the worker enters
+  `WaitingAtSite`, clears its path, emits one shortage notice when entering the wait, and retries
+  silently until resources are available. Waiting does not reserve resources, so another spend can
+  still win the race before the scaffold appears. Economy-created scaffolds persist a paid-cost
+  receipt: canceling one removes the site, releases its active builder's Build order while preserving
+  queued handoffs, and refunds the full building cost without counting a building loss. Lab/authored
+  unpaid scaffolds can still be removed through cancellation but never create resources or reverse
+  structure score.
 - Build-arrival blockers are classified. A building, scaffold, resource node, terrain/out-of-bounds
   footprint, missing tech requirement, unknown building kind, or missing builder eligibility cancels
   the active build order. Relevant unit bodies put the worker in `WaitingAtSite` for up to
@@ -1559,8 +1564,8 @@ Allocation rules:
   queued handoff work. Stop is the explicit exception: it immediately detaches an active builder,
   leaves the unfinished paid scaffold in place, and clears that worker's queued handoff work. The
   released worker can immediately receive ordinary commands, and any eligible owned worker can
-  resume the scaffold through the normal build intent without paying again. Queued orders prefer
-  the lowest work assignment load, then closest worker.
+  resume the now-unattended scaffold through the normal build intent without paying again. Queued
+  orders prefer the lowest work assignment load, then closest worker.
   Work assignment load is the worker's current queued-order count plus one when its active order is
   already a build or deconstruct intent. Every completed Tank Trap is neutral and must be visible
   when a deconstruct order is accepted or promoted. Deconstruction takes half of the Tank Trap's build

@@ -13,7 +13,7 @@ use crate::game::services::ability_orders::{
     caster_can_promote_queued_world_ability, launch_self_ability, launch_world_ability,
     order_or_launch_world_ability, world_ability_facing_ready,
 };
-use crate::game::services::construction::resumable_site_for_build_intent;
+use crate::game::services::construction::unattended_site_for_build_intent;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::order_execution::targeting::{
     artillery_point_fire_target, ArtilleryPointFireAcceptance,
@@ -673,7 +673,7 @@ fn build_intent_promotion_error(
         return Some("Cannot build there".to_string());
     }
     let can_resume =
-        resumable_site_for_build_intent(map, entities, owner, kind, tile_x, tile_y).is_some();
+        unattended_site_for_build_intent(map, entities, owner, kind, tile_x, tile_y).is_some();
     if !can_resume {
         match standability::building_site_status_for_build_intent(
             map, entities, kind, tile_x, tile_y, worker,
@@ -1061,7 +1061,7 @@ mod tests {
     }
 
     #[test]
-    fn queued_build_promotes_resume_when_player_cannot_afford_original_cost() {
+    fn queued_build_skips_occupied_scaffold_and_promotes_next_order() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
@@ -1069,32 +1069,56 @@ mod tests {
             .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
             .expect("city centre should spawn");
         let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 16, 16);
-        entities
+        let site = entities
             .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
             .expect("scaffold should spawn");
-        let worker = entities
+        let builder = entities
+            .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+            .expect("builder should spawn");
+        {
+            let builder = entities.get_mut(builder).expect("builder should exist");
+            builder.set_order(Order::build(EntityKind::Depot, 16, 16));
+            builder.mark_build_phase(BuildPhase::Constructing { site });
+            builder.set_target_id(Some(site));
+        }
+        let queued_worker = entities
             .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
-            .expect("worker should spawn");
-        entities
-            .get_mut(worker)
-            .expect("worker should exist")
-            .append_queued_order(OrderIntent::build(EntityKind::Depot, 16, 16));
+            .expect("queued worker should spawn");
+        let fallback = (cc_x + 160.0, cc_y);
+        {
+            let worker = entities
+                .get_mut(queued_worker)
+                .expect("queued worker should exist");
+            worker.append_queued_order(OrderIntent::build(EntityKind::Depot, 16, 16));
+            worker.append_queued_order(OrderIntent::move_to(fallback.0, fallback.1));
+        }
         let mut players = vec![player_state(1)];
         players[0].steel = 0;
         players[0].oil = 0;
 
-        promote_with_players(&map, &mut entities, &players);
+        let events = promote_with_players_events(&map, &mut entities, &players);
 
-        let entity = entities.get(worker).expect("worker should exist");
+        let entity = entities
+            .get(queued_worker)
+            .expect("queued worker should exist");
         assert!(
-            matches!(entity.order(), Order::Build(_)),
-            "queued resume should promote even when a new depot is unaffordable"
-        );
-        assert_eq!(
-            entity.order().build_intent_tile(),
-            Some((EntityKind::Depot, 16, 16))
+            matches!(entity.order(), Order::Move(_)),
+            "the invalid occupied-scaffold build should fall through to the queued move"
         );
         assert!(entity.queued_orders().is_empty());
+        assert!(
+            events.get(&1).is_some_and(|events| events.iter().any(
+                |event| matches!(event, Event::Notice { msg, .. } if msg == "Cannot build there")
+            )),
+            "the skipped build should report the occupied site"
+        );
+        assert_eq!(
+            entities
+                .get(builder)
+                .expect("builder should remain")
+                .build_phase(),
+            Some(BuildPhase::Constructing { site })
+        );
     }
 
     #[test]
