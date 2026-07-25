@@ -827,19 +827,21 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
       occupantLip?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchRim),
       "occupied trench overlay draws a berm graphic for occupied infantry",
     );
-    const wrapPolygon = polygonAfterLineStyle(occupantShadow?.calls || [], COLORS.trenchRim);
-    const wrapXs = polygonAxisValues(wrapPolygon, 0);
-    const wrapYs = polygonAxisValues(wrapPolygon, 1);
     assert(
-      Math.min(...wrapXs) < -8 && Math.max(...wrapXs) > 8 &&
-        Math.min(...wrapYs) < -8 && Math.max(...wrapYs) > 8,
-      "occupied trench back berm wraps around all sides below the unit",
+      !occupantShadow?.calls.some((call) => call[0] === "beginFill" && call[1] === COLORS.shadow),
+      "occupied trench basin omits the old unit-shadow ellipse",
     );
-    const foregroundRimPolygon = polygonAfterFill(occupantLip?.calls || [], COLORS.trenchRim);
-    const foregroundRimYs = polygonAxisValues(foregroundRimPolygon, 1);
+    const rimPolygon = occupantLip?.calls.find((call) => call[0] === "drawPolygon")?.[1] || [];
+    const rimXs = polygonAxisValues(rimPolygon, 0);
+    const rimYs = polygonAxisValues(rimPolygon, 1);
     assert(
-      Math.min(...foregroundRimYs) > 0,
-      "occupied trench foreground lip stays on the front half instead of covering the unit center",
+      Math.min(...rimXs) < -8 && Math.max(...rimXs) > 8 &&
+        Math.min(...rimYs) < -8 && Math.max(...rimYs) > 8,
+      "occupied trench lip wraps around all sides below the unit",
+    );
+    assert(
+      occupantLip?.calls.some((call) => call[0] === "lineStyle" && call[2] === COLORS.shadow),
+      "occupied trench lip retains its black outline",
     );
     const missingTrenchEntity = { ...entity, id: 4310, occupiedTrenchId: 999, x: 310, y: 210 };
     const missingTrenchDrawn = _drawOccupiedTrenches.call(renderer, [missingTrenchEntity], {
