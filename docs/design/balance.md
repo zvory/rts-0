@@ -392,7 +392,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   selected/commanded Command Car. Units use their mirrored supply as command weight, so current Tanks
   consume 8 command supply and three Tanks fill the base budget; Command Cars still appear as weighted
   selections but their own weight is offset before their bonus is added.
-- **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
+- **Methamphetamines** (Training Centre research): costs 100 steel / 25 oil and takes 600 ticks
   (~20s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
   1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 25%
   faster attacks (16 tick cooldown becomes 12). It also increases that
