@@ -866,7 +866,8 @@ withFakeHudDocument(({ FakeElement }) => {
     spectator: true,
     resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
     playerResources: [
-      { id: 1, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50 },
+      { id: 1, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50,
+        upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK] },
       { id: 2, steel: 99999, oil: 99999, supplyUsed: 6, supplyCap: 50 },
     ],
     players: p2LabHudState.players,
@@ -1136,11 +1137,9 @@ withFakeHudDocument(({ FakeElement }) => {
       { ability: ABILITY.SCOUT_PLANE, cooldownLeft: 0, remainingUses: null },
     ],
   };
-  const commandCarScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar],
-    entities: [scoutPlaneCityCentre, commandCar],
-    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
-  }));
+  const scoutPlaneResources = { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 };
+  const researchedScoutPlane = { resources: scoutPlaneResources, upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK] };
+  const commandCarScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({ selection: [commandCar], entities: [scoutPlaneCityCentre, commandCar], ...researchedScoutPlane }));
   const scoutPlaneAbility = buttonByLabel(commandCarScoutPlaneCard, "Scout Plane");
   assert(scoutPlaneAbility.slotIndex === 8, "Command Car Scout Plane ability should use the C slot");
   assert(scoutPlaneAbility.commandId === defaultFactionCommandId("ability", ABILITY.SCOUT_PLANE), "Scout Plane ability should expose stable ability identity");
@@ -1150,19 +1149,22 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(scoutPlaneAbility.cost.steel === 50 && scoutPlaneAbility.cost.oil === 75, "Scout Plane ability should show 50/75 cost");
   assert(scoutPlaneAbility.enabled, "Scout Plane ability should enable with sufficient resources");
 
+  const unresearchedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({ selection: [commandCar], entities: [commandCar], resources: scoutPlaneResources }));
+  const unresearchedScoutPlane = buttonByLabel(unresearchedScoutPlaneCard, "Scout Plane");
+  assert(!unresearchedScoutPlane.enabled, "Scout Plane ability should stay locked before research");
+  assert(unresearchedScoutPlane.title === "Requires Scout Plane", "locked Scout Plane ability should name its R&D requirement");
+
   const noCityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar],
-    entities: [commandCar],
-    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
+    selection: [commandCar], entities: [commandCar], ...researchedScoutPlane,
     playerHasCompleteKind: (kind) => kind === KIND.FACTORY,
   }));
   const noCityCentreScoutPlane = buttonByLabel(noCityCentreScoutPlaneCard, "Scout Plane");
   assert(noCityCentreScoutPlane.enabled, "Scout Plane ability should not require a completed City Centre");
 
   const oilBlockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar],
-    entities: [scoutPlaneCityCentre, commandCar],
+    selection: [commandCar], entities: [scoutPlaneCityCentre, commandCar],
     resources: { steel: 50, oil: 74, supplyUsed: 0, supplyCap: 10 },
+    upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
   }));
   const oilBlockedScoutPlane = buttonByLabel(oilBlockedScoutPlaneCard, "Scout Plane");
   assert(!oilBlockedScoutPlane.enabled, "Scout Plane ability should disable when oil is short");
@@ -1178,9 +1180,8 @@ withFakeHudDocument(({ FakeElement }) => {
     scoutPlane: { sourceCommandCar: commandCar.id },
   };
   const activeScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar],
-    entities: [scoutPlaneCityCentre, commandCar, activeScoutPlane],
-    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
+    selection: [commandCar], entities: [scoutPlaneCityCentre, commandCar, activeScoutPlane],
+    ...researchedScoutPlane,
   }));
   const activeIndependentScoutPlane = buttonByLabel(activeScoutPlaneCard, "Scout Plane");
   assert(activeIndependentScoutPlane.enabled, "an active Scout Plane should not independently block a ready Command Car");
@@ -1191,9 +1192,8 @@ withFakeHudDocument(({ FakeElement }) => {
     id: 76,
   };
   const mixedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar, secondCommandCar],
+    selection: [commandCar, secondCommandCar], ...researchedScoutPlane,
     entities: [scoutPlaneCityCentre, commandCar, secondCommandCar, activeScoutPlane],
-    resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
   const mixedScoutPlaneAbility = buttonByLabel(mixedScoutPlaneCard, "Scout Plane");
   assert(mixedScoutPlaneAbility.enabled, "selected ready Command Cars can launch while another sortie is active");

@@ -177,6 +177,7 @@ export function buildCommandCardContextCatalog() {
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.TANK_UNLOCK,
+      UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
     groupCooldownClocks: () => [],
     playerHasCompleteKind: (kind) => allEntities.some((e) =>
@@ -737,7 +738,9 @@ function playerHasCompleteKind(ctx, kind) {
 }
 
 function abilityUnlocked(ctx, definition) {
-  return requirementsOf(definition).every((req) => playerHasCompleteKind(ctx, req));
+  return requirementsOf(definition).every((req) => playerHasCompleteKind(ctx, req))
+    && (!definition?.upgradeRequirement
+      || (ctx.upgrades || []).includes(definition.upgradeRequirement));
 }
 
 function abilityTargetActive(commandTarget, ability) {
@@ -780,6 +783,10 @@ function availableResearchesOf(ctx, kind) {
 
 function abilityDisabledReason(ctx, affordance) {
   if (!affordance.unlocked) {
+    const missingUpgrade = affordance.definition?.upgradeRequirement;
+    if (missingUpgrade && !(ctx.upgrades || []).includes(missingUpgrade)) {
+      return `Requires ${UPGRADES[missingUpgrade]?.label || missingUpgrade}`;
+    }
     const missing = requirementsOf(affordance.definition)
       .find((req) => !playerHasCompleteKind(ctx, req));
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;

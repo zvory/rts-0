@@ -95,6 +95,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::SMOKE_PLUS_COST_OIL,
             research_ticks: crate::config::SMOKE_PLUS_RESEARCH_TICKS,
         },
+        UpgradeKind::ScoutPlaneUnlock => UpgradeDefinition {
+            kind,
+            researched_at: catalog.researched_at,
+            requires_upgrade: None,
+            cost_steel: crate::config::SCOUT_PLANE_UNLOCK_COST_STEEL,
+            cost_oil: crate::config::SCOUT_PLANE_UNLOCK_COST_OIL,
+            research_ticks: crate::config::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
+        },
     }
 }
 
@@ -131,6 +139,7 @@ mod tests {
                 UpgradeKind::TankUnlock,
                 UpgradeKind::MortarAutocast,
                 UpgradeKind::SmokePlus,
+                UpgradeKind::ScoutPlaneUnlock,
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));

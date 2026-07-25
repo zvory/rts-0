@@ -93,6 +93,7 @@ export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
+export const SCOUT_PLANE_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
@@ -183,6 +184,7 @@ export const STATS = Object.freeze({
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
+      UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 1,
@@ -310,6 +312,7 @@ export const ABILITIES = Object.freeze({
     rangeTiles: null,
     cooldownTicks: SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 50, oil: 75 }),
+    upgradeRequirement: UPGRADE.SCOUT_PLANE_UNLOCK,
     radiusTiles: SCOUT_PLANE_ORBIT_RADIUS_TILES,
     durationTicks: SCOUT_PLANE_LIFETIME_TICKS,
     queued: true,
@@ -465,6 +468,15 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 150 }),
     researchTicks: SMOKE_PLUS_RESEARCH_TICKS,
     description: "Double Scout Car Smoke radius and duration",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+  }),
+  [UPGRADE.SCOUT_PLANE_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.SCOUT_PLANE_UNLOCK,
+    label: "Scout Plane",
+    icon: "SP+",
+    cost: Object.freeze({ steel: 50, oil: 100 }),
+    researchTicks: SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
+    description: "Unlock the Command Car Scout Plane ability",
     researchedAt: KIND.RESEARCH_COMPLEX,
   }),
 });

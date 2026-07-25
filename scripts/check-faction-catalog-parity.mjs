@@ -73,6 +73,7 @@ import {
   SCOUT_PLANE_LIFETIME_TICKS,
   SCOUT_PLANE_ORBIT_RADIUS_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
+  SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
   SMOKE_PLUS_RESEARCH_TICKS,
   SMOKE_ABILITY_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
@@ -361,6 +362,11 @@ function assertAbilityDescriptor(entry, factionId) {
   assert.equal(descriptor.chargeRechargeTicks ?? null, entry.chargeRechargeTicks, `${factionId} ${entry.id} charge recharge mirrors Rust registry`);
   assert.deepEqual(descriptor.cost, entry.cost, `${factionId} ${entry.id} cost mirrors Rust registry`);
   assert.equal(descriptor.techRequirement ?? null, entry.techRequirement, `${factionId} ${entry.id} tech requirement mirrors Rust registry`);
+  assert.equal(
+    descriptor.upgradeRequirement ?? null,
+    entry.upgradeRequirement,
+    `${factionId} ${entry.id} upgrade requirement mirrors Rust registry`,
+  );
   assert.equal(descriptor.queued, entry.mayQueue, `${factionId} ${entry.id} queue behavior mirrors Rust registry`);
   assert.equal(descriptor.queuePolicy, entry.queuePolicy, `${factionId} ${entry.id} queue policy mirrors Rust registry`);
   assert.equal(!!descriptor.autocast, entry.autocast, `${factionId} ${entry.id} autocast flag mirrors Rust registry`);
@@ -716,6 +722,7 @@ const clientUpgradeResearchTicks = {
   [UPGRADE.TANK_UNLOCK]: TANK_UNLOCK_RESEARCH_TICKS,
   [UPGRADE.MORTAR_AUTOCAST]: MORTAR_AUTOCAST_RESEARCH_TICKS,
   [UPGRADE.SMOKE_PLUS]: SMOKE_PLUS_RESEARCH_TICKS,
+  [UPGRADE.SCOUT_PLANE_UNLOCK]: SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
 };
 assertSortedObjectKeys(
   rustClientConfig.upgrades,

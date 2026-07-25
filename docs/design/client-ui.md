@@ -1572,8 +1572,9 @@ buildings in reverse round-robin order for the displayed producer type. Selectin
 under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot;
 click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
 construction cost. The Scout Plane affordance
-is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It costs 50 steel
-and 75 oil, has no City Centre requirement, disables while that Command Car has an active Scout
+is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It unlocks after
+the Scout Plane R&D research completes, costs 50 steel and 75 oil, has no City Centre requirement,
+disables while that Command Car has an active Scout
 Plane or its 30-second cooldown is running, and issues immediately rather than entering a
 building production queue. Scout Planes are hit-testable for hover/readout purposes but normal
 selection, box selection, control groups, right-click commands, and command-card descriptors filter

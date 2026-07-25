@@ -109,7 +109,7 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         );
         print_kind_array_inline(ability.carriers);
         print!(
-            ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"chargeRechargeTicks\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
+            ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"chargeRechargeTicks\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"upgradeRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
             ability.target_mode.stable_id(),
             json_u32_or_null(ability.range_tiles),
             json_u32_or_null(ability.min_range_tiles),
@@ -119,6 +119,11 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
             ability.cost.steel,
             ability.cost.oil,
             json_kind_or_null(ability.tech_requirement),
+            json_string_or_null(
+                ability
+                    .upgrade_requirement
+                    .map(faction::UpgradeKind::stable_id),
+            ),
             ability.may_queue(),
             ability.queue_policy.stable_id(),
             ability.autocast,
@@ -597,6 +602,15 @@ fn print_upgrades(indent: &str) {
         balance::SMOKE_PLUS_COST_STEEL,
         balance::SMOKE_PLUS_COST_OIL,
         balance::SMOKE_PLUS_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::SCOUT_PLANE_UNLOCK_UPGRADE,
+        balance::SCOUT_PLANE_UNLOCK_COST_STEEL,
+        balance::SCOUT_PLANE_UNLOCK_COST_OIL,
+        balance::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
         None,
         false,
     );
