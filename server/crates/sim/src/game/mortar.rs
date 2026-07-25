@@ -96,9 +96,13 @@ impl MortarShellStore {
         x: f32,
         y: f32,
         tick: u32,
-        reveal_launch_to_enemies: bool,
+        is_autocast: bool,
     ) {
-        let (impact_x, impact_y) = scattered_mortar_impact(fog, teams, owner, attacker, x, y, tick);
+        let (impact_x, impact_y) = if is_autocast {
+            scattered_mortar_impact(fog, teams, owner, attacker, x, y, tick)
+        } else {
+            (x, y)
+        };
         self.shells.push(MortarShell {
             owner,
             attacker,
@@ -116,7 +120,7 @@ impl MortarShellStore {
             from_y,
             impact_x,
             impact_y,
-            reveal_launch_to_enemies,
+            is_autocast,
         );
     }
 

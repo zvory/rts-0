@@ -1,8 +1,6 @@
 use super::fixtures::*;
 use super::*;
 use crate::game::entity::MovePhase;
-use crate::game::mortar_scatter::scattered_mortar_impact;
-use crate::game::teams::TeamRelations;
 
 fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
     let players = [
@@ -109,31 +107,6 @@ fn enqueue_queued_manual_mortar_fire(game: &mut Game, mortar: u32, target_pos: (
     );
 }
 
-fn expected_mortar_impact(
-    game: &Game,
-    mortar: u32,
-    target_pos: (f32, f32),
-    tick: u32,
-) -> (f32, f32) {
-    let owner = game
-        .state
-        .entities
-        .get(mortar)
-        .expect("mortar should exist")
-        .owner;
-    let teams =
-        TeamRelations::from_player_teams(game.state.players.iter().map(|p| (p.id, p.team_id)));
-    scattered_mortar_impact(
-        &game.state.fog,
-        &teams,
-        owner,
-        mortar,
-        target_pos.0,
-        target_pos.1,
-        tick,
-    )
-}
-
 fn points_nearly_equal(a: (f32, f32), b: (f32, f32)) -> bool {
     (a.0 - b.0).abs() <= 0.001 && (a.1 - b.1).abs() <= 0.001
 }
@@ -173,6 +146,29 @@ fn manual_mortar_fire_with_autocast_enabled_only_launches_once() {
             .attack_cd()
             > 0,
         "manual mortar fire should start the shared mortar weapon cooldown"
+    );
+}
+
+#[test]
+fn manual_mortar_fire_lands_exactly_on_a_fogged_point() {
+    let (mut game, mortar, _) = manual_fire_fixture();
+    let target_pos = game.state.map.tile_center(20, 8);
+    assert!(
+        !game
+            .state
+            .fog
+            .is_visible_world(1, target_pos.0, target_pos.1),
+        "test target must be outside the firing player's current vision"
+    );
+
+    enqueue_manual_mortar_fire(&mut game, mortar, target_pos);
+    let events = game.tick();
+    let launch_targets = mortar_launch_targets(&events, 1, mortar);
+
+    assert_eq!(launch_targets.len(), 1, "manual mortar should fire once");
+    assert!(
+        points_nearly_equal(launch_targets[0], target_pos),
+        "manual mortar fire should preserve the clicked point even in fog"
     );
 }
 
@@ -444,11 +440,9 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
     let mut launched_targets = Vec::new();
     let mut expected_targets = Vec::new();
     for _ in 0..240 {
-        let tick = game.tick_count().saturating_add(1);
-        let expected = expected_mortar_impact(&game, mortar, target_pos, tick);
         let events = game.tick();
         let launches = mortar_launch_targets(&events, 1, mortar);
-        expected_targets.extend(std::iter::repeat_n(expected, launches.len()));
+        expected_targets.extend(std::iter::repeat_n(target_pos, launches.len()));
         launched_targets.extend(launches);
         if launched_targets.len() == 3 {
             break;
