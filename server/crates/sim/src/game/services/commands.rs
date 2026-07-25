@@ -1357,11 +1357,7 @@ struct AbilityUse {
     max_units_per_command: usize,
 }
 
-fn upgrade_requirement_met(
-    players: &[PlayerState],
-    player: u32,
-    ability: AbilityKind,
-) -> bool {
+fn upgrade_requirement_met(players: &[PlayerState], player: u32, ability: AbilityKind) -> bool {
     ability::definition(ability)
         .upgrade_requirement
         .is_none_or(|required| {
