@@ -75,6 +75,7 @@ src/
   scoreboard.js   # Shared score/result formatting helpers
   status_badge.js # Build/network/frame status badge with copyable diagnostics
   ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
+  observer_analysis_army_value.js # viewport combat-unit value calculation
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   observer_analysis_preferences.js # persisted observer analysis tab/visibility/window preferences
   observer_analysis_research.js # completed-research tab renderer for observer analysis
@@ -464,9 +465,13 @@ compatibility. Its titlebar is draggable, keyboard-nudgeable, viewport-clamped, 
 desktop placement through replay seeks and spectator rematches; `Home` restores the default
 placement. Coarse-pointer layouts also support viewport-clamped titlebar dragging without writing
 their temporary placement over the saved desktop position. Analysis buttons activate directly on
-touch release and suppress the synthesized compatibility click. The overlay owns its generated DOM and is read-only. The Army Value tab is
-client-side and viewport-specific; Production, Research, Units, Resources, Units Lost, and
-Resources Lost render the latest server-authored `observerAnalysis` payload. Research groups
+touch release and suppress the synthesized compatibility click. The overlay owns its generated DOM
+and is read-only. The Army Value tab is client-side and viewport-specific, excludes economy workers
+(Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
+Resources, Units Lost, and Resources Lost render the latest server-authored `observerAnalysis`
+payload. Alive Resources subtracts dead-unit steel/oil value from lifetime mined resources;
+because starting resources are not lifetime mined income, the derived value can be negative.
+Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
 completed none. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,

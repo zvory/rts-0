@@ -31,6 +31,29 @@ export function renderResourcesMetric({ analysis, players }) {
   return wrap;
 }
 
+export function renderAliveResourcesMetric({ analysis, players }) {
+  const wrap = renderAnalysisMetric("replay-alive-resources", "Lifetime resources still alive");
+  const note = document.createElement("div");
+  note.className = "replay-analysis-note";
+  note.textContent = "Lifetime mined resources minus dead unit value.";
+  wrap.appendChild(note);
+
+  const rows = playerAnalysisRows({ analysis, players });
+  if (!analysis) {
+    wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
+    return wrap;
+  }
+  if (!rows.length) {
+    wrap.appendChild(renderEmptyMetric("No players"));
+    return wrap;
+  }
+
+  for (const player of rows) {
+    wrap.appendChild(renderAliveResourcesRow(player));
+  }
+  return wrap;
+}
+
 const RESOURCE_WINDOWS = [
   { label: "Last 5s", resourceKey: "last5s" },
   { label: "Last 1m", resourceKey: "lastMinute" },
@@ -101,6 +124,30 @@ function renderResourcePlayerRow({ name, color, totals }) {
   const oilEl = resourceValueElement("oil", totals?.oil || 0, "replay-resources-oil");
 
   row.append(player, steelEl, oilEl);
+  return row;
+}
+
+function renderAliveResourcesRow(player) {
+  const row = document.createElement("div");
+  row.className = "replay-resources-lost-row replay-alive-resources-row";
+
+  const swatch = document.createElement("span");
+  swatch.className = "replay-analysis-player-swatch";
+  swatch.setAttribute("style", `background:${safeCssColor(player.color)};`);
+  swatch.setAttribute("aria-hidden", "true");
+
+  const name = document.createElement("span");
+  name.className = "replay-resources-lost-name";
+  name.textContent = player.name;
+
+  const steel = player.resources.lifetime.steel - player.resourcesLost.steel;
+  const oil = player.resources.lifetime.oil - player.resourcesLost.oil;
+  row.append(
+    swatch,
+    name,
+    resourceValueElement("steel", steel, "replay-resources-lost-steel", { allowNegative: true }),
+    resourceValueElement("oil", oil, "replay-resources-lost-oil", { allowNegative: true }),
+  );
   return row;
 }
 
