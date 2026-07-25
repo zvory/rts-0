@@ -1924,9 +1924,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   health bars → fog overlay → local visual-sample labels → shot-revealed units → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost and Lab ruler →
   selection drag-box → (HUD is DOM, not Pixi). Occupied-trench shadows and lips render only when the
   snapshot's `occupiedTrenchId` matches authoritative trench terrain; orphaned ids do not synthesize
-  client-only trench geometry. The below-unit occupied-trench berm cue uses stroked irregular
-  outlines, while the foreground lip uses a filled front-half arc so the berm does not cover unit
-  bodies. Miss toasts use reduced text and stroke sizing, a smaller horizontal offset, and less
+  client-only trench geometry. The below-unit occupied-trench berm cue renders at 115% of the
+  authoritative trench radius as a dark irregular basin beneath concentric 360-degree outer-rim,
+  dirt, and inner-shadow bands. The outer band has a black keyline and twelve lightly irregular
+  radial dirt facets wrap the full circumference. Miss toasts use reduced text and stroke sizing, a smaller horizontal offset, and less
   upward drift so they remain closer to the receiving unit. Selected unit range rings,
   minimum-range rings, and support-weapon field-of-fire overlays use higher-opacity rendering for
   readability.

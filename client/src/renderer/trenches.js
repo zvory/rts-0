@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxEllipse, gfxPoly, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxPoly, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import { COLORS, ENTRENCHMENT_TRENCH_RADIUS_TILES } from "../config.js";
 import { finiteNumber } from "./shared.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
@@ -9,6 +9,7 @@ const TRENCH_MIN_RADIUS_PX = 4;
 const TRENCH_POLYGON_POINTS = 22;
 const TRENCH_FACET_COUNT = 5;
 const OCCUPIED_LIP_POINTS = 12;
+const OCCUPIED_BERM_SCALE = 1.15;
 
 export class TrenchDecalLayer {
   constructor({
@@ -209,7 +210,7 @@ export function normalizedTrenches(trenches, tileSize = 32) {
 export function drawOccupiedTrenchShadow(g, radius, seed = 1) {
   if (!g || !finiteNumber(radius) || radius <= 0) return;
   const rng = mulberry32(seed >>> 0);
-  const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
+  const r = Math.max(TRENCH_MIN_RADIUS_PX, radius) * OCCUPIED_BERM_SCALE;
 
   gfxFill(g, COLORS.trenchShadow, 0.5);
   gfxPoly(g, irregularLocalPolygon(r * 0.76, {
@@ -220,68 +221,53 @@ export function drawOccupiedTrenchShadow(g, radius, seed = 1) {
     offsetY: r * 0.08,
   }));
   gfxNoFill(g);
-
-  gfxFill(g, COLORS.shadow, 0.2);
-  gfxEllipse(g, 0, r * 0.16, r * 0.68, r * 0.34);
-  gfxNoFill(g);
-
-  gfxStroke(g, Math.max(2, r * 0.22), COLORS.trenchRim, 0.6);
-  gfxPoly(g, irregularLocalPolygon(r * 0.96, {
-    points: OCCUPIED_LIP_POINTS + 6,
-    jitter: 0.1,
-    rng,
-    offsetY: r * 0.02,
-  }));
-
-  gfxStroke(g, Math.max(1.5, r * 0.13), COLORS.trenchDirt, 0.54);
-  gfxPoly(g, irregularLocalPolygon(r * 0.86, {
-    points: OCCUPIED_LIP_POINTS + 4,
-    jitter: 0.08,
-    rng,
-    offsetY: r * 0.025,
-  }));
 }
 
 export function drawOccupiedTrenchLip(g, radius, seed = 1) {
   if (!g || !finiteNumber(radius) || radius <= 0) return;
   const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
-  const r = Math.max(TRENCH_MIN_RADIUS_PX, radius);
+  const r = Math.max(TRENCH_MIN_RADIUS_PX, radius) * OCCUPIED_BERM_SCALE;
 
-  gfxFill(g, COLORS.trenchRim, 0.94);
-  gfxPoly(g, arcBandPolygon(r * 1.1, r * 0.5, Math.PI * 0.06, Math.PI * 0.94, {
-    points: OCCUPIED_LIP_POINTS,
+  const outerLip = irregularRingBand(r * 1.1, r * 0.5, {
+    points: OCCUPIED_LIP_POINTS * 2,
     jitter: 0.12,
     rng,
-    offsetY: r * 0.08,
-  }));
+  });
+  gfxFill(g, COLORS.trenchRim, 0.94);
+  gfxStroke(g, 0);
+  gfxPoly(g, outerLip.band);
   gfxNoFill(g);
+  gfxStroke(g, Math.max(1.5, r * 0.12), COLORS.shadow, 1);
+  gfxPoly(g, outerLip.outer);
+  gfxPoly(g, outerLip.inner);
+  gfxStroke(g, 0);
 
-  gfxFill(g, COLORS.trenchDirt, 0.92);
-  gfxPoly(g, arcBandPolygon(r * 0.98, r * 0.58, Math.PI * 0.11, Math.PI * 0.89, {
-    points: OCCUPIED_LIP_POINTS - 2,
+  const dirtLip = irregularRingBand(r * 0.98, r * 0.58, {
+    points: OCCUPIED_LIP_POINTS * 2 - 4,
     jitter: 0.1,
     rng,
-    offsetY: r * 0.09,
-  }));
+  });
+  gfxFill(g, COLORS.trenchDirt, 0.92);
+  gfxPoly(g, dirtLip.band);
   gfxNoFill(g);
 
-  gfxFill(g, COLORS.trenchShadow, 0.34);
-  gfxPoly(g, arcBandPolygon(r * 0.7, r * 0.5, Math.PI * 0.12, Math.PI * 0.88, {
-    points: OCCUPIED_LIP_POINTS - 3,
+  const innerShade = irregularRingBand(r * 0.7, r * 0.5, {
+    points: OCCUPIED_LIP_POINTS * 2 - 6,
     jitter: 0.08,
     rng,
-    offsetY: r * 0.06,
-  }));
+  });
+  gfxFill(g, COLORS.trenchShadow, 0.34);
+  gfxPoly(g, innerShade.band);
   gfxNoFill(g);
 
   const facetPaths = [];
-  for (let i = 0; i < 4; i += 1) {
-    const angle = Math.PI * (0.18 + rng() * 0.64);
+  for (let i = 0; i < OCCUPIED_LIP_POINTS; i += 1) {
+    const angle = (Math.PI * 2 * i) / OCCUPIED_LIP_POINTS + (rng() - 0.5) * 0.12;
     const inner = r * (0.6 + rng() * 0.08);
     const outer = r * (0.96 + rng() * 0.1);
     facetPaths.push([
-      [Math.cos(angle) * inner, Math.sin(angle) * inner + r * 0.08],
-      [Math.cos(angle) * outer, Math.sin(angle) * outer + r * 0.08],
+      [Math.cos(angle) * inner, Math.sin(angle) * inner],
+      [Math.cos(angle) * outer, Math.sin(angle) * outer],
     ]);
   }
   gfxStrokePaths(g, facetPaths, 2, COLORS.trenchDirtLight, 0.42);
@@ -350,26 +336,26 @@ function irregularLocalPolygon(radius, {
   return out;
 }
 
-function arcBandPolygon(outerRadius, innerRadius, startAngle, endAngle, {
+function irregularRingBand(outerRadius, innerRadius, {
   points,
   jitter,
   rng,
-  offsetY = 0,
 }) {
-  const out = [];
-  for (let i = 0; i <= points; i += 1) {
-    const t = i / points;
-    const angle = startAngle + (endAngle - startAngle) * t;
-    const radius = outerRadius * (1 + (rng() - 0.5) * jitter);
-    out.push(Math.cos(angle) * radius, Math.sin(angle) * radius + offsetY);
+  const outer = [];
+  const inner = [];
+  for (let i = 0; i < points; i += 1) {
+    const angle = (Math.PI * 2 * i) / points;
+    const outerR = outerRadius * (1 + (rng() - 0.5) * jitter);
+    const innerR = innerRadius * (1 + (rng() - 0.5) * jitter);
+    outer.push(Math.cos(angle) * outerR, Math.sin(angle) * outerR);
+    inner.push(Math.cos(angle) * innerR, Math.sin(angle) * innerR);
   }
-  for (let i = points; i >= 0; i -= 1) {
-    const t = i / points;
-    const angle = startAngle + (endAngle - startAngle) * t;
-    const radius = innerRadius * (1 + (rng() - 0.5) * jitter);
-    out.push(Math.cos(angle) * radius, Math.sin(angle) * radius + offsetY);
+
+  const band = [...outer, outer[0], outer[1], inner[0], inner[1]];
+  for (let i = inner.length - 2; i >= 0; i -= 2) {
+    band.push(inner[i], inner[i + 1]);
   }
-  return out;
+  return { band, outer, inner };
 }
 
 function trenchSnapshotSignature(trenches) {
