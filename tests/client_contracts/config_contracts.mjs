@@ -507,13 +507,9 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       SMOKE_PLUS_RESEARCH_TICKS === TICK_HZ * 20,
     "Smoke Plus research cost and time mirror server",
   );
-  assert(
-    UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK].cost.steel === 50 &&
-      UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK].cost.oil === 100 &&
-      UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK].researchTicks === SCOUT_PLANE_UNLOCK_RESEARCH_TICKS &&
-      SCOUT_PLANE_UNLOCK_RESEARCH_TICKS === TICK_HZ * 20,
-    "Scout Plane research cost and time mirror server",
-  );
+  const scoutPlaneResearch = UPGRADES[UPGRADE.SCOUT_PLANE_UNLOCK];
+  assert(scoutPlaneResearch.cost.steel === 50 && scoutPlaneResearch.cost.oil === 100, "Scout Plane research costs mirror server");
+  assert(scoutPlaneResearch.researchTicks === SCOUT_PLANE_UNLOCK_RESEARCH_TICKS && SCOUT_PLANE_UNLOCK_RESEARCH_TICKS === TICK_HZ * 20, "Scout Plane research takes 20 seconds");
   assert(
     ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles === SMOKE_PLUS_CLOUD_RADIUS_TILES &&
       ABILITIES[ABILITY.SMOKE].upgradedDurationTicks === SMOKE_PLUS_CLOUD_DURATION_TICKS &&

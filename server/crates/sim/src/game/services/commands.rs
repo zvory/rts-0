@@ -56,7 +56,8 @@ mod scout_plane_ability;
 mod support_weapon_setup;
 use self::artillery_scatter::artillery_blanket_point;
 use self::command_helpers::{
-    choose_smoke_caster, clear_queued_orders, clear_staged_anti_tank_gun_setup,
+    artillery_fire_mode_for, choose_smoke_caster, clear_queued_orders,
+    clear_staged_anti_tank_gun_setup, gather_node_valid, immediate_unit_can_replace,
 };
 use self::guards::{
     command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
@@ -1173,9 +1174,6 @@ mod planned_actions {
         }
     }
 }
-fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
-    unit_can_accept_player_command(entities, player, unit)
-}
 fn attack_target_valid(
     entities: &EntityStore,
     teams: &TeamRelations,
@@ -1319,10 +1317,6 @@ fn deconstruct_unit_can_target(
             && !smokes.point_inside(target.pos_x, target.pos_y))
 }
 
-fn gather_node_valid(entities: &EntityStore, player: u32, node: u32) -> bool {
-    world_query::steel_node_is_mineable_by_player(entities, player, node)
-}
-
 fn gather_unit_can_use_node(
     entities: &EntityStore,
     players: &[PlayerState],
@@ -1339,14 +1333,6 @@ fn gather_unit_can_use_node(
         && gather_node_valid(entities, player, node)
 }
 
-fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryFireMode> {
-    match ability {
-        AbilityKind::PointFire => Some(ArtilleryFireMode::Point),
-        AbilityKind::BlanketFire => Some(ArtilleryFireMode::Blanket),
-        _ => None,
-    }
-}
-
 struct AbilityUse {
     ability: AbilityKind,
     x: Option<f32>,
@@ -1355,17 +1341,6 @@ struct AbilityUse {
     units: Vec<u32>,
     queued: bool,
     max_units_per_command: usize,
-}
-
-fn upgrade_requirement_met(players: &[PlayerState], player: u32, ability: AbilityKind) -> bool {
-    ability::definition(ability)
-        .upgrade_requirement
-        .is_none_or(|required| {
-            players
-                .iter()
-                .find(|candidate| candidate.id == player)
-                .is_some_and(|candidate| candidate.has_upgrade(required))
-        })
 }
 
 fn use_ability(
@@ -1395,7 +1370,12 @@ fn use_ability(
     if definition.effect_hook == AbilityEffectHook::ReservedNoop {
         return;
     }
-    if !upgrade_requirement_met(players, player, ability) {
+    if definition.upgrade_requirement.is_some_and(|required| {
+        !players
+            .iter()
+            .find(|candidate| candidate.id == player)
+            .is_some_and(|candidate| candidate.has_upgrade(required))
+    }) {
         return;
     }
     if ability == AbilityKind::ScoutPlane {
