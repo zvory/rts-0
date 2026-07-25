@@ -200,7 +200,7 @@ export const STATS = Object.freeze({
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
+    cost: { steel: 100, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
     description:
       "Build on an oil patch. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
