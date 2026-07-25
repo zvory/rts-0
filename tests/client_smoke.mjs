@@ -303,7 +303,7 @@ try {
   ok(
     !pumpJackSlot.hasDepotButton &&
       pumpJackSlot.hotkey === "W" &&
-      pumpJackSlot.tooltip.includes("50") &&
+      pumpJackSlot.tooltip.includes("100") &&
       pumpJackSlot.tooltip.includes("20s") &&
       pumpJackSlot.tooltip.includes("oil patch") &&
       pumpJackSlot.tooltip.includes("Extracts 2 Oil"),
