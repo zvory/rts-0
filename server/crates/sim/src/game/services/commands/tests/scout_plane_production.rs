@@ -58,6 +58,7 @@ fn command_car_scout_plane_ability_launches_from_caster_without_a_city_centre() 
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("command car should spawn");
     let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
 
     let events = apply_with_players(
         &map,
@@ -89,6 +90,39 @@ fn command_car_scout_plane_ability_launches_from_caster_without_a_city_centre() 
 }
 
 #[test]
+fn command_car_scout_plane_ability_requires_completed_research() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let command_car = entities
+        .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
+        .expect("command car should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    let resources_before = (players[0].steel, players[0].oil);
+
+    let _ = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, scout_plane_command(vec![command_car], 592.0, 592.0))],
+    );
+
+    assert_eq!((players[0].steel, players[0].oil), resources_before);
+    assert!(
+        entities
+            .iter()
+            .all(|entity| entity.kind != EntityKind::ScoutPlane),
+        "Scout Plane must not launch before its R&D research completes"
+    );
+    assert_eq!(
+        entities
+            .get(command_car)
+            .expect("command car")
+            .ability_cooldown_ticks(AbilityKind::ScoutPlane),
+        0
+    );
+}
+
+#[test]
 fn each_command_car_can_launch_its_own_scout_plane() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
@@ -99,6 +133,7 @@ fn each_command_car_can_launch_its_own_scout_plane() {
         .spawn_unit(1, EntityKind::CommandCar, 192.0, 128.0)
         .expect("second command car should spawn");
     let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
 
     let events = apply_with_players(
         &map,
@@ -145,6 +180,7 @@ fn command_car_scout_plane_ability_does_not_interrupt_caster_orders() {
         caster.append_queued_order(OrderIntent::move_to(672.0, 672.0));
     }
     let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
 
     let events = apply_with_players(
         &map,
@@ -176,6 +212,7 @@ fn command_car_can_launch_again_when_ready_while_an_earlier_plane_is_active() {
         .spawn_unit(1, EntityKind::CommandCar, 128.0, 128.0)
         .expect("command car should spawn");
     let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
     let _ = apply_with_players(
         &map,
         &mut entities,
@@ -215,6 +252,7 @@ fn scout_plane_command_uses_the_first_ready_selected_command_car() {
         .spawn_unit(1, EntityKind::CommandCar, 192.0, 128.0)
         .expect("available command car should spawn");
     let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
     let _ = apply_with_players(
         &map,
         &mut entities,

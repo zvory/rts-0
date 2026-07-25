@@ -74,6 +74,7 @@ export const FACTION_CATALOGS = Object.freeze({
         UPGRADE.TANK_UNLOCK,
         UPGRADE.MORTAR_AUTOCAST,
         UPGRADE.SMOKE_PLUS,
+        UPGRADE.SCOUT_PLANE_UNLOCK,
       ],
     },
     abilities: [

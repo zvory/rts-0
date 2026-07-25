@@ -8,7 +8,7 @@ export function resourceIconHtml(kind) {
   return `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind] || ""}</span>`;
 }
 
-export function resourceValueElement(kind, value, className) {
+export function resourceValueElement(kind, value, className, { allowNegative = false } = {}) {
   const el = document.createElement("span");
   el.className = className;
   el.title = resourceTitle(kind);
@@ -19,7 +19,7 @@ export function resourceValueElement(kind, value, className) {
   icon.setAttribute("aria-hidden", "true");
   const number = document.createElement("span");
   number.className = "resource-value-number";
-  number.textContent = formatResourceValue(value);
+  number.textContent = formatResourceValue(value, { allowNegative });
   el.append(icon, number);
   return el;
 }
@@ -31,6 +31,7 @@ function resourceTitle(kind) {
   return "Resource value";
 }
 
-function formatResourceValue(value) {
-  return String(Math.max(0, Math.round(Number(value) || 0)));
+function formatResourceValue(value, { allowNegative }) {
+  const rounded = Math.round(Number(value) || 0);
+  return String(allowNegative ? rounded : Math.max(0, rounded));
 }

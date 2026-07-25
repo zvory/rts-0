@@ -173,6 +173,7 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(upgrades::PANZERFAUSTS, "panzerfausts");
     assert_eq!(upgrades::ENTRENCHMENT, "entrenchment");
     assert_eq!(upgrades::SMOKE_PLUS, "smoke_plus");
+    assert_eq!(upgrades::SCOUT_PLANE_UNLOCK, "scout_plane_unlock");
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");

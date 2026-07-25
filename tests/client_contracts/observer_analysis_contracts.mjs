@@ -40,6 +40,8 @@ import { textWithin } from "./dom_text.mjs";
     cameraBounds: { x: 0, y: 0, width: 100, height: 100 },
     stats: {
       [KIND.RIFLEMAN]: { size: 9, cost: { steel: 50, oil: 0 } },
+      [KIND.WORKER]: { size: 9, cost: { steel: 50, oil: 0 } },
+      [KIND.GOLEM]: { size: 9, cost: { steel: 200, oil: 50 } },
       [KIND.TANK]: { size: 18, cost: { steel: 300, oil: 150 } },
       [KIND.BARRACKS]: { size: 24, cost: { steel: 150, oil: 0 } },
     },
@@ -52,12 +54,20 @@ import { textWithin } from "./dom_text.mjs";
       { id: 6, owner: 1, kind: KIND.RIFLEMAN, x: 60, y: 40, visionOnly: true },
       { id: 7, owner: 1, kind: KIND.STEEL, x: 25, y: 25 },
       { id: 8, owner: 2, kind: KIND.MACHINE_GUNNER, x: 30, y: 30 },
+      { id: 9, owner: 1, kind: KIND.WORKER, x: 30, y: 30 },
+      { id: 10, owner: 2, kind: KIND.GOLEM, x: 40, y: 40 },
     ],
   });
   const redValue = calculatorRows.find((row) => row.owner === 1);
   const blueValue = calculatorRows.find((row) => row.owner === 2);
-  assert(redValue.steel === 100 && redValue.oil === 0, "army value counts visible units and visionOnly units");
-  assert(blueValue.steel === 300 && blueValue.oil === 150, "army value groups costs by owner");
+  assert(
+    redValue.steel === 100 && redValue.oil === 0,
+    "army value counts visible combat units and visionOnly units while excluding Engineers",
+  );
+  assert(
+    blueValue.steel === 300 && blueValue.oil === 150,
+    "army value groups costs by owner while excluding Golems",
+  );
   assert(calculatorRows.length === 2, "army value keeps known player rows only for known owners");
 
   const emptyRows = calculateViewportArmyValue({
@@ -602,7 +612,7 @@ import { textWithin } from "./dom_text.mjs";
           production: [],
           resourcesLost: { steel: 400, oil: 150 },
           resources: {
-            lifetime: { steel: 120, oil: 30 },
+            lifetime: { steel: 620, oil: 230 },
             last5s: { steel: 40, oil: 10 },
             lastMinute: { steel: 100, oil: 25 },
           },
@@ -613,7 +623,7 @@ import { textWithin } from "./dom_text.mjs";
           production: [],
           resourcesLost: { steel: 150, oil: 0 },
           resources: {
-            lifetime: { steel: 55, oil: 5 },
+            lifetime: { steel: 55, oil: 25 },
             last5s: { steel: 0, oil: 0 },
             lastMinute: { steel: 20, oil: 5 },
           },
@@ -626,8 +636,8 @@ import { textWithin } from "./dom_text.mjs";
         && resourcesText.includes("Lifetime")
         && resourcesText.includes("Last 5s")
         && resourcesText.includes("Last 1m")
-        && resourcesText.includes("120")
-        && resourcesText.includes("30"),
+        && resourcesText.includes("620")
+        && resourcesText.includes("230"),
       "resources tab renders lifetime, short-window, and minute mined-resource values",
     );
     const resourceGroups = findFakes(root, (el) => el.classList.contains("replay-resources-group"));
@@ -647,6 +657,30 @@ import { textWithin } from "./dom_text.mjs";
         && findFakes(root, (el) => el.classList.contains("replay-resources-oil"))
           .some((cell) => cell.querySelector(".oil")),
       "resources tab uses shared steel and oil icons",
+    );
+
+    restored.selectedTab = "alive-resources";
+    overlay.render();
+    const aliveResourcesText = textWithin(root);
+    assert(
+      aliveResourcesText.includes("Lifetime resources still alive")
+        && aliveResourcesText.includes("Lifetime mined resources minus dead unit value")
+        && aliveResourcesText.includes("Red")
+        && aliveResourcesText.includes("Blue"),
+      "alive resources tab explains and renders the derived metric for every player",
+    );
+    const aliveRows = findFakes(root, (el) => el.classList.contains("replay-alive-resources-row"));
+    assert(
+      aliveRows.length === 2
+        && aliveRows[0].querySelector(".replay-resources-lost-steel")
+          ?.querySelector(".resource-value-number")?.textContent === "220"
+        && aliveRows[0].querySelector(".replay-resources-lost-oil")
+          ?.querySelector(".resource-value-number")?.textContent === "80"
+        && aliveRows[1].querySelector(".replay-resources-lost-steel")
+          ?.querySelector(".resource-value-number")?.textContent === "-95"
+        && aliveRows[1].querySelector(".replay-resources-lost-oil")
+          ?.querySelector(".resource-value-number")?.textContent === "25",
+      "alive resources subtracts dead unit value from lifetime mined resources, including negative results",
     );
 
     restored.selectedTab = "resources-lost";
