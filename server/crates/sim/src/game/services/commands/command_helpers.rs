@@ -8,11 +8,7 @@ pub(super) fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryF
     }
 }
 
-pub(super) fn immediate_unit_can_replace(
-    entities: &EntityStore,
-    player: u32,
-    unit: u32,
-) -> bool {
+pub(super) fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
     unit_can_accept_player_command(entities, player, unit)
 }
 
