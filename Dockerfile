@@ -30,7 +30,7 @@ RUN test -s ./client/assets/snapshot-streams/supply-300-hellhole.rtsstream \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png \
     && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png \
-    && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png \
+    && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png \
     && test -s ./client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png \
     && test -s ./client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png \
     && test -s ./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png \
