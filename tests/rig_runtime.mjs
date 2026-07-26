@@ -1193,7 +1193,7 @@ test("frame-strip color profile applies shared and per-strip targets only when n
   assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
   assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
   assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), {
-    brightness: 145,
+    brightness: 140,
     saturation: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.saturation,
     hue: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.hue,
   });
