@@ -94,7 +94,11 @@ function atlasPortrait(atlas, teamColor) {
     };
   }
 
-  const sprite = representativeAtlasSprite(atlas.sprites);
+  // A component atlas is not necessarily a portrait atlas. Only use a component when it is the
+  // complete unit body; selecting a barrel or carriage merely because it is large produces a
+  // misleading icon. Support weapons without an assembled reference fall back to their complete
+  // authored SVG rig.
+  const sprite = atlas.sprites?.find?.((candidate) => candidate.id === "sprite.body");
   const baseFrame = sprite?.frame?.visibleBounds || sprite?.frame;
   const paletteFrame = sprite?.paletteFrames?.[teamColor];
   const frame = paletteFrame?.visibleBounds || paletteFrame || baseFrame;
@@ -118,20 +122,6 @@ function translatedVisibleFrame(visibleFrame, baseFrame, selectedFrame) {
     x: visibleFrame.x + finiteNumber(selectedFrame.x) - finiteNumber(baseFrame.x),
     y: visibleFrame.y + finiteNumber(selectedFrame.y) - finiteNumber(baseFrame.y),
   };
-}
-
-function representativeAtlasSprite(sprites) {
-  if (!Array.isArray(sprites)) return null;
-  const preferences = [
-    (sprite) => sprite.id === "sprite.body",
-    (sprite) => sprite.id?.includes("barrelAssembly.deployed"),
-    (sprite) => sprite.id?.includes("carriage.deployed"),
-  ];
-  for (const preferred of preferences) {
-    const sprite = sprites.find(preferred);
-    if (sprite) return sprite;
-  }
-  return sprites[0] || null;
 }
 
 function sourceAssetUrl(sourcePath, version = "") {

@@ -375,7 +375,7 @@ export function entrenchmentSelectionStatus(entity, state = null) {
 function selectionPanelSignature(entities, overflow, state = null) {
   if (!entities || entities.length === 0) return "empty";
   if (entities.length === 1) return `single:${selectionDetailSignature(entities[0], state)}`;
-  const selected = entities.map(selectionBudgetEntitySignature).join("|");
+  const selected = entities.map((entity) => selectionBudgetEntitySignature(entity, state)).join("|");
   const overflowSig = overflow
     ? `${numberSig(overflow.used)}:${numberSig(overflow.cap)}:${sigValue(overflow.seq)}`
     : "none";
@@ -437,12 +437,17 @@ function percent(value) {
   return `${Math.round(value * 100)}%`;
 }
 
-function selectionBudgetEntitySignature(entity) {
+function selectionBudgetEntitySignature(entity, state = null) {
   if (!entity) return "missing";
+  const ownerColor = state?.playerById?.(entity.owner)?.color ||
+    state?.players?.find?.((player) =>
+      Number(player?.id) === Number(entity.owner))?.color;
   return [
     sigValue(entity.id),
     sigValue(entity.kind),
     sigValue(entity.label),
+    sigValue(entity.owner),
+    sigValue(ownerColor),
   ].join(":");
 }
 

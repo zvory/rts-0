@@ -80,8 +80,9 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
     "unit icon resolver fits the live Tank PNG reference to its opaque silhouette",
   );
   assert(
-    liveUnitIconMarkupFor(KIND.ARTILLERY).includes('viewBox="664 640.4 835 235.2"'),
-    "unit icon resolver removes transparent atlas margins without clipping gun pixels",
+    liveUnitIconMarkupFor(KIND.ARTILLERY).includes('class="unit-rig-icon"') &&
+      liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN).includes('class="unit-rig-icon"'),
+    "component-only support-weapon atlases fall back to complete authored unit silhouettes",
   );
   const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);
   assert(

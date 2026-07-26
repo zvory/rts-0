@@ -163,16 +163,8 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "artillery",
   image: "/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png?v=a19-pass03-d485-spaced-team-tint",
-  iconVisibleBounds: {
-    x: 674,
-    y: 646,
-    w: 815,
-    h: 224,
-  },
   grid: {
     profile: "semantic-components",
-    width: 1536,
-    height: 1024,
     sourceSheet: "client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png",
     generatedSource: "client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-source.png",
     imageVersion: "a19-pass03-d485-spaced-team-tint",

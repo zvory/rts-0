@@ -452,7 +452,8 @@ export class HUD {
     if (!card) return;
     let descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext(frameViews));
     if (this.hotkeyProfiles) descriptorCard = this.hotkeyProfiles.resolveCard(descriptorCard);
-    const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}`;
+    const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}` +
+      `|unitIconColor:${this._selectedOwnerColor()}`;
     if (descriptorCard.kind === "spectator") {
       if (this._cardSig !== cardSig) {
         card.innerHTML = "";

@@ -12,11 +12,12 @@ withFakeHudDocument(({ FakeElement }) => {
   }));
   const iconMarkup = '<svg data-test-unit-icon="tank"></svg>';
   const iconOptions = [];
+  let teamColor = "#0072b2";
   const selectionPanel = new HudSelectionPanel(
     panel,
     {
       selectedEntities: () => tanks,
-      playerById: (id) => id === 1 ? { id: 1, color: "#0072b2" } : null,
+      playerById: (id) => id === 1 ? { id: 1, color: teamColor } : null,
     },
     null,
     (kind, options) => {
@@ -36,5 +37,12 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(
     iconOptions.every((options) => options?.teamColor === "#0072b2"),
     "HUD multi-selection icons receive their owning player's team color",
+  );
+
+  teamColor = "#d55e00";
+  selectionPanel.render();
+  assert(
+    iconOptions.at(-1)?.teamColor === "#d55e00",
+    "HUD multi-selection icons refresh when player color metadata changes",
   );
 });
