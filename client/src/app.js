@@ -36,6 +36,12 @@ import { applyMatchUnitRanges } from "./match_settings_toggles.js";
 import { readAutoSpectatorEnabled, writeAutoSpectatorEnabled } from "./auto_spectator_settings.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
+import {
+  applyExclusiveFullscreen,
+  exclusiveFullscreenSupported,
+  readExclusiveFullscreenEnabled,
+  writeExclusiveFullscreenEnabled,
+} from "./exclusive_fullscreen_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
 import { createAiDiagnosticsPanelPreferences } from "./ai_diagnostics_panel.js";
 import { ReplayViewer } from "./replay_viewer.js";
@@ -220,12 +226,17 @@ export class App {
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
+    this.onExclusiveFullscreenEscape = this.onExclusiveFullscreenEscape.bind(this);
+    this.onExclusiveFullscreenShellExit =
+      this.onExclusiveFullscreenShellExit.bind(this);
     this.onPlayerActivity = () => this.reportPlayerActivity();
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
     this.predictionEnabled = readPredictionEnabled();
     this.unitRangesEnabled = readUnitRangesEnabled();
+    this.exclusiveFullscreenEnabled = exclusiveFullscreenSupported() &&
+      readExclusiveFullscreenEnabled();
     this.autoSpectatorEnabled = readAutoSpectatorEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
@@ -255,9 +266,20 @@ export class App {
     dom.gameOverClose?.addEventListener("click", this.onCloseScorePanel);
     dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
     window.addEventListener("beforeunload", this.onBeforeUnload);
+    window.addEventListener("keydown", this.onExclusiveFullscreenEscape, true);
+    window.addEventListener(
+      "rts-exclusive-fullscreen-shell-exit",
+      this.onExclusiveFullscreenShellExit,
+    );
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     for (const eventName of PLAYER_ACTIVITY_EVENTS) {
       document.addEventListener(eventName, this.onPlayerActivity, { passive: true });
+    }
+    if (this.exclusiveFullscreenEnabled) {
+      await this.setExclusiveFullscreenEnabled(true, {
+        persist: false,
+        force: true,
+      });
     }
 
     void this.loadVersion();
@@ -811,9 +833,12 @@ export class App {
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
+        exclusiveFullscreenEnabled: this.exclusiveFullscreenEnabled,
         autoSpectatorEnabled: this.autoSpectatorEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
+        onExclusiveFullscreenEnabledChange: (enabled) =>
+          this.setExclusiveFullscreenEnabled(enabled),
         onAutoSpectatorEnabledChange: (enabled) => this.setAutoSpectatorEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
         aiDiagnosticsPanelPreferences: this.aiDiagnosticsPanelPreferences,
@@ -1145,6 +1170,15 @@ export class App {
             }),
             onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
           },
+          exclusiveFullscreen: {
+            state: () => ({
+              hidden: !exclusiveFullscreenSupported(),
+              supported: exclusiveFullscreenSupported(),
+              enabled: this.exclusiveFullscreenEnabled,
+            }),
+            onToggle: () =>
+              this.setExclusiveFullscreenEnabled(!this.exclusiveFullscreenEnabled),
+          },
         },
       }),
     });
@@ -1177,6 +1211,70 @@ export class App {
         this.mountLobbySettings();
         this.settings.open({ focus: false });
       }
+    }
+  }
+
+  async setExclusiveFullscreenEnabled(enabled, {
+    persist = true,
+    force = false,
+  } = {}) {
+    const next = !!enabled;
+    if (!exclusiveFullscreenSupported()) {
+      this.exclusiveFullscreenEnabled = false;
+      if (persist) writeExclusiveFullscreenEnabled(false);
+      return false;
+    }
+    if (!force && next === this.exclusiveFullscreenEnabled) return true;
+
+    const cursorExit = !next && this.match?.input?.pointerLocked
+      ? this.match.input.exitPointerLock()
+      : null;
+    try {
+      const snapshot = await applyExclusiveFullscreen(next);
+      if (cursorExit) await cursorExit;
+      if (next && snapshot?.active === false) {
+        throw new Error("Windows did not activate the requested display mode.");
+      }
+      this.exclusiveFullscreenEnabled = next;
+      if (persist) writeExclusiveFullscreenEnabled(next);
+      this.match?.setExclusiveFullscreenEnabled?.(next);
+      this.refreshSettingsAfterPreferenceChange();
+      return true;
+    } catch (err) {
+      this.exclusiveFullscreenEnabled = false;
+      writeExclusiveFullscreenEnabled(false);
+      this.match?.setExclusiveFullscreenEnabled?.(false);
+      this.refreshSettingsAfterPreferenceChange();
+      this.showToast(
+        `Fullscreen mode failed: ${err?.message || String(err)}`,
+      );
+      return false;
+    }
+  }
+
+  onExclusiveFullscreenEscape(ev) {
+    if (
+      ev.code !== "Escape" ||
+      ev.repeat ||
+      !this.exclusiveFullscreenEnabled
+    ) return;
+    void this.setExclusiveFullscreenEnabled(false);
+  }
+
+  onExclusiveFullscreenShellExit() {
+    this.exclusiveFullscreenEnabled = false;
+    writeExclusiveFullscreenEnabled(false);
+    this.match?.setExclusiveFullscreenEnabled?.(false);
+    this.refreshSettingsAfterPreferenceChange();
+  }
+
+  refreshSettingsAfterPreferenceChange() {
+    if (!this.settings?.isOpen()) return;
+    if (this.match?.mountSettings) {
+      this.match.mountSettings({ keepOpen: true });
+    } else {
+      this.mountLobbySettings();
+      this.settings.open({ focus: false });
     }
   }
 

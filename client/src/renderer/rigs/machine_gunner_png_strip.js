@@ -8,8 +8,8 @@ function deepFreeze(value) {
 export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "machine_gunner",
-  image: "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass01-halfres-rgba8",
-  imageVersion: "pass01-halfres-rgba8",
+  image: "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass02-white-clothing-rgba8",
+  imageVersion: "pass02-white-clothing-rgba8",
   frameWidth: 64,
   frameHeight: 64,
   frameCount: 15,
@@ -35,7 +35,7 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
     hue: 100,
   },
   targetColorAdjustment: {
-    brightness: 145,
+    brightness: 140,
     saturation: 118,
     hue: 100,
   },
@@ -49,6 +49,11 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
     fireRecoilSource: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-source.png",
     fireRecoilAlpha: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-alpha.png",
     fireRecoilStrip: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-strip.png",
+    preWhiteRuntimeStrip: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-prewhite-strip.png",
+    whiteCarryImagegen: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-carry-imagegen.png",
+    whiteDeployImagegen: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-deploy-imagegen.png",
+    whiteFireImagegen: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-fire-imagegen.png",
+    whiteRecolorMask: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-recolor-mask.png",
     runtimeStrip: "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
   },
 });

@@ -82,7 +82,13 @@ function desktopCursorAutoLockOptedOut(root = globalThis) {
 function desktopCursorAggressiveLockEnabled(root = globalThis) {
   const runtime = desktopRuntime(root);
   return runtime?.shell === "tauri" &&
-    runtime?.nativeCursorCapture === true &&
+    (
+      runtime?.nativeCursorCapture === true ||
+      (
+        runtime?.platform === "windows" &&
+        root?.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED === true
+      )
+    ) &&
     runtime?.aggressiveCursorLock !== false &&
     !desktopCursorAutoLockOptedOut(root);
 }
@@ -178,6 +184,9 @@ export class Match {
     this.backToLobbyHandler = options.onBackToLobby || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
     this.onUnitRangesEnabledChange = options.onUnitRangesEnabledChange;
+    this.onExclusiveFullscreenEnabledChange =
+      options.onExclusiveFullscreenEnabledChange || null;
+    this.exclusiveFullscreenEnabled = !!options.exclusiveFullscreenEnabled;
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
@@ -437,6 +446,8 @@ export class Match {
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
     this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
     this.onUnitRangeToggle = this.toggleUnitRangeOverlays.bind(this);
+    this.onExclusiveFullscreenToggle = () =>
+      this.onExclusiveFullscreenEnabledChange?.(!this.exclusiveFullscreenEnabled);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
     this.onPointerLockError = this.handlePointerLockError.bind(this);
     if (!this.replayViewer) {
@@ -935,6 +946,22 @@ export class Match {
 
   toggleUnitRangeOverlays() {
     toggleUnitRanges(this);
+  }
+
+  setExclusiveFullscreenEnabled(enabled) {
+    this.exclusiveFullscreenEnabled = !!enabled;
+    const shouldLock = this.shouldUseDesktopCursorAutoLock();
+    if (shouldLock && !this.desktopCursorAutoLockEnabled) {
+      this.desktopCursorAutoLockEnabled = true;
+      this.installDesktopCursorAutoLock();
+      this.scheduleDesktopCursorAutoLock(
+        "fullscreen-enabled",
+        DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS,
+      );
+    } else if (!shouldLock && this.desktopCursorAutoLockEnabled) {
+      this.teardownDesktopCursorAutoLock();
+    }
+    this.syncSettingsToggleUi();
   }
 
   handlePointerLockChange(locked) {

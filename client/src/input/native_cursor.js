@@ -11,7 +11,7 @@ export function _nativeCursorBounds() {
 }
 
 export function configureNativeCursorBounds() {
-  if (this._cursorLockMode !== "native-macos" || typeof this.desktopCursor?.configure !== "function") return;
+  if (!nativeCursorMode(this._cursorLockMode) || typeof this.desktopCursor?.configure !== "function") return;
   void this.desktopCursor.configure(this._nativeCursorBounds());
 }
 
@@ -29,12 +29,12 @@ export function _setNativeCursorPoint(detail) {
 export function _handleNativeCursorEvent(detail) {
   if (detail?.type === "capture" && detail.active === false) {
     this._nativeButtonsMask = 0;
-    if (this.pointerLocked && this._cursorLockMode === "native-macos") {
+    if (this.pointerLocked && nativeCursorMode(this._cursorLockMode)) {
       this._setCursorLockState(false, null);
     }
     return;
   }
-  if (!this.pointerLocked || this._cursorLockMode !== "native-macos") return;
+  if (!this.pointerLocked || !nativeCursorMode(this._cursorLockMode)) return;
 
   const p = this._setNativeCursorPoint(detail);
   updateNativeButtonsMask(this, detail);
@@ -108,4 +108,8 @@ function nativeButtonMask(button) {
   if (button === 2) return 2;
   if (button >= 3 && button < 31) return 2 ** button;
   return 0;
+}
+
+function nativeCursorMode(mode) {
+  return typeof mode === "string" && mode !== "browser";
 }

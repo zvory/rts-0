@@ -79,6 +79,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "sim_wasm_adapter.js": "model",
   "prediction_settings.js": "platform",
   "unit_range_settings.js": "platform",
+  "exclusive_fullscreen_settings.js": "platform",
   "auto_spectator_settings.js": "platform",
 
   "net.js": "transport",
@@ -208,7 +209,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Interact Phase 6 adds only the public fixed-capture lifecycle seam; its state machine lives
   // in match_fixed_capture.js so Match retains renderer/rAF ownership without absorbing the logic.
   // Render3D Phase 4 replaces direct Pixi construction with one injected selected-backend bundle.
-  "match.js": 48131,
+  // Windows exclusive fullscreen adds only the injected preference/autolock handoff at the Match
+  // seam; native display-mode and raw-input ownership remain isolated in the Tauri shell.
+  "match.js": 49147,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.
