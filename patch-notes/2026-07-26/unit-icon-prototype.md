@@ -6,8 +6,8 @@ _2026-07-26_
 
 ## Changes
 
-- Selection panels and training commands now show team-colored unit portraits from their live battlefield art.
+- Selection panels and training commands now show larger, team-colored portraits drawn from each unit’s battlefield art.
 
 ## Playtest watch
 
-- Check icon clarity, cropping, and team-color readability across all units.
+- Check portrait clarity, cropping, and team-color readability across all units.
