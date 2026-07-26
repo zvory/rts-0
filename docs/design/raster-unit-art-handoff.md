@@ -357,11 +357,13 @@ cheap checks before any generated atlas can be enabled.
   component atlas. The active runtime strip is brightened from the generated pass using
   the shared frame-strip target and `team-light` tint. Not final art: the anatomy and weapon hold
   still need another art pass, and the current runtime has no firing/recoil frame.
-- `machine-gunner-pass-01`: active experiment. Generated carry and setup/deployed sheets are kept
-  in raw color, and the client applies a per-unit `brightness: 145`, `saturation: 118`, `hue: 100`
-  frame-strip target at texture-load time so its runtime brightness can be tuned against Rifleman
-  and Tank without destructively rewriting the source art. The production strip uses 64px RGBA8
-  cells while the generated component sheets remain at source resolution.
+- `machine-gunner-pass-01`: active experiment, now using the pass-02 white-clothing recolor.
+  Built-in image generation identifies the uniform and backpack/bedroll material independently on
+  the carry, setup/deploy, and recoil sheets. A deterministic pipeline maps that semantic guide
+  into the 15-frame compact strip while preserving the old strip's alpha byte-for-byte, retaining
+  every unmasked RGB byte, and protecting the gun geometry in every pose. The client still applies
+  the per-unit `brightness: 140`, `saturation: 118`, `hue: 100` target at texture-load time so the
+  white base can be tuned against Rifleman and Tank without another destructive asset rewrite.
 - `mortar-png-pass-01`: active experiment. Generated as a three-cell M2 4.2-inch-inspired wheeled
   mortar sheet: assembled reference, carriage/frame/wheels component, and separate tube component.
   The checked-in alpha source is routed through `mortar_team_png_atlas.js`; the carriage and tube

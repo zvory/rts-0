@@ -26,3 +26,15 @@ used as the reference for the deploy-only generation.
   setup, and final deployed frames in one prompt unless there is a stronger reference sheet.
 - For firing recoil, keep the first and last frame visually aligned with frame 11 so the deployed
   idle pose does not pop when the recoil clip starts or finishes.
+
+## Pass 02 White Clothing Recolor
+
+Pass 02 sends the carry, setup/deploy, and firing/recoil sheets through built-in image generation
+independently. The model output is used as a semantic guide for the clothing and backpack/bedroll
+material only. `scripts/art/machine-gunner-white-pipeline.mjs` maps that guide back onto the compact
+15-frame runtime strip and writes an explicit approved recolor mask.
+
+The original pass-01 compact strip is retained as `generated/machine-gunner-pass-01-prewhite-strip.png`.
+The pipeline asserts that the output alpha is byte-identical, that every RGB byte outside the
+approved mask is unchanged, and that no protected weapon pixel changes. This keeps the generated
+recolor away from the gun and prevents silhouette or exterior-edge drift.
