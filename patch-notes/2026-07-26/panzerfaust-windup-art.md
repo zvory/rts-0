@@ -7,8 +7,8 @@ _2026-07-26_
 ## Changes
 
 - Panzerfaust units now visibly wind up before firing, with faster animation after Methamphetamines research.
-- Frame-strip units now animate movement while pursuing attack targets.
+- Units using frame-strip art now animate while pursuing attack targets.
 
 ## Playtest watch
 
-- Check wind-up timing stays synchronized with firing and pursuit transitions remain smooth.
+- Check wind-up timing stays synchronized with firing and pursuit animation remains smooth.
