@@ -21,6 +21,8 @@ mod ability_charges;
 mod anti_tank_gun_memory;
 mod building_memory;
 mod entities;
+#[cfg(test)]
+mod entities_tests;
 mod firing_reveal;
 pub(super) use building_memory::validate as validate_building_memory;
 pub(super) use entities::normalize_completed_tank_traps;
@@ -112,6 +114,7 @@ pub(super) fn validate_entities(
     for entity in &entities.entities {
         validate_entity(entity, entities.next_id, player_ids, world, tick, &mut ids)?;
     }
+    entities::validate_single_builders(&entities.entities)?;
     Ok(ids)
 }
 

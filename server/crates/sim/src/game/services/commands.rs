@@ -20,7 +20,7 @@ use crate::game::services::ability_orders::{
     self, caster_can_accept_order, launch_self_ability, launch_world_ability,
     order_or_launch_world_ability, tech_requirement_met,
 };
-use crate::game::services::construction::resumable_site_for_build_intent;
+use crate::game::services::construction::unattended_site_for_build_intent;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::order_execution::targeting::{
@@ -1894,7 +1894,7 @@ fn order_build(
     // Feedback only; construction repeats a stricter final-placement check at arrival.
     // Unit bodies can move away before the worker arrives, so only permanent blockers reject here.
     let can_resume_existing =
-        resumable_site_for_build_intent(map, entities, player, building, tile_x, tile_y).is_some();
+        unattended_site_for_build_intent(map, entities, player, building, tile_x, tile_y).is_some();
     if !can_resume_existing {
         match standability::building_site_status_for_build_intent(
             map, entities, building, tile_x, tile_y, worker,

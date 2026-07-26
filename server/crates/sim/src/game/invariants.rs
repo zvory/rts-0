@@ -258,6 +258,7 @@ impl Game {
         //    (transition windows where a target just died are allowed because
         //     death_system cleans them up on the same tick).
         // ------------------------------------------------------------------
+        let mut active_build_sites = Vec::new();
         for e in self.state.entities.iter() {
             if !e.is_unit() {
                 continue;
@@ -291,6 +292,11 @@ impl Game {
                     let Some(site) = e.order().build_site() else {
                         continue;
                     };
+                    assert!(
+                        !active_build_sites.contains(&site),
+                        "invariant: multiple workers are constructing site {site}"
+                    );
+                    active_build_sites.push(site);
                     if let Some(b) = self.state.entities.get(site) {
                         assert!(
                             b.is_building() && b.under_construction(),

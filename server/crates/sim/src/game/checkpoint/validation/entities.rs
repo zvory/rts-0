@@ -22,6 +22,23 @@ pub(super) fn validate_ownership(entity: &Entity) -> Result<(), CheckpointPayloa
     Ok(())
 }
 
+pub(super) fn validate_single_builders(entities: &[Entity]) -> Result<(), CheckpointPayloadError> {
+    let mut active_sites = BTreeSet::new();
+    for site in entities
+        .iter()
+        .filter(|entity| entity.hp > 0 && entity.is_unit())
+        .filter_map(|entity| entity.order().build_site())
+    {
+        if !active_sites.insert(site) {
+            return Err(CheckpointPayloadError::DuplicateId {
+                field: "entities.order.buildSite",
+                id: site,
+            });
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

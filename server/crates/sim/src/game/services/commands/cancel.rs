@@ -21,10 +21,10 @@ pub(super) fn apply(
         })?;
         let builders = entities
             .iter()
-            .filter(|entity| {
-                entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(building)
+            .filter_map(|entity| {
+                (entity.hp > 0 && entity.is_unit() && entity.order().build_site() == Some(building))
+                    .then_some(entity.id)
             })
-            .map(|entity| entity.id)
             .collect::<Vec<_>>();
         entities.remove(building)?;
         for builder in builders {
