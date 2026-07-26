@@ -102,6 +102,26 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
 }
 
 #[test]
+fn lab_map_draft_rejects_duplicate_base_resource_records() {
+    let mut game = new_game();
+    let mut draft = map_draft();
+    draft.base_sites.push(LabBaseSite {
+        x: 32,
+        y: 32,
+        steel_patches: 8,
+        oil_patches: 1,
+    });
+
+    let error = game
+        .apply_lab_op(LabOp::ApplyMapDraft(draft))
+        .expect_err("duplicate base coordinates must not silently overwrite resource counts");
+    assert!(matches!(
+        error,
+        LabError::InvalidMap { reason, .. } if reason.contains("duplicate base sites")
+    ));
+}
+
+#[test]
 fn lab_map_draft_rejects_blocked_base_protection_area() {
     let mut game = new_game();
     let mut draft = map_draft();

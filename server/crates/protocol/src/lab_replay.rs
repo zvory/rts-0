@@ -728,10 +728,16 @@ fn validate_map_container(
             )));
         }
     }
+    let mut base_sites = HashSet::with_capacity(scenario.map.data.base_sites.len());
     for site in &scenario.map.data.base_sites {
         if site.x >= size || site.y >= size {
             return Err(invalid(format!(
                 "{label}.map.data contains an out-of-bounds site"
+            )));
+        }
+        if !base_sites.insert((site.x, site.y)) {
+            return Err(invalid(format!(
+                "{label}.map.data contains duplicate base sites"
             )));
         }
         if site.steel_patches > crate::MAX_STEEL_PATCHES_PER_BASE

@@ -296,6 +296,11 @@ fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
     }
     assert_restore_invalid_map(too_many_starts, "start site count");
 
+    let mut duplicate_base_sites = checkpoint.clone();
+    let duplicate = duplicate_base_sites.map.data.base_sites[0];
+    duplicate_base_sites.map.data.base_sites.push(duplicate);
+    assert_restore_invalid_map(duplicate_base_sites, "duplicate base sites");
+
     let mut too_many_base_sites = checkpoint;
     let start = too_many_base_sites.map.data.starts[0];
     let base_site = crate::game::lab::LabScenarioBaseSite {

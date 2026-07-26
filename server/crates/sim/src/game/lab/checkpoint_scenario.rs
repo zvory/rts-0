@@ -3,12 +3,11 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use super::{LabEntityIdRemap, LabError};
-use crate::game::map::{
-    BaseResourceCounts, Map, MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE,
-};
+use crate::game::map::{BaseResourceCounts, Map};
 use crate::game::Game;
 use crate::game::MapMetadata;
 use crate::protocol::terrain;
+use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
 pub(super) const LAB_CHECKPOINT_SCENARIO_KIND: &str = "labCheckpointScenario";
@@ -225,11 +224,18 @@ impl LabCheckpointScenarioMap {
                 });
             }
         }
+        let mut base_sites = HashSet::with_capacity(self.data.base_sites.len());
         for site in &self.data.base_sites {
             if site.x >= size || site.y >= size {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),
                     reason: "checkpoint scenario map site is out of bounds".to_string(),
+                });
+            }
+            if !base_sites.insert((site.x, site.y)) {
+                return Err(LabError::InvalidMap {
+                    name: self.name.clone(),
+                    reason: "checkpoint scenario map contains duplicate base sites".to_string(),
                 });
             }
             if site.steel_patches > MAX_STEEL_PATCHES_PER_BASE

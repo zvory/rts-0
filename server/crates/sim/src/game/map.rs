@@ -14,6 +14,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 mod authored;
+mod base_resources;
+mod data;
 #[cfg(test)]
 mod team_assignment_tests;
 
@@ -22,7 +24,9 @@ use crate::protocol::terrain;
 use crate::rules::terrain as terrain_rules;
 use serde::{Deserialize, Serialize};
 
-pub use rts_protocol::{AvailableMap, MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
+pub use base_resources::BaseResourceCounts;
+pub use data::AuthoredMapData;
+pub use rts_protocol::AvailableMap;
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
 pub const CURRENT_MAP_VERSION: u32 = 4;
@@ -61,48 +65,6 @@ pub struct Map {
     pub base_sites: Vec<(u32, u32)>,
     /// Per-site resource counts. Hand-authored/dev maps without an entry use the live balance
     /// defaults so existing test helpers remain concise.
-    pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
-}
-
-/// Empty scaffold used by focused tests and dev fixtures through struct-update syntax.
-impl Default for Map {
-    fn default() -> Self {
-        Self {
-            size: 0,
-            terrain: Vec::new(),
-            starts: Vec::new(),
-            base_sites: Vec::new(),
-            base_resource_counts: HashMap::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BaseResourceCounts {
-    pub steel_patches: u32,
-    pub oil_patches: u32,
-}
-
-impl Default for BaseResourceCounts {
-    fn default() -> Self {
-        Self {
-            steel_patches: config::STEEL_PATCHES_PER_BASE,
-            oil_patches: config::OIL_PATCHES_PER_BASE,
-        }
-    }
-}
-
-/// Canonical materialization of an authored-map document before player starts are assigned.
-///
-/// HTTP/session boundaries use this to bind an untrusted authored document to an equivalent
-/// wire-format draft without maintaining a second copy of the authored-map decoder.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AuthoredMapData {
-    pub name: String,
-    pub size: u32,
-    pub terrain: Vec<u8>,
-    pub starts: Vec<(u32, u32)>,
-    pub base_sites: Vec<(u32, u32)>,
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
 }
 
@@ -226,13 +188,6 @@ impl Map {
             hash = fnv_bytes(hash, &counts.oil_patches.to_le_bytes());
         }
         format!("{hash:016x}")
-    }
-
-    pub fn resource_counts_at(&self, tile: (u32, u32)) -> BaseResourceCounts {
-        self.base_resource_counts
-            .get(&tile)
-            .copied()
-            .unwrap_or_default()
     }
 
     fn authored_json_for_name(map_name: &str) -> Result<(String, String), String> {

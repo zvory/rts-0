@@ -6,10 +6,10 @@ mod assignment;
 
 use super::{
     AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
-    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION, MAX_OIL_PATCHES_PER_BASE,
-    MAX_STEEL_PATCHES_PER_BASE,
+    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
+use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 /// Bound authored locations before any game entities are allocated from them. The game currently
 /// supports four active players, while a map can contain many more permanent resource bases.
