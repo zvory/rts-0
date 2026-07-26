@@ -20,6 +20,13 @@ import {
   DomClickInputZone,
   MatchInputRouter,
 } from "../../client/src/input/router.js";
+import {
+  applyExclusiveFullscreen,
+  exclusiveFullscreenPreferenceActive,
+  exclusiveFullscreenSupported,
+  readExclusiveFullscreenEnabled,
+  writeExclusiveFullscreenEnabled,
+} from "../../client/src/exclusive_fullscreen_settings.js";
 
 // ---------------------------------------------------------------------------
 // Control groups
@@ -722,20 +729,27 @@ import {
     __RTS_DESKTOP_RUNTIME: {
       shell: "tauri",
       platform: "windows",
-      nativeCursorBackend: false,
+      nativeCursorBackend: true,
       nativeCursorCapture: false,
       pointerLockDisabled: false,
-      aggressiveCursorLock: false,
+      aggressiveCursorLock: true,
+      exclusiveFullscreenSupported: true,
     },
     __TAURI__: tauriRoot.__TAURI__,
   };
+  const windowsBridge = installTauriNativeCursorBridge(windowsTauriRoot);
   assert(
-    installTauriNativeCursorBridge(windowsTauriRoot) === null,
-    "Windows Tauri runtime does not infer or install the macOS native cursor bridge",
+    windowsBridge?.backend === "native-windows-raw-input",
+    "Windows Tauri runtime installs the raw-input native cursor bridge",
   );
   assert(
-    windowsTauriRoot.__RTS_NATIVE_CURSOR === undefined,
-    "Windows Tauri runtime leaves the native cursor global absent",
+    nativeDesktopCursorBridge(windowsTauriRoot) === null,
+    "Windows raw-input cursor stays unavailable while fullscreen is opted out",
+  );
+  windowsTauriRoot.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED = true;
+  assert(
+    nativeDesktopCursorBridge(windowsTauriRoot) === windowsBridge,
+    "Windows raw-input cursor activates with the fullscreen preference",
   );
   const tauriOnlyRoot = { __TAURI__: tauriRoot.__TAURI__ };
   assert(
@@ -797,6 +811,59 @@ import {
   prefixedInput._exitBrowserPointerLock();
   assert(webkitExitCalled, "WebKit-prefixed Pointer Lock exit is called");
   globalThis.document = priorDocument;
+}
+
+// Windows exclusive fullscreen preference
+// ---------------------------------------------------------------------------
+{
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+  assert(!readExclusiveFullscreenEnabled(storage), "Windows fullscreen defaults off");
+  writeExclusiveFullscreenEnabled(true, storage);
+  assert(readExclusiveFullscreenEnabled(storage), "Windows fullscreen opt-in persists");
+  writeExclusiveFullscreenEnabled(false, storage);
+  assert(!readExclusiveFullscreenEnabled(storage), "Windows fullscreen opt-out clears persistence");
+
+  const calls = [];
+  const root = {
+    __RTS_DESKTOP_RUNTIME: {
+      shell: "tauri",
+      platform: "windows",
+      exclusiveFullscreenSupported: true,
+    },
+    __TAURI_INTERNALS__: {
+      invoke(command, payload) {
+        calls.push({ command, payload });
+        return Promise.resolve({
+          supported: true,
+          requested: payload.enabled,
+          active: payload.enabled,
+          mode: "windows-display-mode",
+        });
+      },
+    },
+  };
+  assert(exclusiveFullscreenSupported(root), "Windows Tauri runtime exposes fullscreen support");
+  const entered = await applyExclusiveFullscreen(true, root);
+  assert(entered.active, "fullscreen command reports the temporary display mode active");
+  assert(
+    calls[0].command === "desktop_set_exclusive_fullscreen" &&
+      calls[0].payload.enabled === true,
+    "fullscreen preference invokes the narrow Tauri command",
+  );
+  assert(
+    exclusiveFullscreenPreferenceActive(root),
+    "fullscreen preference activates the native-cursor gate",
+  );
+  await applyExclusiveFullscreen(false, root);
+  assert(
+    !exclusiveFullscreenPreferenceActive(root),
+    "fullscreen opt-out disables the native-cursor gate",
+  );
 }
 
 {

@@ -1,5 +1,6 @@
 const CURSOR_LOCK_BROWSER = "browser";
 const CURSOR_LOCK_NATIVE_MACOS = "native-macos";
+const CURSOR_LOCK_NATIVE_WINDOWS = "native-windows-raw-input";
 
 export function installedAppRuntime() {
   const standaloneDisplay = globalThis.matchMedia?.("(display-mode: standalone)")?.matches;
@@ -23,14 +24,21 @@ export function nativeBridgeSupported(bridge) {
 export function installTauriNativeCursorBridge(root = globalThis) {
   if (!root) return null;
   const existingBridge = root.__RTS_NATIVE_CURSOR;
+  if (nativeBridgeInstalled(existingBridge)) return existingBridge;
   if (nativeBridgeSupported(existingBridge)) return existingBridge;
-  if (!macosNativeCursorRuntime(root.__RTS_DESKTOP_RUNTIME)) return null;
+  const runtime = root.__RTS_DESKTOP_RUNTIME;
+  if (!nativeCursorRuntime(runtime)) return null;
   if (typeof tauriInvokeFn(root) !== "function") return null;
+  const backend = runtime.platform === "windows"
+    ? CURSOR_LOCK_NATIVE_WINDOWS
+    : CURSOR_LOCK_NATIVE_MACOS;
+  const supported = () => runtime.platform !== "windows" ||
+    root.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED === true;
 
   const listeners = new Set();
   const diagnostics = {
-    supported: true,
-    backend: CURSOR_LOCK_NATIVE_MACOS,
+    supported: supported(),
+    backend,
     active: false,
     visual: "dom-event-time",
     movementBatched: false,
@@ -88,8 +96,8 @@ export function installTauriNativeCursorBridge(root = globalThis) {
     }
   };
   const bridge = Object.freeze({
-    supported: () => true,
-    backend: CURSOR_LOCK_NATIVE_MACOS,
+    supported,
+    backend,
     visual: "dom-event-time",
     start: (bounds = {}) => invoke("maccursor_start", {
       x: toFiniteNumber(bounds.x, 0),
@@ -125,16 +133,20 @@ export function installTauriNativeCursorBridge(root = globalThis) {
     __dispatchNativeEvent: dispatchNativeEvent,
   });
   defineRuntimeGlobal(root, "__RTS_NATIVE_CURSOR", bridge);
-  disableBrowserPointerLockForNativeShell(root);
+  if (runtime.pointerLockDisabled === true) disableBrowserPointerLockForNativeShell(root);
   return root.__RTS_NATIVE_CURSOR === bridge ? bridge : nativeBridgeSupported(root.__RTS_NATIVE_CURSOR) ? root.__RTS_NATIVE_CURSOR : bridge;
 }
 
-function macosNativeCursorRuntime(runtime) {
+function nativeCursorRuntime(runtime) {
   return runtime?.shell === "tauri" &&
-    runtime?.platform === "macos" &&
     runtime?.nativeCursorBackend === true &&
-    runtime?.nativeCursorCapture === true &&
-    runtime?.pointerLockDisabled === true;
+    (
+      (runtime?.platform === "macos" &&
+        runtime?.nativeCursorCapture === true &&
+        runtime?.pointerLockDisabled === true) ||
+      (runtime?.platform === "windows" &&
+        runtime?.exclusiveFullscreenSupported === true)
+    );
 }
 
 export function cursorLockSupported(browserPointerLockSupported, nativeBridge = nativeDesktopCursorBridge()) {
@@ -160,7 +172,10 @@ export async function enterCursorLock(
       height: Number.isFinite(bounds?.height) ? bounds.height : 0,
     };
     const started = await nativeBridge.start(startBounds);
-    if (started?.active !== false) return started?.mode || CURSOR_LOCK_NATIVE_MACOS;
+    if (started?.active !== false) {
+      return started?.mode || started?.backend || nativeBridge.backend ||
+        CURSOR_LOCK_NATIVE_MACOS;
+    }
     if (nativeRequired) throw new Error("Native cursor capture did not activate.");
   }
   const browserLocked = await enterBrowserPointerLock();
@@ -170,7 +185,14 @@ export async function enterCursorLock(
 function nativeCursorRequired(root = globalThis) {
   installTauriNativeCursorBridge(root);
   const runtime = root?.__RTS_DESKTOP_RUNTIME;
-  return !!(runtime?.nativeCursorCapture || runtime?.pointerLockDisabled);
+  return !!(
+    runtime?.nativeCursorCapture ||
+    runtime?.pointerLockDisabled ||
+    (
+      runtime?.platform === "windows" &&
+      root?.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED === true
+    )
+  );
 }
 
 export async function exitCursorLock(
@@ -179,11 +201,23 @@ export async function exitCursorLock(
   nativeBridge = nativeDesktopCursorBridge(),
   reason = "js-stop",
 ) {
-  if (mode === CURSOR_LOCK_NATIVE_MACOS && nativeBridgeSupported(nativeBridge) && typeof nativeBridge.stop === "function") {
+  if (
+    mode &&
+    mode !== CURSOR_LOCK_BROWSER &&
+    (nativeBridgeSupported(nativeBridge) || nativeBridgeInstalled(nativeBridge)) &&
+    typeof nativeBridge.stop === "function"
+  ) {
     await nativeBridge.stop(reason);
     return;
   }
   exitBrowserPointerLock();
+}
+
+function nativeBridgeInstalled(bridge) {
+  return !!bridge &&
+    typeof bridge.start === "function" &&
+    typeof bridge.stop === "function" &&
+    typeof bridge.onEvent === "function";
 }
 
 export function nativeCursorDebugSnapshot(nativeBridge = nativeDesktopCursorBridge()) {

@@ -8,11 +8,17 @@ use std::{
 };
 
 mod diagnostics;
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg(target_os = "windows")]
+mod exclusive_fullscreen;
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 mod native_cursor;
 
 use diagnostics::{bounded_log_text, ShellDiagnostics, ShellLogInfo};
-#[cfg(target_os = "macos")]
+#[cfg(target_os = "windows")]
+use exclusive_fullscreen::{
+    desktop_exclusive_fullscreen_diagnostics, desktop_set_exclusive_fullscreen, ExclusiveFullscreen,
+};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use native_cursor::{
     maccursor_configure, maccursor_diagnostics, maccursor_start, maccursor_stop,
     NativeCursorBackend,
@@ -139,14 +145,31 @@ struct RuntimePolicy {
 
 impl RuntimePolicy {
     fn for_platform(platform: ShellPlatform) -> Self {
-        let native_cursor = platform == ShellPlatform::Macos;
-        Self {
-            platform,
-            native_cursor_backend: native_cursor,
-            native_cursor_capture: native_cursor,
-            pointer_lock_disabled: native_cursor,
-            aggressive_cursor_lock: native_cursor,
-            disable_native_drag_drop_handler: platform == ShellPlatform::Windows,
+        match platform {
+            ShellPlatform::Macos => Self {
+                platform,
+                native_cursor_backend: true,
+                native_cursor_capture: true,
+                pointer_lock_disabled: true,
+                aggressive_cursor_lock: true,
+                disable_native_drag_drop_handler: false,
+            },
+            ShellPlatform::Windows => Self {
+                platform,
+                native_cursor_backend: true,
+                native_cursor_capture: false,
+                pointer_lock_disabled: false,
+                aggressive_cursor_lock: true,
+                disable_native_drag_drop_handler: true,
+            },
+            ShellPlatform::Other => Self {
+                platform,
+                native_cursor_backend: false,
+                native_cursor_capture: false,
+                pointer_lock_disabled: false,
+                aggressive_cursor_lock: false,
+                disable_native_drag_drop_handler: false,
+            },
         }
     }
 
@@ -228,7 +251,20 @@ fn run() -> ShellResult<()> {
         desktop_log_client_event,
         desktop_open_profile
     ]);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        maccursor_start,
+        maccursor_configure,
+        maccursor_stop,
+        maccursor_diagnostics,
+        desktop_set_exclusive_fullscreen,
+        desktop_exclusive_fullscreen_diagnostics,
+        desktop_log_info,
+        desktop_reveal_logs,
+        desktop_log_client_event,
+        desktop_open_profile
+    ]);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         desktop_log_info,
         desktop_reveal_logs,
@@ -256,7 +292,14 @@ fn run() -> ShellResult<()> {
                         "invalid developer server URL from {SERVER_URL_ENV}: {err}"
                     ))
                 })?;
-            #[cfg(target_os = "macos")]
+            #[cfg(target_os = "windows")]
+            let exclusive_fullscreen = {
+                let exclusive_fullscreen =
+                    ExclusiveFullscreen::with_diagnostics(diagnostics.clone());
+                app.manage(exclusive_fullscreen.clone());
+                exclusive_fullscreen
+            };
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             let native_cursor = {
                 let native_cursor = NativeCursorBackend::with_diagnostics(diagnostics.clone());
                 app.manage(native_cursor.clone());
@@ -299,13 +342,18 @@ fn run() -> ShellResult<()> {
                 window_builder
             };
             let window = window_builder.build()?;
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
                 native_cursor.install(&window);
+            }
+            #[cfg(target_os = "macos")]
+            {
                 let _ = app
                     .handle()
                     .set_activation_policy(tauri::ActivationPolicy::Regular);
             }
+            #[cfg(target_os = "windows")]
+            let _ = exclusive_fullscreen;
             let _ = window.set_focus();
             Ok(())
         })
@@ -315,12 +363,30 @@ fn run() -> ShellResult<()> {
             }
             match event {
                 WindowEvent::Focused(false) => {
-                    #[cfg(target_os = "macos")]
+                    #[cfg(any(target_os = "macos", target_os = "windows"))]
                     let _ = window.state::<NativeCursorBackend>().stop("window blur");
+                    #[cfg(target_os = "windows")]
+                    if let Some(webview) = window.app_handle().get_webview_window(WINDOW_LABEL) {
+                        let _ = window
+                            .state::<ExclusiveFullscreen>()
+                            .suspend(&webview, "window blur");
+                    }
+                }
+                WindowEvent::Focused(true) => {
+                    #[cfg(target_os = "windows")]
+                    if let Some(webview) = window.app_handle().get_webview_window(WINDOW_LABEL) {
+                        let _ = window.state::<ExclusiveFullscreen>().resume(&webview);
+                    }
                 }
                 WindowEvent::CloseRequested { .. } => {
-                    #[cfg(target_os = "macos")]
+                    #[cfg(any(target_os = "macos", target_os = "windows"))]
                     let _ = window.state::<NativeCursorBackend>().stop("window closed");
+                    #[cfg(target_os = "windows")]
+                    if let Some(webview) = window.app_handle().get_webview_window(WINDOW_LABEL) {
+                        let _ = window
+                            .state::<ExclusiveFullscreen>()
+                            .shutdown(&webview, "window closed");
+                    }
                     window.app_handle().exit(0);
                 }
                 _ => {}
@@ -793,6 +859,7 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     nativeCursorCapture: {native_cursor_capture},
     pointerLockDisabled: {pointer_lock_disabled},
     aggressiveCursorLock: {aggressive_cursor_lock},
+    exclusiveFullscreenSupported: {exclusive_fullscreen_supported},
     autostart: {autostart},
     autolock: {autolock},
     serverMode: selectedProfile ? "release" : developerSelected ? "developer" : "startup",
@@ -806,8 +873,11 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
   }});
 
   const diagnostics = {{
-    supported: runtime.nativeCursorBackend,
-    backend: runtime.nativeCursorBackend ? "native-macos" : "browser-raw",
+    supported: runtime.nativeCursorBackend && (
+      runtime.platform !== "windows" || window.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED === true
+    ),
+    backend: runtime.platform === "windows" ? "native-windows-raw-input" :
+      runtime.nativeCursorBackend ? "native-macos" : "browser-raw",
     active: false,
     visual: runtime.nativeCursorBackend ? "dom-event-time" : null,
     movementBatched: false,
@@ -943,8 +1013,9 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
   }};
   Object.defineProperty(window, "__RTS_NATIVE_CURSOR", {{
     value: Object.freeze({{
-      supported: () => true,
-      backend: "native-macos",
+      supported: () => runtime.platform !== "windows" ||
+        window.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED === true,
+      backend: runtime.platform === "windows" ? "native-windows-raw-input" : "native-macos",
       visual: "dom-event-time",
       start: (bounds = {{}}) => invoke("maccursor_start", {{
         x: Number(bounds.x || 0),
@@ -985,12 +1056,14 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     writable: false
   }});
 
-  const elementProto = typeof Element !== "undefined" ? Element.prototype : null;
-  const htmlElementProto = typeof HTMLElement !== "undefined" ? HTMLElement.prototype : null;
-  replace(elementProto, "requestPointerLock");
-  replace(elementProto, "webkitRequestPointerLock");
-  replace(htmlElementProto, "requestPointerLock");
-  replace(htmlElementProto, "webkitRequestPointerLock");
+  if (runtime.pointerLockDisabled) {{
+    const elementProto = typeof Element !== "undefined" ? Element.prototype : null;
+    const htmlElementProto = typeof HTMLElement !== "undefined" ? HTMLElement.prototype : null;
+    replace(elementProto, "requestPointerLock");
+    replace(elementProto, "webkitRequestPointerLock");
+    replace(htmlElementProto, "requestPointerLock");
+    replace(htmlElementProto, "webkitRequestPointerLock");
+  }}
   /* RTS_NATIVE_CURSOR_END */
 
 {autostart_script}
@@ -1005,6 +1078,7 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
         native_cursor_capture = options.policy.native_cursor_capture,
         pointer_lock_disabled = options.policy.pointer_lock_disabled,
         aggressive_cursor_lock = options.policy.aggressive_cursor_lock,
+        exclusive_fullscreen_supported = options.policy.platform == ShellPlatform::Windows,
         autostart_script = autostart_script,
         autolock_script = autolock_script,
         default_profile_id = default_profile_id,
@@ -1386,7 +1460,7 @@ mod tests {
     }
 
     #[test]
-    fn windows_runtime_script_uses_raw_browser_pointer_lock_without_native_bridge() {
+    fn windows_runtime_script_exposes_opt_in_raw_input_bridge() {
         let policy = RuntimePolicy::for_platform(ShellPlatform::Windows);
         let script = desktop_runtime_script(&RuntimeScriptOptions {
             policy,
@@ -1397,18 +1471,21 @@ mod tests {
 
         assert!(policy.disable_native_drag_drop_handler);
         assert!(script.contains("platform: \"windows\""));
-        assert!(script.contains("nativeCursorBackend: false"));
+        assert!(script.contains("nativeCursorBackend: true"));
         assert!(script.contains("nativeCursorCapture: false"));
         assert!(script.contains("pointerLockDisabled: false"));
-        assert!(script.contains("aggressiveCursorLock: false"));
+        assert!(script.contains("aggressiveCursorLock: true"));
+        assert!(script.contains("exclusiveFullscreenSupported: true"));
         assert!(script.contains("__RTS_DESKTOP_RUNTIME"));
         assert!(script.contains("sameOriginTargetBlankUrl"));
         assert!(script.contains("desktop_log_client_event"));
-        assert!(!script.contains("__RTS_NATIVE_CURSOR"));
-        assert!(!script.contains("maccursor_start"));
-        assert!(!script.contains("requestPointerLock"));
-        assert!(!script.contains(NATIVE_CURSOR_SCRIPT_BEGIN));
-        assert!(!script.contains(NATIVE_CURSOR_SCRIPT_END));
+        assert!(script.contains("__RTS_NATIVE_CURSOR"));
+        assert!(script.contains("maccursor_start"));
+        assert!(script.contains("native-windows-raw-input"));
+        assert!(script.contains("__RTS_EXCLUSIVE_FULLSCREEN_ENABLED"));
+        assert!(script.contains("if (runtime.pointerLockDisabled)"));
+        assert!(script.contains(NATIVE_CURSOR_SCRIPT_BEGIN));
+        assert!(script.contains(NATIVE_CURSOR_SCRIPT_END));
     }
 
     #[test]

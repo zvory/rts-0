@@ -3,9 +3,11 @@ import {
   enterCursorLock,
   exitCursorLock,
   installedAppRuntime as detectInstalledAppRuntime,
+  nativeDesktopCursorBridge,
 } from "./cursor_lock.js";
 
 export function pointerLockSupported() {
+  refreshDesktopCursorBridge(this);
   return cursorLockSupported(this._browserPointerLockSupported(), this.desktopCursor);
 }
 
@@ -21,6 +23,7 @@ export function _prepareCursorLock() {
 }
 
 export function requestPointerLock() {
+  refreshDesktopCursorBridge(this);
   if (this.pointerLocked) {
     this._recordPointerLockTrace("attempt-skipped", { reason: "already-locked", mode: this._cursorLockMode });
     return Promise.resolve(true);
@@ -75,6 +78,15 @@ export function requestPointerLock() {
   });
   this._pointerLockRequestInFlight = trackedRequest;
   return trackedRequest;
+}
+
+function refreshDesktopCursorBridge(input) {
+  const bridge = nativeDesktopCursorBridge();
+  if (!bridge || bridge === input.desktopCursor) return;
+  input._removeNativeCursorListener?.();
+  input._removeNativeCursorListener = null;
+  input.desktopCursor = bridge;
+  input._installNativeCursorBridge?.();
 }
 
 export function exitPointerLock() {

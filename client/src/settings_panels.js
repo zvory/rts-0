@@ -81,9 +81,39 @@ export function buildPauseAction({ visible, disabled = false, label = "Pause", t
 function renderGamePanel(root, game) {
   root.classList.add("settings-game-panel");
   if (game?.prediction) renderPredictionControl(root, game.prediction);
+  if (game?.exclusiveFullscreen) {
+    renderExclusiveFullscreenControl(root, game.exclusiveFullscreen);
+  }
   if (game?.pointerLock) renderPointerLockControl(root, game.pointerLock);
   if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
   renderContextSummary(root, game);
+}
+
+function renderExclusiveFullscreenControl(root, exclusiveFullscreen) {
+  const button = document.createElement("button");
+  button.id = "exclusive-fullscreen-toggle";
+  button.type = "button";
+  button.className = "settings-toggle";
+  button.setAttribute("role", "switch");
+  button.addEventListener("click", () => {
+    exclusiveFullscreen.onToggle?.();
+    sync();
+  });
+  root.appendChild(button);
+
+  function sync() {
+    const state = exclusiveFullscreen.state?.() || {};
+    const enabled = !!state.enabled;
+    button.hidden = !!state.hidden;
+    button.disabled = state.supported === false;
+    button.setAttribute("aria-checked", String(enabled));
+    button.textContent = enabled
+      ? "Use fullscreen mode: on"
+      : "Use fullscreen mode: off";
+    button.title = "Use temporary Windows display-mode fullscreen with native raw mouse input.";
+  }
+  sync();
+  exclusiveFullscreen.onMount?.(sync);
 }
 
 function renderPredictionControl(root, prediction) {

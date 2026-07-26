@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-desktop-exclusive-fullscreen-diagnostics"
+description = "Enables the desktop_exclusive_fullscreen_diagnostics command without any pre-configured scope."
+commands.allow = ["desktop_exclusive_fullscreen_diagnostics"]
+
+[[permission]]
+identifier = "deny-desktop-exclusive-fullscreen-diagnostics"
+description = "Denies the desktop_exclusive_fullscreen_diagnostics command without any pre-configured scope."
+commands.deny = ["desktop_exclusive_fullscreen_diagnostics"]
