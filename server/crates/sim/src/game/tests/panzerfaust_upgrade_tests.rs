@@ -122,6 +122,54 @@ fn riflemen_never_receive_panzerfaust_state() {
 }
 
 #[test]
+fn snapshot_windup_progress_tracks_normal_and_methamphetamines_timing() {
+    let progress_after_ticks = |has_methamphetamines: bool| {
+        let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+        if has_methamphetamines {
+            game.state.players[0]
+                .upgrades
+                .insert(upgrade::UpgradeKind::Methamphetamines);
+        }
+        enqueue_attack(&mut game, panzerfaust, tank, false);
+        for _ in 0..5 {
+            game.tick();
+        }
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .find(|entity| entity.id == panzerfaust)
+            .and_then(|entity| entity.panzerfaust_windup_progress)
+            .expect("Panzerfaust should expose wind-up progress")
+    };
+
+    let normal = progress_after_ticks(false);
+    let methamphetamines = progress_after_ticks(true);
+    assert!((normal - 4.0 / 15.0).abs() < f32::EPSILON);
+    assert!((methamphetamines - 4.0 / 12.0).abs() < f32::EPSILON);
+    assert!(
+        methamphetamines > normal,
+        "the same elapsed ticks should advance the researched wind-up farther"
+    );
+
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    for _ in 0..5 {
+        game.tick();
+    }
+    game.state.players[0]
+        .upgrades
+        .insert(upgrade::UpgradeKind::Methamphetamines);
+    let progress_after_mid_windup_research = game
+        .snapshot_for(1)
+        .entities
+        .iter()
+        .find(|entity| entity.id == panzerfaust)
+        .and_then(|entity| entity.panzerfaust_windup_progress)
+        .expect("Panzerfaust should retain wind-up progress");
+    assert!((progress_after_mid_windup_research - normal).abs() < f32::EPSILON);
+}
+
+#[test]
 fn panzerfaust_fires_once_at_a_tank_and_stays_the_same_unit() {
     let (mut game, rifleman, tank) = panzerfaust_fixture();
     let starting_hp = game.state.entities.get(tank).expect("tank").hp;

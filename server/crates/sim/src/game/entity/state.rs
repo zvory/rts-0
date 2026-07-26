@@ -316,7 +316,11 @@ impl CombatState {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PanzerfaustState {
     Loaded,
-    Windup { target: u32, ticks_remaining: u16 },
+    Windup {
+        target: u32,
+        ticks_remaining: u16,
+        total_ticks: u16,
+    },
     Spent,
 }
 

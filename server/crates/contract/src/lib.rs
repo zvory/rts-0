@@ -579,6 +579,9 @@ pub struct EntityView {
     pub weapon_range_tiles: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panzerfaust_loaded: Option<bool>,
+    /// Normalized 0..1 progress while a visible Panzerfaust is winding up its loaded shot.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panzerfaust_windup_progress: Option<f32>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_kind: Option<String>,
@@ -680,6 +683,7 @@ impl EntityView {
             weapon_facing: None,
             weapon_range_tiles: None,
             panzerfaust_loaded: None,
+            panzerfaust_windup_progress: None,
             prod_kind: None,
             prod_upgrade: None,
             prod_upgrade_queue: Vec::new(),

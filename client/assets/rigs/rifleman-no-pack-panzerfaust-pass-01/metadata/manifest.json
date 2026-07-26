@@ -15,6 +15,12 @@
       "alpha": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-panzerfaust-back-alpha.png",
       "runtimeAlignedColorPreview": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-panzerfaust-back-runtime-aligned-color.png",
       "prompt": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/metadata/prompt-rifleman-panzerfaust-back.md"
+    },
+    "panzerfaustWindup": {
+      "runtimeFrames": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-frames.png",
+      "prompt": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/metadata/prompt-panzerfaust-windup.md",
+      "selection": "Set A",
+      "linearScalePercent": 60
     }
   },
   "references": {
@@ -53,6 +59,7 @@
     "fps": 8,
     "worldScale": 0.34,
     "originForwardPx": 10,
+    "windupOriginForwardPx": 0,
     "firingRecoilPx": 4,
     "tintSlot": "team-light",
     "bakedColorAdjustment": {"brightness": 100, "saturation": 100, "hue": 100},
@@ -63,18 +70,23 @@
       "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png"
     },
     "panzerfaustLoaded": {
-      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png?v=recoil-review-1-rgba8",
-      "imageVersion": "recoil-review-1-rgba8",
-      "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-recoil-review-strip.png",
+      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png?v=windup-a-scaled-60-rgba8",
+      "imageVersion": "windup-a-scaled-60-rgba8",
+      "frameCount": 8,
+      "windupFrames": [5, 6, 7],
+      "windupProgressField": "panzerfaustWindupProgress",
+      "windupOriginForwardPx": 0,
+      "windupSource": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-frames.png",
+      "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png",
       "routeKey": "rifleman.panzerfaustLoaded"
     }
   },
   "notes": [
     "The no-pack preview matches the production idle frame's opaque bounding box exactly.",
     "The Panzerfaust variant uses the same full-canvas transform as the no-pack variant, preserving the underlying soldier anchor while allowing the oversized launcher to expand the silhouette.",
-    "The four-frame no-pack strip is the live ordinary and spent Rifleman route.",
-    "The composited four-frame launcher strip is live only while panzerfaustLoaded is true; launch immediately returns the same entity to the normal strip.",
+    "The five-frame no-pack strip is the live ordinary and spent Rifleman route.",
+    "The composited eight-frame launcher strip is live only while panzerfaustLoaded is true; launch immediately returns the same entity to the normal strip.",
     "Both strips use a 70% runtime brightness target to reduce the white-source luminance before team tinting.",
-    "Firing/recoil frames are intentionally deferred to the next art pass."
+    "The loaded Panzerfaust runtime appends three scale-matched wind-up frames selected from Set A; the rifle is absent throughout the wind-up."
   ]
 }

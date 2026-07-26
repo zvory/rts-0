@@ -11,7 +11,7 @@ use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     active_trench_occupation, fires_while_moving, supports_manual_emplacement,
     tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore, GatherPhase, Order,
-    OrderIntent, PanzerfaustState,
+    OrderIntent,
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
@@ -23,6 +23,7 @@ use crate::protocol::{EntityView, OrderPlanMarker};
 use super::projection_abilities::{
     active_ability_object_expires_in, active_return_object_id, return_available_tick,
 };
+use super::projection_panzerfaust::project_panzerfaust_state;
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
@@ -307,18 +308,7 @@ pub fn project_entity(
                 Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
     }
-    if entity.kind == EntityKind::Panzerfaust {
-        view.panzerfaust_loaded = entity
-            .combat
-            .as_ref()
-            .and_then(|combat| combat.panzerfaust)
-            .map(|state| {
-                matches!(
-                    state,
-                    PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }
-                )
-            });
-    }
+    project_panzerfaust_state(entity, &mut view);
     let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();
     let active_combat_target =
         matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_)) || acquired_combat_target;

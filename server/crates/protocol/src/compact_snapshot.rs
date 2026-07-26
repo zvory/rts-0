@@ -700,6 +700,9 @@ impl Serialize for CompactEntity<'_> {
         if !entity.prod_upgrade_queue.is_empty() {
             len = 41;
         }
+        if entity.panzerfaust_windup_progress.is_some() {
+            len = 42;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -838,6 +841,9 @@ impl Serialize for CompactEntity<'_> {
                     .map(|upgrade| upgrade_code(upgrade))
                     .collect::<Vec<_>>(),
             )?;
+        }
+        if len > 41 {
+            seq.serialize_element(&entity.panzerfaust_windup_progress)?;
         }
         seq.end()
     }
