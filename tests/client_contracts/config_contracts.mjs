@@ -197,7 +197,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   );
   assert(
     STATS[KIND.CITY_CENTRE].cost.steel === 450 &&
-      STATS[KIND.CITY_CENTRE].cost.oil === 150 &&
+      STATS[KIND.CITY_CENTRE].cost.oil === 100 &&
       STATS[KIND.CITY_CENTRE].buildTicks === 750,
     "City Centre cost and build time mirror server",
   );
@@ -253,7 +253,12 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
     STATS[KIND.BARRACKS].requires === KIND.CITY_CENTRE,
     "Barracks should require a City Centre in the command card",
   );
-  assert(STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre build time mirrors server");
+  assert(
+    STATS[KIND.TRAINING_CENTRE].cost.steel === 100 &&
+      STATS[KIND.TRAINING_CENTRE].cost.oil === 25 &&
+      STATS[KIND.TRAINING_CENTRE].buildTicks === 560,
+    "Training Centre cost and build time mirror server",
+  );
   assert(
     STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),
     "Vehicle Works should require a City Centre in the command card",
