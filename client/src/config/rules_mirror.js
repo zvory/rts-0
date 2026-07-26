@@ -164,7 +164,7 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 450, oil: 150 }, buildTicks: 750, trains: [KIND.WORKER] },
+    cost: { steel: 450, oil: 100 }, buildTicks: 750, trains: [KIND.WORKER] },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -172,7 +172,7 @@ export const STATS = Object.freeze({
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.PANZERFAUST], requires: KIND.CITY_CENTRE },
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 1,
-    cost: { steel: 100, oil: 50 }, buildTicks: 560, trains: [],
+    cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.METHAMPHETAMINES, UPGRADE.PANZERFAUSTS, UPGRADE.ENTRENCHMENT],
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.RESEARCH_COMPLEX]: { label: "R&D Complex", icon: "RD", footW: 3, footH: 3, sight: 1,
