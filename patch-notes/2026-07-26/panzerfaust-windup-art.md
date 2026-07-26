@@ -6,9 +6,9 @@ _2026-07-26_
 
 ## Changes
 
-- Panzerfaust units now visibly wind up before firing, with faster animation after Methamphetamines research.
+- Panzerfaust troops now visibly wind up before firing, reflecting Methamphetamines' faster timing.
 - Frame-strip units now animate while pursuing attack targets.
 
 ## Playtest watch
 
-- Check wind-up timing stays synchronized with firing and pursuit animation remains smooth.
+- Check wind-up visuals stay synchronized with firing and pursuit animation remains smooth.
