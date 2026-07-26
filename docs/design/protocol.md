@@ -757,7 +757,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 46. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 47. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -783,7 +783,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 46,
+  "v": 47,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -910,9 +910,8 @@ normal Rifleman art. It is omitted for Riflemen and all other entities.
 `panzerfaustWindupProgress` is present only while a visible Panzerfaust is in its cancellable loaded
 shot wind-up. It is an authoritative normalized `0..1` value using that owner's actual 15-tick
 wind-up, or 12 ticks with Methamphetamines, so renderers can select wind-up frames without receiving
-private upgrade state. It is appended as an optional trailing compact entity slot; compact snapshot
-version 46 remains compatible because older decoders ignore the tail and newer decoders tolerate
-its absence.
+private upgrade state. It is appended as an optional trailing compact entity slot in compact
+snapshot version 47.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center and source Command Car id; enemy projections that can see the plane omit
 this state. Scout Plane

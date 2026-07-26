@@ -137,14 +137,6 @@ impl Game {
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
                     ability_runtime: Some(&self.state.ability_runtime),
-                    panzerfaust_windup_total_ticks: if self
-                        .player(e.owner)
-                        .is_some_and(|p| p.has_upgrade(upgrade::UpgradeKind::Methamphetamines))
-                    {
-                        config::METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS
-                    } else {
-                        config::PANZERFAUST_WINDUP_TICKS
-                    },
                     tick: self.state.tick,
                 },
             ) {
@@ -348,14 +340,6 @@ impl Game {
                     teams: Some(teams),
                     owner_faction_id: self.player(entity.owner).map(|p| p.faction_id.as_str()),
                     ability_runtime: Some(&self.state.ability_runtime),
-                    panzerfaust_windup_total_ticks: if self
-                        .player(entity.owner)
-                        .is_some_and(|p| p.has_upgrade(upgrade::UpgradeKind::Methamphetamines))
-                    {
-                        config::METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS
-                    } else {
-                        config::PANZERFAUST_WINDUP_TICKS
-                    },
                     tick: self.state.tick,
                 },
             )

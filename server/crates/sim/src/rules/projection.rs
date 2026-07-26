@@ -43,7 +43,6 @@ pub struct EntityProjectionContext<'a> {
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
     pub ability_runtime: Option<&'a AbilityRuntime>,
-    pub panzerfaust_windup_total_ticks: u16,
     pub tick: u32,
 }
 
@@ -309,10 +308,7 @@ pub fn project_entity(
         }
     }
     if entity.kind == EntityKind::Panzerfaust {
-        let panzerfaust_state = entity
-            .combat
-            .as_ref()
-            .and_then(|combat| combat.panzerfaust);
+        let panzerfaust_state = entity.combat.as_ref().and_then(|combat| combat.panzerfaust);
         view.panzerfaust_loaded = panzerfaust_state.map(|state| {
             matches!(
                 state,
@@ -320,10 +316,12 @@ pub fn project_entity(
             )
         });
         if let Some(PanzerfaustState::Windup {
-            ticks_remaining, ..
+            ticks_remaining,
+            total_ticks,
+            ..
         }) = panzerfaust_state
         {
-            let total = context.panzerfaust_windup_total_ticks.max(1);
+            let total = total_ticks.max(1);
             let elapsed = total.saturating_sub(ticks_remaining);
             view.panzerfaust_windup_progress =
                 Some((elapsed as f32 / total as f32).clamp(0.0, 1.0));
@@ -872,7 +870,6 @@ mod tests {
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
                 ability_runtime: None,
-                panzerfaust_windup_total_ticks: config::PANZERFAUST_WINDUP_TICKS,
                 tick: 0,
             },
         )
@@ -906,7 +903,6 @@ mod tests {
                     teams: Some(&teams),
                     owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
                     ability_runtime: None,
-                    panzerfaust_windup_total_ticks: config::PANZERFAUST_WINDUP_TICKS,
                     tick: 0,
                 },
             )

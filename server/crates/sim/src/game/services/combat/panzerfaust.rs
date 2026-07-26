@@ -114,6 +114,7 @@ fn handle_loaded_combat(
     let clear_shot = panzerfaust_target_fireable(&fire_context, id, owner, target);
     if distance <= range_px && clear_shot {
         if let Some(attacker) = entities.get_mut(id) {
+            let total_ticks = windup_ticks(methamphetamines_researched(owner));
             if target_angle.is_finite() {
                 attacker.set_facing(target_angle);
                 mirror_weapon_to_body(attacker, target_angle);
@@ -125,7 +126,8 @@ fn handle_loaded_combat(
                 attacker,
                 PanzerfaustState::Windup {
                     target,
-                    ticks_remaining: windup_ticks(methamphetamines_researched(owner)),
+                    ticks_remaining: total_ticks,
+                    total_ticks,
                 },
             );
         }

@@ -39,6 +39,7 @@ pub(in crate::game::services::combat) fn tick_states(
             PanzerfaustState::Windup {
                 target,
                 ticks_remaining,
+                total_ticks,
             } => tick_windup(
                 map,
                 entities,
@@ -53,6 +54,7 @@ pub(in crate::game::services::combat) fn tick_states(
                 id,
                 target,
                 ticks_remaining,
+                total_ticks,
                 methamphetamines_researched,
             ),
             PanzerfaustState::Spent => {}
@@ -75,6 +77,7 @@ fn tick_windup(
     id: u32,
     target: u32,
     ticks_remaining: u16,
+    total_ticks: u16,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
 ) {
     let Some((owner, ax, ay, target_angle)) = entities.get(id).and_then(|attacker| {
@@ -118,6 +121,7 @@ fn tick_windup(
                 PanzerfaustState::Windup {
                     target,
                     ticks_remaining: ticks_remaining - 1,
+                    total_ticks,
                 },
             );
         }

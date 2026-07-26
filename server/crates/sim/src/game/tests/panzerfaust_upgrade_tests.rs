@@ -150,6 +150,23 @@ fn snapshot_windup_progress_tracks_normal_and_methamphetamines_timing() {
         methamphetamines > normal,
         "the same elapsed ticks should advance the researched wind-up farther"
     );
+
+    let (mut game, panzerfaust, tank) = panzerfaust_fixture();
+    enqueue_attack(&mut game, panzerfaust, tank, false);
+    for _ in 0..5 {
+        game.tick();
+    }
+    game.state.players[0]
+        .upgrades
+        .insert(upgrade::UpgradeKind::Methamphetamines);
+    let progress_after_mid_windup_research = game
+        .snapshot_for(1)
+        .entities
+        .iter()
+        .find(|entity| entity.id == panzerfaust)
+        .and_then(|entity| entity.panzerfaust_windup_progress)
+        .expect("Panzerfaust should retain wind-up progress");
+    assert!((progress_after_mid_windup_research - normal).abs() < f32::EPSILON);
 }
 
 #[test]
