@@ -6,6 +6,7 @@ import { createLivePngRigAtlases } from "./png_routing.js";
 const LIVE_FRAME_STRIPS = createLiveFrameStrips();
 const LIVE_PNG_ATLASES = createLivePngRigAtlases();
 const ICON_FRAME_ZOOM = 1.5;
+const ICON_VISIBLE_PADDING_RATIO = 0.08;
 
 /**
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
@@ -15,17 +16,26 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
   const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
   if (strip) {
+    const frameX = strip.frameWidth * (strip.idleFrame || 0);
     return rasterIconMarkup({
       source: "frame-strip",
       image: strip.image,
       sheetWidth: strip.frameWidth * strip.frameCount,
       sheetHeight: strip.frameHeight,
       frame: {
-        x: strip.frameWidth * (strip.idleFrame || 0),
+        x: frameX,
         y: 0,
         w: strip.frameWidth,
         h: strip.frameHeight,
       },
+      visibleFrame: strip.iconVisibleBounds
+        ? {
+            x: frameX + strip.iconVisibleBounds.x,
+            y: strip.iconVisibleBounds.y,
+            w: strip.iconVisibleBounds.w,
+            h: strip.iconVisibleBounds.h,
+          }
+        : null,
       teamTint: !!strip.tintSlot,
       teamColor,
     });
@@ -114,6 +124,7 @@ function rasterIconMarkup({
   sheetWidth,
   sheetHeight,
   frame,
+  visibleFrame = null,
   teamTint = false,
   teamColor = "#0072b2",
 }) {
@@ -127,10 +138,15 @@ function rasterIconMarkup({
   };
   if (!image || !safeSheetWidth || !safeSheetHeight || !safeFrame.w || !safeFrame.h) return "";
 
-  const viewWidth = safeFrame.w / ICON_FRAME_ZOOM;
-  const viewHeight = safeFrame.h / ICON_FRAME_ZOOM;
-  const viewX = safeFrame.x + (safeFrame.w - viewWidth) / 2;
-  const viewY = safeFrame.y + (safeFrame.h - viewHeight) / 2;
+  const safeVisibleFrame = visibleFrame && {
+    x: finiteNumber(visibleFrame.x),
+    y: finiteNumber(visibleFrame.y),
+    w: positiveDimension(visibleFrame.w),
+    h: positiveDimension(visibleFrame.h),
+  };
+  const viewFrame = safeVisibleFrame?.w && safeVisibleFrame?.h
+    ? paddedVisibleFrame(safeFrame, safeVisibleFrame)
+    : centeredZoomFrame(safeFrame);
   const tintColor = normalizeTeamColor(teamColor);
   const tintId = `unit-icon-tint-${tintColor.slice(1).toLowerCase()}`;
   const tintFilter = teamTint
@@ -144,13 +160,39 @@ function rasterIconMarkup({
   return (
     `<svg class="unit-raster-icon${teamTint ? " team-tinted" : ""}" ` +
       `data-unit-icon-source="${source}" aria-hidden="true" focusable="false" ` +
-      `viewBox="${number(viewX)} ${number(viewY)} ${number(viewWidth)} ${number(viewHeight)}" ` +
+      `viewBox="${number(viewFrame.x)} ${number(viewFrame.y)} ${number(viewFrame.w)} ${number(viewFrame.h)}" ` +
       `preserveAspectRatio="xMidYMid meet" style="overflow:hidden">` +
       tintFilter +
       `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
         `height="${number(safeSheetHeight)}" preserveAspectRatio="none"${imageFilter} />` +
     `</svg>`
   );
+}
+
+function paddedVisibleFrame(frame, visibleFrame) {
+  const padX = visibleFrame.w * ICON_VISIBLE_PADDING_RATIO;
+  const padY = visibleFrame.h * ICON_VISIBLE_PADDING_RATIO;
+  const left = Math.max(frame.x, visibleFrame.x - padX);
+  const top = Math.max(frame.y, visibleFrame.y - padY);
+  const right = Math.min(frame.x + frame.w, visibleFrame.x + visibleFrame.w + padX);
+  const bottom = Math.min(frame.y + frame.h, visibleFrame.y + visibleFrame.h + padY);
+  return {
+    x: left,
+    y: top,
+    w: right - left,
+    h: bottom - top,
+  };
+}
+
+function centeredZoomFrame(frame) {
+  const w = frame.w / ICON_FRAME_ZOOM;
+  const h = frame.h / ICON_FRAME_ZOOM;
+  return {
+    x: frame.x + (frame.w - w) / 2,
+    y: frame.y + (frame.h - h) / 2,
+    w,
+    h,
+  };
 }
 
 function positiveDimension(value) {

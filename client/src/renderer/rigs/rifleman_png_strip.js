@@ -14,6 +14,12 @@ export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   frameHeight: 112,
   frameCount: 5,
   idleFrame: 0,
+  iconVisibleBounds: {
+    x: 20,
+    y: 27,
+    w: 131,
+    h: 57,
+  },
   movementFrames: [1, 2, 3],
   firingFrames: [4],
   firingWeaponKinds: ["rifleman_rifle"],

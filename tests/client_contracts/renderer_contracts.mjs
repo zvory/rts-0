@@ -37,11 +37,16 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
   assert(
     riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
       riflemanIcon.includes("rifleman-recoil-review-strip.png") &&
-      riflemanIcon.includes('viewBox="26.6667 18.6667 106.6667 74.6667"') &&
+      riflemanIcon.includes('viewBox="9.52 22.44 150.48 66.12"') &&
       riflemanIcon.includes('flood-color="#0072b2"') &&
       riflemanIcon.includes('style="overflow:hidden"') &&
       !riflemanIcon.includes("<img"),
-    "unit icon resolver hard-crops and zooms one live Rifleman PNG frame",
+    "unit icon resolver fits the live Rifleman PNG silhouette without exposing adjacent frames",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="0 0 160 105.36"') &&
+      liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="0 7.72 64 47.56"'),
+    "unit icon resolver independently fits each production PNG silhouette",
   );
   assert(
     liveUnitIconMarkupFor(KIND.RIFLEMAN, { teamColor: "#d55e00" })
