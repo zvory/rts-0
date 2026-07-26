@@ -38,6 +38,8 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
     riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
       riflemanIcon.includes("rifleman-recoil-review-strip.png") &&
       riflemanIcon.includes('viewBox="9.52 22.44 150.48 66.12"') &&
+      riflemanIcon.includes('width="150.48" height="66.12"') &&
+      riflemanIcon.includes('preserveAspectRatio="xMidYMid meet"') &&
       riflemanIcon.includes('flood-color="#0072b2"') &&
       riflemanIcon.includes('style="overflow:hidden"') &&
       !riflemanIcon.includes("<img"),

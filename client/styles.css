@@ -3260,6 +3260,14 @@ input[type="text"]:focus {
   overflow: visible;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.78));
 }
+#selected-panel .sel-budget-block .unit-raster-icon {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
 #selected-panel .sel-single[data-selection-entity-id] {
   cursor: pointer;
 }
@@ -3455,13 +3463,17 @@ input[type="text"]:focus {
   overflow: visible;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.82));
 }
+.cmd-btn .cmd-icon .unit-raster-icon {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100%;
+  max-height: 100%;
+}
 .unit-raster-icon {
   display: block;
   overflow: hidden !important;
   clip-path: inset(0);
   contain: paint;
-  width: 100% !important;
-  height: 100% !important;
   max-width: 100%;
   max-height: 100%;
 }

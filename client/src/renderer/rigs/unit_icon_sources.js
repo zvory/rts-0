@@ -160,6 +160,7 @@ function rasterIconMarkup({
   return (
     `<svg class="unit-raster-icon${teamTint ? " team-tinted" : ""}" ` +
       `data-unit-icon-source="${source}" aria-hidden="true" focusable="false" ` +
+      `width="${number(viewFrame.w)}" height="${number(viewFrame.h)}" ` +
       `viewBox="${number(viewFrame.x)} ${number(viewFrame.y)} ${number(viewFrame.w)} ${number(viewFrame.h)}" ` +
       `preserveAspectRatio="xMidYMid meet" style="overflow:hidden">` +
       tintFilter +
