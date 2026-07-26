@@ -69,11 +69,11 @@ export function selectionBudgetGridModel(entities, overflow = null) {
 }
 
 export class HudSelectionPanel {
-  constructor(panel, state, controlPolicy = null, unitIconSvgForKind = null) {
+  constructor(panel, state, controlPolicy = null, unitIconMarkupForKind = null) {
     this.panel = panel;
     this.state = state;
     this.controlPolicy = controlPolicy;
-    this.unitIconSvgForKind = unitIconSvgForKind;
+    this.unitIconMarkupForKind = unitIconMarkupForKind;
     this._renderSig = null;
     this._selectionOverflowSig = null;
     this._selectionOverflowUntil = 0;
@@ -168,10 +168,10 @@ export class HudSelectionPanel {
       cell.style.gridColumn = `${block.col} / span ${block.cols}`;
       cell.style.gridRow = `${block.row} / span ${block.rows}`;
       cell.title = `${block.label}: ${block.weight} command supply`;
-      const unitIconSvg = this.unitIconSvgForKind?.(block.kind) || "";
-      if (unitIconSvg) {
-        cell.className += " has-unit-rig-icon";
-        cell.innerHTML = unitIconSvg;
+      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind) || "";
+      if (unitIconMarkup) {
+        cell.className += " has-unit-render-icon";
+        cell.innerHTML = unitIconMarkup;
       } else {
         cell.textContent = block.icon;
       }

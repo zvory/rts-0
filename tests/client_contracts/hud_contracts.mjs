@@ -541,7 +541,7 @@ withFakeHudDocument(({ FakeElement }) => {
     assert(
       blocks.length === tanks.length &&
         blocks.every((block) =>
-          block.className.includes("has-unit-rig-icon") && block.innerHTML === iconMarkup),
+          block.className.includes("has-unit-render-icon") && block.innerHTML === iconMarkup),
       "HUD multi-selection blocks render injected renderer-authored unit icons",
     );
   });

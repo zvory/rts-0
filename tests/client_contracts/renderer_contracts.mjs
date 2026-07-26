@@ -4,7 +4,7 @@ import { COLORS } from "../../client/src/config.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
-import { liveRigIconSvgFor } from "../../client/src/renderer/rigs/live_routing.js";
+import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -33,16 +33,26 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
   "rig presentation scale composes with occupied-trench scale");
 
 {
-  const tankIcon = liveRigIconSvgFor(KIND.TANK);
+  const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);
   assert(
-    tankIcon.includes('class="unit-rig-icon"') && tankIcon.includes('id="part.hull"'),
-    "unit icon resolver preserves the authored live-rig unit parts",
+    riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
+      riflemanIcon.includes("rifleman-recoil-review-strip.png"),
+    "unit icon resolver uses the live Rifleman PNG frame strip",
   );
+  const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
   assert(
-    !tankIcon.includes("anchor.") && !tankIcon.includes("bounds.") && !tankIcon.includes("part.shadow"),
-    "unit icon resolver excludes authored rig metadata and shadow layers",
+    tankIcon.includes('data-unit-icon-source="png-atlas-reference"') &&
+      tankIcon.includes("tank-tiger-i-pass-11-white-alpha.png"),
+    "unit icon resolver uses the live Tank PNG atlas reference",
   );
-  assert(liveRigIconSvgFor("not_a_unit") === "", "unit icon resolver leaves unknown kinds to HUD fallback");
+  const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);
+  assert(
+    workerIcon.includes('class="unit-rig-icon"') &&
+      !workerIcon.includes("anchor.") &&
+      !workerIcon.includes("bounds."),
+    "unit icon resolver retains the clean authored SVG fallback when no live PNG exists",
+  );
+  assert(liveUnitIconMarkupFor("not_a_unit") === "", "unit icon resolver leaves unknown kinds to HUD fallback");
 }
 
 {

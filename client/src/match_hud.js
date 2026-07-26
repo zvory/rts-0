@@ -12,6 +12,6 @@ export function createMatchHud(match, rootEl) {
     match.controlPolicy,
     match.camera,
     match.apmTracker,
-    match.rendererBackendBundle.unitIconSvgForKind,
+    match.rendererBackendBundle.unitIconMarkupForKind,
   );
 }
