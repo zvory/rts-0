@@ -4,6 +4,8 @@ import {
   MAP_EDITOR_DEFAULT_SIZE,
   MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_OIL_PATCHES,
+  MAP_EDITOR_MAX_STEEL_PATCHES,
   MAP_EDITOR_MAX_SIZE,
   MAP_EDITOR_MAX_START_LOCATIONS,
   MAP_EDITOR_MIN_SIZE,
@@ -249,6 +251,10 @@ export class MapEditorPanel {
     }
     const start = starts[this.selectedStartIndex];
     const base = bases[this.selectedBaseIndex];
+    const startBaseIndex = start
+      ? this.session.draft.baseSites.findIndex((site) => site.x === start.x && site.y === start.y)
+      : -1;
+    const startBase = this.session.draft.baseSites[startBaseIndex];
     this.viewport.setSelectedBase(base?.index ?? null);
     section.append(
       readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Drafts may temporarily have none. Every base site always spawns resources.`),
@@ -260,6 +266,12 @@ export class MapEditorPanel {
       }),
       button("Add start", () => this.armLocation("start", null, true), { disabled: starts.length >= MAP_EDITOR_MAX_START_LOCATIONS }),
       button("Remove start", () => this.removeLocation("start", this.selectedStartIndex), { disabled: !start }),
+      patchCountField("Start-base steel patches", startBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+        this.updateBasePatchCount(startBaseIndex, "steelPatches", value);
+      }, !startBase),
+      patchCountField("Start-base oil patches", startBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+        this.updateBasePatchCount(startBaseIndex, "oilPatches", value);
+      }, !startBase),
       basePicker,
       readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
       button("Move base", () => this.armLocation("base", base?.index), {
@@ -270,6 +282,12 @@ export class MapEditorPanel {
         disabled: this.session.draft.baseSites.length >= MAP_EDITOR_MAX_BASE_SITES,
       }),
       button("Remove base", () => this.removeLocation("base", base?.index), { disabled: !base }),
+      patchCountField("Base steel patches", base?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+        this.updateBasePatchCount(base?.index, "steelPatches", value);
+      }, !base),
+      patchCountField("Base oil patches", base?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+        this.updateBasePatchCount(base?.index, "oilPatches", value);
+      }, !base),
       readout("Bases and starts reserve a passable grass area."),
     );
     return section;
@@ -312,6 +330,16 @@ export class MapEditorPanel {
     });
     if (changed) this.viewport.armTool(null);
     this.setStatus(changed ? "Map location removed." : result?.error || "Map location was already absent.", !changed);
+  }
+
+  updateBasePatchCount(baseIndex, fieldName, value) {
+    const max = fieldName === "oilPatches" ? MAP_EDITOR_MAX_OIL_PATCHES : MAP_EDITOR_MAX_STEEL_PATCHES;
+    const count = Math.max(0, Math.min(max, Math.trunc(Number(value)) || 0));
+    const changed = this.session.mutate("Updated base resources", (draft) => {
+      const site = draft.baseSites[Math.trunc(Number(baseIndex))];
+      if (site) site[fieldName] = count;
+    });
+    this.setStatus(changed ? "Base resource counts updated." : "Base resource count unchanged.");
   }
 
   armTerrain() {
@@ -508,6 +536,18 @@ function textAreaField(labelText, value, onChange) {
   input.value = value;
   input.maxLength = 500;
   input.rows = 3;
+  input.addEventListener("change", () => onChange(input.value));
+  return field(labelText, input);
+}
+
+function patchCountField(labelText, value, max, onChange, disabled = false) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.max = String(max);
+  input.step = "1";
+  input.value = String(value ?? 0);
+  input.disabled = disabled;
   input.addEventListener("change", () => onChange(input.value));
   return field(labelText, input);
 }

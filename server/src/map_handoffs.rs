@@ -218,11 +218,31 @@ fn validate_materialized_binding(
         return Err("Authored and materialized terrain do not match.".to_string());
     }
     if !locations_match(&authored.starts, &materialized.starts)
-        || !locations_match(&authored.base_sites, &materialized.base_sites)
+        || !base_sites_match(authored, &materialized.base_sites)
     {
         return Err("Authored map locations do not match the materialized map.".to_string());
     }
     Ok(())
+}
+
+fn base_sites_match(
+    authored: &AuthoredMapData,
+    materialized: &[rts_server::protocol::LabBaseSite],
+) -> bool {
+    authored.base_sites.len() == materialized.len()
+        && authored
+            .base_sites
+            .iter()
+            .zip(materialized)
+            .all(|(&(x, y), site)| {
+                let counts = authored.base_resource_counts.get(&(x, y));
+                x == site.x
+                    && y == site.y
+                    && counts.is_some_and(|counts| {
+                        counts.steel_patches == site.steel_patches
+                            && counts.oil_patches == site.oil_patches
+                    })
+            })
 }
 
 fn locations_match(
@@ -247,7 +267,7 @@ fn error_response(status: StatusCode, error: String) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_server::protocol::{terrain, LabMapTile};
+    use rts_server::protocol::{terrain, LabBaseSite, LabMapTile};
 
     fn valid_request() -> CreateMapHandoffRequest {
         let authored_map: serde_json::Value =
@@ -267,7 +287,12 @@ mod tests {
             .as_array()
             .expect("base sites")
             .iter()
-            .map(tile)
+            .map(|value| LabBaseSite {
+                x: value["x"].as_u64().expect("x") as u32,
+                y: value["y"].as_u64().expect("y") as u32,
+                steel_patches: value["steelPatches"].as_u64().expect("steel patches") as u32,
+                oil_patches: value["oilPatches"].as_u64().expect("oil patches") as u32,
+            })
             .collect();
         CreateMapHandoffRequest {
             destination: HandoffDestination::Lab,
@@ -294,6 +319,12 @@ mod tests {
         request.materialized_map.starts[0].x += 1;
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
+            .contains("do not match"));
+
+        let mut request = valid_request();
+        request.materialized_map.base_sites[0].steel_patches = 11;
+        assert!(validate_request(&request)
+            .expect_err("mismatched resource counts must fail")
             .contains("do not match"));
     }
 
@@ -333,9 +364,20 @@ mod tests {
     fn handoff_validation_accepts_a_non_default_map_size() {
         let size = 48_u32;
         let starts = [LabMapTile { x: 8, y: 8 }, LabMapTile { x: 39, y: 39 }];
-        let locations = starts
+        let start_locations = starts
             .iter()
             .map(|tile| serde_json::json!({ "x": tile.x, "y": tile.y }))
+            .collect::<Vec<_>>();
+        let base_sites = starts
+            .iter()
+            .map(|tile| {
+                serde_json::json!({
+                    "x": tile.x,
+                    "y": tile.y,
+                    "steelPatches": 12,
+                    "oilPatches": 3
+                })
+            })
             .collect::<Vec<_>>();
         let mut request = valid_request();
         request.authored_map["name"] = "Custom size".into();
@@ -344,14 +386,22 @@ mod tests {
                 .map(|_| ".".repeat(size as usize).into())
                 .collect(),
         );
-        request.authored_map["startLocations"] = locations.clone().into();
-        request.authored_map["baseSites"] = locations.into();
+        request.authored_map["startLocations"] = start_locations.into();
+        request.authored_map["baseSites"] = base_sites.into();
         request.materialized_map = LabMapDraft {
             name: "Custom size".to_string(),
             size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: starts.to_vec(),
-            base_sites: starts.to_vec(),
+            base_sites: starts
+                .iter()
+                .map(|tile| LabBaseSite {
+                    x: tile.x,
+                    y: tile.y,
+                    steel_patches: 12,
+                    oil_patches: 3,
+                })
+                .collect(),
         };
 
         assert_eq!(validate_request(&request), Ok(()));

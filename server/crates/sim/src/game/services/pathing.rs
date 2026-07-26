@@ -396,7 +396,7 @@ mod tests {
             size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -423,7 +423,7 @@ mod tests {
             size: size as u32,
             terrain,
             starts: vec![],
-            base_sites: vec![],
+            ..Default::default()
         }
     }
 

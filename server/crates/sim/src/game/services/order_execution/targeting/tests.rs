@@ -8,7 +8,7 @@ fn fixture() -> (Map, EntityStore, u32, (f32, f32)) {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4)],
-        base_sites: Vec::new(),
+        ..Default::default()
     };
     let origin = map.tile_center(20, 20);
     let mut entities = EntityStore::new();

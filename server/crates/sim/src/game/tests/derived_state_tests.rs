@@ -873,7 +873,7 @@ fn derived_state_lab_fixture() -> Game {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(16, 16), (48, 48)],
-        base_sites: Vec::new(),
+        ..Default::default()
     };
     let metadata = MapMetadata {
         name: "Derived State Lab".to_string(),

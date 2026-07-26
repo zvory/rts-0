@@ -16,10 +16,11 @@ use crate::rules;
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod checkpoint_scenario;
+mod map_draft;
 
 pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioTile,
+    LabCheckpointScenarioSource, LabCheckpointScenarioV1, LabScenarioBaseSite, LabScenarioTile,
 };
 
 pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
@@ -282,25 +283,7 @@ impl Game {
     /// Export only the authoritative map fields needed by the dedicated Map Editor boundary.
     /// Simulation entities, orders, resources, fog, and timeline state are intentionally absent.
     pub fn export_lab_map(&self) -> LabMapDraft {
-        LabMapDraft {
-            name: self.map_metadata().name.clone(),
-            size: self.state.map.size,
-            terrain: self.state.map.terrain.clone(),
-            starts: self
-                .state
-                .map
-                .starts
-                .iter()
-                .map(|&(x, y)| crate::protocol::LabMapTile { x, y })
-                .collect(),
-            base_sites: self
-                .state
-                .map
-                .base_sites
-                .iter()
-                .map(|&(x, y)| crate::protocol::LabMapTile { x, y })
-                .collect(),
-        }
+        map_draft::export(&self.state.map, &self.map_metadata().name)
     }
 
     fn apply_lab_op_without_repair(&mut self, op: LabOp) -> Result<LabOpOutcome, LabError> {
@@ -561,13 +544,13 @@ impl Game {
                 reason: format!("map has more than {LAB_MAP_MAX_BASE_SITES} base sites"),
             });
         }
-
         let starts: Vec<_> = draft.starts.iter().map(|tile| (tile.x, tile.y)).collect();
         let base_sites: Vec<_> = draft
             .base_sites
             .iter()
             .map(|tile| (tile.x, tile.y))
             .collect();
+        let base_resource_counts = map_draft::resource_counts(&draft, name)?;
         let mut occupied_sites = std::collections::HashSet::new();
         for &(x, y) in &starts {
             validate_lab_map_site(
@@ -600,6 +583,7 @@ impl Game {
             terrain: draft.terrain,
             starts,
             base_sites,
+            base_resource_counts,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),

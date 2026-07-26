@@ -7,7 +7,7 @@ fn flat_test_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(1, 1)],
-        base_sites: Vec::new(),
+        ..Default::default()
     }
 }
 

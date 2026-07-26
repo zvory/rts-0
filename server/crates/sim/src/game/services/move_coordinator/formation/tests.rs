@@ -56,7 +56,7 @@ fn flat_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![],
-        base_sites: vec![],
+        ..Default::default()
     }
 }
 

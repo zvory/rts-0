@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1632,
-      "reason": "Client-message serde tests moved out of the oversized protocol root while the Attack DTO gained the optional Tank Trap cluster flag; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
+      "lines": 1615,
+      "reason": "Lab map and base-site DTOs moved into lab_scenario.rs; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",

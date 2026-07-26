@@ -1321,19 +1321,26 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV3,
-  materializedMap: { name: string, size: u32, terrain: u8[], starts: LabMapTile[], baseSites: LabMapTile[] }
+  authoredMap: AuthoredMapV4,
+  materializedMap: {
+    name: string,
+    size: u32,
+    terrain: u8[],
+    starts: LabMapTile[],
+    baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[]
+  }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV3 }
+ | { destination: "editor", authoredMap: AuthoredMapV4 }
 ```
-`AuthoredMapV3` has flat `startLocations` and `baseSites` arrays. Start locations determine the
+`AuthoredMapV4` has flat `startLocations` and `baseSites` arrays. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
-start locations. Creation validates the complete authored-map schema and binds its terrain and flat
-locations to `materializedMap` before storing it. Records are capped at 64, expire after two
+start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
+counts. Creation validates the complete authored-map schema and binds its terrain, locations, and
+resource counts to `materializedMap` before storing it. Records are capped at 64, expire after two
 minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
 The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
 cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
@@ -1359,7 +1366,7 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       size: u32,
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
-      baseSites: [{ x: u32, y: u32 }]
+      baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }]
     }
   },
   metadata: {

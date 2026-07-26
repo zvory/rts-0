@@ -1,8 +1,8 @@
 {
-  "version": 3,
+  "version": 4,
   "name": "Chokes",
   "description": "Four-start map with twelve permanent resource base locations and contested choke points.",
-  "_design": "Flat map locations: startLocations choose player starts; every baseSites entry always spawns its resource cluster.",
+  "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
@@ -152,51 +152,75 @@
   "baseSites": [
     {
       "x": 13,
-      "y": 12
+      "y": 12,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 112,
-      "y": 113
+      "y": 113,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 112,
-      "y": 12
+      "y": 12,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 13,
-      "y": 113
+      "y": 113,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 40,
-      "y": 11
+      "y": 11,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 85,
-      "y": 114
+      "y": 114,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 114,
-      "y": 40
+      "y": 40,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 11,
-      "y": 85
+      "y": 85,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 63,
-      "y": 38
+      "y": 38,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 63,
-      "y": 87
+      "y": 87,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 87,
-      "y": 63
+      "y": 63,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 38,
-      "y": 63
+      "y": 63,
+      "steelPatches": 12,
+      "oilPatches": 3
     }
   ]
 }

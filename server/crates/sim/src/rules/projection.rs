@@ -785,7 +785,7 @@ mod tests {
             size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(4, 4)],
-            base_sites: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -928,7 +928,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2, 3], &entities, &map);
@@ -972,7 +972,7 @@ mod tests {
             size: 16,
             terrain: vec![terrain::GRASS; 16 * 16],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2, 3], &entities, &map);
@@ -1007,7 +1007,7 @@ mod tests {
             size: 16,
             terrain: vec![terrain::GRASS; 16 * 16],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2, 3], &entities, &map);
@@ -1043,7 +1043,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2, 3], &entities, &map);
@@ -1077,7 +1077,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
@@ -1107,7 +1107,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], &entities, &map);
@@ -1184,7 +1184,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], &entities, &map);
@@ -1239,7 +1239,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], &entities, &map);
@@ -1285,7 +1285,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
@@ -1337,7 +1337,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], &entities, &map);
@@ -1401,7 +1401,7 @@ mod tests {
             size: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], &entities, &map);

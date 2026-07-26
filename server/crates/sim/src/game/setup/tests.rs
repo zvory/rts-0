@@ -326,6 +326,49 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
 }
 
 #[test]
+fn authored_base_resource_counts_control_spawned_patch_totals() {
+    let mut map = Map::generate(1, 0x5151_9090);
+    let site = map.base_sites[0];
+    map.base_resource_counts.insert(
+        site,
+        crate::game::map::BaseResourceCounts {
+            steel_patches: 36,
+            oil_patches: 9,
+        },
+    );
+    let mut entities = EntityStore::new();
+    spawn_base_resources(&mut entities, &map, site);
+    assert_eq!(
+        entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Steel)
+            .count(),
+        36
+    );
+    assert_eq!(
+        entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Oil)
+            .count(),
+        9
+    );
+
+    map.base_resource_counts.insert(
+        site,
+        crate::game::map::BaseResourceCounts {
+            steel_patches: 0,
+            oil_patches: 0,
+        },
+    );
+    let mut empty = EntityStore::new();
+    spawn_base_resources(&mut empty, &map, site);
+    assert_eq!(
+        empty.iter().filter(|entity| entity.kind.is_node()).count(),
+        0
+    );
+}
+
+#[test]
 fn base_steel_patches_split_across_both_sides_of_city_centre() {
     let players = [
         (1, super::teams::normalize_team_id(1, 1)),

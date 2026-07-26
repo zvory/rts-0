@@ -268,7 +268,7 @@ mod tests {
             size,
             terrain,
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -277,7 +277,7 @@ mod tests {
             size,
             terrain: vec![wire_terrain::GRASS; (size * size) as usize],
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -310,7 +310,7 @@ mod tests {
             size,
             terrain,
             starts: vec![(1, 1)],
-            base_sites: Vec::new(),
+            ..Default::default()
         };
         let los = LineOfSight::new(&map);
 

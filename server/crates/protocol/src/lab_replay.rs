@@ -721,16 +721,24 @@ fn validate_map_container(
             "{label}.map.data.baseSites count is invalid"
         )));
     }
-    for site in scenario
-        .map
-        .data
-        .starts
-        .iter()
-        .chain(scenario.map.data.base_sites.iter())
-    {
+    for site in &scenario.map.data.starts {
         if site.x >= size || site.y >= size {
             return Err(invalid(format!(
                 "{label}.map.data contains an out-of-bounds site"
+            )));
+        }
+    }
+    for site in &scenario.map.data.base_sites {
+        if site.x >= size || site.y >= size {
+            return Err(invalid(format!(
+                "{label}.map.data contains an out-of-bounds site"
+            )));
+        }
+        if site.steel_patches > crate::MAX_STEEL_PATCHES_PER_BASE
+            || site.oil_patches > crate::MAX_OIL_PATCHES_PER_BASE
+        {
+            return Err(invalid(format!(
+                "{label}.map.data contains an out-of-range base resource count"
             )));
         }
     }

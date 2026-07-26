@@ -239,6 +239,7 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
             .iter()
             .map(|tile| (tile.x, tile.y))
             .collect(),
+        base_resource_counts: Default::default(),
     };
     let materialized_hash = map.materialized_hash();
     checkpoint.map.materialized_hash = materialized_hash.clone();
@@ -296,7 +297,13 @@ fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
     assert_restore_invalid_map(too_many_starts, "start site count");
 
     let mut too_many_base_sites = checkpoint;
-    let base_site = too_many_base_sites.map.data.starts[0];
+    let start = too_many_base_sites.map.data.starts[0];
+    let base_site = crate::game::lab::LabScenarioBaseSite {
+        x: start.x,
+        y: start.y,
+        steel_patches: 12,
+        oil_patches: 3,
+    };
     while too_many_base_sites.map.data.base_sites.len() <= 64 {
         too_many_base_sites.map.data.base_sites.push(base_site);
     }

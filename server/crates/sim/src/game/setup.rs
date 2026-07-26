@@ -456,7 +456,8 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let perp_x = -base_angle.sin();
     let perp_y = base_angle.cos();
 
-    let patches = config::STEEL_PATCHES_PER_BASE;
+    let counts = map.resource_counts_at(tile);
+    let patches = counts.steel_patches;
     let field_counts = [patches.div_ceil(2), patches / 2];
     let mut patch_index = 0;
     for (side, field_patches) in [1.0, -1.0].into_iter().zip(field_counts) {
@@ -468,12 +469,13 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         let block_cy = hy + block_dist * base_angle.sin();
         let rows = field_patches.div_ceil(STEEL_FIELD_COLUMNS);
         let row_center = (rows - 1) as f32 / 2.0;
+        let row_spacing = if rows > 1 { ts / (rows - 1) as f32 } else { ts };
         let col_center = (STEEL_FIELD_COLUMNS - 1) as f32 / 2.0;
         for i in 0..field_patches {
             let col = (i % STEEL_FIELD_COLUMNS) as f32;
             let row = (i / STEEL_FIELD_COLUMNS) as f32;
             let off_x = (col - col_center) * ts;
-            let off_y = (row - row_center) * ts;
+            let off_y = (row - row_center) * row_spacing;
             let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
             let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
             let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
@@ -499,7 +501,7 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         EntityKind::PumpJack,
         Some(EntityKind::Oil),
     );
-    for i in 0..config::OIL_PATCHES_PER_BASE {
+    for i in 0..counts.oil_patches {
         let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
         let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
         let (px, py, tile) = resource_placement::nearest_oil_patch_tile_center(
@@ -533,12 +535,21 @@ fn tile_step(value: f32) -> i32 {
 }
 
 fn oil_patch_tile_offset(index: u32, step_x: i32, step_y: i32) -> (i32, i32) {
-    // Integer offsets keep mirrored starts at identical CC distances after tile snapping.
-    match index {
-        0 => (4 * step_x, 4 * step_y),
-        1 => (4 * step_x, 2 * step_y),
-        _ => (6 * step_x, 3 * step_y),
-    }
+    // Integer offsets keep mirrored starts at identical CC distances after tile snapping. The
+    // nine authored slots maintain at least one free tile between desired Pump Jack centres.
+    const OFFSETS: [(i32, i32); 9] = [
+        (4, 4),
+        (4, 2),
+        (6, 3),
+        (2, 4),
+        (3, 6),
+        (6, 5),
+        (1, 6),
+        (6, 1),
+        (0, 4),
+    ];
+    let (x, y) = OFFSETS[index.min((OFFSETS.len() - 1) as u32) as usize];
+    (x * step_x, y * step_y)
 }
 
 fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f32) {
