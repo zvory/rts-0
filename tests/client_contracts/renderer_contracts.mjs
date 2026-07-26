@@ -37,8 +37,8 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
   assert(
     riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
       riflemanIcon.includes("rifleman-recoil-review-strip.png") &&
-      riflemanIcon.includes('viewBox="9.52 22.44 150.48 66.12"') &&
-      riflemanIcon.includes('width="150.48" height="66.12"') &&
+      riflemanIcon.includes('viewBox="16.725 25.575 137.55 59.85"') &&
+      riflemanIcon.includes('width="137.55" height="59.85"') &&
       riflemanIcon.includes('preserveAspectRatio="xMidYMid meet"') &&
       riflemanIcon.includes('flood-color="#0072b2"') &&
       riflemanIcon.includes('style="overflow:hidden"') &&
@@ -46,8 +46,8 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
     "unit icon resolver fits the live Rifleman PNG silhouette without exposing adjacent frames",
   );
   assert(
-    liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="0 0 160 105.36"') &&
-      liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="0 7.72 64 47.56"'),
+    liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="0 3.7 154.725 96.6"') &&
+      liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="0.525 9.975 61.95 43.05"'),
     "unit icon resolver independently fits each production PNG silhouette",
   );
   assert(
@@ -58,8 +58,13 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
   const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
   assert(
     tankIcon.includes('data-unit-icon-source="png-atlas-reference"') &&
-      tankIcon.includes("tank-tiger-i-pass-11-white-alpha.png"),
-    "unit icon resolver uses the live Tank PNG atlas reference",
+      tankIcon.includes("tank-tiger-i-pass-11-white-alpha.png") &&
+      tankIcon.includes('viewBox="41.025 108.9 531.975 298.2"'),
+    "unit icon resolver fits the live Tank PNG reference to its opaque silhouette",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.ARTILLERY).includes('viewBox="664 640.4 835 235.2"'),
+    "unit icon resolver removes transparent atlas margins without clipping gun pixels",
   );
   const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);
   assert(

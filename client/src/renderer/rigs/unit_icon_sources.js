@@ -6,7 +6,7 @@ import { createLivePngRigAtlases } from "./png_routing.js";
 const LIVE_FRAME_STRIPS = createLiveFrameStrips();
 const LIVE_PNG_ATLASES = createLivePngRigAtlases();
 const ICON_FRAME_ZOOM = 1.5;
-const ICON_VISIBLE_PADDING_RATIO = 0.08;
+const ICON_VISIBLE_PADDING_RATIO = 0.025;
 
 /**
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
@@ -58,6 +58,7 @@ function atlasPortrait(atlas) {
       sheetWidth: atlas.grid.width,
       sheetHeight: atlas.grid.height,
       frame: assembled,
+      visibleFrame: atlas.iconVisibleBounds || assembled,
       teamTint: true,
     };
   }
@@ -81,6 +82,12 @@ function atlasPortrait(atlas) {
         w: frameWidth,
         h: frameHeight,
       },
+      visibleFrame: atlas.iconVisibleBounds || {
+        x: (referenceIndex % atlas.grid.columns) * frameWidth,
+        y: Math.floor(referenceIndex / atlas.grid.columns) * frameHeight,
+        w: frameWidth,
+        h: frameHeight,
+      },
       teamTint: true,
     };
   }
@@ -94,6 +101,7 @@ function atlasPortrait(atlas) {
     sheetWidth: atlas.grid.width,
     sheetHeight: atlas.grid.height,
     frame,
+    visibleFrame: atlas.iconVisibleBounds || frame,
     teamTint: sprite.tintSlot !== "fixed",
   };
 }

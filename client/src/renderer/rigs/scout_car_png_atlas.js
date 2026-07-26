@@ -73,6 +73,12 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "scout_car",
   image: "/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png?v=pass02-team-halfres-rgba8-adjusted",
+  iconVisibleBounds: {
+    x: 4,
+    y: 1,
+    w: 650,
+    h: 339,
+  },
   bakedColorAdjustment: {
     brightness: 90,
     saturation: 90,
