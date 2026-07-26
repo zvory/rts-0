@@ -1,4 +1,7 @@
-//! Fog-gated entity projection; this module never mutates world state.
+//! Projection rules for fog-gated entity views and event delivery.
+//!
+//! This module owns what a player is allowed to see. It does not mutate the world; future
+//! last-known-position or partial-reveal rules should grow here.
 
 use std::collections::BTreeSet;
 
@@ -8,7 +11,7 @@ use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     active_trench_occupation, fires_while_moving, supports_manual_emplacement,
     tank_trap_deconstruction_ticks, Entity, EntityKind, EntityStore, GatherPhase, Order,
-    OrderIntent, PanzerfaustState,
+    OrderIntent,
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
@@ -20,6 +23,7 @@ use crate::protocol::{EntityView, OrderPlanMarker};
 use super::projection_abilities::{
     active_ability_object_expires_in, active_return_object_id, return_available_tick,
 };
+use super::projection_panzerfaust::project_panzerfaust_state;
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
@@ -304,26 +308,7 @@ pub fn project_entity(
                 Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
         }
     }
-    if entity.kind == EntityKind::Panzerfaust {
-        let panzerfaust_state = entity.combat.as_ref().and_then(|combat| combat.panzerfaust);
-        view.panzerfaust_loaded = panzerfaust_state.map(|state| {
-            matches!(
-                state,
-                PanzerfaustState::Loaded | PanzerfaustState::Windup { .. }
-            )
-        });
-        if let Some(PanzerfaustState::Windup {
-            ticks_remaining,
-            total_ticks,
-            ..
-        }) = panzerfaust_state
-        {
-            let total = total_ticks.max(1);
-            let elapsed = total.saturating_sub(ticks_remaining);
-            view.panzerfaust_windup_progress =
-                Some((elapsed as f32 / total as f32).clamp(0.0, 1.0));
-        }
-    }
+    project_panzerfaust_state(entity, &mut view);
     let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();
     let active_combat_target =
         matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_)) || acquired_combat_target;
