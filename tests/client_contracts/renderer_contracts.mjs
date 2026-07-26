@@ -4,6 +4,7 @@ import { COLORS } from "../../client/src/config.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
+import { liveRigIconSvgFor } from "../../client/src/renderer/rigs/live_routing.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -30,6 +31,19 @@ function restoreGlobal(name, value) {
 
 assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 * 0.85,
   "rig presentation scale composes with occupied-trench scale");
+
+{
+  const tankIcon = liveRigIconSvgFor(KIND.TANK);
+  assert(
+    tankIcon.includes('class="unit-rig-icon"') && tankIcon.includes('id="part.hull"'),
+    "unit icon resolver preserves the authored live-rig unit parts",
+  );
+  assert(
+    !tankIcon.includes("anchor.") && !tankIcon.includes("bounds.") && !tankIcon.includes("part.shadow"),
+    "unit icon resolver excludes authored rig metadata and shadow layers",
+  );
+  assert(liveRigIconSvgFor("not_a_unit") === "", "unit icon resolver leaves unknown kinds to HUD fallback");
+}
 
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");

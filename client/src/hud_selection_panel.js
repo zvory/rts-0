@@ -69,10 +69,11 @@ export function selectionBudgetGridModel(entities, overflow = null) {
 }
 
 export class HudSelectionPanel {
-  constructor(panel, state, controlPolicy = null) {
+  constructor(panel, state, controlPolicy = null, unitIconSvgForKind = null) {
     this.panel = panel;
     this.state = state;
     this.controlPolicy = controlPolicy;
+    this.unitIconSvgForKind = unitIconSvgForKind;
     this._renderSig = null;
     this._selectionOverflowSig = null;
     this._selectionOverflowUntil = 0;
@@ -167,7 +168,13 @@ export class HudSelectionPanel {
       cell.style.gridColumn = `${block.col} / span ${block.cols}`;
       cell.style.gridRow = `${block.row} / span ${block.rows}`;
       cell.title = `${block.label}: ${block.weight} command supply`;
-      cell.textContent = block.icon;
+      const unitIconSvg = this.unitIconSvgForKind?.(block.kind) || "";
+      if (unitIconSvg) {
+        cell.className += " has-unit-rig-icon";
+        cell.innerHTML = unitIconSvg;
+      } else {
+        cell.textContent = block.icon;
+      }
       this._selectionEntityNode(cell, block);
       grid.appendChild(cell);
     }

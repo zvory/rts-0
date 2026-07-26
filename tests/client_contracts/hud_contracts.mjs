@@ -22,7 +22,10 @@ import {
   selectionBudgetBlockShape,
   selectionBudgetGridModel,
 } from "../../client/src/hud.js";
-import { entrenchmentSelectionStatus } from "../../client/src/hud_selection_panel.js";
+import {
+  entrenchmentSelectionStatus,
+  HudSelectionPanel,
+} from "../../client/src/hud_selection_panel.js";
 import { renderAllPlayersResources } from "../../client/src/hud_resources.js";
 import {
   buildCommandCardContextCatalog,
@@ -522,6 +525,25 @@ withFakeHudDocument(({ FakeElement }) => {
     const stableChildren = panel.children;
     hud._renderSelectedPanel();
     assert(panel.children === stableChildren, "HUD selected budget grid skips unchanged DOM rebuilds");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const iconMarkup = '<svg data-test-unit-icon="tank"></svg>';
+    const selectionPanel = new HudSelectionPanel(
+      panel,
+      { selectedEntities: () => tanks },
+      null,
+      (kind) => kind === KIND.TANK ? iconMarkup : "",
+    );
+    selectionPanel.render();
+    const blocks = panel.querySelectorAll(".sel-budget-block");
+    assert(
+      blocks.length === tanks.length &&
+        blocks.every((block) =>
+          block.className.includes("has-unit-rig-icon") && block.innerHTML === iconMarkup),
+      "HUD multi-selection blocks render injected renderer-authored unit icons",
+    );
   });
 
   withFakeHudDocument(({ FakeElement }) => {
@@ -1055,6 +1077,7 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(trainCard.kind === "train", "production building should use train descriptor card");
   assert(trainCard.slots[0].label === "Rifleman", "Barracks first train slot should be Rifleman");
   assert(trainCard.slots[0].commandId === defaultFactionCommandId("train", KIND.RIFLEMAN), "train button should expose stable train identity");
+  assert(trainCard.slots[0].unitIconKind === KIND.RIFLEMAN, "train button identifies its renderer-authored unit icon kind");
   assert(trainCard.slots[0].slotIndex === 0, "train button should expose rendered slot index");
   assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
   assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");

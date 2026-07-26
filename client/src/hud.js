@@ -165,8 +165,9 @@ export class HUD {
    * @param {object} [controlPolicy] policy that decides command-surface and owner control.
    * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
    * @param {import("./apm_tracker.js").ApmTracker} [apmTracker] recent issued-command rate.
+   * @param {(kind:string) => string} [unitIconSvgForKind] renderer-authored unit icon resolver.
    */
-  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null) {
+  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null, unitIconSvgForKind = null) {
     this.root = rootEl;
     this.state = state;
     this.commandInteraction = commandInteraction;
@@ -176,6 +177,7 @@ export class HUD {
     this.controlPolicy = controlPolicy;
     this.camera = camera;
     this.apmTracker = apmTracker;
+    this.unitIconSvgForKind = unitIconSvgForKind;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -197,7 +199,12 @@ export class HUD {
     this.elSelected = rootEl.querySelector("#selected-panel");
     this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
-    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state, this.controlPolicy);
+    this.selectionPanel = new HudSelectionPanel(
+      this.elSelected,
+      this.state,
+      this.controlPolicy,
+      this.unitIconSvgForKind,
+    );
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
@@ -527,6 +534,9 @@ export class HUD {
       commandId: descriptor.commandId,
       slotIndex: descriptor.slotIndex,
       icon: descriptor.icon,
+      unitIconSvg: descriptor.unitIconKind
+        ? this.unitIconSvgForKind?.(descriptor.unitIconKind) || ""
+        : "",
       label: descriptor.label,
       ability: descriptor.ability,
       hotkey: descriptor.hotkey,
