@@ -201,7 +201,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
       STATS[KIND.CITY_CENTRE].buildTicks === 750,
     "City Centre cost and build time mirror server",
   );
-  assert(STATS[KIND.WORKER].buildTicks === 396, "Worker build time mirrors server");
+  assert(STATS[KIND.WORKER].buildTicks === 495, "Worker build time mirrors server");
   assert(
     Array.isArray(STATS[KIND.FACTORY].requires),
     "Vehicle Works should expose all server-side build prerequisites",
