@@ -1,7 +1,4 @@
-//! Projection rules for fog-gated entity views and event delivery.
-//!
-//! This module owns what a player is allowed to see. It does not mutate the world; future
-//! last-known-position or partial-reveal rules should grow here.
+//! Fog-gated entity projection; this module never mutates world state.
 
 use std::collections::BTreeSet;
 
