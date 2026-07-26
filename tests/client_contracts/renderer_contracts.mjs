@@ -36,8 +36,10 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
   const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);
   assert(
     riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
-      riflemanIcon.includes("rifleman-recoil-review-strip.png"),
-    "unit icon resolver uses the live Rifleman PNG frame strip",
+      riflemanIcon.includes("rifleman-recoil-review-strip.png") &&
+      riflemanIcon.includes('viewBox="26.6667 18.6667 106.6667 74.6667"') &&
+      !riflemanIcon.includes("<img"),
+    "unit icon resolver hard-crops and zooms one live Rifleman PNG frame",
   );
   const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
   assert(

@@ -5,6 +5,7 @@ import { createLivePngRigAtlases } from "./png_routing.js";
 
 const LIVE_FRAME_STRIPS = createLiveFrameStrips();
 const LIVE_PNG_ATLASES = createLivePngRigAtlases();
+const ICON_FRAME_ZOOM = 1.5;
 
 /**
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
@@ -117,18 +118,18 @@ function rasterIconMarkup({ source, image, sheetWidth, sheetHeight, frame, teamT
   };
   if (!image || !safeSheetWidth || !safeSheetHeight || !safeFrame.w || !safeFrame.h) return "";
 
-  const widthPct = (safeSheetWidth / safeFrame.w) * 100;
-  const heightPct = (safeSheetHeight / safeFrame.h) * 100;
-  const leftPct = -(safeFrame.x / safeFrame.w) * 100;
-  const topPct = -(safeFrame.y / safeFrame.h) * 100;
+  const viewWidth = safeFrame.w / ICON_FRAME_ZOOM;
+  const viewHeight = safeFrame.h / ICON_FRAME_ZOOM;
+  const viewX = safeFrame.x + (safeFrame.w - viewWidth) / 2;
+  const viewY = safeFrame.y + (safeFrame.h - viewHeight) / 2;
   return (
-    `<span class="unit-raster-icon${teamTint ? " team-tinted" : ""}" ` +
-      `data-unit-icon-source="${source}" ` +
-      `style="aspect-ratio:${safeFrame.w}/${safeFrame.h}">` +
-      `<img src="${image}" alt="" draggable="false" ` +
-        `style="width:${widthPct.toFixed(4)}%;height:${heightPct.toFixed(4)}%;` +
-          `left:${leftPct.toFixed(4)}%;top:${topPct.toFixed(4)}%">` +
-    `</span>`
+    `<svg class="unit-raster-icon${teamTint ? " team-tinted" : ""}" ` +
+      `data-unit-icon-source="${source}" aria-hidden="true" focusable="false" ` +
+      `viewBox="${number(viewX)} ${number(viewY)} ${number(viewWidth)} ${number(viewHeight)}" ` +
+      `preserveAspectRatio="xMidYMid meet">` +
+      `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
+        `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
+    `</svg>`
   );
 }
 
@@ -140,4 +141,8 @@ function positiveDimension(value) {
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function number(value) {
+  return Number(value.toFixed(4));
 }

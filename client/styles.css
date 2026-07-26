@@ -3456,21 +3456,18 @@ input[type="text"]:focus {
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.82));
 }
 .unit-raster-icon {
-  position: relative;
+  display: block;
   overflow: hidden;
   width: 100% !important;
-  height: auto !important;
+  height: 100% !important;
   max-width: 100%;
   max-height: 100%;
 }
-.unit-raster-icon img {
-  position: absolute;
-  display: block;
-  max-width: none;
+.unit-raster-icon image {
   pointer-events: none;
   user-select: none;
 }
-.unit-raster-icon.team-tinted img {
+.unit-raster-icon.team-tinted image {
   filter: brightness(0.72) sepia(0.22) saturate(1.35) hue-rotate(165deg);
 }
 .cmd-btn .cmd-label {
