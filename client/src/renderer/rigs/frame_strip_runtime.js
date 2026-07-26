@@ -47,6 +47,8 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
   const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
   if (setupFrame != null) return setupFrame;
+  const windupFrame = frameStripWindupFrameIndex(strip, entity, idleFrame);
+  if (windupFrame != null) return windupFrame;
   const setupFrames = validFrameList(strip, strip?.setupFrames);
   if (!frameStripEntityIsMoving(entity, renderContext)) {
     if (setupFrames.length === 0) {
@@ -66,6 +68,16 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const timeIndex = Math.floor(Math.max(0, finite(now, 0)) / frameDurationMs);
   const idOffset = Number.isFinite(entity?.id) ? Math.abs(Math.trunc(entity.id)) % frames.length : 0;
   return validFrame(strip, frames[(timeIndex + idOffset) % frames.length], idleFrame);
+}
+
+function frameStripWindupFrameIndex(strip, entity, fallback = 0) {
+  const frames = validFrameList(strip, strip?.windupFrames);
+  const progressField = strip?.windupProgressField;
+  const rawProgress = typeof progressField === "string" ? entity?.[progressField] : null;
+  if (frames.length === 0 || !Number.isFinite(rawProgress)) return null;
+  const progress = clamp01(rawProgress);
+  const index = Math.min(frames.length - 1, Math.floor(progress * frames.length));
+  return validFrame(strip, frames[index], fallback);
 }
 
 function frameStripSetupFrameIndex(strip, entity, renderContext = {}, idleFrame = 0) {
@@ -132,7 +144,11 @@ export function frameStripWorldScale(strip, entity, renderContext = null) {
 }
 
 export function frameStripSpriteOffset(strip, frameIndex) {
-  const forwardPx = finite(strip?.originForwardPx, 0);
+  const defaultForwardPx = finite(strip?.originForwardPx, 0);
+  const windupFrames = validFrameList(strip, strip?.windupFrames);
+  const forwardPx = windupFrames.includes(frameIndex)
+    ? finite(strip?.windupOriginForwardPx, defaultForwardPx)
+    : defaultForwardPx;
   const lateralPx = finite(strip?.originLateralPx, 0);
   const firingFrames = validFrameList(strip, strip?.firingFrames);
   const recoilPx = firingFrames.includes(frameIndex) ? Math.max(0, finite(strip?.firingRecoilPx, 0)) : 0;
@@ -253,12 +269,12 @@ function frameStripUsesMovementFrames(strip, entity, renderContext = null) {
 }
 
 function frameStripEntityIsMoving(entity, renderContext = null) {
-  if (entity?.state !== STATE.MOVE) return false;
+  if (entity?.state !== STATE.MOVE && entity?.state !== STATE.ATTACK) return false;
   if (typeof renderContext?.frameStripMoving === "boolean") return renderContext.frameStripMoving;
   if (Number.isFinite(renderContext?.frameStripMovementActivity)) {
     return renderContext.frameStripMovementActivity > 0.01;
   }
-  return true;
+  return entity?.state === STATE.MOVE;
 }
 
 function clamp01(value) {

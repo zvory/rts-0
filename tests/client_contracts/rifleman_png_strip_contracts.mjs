@@ -27,7 +27,8 @@ for (const [label, strip, variant] of [
   assert(assetUrlVersion(strip.image) === strip.imageVersion, `${label} strip URL carries its image version cache key`);
   assert(strip.frameWidth === runtime.frameWidth, `${label} frame width matches the manifest`);
   assert(strip.frameHeight === runtime.frameHeight, `${label} frame height matches the manifest`);
-  assert(strip.frameCount === runtime.frameCount, `${label} frame count matches the manifest`);
+  const expectedFrameCount = variant.frameCount ?? runtime.frameCount;
+  assert(strip.frameCount === expectedFrameCount, `${label} frame count matches the manifest`);
   assert(strip.idleFrame === runtime.idleFrame, `${label} idle frame matches the manifest`);
   assert(JSON.stringify(strip.movementFrames) === JSON.stringify(runtime.movementFrames), `${label} movement frames match the manifest`);
   assert(JSON.stringify(strip.firingFrames) === JSON.stringify(runtime.firingFrames), `${label} firing frames match the manifest`);
@@ -43,9 +44,30 @@ for (const [label, strip, variant] of [
   assert(strip.source.runtimeStrip === variant.runtimeStrip, `${label} source metadata points at its checked-in runtime strip`);
   assert(repoPathFromClientAssetUrl(strip.image) === variant.runtimeStrip, `${label} runtime URL maps back to the checked-in strip`);
   const runtimeStripSize = readPngDimensions(variant.runtimeStrip);
-  assert(runtimeStripSize.width === runtime.frameWidth * runtime.frameCount, `${label} runtime strip width matches frame geometry`);
+  assert(runtimeStripSize.width === runtime.frameWidth * expectedFrameCount, `${label} runtime strip width matches frame geometry`);
   assert(runtimeStripSize.height === runtime.frameHeight, `${label} runtime strip height matches frame geometry`);
 }
+
+assert(
+  JSON.stringify(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.windupFrames) ===
+    JSON.stringify(runtime.panzerfaustLoaded.windupFrames),
+  "loaded Panzerfaust strip exposes the three selected wind-up frames",
+);
+assert(
+  RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.windupProgressField ===
+    runtime.panzerfaustLoaded.windupProgressField,
+  "loaded Panzerfaust strip binds its authoritative wind-up progress field",
+);
+assert(
+  RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.windupOriginForwardPx ===
+    runtime.panzerfaustLoaded.windupOriginForwardPx,
+  "loaded Panzerfaust wind-up uses the torso-centered origin",
+);
+assert(
+  RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.source.windupFrames ===
+    runtime.panzerfaustLoaded.windupSource,
+  "loaded Panzerfaust descriptor records the selected wind-up source strip",
+);
 
 const liveStrips = createLiveFrameStrips();
 assert(liveFrameStripFor(liveStrips, KIND.RIFLEMAN) === RIFLEMAN_PNG_FRAME_STRIP,

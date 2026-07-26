@@ -8,6 +8,7 @@ import {
 } from "../../client/src/renderer/rigs/frame_strip_runtime.js";
 import { _frameStripMovementVisual } from "../../client/src/renderer/units.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/machine_gunner_png_strip.js";
+import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_png_strip.js";
 
 const deployedMachineGunner = {
@@ -104,6 +105,36 @@ assert(
     { now: 0, recoilProgress: 1, recoilPhase: 0.05, recoilWeaponKind: WEAPON_KIND.PANZERFAUST_LOADED_SHOT },
   ) === RIFLEMAN_PNG_FRAME_STRIP.idleFrame,
   "Panzerfaust recoil does not show the rifle muzzle-flare frame",
+);
+
+const windingUpPanzerfaust = {
+  id: 12,
+  kind: KIND.PANZERFAUST,
+  state: STATE.ATTACK,
+  panzerfaustLoaded: true,
+};
+for (const [progress, expectedFrame] of [
+  [0, 5],
+  [0.34, 6],
+  [0.67, 7],
+  [1, 7],
+]) {
+  assert(
+    frameStripFrameIndex(
+      RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP,
+      { ...windingUpPanzerfaust, panzerfaustWindupProgress: progress },
+    ) === expectedFrame,
+    `Panzerfaust wind-up progress ${progress} selects authored frame ${expectedFrame}`,
+  );
+}
+assert(
+  frameStripFrameIndex(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP, windingUpPanzerfaust) ===
+    RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.idleFrame,
+  "loaded Panzerfaust holds its carried idle art when no authoritative wind-up is active",
+);
+assert(
+  frameStripSpriteOffset(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP, 5).x === 0,
+  "Panzerfaust wind-up art uses its torso-centered origin instead of the carried-rifle offset",
 );
 
 assert(
@@ -274,7 +305,25 @@ assert(
     interruptedMovement.tick + 1,
     25,
   ).moving === false,
-  "renderer clears latched movement when the unit leaves move state",
+  "renderer clears latched movement when an attacking unit is stationary",
+);
+const pursuingAttackEntity = { ...stationaryMoveEntity, state: STATE.ATTACK };
+assert(
+  frameStripMovementFor(
+    pursuingAttackEntity,
+    { ...pursuingAttackEntity, x: 38 },
+    pursuingAttackEntity,
+  ).moving === true,
+  "renderer animates frame-strip walking while an attack-state unit pursues its target",
+);
+assert(
+  RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.movementFrames.includes(
+    frameStripFrameIndex(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP, pursuingAttackEntity, {
+      now: 0,
+      frameStripMoving: true,
+    }),
+  ),
+  "attacking Panzerfaust pursuit uses the authored walking frames",
 );
 assert(
   frameStripMovementFor(

@@ -2011,7 +2011,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled no-backpack PNG
   frame strip with frame 0 idle, frames 1-3 moving, and frame 4 firing; machine gunner: enabled PNG frame-strip
   experiment with carried movement frames and setup/deployed frames; Panzerfaust:
-  the matching five-frame Rifleman strip with an oversized launcher composited on the back
+  an eight-frame loaded strip with the matching five Rifleman poses plus three wind-up poses
   until launch, then the normal no-backpack Rifleman strip; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
@@ -2019,7 +2019,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
   A-19 PNG components animated from the SVG-authored support-weapon rig).
   Riflemen normally carry a rifle; Panzerfausts with `panzerfaustLoaded: true` carry a tube launcher
-  with a team-colored band and switch immediately to normal rifle art after launch. Both white-base
+  with a team-colored band and switch immediately to normal rifle art after launch. While
+  `panzerfaustWindupProgress` is present, the loaded strip selects its three authored
+  back-to-shoulder wind-up frames in thirds; the rifle is absent, the final aim faces the target,
+  and the server's normalized progress naturally plays the sequence over 15 ticks normally or
+  12 ticks with Methamphetamines. The wind-up soldier was uniformly scaled to 60 percent linear
+  size so its neutral-white pixel area matches the walking soldier before the shared team tint.
+  Both white-base
   Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine
   Gunner's tonal weight. Their torso-centered sprite origin sits 10 world pixels ahead of the raw
   frame center. Frame 4 is shown only for the opening 20% of the recoil envelope (about 84 ms for

@@ -124,7 +124,7 @@ export function _frameStripMovementVisual(e, state) {
   const previousMotion = this._frameStripMotion?.get?.(e.id);
   const snapshotMotion = snapshotMovementSample(e, state);
   const renderMoving = renderedPositionChanged(e, this._frameStripMotion);
-  const moveState = e?.state === STATE.MOVE;
+  const moveState = e?.state === STATE.MOVE || e?.state === STATE.ATTACK;
   const freshSnapshot = snapshotMotion != null &&
     authoritativeSampleChanged(snapshotMotion, previousMotion);
   const observedMovement = moveState && (
@@ -134,12 +134,17 @@ export function _frameStripMovementVisual(e, state) {
   );
   let lastMovementAt = null;
   if (moveState) {
-    lastMovementAt = observedMovement ? now : previousMotion?.lastMovementAt ?? null;
+    lastMovementAt = observedMovement
+      ? now
+      : previousMotion?.state === e.state
+        ? previousMotion.lastMovementAt ?? null
+        : null;
   }
   if (this._frameStripMotion) {
     this._frameStripMotion.set(e.id, {
       x: finite(e.x, 0),
       y: finite(e.y, 0),
+      state: e?.state ?? null,
       snapshotTick: snapshotMotion?.tick ?? null,
       snapshotX: snapshotMotion?.x ?? null,
       snapshotY: snapshotMotion?.y ?? null,
