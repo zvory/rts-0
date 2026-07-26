@@ -3203,7 +3203,7 @@ input[type="text"]:focus {
   color: var(--bad);
 }
 #selected-panel .sel-budget-grid {
-  --sel-budget-cell: 18px;
+  --sel-budget-cell: 24px;
   display: grid;
   grid-template-columns: repeat(var(--sel-budget-cols), var(--sel-budget-cell));
   grid-template-rows: repeat(2, var(--sel-budget-cell));

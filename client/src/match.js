@@ -7,7 +7,7 @@ import {
 import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { FrameProfiler } from "./frame_profiler.js";
-import { HUD } from "./hud.js";
+import { createMatchHud } from "./match_hud.js";
 import { ApmTracker } from "./apm_tracker.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
@@ -325,17 +325,7 @@ export class Match {
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit(
       "match.hud",
-      () => new HUD(
-        dom.gameScreen,
-        this.state,
-        this.commandInteraction,
-        this.audio,
-        this.hotkeyProfiles,
-        this.clientIntent,
-        this.controlPolicy,
-        this.camera,
-        this.apmTracker,
-      ),
+      () => createMatchHud(this, dom.gameScreen),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.domInputZone = this._timeInit(

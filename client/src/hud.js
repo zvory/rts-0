@@ -165,8 +165,9 @@ export class HUD {
    * @param {object} [controlPolicy] policy that decides command-surface and owner control.
    * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
    * @param {import("./apm_tracker.js").ApmTracker} [apmTracker] recent issued-command rate.
+   * @param {(kind:string) => string} [unitIconMarkupForKind] renderer-authored unit icon resolver.
    */
-  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null) {
+  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null, unitIconMarkupForKind = null) {
     this.root = rootEl;
     this.state = state;
     this.commandInteraction = commandInteraction;
@@ -176,6 +177,7 @@ export class HUD {
     this.controlPolicy = controlPolicy;
     this.camera = camera;
     this.apmTracker = apmTracker;
+    this.unitIconMarkupForKind = unitIconMarkupForKind;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -197,7 +199,12 @@ export class HUD {
     this.elSelected = rootEl.querySelector("#selected-panel");
     this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
-    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state, this.controlPolicy);
+    this.selectionPanel = new HudSelectionPanel(
+      this.elSelected,
+      this.state,
+      this.controlPolicy,
+      this.unitIconMarkupForKind,
+    );
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
@@ -445,7 +452,8 @@ export class HUD {
     if (!card) return;
     let descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext(frameViews));
     if (this.hotkeyProfiles) descriptorCard = this.hotkeyProfiles.resolveCard(descriptorCard);
-    const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}`;
+    const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}` +
+      `|unitIconColor:${this._selectedOwnerColor()}`;
     if (descriptorCard.kind === "spectator") {
       if (this._cardSig !== cardSig) {
         card.innerHTML = "";
@@ -527,6 +535,11 @@ export class HUD {
       commandId: descriptor.commandId,
       slotIndex: descriptor.slotIndex,
       icon: descriptor.icon,
+      unitIconMarkup: descriptor.unitIconKind
+        ? this.unitIconMarkupForKind?.(descriptor.unitIconKind, {
+            teamColor: this._selectedOwnerColor(),
+          }) || ""
+        : "",
       label: descriptor.label,
       ability: descriptor.ability,
       hotkey: descriptor.hotkey,
@@ -1028,5 +1041,15 @@ export class HUD {
 
   _resourceIcon(kind) {
     return resourceIconHtml(kind);
+  }
+
+  _selectedOwnerColor() {
+    const selected = typeof this.state?.selectedEntities === "function"
+      ? this.state.selectedEntities() || []
+      : [];
+    const owner = selected[0]?.owner ?? this.state?.playerId;
+    return this.state?.playerById?.(owner)?.color ||
+      this.state?.players?.find?.((player) => Number(player?.id) === Number(owner))?.color ||
+      "#0072b2";
   }
 }

@@ -14,6 +14,12 @@ export const SCOUT_PLANE_PNG_FRAME_STRIP = deepFreeze({
   frameHeight: 1163,
   frameCount: 1,
   idleFrame: 0,
+  iconVisibleBounds: {
+    x: 24,
+    y: 24,
+    w: 894,
+    h: 1115,
+  },
   fps: 12,
   worldScale: 0.065,
   tintSlot: "team-light",

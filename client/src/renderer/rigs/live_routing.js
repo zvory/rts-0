@@ -221,6 +221,33 @@ export function liveRigKinds() {
   ];
 }
 
+/**
+ * Return a static inline-SVG portrait assembled from the same authored parts as the live unit.
+ *
+ * HUD consumers receive this through Match dependency injection, keeping renderer assets out of
+ * UI modules while ensuring an authored rig edit also updates its command-card/selection icon.
+ */
+export function liveRigIconSvgFor(kind) {
+  const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
+  const svgText = LIVE_RIG_SOURCES.find(([candidate]) => candidate === rigKey)?.[1];
+  const unitParts = LIVE_RIG_PARTS[rigKey]?.unit;
+  if (!svgText || !Array.isArray(unitParts) || unitParts.length === 0) return "";
+
+  const includedParts = new Set(unitParts);
+  return svgText
+    .split("\n")
+    .filter((line) => {
+      if (line.includes("<svg") || line.includes("</svg>")) return true;
+      const id = line.match(/\sid="([^"]+)"/)?.[1];
+      return !id || includedParts.has(id);
+    })
+    .join("\n")
+    .replace(
+      "<svg ",
+      '<svg class="unit-rig-icon" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid meet" ',
+    );
+}
+
 export function liveRigKeyForEntity(entity) {
   if (entity?.kind !== KIND.PANZERFAUST) return entity?.kind;
   return entity?.panzerfaustLoaded === true ? LOADED_RIFLEMAN_RIG_KEY : KIND.RIFLEMAN;

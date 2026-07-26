@@ -1055,6 +1055,7 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(trainCard.kind === "train", "production building should use train descriptor card");
   assert(trainCard.slots[0].label === "Rifleman", "Barracks first train slot should be Rifleman");
   assert(trainCard.slots[0].commandId === defaultFactionCommandId("train", KIND.RIFLEMAN), "train button should expose stable train identity");
+  assert(trainCard.slots[0].unitIconKind === KIND.RIFLEMAN, "train button identifies its renderer-authored unit icon kind");
   assert(trainCard.slots[0].slotIndex === 0, "train button should expose rendered slot index");
   assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
   assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");

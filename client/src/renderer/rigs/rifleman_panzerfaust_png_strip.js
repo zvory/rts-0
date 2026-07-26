@@ -14,6 +14,12 @@ export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
   frameHeight: 112,
   frameCount: 8,
   idleFrame: 0,
+  iconVisibleBounds: {
+    x: 2,
+    y: 6,
+    w: 149,
+    h: 92,
+  },
   movementFrames: [1, 2, 3],
   firingFrames: [4],
   windupFrames: [5, 6, 7],

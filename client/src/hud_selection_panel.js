@@ -47,6 +47,7 @@ export function selectionBudgetGridModel(entities, overflow = null) {
     blocks.push({
       id: entity?.id,
       kind: entity?.kind,
+      owner: entity?.owner,
       icon: st.icon || "",
       label: st.label || entity?.kind || "",
       weight,
@@ -69,10 +70,11 @@ export function selectionBudgetGridModel(entities, overflow = null) {
 }
 
 export class HudSelectionPanel {
-  constructor(panel, state, controlPolicy = null) {
+  constructor(panel, state, controlPolicy = null, unitIconMarkupForKind = null) {
     this.panel = panel;
     this.state = state;
     this.controlPolicy = controlPolicy;
+    this.unitIconMarkupForKind = unitIconMarkupForKind;
     this._renderSig = null;
     this._selectionOverflowSig = null;
     this._selectionOverflowUntil = 0;
@@ -167,7 +169,17 @@ export class HudSelectionPanel {
       cell.style.gridColumn = `${block.col} / span ${block.cols}`;
       cell.style.gridRow = `${block.row} / span ${block.rows}`;
       cell.title = `${block.label}: ${block.weight} command supply`;
-      cell.textContent = block.icon;
+      const teamColor = this.state?.playerById?.(block.owner)?.color ||
+        this.state?.players?.find?.((player) =>
+          Number(player?.id) === Number(block.owner))?.color ||
+        "#0072b2";
+      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind, { teamColor }) || "";
+      if (unitIconMarkup) {
+        cell.className += " has-unit-render-icon";
+        cell.innerHTML = unitIconMarkup;
+      } else {
+        cell.textContent = block.icon;
+      }
       this._selectionEntityNode(cell, block);
       grid.appendChild(cell);
     }
@@ -363,7 +375,7 @@ export function entrenchmentSelectionStatus(entity, state = null) {
 function selectionPanelSignature(entities, overflow, state = null) {
   if (!entities || entities.length === 0) return "empty";
   if (entities.length === 1) return `single:${selectionDetailSignature(entities[0], state)}`;
-  const selected = entities.map(selectionBudgetEntitySignature).join("|");
+  const selected = entities.map((entity) => selectionBudgetEntitySignature(entity, state)).join("|");
   const overflowSig = overflow
     ? `${numberSig(overflow.used)}:${numberSig(overflow.cap)}:${sigValue(overflow.seq)}`
     : "none";
@@ -425,12 +437,17 @@ function percent(value) {
   return `${Math.round(value * 100)}%`;
 }
 
-function selectionBudgetEntitySignature(entity) {
+function selectionBudgetEntitySignature(entity, state = null) {
   if (!entity) return "missing";
+  const ownerColor = state?.playerById?.(entity.owner)?.color ||
+    state?.players?.find?.((player) =>
+      Number(player?.id) === Number(entity.owner))?.color;
   return [
     sigValue(entity.id),
     sigValue(entity.kind),
     sigValue(entity.label),
+    sigValue(entity.owner),
+    sigValue(ownerColor),
   ].join(":");
 }
 

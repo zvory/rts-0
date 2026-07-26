@@ -4,6 +4,7 @@ import { COLORS } from "../../client/src/config.js";
 import { KIND, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
+import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -30,6 +31,68 @@ function restoreGlobal(name, value) {
 
 assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 * 0.85,
   "rig presentation scale composes with occupied-trench scale");
+
+{
+  const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);
+  assert(
+    riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
+      riflemanIcon.includes("rifleman-recoil-review-strip.png") &&
+      riflemanIcon.includes('viewBox="16.725 25.575 137.55 59.85"') &&
+      riflemanIcon.includes('width="137.55" height="59.85"') &&
+      riflemanIcon.includes('preserveAspectRatio="xMidYMid meet"') &&
+      riflemanIcon.includes('flood-color="#0072b2"') &&
+      riflemanIcon.includes('style="overflow:hidden"') &&
+      !riflemanIcon.includes("<img"),
+    "unit icon resolver fits the live Rifleman PNG silhouette without exposing adjacent frames",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="0 3.7 154.725 96.6"') &&
+      liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="0.525 9.975 61.95 43.05"'),
+    "unit icon resolver independently fits each production PNG silhouette",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.RIFLEMAN, { teamColor: "#d55e00" })
+      .includes('flood-color="#d55e00"'),
+    "unit icon resolver multiplies PNG detail by the selected owner's team color",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.WORKER, { teamColor: "#d55e00" })
+      .includes('fill="#d55e00"') &&
+      liveUnitIconMarkupFor(KIND.EKAT, { teamColor: "#d55e00" })
+        .includes('fill="#e46d0f"'),
+    "unit icon resolver applies the live rig tint palette to SVG fallback portraits",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" })
+      .includes('viewBox="658 1 656 339"'),
+    "unit icon resolver selects the owning team's baked Scout Car palette frame",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.SCOUT_PLANE)
+      .includes('viewBox="1.65 0 938.7 1163"'),
+    "unit icon resolver fits the Scout Plane silhouette instead of center-cropping it",
+  );
+  const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
+  assert(
+    tankIcon.includes('data-unit-icon-source="png-atlas-reference"') &&
+      tankIcon.includes("tank-tiger-i-pass-11-white-alpha.png") &&
+      tankIcon.includes('viewBox="41.025 108.9 531.975 298.2"'),
+    "unit icon resolver fits the live Tank PNG reference to its opaque silhouette",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.ARTILLERY).includes('class="unit-rig-icon"') &&
+      liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN).includes('class="unit-rig-icon"'),
+    "component-only support-weapon atlases fall back to complete authored unit silhouettes",
+  );
+  const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);
+  assert(
+    workerIcon.includes('class="unit-rig-icon"') &&
+      !workerIcon.includes("anchor.") &&
+      !workerIcon.includes("bounds."),
+    "unit icon resolver retains the clean authored SVG fallback when no live PNG exists",
+  );
+  assert(liveUnitIconMarkupFor("not_a_unit") === "", "unit icon resolver leaves unknown kinds to HUD fallback");
+}
 
 {
   assert(COLORS.road < 0x383838, "road base stays visibly darker than the surrounding terrain");

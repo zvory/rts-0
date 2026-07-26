@@ -492,6 +492,7 @@ export function buildTrainCard(ctx, building) {
       action: "train",
       intent: { type: "train", unit },
       icon: st.icon,
+      unitIconKind: unit,
       label: st.label,
       cost: st.cost,
       enabled: availability !== "locked",

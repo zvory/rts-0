@@ -142,8 +142,16 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "mortar_team",
   image: "/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png?v=m2-wheeled-baseplate-pass04-halfres-rgba8",
+  iconVisibleBounds: {
+    x: 37,
+    y: 82,
+    w: 306,
+    h: 196,
+  },
   grid: {
     profile: "four-component-cells",
+    width: 1150,
+    height: 362,
     sourceSheet: "client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png",
     generatedSource: "client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-source.png",
     basePlateGeneratedSource: "client/assets/rigs/mortar-png-pass-04/generated/mortar-baseplate-source-v3.png",

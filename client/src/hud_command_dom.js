@@ -32,6 +32,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {string} [opts.commandId] stable command identity for hotkey/profile tooling.
  * @param {number} [opts.slotIndex] rendered command-card grid slot.
  * @param {string} [opts.icon] glyph shown large.
+ * @param {string} [opts.unitIconMarkup] trusted renderer-authored PNG/SVG markup shown instead of glyph.
  * @param {string} opts.label visible name.
  * @param {string} [opts.ability] ability id for dynamic cooldown-clock refreshes.
  * @param {string} [opts.hotkey] keyboard hint shown in a corner.
@@ -133,7 +134,8 @@ export function createCommandButton(opts) {
 
   btn.innerHTML =
     autobuildHtml +
-    `<span class="cmd-icon">${opts.icon || ""}</span>` +
+    `<span class="cmd-icon${opts.unitIconMarkup ? " has-unit-render-icon" : ""}">` +
+      `${opts.unitIconMarkup || opts.icon || ""}</span>` +
     `<span class="cmd-label">${opts.label || ""}</span>` +
     (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +
     cooldownHtml +
