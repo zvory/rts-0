@@ -11,7 +11,7 @@ const ICON_FRAME_ZOOM = 1.5;
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
  * PNG frame strips/atlases win; authored SVG is retained only for units without a PNG route.
  */
-export function liveUnitIconMarkupFor(kind) {
+export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
   const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
   if (strip) {
@@ -27,12 +27,13 @@ export function liveUnitIconMarkupFor(kind) {
         h: strip.frameHeight,
       },
       teamTint: !!strip.tintSlot,
+      teamColor,
     });
   }
 
   const atlas = LIVE_PNG_ATLASES.get(rigKey);
   const atlasIcon = atlasPortrait(atlas);
-  if (atlasIcon) return rasterIconMarkup(atlasIcon);
+  if (atlasIcon) return rasterIconMarkup({ ...atlasIcon, teamColor });
 
   return liveRigIconSvgFor(kind);
 }
@@ -107,7 +108,15 @@ function sourceAssetUrl(sourcePath, version = "") {
   return version ? `${path}?v=${encodeURIComponent(version)}` : path;
 }
 
-function rasterIconMarkup({ source, image, sheetWidth, sheetHeight, frame, teamTint = false }) {
+function rasterIconMarkup({
+  source,
+  image,
+  sheetWidth,
+  sheetHeight,
+  frame,
+  teamTint = false,
+  teamColor = "#0072b2",
+}) {
   const safeSheetWidth = positiveDimension(sheetWidth);
   const safeSheetHeight = positiveDimension(sheetHeight);
   const safeFrame = {
@@ -122,13 +131,24 @@ function rasterIconMarkup({ source, image, sheetWidth, sheetHeight, frame, teamT
   const viewHeight = safeFrame.h / ICON_FRAME_ZOOM;
   const viewX = safeFrame.x + (safeFrame.w - viewWidth) / 2;
   const viewY = safeFrame.y + (safeFrame.h - viewHeight) / 2;
+  const tintColor = normalizeTeamColor(teamColor);
+  const tintId = `unit-icon-tint-${tintColor.slice(1).toLowerCase()}`;
+  const tintFilter = teamTint
+    ? `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
+        `<feFlood flood-color="${tintColor}" result="teamColor" />` +
+        `<feComposite in="teamColor" in2="SourceGraphic" operator="in" result="maskedTeamColor" />` +
+        `<feBlend in="SourceGraphic" in2="maskedTeamColor" mode="multiply" />` +
+      `</filter></defs>`
+    : "";
+  const imageFilter = teamTint ? ` filter="url(#${tintId})"` : "";
   return (
     `<svg class="unit-raster-icon${teamTint ? " team-tinted" : ""}" ` +
       `data-unit-icon-source="${source}" aria-hidden="true" focusable="false" ` +
       `viewBox="${number(viewX)} ${number(viewY)} ${number(viewWidth)} ${number(viewHeight)}" ` +
-      `preserveAspectRatio="xMidYMid meet">` +
+      `preserveAspectRatio="xMidYMid meet" style="overflow:hidden">` +
+      tintFilter +
       `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
-        `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
+        `height="${number(safeSheetHeight)}" preserveAspectRatio="none"${imageFilter} />` +
     `</svg>`
   );
 }
@@ -145,4 +165,9 @@ function finiteNumber(value) {
 
 function number(value) {
   return Number(value.toFixed(4));
+}
+
+function normalizeTeamColor(value) {
+  const color = String(value || "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#0072b2";
 }

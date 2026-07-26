@@ -3457,7 +3457,9 @@ input[type="text"]:focus {
 }
 .unit-raster-icon {
   display: block;
-  overflow: hidden;
+  overflow: hidden !important;
+  clip-path: inset(0);
+  contain: paint;
   width: 100% !important;
   height: 100% !important;
   max-width: 100%;
@@ -3467,8 +3469,9 @@ input[type="text"]:focus {
   pointer-events: none;
   user-select: none;
 }
-.unit-raster-icon.team-tinted image {
-  filter: brightness(0.72) sepia(0.22) saturate(1.35) hue-rotate(165deg);
+.cmd-btn:disabled .cmd-icon.has-unit-render-icon,
+.cmd-btn.primary-disabled .cmd-icon.has-unit-render-icon {
+  opacity: 0.72;
 }
 .cmd-btn .cmd-label {
   font-size: 10px;

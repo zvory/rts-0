@@ -47,6 +47,7 @@ export function selectionBudgetGridModel(entities, overflow = null) {
     blocks.push({
       id: entity?.id,
       kind: entity?.kind,
+      owner: entity?.owner,
       icon: st.icon || "",
       label: st.label || entity?.kind || "",
       weight,
@@ -168,7 +169,11 @@ export class HudSelectionPanel {
       cell.style.gridColumn = `${block.col} / span ${block.cols}`;
       cell.style.gridRow = `${block.row} / span ${block.rows}`;
       cell.title = `${block.label}: ${block.weight} command supply`;
-      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind) || "";
+      const teamColor = this.state?.playerById?.(block.owner)?.color ||
+        this.state?.players?.find?.((player) =>
+          Number(player?.id) === Number(block.owner))?.color ||
+        "#0072b2";
+      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind, { teamColor }) || "";
       if (unitIconMarkup) {
         cell.className += " has-unit-render-icon";
         cell.innerHTML = unitIconMarkup;

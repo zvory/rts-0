@@ -535,7 +535,9 @@ export class HUD {
       slotIndex: descriptor.slotIndex,
       icon: descriptor.icon,
       unitIconMarkup: descriptor.unitIconKind
-        ? this.unitIconMarkupForKind?.(descriptor.unitIconKind) || ""
+        ? this.unitIconMarkupForKind?.(descriptor.unitIconKind, {
+            teamColor: this._selectedOwnerColor(),
+          }) || ""
         : "",
       label: descriptor.label,
       ability: descriptor.ability,
@@ -1038,5 +1040,15 @@ export class HUD {
 
   _resourceIcon(kind) {
     return resourceIconHtml(kind);
+  }
+
+  _selectedOwnerColor() {
+    const selected = typeof this.state?.selectedEntities === "function"
+      ? this.state.selectedEntities() || []
+      : [];
+    const owner = selected[0]?.owner ?? this.state?.playerId;
+    return this.state?.playerById?.(owner)?.color ||
+      this.state?.players?.find?.((player) => Number(player?.id) === Number(owner))?.color ||
+      "#0072b2";
   }
 }
