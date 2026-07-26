@@ -41,6 +41,32 @@ for (let y = 0; y < before.height; y += 1) {
       assert.equal(masked, false, `approved recolor mask overlaps weapon at ${x},${y}`);
     }
     if (masked) {
+      const expectedWhite = Math.max(
+        180,
+        Math.min(
+          242,
+          Math.round(
+            165
+              + luma(
+                before.data[offset],
+                before.data[offset + 1],
+                before.data[offset + 2],
+              ) * 0.45,
+          ),
+        ),
+      );
+      for (let channel = 0; channel < 3; channel += 1) {
+        assert.equal(
+          after.data[offset + channel],
+          expectedWhite,
+          `masked RGB does not match the white-clothing transform at ${x},${y}`,
+        );
+      }
+      assert.notDeepEqual(
+        [...after.data.subarray(offset, offset + 3)],
+        [...before.data.subarray(offset, offset + 3)],
+        `approved recolor pixel is unchanged at ${x},${y}`,
+      );
       changedPixels += 1;
       changedByFrame[frame] += 1;
     }
@@ -66,6 +92,10 @@ function distanceToSegment(x, y, x1, y1, x2, y2) {
     ? 0
     : Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / lengthSquared));
   return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
+}
+
+function luma(r, g, b) {
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
 }
 
 function readPng(filePath) {

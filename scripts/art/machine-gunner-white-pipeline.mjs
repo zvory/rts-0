@@ -104,6 +104,13 @@ for (let y = 0; y < baseline.height; y += 1) {
       baseline.data[offset + 2],
     );
     const white = Math.max(180, Math.min(242, Math.round(165 + originalLuma * 0.45)));
+    if (
+      baseline.data[offset] === white
+      && baseline.data[offset + 1] === white
+      && baseline.data[offset + 2] === white
+    ) {
+      throw new Error(`Approved recolor pixel is unchanged at ${x},${y}`);
+    }
     output.data[offset] = white;
     output.data[offset + 1] = white;
     output.data[offset + 2] = white;
