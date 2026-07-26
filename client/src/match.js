@@ -960,15 +960,15 @@ export class Match {
 
   setExclusiveFullscreenEnabled(enabled) {
     this.exclusiveFullscreenEnabled = !!enabled;
-    const shouldAutoLock = this.shouldUseDesktopCursorAutoLock();
-    if (shouldAutoLock && !this.desktopCursorAutoLockEnabled) {
+    const shouldLock = this.shouldUseDesktopCursorAutoLock();
+    if (shouldLock && !this.desktopCursorAutoLockEnabled) {
       this.desktopCursorAutoLockEnabled = true;
       this.installDesktopCursorAutoLock();
       this.scheduleDesktopCursorAutoLock(
         "fullscreen-enabled",
         DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS,
       );
-    } else if (!shouldAutoLock && this.desktopCursorAutoLockEnabled) {
+    } else if (!shouldLock && this.desktopCursorAutoLockEnabled) {
       this.teardownDesktopCursorAutoLock();
     }
     this.syncSettingsToggleUi();
