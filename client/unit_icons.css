@@ -1,0 +1,65 @@
+#selected-panel .sel-budget-block.has-unit-render-icon {
+  padding: 1px;
+}
+
+#selected-panel .sel-budget-block .unit-rig-icon,
+#selected-panel .sel-budget-block .unit-raster-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 14px;
+  min-height: 14px;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.78));
+}
+
+#selected-panel .sel-budget-block .unit-raster-icon {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.cmd-btn .cmd-icon.has-unit-render-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 34px;
+}
+
+.cmd-btn .cmd-icon .unit-rig-icon,
+.cmd-btn .cmd-icon .unit-raster-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.82));
+}
+
+.cmd-btn .cmd-icon .unit-raster-icon {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.unit-raster-icon {
+  display: block;
+  overflow: hidden !important;
+  clip-path: inset(0);
+  contain: paint;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.unit-raster-icon image {
+  pointer-events: none;
+  user-select: none;
+}
+
+.cmd-btn:disabled .cmd-icon.has-unit-render-icon,
+.cmd-btn.primary-disabled .cmd-icon.has-unit-render-icon {
+  opacity: 0.72;
+}

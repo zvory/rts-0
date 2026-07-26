@@ -8,6 +8,7 @@ import "./client_contracts/apm_tracker_contracts.mjs";
 
 await import("./client_contracts/settings_contracts.mjs");
 await import("./client_contracts/hud_contracts.mjs");
+await import("./client_contracts/unit_icon_contracts.mjs");
 await import("./client_contracts/command_interaction_contracts.mjs");
 await import("./client_contracts/client_flamegraph_contracts.mjs");
 await import("./client_contracts/client_render_parity_contracts.mjs");

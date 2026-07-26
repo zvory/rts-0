@@ -10,7 +10,7 @@
     },
     {
       "path": "client/styles.css",
-      "lines": 5746,
+      "lines": 5745,
       "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {

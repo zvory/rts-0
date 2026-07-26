@@ -22,10 +22,7 @@ import {
   selectionBudgetBlockShape,
   selectionBudgetGridModel,
 } from "../../client/src/hud.js";
-import {
-  entrenchmentSelectionStatus,
-  HudSelectionPanel,
-} from "../../client/src/hud_selection_panel.js";
+import { entrenchmentSelectionStatus } from "../../client/src/hud_selection_panel.js";
 import { renderAllPlayersResources } from "../../client/src/hud_resources.js";
 import {
   buildCommandCardContextCatalog,
@@ -525,36 +522,6 @@ withFakeHudDocument(({ FakeElement }) => {
     const stableChildren = panel.children;
     hud._renderSelectedPanel();
     assert(panel.children === stableChildren, "HUD selected budget grid skips unchanged DOM rebuilds");
-  });
-
-  withFakeHudDocument(({ FakeElement }) => {
-    const panel = new FakeElement("section");
-    const iconMarkup = '<svg data-test-unit-icon="tank"></svg>';
-    const iconOptions = [];
-    const selectionPanel = new HudSelectionPanel(
-      panel,
-      {
-        selectedEntities: () => tanks,
-        playerById: (id) => id === 1 ? { id: 1, color: "#0072b2" } : null,
-      },
-      null,
-      (kind, options) => {
-        iconOptions.push(options);
-        return kind === KIND.TANK ? iconMarkup : "";
-      },
-    );
-    selectionPanel.render();
-    const blocks = panel.querySelectorAll(".sel-budget-block");
-    assert(
-      blocks.length === tanks.length &&
-        blocks.every((block) =>
-          block.className.includes("has-unit-render-icon") && block.innerHTML === iconMarkup),
-      "HUD multi-selection blocks render injected renderer-authored unit icons",
-    );
-    assert(
-      iconOptions.every((options) => options?.teamColor === "#0072b2"),
-      "HUD multi-selection icons receive their owning player's team color",
-    );
   });
 
   withFakeHudDocument(({ FakeElement }) => {
