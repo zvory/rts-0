@@ -32,9 +32,7 @@ fn queued_build_skips_occupied_scaffold_and_promotes_next_order() {
         worker.append_queued_order(OrderIntent::build(EntityKind::Depot, 16, 16));
         worker.append_queued_order(OrderIntent::move_to(fallback.0, fallback.1));
     }
-    let mut players = vec![player_state(1)];
-    players[0].steel = 0;
-    players[0].oil = 0;
+    let players = vec![player_state(1)];
 
     let events = promote_with_players_events(&map, &mut entities, &players);
 

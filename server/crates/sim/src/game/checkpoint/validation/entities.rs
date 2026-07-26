@@ -42,7 +42,6 @@ pub(super) fn validate_single_builders(entities: &[Entity]) -> Result<(), Checkp
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{BuildPhase, Order};
 
     #[test]
     fn tank_trap_owner_matches_construction_state() {
@@ -61,27 +60,5 @@ mod tests {
         let mut owned_obstacle = completed;
         owned_obstacle.owner = 1;
         assert!(validate_ownership(&owned_obstacle).is_err());
-    }
-
-    #[test]
-    fn rejects_multiple_active_builders_for_one_site() {
-        let site = 7;
-        let mut workers = [1, 2].map(|id| {
-            let mut worker =
-                Entity::new_unit(1, EntityKind::Worker, 32.0, 32.0).expect("worker should spawn");
-            worker.id = id;
-            worker.set_order(Order::build(EntityKind::Depot, 1, 1));
-            worker.mark_build_phase(BuildPhase::Constructing { site });
-            worker
-        });
-        assert!(matches!(
-            validate_single_builders(&workers),
-            Err(CheckpointPayloadError::DuplicateId {
-                field: "entities.order.buildSite",
-                id: 7
-            })
-        ));
-        workers[1].clear_active_order();
-        assert!(validate_single_builders(&workers).is_ok());
     }
 }
