@@ -1,4 +1,5 @@
 import { KIND } from "../../protocol.js";
+import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { liveRigIconSvgFor, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
@@ -13,6 +14,7 @@ const ICON_VISIBLE_PADDING_RATIO = 0.025;
  * PNG frame strips/atlases win; authored SVG is retained only for units without a PNG route.
  */
 export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
+  const tintColor = normalizeTeamColor(teamColor);
   const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
   if (strip) {
@@ -37,18 +39,18 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
           }
         : null,
       teamTint: !!strip.tintSlot,
-      teamColor,
+      teamColor: tintColor,
     });
   }
 
   const atlas = LIVE_PNG_ATLASES.get(rigKey);
-  const atlasIcon = atlasPortrait(atlas);
-  if (atlasIcon) return rasterIconMarkup({ ...atlasIcon, teamColor });
+  const atlasIcon = atlasPortrait(atlas, tintColor);
+  if (atlasIcon) return rasterIconMarkup({ ...atlasIcon, teamColor: tintColor });
 
-  return liveRigIconSvgFor(kind);
+  return tintRigIconMarkup(liveRigIconSvgFor(kind), tintColor);
 }
 
-function atlasPortrait(atlas) {
+function atlasPortrait(atlas, teamColor) {
   if (!atlas?.image || !atlas?.grid) return null;
   const assembled = atlas.grid.components?.assembledReference;
   if (assembled) {
@@ -93,16 +95,28 @@ function atlasPortrait(atlas) {
   }
 
   const sprite = representativeAtlasSprite(atlas.sprites);
-  const frame = sprite?.frame?.visibleBounds || sprite?.frame;
+  const baseFrame = sprite?.frame?.visibleBounds || sprite?.frame;
+  const paletteFrame = sprite?.paletteFrames?.[teamColor];
+  const frame = paletteFrame?.visibleBounds || paletteFrame || baseFrame;
   if (!frame) return null;
+  const visibleFrame = translatedVisibleFrame(atlas.iconVisibleBounds, baseFrame, frame) || frame;
   return {
     source: "png-atlas-component",
     image: atlas.image,
     sheetWidth: atlas.grid.width,
     sheetHeight: atlas.grid.height,
     frame,
-    visibleFrame: atlas.iconVisibleBounds || frame,
+    visibleFrame,
     teamTint: sprite.tintSlot !== "fixed",
+  };
+}
+
+function translatedVisibleFrame(visibleFrame, baseFrame, selectedFrame) {
+  if (!visibleFrame || !baseFrame || !selectedFrame) return null;
+  return {
+    ...visibleFrame,
+    x: visibleFrame.x + finiteNumber(selectedFrame.x) - finiteNumber(baseFrame.x),
+    y: visibleFrame.y + finiteNumber(selectedFrame.y) - finiteNumber(baseFrame.y),
   };
 }
 
@@ -220,5 +234,41 @@ function number(value) {
 
 function normalizeTeamColor(value) {
   const color = String(value || "").trim();
-  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#0072b2";
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : "#0072b2";
+}
+
+function tintRigIconMarkup(markup, teamColor) {
+  if (!markup) return "";
+  const team = Number.parseInt(teamColor.slice(1), 16);
+  const colors = {
+    team: teamColor,
+    "team-light": cssHex(lightenColor(team, 0.12)),
+    "team-light-soft": cssHex(lightenColor(team, 0.06)),
+    "team-light-strong": cssHex(lightenColor(team, 0.16)),
+    "team-light-08": cssHex(lightenColor(team, 0.08)),
+    "team-light-10": cssHex(lightenColor(team, 0.10)),
+    "team-light-14": cssHex(lightenColor(team, 0.14)),
+    "team-light-24": cssHex(lightenColor(team, 0.24)),
+  };
+  return markup
+    .split("\n")
+    .map((line) => {
+      const slot = line.match(/\sdata-rts-tint="([^"]+)"/)?.[1];
+      if (!slot) return line;
+      if (slot === "team-stroke") return replacePaint(line, "stroke", teamColor);
+      if (slot === "team-fill-stroke") {
+        return replacePaint(replacePaint(line, "fill", teamColor), "stroke", teamColor);
+      }
+      return colors[slot] ? replacePaint(line, "fill", colors[slot]) : line;
+    })
+    .join("\n");
+}
+
+function replacePaint(line, attribute, color) {
+  const pattern = new RegExp(`\\s${attribute}="[^"]*"`);
+  return pattern.test(line) ? line.replace(pattern, ` ${attribute}="${color}"`) : line;
+}
+
+function cssHex(color) {
+  return `#${color.toString(16).padStart(6, "0")}`;
 }

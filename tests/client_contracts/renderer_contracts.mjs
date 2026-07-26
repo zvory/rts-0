@@ -55,6 +55,23 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
       .includes('flood-color="#d55e00"'),
     "unit icon resolver multiplies PNG detail by the selected owner's team color",
   );
+  assert(
+    liveUnitIconMarkupFor(KIND.WORKER, { teamColor: "#d55e00" })
+      .includes('fill="#d55e00"') &&
+      liveUnitIconMarkupFor(KIND.EKAT, { teamColor: "#d55e00" })
+        .includes('fill="#e46d0f"'),
+    "unit icon resolver applies the live rig tint palette to SVG fallback portraits",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" })
+      .includes('viewBox="658 1 656 339"'),
+    "unit icon resolver selects the owning team's baked Scout Car palette frame",
+  );
+  assert(
+    liveUnitIconMarkupFor(KIND.SCOUT_PLANE)
+      .includes('viewBox="1.65 0 938.7 1163"'),
+    "unit icon resolver fits the Scout Plane silhouette instead of center-cropping it",
+  );
   const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
   assert(
     tankIcon.includes('data-unit-icon-source="png-atlas-reference"') &&
