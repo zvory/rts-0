@@ -28,7 +28,7 @@ use rts_protocol::{
     PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
     SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
 };
-use rts_protocol::{LabMapDraft, LabMapTile};
+use rts_protocol::{LabBaseSite, LabMapDraft, LabMapTile};
 
 fn assert_type<T>() {}
 
@@ -70,6 +70,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<LabClientOp>();
     assert_type::<LabMapDraft>();
     assert_type::<LabMapTile>();
+    assert_type::<LabBaseSite>();
     assert_type::<LabReplayArtifactV1>();
     assert_type::<LabReplayAuthoringMetadata>();
     assert_type::<LabReplayOperation>();

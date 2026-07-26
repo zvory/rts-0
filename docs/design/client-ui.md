@@ -839,7 +839,9 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 `MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–166-tile square blank maps with a 126-tile default and a compact size field that follows the active draft, edits name/description plus flat start and base
 locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
-capacity; every base location is permanent and its resources spawn even when no player starts there.
+capacity; every base location is permanent and its authored resource counts spawn even when no
+player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
+(0–9) patch controls; new and migrated bases default to 12 Steel and 3 Oil.
 Editor drafts may temporarily contain zero start locations so authors can clear and rebuild the player
 layout. Adding symmetric starts reuses any base sites already present at the target locations. There is no
 active layout, player slot, or per-player natural assignment. The viewport draws blue start

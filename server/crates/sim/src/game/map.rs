@@ -2,16 +2,20 @@
 //! `docs/design/server-sim.md` (`map.rs`).
 //!
 //! The live game loads authored maps from the server asset bundle. Map files define terrain,
-//! flat start locations and permanent base sites. The simulation assigns players to start
-//! locations, while every base site receives its resource cluster in every match.
+//! flat start locations and permanent base sites with per-site Steel/Oil patch counts. The
+//! simulation assigns players to start locations, while every base site receives its authored
+//! resource cluster in every match.
 //!
 //! Terrain passability here is purely about *terrain* — building footprints are tracked
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
 //! not baked into the map.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 mod authored;
+mod base_resources;
+mod data;
 #[cfg(test)]
 mod team_assignment_tests;
 
@@ -20,10 +24,12 @@ use crate::protocol::terrain;
 use crate::rules::terrain as terrain_rules;
 use serde::{Deserialize, Serialize};
 
+pub use base_resources::BaseResourceCounts;
+pub use data::AuthoredMapData;
 pub use rts_protocol::AvailableMap;
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 3;
+pub const CURRENT_MAP_VERSION: u32 = 4;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -57,19 +63,9 @@ pub struct Map {
     /// Every authored base location. These always receive resource clusters; selected starts
     /// additionally receive a player's starting buildings and workers.
     pub base_sites: Vec<(u32, u32)>,
-}
-
-/// Canonical materialization of an authored-map document before player starts are assigned.
-///
-/// HTTP/session boundaries use this to bind an untrusted authored document to an equivalent
-/// wire-format draft without maintaining a second copy of the authored-map decoder.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AuthoredMapData {
-    pub name: String,
-    pub size: u32,
-    pub terrain: Vec<u8>,
-    pub starts: Vec<(u32, u32)>,
-    pub base_sites: Vec<(u32, u32)>,
+    /// Per-site resource counts. Hand-authored/dev maps without an entry use the live balance
+    /// defaults so existing test helpers remain concise.
+    pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -187,6 +183,9 @@ impl Map {
         for &(x, y) in &self.base_sites {
             hash = fnv_bytes(hash, &x.to_le_bytes());
             hash = fnv_bytes(hash, &y.to_le_bytes());
+            let counts = self.resource_counts_at((x, y));
+            hash = fnv_bytes(hash, &counts.steel_patches.to_le_bytes());
+            hash = fnv_bytes(hash, &counts.oil_patches.to_le_bytes());
         }
         format!("{hash:016x}")
     }
@@ -608,7 +607,7 @@ mod tests {
               "_design": "n/a",
               "terrain": [".."],
               "startLocations": [{"x": 0, "y": 0}],
-              "baseSites": [{"x": 0, "y": 0}]
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}]
             }"#,
             0,
         )
@@ -622,13 +621,13 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 3,
+              "version": 4,
               "name": "bad",
               "description": "bad map",
               "_design": "n/a",
               "terrain": ["..", ".x"],
               "startLocations": [{"x": 0, "y": 0}],
-              "baseSites": [{"x": 0, "y": 0}]
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}]
             }"#,
             0,
         )
@@ -644,13 +643,13 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 3,
+              "version": 4,
               "name": "bad-base",
               "description": "bad base map",
               "_design": "n/a",
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
-              "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
+              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -667,13 +666,13 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 3,
+              "version": 4,
               "name": "road-base",
               "description": "road through a base",
               "_design": "n/a",
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
-              "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
+              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );

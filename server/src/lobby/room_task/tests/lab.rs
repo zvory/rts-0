@@ -81,9 +81,11 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
             crate::protocol::LabMapTile { x: size - 9, y: 8 },
             crate::protocol::LabMapTile { x: 8, y: size - 9 },
         ],
-        base_sites: vec![crate::protocol::LabMapTile {
+        base_sites: vec![crate::protocol::LabBaseSite {
             x: size / 2,
             y: size / 2,
+            steel_patches: 12,
+            oil_patches: 3,
         }],
     });
     let mut task = RoomTask::new(

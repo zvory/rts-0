@@ -111,8 +111,12 @@ import {
   authoredMapFromMaterialized,
   MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
   MAP_EDITOR_DEFAULT_SIZE,
+  MAP_EDITOR_DEFAULT_OIL_PATCHES,
+  MAP_EDITOR_DEFAULT_STEEL_PATCHES,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_OIL_PATCHES,
+  MAP_EDITOR_MAX_STEEL_PATCHES,
   MAP_EDITOR_MAX_SIZE,
   MAP_EDITOR_MIN_SIZE,
   MAP_EDITOR_SYMMETRY,
@@ -124,6 +128,8 @@ import {
   symmetricMapTiles,
   symmetricTerrainTiles,
 } from "../../client/src/map_editor_session.js";
+
+const baseLocations = (sites) => sites.map(({ x, y }) => ({ x, y }));
 
 {
   const viewport = { keys: { up: false, down: false, left: false, right: false } };
@@ -171,6 +177,7 @@ import {
 const repoRoot = new URL("../../", import.meta.url);
 const oneVOneNoTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1-no-terrain.json", repoRoot), "utf8"));
 const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
+const serverProtocolSource = fs.readFileSync(new URL("server/crates/protocol/src/lab_scenario.rs", repoRoot), "utf8");
 const mainSource = fs.readFileSync(new URL("client/src/main.js", repoRoot), "utf8");
 
 assert(
@@ -183,17 +190,23 @@ assert(
   const serverBaseRadius = Number(serverMapSource.match(/BASE_SITE_PROTECTION_RADIUS_TILES:\s*i32\s*=\s*(\d+)/)?.[1]);
   assert.equal(MAP_EDITOR_MAIN_CLEARANCE_TILES, serverMainRadius);
   assert.equal(MAP_EDITOR_BASE_SITE_CLEARANCE_TILES, serverBaseRadius);
+  const serverMaxSteel = Number(serverProtocolSource.match(/MAX_STEEL_PATCHES_PER_BASE:\s*u32\s*=\s*(\d+)/)?.[1]);
+  const serverMaxOil = Number(serverProtocolSource.match(/MAX_OIL_PATCHES_PER_BASE:\s*u32\s*=\s*(\d+)/)?.[1]);
+  assert.equal(MAP_EDITOR_MAX_STEEL_PATCHES, serverMaxSteel);
+  assert.equal(MAP_EDITOR_MAX_OIL_PATCHES, serverMaxOil);
 }
 
 {
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 3);
+  assert.equal(session.exportMap().version, 4);
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
   assert.equal(materialized.baseSites.length, 4, "every authored base is materialized without choosing a player layout");
   assert(materialized.baseSites.some((site) => site.x === 25 && site.y === 25), "start locations are permanent base sites");
+  assert(materialized.baseSites.every((site) => site.steelPatches === 12 && site.oilPatches === 3),
+    "bundled maps materialize per-base resource counts");
   assert.deepEqual(
     session.mapOverlay().bases.map((site) => site.index),
     [2, 3],
@@ -221,7 +234,9 @@ assert(
   }), true);
   assert.equal(result.ok, true);
   assert.equal(session.draft.startLocations.length, 0, "an editor draft may temporarily have no start locations");
-  assert.deepEqual(session.draft.baseSites, [{ x: 8, y: 8 }], "removing a start keeps its resource site as a neutral base");
+  assert.deepEqual(session.draft.baseSites, [{
+    x: 8, y: 8, steelPatches: MAP_EDITOR_DEFAULT_STEEL_PATCHES, oilPatches: MAP_EDITOR_DEFAULT_OIL_PATCHES,
+  }], "removing a start keeps its resource site as a neutral base");
   assert.deepEqual(session.materialized().starts, [], "zero-start editor drafts remain materializable");
 
   assert.equal(session.mutate("Rebuilt radial starts", (draft) => {
@@ -233,7 +248,7 @@ assert(
   assert.deepEqual(session.draft.startLocations, [
     { x: 8, y: 8 }, { x: 23, y: 8 }, { x: 23, y: 23 }, { x: 8, y: 23 },
   ]);
-  assert.deepEqual(session.draft.baseSites, session.draft.startLocations,
+  assert.deepEqual(baseLocations(session.draft.baseSites), session.draft.startLocations,
     "symmetric start placement reuses an existing base and creates only the missing resource sites");
 }
 
@@ -281,7 +296,7 @@ assert(
     kind: "base", locationIndex: 1, tile: { x: 10, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
   });
   assert.deepEqual(result, { ok: true, count: 2 });
-  assert.deepEqual(draft.baseSites, [{ x: 8, y: 8 }, { x: 10, y: 12 }, { x: 10, y: 19 }],
+  assert.deepEqual(baseLocations(draft.baseSites), [{ x: 8, y: 8 }, { x: 10, y: 12 }, { x: 10, y: 19 }],
     "a symmetric base move relocates its existing matching neutral base");
 }
 
@@ -296,7 +311,7 @@ assert(
     kind: "base", locationIndex: 1, tile: { x: 10, y: 12 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
   });
   assert.deepEqual(result, { ok: true, count: 1 });
-  assert.deepEqual(draft.baseSites, [{ x: 8, y: 8 }, { x: 10, y: 12 }],
+  assert.deepEqual(baseLocations(draft.baseSites), [{ x: 8, y: 8 }, { x: 10, y: 12 }],
     "a symmetric base move leaves a missing counterpart absent");
 }
 
@@ -311,8 +326,8 @@ assert(
     kind: "base", locationIndex: 0, tile: { x: 10, y: 8 }, symmetry: MAP_EDITOR_SYMMETRY.HORIZONTAL,
   });
   assert.deepEqual(result, { ok: true, count: 2 });
-  assert.deepEqual(draft.baseSites, [{ x: 10, y: 8 }, { x: 10, y: 23 }]);
-  assert.deepEqual(draft.startLocations, draft.baseSites,
+  assert.deepEqual(baseLocations(draft.baseSites), [{ x: 10, y: 8 }, { x: 10, y: 23 }]);
+  assert.deepEqual(draft.startLocations, baseLocations(draft.baseSites),
     "moving symmetric start-backed bases keeps their start locations attached");
 }
 
@@ -395,7 +410,7 @@ assert(
   };
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(legacy);
-  assert.equal(session.exportMap().version, 3, "local v2 maps migrate into flat map data");
+  assert.equal(session.exportMap().version, 4, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
 }
 
@@ -418,8 +433,8 @@ assert(
     setItem(key, value) { values.set(key, value); },
   };
   const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("legacy-workspace"), true, "v3 sessions recover saved v2 workspaces");
-  assert.equal(session.exportMap().version, 3);
+  assert.equal(session.loadLocal("legacy-workspace"), true, "v4 sessions recover saved v2 workspaces");
+  assert.equal(session.exportMap().version, 4);
   assert.equal(session.materialized().baseSites.length, 2);
 }
 
@@ -432,6 +447,35 @@ assert(
   assert.equal(session.commitTerrainStroke(), false);
   const base = session.draft.baseSites[0];
   assert.equal(base.x, start.x);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
+  const panel = {
+    session,
+    setStatus(message) { this.status = message; },
+  };
+  MapEditorPanel.prototype.updateBasePatchCount.call(panel, 0, "steelPatches", 36);
+  MapEditorPanel.prototype.updateBasePatchCount.call(panel, 0, "oilPatches", 9);
+  assert.deepEqual(
+    {
+      steelPatches: session.draft.baseSites[0].steelPatches,
+      oilPatches: session.draft.baseSites[0].oilPatches,
+    },
+    { steelPatches: 36, oilPatches: 9 },
+    "Map Editor controls update the authoritative per-base patch counts",
+  );
+  MapEditorPanel.prototype.updateBasePatchCount.call(panel, 0, "steelPatches", 100);
+  MapEditorPanel.prototype.updateBasePatchCount.call(panel, 0, "oilPatches", -4);
+  assert.deepEqual(
+    {
+      steelPatches: session.draft.baseSites[0].steelPatches,
+      oilPatches: session.draft.baseSites[0].oilPatches,
+    },
+    { steelPatches: 36, oilPatches: 0 },
+    "Map Editor controls clamp Steel to 36 and Oil to the zero minimum",
+  );
 }
 
 {
@@ -650,7 +694,7 @@ assert(
   });
   assert.deepEqual(result, { ok: true, count: 3 });
   assert.deepEqual(draft.startLocations, [{ x: 47, y: 7 }, { x: 118, y: 77 }, { x: 22, y: 104 }]);
-  assert.deepEqual(draft.baseSites, draft.startLocations,
+  assert.deepEqual(baseLocations(draft.baseSites), draft.startLocations,
     "three-way placement creates a matching base for each 1v1v1 start");
 
   const movedFromRotatedCopy = moveSymmetricDraftLocation(draft, {
@@ -660,7 +704,7 @@ assert(
   assert.deepEqual(movedFromRotatedCopy, { ok: true, count: 3 });
   assert.deepEqual(draft.startLocations, [{ x: 48, y: 8 }, { x: 117, y: 77 }, { x: 23, y: 102 }],
     "a rotated copy with square-grid rounding drift still moves the complete location group");
-  assert.deepEqual(draft.baseSites, draft.startLocations,
+  assert.deepEqual(baseLocations(draft.baseSites), draft.startLocations,
     "moving a rounded three-way copy keeps its matching start bases coupled");
 
   const edgeDraft = authoredMapFromMaterialized({
@@ -695,7 +739,7 @@ assert(
   }), true);
   assert.equal(result.count, 2, "half-turn moves the opposing start and its matching base site");
   assert.deepEqual(session.draft.startLocations, [{ x: 40, y: 46 }, { x: 85, y: 79 }]);
-  assert.deepEqual(session.draft.baseSites, session.draft.startLocations);
+  assert.deepEqual(baseLocations(session.draft.baseSites), session.draft.startLocations);
 }
 
 {
@@ -709,7 +753,7 @@ assert(
   });
   assert.equal(result.ok, true);
   assert.deepEqual(draft.startLocations, [{ x: 8, y: 23 }, { x: 8, y: 8 }], "symmetric base swaps stay atomic");
-  assert.deepEqual(draft.baseSites, draft.startLocations);
+  assert.deepEqual(baseLocations(draft.baseSites), draft.startLocations);
 }
 
 {
@@ -729,7 +773,7 @@ assert(
 {
   const request = [];
   await createMapHandoff({
-    destination: "lab", authoredMap: { version: 3 }, materializedMap: { starts: [], baseSites: [] },
+    destination: "lab", authoredMap: { version: 4 }, materializedMap: { starts: [], baseSites: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
       return { ok: true, json: async () => ({ handoffId: "0123456789abcdef0123456789abcdef" }) };
@@ -741,6 +785,8 @@ assert(
 {
   assert.equal(mapEditorLaunchConfig({ search: "?workspace=map-1", pathname: "/map-editor" }).workspaceId, "map-1");
   assert.equal(MAP_EDITOR_MAX_BASE_SITES, 32);
+  assert.equal(MAP_EDITOR_MAX_STEEL_PATCHES, 36);
+  assert.equal(MAP_EDITOR_MAX_OIL_PATCHES, 9);
 }
 
 {

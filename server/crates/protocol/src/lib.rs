@@ -433,23 +433,6 @@ fn default_true() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LabMapDraft {
-    pub name: String,
-    pub size: u32,
-    pub terrain: Vec<u8>,
-    pub starts: Vec<LabMapTile>,
-    pub base_sites: Vec<LabMapTile>,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LabMapTile {
-    pub x: u32,
-    pub y: u32,
-}
-
 // Server -> Client
 
 /// A lobby map catalog row. `name` is the stable selector key; `description` is display text;

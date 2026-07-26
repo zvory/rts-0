@@ -5,10 +5,11 @@ use serde::Deserialize;
 mod assignment;
 
 use super::{
-    AuthoredMapData, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
+    AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
     BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
+use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 /// Bound authored locations before any game entities are allocated from them. The game currently
 /// supports four active players, while a map can contain many more permanent resource bases.
@@ -62,6 +63,7 @@ pub(super) fn load_for_players(
         terrain: materialized.terrain,
         starts,
         base_sites: materialized.base_sites,
+        base_resource_counts: materialized.base_resource_counts,
     })
 }
 
@@ -76,7 +78,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
     }
     let (size, terrain) = parse_terrain(&authored.terrain)?;
     let start_locations = parse_locations(size, &authored.start_locations, "startLocations")?;
-    let base_sites = parse_locations(size, &authored.base_sites, "baseSites")?;
+    let base_sites = parse_base_sites(size, &authored.base_sites)?;
+    let base_locations: Vec<_> = base_sites.iter().map(|site| (site.x, site.y)).collect();
 
     if player_count == 0 {
         return Err("player_count must be at least 1".to_string());
@@ -86,7 +89,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             "startLocations must contain 1 to {MAX_START_LOCATIONS} locations"
         ));
     }
-    if base_sites.is_empty() || base_sites.len() > MAX_BASE_SITES {
+    if base_locations.is_empty() || base_locations.len() > MAX_BASE_SITES {
         return Err(format!(
             "baseSites must contain 1 to {MAX_BASE_SITES} locations"
         ));
@@ -99,7 +102,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         ));
     }
 
-    let base_set: HashSet<_> = base_sites.iter().copied().collect();
+    let base_set: HashSet<_> = base_locations.iter().copied().collect();
     for start in &start_locations {
         if !base_set.contains(start) {
             return Err(format!(
@@ -108,13 +111,26 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             ));
         }
     }
-    validate_base_clearance(size, &terrain, &start_locations, &base_sites)?;
+    validate_base_clearance(size, &terrain, &start_locations, &base_locations)?;
+    let base_resource_counts = base_sites
+        .into_iter()
+        .map(|site| {
+            (
+                (site.x, site.y),
+                BaseResourceCounts {
+                    steel_patches: site.steel_patches,
+                    oil_patches: site.oil_patches,
+                },
+            )
+        })
+        .collect();
     Ok(AuthoredMapData {
         name: authored.name,
         size,
         terrain,
         starts: start_locations,
-        base_sites,
+        base_sites: base_locations,
+        base_resource_counts,
     })
 }
 
@@ -130,7 +146,7 @@ struct AuthoredMap {
     design: String,
     terrain: Vec<String>,
     start_locations: Vec<AuthoredLocation>,
-    base_sites: Vec<AuthoredLocation>,
+    base_sites: Vec<AuthoredBaseSite>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -138,6 +154,15 @@ struct AuthoredMap {
 struct AuthoredLocation {
     x: u32,
     y: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredBaseSite {
+    x: u32,
+    y: u32,
+    steel_patches: u32,
+    oil_patches: u32,
 }
 
 fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
@@ -212,6 +237,40 @@ fn parse_locations(
         locations.push((location.x, location.y));
     }
     Ok(locations)
+}
+
+fn parse_base_sites(
+    size: u32,
+    authored: &[AuthoredBaseSite],
+) -> Result<Vec<AuthoredBaseSite>, String> {
+    let mut sites = Vec::with_capacity(authored.len());
+    let mut seen = HashSet::with_capacity(authored.len());
+    for (index, site) in authored.iter().copied().enumerate() {
+        if site.x >= size || site.y >= size {
+            return Err(format!(
+                "baseSites[{index}] = ({},{}) is outside the {size}x{size} map",
+                site.x, site.y
+            ));
+        }
+        if !seen.insert((site.x, site.y)) {
+            return Err(format!(
+                "baseSites[{index}] duplicates an earlier location at ({},{})",
+                site.x, site.y
+            ));
+        }
+        if site.steel_patches > MAX_STEEL_PATCHES_PER_BASE {
+            return Err(format!(
+                "baseSites[{index}].steelPatches must be between 0 and {MAX_STEEL_PATCHES_PER_BASE}"
+            ));
+        }
+        if site.oil_patches > MAX_OIL_PATCHES_PER_BASE {
+            return Err(format!(
+                "baseSites[{index}].oilPatches must be between 0 and {MAX_OIL_PATCHES_PER_BASE}"
+            ));
+        }
+        sites.push(site);
+    }
+    Ok(sites)
 }
 
 fn validate_base_clearance(

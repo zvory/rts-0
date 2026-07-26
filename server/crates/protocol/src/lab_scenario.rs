@@ -3,6 +3,35 @@ use serde::{Deserialize, Serialize};
 use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabMapDraft {
+    pub name: String,
+    pub size: u32,
+    pub terrain: Vec<u8>,
+    pub starts: Vec<LabMapTile>,
+    pub base_sites: Vec<LabBaseSite>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabMapTile {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabBaseSite {
+    pub x: u32,
+    pub y: u32,
+    pub steel_patches: u32,
+    pub oil_patches: u32,
+}
+
+pub const MAX_STEEL_PATCHES_PER_BASE: u32 = 36;
+pub const MAX_OIL_PATCHES_PER_BASE: u32 = 9;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LabScenarioAuthoringMetadata {
     pub slug: String,
@@ -48,7 +77,7 @@ pub struct LabCheckpointScenarioMapData {
     pub terrain: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
-    pub base_sites: Vec<LabScenarioTile>,
+    pub base_sites: Vec<LabScenarioBaseSite>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -56,6 +85,15 @@ pub struct LabCheckpointScenarioMapData {
 pub struct LabScenarioTile {
     pub x: u32,
     pub y: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabScenarioBaseSite {
+    pub x: u32,
+    pub y: u32,
+    pub steel_patches: u32,
+    pub oil_patches: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -98,26 +136,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn checkpoint_map_data_uses_base_sites_and_accepts_legacy_expansion_sites() {
+    fn checkpoint_map_data_uses_per_base_resource_counts() {
         let data = LabCheckpointScenarioMapData {
             size: 16,
             terrain: vec![0; 16 * 16],
             starts: vec![LabScenarioTile { x: 4, y: 4 }],
-            base_sites: vec![LabScenarioTile { x: 12, y: 12 }],
+            base_sites: vec![LabScenarioBaseSite {
+                x: 12,
+                y: 12,
+                steel_patches: 36,
+                oil_patches: 9,
+            }],
         };
 
         let serialized = serde_json::to_value(&data).expect("checkpoint map data serializes");
         assert!(serialized.get("baseSites").is_some());
         assert!(serialized.get("expansionSites").is_none());
 
-        let legacy = serde_json::json!({
+        let encoded = serde_json::json!({
             "size": 16,
             "terrain": vec![0; 16 * 16],
             "starts": [{ "x": 4, "y": 4 }],
-            "expansionSites": [{ "x": 12, "y": 12 }],
+            "baseSites": [{
+                "x": 12,
+                "y": 12,
+                "steelPatches": 36,
+                "oilPatches": 9
+            }],
         });
         let parsed: LabCheckpointScenarioMapData =
-            serde_json::from_value(legacy).expect("legacy checkpoint map data parses");
+            serde_json::from_value(encoded).expect("checkpoint map data parses");
         assert_eq!(parsed.base_sites, data.base_sites);
     }
 }

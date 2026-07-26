@@ -3,10 +3,11 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use super::{LabEntityIdRemap, LabError};
-use crate::game::map::Map;
+use crate::game::map::{BaseResourceCounts, Map};
 use crate::game::Game;
 use crate::game::MapMetadata;
 use crate::protocol::terrain;
+use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
 pub(super) const LAB_CHECKPOINT_SCENARIO_KIND: &str = "labCheckpointScenario";
@@ -45,7 +46,7 @@ pub struct LabCheckpointScenarioMapData {
     pub terrain: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
-    pub base_sites: Vec<LabScenarioTile>,
+    pub base_sites: Vec<LabScenarioBaseSite>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -53,6 +54,15 @@ pub struct LabCheckpointScenarioMapData {
 pub struct LabScenarioTile {
     pub x: u32,
     pub y: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabScenarioBaseSite {
+    pub x: u32,
+    pub y: u32,
+    pub steel_patches: u32,
+    pub oil_patches: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -90,7 +100,15 @@ impl LabCheckpointScenarioMap {
                 base_sites: map
                     .base_sites
                     .iter()
-                    .map(|&(x, y)| LabScenarioTile { x, y })
+                    .map(|&(x, y)| {
+                        let counts = map.resource_counts_at((x, y));
+                        LabScenarioBaseSite {
+                            x,
+                            y,
+                            steel_patches: counts.steel_patches,
+                            oil_patches: counts.oil_patches,
+                        }
+                    })
                     .collect(),
             },
         }
@@ -99,6 +117,19 @@ impl LabCheckpointScenarioMap {
     pub(super) fn into_map(self) -> Result<(Map, MapMetadata), LabError> {
         self.validate()?;
         let data = self.data;
+        let base_resource_counts = data
+            .base_sites
+            .iter()
+            .map(|site| {
+                (
+                    (site.x, site.y),
+                    BaseResourceCounts {
+                        steel_patches: site.steel_patches,
+                        oil_patches: site.oil_patches,
+                    },
+                )
+            })
+            .collect();
         let map = Map {
             size: data.size,
             terrain: data.terrain,
@@ -112,6 +143,7 @@ impl LabCheckpointScenarioMap {
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
+            base_resource_counts,
         };
         if map.materialized_hash() != self.materialized_hash {
             return Err(LabError::InvalidMap {
@@ -184,11 +216,34 @@ impl LabCheckpointScenarioMap {
                 reason: "checkpoint scenario map base site count is invalid".to_string(),
             });
         }
-        for tile in self.data.starts.iter().chain(self.data.base_sites.iter()) {
+        for tile in &self.data.starts {
             if tile.x >= size || tile.y >= size {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),
                     reason: "checkpoint scenario map site is out of bounds".to_string(),
+                });
+            }
+        }
+        let mut base_sites = HashSet::with_capacity(self.data.base_sites.len());
+        for site in &self.data.base_sites {
+            if site.x >= size || site.y >= size {
+                return Err(LabError::InvalidMap {
+                    name: self.name.clone(),
+                    reason: "checkpoint scenario map site is out of bounds".to_string(),
+                });
+            }
+            if !base_sites.insert((site.x, site.y)) {
+                return Err(LabError::InvalidMap {
+                    name: self.name.clone(),
+                    reason: "checkpoint scenario map contains duplicate base sites".to_string(),
+                });
+            }
+            if site.steel_patches > MAX_STEEL_PATCHES_PER_BASE
+                || site.oil_patches > MAX_OIL_PATCHES_PER_BASE
+            {
+                return Err(LabError::InvalidMap {
+                    name: self.name.clone(),
+                    reason: "checkpoint scenario map resource count is invalid".to_string(),
                 });
             }
         }

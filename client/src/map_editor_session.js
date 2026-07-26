@@ -3,6 +3,10 @@ import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
 export const MAP_EDITOR_MAX_BASE_SITES = 32;
+export const MAP_EDITOR_MAX_STEEL_PATCHES = 36;
+export const MAP_EDITOR_MAX_OIL_PATCHES = 9;
+export const MAP_EDITOR_DEFAULT_STEEL_PATCHES = 12;
+export const MAP_EDITOR_DEFAULT_OIL_PATCHES = 3;
 export const MAP_EDITOR_DEFAULT_SIZE = 126;
 export const MAP_EDITOR_MIN_SIZE = 16;
 export const MAP_EDITOR_MAX_SIZE = 166;
@@ -300,7 +304,7 @@ export class MapEditorSession {
 
   saveLocal(key) {
     if (!this.draft || !this.storage?.setItem) return false;
-    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 3, draft: this.draft })); } catch { return false; }
+    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 4, draft: this.draft })); } catch { return false; }
     this.lastAction = "Saved local map";
     this.markSaved();
     return true;
@@ -310,7 +314,9 @@ export class MapEditorSession {
     if (!this.storage?.getItem) return false;
     let parsed;
     try {
-      const text = this.storage.getItem(storageKey(key)) || this.storage.getItem(legacyStorageKey(key));
+      const text = this.storage.getItem(storageKey(key))
+        || this.storage.getItem(legacyV3StorageKey(key))
+        || this.storage.getItem(legacyStorageKey(key));
       if (!text) return false;
       parsed = JSON.parse(text);
       if (parsed?.draft) parsed = parsed.draft;
@@ -337,7 +343,7 @@ export class MapEditorSession {
       size: draft.terrain.length,
       terrain: draft.terrain.flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
       starts: draft.startLocations.map(copyLocation),
-      baseSites: draft.baseSites.map(copyLocation),
+      baseSites: draft.baseSites.map(copyBaseSite),
     };
   }
 
@@ -444,9 +450,9 @@ export function moveSymmetricDraftLocation(draft, {
   for (const plan of plans) {
     if (kind === "start") {
       draft.startLocations[plan.index] = copyLocation(plan.to);
-      if (plan.baseIndex >= 0) draft.baseSites[plan.baseIndex] = copyLocation(plan.to);
+      if (plan.baseIndex >= 0) draft.baseSites[plan.baseIndex] = movedBaseSite(draft.baseSites[plan.baseIndex], plan.to);
     } else {
-      draft.baseSites[plan.index] = copyLocation(plan.to);
+      draft.baseSites[plan.index] = movedBaseSite(draft.baseSites[plan.index], plan.to);
       if (plan.startIndex >= 0) draft.startLocations[plan.startIndex] = copyLocation(plan.to);
     }
   }
@@ -478,7 +484,7 @@ export function addSymmetricDraftLocations(draft, {
     }
     for (const location of additions) {
       if (!draft.baseSites.some((site) => sameLocation(site, location))) {
-        draft.baseSites.push(copyLocation(location));
+        draft.baseSites.push(newBaseSite(location));
       }
       draft.startLocations.push(copyLocation(location));
     }
@@ -490,7 +496,7 @@ export function addSymmetricDraftLocations(draft, {
   if (locations.some((location) => draft.baseSites.some((site) => sameLocation(site, location)))) {
     return draftEditError("A base already uses that tile.");
   }
-  for (const location of locations) draft.baseSites.push(copyLocation(location));
+  for (const location of locations) draft.baseSites.push(newBaseSite(location));
   return { ok: true, count: locations.length };
 }
 
@@ -548,13 +554,13 @@ export function authoredMapFromMaterialized({ name, description, size, terrain, 
     Array.from({ length: mapSize }, (_, x) => TERRAIN_TO_CHAR[codes[y * mapSize + x]] || ".").join("")
   ));
   const startLocations = normalizeLocations(starts, mapSize);
-  const bases = normalizeLocations(baseSites, mapSize);
-  for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(copyLocation(start));
+  const bases = normalizeBaseSiteRecords(baseSites, mapSize);
+  for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(newBaseSite(start));
   const draft = {
-    version: 3,
+    version: 4,
     name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
-    _design: "Flat map locations: startLocations choose player starts; every baseSites entry always spawns its resource cluster.",
+    _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
     terrain: terrainRows,
     startLocations,
     baseSites: bases,
@@ -566,17 +572,17 @@ export function authoredMapFromMaterialized({ name, description, size, terrain, 
 export function materializedMapsEqual(left, right) {
   if (!left || !right || left.name !== right.name || left.size !== right.size) return false;
   if (!sameFlatArray(left.terrain, right.terrain)) return false;
-  return sameLocationSet(left.starts, right.starts) && sameLocationSet(left.baseSites, right.baseSites);
+  return sameLocationSet(left.starts, right.starts) && sameBaseSiteSet(left.baseSites, right.baseSites);
 }
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
-  if (Number(draft.version) !== 3) replaceObject(draft, migrateLegacyDraft(draft));
+  if (Number(draft.version) !== 4) replaceObject(draft, migrateLegacyDraft(draft));
   const size = draft.terrain?.length;
   if (!positiveInteger(size) || !Array.isArray(draft.terrain) || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== size)) {
     throw new Error("Map terrain must be a square grid.");
   }
-  draft.version = 3;
+  draft.version = 4;
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
@@ -589,20 +595,20 @@ function normalizeDraft(draft) {
 function migrateLegacyDraft(source) {
   const sites = Array.isArray(source?.sites) ? source.sites : [];
   const byId = new Map(sites.map((site) => [site.id, site]));
-  const starts = [];
+  const starts = normalizeLocations(source?.startLocations, source?.terrain?.length || 0);
   for (const layout of source?.layouts || []) for (const slot of layout?.slots || []) {
     const site = byId.get(slot.main);
     if (site && !starts.some((candidate) => sameLocation(candidate, site))) starts.push(copyLocation(site));
   }
   if (!starts.length) for (const site of sites.filter((site) => site.kind === "main")) starts.push(copyLocation(site));
   return {
-    version: 3,
+    version: 4,
     name: source?.name || "Map",
     description: source?.description || "",
-    _design: "Migrated from layout-based map data. Flat map locations are now authoritative.",
+    _design: "Migrated map data. Flat locations and per-base resource counts are authoritative.",
     terrain: source?.terrain || [],
     startLocations: starts,
-    baseSites: sites.map(copyLocation),
+    baseSites: (source?.baseSites || sites).map(copyBaseSite),
   };
 }
 
@@ -625,7 +631,7 @@ function normalizeLocations(locations, size) {
   return out;
 }
 function normalizeBaseSites(baseSites, startLocations, size) {
-  const normalized = normalizeLocations(baseSites, size);
+  const normalized = normalizeBaseSiteRecords(baseSites, size);
   const startKeys = new Set(startLocations.map(locationKey));
   if (
     normalized.length <= MAP_EDITOR_MAX_BASE_SITES
@@ -638,7 +644,22 @@ function normalizeBaseSites(baseSites, startLocations, size) {
   const retainedBases = normalized
     .filter((site) => !startKeys.has(locationKey(site)))
     .slice(0, Math.max(0, availableBaseSlots));
-  return [...retainedStarts, ...retainedBases, ...missingStarts.map(copyLocation)];
+  return [...retainedStarts, ...retainedBases, ...missingStarts.map(newBaseSite)];
+}
+function normalizeBaseSiteRecords(baseSites, size) {
+  const out = [];
+  const seen = new Set();
+  for (const site of Array.isArray(baseSites) ? baseSites : []) {
+    const valid = validMapTile(site, size);
+    if (!valid || seen.has(locationKey(valid))) continue;
+    seen.add(locationKey(valid));
+    out.push({
+      ...valid,
+      steelPatches: boundedPatchCount(site?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, MAP_EDITOR_DEFAULT_STEEL_PATCHES),
+      oilPatches: boundedPatchCount(site?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, MAP_EDITOR_DEFAULT_OIL_PATCHES),
+    });
+  }
+  return out;
 }
 function normalizedDraftTile(draft, tile, radius) {
   const size = draft?.terrain?.length || 0;
@@ -770,8 +791,32 @@ function normalizeMapEditorSymmetry(value) { return SYMMETRY_TRANSFORMS[value] ?
 function locationKey(location) { return `${location?.x},${location?.y}`; }
 function sameLocation(a, b) { return !!a && !!b && a.x === b.x && a.y === b.y; }
 function copyLocation(location) { return { x: Number(location?.x), y: Number(location?.y) }; }
+function copyBaseSite(site) {
+  return {
+    ...copyLocation(site),
+    steelPatches: boundedPatchCount(site?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, MAP_EDITOR_DEFAULT_STEEL_PATCHES),
+    oilPatches: boundedPatchCount(site?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, MAP_EDITOR_DEFAULT_OIL_PATCHES),
+  };
+}
+function newBaseSite(location) {
+  return {
+    ...copyLocation(location),
+    steelPatches: MAP_EDITOR_DEFAULT_STEEL_PATCHES,
+    oilPatches: MAP_EDITOR_DEFAULT_OIL_PATCHES,
+  };
+}
+function movedBaseSite(site, location) { return { ...copyBaseSite(site), ...copyLocation(location) }; }
+function boundedPatchCount(value, max, fallback) {
+  const number = Number(value);
+  return Number.isInteger(number) ? Math.max(0, Math.min(max, number)) : fallback;
+}
 function sameLocationSet(left, right) {
   const a = new Set((left || []).map(locationKey)); const b = new Set((right || []).map(locationKey));
+  return a.size === b.size && [...a].every((key) => b.has(key));
+}
+function sameBaseSiteSet(left, right) {
+  const record = (site) => `${locationKey(site)}:${site?.steelPatches}:${site?.oilPatches}`;
+  const a = new Set((left || []).map(record)); const b = new Set((right || []).map(record));
   return a.size === b.size && [...a].every((key) => b.has(key));
 }
 function sameFlatArray(left, right) { return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => value === right[index]); }
@@ -782,6 +827,7 @@ function replaceObject(target, source) { for (const key of Object.keys(target)) 
 function positiveInteger(value) { const number = Math.trunc(Number(value)); return Number.isInteger(number) && number > 0 ? number : 0; }
 function clampTile(value, size) { return Math.max(0, Math.min(size - 1, Math.trunc(value))); }
 function draftEditError(error) { return { ok: false, error }; }
-function storageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
+function storageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
+function legacyV3StorageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
 function legacyStorageKey(key) { return `rts.mapEditor.${String(key || "default")}.v2`; }
 function defaultStorage() { try { return globalThis.localStorage || null; } catch { return null; } }

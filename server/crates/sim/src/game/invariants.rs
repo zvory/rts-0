@@ -976,7 +976,7 @@ mod tests {
             size: 30,
             terrain: vec![terrain::GRASS; 30 * 30],
             starts: vec![],
-            base_sites: vec![],
+            ..Default::default()
         };
         let ts = config::TILE_SIZE as f32;
 

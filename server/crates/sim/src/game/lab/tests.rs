@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::entity::{PanzerfaustState, WeaponSetup};
 use crate::game::services::occupancy::footprint_center;
-use crate::protocol::{terrain, LabMapTile};
+use crate::protocol::{terrain, LabBaseSite, LabMapTile};
 
 fn lab_players() -> [PlayerInit; 2] {
     [
@@ -38,7 +38,7 @@ fn flat_lab_map() -> Map {
         size: SIZE,
         terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
         starts: vec![(16, 16), (48, 48)],
-        base_sites: Vec::new(),
+        ..Default::default()
     }
 }
 
@@ -54,7 +54,12 @@ fn map_draft() -> LabMapDraft {
         size: 64,
         terrain,
         starts: vec![LabMapTile { x: 12, y: 12 }, LabMapTile { x: 51, y: 51 }],
-        base_sites: vec![LabMapTile { x: 32, y: 32 }],
+        base_sites: vec![LabBaseSite {
+            x: 32,
+            y: 32,
+            steel_patches: 7,
+            oil_patches: 2,
+        }],
     }
 }
 
@@ -81,6 +86,10 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
     assert_eq!(game.state.map.terrain[0], terrain::WATER);
     assert_eq!(game.state.map.starts, vec![(12, 12), (51, 51)]);
     assert_eq!(game.state.map.base_sites, vec![(32, 32)]);
+    assert_eq!(game.state.map.resource_counts_at((32, 32)).steel_patches, 7);
+    assert_eq!(game.state.map.resource_counts_at((32, 32)).oil_patches, 2);
+    assert_eq!(game.export_lab_map().base_sites[0].steel_patches, 7);
+    assert_eq!(game.export_lab_map().base_sites[0].oil_patches, 2);
     assert_eq!(game.state.map_metadata.name, "Edited Lab Map");
     assert_eq!(
         game.start_payload()
@@ -90,6 +99,26 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
             .collect::<Vec<_>>(),
         vec![(12, 12), (51, 51)]
     );
+}
+
+#[test]
+fn lab_map_draft_rejects_duplicate_base_resource_records() {
+    let mut game = new_game();
+    let mut draft = map_draft();
+    draft.base_sites.push(LabBaseSite {
+        x: 32,
+        y: 32,
+        steel_patches: 8,
+        oil_patches: 1,
+    });
+
+    let error = game
+        .apply_lab_op(LabOp::ApplyMapDraft(draft))
+        .expect_err("duplicate base coordinates must not silently overwrite resource counts");
+    assert!(matches!(
+        error,
+        LabError::InvalidMap { reason, .. } if reason.contains("duplicate base sites")
+    ));
 }
 
 #[test]
@@ -863,7 +892,7 @@ fn lab_rejects_research_not_in_player_faction_catalog() {
         size: 32,
         terrain: vec![terrain::GRASS; 32 * 32],
         starts: vec![(8, 8)],
-        base_sites: Vec::new(),
+        ..Default::default()
     };
     let mut game = Game::new_lab(&players, 1, map, lab_metadata());
 

@@ -175,7 +175,7 @@ mod tests {
             size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: Vec::new(),
-            base_sites: Vec::new(),
+            ..Default::default()
         }
     }
 

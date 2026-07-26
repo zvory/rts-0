@@ -1,8 +1,8 @@
 {
-  "version": 3,
+  "version": 4,
   "name": "1v1",
   "description": "1v1 map",
-  "_design": "Migrated from layout-based map data. Flat map locations are now authoritative.",
+  "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "terrain": [
     "................................................................................................~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
     "..................................................................................................~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -144,43 +144,63 @@
   "baseSites": [
     {
       "x": 9,
-      "y": 9
+      "y": 9,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 116,
-      "y": 116
+      "y": 116,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 39,
-      "y": 14
+      "y": 14,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 86,
-      "y": 111
+      "y": 111,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 68,
-      "y": 27
+      "y": 27,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 57,
-      "y": 98
+      "y": 98,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 91,
-      "y": 52
+      "y": 52,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 34,
-      "y": 73
+      "y": 73,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 86,
-      "y": 82
+      "y": 82,
+      "steelPatches": 12,
+      "oilPatches": 3
     },
     {
       "x": 39,
-      "y": 43
+      "y": 43,
+      "steelPatches": 12,
+      "oilPatches": 3
     }
   ]
 }

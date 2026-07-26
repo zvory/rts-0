@@ -1055,7 +1055,7 @@ mod tests {
             size,
             terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
             starts: vec![],
-            base_sites: vec![],
+            ..Default::default()
         }
     }
 

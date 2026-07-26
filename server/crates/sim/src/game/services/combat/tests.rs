@@ -45,7 +45,7 @@ fn open_map(size: u32) -> Map {
         size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4), (size - 5, size - 5)],
-        base_sites: Vec::new(),
+        ..Default::default()
     }
 }
 fn map_with_rock_at(tile: (u32, u32)) -> Map {

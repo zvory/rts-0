@@ -32,11 +32,17 @@ fn three_player_map_is_selectable_and_loads_for_each_supported_player_count() {
 fn authored_map_supports_many_unconditional_base_sites() {
     let rows = vec![".".repeat(80); 80];
     let base_sites: Vec<_> = (0..12)
-        .map(|index| format!(r#"{{"x": {}, "y": {}}}"#, 8 + index * 5, 24))
+        .map(|index| {
+            format!(
+                r#"{{"x": {}, "y": {}, "steelPatches": 12, "oilPatches": 3}}"#,
+                8 + index * 5,
+                24
+            )
+        })
         .collect();
     let json = format!(
         r#"{{
-          "version": 3,
+          "version": 4,
           "name": "many-bases",
           "description": "many permanent bases",
           "_design": "n/a",
@@ -58,11 +64,16 @@ fn authored_map_supports_many_unconditional_base_sites() {
 fn authored_map_rejects_more_than_bounded_base_sites() {
     let rows = vec![".".repeat(200); 200];
     let base_sites: Vec<_> = (0..33)
-        .map(|index| format!(r#"{{"x": {}, "y": 100}}"#, 8 + index * 5))
+        .map(|index| {
+            format!(
+                r#"{{"x": {}, "y": 100, "steelPatches": 12, "oilPatches": 3}}"#,
+                8 + index * 5
+            )
+        })
         .collect();
     let json = format!(
         r#"{{
-          "version": 3,
+          "version": 4,
           "name": "too-many-bases",
           "description": "too many bases",
           "_design": "n/a",
@@ -80,4 +91,60 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
         err.contains("baseSites must contain 1 to 32"),
         "error was: {err}"
     );
+}
+
+#[test]
+fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
+    let rows = vec![".".repeat(40); 40];
+    let json = format!(
+        r#"{{
+          "version": 4,
+          "name": "resource-bounds",
+          "description": "per-base resource bounds",
+          "_design": "n/a",
+          "terrain": {},
+          "startLocations": [{{"x": 8, "y": 8}}],
+          "baseSites": [
+            {{"x": 8, "y": 8, "steelPatches": 0, "oilPatches": 0}},
+            {{"x": 31, "y": 31, "steelPatches": 36, "oilPatches": 9}}
+          ]
+        }}"#,
+        serde_json::to_string(&rows).unwrap(),
+    );
+
+    let map = Map::from_authored_json(1, &json, 0).expect("resource bounds should be accepted");
+    assert_eq!(map.resource_counts_at((8, 8)).steel_patches, 0);
+    assert_eq!(map.resource_counts_at((8, 8)).oil_patches, 0);
+    assert_eq!(map.resource_counts_at((31, 31)).steel_patches, 36);
+    assert_eq!(map.resource_counts_at((31, 31)).oil_patches, 9);
+}
+
+#[test]
+fn authored_map_rejects_per_base_resource_counts_above_the_limits() {
+    let rows = vec![".".repeat(32); 32];
+    for (field, value, expected) in [
+        ("steelPatches", 37, "steelPatches must be between 0 and 36"),
+        ("oilPatches", 10, "oilPatches must be between 0 and 9"),
+    ] {
+        let mut site = serde_json::json!({
+            "x": 8,
+            "y": 8,
+            "steelPatches": 12,
+            "oilPatches": 3
+        });
+        site[field] = value.into();
+        let json = serde_json::json!({
+            "version": 4,
+            "name": "bad-resource-count",
+            "description": "invalid per-base resource count",
+            "_design": "n/a",
+            "terrain": rows.clone(),
+            "startLocations": [{ "x": 8, "y": 8 }],
+            "baseSites": [site]
+        })
+        .to_string();
+        let err = Map::from_authored_json(1, &json, 0)
+            .expect_err("resource count above the schema limit must fail");
+        assert!(err.contains(expected), "error was: {err}");
+    }
 }

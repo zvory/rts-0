@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabScenarioLabMetadata, LabScenarioTile,
+    LabScenarioBaseSite, LabScenarioLabMetadata, LabScenarioTile,
 };
 use serde_json::json;
 
@@ -397,6 +397,23 @@ fn lab_replay_artifact_rejects_checkpoint_player_count_start_mismatch() {
     assert!(err
         .to_string()
         .contains("playerCount must match map starts"));
+}
+
+#[test]
+fn lab_replay_artifact_rejects_duplicate_base_resource_records() {
+    let mut artifact = valid_artifact();
+    let site = LabScenarioBaseSite {
+        x: 0,
+        y: 0,
+        steel_patches: 12,
+        oil_patches: 3,
+    };
+    artifact.initial_setup.map.data.base_sites = vec![site, site];
+
+    let error = validate_lab_replay_artifact(&artifact)
+        .expect_err("duplicate base coordinates must not ambiguously bind resource counts");
+
+    assert!(error.to_string().contains("duplicate base sites"));
 }
 
 #[test]
