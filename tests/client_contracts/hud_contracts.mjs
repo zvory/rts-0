@@ -914,12 +914,12 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(buildCard.slots[0].enabled, "unaffordable build buttons enter placement and wait at the site");
   assert(buildCard.slots[1].label === "Pump Jack", "worker build menu puts Pump Jack in the top-middle W slot");
   assert(buildCard.slots[1].hotkey === "W", "Pump Jack build hotkey should be W");
-  assert(buildCard.slots[1].cost.steel === 50, "Pump Jack build button should expose its regular cost");
+  assert(buildCard.slots[1].cost.steel === 100, "Pump Jack build button should expose its regular cost");
   const tooltipHud = Object.create(HUD.prototype);
   tooltipHud._resourceIcon = (kind) => kind;
   const pumpJackTooltip = tooltipHud._kindTooltipHtml(KIND.PUMP_JACK);
   assert(
-    pumpJackTooltip.includes("50") &&
+    pumpJackTooltip.includes("100") &&
       pumpJackTooltip.includes("20s") &&
       pumpJackTooltip.includes("oil patch") &&
       pumpJackTooltip.includes("Extracts 2 Oil every 1.3s"),

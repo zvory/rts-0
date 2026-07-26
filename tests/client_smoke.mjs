@@ -297,17 +297,18 @@ try {
     return {
       hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.depot"]'),
       hotkey: button?.dataset.hotkey || null,
+      steelCost: button?.querySelector(".cmd-cost .c-steel")?.textContent || "",
       tooltip: button?.querySelector('.cmd-tooltip')?.textContent || "",
     };
   });
   ok(
     !pumpJackSlot.hasDepotButton &&
       pumpJackSlot.hotkey === "W" &&
-      pumpJackSlot.tooltip.includes("50") &&
+      pumpJackSlot.steelCost === "100" &&
       pumpJackSlot.tooltip.includes("20s") &&
       pumpJackSlot.tooltip.includes("oil patch") &&
       pumpJackSlot.tooltip.includes("Extracts 2 Oil"),
-    "BUILD: Pump Jack occupies W with cost, build time, oil-patch placement, and extraction details",
+    `BUILD: Pump Jack occupies W with 100 steel cost, build time, oil-patch placement, and extraction details (${JSON.stringify(pumpJackSlot)})`,
   );
 
   const trainBtn = await page.evaluate(() => {

@@ -116,7 +116,7 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("friendly blocker should exist");
     let mut players = vec![player_state(1)];
-    players[0].set_resources(49, 0);
+    players[0].set_resources(99, 0);
     let mut events = HashMap::new();
 
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
@@ -147,7 +147,7 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
     ));
 
     let cost = rules::economy::resource_cost(EntityKind::PumpJack);
-    assert_eq!((cost.steel, cost.oil), (50, 0));
+    assert_eq!((cost.steel, cost.oil), (100, 0));
     players[0].set_resources(cost.steel, cost.oil);
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
 
