@@ -363,20 +363,8 @@ fn run() -> ShellResult<()> {
             }
             match event {
                 WindowEvent::Focused(false) => {
-                    #[cfg(any(target_os = "macos", target_os = "windows"))]
+                    #[cfg(target_os = "macos")]
                     let _ = window.state::<NativeCursorBackend>().stop("window blur");
-                    #[cfg(target_os = "windows")]
-                    if let Some(webview) = window.app_handle().get_webview_window(WINDOW_LABEL) {
-                        let _ = window
-                            .state::<ExclusiveFullscreen>()
-                            .suspend(&webview, "window blur");
-                    }
-                }
-                WindowEvent::Focused(true) => {
-                    #[cfg(target_os = "windows")]
-                    if let Some(webview) = window.app_handle().get_webview_window(WINDOW_LABEL) {
-                        let _ = window.state::<ExclusiveFullscreen>().resume(&webview);
-                    }
                 }
                 WindowEvent::CloseRequested { .. } => {
                     #[cfg(any(target_os = "macos", target_os = "windows"))]

@@ -1670,7 +1670,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "maccursor-shell"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "block2",
  "objc2",
@@ -1680,6 +1680,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "windows",
  "windows-sys 0.61.2",
 ]
 

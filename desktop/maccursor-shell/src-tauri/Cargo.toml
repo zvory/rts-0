@@ -1,6 +1,6 @@
 [package]
 name = "maccursor-shell"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2021"
 description = "Tauri shell for the Bewegungskrieg Windows client"
 publish = false
@@ -20,6 +20,10 @@ objc2-app-kit = { version = "0.3.2", features = ["block2", "NSEvent", "NSWindow"
 objc2-core-graphics = { version = "0.3.2", features = ["CGDirectDisplay", "CGError", "CGRemoteOperation", "libc"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61.3", features = [
+  "Win32_System_Com",
+  "Win32_UI_Shell",
+] }
 windows-sys = { version = "0.61.2", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
