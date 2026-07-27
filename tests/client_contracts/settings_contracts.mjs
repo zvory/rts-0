@@ -134,6 +134,15 @@ function hotkeyService() {
   );
 
   withFakeSettingsDocument(() => {
+    for (const kind of ["lobby", "match", "spectator", "replay", "lab"]) {
+      const gameTab = buildSettingsTabs({ game: { kind, spectator: kind !== "lobby" && kind !== "match" } })[0];
+      const root = document.createElement("div");
+      gameTab.render(root);
+      assert(root.children.length === 0, `settings: ${kind} game tab omits redundant context text`);
+    }
+  });
+
+  withFakeSettingsDocument(() => {
     let giveUpOpened = false;
     const action = buildGiveUpAction({ visible: true, onOpen: () => { giveUpOpened = true; } });
     const button = action.render();
