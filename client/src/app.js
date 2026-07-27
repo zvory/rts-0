@@ -1154,7 +1154,6 @@ export class App {
         audio: this.audio,
         hotkeyProfiles: this.hotkeyProfiles,
         game: {
-          kind: "lobby",
           prediction: {
             state: () => ({
               enabled: this.predictionEnabled,

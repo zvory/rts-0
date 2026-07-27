@@ -83,8 +83,6 @@ export function buildMatchSettingsContext({
       audio,
       hotkeyProfiles,
       game: {
-        kind,
-        spectator,
         prediction: {
           state: () => ({
             hidden: spectator || !!replayViewer,

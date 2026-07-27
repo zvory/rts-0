@@ -86,7 +86,6 @@ function renderGamePanel(root, game) {
   }
   if (game?.pointerLock) renderPointerLockControl(root, game.pointerLock);
   if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
-  renderContextSummary(root, game);
 }
 
 function renderExclusiveFullscreenControl(root, exclusiveFullscreen) {
@@ -196,21 +195,6 @@ function renderUnitRangeControl(root, unitRanges) {
   unitRanges.onMount?.(sync);
 }
 
-function renderContextSummary(root, game) {
-  const row = document.createElement("div");
-  row.className = "settings-context-row";
-  const label = document.createElement("span");
-  label.textContent = contextLabel(game?.kind);
-  row.appendChild(label);
-  if (game?.spectator) {
-    const badge = document.createElement("span");
-    badge.className = "settings-badge";
-    badge.textContent = "Spectator";
-    row.appendChild(badge);
-  }
-  root.appendChild(row);
-}
-
 function renderHotkeysPanel(root, hotkeyProfiles, context) {
   return renderHotkeyEditor(root, hotkeyProfiles, context);
 }
@@ -313,12 +297,4 @@ function renderMutedText(root, text) {
   el.className = "settings-muted";
   el.textContent = text;
   root.appendChild(el);
-}
-
-function contextLabel(kind) {
-  if (kind === "match") return "Live match";
-  if (kind === "lab") return "Lab";
-  if (kind === "replay") return "Replay";
-  if (kind === "spectator") return "Spectator match";
-  return "Lobby";
 }

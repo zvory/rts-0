@@ -134,6 +134,13 @@ function hotkeyService() {
   );
 
   withFakeSettingsDocument(() => {
+    const gameTab = buildSettingsTabs({ game: {} })[0];
+    const root = document.createElement("div");
+    gameTab.render(root);
+    assert(root.children.length === 0, "settings: game tab omits redundant context text");
+  });
+
+  withFakeSettingsDocument(() => {
     let giveUpOpened = false;
     const action = buildGiveUpAction({ visible: true, onOpen: () => { giveUpOpened = true; } });
     const button = action.render();
