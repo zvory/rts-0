@@ -1,14 +1,28 @@
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
-use tauri::{PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
+use tauri::WebviewWindow;
+use windows::Win32::{
+    Foundation::HWND as TaskbarHwnd,
+    System::Com::{
+        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
+    },
+    UI::Shell::{ITaskbarList2, TaskbarList},
+};
 use windows_sys::Win32::{
-    Foundation::HWND,
+    Foundation::{HWND, RECT},
     Graphics::Gdi::{
         ChangeDisplaySettingsExW, EnumDisplaySettingsW, GetMonitorInfoW, MonitorFromWindow,
-        CDS_FULLSCREEN, DEVMODEW, DISP_CHANGE_SUCCESSFUL, DM_BITSPERPEL, DM_DISPLAYFREQUENCY,
-        DM_PELSHEIGHT, DM_PELSWIDTH, ENUM_CURRENT_SETTINGS, MONITORINFOEXW,
+        CDS_FULLSCREEN, CDS_RESET, DEVMODEW, DISP_CHANGE_SUCCESSFUL, DM_BITSPERPEL,
+        DM_DISPLAYFREQUENCY, DM_PELSHEIGHT, DM_PELSWIDTH, ENUM_CURRENT_SETTINGS, MONITORINFOEXW,
         MONITOR_DEFAULTTONEAREST,
+    },
+    UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, GetWindowPlacement, GetWindowRect, PeekMessageW, SetForegroundWindow,
+        SetWindowLongPtrW, SetWindowPlacement, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE,
+        HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, MSG, PM_NOREMOVE, SWP_FRAMECHANGED,
+        SWP_NOOWNERZORDER, SWP_SHOWWINDOW, SW_RESTORE, WINDOWPLACEMENT, WS_EX_TOPMOST, WS_MAXIMIZE,
+        WS_MINIMIZE, WS_OVERLAPPEDWINDOW,
     },
 };
 
@@ -17,6 +31,7 @@ use crate::diagnostics::ShellDiagnostics;
 #[derive(Clone, Default)]
 pub struct ExclusiveFullscreen {
     inner: Arc<Mutex<ExclusiveFullscreenSession>>,
+    operation: Arc<Mutex<()>>,
     diagnostics: Option<ShellDiagnostics>,
 }
 
@@ -29,11 +44,12 @@ struct ExclusiveFullscreenSession {
     last_error: Option<String>,
 }
 
+#[derive(Clone, Copy)]
 struct WindowRestoration {
-    position: PhysicalPosition<i32>,
-    size: PhysicalSize<u32>,
-    decorated: bool,
-    maximized: bool,
+    rect: RECT,
+    placement: WINDOWPLACEMENT,
+    style: isize,
+    ex_style: isize,
     device_name: [u16; 32],
 }
 
@@ -58,6 +74,7 @@ impl ExclusiveFullscreen {
                 last_reason: "ready".to_string(),
                 last_error: None,
             })),
+            operation: Arc::new(Mutex::new(())),
             diagnostics: Some(diagnostics),
         }
     }
@@ -128,41 +145,82 @@ impl ExclusiveFullscreen {
         window: &WebviewWindow,
         reason: &str,
     ) -> Result<ExclusiveFullscreenSnapshot, String> {
+        let _operation = self
+            .operation
+            .lock()
+            .map_err(|_| "exclusive fullscreen operation lock is poisoned".to_string())?;
         if self.active() {
             return self.snapshot();
         }
+        let restoration_pending = { self.lock_session()?.restoration.is_some() };
+        if restoration_pending {
+            return self.fail(
+                "exclusive fullscreen cannot re-enter while restoration is pending".to_string(),
+            );
+        }
 
-        let restoration = capture_window_restoration(window)?;
         let display = display_mode_for_window(window)?;
+        let restoration = WindowRestoration {
+            device_name: display.device_name,
+            ..capture_window_restoration(window)?
+        };
+        {
+            let mut session = self.lock_session()?;
+            session.restoration = Some(restoration);
+        }
         let change_result = unsafe {
             ChangeDisplaySettingsExW(
                 display.device_name.as_ptr(),
                 &display.mode,
                 std::ptr::null_mut(),
-                CDS_FULLSCREEN,
+                CDS_FULLSCREEN | CDS_RESET,
                 std::ptr::null(),
             )
         };
         if change_result != DISP_CHANGE_SUCCESSFUL {
+            if let Ok(mut session) = self.inner.lock() {
+                session.restoration = None;
+            }
             return self.fail(format!(
                 "ChangeDisplaySettingsExW(CDS_FULLSCREEN) failed with code {change_result}"
             ));
         }
+        pump_window_messages();
 
-        let window_result = configure_exclusive_window(window, display.monitor_rect);
-        if let Err(err) = window_result {
-            restore_display_mode(&display.device_name);
-            let _ = restore_window(window, &restoration);
-            return self.fail(err);
-        }
+        let window_rect = match configure_exclusive_window(window, display.monitor_rect) {
+            Ok(rect) => rect,
+            Err(err) => {
+                let display_rollback = restore_display_mode(&display.device_name);
+                pump_window_messages();
+                let taskbar_rollback = mark_taskbar_fullscreen(window_hwnd(window)?, false);
+                let window_rollback = restore_window(window, &restoration);
+                let rollback_errors = [display_rollback.err(), window_rollback.err()]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
+                if rollback_errors.is_empty() {
+                    if let Ok(mut session) = self.inner.lock() {
+                        session.restoration = None;
+                    }
+                }
+                if let Err(taskbar_err) = taskbar_rollback {
+                    self.log_event(
+                        "exclusive_fullscreen_taskbar_restore_failed",
+                        serde_json::json!({ "message": taskbar_err }),
+                    );
+                }
+                let message = if rollback_errors.is_empty() {
+                    err
+                } else {
+                    format!("{err}; rollback failed: {}", rollback_errors.join("; "))
+                };
+                return self.fail(message);
+            }
+        };
 
         let snapshot = {
             let mut session = self.lock_session()?;
             session.active = true;
-            session.restoration = Some(WindowRestoration {
-                device_name: display.device_name,
-                ..restoration
-            });
             session.last_reason = reason.to_string();
             session.last_error = None;
             snapshot_from_session(&session)
@@ -174,6 +232,14 @@ impl ExclusiveFullscreen {
                 "width": display.mode.dmPelsWidth,
                 "height": display.mode.dmPelsHeight,
                 "refreshHz": display.mode.dmDisplayFrequency,
+                "windowLeft": window_rect.left,
+                "windowTop": window_rect.top,
+                "windowWidth": window_rect.right.saturating_sub(window_rect.left),
+                "windowHeight": window_rect.bottom.saturating_sub(window_rect.top),
+                "monitorLeft": display.monitor_rect.left,
+                "monitorTop": display.monitor_rect.top,
+                "monitorWidth": display.monitor_rect.right.saturating_sub(display.monitor_rect.left),
+                "monitorHeight": display.monitor_rect.bottom.saturating_sub(display.monitor_rect.top),
             }),
         );
         Ok(snapshot)
@@ -184,24 +250,54 @@ impl ExclusiveFullscreen {
         window: &WebviewWindow,
         reason: &str,
     ) -> Result<ExclusiveFullscreenSnapshot, String> {
+        let _operation = self
+            .operation
+            .lock()
+            .map_err(|_| "exclusive fullscreen operation lock is poisoned".to_string())?;
         let restoration = {
             let mut session = self.lock_session()?;
-            if !session.active {
+            if !session.active && session.restoration.is_none() {
                 session.last_reason = reason.to_string();
                 return Ok(snapshot_from_session(&session));
             }
-            session.active = false;
-            session.last_reason = reason.to_string();
-            session.last_error = None;
-            session.restoration.take()
+            session.restoration
         };
 
         let Some(restoration) = restoration else {
             return self.fail("exclusive fullscreen restoration state is missing".to_string());
         };
-        restore_display_mode(&restoration.device_name);
-        if let Err(err) = restore_window(window, &restoration) {
-            return self.fail(err);
+        let taskbar_result = mark_taskbar_fullscreen(window_hwnd(window)?, false);
+        let display_result = restore_display_mode(&restoration.device_name);
+        pump_window_messages();
+        let window_result = restore_window(window, &restoration);
+        if display_result.is_err() || window_result.is_err() {
+            let message = [display_result.err(), window_result.err()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join("; ");
+            if let Ok(mut session) = self.inner.lock() {
+                session.last_reason = "exclusive-fullscreen-restore-failed".to_string();
+                session.last_error = Some(message.clone());
+            }
+            self.log_event(
+                "exclusive_fullscreen_restore_failed",
+                serde_json::json!({ "message": message, "reason": reason }),
+            );
+            return Err(message);
+        }
+        if let Err(message) = taskbar_result {
+            self.log_event(
+                "exclusive_fullscreen_taskbar_restore_failed",
+                serde_json::json!({ "message": message, "reason": reason }),
+            );
+        }
+        {
+            let mut session = self.lock_session()?;
+            session.active = false;
+            session.last_reason = reason.to_string();
+            session.last_error = None;
+            session.restoration = None;
         }
         self.log_event(
             "exclusive_fullscreen_exited",
@@ -241,7 +337,7 @@ impl ExclusiveFullscreen {
 impl Drop for ExclusiveFullscreenSession {
     fn drop(&mut self) {
         if let Some(restoration) = self.restoration.take() {
-            restore_display_mode(&restoration.device_name);
+            let _ = restore_display_mode(&restoration.device_name);
         }
     }
 }
@@ -327,73 +423,249 @@ fn display_mode_for_window(window: &WebviewWindow) -> Result<DisplayMode, String
 }
 
 fn capture_window_restoration(window: &WebviewWindow) -> Result<WindowRestoration, String> {
+    let hwnd = window_hwnd(window)?;
+    let mut rect = RECT::default();
+    if unsafe { GetWindowRect(hwnd, &mut rect) } == 0 {
+        return Err("GetWindowRect failed while capturing window restoration".to_string());
+    }
+    let mut placement = WINDOWPLACEMENT {
+        length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+        ..WINDOWPLACEMENT::default()
+    };
+    if unsafe { GetWindowPlacement(hwnd, &mut placement) } == 0 {
+        return Err("GetWindowPlacement failed while capturing window restoration".to_string());
+    }
     Ok(WindowRestoration {
-        position: window
-            .outer_position()
-            .map_err(|err| format!("failed to read window position: {err}"))?,
-        size: window
-            .outer_size()
-            .map_err(|err| format!("failed to read window size: {err}"))?,
-        decorated: window
-            .is_decorated()
-            .map_err(|err| format!("failed to read window decorations: {err}"))?,
-        maximized: window
-            .is_maximized()
-            .map_err(|err| format!("failed to read maximized state: {err}"))?,
+        rect,
+        placement,
+        style: unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) },
+        ex_style: unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) },
         device_name: [0; 32],
     })
 }
 
-fn configure_exclusive_window(
-    window: &WebviewWindow,
-    rect: windows_sys::Win32::Foundation::RECT,
-) -> Result<(), String> {
-    window
-        .unmaximize()
-        .map_err(|err| format!("failed to unmaximize window: {err}"))?;
-    window
-        .set_decorations(false)
-        .map_err(|err| format!("failed to remove window decorations: {err}"))?;
-    window
-        .set_position(Position::Physical(PhysicalPosition::new(
-            rect.left, rect.top,
-        )))
-        .map_err(|err| format!("failed to position exclusive window: {err}"))?;
-    let width = rect.right.saturating_sub(rect.left).max(1) as u32;
-    let height = rect.bottom.saturating_sub(rect.top).max(1) as u32;
-    window
-        .set_size(Size::Physical(PhysicalSize::new(width, height)))
-        .map_err(|err| format!("failed to size exclusive window: {err}"))?;
-    Ok(())
+fn configure_exclusive_window(window: &WebviewWindow, rect: RECT) -> Result<RECT, String> {
+    let hwnd = window_hwnd(window)?;
+    // A maximized HWND remains governed by its work-area placement even after its frame is
+    // removed. Normalize it first; the captured WINDOWPLACEMENT restores its zoom state later.
+    unsafe {
+        ShowWindow(hwnd, SW_RESTORE);
+    }
+    let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) };
+    let fullscreen_style = fullscreen_window_style(style);
+    unsafe {
+        SetWindowLongPtrW(hwnd, GWL_STYLE, fullscreen_style);
+    }
+    let (width, height) = rect_size(rect);
+    if unsafe {
+        SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            rect.left,
+            rect.top,
+            width,
+            height,
+            SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
+        )
+    } == 0
+    {
+        return Err("SetWindowPos failed while entering exclusive fullscreen".to_string());
+    }
+    unsafe {
+        SetForegroundWindow(hwnd);
+    }
+    let actual_style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) };
+    if actual_style != fullscreen_style {
+        return Err(format!(
+            "exclusive window style did not apply: expected {fullscreen_style:#x}, got {actual_style:#x}"
+        ));
+    }
+    let actual = current_window_rect(hwnd)?;
+    if !rect_matches(actual, rect) {
+        return Err(format!(
+            "exclusive window bounds did not match monitor: expected {}x{} at {},{}; got {}x{} at {},{}",
+            width,
+            height,
+            rect.left,
+            rect.top,
+            actual.right.saturating_sub(actual.left),
+            actual.bottom.saturating_sub(actual.top),
+            actual.left,
+            actual.top,
+        ));
+    }
+    mark_taskbar_fullscreen(hwnd, true)?;
+    Ok(actual)
 }
 
 fn restore_window(window: &WebviewWindow, restoration: &WindowRestoration) -> Result<(), String> {
-    window
-        .set_decorations(restoration.decorated)
-        .map_err(|err| format!("failed to restore window decorations: {err}"))?;
-    window
-        .set_position(Position::Physical(restoration.position))
-        .map_err(|err| format!("failed to restore window position: {err}"))?;
-    window
-        .set_size(Size::Physical(restoration.size))
-        .map_err(|err| format!("failed to restore window size: {err}"))?;
-    if restoration.maximized {
-        window
-            .maximize()
-            .map_err(|err| format!("failed to restore maximized state: {err}"))?;
+    let hwnd = window_hwnd(window)?;
+    let unzoomed_style = restoration.style & !(WS_MAXIMIZE as isize | WS_MINIMIZE as isize);
+    unsafe {
+        SetWindowLongPtrW(hwnd, GWL_STYLE, unzoomed_style);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, restoration.ex_style);
+    }
+    verify_window_styles(
+        hwnd,
+        unzoomed_style,
+        restoration.ex_style,
+        "before placement",
+    )?;
+    let insert_after = if restoration.ex_style & WS_EX_TOPMOST as isize != 0 {
+        HWND_TOPMOST
+    } else {
+        HWND_NOTOPMOST
+    };
+    let (width, height) = rect_size(restoration.rect);
+    if unsafe {
+        SetWindowPos(
+            hwnd,
+            insert_after,
+            restoration.rect.left,
+            restoration.rect.top,
+            width,
+            height,
+            SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
+        )
+    } == 0
+    {
+        return Err("SetWindowPos failed while restoring the window".to_string());
+    }
+    if unsafe { SetWindowPlacement(hwnd, &restoration.placement) } == 0 {
+        return Err("SetWindowPlacement failed while restoring the window".to_string());
+    }
+    verify_restored_window(hwnd, restoration)?;
+    Ok(())
+}
+
+fn fullscreen_window_style(style: isize) -> isize {
+    style & !(WS_OVERLAPPEDWINDOW as isize | WS_MAXIMIZE as isize | WS_MINIMIZE as isize)
+}
+
+fn verify_window_styles(
+    hwnd: HWND,
+    expected_style: isize,
+    expected_ex_style: isize,
+    phase: &str,
+) -> Result<(), String> {
+    let actual_style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) };
+    let actual_ex_style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) };
+    if actual_style != expected_style || actual_ex_style != expected_ex_style {
+        return Err(format!(
+            "window styles did not restore {phase}: expected {expected_style:#x}/{expected_ex_style:#x}, got {actual_style:#x}/{actual_ex_style:#x}"
+        ));
     }
     Ok(())
 }
 
-fn restore_display_mode(device_name: &[u16; 32]) {
+fn verify_restored_window(hwnd: HWND, restoration: &WindowRestoration) -> Result<(), String> {
+    let mut actual_placement = WINDOWPLACEMENT {
+        length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+        ..WINDOWPLACEMENT::default()
+    };
+    if unsafe { GetWindowPlacement(hwnd, &mut actual_placement) } == 0 {
+        return Err("GetWindowPlacement failed while verifying window restoration".to_string());
+    }
+    if actual_placement.showCmd != restoration.placement.showCmd
+        || !rect_matches(
+            actual_placement.rcNormalPosition,
+            restoration.placement.rcNormalPosition,
+        )
+    {
+        return Err(format!(
+            "window placement did not restore: expected show {} normal {},{}-{},{}; got show {} normal {},{}-{},{}",
+            restoration.placement.showCmd,
+            restoration.placement.rcNormalPosition.left,
+            restoration.placement.rcNormalPosition.top,
+            restoration.placement.rcNormalPosition.right,
+            restoration.placement.rcNormalPosition.bottom,
+            actual_placement.showCmd,
+            actual_placement.rcNormalPosition.left,
+            actual_placement.rcNormalPosition.top,
+            actual_placement.rcNormalPosition.right,
+            actual_placement.rcNormalPosition.bottom,
+        ));
+    }
+    verify_window_styles(
+        hwnd,
+        restoration.style,
+        restoration.ex_style,
+        "after placement",
+    )
+}
+
+fn window_hwnd(window: &WebviewWindow) -> Result<HWND, String> {
+    window
+        .hwnd()
+        .map(|handle| handle.0 as HWND)
+        .map_err(|err| format!("failed to resolve Windows window handle: {err}"))
+}
+
+fn current_window_rect(hwnd: HWND) -> Result<RECT, String> {
+    let mut rect = RECT::default();
+    if unsafe { GetWindowRect(hwnd, &mut rect) } == 0 {
+        return Err("GetWindowRect failed while verifying exclusive fullscreen".to_string());
+    }
+    Ok(rect)
+}
+
+fn rect_size(rect: RECT) -> (i32, i32) {
+    (
+        rect.right.saturating_sub(rect.left).max(1),
+        rect.bottom.saturating_sub(rect.top).max(1),
+    )
+}
+
+fn rect_matches(actual: RECT, expected: RECT) -> bool {
+    actual.left == expected.left
+        && actual.top == expected.top
+        && actual.right == expected.right
+        && actual.bottom == expected.bottom
+}
+
+fn pump_window_messages() {
     unsafe {
+        let mut message = MSG::default();
+        PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_NOREMOVE);
+    }
+}
+
+fn mark_taskbar_fullscreen(hwnd: HWND, fullscreen: bool) -> Result<(), String> {
+    let com_result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    let should_uninitialize = com_result.is_ok();
+    let result = (|| -> windows::core::Result<()> {
+        let taskbar: ITaskbarList2 = unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_ALL) }?;
+        unsafe {
+            taskbar.HrInit()?;
+            taskbar.MarkFullscreenWindow(TaskbarHwnd(hwnd), fullscreen)?;
+        }
+        Ok(())
+    })()
+    .map_err(|err| format!("ITaskbarList2::MarkFullscreenWindow failed: {err}"));
+    if should_uninitialize {
+        unsafe {
+            CoUninitialize();
+        }
+    }
+    result
+}
+
+fn restore_display_mode(device_name: &[u16; 32]) -> Result<(), String> {
+    let result = unsafe {
         ChangeDisplaySettingsExW(
             device_name.as_ptr(),
             std::ptr::null(),
             std::ptr::null_mut(),
             0,
             std::ptr::null(),
-        );
+        )
+    };
+    if result == DISP_CHANGE_SUCCESSFUL {
+        Ok(())
+    } else {
+        Err(format!(
+            "ChangeDisplaySettingsExW failed to restore the display mode with code {result}"
+        ))
     }
 }
 
@@ -409,5 +681,39 @@ mod tests {
         assert!(!snapshot.requested);
         assert!(!snapshot.active);
         assert_eq!(snapshot.mode, "windows-display-mode");
+    }
+
+    #[test]
+    fn exclusive_style_removes_the_complete_overlapped_frame() {
+        let original = 0x14cf_0000isize | WS_MAXIMIZE as isize | WS_MINIMIZE as isize;
+        let fullscreen = fullscreen_window_style(original);
+        assert_eq!(fullscreen & WS_OVERLAPPEDWINDOW as isize, 0);
+        assert_eq!(fullscreen & WS_MAXIMIZE as isize, 0);
+        assert_eq!(fullscreen & WS_MINIMIZE as isize, 0);
+        assert_eq!(
+            fullscreen
+                & !(WS_OVERLAPPEDWINDOW as isize | WS_MAXIMIZE as isize | WS_MINIMIZE as isize),
+            original
+                & !(WS_OVERLAPPEDWINDOW as isize | WS_MAXIMIZE as isize | WS_MINIMIZE as isize)
+        );
+    }
+
+    #[test]
+    fn fullscreen_bounds_require_the_exact_monitor_rectangle() {
+        let monitor = RECT {
+            left: -1920,
+            top: 0,
+            right: 0,
+            bottom: 1080,
+        };
+        assert_eq!(rect_size(monitor), (1920, 1080));
+        assert!(rect_matches(monitor, monitor));
+        assert!(!rect_matches(
+            RECT {
+                right: -1,
+                ..monitor
+            },
+            monitor
+        ));
     }
 }

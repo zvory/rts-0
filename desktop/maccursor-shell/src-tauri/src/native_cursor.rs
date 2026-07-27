@@ -790,13 +790,40 @@ unsafe extern "system" fn windows_raw_input_wnd_proc(
     lparam: windows_sys::Win32::Foundation::LPARAM,
 ) -> windows_sys::Win32::Foundation::LRESULT {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{CallWindowProcW, WM_INPUT, WM_KEYDOWN};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CallWindowProcW, PostMessageW, WM_APP, WM_INPUT, WM_KEYDOWN,
+    };
+
+    const WM_RTS_APPLICATION_ACTIVATION: u32 = WM_APP + 0x421;
+    const WM_RTS_ESCAPE: u32 = WM_APP + 0x422;
 
     let Some(runtime) = WINDOWS_RAW_INPUT.get() else {
         return 0;
     };
     if message == WM_INPUT && runtime.backend.active() {
         handle_windows_raw_input(&runtime.backend, lparam);
+    }
+    if let Some(activated) = windows_application_activation(message, wparam) {
+        PostMessageW(
+            hwnd,
+            WM_RTS_APPLICATION_ACTIVATION,
+            usize::from(activated),
+            0,
+        );
+    }
+    if message == WM_RTS_APPLICATION_ACTIVATION {
+        if wparam == 0 {
+            let _ = runtime.backend.stop("application deactivated");
+            let _ = runtime
+                .window
+                .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+                .suspend(&runtime.window, "application deactivated");
+        } else {
+            let _ = runtime
+                .window
+                .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+                .resume(&runtime.window);
+        }
     }
     if message == WM_KEYDOWN
         && wparam == VK_ESCAPE as usize
@@ -806,21 +833,30 @@ unsafe extern "system" fn windows_raw_input_wnd_proc(
             .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
             .active()
     {
-        let backend = runtime.backend.clone();
-        let window = runtime.window.clone();
-        std::thread::spawn(move || {
-            let _ = backend.stop("escape");
-            let _ = window
-                .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
-                .set_enabled(&window, false);
-            let _ = window.eval(
-                "window.dispatchEvent(new CustomEvent('rts-exclusive-fullscreen-shell-exit', { detail: { reason: 'escape' } }));",
-            );
-        });
+        PostMessageW(hwnd, WM_RTS_ESCAPE, 0, 0);
+    }
+    if message == WM_RTS_ESCAPE {
+        let _ = runtime.backend.stop("escape");
+        let _ = runtime
+            .window
+            .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
+            .set_enabled(&runtime.window, false);
+        let _ = runtime.window.eval(
+            "window.dispatchEvent(new CustomEvent('rts-exclusive-fullscreen-shell-exit', { detail: { reason: 'escape' } }));",
+        );
     }
     let previous: windows_sys::Win32::UI::WindowsAndMessaging::WNDPROC =
         Some(std::mem::transmute(runtime.previous_wnd_proc));
     CallWindowProcW(previous, hwnd, message, wparam, lparam)
+}
+
+#[cfg(target_os = "windows")]
+fn windows_application_activation(
+    message: u32,
+    wparam: windows_sys::Win32::Foundation::WPARAM,
+) -> Option<bool> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::WM_ACTIVATEAPP;
+    (message == WM_ACTIVATEAPP).then_some(wparam != 0)
 }
 
 #[cfg(target_os = "windows")]
@@ -1118,5 +1154,21 @@ mod tests {
             windows_wheel_deltas(RI_MOUSE_WHEEL, (-120_i16) as u16),
             (0.0, 120.0)
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn application_activation_ignores_window_focus_churn() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{WM_ACTIVATEAPP, WM_SETFOCUS};
+
+        assert_eq!(
+            windows_application_activation(WM_ACTIVATEAPP, 0),
+            Some(false)
+        );
+        assert_eq!(
+            windows_application_activation(WM_ACTIVATEAPP, 1),
+            Some(true)
+        );
+        assert_eq!(windows_application_activation(WM_SETFOCUS, 0), None);
     }
 }

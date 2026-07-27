@@ -69,22 +69,26 @@ a native overlay.
 Windows keeps its native backend opt-in. **Settings > Game > Use fullscreen
 mode** starts disabled. Enabling it enters a temporary Win32
 `CDS_FULLSCREEN` display mode on the window's current monitor, removes the
-window chrome without using Tauri's borderless fullscreen API, and switches
-cursor lock to Win32 Raw Input. The shell hides and confines the physical
-cursor while captured; relative movement, buttons, and wheel input continue
-through the same `window.__RTS_NATIVE_CURSOR` event contract as macOS.
-WebView2 Pointer Lock remains available while the setting is off and is not
-used while the Windows native backend is active.
+window chrome without using Tauri's borderless fullscreen API, positions the
+native `HWND` over the exact monitor rectangle, marks it fullscreen through
+the Windows taskbar API, and switches cursor lock to Win32 Raw Input. Entry is
+only reported after `GetWindowRect` confirms the monitor-sized window. The
+shell hides and confines the physical cursor while captured; relative
+movement, buttons, and wheel input continue through the same
+`window.__RTS_NATIVE_CURSOR` event contract as macOS. WebView2 Pointer Lock
+remains available while the setting is off and is not used while the Windows
+native backend is active.
 
 Escape turns **Use fullscreen mode** off. Alt-Tab remains available: losing
-focus releases Raw Input capture, cursor hiding/confinement, and the temporary
-display mode. If the preference is still enabled, focusing the game restores
-the display mode and the match re-captures the native cursor.
+application activation releases Raw Input capture, cursor hiding/confinement,
+the taskbar fullscreen marker, and the temporary display mode. If the
+preference is still enabled, activating the game again restores the display
+mode and the match re-captures the native cursor.
 
 Once a non-replay match starts in a native-cursor mode, the web client
 aggressively requests native cursor capture, retries on focused unlocks, and
 grabs the cursor again after the window regains focus. Alt-Tab releases capture
-through the shell window blur handler; focusing the game window again
+through the shell's `WM_ACTIVATEAPP` handler; activating the game window again
 re-captures it.
 
 Developer-only shortcuts for local debug runs:
