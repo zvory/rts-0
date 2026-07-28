@@ -3,7 +3,7 @@ use super::*;
 use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
 };
-use crate::ai_core::profiles::{AiProfile, AI_2_1};
+use crate::ai_core::profiles::{AiProfile, AI_2_1, JEFFS_AI};
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
@@ -166,6 +166,50 @@ fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile)
         },
         |_, tx, ty| tx < width && ty < height,
     )
+}
+
+fn jeff_opening_observation(worker_count: usize, pump_jacks: usize) -> AiObservation {
+    let mut owned = vec![building(1, EntityKind::CityCentre, Some(0))];
+    owned.extend((0..worker_count).map(|index| {
+        worker(
+            20 + index as u32,
+            if index == 0 {
+                AiEntityState::Idle
+            } else {
+                AiEntityState::Gather
+            },
+        )
+    }));
+    owned.extend(
+        (0..pump_jacks).map(|index| building(60 + index as u32, EntityKind::PumpJack, None)),
+    );
+    observation(
+        AiEconomy {
+            steel: 200,
+            oil: 50,
+            supply_used: worker_count as u32,
+            supply_cap: 40,
+        },
+        owned,
+    )
+}
+
+#[test]
+fn jeff_waits_for_seven_workers_and_two_pump_jacks_before_barracks() {
+    for observation in [
+        jeff_opening_observation(6, 2),
+        jeff_opening_observation(7, 1),
+    ] {
+        let decision = decide_with_profile(&observation, &JEFFS_AI);
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }));
+    }
+
+    let decision = decide_with_profile(&jeff_opening_observation(7, 2), &JEFFS_AI);
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Barracks
+    }));
 }
 
 fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {

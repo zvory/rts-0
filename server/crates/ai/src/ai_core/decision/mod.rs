@@ -463,6 +463,11 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
+    let delay_opening_barracks = profile.fast_tank_timing.is_some_and(|timing| {
+        facts.complete_building_count(EntityKind::Barracks) == 0
+            && (facts.worker_count < timing.workers_before_barracks
+                || facts.building_count(EntityKind::PumpJack) < timing.pump_jacks_before_barracks)
+    });
     let preserve_fast_tank_economy = profile
         .fast_tank_timing
         .map(|timing| timing.preserve_during_defensive_panic)
@@ -530,6 +535,9 @@ where
     }
 
     for kind in required_tech_path {
+        if *kind == EntityKind::Barracks && delay_opening_barracks {
+            continue;
+        }
         if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
             continue;
         }
@@ -566,6 +574,7 @@ where
     };
     let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
     if production_uses_building(production_policy, EntityKind::Barracks)
+        && !delay_opening_barracks
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(&intents, EntityKind::Barracks)
             < target_barracks

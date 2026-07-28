@@ -124,6 +124,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
             "Fast-Tank containment profile with armored-contact range holds, batched reinforcements, a shallow flank, and layered Machine Gunner plus Anti-Tank Gun home defense.",
             vec![
                 "economy_manager",
+                "seven_worker_two_pump_opening",
                 "two_machine_gunner_opening",
                 "half_health_machine_gunner_replacement",
                 "immediate_tank_tech",

@@ -43,6 +43,8 @@ pub(crate) struct AiProfile {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct FastTankTimingPolicy {
+    pub(crate) workers_before_barracks: usize,
+    pub(crate) pump_jacks_before_barracks: usize,
     pub(crate) tanks_before_scout_car: usize,
     pub(crate) scout_car_target: usize,
     pub(crate) tanks_before_optional_upgrades: usize,
