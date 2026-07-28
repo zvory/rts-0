@@ -212,6 +212,66 @@ fn jeff_waits_for_seven_workers_and_two_pump_jacks_before_barracks() {
     }));
 }
 
+#[test]
+fn jeff_first_pump_builder_immediately_builds_one_followup_pump() {
+    let mut observation = jeff_opening_observation(7, 1);
+    let ts = observation.map.tile_size as f32;
+    let first_oil = observation
+        .resources
+        .iter()
+        .find(|resource| resource.id == 200)
+        .map(|resource| (resource.x, resource.y))
+        .expect("first oil node");
+    if let Some(city_centre) = observation.owned.iter_mut().find(|entity| entity.id == 1) {
+        city_centre.x = 8.5 * ts;
+        city_centre.y = 8.5 * ts;
+    }
+    if let Some(builder) = observation.owned.iter_mut().find(|entity| entity.id == 20) {
+        builder.x = first_oil.0;
+        builder.y = first_oil.1;
+    }
+    if let Some(pump_jack) = observation.owned.iter_mut().find(|entity| entity.id == 60) {
+        pump_jack.x = first_oil.0;
+        pump_jack.y = first_oil.1;
+    }
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.opening_first_pump_builder = Some(20);
+    let width = observation.map.width;
+    let height = observation.map.height;
+
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+
+    assert!(
+        decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Build {
+                    units,
+                    building: EntityKind::PumpJack,
+                    ..
+                } if units == &[20]
+            )
+        }),
+        "commands={:?}",
+        decision.commands
+    );
+    assert_eq!(memory.opening_first_pump_builder_followups, 1);
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(command, Command::Gather { units, .. } if units.contains(&20))
+    }));
+}
+
 fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {
     with_expansion_resources(observation(
         AiEconomy {

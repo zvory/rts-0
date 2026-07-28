@@ -140,6 +140,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     fast_tank_timing: Some(FastTankTimingPolicy {
         workers_before_barracks: 7,
         pump_jacks_before_barracks: 2,
+        first_pump_builder_additional_pump_jacks: 1,
         tanks_before_scout_car: 2,
         scout_car_target: 1,
         tanks_before_optional_upgrades: 3,
@@ -183,6 +184,7 @@ mod tests {
         let timing = JEFFS_AI.fast_tank_timing.expect("fast tank timing");
         assert_eq!(timing.workers_before_barracks, 7);
         assert_eq!(timing.pump_jacks_before_barracks, 2);
+        assert_eq!(timing.first_pump_builder_additional_pump_jacks, 1);
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);
         assert_eq!(timing.optional_upgrades, &OPTIONAL_UPGRADES);
