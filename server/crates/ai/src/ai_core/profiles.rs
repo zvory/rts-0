@@ -27,6 +27,7 @@ pub(crate) struct AiProfile {
     pub(crate) workers: WorkerPolicy,
     pub(crate) buildings: BuildingPolicy,
     pub(crate) extra_factories: Option<ExtraFactoryPolicy>,
+    pub(crate) surplus_steel_production: Option<SurplusSteelProductionPolicy>,
     pub(crate) production: ProductionPolicy,
     pub(crate) upgrade_priorities: &'static [UpgradeKind],
     pub(crate) attack: AttackPolicy,
@@ -111,7 +112,15 @@ pub(crate) struct BuildingPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ExtraFactoryPolicy {
     pub(crate) target_count: usize,
+    pub(crate) minimum_units: usize,
+    pub(crate) prerequisite_unit: EntityKind,
     pub(crate) resource_float: ResourceFloatThreshold,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SurplusSteelProductionPolicy {
+    pub(crate) reserve: u32,
+    pub(crate) unit: EntityKind,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,6 +228,7 @@ pub(crate) struct ExpansionContainmentPolicy {
     pub(crate) flank_tiles: f32,
     pub(crate) contact_stop_tiles: f32,
     pub(crate) minimum_tanks_to_continue: usize,
+    pub(crate) recovery_tanks_to_continue: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -301,8 +311,11 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
     },
     extra_factories: Some(ExtraFactoryPolicy {
         target_count: 2,
+        minimum_units: 0,
+        prerequisite_unit: EntityKind::Tank,
         resource_float: AI_2_1_SECOND_FACTORY_FLOAT_THRESHOLD,
     }),
+    surplus_steel_production: None,
     production: ProductionPolicy {
         queue_depth: 2,
         unit_priorities: &RIFLE_ONLY,
@@ -411,6 +424,8 @@ mod tests {
             AI_2_1.extra_factories,
             Some(ExtraFactoryPolicy {
                 target_count: 2,
+                minimum_units: 0,
+                prerequisite_unit: EntityKind::Tank,
                 resource_float: AI_2_1_SECOND_FACTORY_FLOAT_THRESHOLD,
             })
         );

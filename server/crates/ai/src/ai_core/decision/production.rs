@@ -16,9 +16,7 @@ pub(super) fn should_build_extra_factory(
     let Some(policy) = profile.extra_factories else {
         return false;
     };
-    if profile.fast_tank_timing.is_some_and(|timing| {
-        facts.unit_count(EntityKind::Tank) < timing.tanks_before_optional_upgrades
-    }) {
+    if facts.unit_count(policy.prerequisite_unit) < policy.minimum_units {
         return false;
     }
     if observation.economy.steel <= policy.resource_float.steel

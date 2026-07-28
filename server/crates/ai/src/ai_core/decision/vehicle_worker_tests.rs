@@ -43,6 +43,24 @@ fn building(id: u32, kind: EntityKind, queue_len: Option<usize>) -> AiEntitySumm
     building_at(id, kind, queue_len, 0.0, 0.0)
 }
 
+fn combat_unit(id: u32, kind: EntityKind) -> AiEntitySummary {
+    AiEntitySummary {
+        id,
+        owner: 1,
+        kind,
+        x: 0.0,
+        y: 0.0,
+        hp: 100,
+        state: AiEntityState::Idle,
+        is_complete: true,
+        production_queue_len: None,
+        production_kind: None,
+        latched_node: None,
+        target_id: None,
+        free_for_combat: true,
+    }
+}
+
 fn building_at(
     id: u32,
     kind: EntityKind,
@@ -509,6 +527,108 @@ fn ai_2_1_waits_until_above_second_factory_resource_float() {
 
     let decision = decide_with_profile(&observation, &AI_2_1);
 
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+}
+
+fn jeff_surplus_observation(steel: u32) -> AiObservation {
+    let mut observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel,
+            oil: 1,
+            supply_used: 54,
+            supply_cap: 120,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::CityCentre, Some(0)),
+            building(12, EntityKind::Barracks, Some(0)),
+            building(13, EntityKind::TrainingCentre, None),
+            building(14, EntityKind::ResearchComplex, None),
+            building(15, EntityKind::Factory, Some(1)),
+            combat_unit(30, EntityKind::Tank),
+            combat_unit(31, EntityKind::Tank),
+            combat_unit(32, EntityKind::Tank),
+            combat_unit(33, EntityKind::ScoutCar),
+            combat_unit(34, EntityKind::MachineGunner),
+            combat_unit(35, EntityKind::MachineGunner),
+            worker(40, AiEntityState::Idle),
+        ],
+    ));
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Entrenchment);
+    observation
+}
+
+#[test]
+fn jeff_does_not_spend_the_six_hundred_steel_reserve_on_riflemen() {
+    let decision = decide_with_profile(&jeff_surplus_observation(600), &JEFFS_AI);
+
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Barracks
+    }));
+}
+
+#[test]
+fn jeff_spends_only_steel_above_reserve_on_riflemen_and_a_second_barracks() {
+    let decision = decide_with_profile(&jeff_surplus_observation(601), &JEFFS_AI);
+
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Barracks
+    }));
+}
+
+#[test]
+fn jeff_reforms_three_tanks_at_home_after_the_opening_wave_is_lost() {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment_wave_launched = true;
+    memory.containment_opening_tanks = BTreeSet::from([101, 102]);
+    memory.home_defensive_tank = Some(200);
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 20,
+            supply_cap: 120,
+        },
+        vec![
+            combat_unit(200, EntityKind::Tank),
+            combat_unit(201, EntityKind::Tank),
+            combat_unit(202, EntityKind::Tank),
+            combat_unit(203, EntityKind::ScoutCar),
+        ],
+    );
+
+    memory.sync_containment_recovery(&observation, &JEFFS_AI, false);
+    assert!(memory.containment_recovery_active);
+
+    observation.owned.push(combat_unit(204, EntityKind::Tank));
+    memory.sync_containment_recovery(&observation, &JEFFS_AI, true);
+    assert!(memory.containment_recovery_active);
+
+    memory.sync_containment_recovery(&observation, &JEFFS_AI, false);
+    assert!(!memory.containment_recovery_active);
+}
+
+#[test]
+fn jeff_adds_the_second_vehicle_works_after_three_tanks_at_the_earlier_float() {
+    let mut observation = jeff_surplus_observation(251);
+    observation.economy.oil = 126;
+
+    let decision = decide_with_profile(&observation, &JEFFS_AI);
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+
+    observation.owned.retain(|entity| entity.id != 32);
+    let decision = decide_with_profile(&observation, &JEFFS_AI);
     assert!(!decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Factory
     }));

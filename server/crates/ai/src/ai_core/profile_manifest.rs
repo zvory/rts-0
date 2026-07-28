@@ -135,6 +135,8 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "stationary_tank_expansion_containment",
                 "armored_contact_range_hold",
                 "minimum_two_tank_reform",
+                "three_tank_failed_push_recovery",
+                "failed_push_home_regroup",
                 "shallow_flank_approach",
                 "threat_first_targeting",
                 "post_launch_anti_tank_unlock",
@@ -150,6 +152,9 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "endgame_search_and_destroy_sweep",
                 "two_base_full_saturation",
                 "post_timing_expansion",
+                "earlier_second_vehicle_works",
+                "surplus_steel_riflemen",
+                "surplus_second_barracks",
             ],
         ),
         _ => (

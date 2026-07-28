@@ -234,7 +234,12 @@ fn issue_expansion_containment_wave(
             .extend(tanks.iter().copied());
         memory.containment_wave_launched = true;
     }
-    if memory.containment_wave_launched && tanks.len() < policy.minimum_tanks_to_continue {
+    let tanks_required = if memory.containment_recovery_active {
+        policy.recovery_tanks_to_continue
+    } else {
+        policy.minimum_tanks_to_continue
+    };
+    if memory.containment_wave_launched && tanks.len() < tanks_required {
         memory.containment_stationary_since = None;
         let fallback = own_base;
         actions::move_units(actions, tanks.iter().copied(), fallback.0, fallback.1);
@@ -316,18 +321,8 @@ fn issue_expansion_containment_wave(
         // target, so the formation continues toward the containment anchor.
         actions::attack_move_units(actions, tanks.iter().copied(), tank_point.0, tank_point.1);
     }
-    let scout_point = if stationary_range_ready {
-        if tanks_in_position {
-            scout_point
-        } else {
-            scout_forward_from_tanks(
-                tank_center,
-                own_base,
-                objective,
-                observation.map,
-                policy.scout_forward_tiles,
-            )?
-        }
+    let scout_point = if stationary_range_ready && tanks_in_position {
+        scout_point
     } else {
         trailing_point
     };
@@ -720,6 +715,7 @@ mod tests {
             flank_tiles: 5.0,
             contact_stop_tiles: 18.0,
             minimum_tanks_to_continue: 2,
+            recovery_tanks_to_continue: 3,
         };
         let objective = (2_000.0, 1_000.0);
         let (tank, scout) = containment_points((200.0, 1_000.0), objective, map, policy).unwrap();

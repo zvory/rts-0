@@ -2,7 +2,8 @@ use super::{
     AiProfile, AttackPolicy, BarracksCurve, BuildingPolicy, DefensiveMachineGunnerPolicy,
     ExpansionContainmentPolicy, ExpansionPolicy, ExtraFactoryPolicy, FastTankTimingPolicy,
     FrontalWavePolicy, HomeAntiTankPolicy, ProductionPolicy, Ratio, ResourceFloatThreshold,
-    ResourcePolicy, TankResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    ResourcePolicy, SurplusSteelProductionPolicy, TankResourcePolicy, TechTransitionPolicy,
+    WorkerPolicy,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -37,9 +38,9 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         barracks_curve: BarracksCurve {
             before_steel_saturation: 1,
             after_steel_saturation: 1,
-            banked_steel_threshold: 0,
-            banked_steel_step: 0,
-            max: 1,
+            banked_steel_threshold: 600,
+            banked_steel_step: u32::MAX,
+            max: 2,
         },
         factory_target: 1,
         required_tech_path: &ARMORED_TECH_PATH,
@@ -47,10 +48,16 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     },
     extra_factories: Some(ExtraFactoryPolicy {
         target_count: 2,
+        minimum_units: 3,
+        prerequisite_unit: EntityKind::Tank,
         resource_float: ResourceFloatThreshold {
-            steel: 350,
-            oil: 225,
+            steel: 250,
+            oil: 125,
         },
+    }),
+    surplus_steel_production: Some(SurplusSteelProductionPolicy {
+        reserve: 600,
+        unit: EntityKind::Rifleman,
     }),
     production: ProductionPolicy {
         queue_depth: 1,
@@ -110,6 +117,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         flank_tiles: 5.0,
         contact_stop_tiles: 18.0,
         minimum_tanks_to_continue: 2,
+        recovery_tanks_to_continue: 3,
     }),
     home_anti_tank: Some(HomeAntiTankPolicy {
         defensive_tanks: 1,
@@ -172,6 +180,7 @@ mod tests {
         assert_eq!(JEFFS_AI.expansion.unwrap().defensive_unit_count, 1);
         let containment = JEFFS_AI.expansion_containment.unwrap();
         assert_eq!(containment.minimum_tanks_to_continue, 2);
+        assert_eq!(containment.recovery_tanks_to_continue, 3);
         assert_eq!(containment.contact_stop_tiles, 18.0);
         let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
         assert_eq!(home_anti_tank.defensive_tanks, 1);
@@ -188,5 +197,7 @@ mod tests {
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);
         assert_eq!(timing.optional_upgrades, &OPTIONAL_UPGRADES);
+        assert_eq!(JEFFS_AI.surplus_steel_production.unwrap().reserve, 600);
+        assert_eq!(JEFFS_AI.extra_factories.unwrap().minimum_units, 3);
     }
 }

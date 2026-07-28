@@ -33,6 +33,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         max_pending_per_kind: 1,
     },
     extra_factories: None,
+    surplus_steel_production: None,
     production: ProductionPolicy {
         queue_depth: 3,
         unit_priorities: &TURTLE_UNITS,

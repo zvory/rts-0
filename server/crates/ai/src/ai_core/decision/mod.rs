@@ -134,6 +134,7 @@ pub(crate) struct AiDecisionMemory {
     containment_stationary_since: Option<u32>,
     containment_wave_launched: bool,
     containment_opening_tanks: BTreeSet<u32>,
+    containment_recovery_active: bool,
     home_defensive_tank: Option<u32>,
     home_defensive_tank_assigned_once: bool,
     enemy_natural_city_centre: Option<u32>,
@@ -162,6 +163,7 @@ impl AiDecisionMemory {
             containment_stationary_since: None,
             containment_wave_launched: false,
             containment_opening_tanks: BTreeSet::new(),
+            containment_recovery_active: false,
             home_defensive_tank: None,
             home_defensive_tank_assigned_once: false,
             enemy_natural_city_centre: None,
@@ -237,6 +239,7 @@ impl AiDecisionMemory {
         self.containment_stationary_since = None;
         self.containment_wave_launched = false;
         self.containment_opening_tanks.clear();
+        self.containment_recovery_active = false;
         self.home_defensive_tank = None;
         self.home_defensive_tank_assigned_once = false;
         self.enemy_natural_city_centre = None;
@@ -383,6 +386,50 @@ impl AiDecisionMemory {
             })
             .map(|entity| entity.id);
         self.home_defensive_tank_assigned_once = self.home_defensive_tank.is_some();
+    }
+
+    fn sync_containment_recovery(
+        &mut self,
+        observation: &AiObservation,
+        profile: &AiProfile,
+        defensive_panic_active: bool,
+    ) {
+        let Some(policy) = profile.expansion_containment else {
+            self.containment_recovery_active = false;
+            return;
+        };
+        if !self.containment_wave_launched || self.enemy_natural_destroyed {
+            self.containment_recovery_active = false;
+            return;
+        }
+        let opening_tanks_alive = observation
+            .owned
+            .iter()
+            .filter(|entity| {
+                entity.kind == EntityKind::Tank
+                    && self.containment_opening_tanks.contains(&entity.id)
+            })
+            .count();
+        if opening_tanks_alive < policy.minimum_tanks_to_continue {
+            self.containment_recovery_active = true;
+        }
+        if !self.containment_recovery_active || defensive_panic_active {
+            return;
+        }
+        let replacement_tanks = observation
+            .owned
+            .iter()
+            .filter(|entity| {
+                entity.kind == EntityKind::Tank && Some(entity.id) != self.home_defensive_tank
+            })
+            .count();
+        let scout_ready = observation
+            .owned
+            .iter()
+            .any(|entity| entity.kind == EntityKind::ScoutCar && entity.free_for_combat);
+        if replacement_tanks >= policy.recovery_tanks_to_continue && scout_ready {
+            self.containment_recovery_active = false;
+        }
     }
 
     fn city_centre_is_safe_to_resume(&self, site_id: u32, tick: u32) -> bool {
@@ -678,7 +725,11 @@ where
         )
     };
     let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
-    if production_uses_building(production_policy, EntityKind::Barracks)
+    let surplus_barracks_enabled = profile
+        .surplus_steel_production
+        .is_some_and(|policy| observation.economy.steel > policy.reserve);
+    if (production_uses_building(production_policy, EntityKind::Barracks)
+        || surplus_barracks_enabled)
         && !delay_opening_barracks
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(&intents, EntityKind::Barracks)
@@ -876,6 +927,13 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
+    if let Some(policy) = profile.surplus_steel_production {
+        if observation.economy.steel > policy.reserve
+            && !effective_unit_priorities.contains(&policy.unit)
+        {
+            effective_unit_priorities.push(policy.unit);
+        }
+    }
     if profile.home_anti_tank.is_some()
         && memory.containment_wave_launched
         && !effective_unit_priorities.contains(&EntityKind::AntiTankGun)
@@ -1017,6 +1075,7 @@ where
     if let Some(tank_id) = memory.home_defensive_tank {
         frontal_exclusions.insert(tank_id);
     }
+    memory.sync_containment_recovery(observation, profile, defensive_panic.active);
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
