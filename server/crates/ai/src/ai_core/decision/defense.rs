@@ -12,6 +12,9 @@ pub(super) const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 
 pub(super) const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 
+const DEFENSIVE_FIRING_LANE_TILES: f32 = 14.0;
+const DEFENSIVE_FIRING_POSITION_SEARCH_TILES: i32 = 6;
+
 pub(super) const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 
 pub(super) const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
@@ -336,6 +339,48 @@ pub(super) fn machine_gunner_meets_replacement_health(hp: u32, threshold: u8) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_core::observation::AiEconomy;
+
+    fn los_test_observation(blocker: EntityKind) -> AiObservation {
+        let tile_size = config::TILE_SIZE;
+        AiObservation {
+            player_id: 1,
+            tick: 0,
+            map: AiMapSummary {
+                width: 32,
+                height: 32,
+                tile_size,
+            },
+            economy: AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 100,
+            },
+            own_start_tile: (5, 5),
+            players: Vec::new(),
+            owned: vec![AiEntitySummary {
+                id: 10,
+                owner: 1,
+                kind: blocker,
+                x: 10.5 * tile_size as f32,
+                y: 5.5 * tile_size as f32,
+                hp: 100,
+                state: AiEntityState::Idle,
+                is_complete: true,
+                production_queue_len: None,
+                production_kind: None,
+                latched_node: None,
+                target_id: None,
+                free_for_combat: false,
+            }],
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        }
+    }
 
     #[test]
     fn machine_gunner_below_half_health_requires_replacement() {
@@ -347,6 +392,58 @@ mod tests {
         assert!(!machine_gunner_meets_replacement_health(
             half_or_above - 1,
             50
+        ));
+    }
+
+    #[test]
+    fn defensive_firing_lane_rejects_opaque_building_but_not_pump_jack() {
+        let ts = config::TILE_SIZE as f32;
+        let origin = (5.5 * ts, 5.5 * ts);
+        assert!(!defensive_firing_lane_is_clear(
+            &los_test_observation(EntityKind::Depot),
+            None,
+            origin,
+            (1.0, 0.0),
+            14.0,
+        ));
+        assert!(defensive_firing_lane_is_clear(
+            &los_test_observation(EntityKind::PumpJack),
+            None,
+            origin,
+            (1.0, 0.0),
+            14.0,
+        ));
+    }
+
+    #[test]
+    fn defensive_assignment_shifts_out_from_behind_building() {
+        let observation = los_test_observation(EntityKind::Depot);
+        let ts = observation.map.tile_size as f32;
+        let original = DefensiveLineAssignment {
+            unit_id: 20,
+            x: 5.5 * ts,
+            y: 5.5 * ts,
+        };
+        let adjusted = clear_firing_assignment(
+            &observation,
+            None,
+            original,
+            EnemyBaseFact {
+                player_id: 2,
+                start_tile: (25, 5),
+                x: 25.5 * ts,
+                y: 5.5 * ts,
+            },
+            14.0,
+        )
+        .expect("nearby clear firing position");
+        assert_ne!((adjusted.x, adjusted.y), (original.x, original.y));
+        assert!(defensive_firing_lane_is_clear(
+            &observation,
+            None,
+            (adjusted.x, adjusted.y),
+            (1.0, 0.0),
+            14.0,
         ));
     }
 }
@@ -414,6 +511,7 @@ pub(super) fn stage_home_anti_tank_line(
     observation: &AiObservation,
     profile: &AiProfile,
     enemy_base: EnemyBaseFact,
+    map_analysis: Option<&AiMapAnalysis>,
 ) -> Option<Vec<u32>> {
     let policy = profile.home_anti_tank?;
     let units = actions::select_ready_combat_units(&observation.owned, &[EntityKind::AntiTankGun]);
@@ -443,6 +541,15 @@ pub(super) fn stage_home_anti_tank_line(
         .unwrap_or((enemy_base.x, enemy_base.y));
     let mut staged = Vec::new();
     for assignment in assignments {
+        let Some(assignment) = clear_firing_assignment(
+            observation,
+            map_analysis,
+            assignment,
+            enemy_base,
+            DEFENSIVE_FIRING_LANE_TILES,
+        ) else {
+            continue;
+        };
         let Some(unit) = by_id.get(&assignment.unit_id).copied() else {
             continue;
         };
@@ -475,6 +582,7 @@ pub(super) fn home_defensive_tank_is_positioned(
     tank_id: u32,
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
+    map_analysis: Option<&AiMapAnalysis>,
 ) -> bool {
     let Some(assignment) = main_steel_defensive_line_assignments(
         observation,
@@ -484,6 +592,15 @@ pub(super) fn home_defensive_tank_is_positioned(
         EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
     )
     .and_then(|assignments| assignments.into_iter().next()) else {
+        return false;
+    };
+    let Some(assignment) = clear_firing_assignment(
+        observation,
+        map_analysis,
+        assignment,
+        enemy_base,
+        DEFENSIVE_FIRING_LANE_TILES,
+    ) else {
         return false;
     };
     let Some(tank) = observation.owned.iter().find(|entity| entity.id == tank_id) else {
@@ -499,6 +616,7 @@ pub(super) fn stage_home_defensive_tank(
     tank_id: u32,
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
+    map_analysis: Option<&AiMapAnalysis>,
 ) -> Option<Vec<u32>> {
     let assignment = main_steel_defensive_line_assignments(
         observation,
@@ -509,11 +627,169 @@ pub(super) fn stage_home_defensive_tank(
     )?
     .into_iter()
     .next()?;
-    if home_defensive_tank_is_positioned(observation, tank_id, enemy_base, distance_tiles) {
+    let assignment = clear_firing_assignment(
+        observation,
+        map_analysis,
+        assignment,
+        enemy_base,
+        DEFENSIVE_FIRING_LANE_TILES,
+    )?;
+    if home_defensive_tank_is_positioned(
+        observation,
+        tank_id,
+        enemy_base,
+        distance_tiles,
+        map_analysis,
+    ) {
         actions::hold_position_units(actions, [tank_id])
     } else {
         actions::move_units(actions, [tank_id], assignment.x, assignment.y)
     }
+}
+
+fn clear_firing_assignment(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    assignment: DefensiveLineAssignment,
+    enemy_base: EnemyBaseFact,
+    lane_tiles: f32,
+) -> Option<DefensiveLineAssignment> {
+    let Some(direction) =
+        normalized_direction((assignment.x, assignment.y), (enemy_base.x, enemy_base.y))
+    else {
+        return Some(assignment);
+    };
+    let perpendicular = (-direction.1, direction.0);
+    let tile_size = observation.map.tile_size as f32;
+    let mut offsets = vec![(0.0, 0.0)];
+    for radius in 1..=DEFENSIVE_FIRING_POSITION_SEARCH_TILES {
+        let r = radius as f32;
+        offsets.extend([
+            (perpendicular.0 * r, perpendicular.1 * r),
+            (-perpendicular.0 * r, -perpendicular.1 * r),
+            (-direction.0 * r, -direction.1 * r),
+            (direction.0 * r, direction.1 * r),
+            (
+                (perpendicular.0 - direction.0) * r,
+                (perpendicular.1 - direction.1) * r,
+            ),
+            (
+                (-perpendicular.0 - direction.0) * r,
+                (-perpendicular.1 - direction.1) * r,
+            ),
+        ]);
+    }
+    offsets
+        .into_iter()
+        .map(|offset| {
+            let (x, y) = clamp_to_map(
+                (
+                    assignment.x + offset.0 * tile_size,
+                    assignment.y + offset.1 * tile_size,
+                ),
+                observation.map,
+            );
+            DefensiveLineAssignment {
+                unit_id: assignment.unit_id,
+                x,
+                y,
+            }
+        })
+        .find(|candidate| {
+            defensive_position_is_open(observation, map_analysis, candidate.x, candidate.y)
+                && defensive_firing_lane_is_clear(
+                    observation,
+                    map_analysis,
+                    (candidate.x, candidate.y),
+                    direction,
+                    lane_tiles,
+                )
+        })
+}
+
+fn defensive_position_is_open(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    x: f32,
+    y: f32,
+) -> bool {
+    let tile = world_tile(observation.map, x, y);
+    map_analysis
+        .map(|analysis| analysis.tile_is_passable(tile.0, tile.1))
+        .unwrap_or(true)
+        && !dynamic_los_blocking_tiles(observation).contains(&tile)
+}
+
+fn defensive_firing_lane_is_clear(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    origin: (f32, f32),
+    direction: (f32, f32),
+    lane_tiles: f32,
+) -> bool {
+    let tile_size = observation.map.tile_size as f32;
+    let endpoint = clamp_to_map(
+        (
+            origin.0 + direction.0 * lane_tiles * tile_size,
+            origin.1 + direction.1 * lane_tiles * tile_size,
+        ),
+        observation.map,
+    );
+    let blockers = dynamic_los_blocking_tiles(observation);
+    let samples = (lane_tiles * 4.0).ceil().max(1.0) as usize;
+    (1..=samples).all(|step| {
+        let t = step as f32 / samples as f32;
+        let tile = world_tile(
+            observation.map,
+            origin.0 + (endpoint.0 - origin.0) * t,
+            origin.1 + (endpoint.1 - origin.1) * t,
+        );
+        !blockers.contains(&tile)
+            && !map_analysis
+                .map(|analysis| analysis.tile_blocks_line_of_sight(tile.0, tile.1))
+                .unwrap_or(false)
+    })
+}
+
+fn dynamic_los_blocking_tiles(observation: &AiObservation) -> BTreeSet<(u32, u32)> {
+    observation
+        .owned
+        .iter()
+        .chain(observation.visible_allies.iter())
+        .chain(observation.visible_enemies.iter())
+        .filter(|entity| entity.hp > 0 && rts_rules::blocks_line_of_sight(entity.kind))
+        .flat_map(|entity| building_footprint_tiles(observation.map, entity))
+        .collect()
+}
+
+fn building_footprint_tiles(map: AiMapSummary, entity: &AiEntitySummary) -> Vec<(u32, u32)> {
+    let Some(stats) = config::building_stats(entity.kind) else {
+        return Vec::new();
+    };
+    let center = world_tile(map, entity.x, entity.y);
+    let origin_x = center.0 as i32 - stats.foot_w as i32 / 2;
+    let origin_y = center.1 as i32 - stats.foot_h as i32 / 2;
+    let mut tiles = Vec::new();
+    for dy in 0..stats.foot_h as i32 {
+        for dx in 0..stats.foot_w as i32 {
+            let x = origin_x + dx;
+            let y = origin_y + dy;
+            if x >= 0 && y >= 0 && x < map.width as i32 && y < map.height as i32 {
+                tiles.push((x as u32, y as u32));
+            }
+        }
+    }
+    tiles
+}
+
+fn world_tile(map: AiMapSummary, x: f32, y: f32) -> (u32, u32) {
+    let tile_size = map.tile_size.max(1) as f32;
+    let tile_x = (x / tile_size).floor().max(0.0) as u32;
+    let tile_y = (y / tile_size).floor().max(0.0) as u32;
+    (
+        tile_x.min(map.width.saturating_sub(1)),
+        tile_y.min(map.height.saturating_sub(1)),
+    )
 }
 
 #[derive(Clone, Copy, Debug)]

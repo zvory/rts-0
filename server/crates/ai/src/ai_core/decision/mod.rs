@@ -752,7 +752,13 @@ where
                 .defensive_machine_gunners
                 .map(|policy| policy.perimeter_distance_tiles)
                 .unwrap_or(6.0);
-            home_defensive_tank_is_positioned(observation, tank_id, enemy_base, distance)
+            home_defensive_tank_is_positioned(
+                observation,
+                tank_id,
+                enemy_base,
+                distance,
+                map_analysis,
+            )
         });
     if profile.home_anti_tank.is_some()
         && home_defensive_tank_ready
@@ -1033,9 +1039,13 @@ where
         let mut local_defense_assigned = BTreeSet::new();
         if profile.home_anti_tank.is_some() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(units) =
-                    stage_home_anti_tank_line(&mut actions, observation, profile, enemy_base)
-                {
+                if let Some(units) = stage_home_anti_tank_line(
+                    &mut actions,
+                    observation,
+                    profile,
+                    enemy_base,
+                    map_analysis,
+                ) {
                     intents.push(AiIntent::Stage { units });
                 }
             }
@@ -1122,6 +1132,7 @@ where
                     tank_id,
                     enemy_base,
                     distance,
+                    map_analysis,
                 ) {
                     intents.push(AiIntent::Stage { units });
                 }
