@@ -272,6 +272,126 @@ fn jeff_first_pump_builder_immediately_builds_one_followup_pump() {
     }));
 }
 
+fn jeff_armored_tech_observation(factory: Option<AiEntitySummary>) -> AiObservation {
+    let mut owned = vec![
+        building(1, EntityKind::CityCentre, Some(0)),
+        building(2, EntityKind::Barracks, Some(0)),
+        building(3, EntityKind::TrainingCentre, None),
+        building(4, EntityKind::ResearchComplex, Some(0)),
+        worker(20, AiEntityState::Idle),
+    ];
+    if let Some(factory) = factory {
+        owned.push(factory);
+    }
+    observation(
+        AiEconomy {
+            steel: 2_000,
+            oil: 2_000,
+            supply_used: 20,
+            supply_cap: 100,
+        },
+        owned,
+    )
+}
+
+#[test]
+fn jeff_starts_vehicle_works_before_tank_production_research() {
+    let without_factory = jeff_armored_tech_observation(None);
+    let decision = decide_with_profile(&without_factory, &JEFFS_AI);
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Build {
+                building: EntityKind::Factory,
+                ..
+            }
+        )
+    }));
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Research {
+                upgrade: UpgradeKind::TankUnlock,
+                ..
+            }
+        )
+    }));
+
+    let with_factory =
+        jeff_armored_tech_observation(Some(building(5, EntityKind::Factory, Some(0))));
+    let decision = decide_with_profile(&with_factory, &JEFFS_AI);
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Research {
+                upgrade: UpgradeKind::TankUnlock,
+                ..
+            }
+        )
+    }));
+}
+
+#[test]
+fn jeff_starts_defensive_tank_before_anti_tank_research() {
+    let mut factory = building(5, EntityKind::Factory, Some(0));
+    let mut observation = jeff_armored_tech_observation(Some(factory.clone()));
+    observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment_wave_launched = true;
+    let width = observation.map.width;
+    let height = observation.map.height;
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Research {
+                upgrade: UpgradeKind::AntiTankGunUnlock,
+                ..
+            }
+        )
+    }));
+
+    factory.state = AiEntityState::Train;
+    factory.production_queue_len = Some(1);
+    factory.production_kind = Some(EntityKind::Tank);
+    observation = jeff_armored_tech_observation(Some(factory));
+    observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment_wave_launched = true;
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Research {
+                upgrade: UpgradeKind::AntiTankGunUnlock,
+                ..
+            }
+        )
+    }));
+}
+
 fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {
     with_expansion_resources(observation(
         AiEconomy {

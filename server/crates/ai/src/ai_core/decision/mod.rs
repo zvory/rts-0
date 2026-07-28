@@ -832,7 +832,13 @@ where
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
     queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
-    if profile.home_anti_tank.is_some() && memory.containment_wave_launched {
+    let defensive_tank_started = memory.home_defensive_tank.is_some()
+        || (memory.containment_wave_launched
+            && observation.owned.iter().any(|entity| {
+                entity.kind == EntityKind::Factory
+                    && entity.production_kind == Some(EntityKind::Tank)
+            }));
+    if profile.home_anti_tank.is_some() && defensive_tank_started {
         queue_upgrade_if_available(
             &mut actions,
             &facts,
@@ -874,6 +880,7 @@ where
         production_policy.unit_priorities,
         memory,
         &mut intents,
+        profile,
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
@@ -1518,6 +1525,12 @@ fn queue_profile_upgrades(
     profile: &AiProfile,
 ) {
     for upgrade in profile.upgrade_priorities {
+        if profile.fast_tank_timing.is_some()
+            && *upgrade == UpgradeKind::TankUnlock
+            && facts.building_count(EntityKind::Factory) == 0
+        {
+            continue;
+        }
         queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
     }
 }
@@ -1546,11 +1559,18 @@ fn queue_required_unit_unlocks(
     unit_priorities: &[EntityKind],
     memory: &mut AiDecisionMemory,
     intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
 ) {
     for unit in unit_priorities {
         let Some(upgrade) = upgrade::required_for_unit(*unit) else {
             continue;
         };
+        if profile.fast_tank_timing.is_some()
+            && upgrade == UpgradeKind::TankUnlock
+            && facts.building_count(EntityKind::Factory) == 0
+        {
+            continue;
+        }
         queue_upgrade_if_available(actions, facts, memory, intents, upgrade);
     }
 }
