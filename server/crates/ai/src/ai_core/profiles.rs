@@ -36,6 +36,16 @@ pub(crate) struct AiProfile {
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
+    pub(crate) fast_tank_timing: Option<FastTankTimingPolicy>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FastTankTimingPolicy {
+    pub(crate) tanks_before_scout_car: usize,
+    pub(crate) scout_car_target: usize,
+    pub(crate) tanks_before_optional_upgrades: usize,
+    pub(crate) optional_upgrades: &'static [UpgradeKind],
+    pub(crate) preserve_during_defensive_panic: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -164,9 +174,11 @@ pub(crate) struct AttackPolicy {
     pub(crate) required_unit: Option<EntityKind>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
+    pub(crate) perimeter_distance_tiles: f32,
+    pub(crate) replacement_health_percent: Option<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -299,7 +311,11 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
+        target_count: 4,
+        perimeter_distance_tiles: 20.0,
+        replacement_health_percent: None,
+    }),
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(FRONTAL_COHORT_TICKS),
@@ -324,6 +340,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
             required_unit: None,
         },
     }),
+    fast_tank_timing: None,
 };
 
 pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {

@@ -121,15 +121,15 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
         ),
         JEFFS_AI_ID => (
             "Jeff's AI",
-            "Server-authoritative port of the locally evaluated V3 champion policy with a Machine Gunner screen, Entrenchment, armored scouting, and five-Tank pressure.",
+            "Fast-Tank pressure profile with two entrenched Machine Gunners, damaged-screen replacement, and one Scout Car joining the first two Tanks for vision.",
             vec![
                 "economy_manager",
-                "local_v3_policy",
-                "machine_gunner_screen",
-                "entrenchment_research",
-                "armored_scout",
-                "five_tank_pressure",
-                "second_factory",
+                "two_machine_gunner_opening",
+                "half_health_machine_gunner_replacement",
+                "immediate_tank_tech",
+                "two_tanks_before_scout",
+                "tank_scout_vision_wave",
+                "post_timing_expansion",
             ],
         ),
         _ => (

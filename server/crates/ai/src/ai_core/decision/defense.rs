@@ -12,8 +12,6 @@ pub(super) const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 
 pub(super) const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 
-pub(super) const DEFENSIVE_MG_PERIMETER_DISTANCE_TILES: f32 = 20.0;
-
 pub(super) const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 
 pub(super) const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
@@ -298,22 +296,56 @@ pub(super) fn defensive_machine_gunner_units(
     };
     let mut units =
         actions::select_ready_combat_units(&observation.owned, &[EntityKind::MachineGunner]);
+    if let Some(threshold) = policy.replacement_health_percent {
+        units.retain(|id| {
+            observation.owned.iter().any(|entity| {
+                entity.id == *id && machine_gunner_meets_replacement_health(entity.hp, threshold)
+            })
+        });
+    }
     units.truncate(policy.target_count);
     units
+}
+
+pub(super) fn machine_gunner_meets_replacement_health(hp: u32, threshold: u8) -> bool {
+    let max_hp = config::unit_stats(EntityKind::MachineGunner)
+        .map(|stats| stats.hp)
+        .unwrap_or(0);
+    hp.saturating_mul(100) >= max_hp.saturating_mul(u32::from(threshold))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn machine_gunner_below_half_health_requires_replacement() {
+        let max_hp = config::unit_stats(EntityKind::MachineGunner)
+            .expect("machine gunner stats")
+            .hp;
+        let half_or_above = max_hp.div_ceil(2);
+        assert!(machine_gunner_meets_replacement_health(half_or_above, 50));
+        assert!(!machine_gunner_meets_replacement_health(
+            half_or_above - 1,
+            50
+        ));
+    }
 }
 
 pub(super) fn stage_defensive_machine_gunner_perimeter(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
+    profile: &AiProfile,
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
 ) -> Option<Vec<u32>> {
+    let policy = profile.defensive_machine_gunners?;
     stage_main_steel_defensive_line(
         actions,
         observation,
         ready_units,
         enemy_base,
-        DEFENSIVE_MG_PERIMETER_DISTANCE_TILES,
+        policy.perimeter_distance_tiles,
     )
 }
 

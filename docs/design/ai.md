@@ -114,13 +114,16 @@ All three profiles are self-contained policy records in the same registry. Each 
 whether to use the proposal economy manager; AI 2.1, Jeff's AI, and AI Turtle enable it. None
 inherits behavior from a retired version or resolves through a second profile name.
 
-Jeff's AI is the server-authoritative port of the champion V3 policy developed and evaluated in
-the standalone local bot workspace. It keeps the local policy's 40-worker pre-second-Factory cap,
-ten-oil-worker cap, Rifleman and Machine Gunner opening, Entrenchment and Tank transition,
-Scout-supported five-Tank armored attack threshold, seven defensive/mobile Machine Gunners,
-3.25-tile formation spacing, and second-Factory float thresholds. It uses the shared profile
-decision and action layers, receives only fog-filtered observations, and issues ordinary validated
-player commands for spending, placement, production, and combat.
+Jeff's AI is the fast-Tank timing profile developed from the standalone local bot workspace. It
+opens with exactly two entrenched Machine Gunners held close to the main steel line; a defender
+below 50% health no longer counts toward that healthy screen and triggers a replacement. The full
+Tank tech path starts immediately, Tanks do not wait for Methamphetamines, and defensive panic
+does not replace the active armored production plan with infantry. After two Tanks, one Scout Car
+takes temporary Factory priority and joins those Tanks as a single vision-supported attack wave.
+Expansion, a second Factory, Methamphetamines, and other optional spending wait until the initial
+Tank core exists. The profile uses the shared decision and action layers, receives only
+fog-filtered observations, and issues ordinary validated player commands for spending, placement,
+production, and combat.
 
 ### Self-play and arena tools
 

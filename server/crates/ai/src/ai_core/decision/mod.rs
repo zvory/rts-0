@@ -37,7 +37,8 @@ mod turtle;
 use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
     defensive_panic_response, local_defense_target, local_defense_units,
-    stage_defensive_machine_gunner_perimeter, stage_main_steel_defensive_line, DefensivePanic,
+    machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
+    stage_main_steel_defensive_line, DefensivePanic,
     DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
     DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
@@ -421,7 +422,10 @@ where
     } else {
         active_required_tech_path(observation, profile)
     };
-    let production_policy = if defensive_panic.active {
+    let preserve_fast_tank_timing = profile
+        .fast_tank_timing
+        .is_some_and(|timing| timing.preserve_during_defensive_panic);
+    let production_policy = if defensive_panic.active && !preserve_fast_tank_timing {
         panic_plan.map(|plan| plan.production).unwrap_or_else(|| {
             defensive_panic_plan(DefensivePanicResponse::Riflemen, &facts).production
         })
@@ -650,7 +654,8 @@ where
     }
 
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
-    let tank_methamphetamines_pending = production_policy
+    let tank_methamphetamines_pending = profile.fast_tank_timing.is_none()
+        && production_policy
         .unit_priorities
         .contains(&EntityKind::Tank)
         && !facts
@@ -668,9 +673,16 @@ where
     if profile.turtle_defense.is_none() {
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
+    queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
+        profile,
         production_policy.unit_priorities,
         facts.completed_upgrades(),
+    );
+    let effective_unit_priorities = effective_unit_priorities_for_fast_tank_timing(
+        profile,
+        &facts,
+        &effective_unit_priorities,
     );
     let effective_unit_priorities = effective_unit_priorities_for_turtle(
         profile,
@@ -692,8 +704,12 @@ where
         memory,
         &mut intents,
     );
-    let production_unit_counts =
-        unit_counts_for_priorities(observation, &facts, &effective_unit_priorities);
+    let production_unit_counts = unit_counts_for_priorities(
+        observation,
+        &facts,
+        profile,
+        &effective_unit_priorities,
+    );
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
@@ -868,6 +884,7 @@ where
                 if let Some(units) = stage_defensive_machine_gunner_perimeter(
                     &mut actions,
                     observation,
+                    profile,
                     &defensive_machine_gunners_available,
                     enemy_base,
                 ) {
@@ -1076,15 +1093,43 @@ fn unit_and_queue_count(observation: &AiObservation, kind: EntityKind) -> usize 
 }
 
 fn effective_unit_priorities_for_upgrades(
+    profile: &AiProfile,
     unit_priorities: &[EntityKind],
     completed_upgrades: &[UpgradeKind],
 ) -> Vec<EntityKind> {
+    if profile.fast_tank_timing.is_some() {
+        return unit_priorities.to_vec();
+    }
     let methamphetamines_ready = completed_upgrades.contains(&UpgradeKind::Methamphetamines);
     unit_priorities
         .iter()
         .copied()
         .filter(|unit| *unit != EntityKind::Tank || methamphetamines_ready)
         .collect()
+}
+
+fn effective_unit_priorities_for_fast_tank_timing(
+    profile: &AiProfile,
+    facts: &AiFacts,
+    unit_priorities: &[EntityKind],
+) -> Vec<EntityKind> {
+    let Some(timing) = profile.fast_tank_timing else {
+        return unit_priorities.to_vec();
+    };
+    let mut priorities: Vec<EntityKind> = unit_priorities
+        .iter()
+        .copied()
+        .filter(|unit| {
+            *unit != EntityKind::ScoutCar
+                || facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
+        })
+        .collect();
+    if facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
+        && facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target
+    {
+        priorities.sort_by_key(|unit| (*unit != EntityKind::ScoutCar) as u8);
+    }
+    priorities
 }
 
 fn effective_unit_priorities_for_turtle(
@@ -1171,6 +1216,9 @@ fn production_max_counts(
             target_chokes.saturating_mul(policy.machine_gunners_per_choke),
         ));
     }
+    if let Some(timing) = profile.fast_tank_timing {
+        counts.push((EntityKind::ScoutCar, timing.scout_car_target));
+    }
     counts
 }
 
@@ -1226,6 +1274,24 @@ fn queue_profile_upgrades(
     profile: &AiProfile,
 ) {
     for upgrade in profile.upgrade_priorities {
+        queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
+    }
+}
+
+fn queue_fast_tank_optional_upgrades(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
+) {
+    let Some(timing) = profile.fast_tank_timing else {
+        return;
+    };
+    if facts.unit_count(EntityKind::Tank) < timing.tanks_before_optional_upgrades {
+        return;
+    }
+    for upgrade in timing.optional_upgrades {
         queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
     }
 }

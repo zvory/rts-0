@@ -60,7 +60,8 @@ pub(super) fn plan_frontal_wave(
                 .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
         })
         .unwrap_or(true);
-    let methamphetamines_ready = !attack.unit_kinds.contains(&EntityKind::Tank)
+    let methamphetamines_ready = profile.fast_tank_timing.is_some()
+        || !attack.unit_kinds.contains(&EntityKind::Tank)
         || observation
             .upgrades
             .contains(&UpgradeKind::Methamphetamines);

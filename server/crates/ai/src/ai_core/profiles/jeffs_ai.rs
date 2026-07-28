@@ -1,22 +1,16 @@
 use super::{
     AiProfile, AttackPolicy, BarracksCurve, BuildingPolicy, DefensiveMachineGunnerPolicy,
-    ExpansionPolicy, ExtraFactoryPolicy, FrontalWavePolicy, ProductionPolicy, Ratio,
-    ResourceFloatThreshold, ResourcePolicy, TankResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    ExpansionPolicy, ExtraFactoryPolicy, FastTankTimingPolicy, FrontalWavePolicy, ProductionPolicy,
+    Ratio, ResourceFloatThreshold, ResourcePolicy, TankResourcePolicy, TechTransitionPolicy,
+    WorkerPolicy,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
 pub(crate) const JEFFS_AI_ID: &str = "jeffs_ai";
 
-const OPENING_UNITS: [EntityKind; 2] = [EntityKind::Rifleman, EntityKind::MachineGunner];
-const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
-const ARMORED_UNITS: [EntityKind; 4] = [
-    EntityKind::Tank,
-    EntityKind::ScoutCar,
-    EntityKind::CommandCar,
-    EntityKind::Rifleman,
-];
-const BASE_TECH_PATH: [EntityKind; 2] = [EntityKind::Barracks, EntityKind::TrainingCentre];
+const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
+const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
 const ARMORED_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
@@ -24,6 +18,7 @@ const ARMORED_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Factory,
 ];
 const UPGRADES: [UpgradeKind; 2] = [UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
+const OPTIONAL_UPGRADES: [UpgradeKind; 1] = [UpgradeKind::Methamphetamines];
 
 /// Server-authoritative port of the champion V3 policy developed in the standalone
 /// `Jeff's AI` workspace. The live controller still emits ordinary fog-constrained
@@ -44,7 +39,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
             max: 1,
         },
         factory_target: 1,
-        required_tech_path: &BASE_TECH_PATH,
+        required_tech_path: &ARMORED_TECH_PATH,
         max_pending_per_kind: 1,
     },
     extra_factories: Some(ExtraFactoryPolicy {
@@ -57,8 +52,8 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     production: ProductionPolicy {
         queue_depth: 2,
         unit_priorities: &OPENING_UNITS,
-        save_for_first_tech_unit: Some(EntityKind::MachineGunner),
-        balance_unit_priorities: true,
+        save_for_first_tech_unit: Some(EntityKind::Tank),
+        balance_unit_priorities: false,
     },
     upgrade_priorities: &UPGRADES,
     attack: AttackPolicy {
@@ -67,8 +62,8 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         regroup_reset_ticks: 450,
         reissue_cadence_ticks: 450,
         stage_distance_tiles: 3.25,
-        unit_kinds: &RIFLE_ONLY,
-        required_unit: None,
+        unit_kinds: &OPENING_UNITS,
+        required_unit: Some(EntityKind::MachineGunner),
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 5,
@@ -80,8 +75,8 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     },
     expansion: Some(ExpansionPolicy {
         target_city_centres: 2,
-        required_complete_building: EntityKind::TrainingCentre,
-        defensive_unit: EntityKind::MachineGunner,
+        required_complete_building: EntityKind::Factory,
+        defensive_unit: EntityKind::Tank,
         defensive_unit_count: 3,
         pre_expansion_steel_worker_cap: 18,
         post_expansion_steel_worker_cap: Some(40),
@@ -92,7 +87,11 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 7 }),
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
+        target_count: 2,
+        perimeter_distance_tiles: 5.0,
+        replacement_health_percent: Some(50),
+    }),
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(450),
@@ -100,8 +99,8 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     },
     tech_transition: Some(TechTransitionPolicy {
         resource_float: ResourceFloatThreshold {
-            steel: 275,
-            oil: 100,
+            steel: 0,
+            oil: 0,
         },
         required_tech_path: &ARMORED_TECH_PATH,
         production: ProductionPolicy {
@@ -111,14 +110,21 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
             balance_unit_priorities: false,
         },
         attack: AttackPolicy {
-            first_attack_size: 5,
+            first_attack_size: 3,
             wave_growth: 1,
             regroup_reset_ticks: 450,
-            reissue_cadence_ticks: 450,
-            stage_distance_tiles: 3.25,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 8.0,
             unit_kinds: &ARMORED_UNITS,
             required_unit: Some(EntityKind::ScoutCar),
         },
+    }),
+    fast_tank_timing: Some(FastTankTimingPolicy {
+        tanks_before_scout_car: 2,
+        scout_car_target: 1,
+        tanks_before_optional_upgrades: 3,
+        optional_upgrades: &OPTIONAL_UPGRADES,
+        preserve_during_defensive_panic: true,
     }),
 };
 
@@ -131,10 +137,14 @@ mod tests {
         let transition = JEFFS_AI.tech_transition.expect("armored transition");
         assert_eq!(JEFFS_AI.workers.steel_worker_cap, Some(40));
         assert_eq!(JEFFS_AI.workers.extra_oil_workers, 10);
-        assert_eq!(JEFFS_AI.attack.first_attack_size, 4);
-        assert_eq!(JEFFS_AI.attack.unit_kinds, &[EntityKind::Rifleman]);
-        assert_eq!(transition.attack.first_attack_size, 5);
+        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
+        assert_eq!(transition.production.unit_priorities, &ARMORED_UNITS);
+        assert_eq!(transition.attack.first_attack_size, 3);
         assert_eq!(transition.attack.required_unit, Some(EntityKind::ScoutCar));
-        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 7);
+        assert_eq!(transition.resource_float, ResourceFloatThreshold { steel: 0, oil: 0 });
+        let timing = JEFFS_AI.fast_tank_timing.expect("fast tank timing");
+        assert_eq!(timing.tanks_before_scout_car, 2);
+        assert_eq!(timing.scout_car_target, 1);
+        assert_eq!(timing.optional_upgrades, &OPTIONAL_UPGRADES);
     }
 }

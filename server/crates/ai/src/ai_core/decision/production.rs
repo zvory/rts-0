@@ -16,6 +16,11 @@ pub(super) fn should_build_extra_factory(
     let Some(policy) = profile.extra_factories else {
         return false;
     };
+    if profile.fast_tank_timing.is_some_and(|timing| {
+        facts.unit_count(EntityKind::Tank) < timing.tanks_before_optional_upgrades
+    }) {
+        return false;
+    }
     if observation.economy.steel <= policy.resource_float.steel
         || observation.economy.oil <= policy.resource_float.oil
     {
@@ -192,6 +197,7 @@ pub(super) fn production_uses_building(production: ProductionPolicy, building: E
 pub(super) fn unit_counts_for_priorities(
     observation: &AiObservation,
     facts: &AiFacts,
+    profile: &AiProfile,
     unit_priorities: &[EntityKind],
 ) -> Vec<(EntityKind, usize)> {
     let mut counts: BTreeMap<EntityKind, usize> = unit_priorities
@@ -199,6 +205,17 @@ pub(super) fn unit_counts_for_priorities(
         .copied()
         .map(|unit| (unit, facts.unit_count(unit)))
         .collect();
+    if let Some(policy) = profile.defensive_machine_gunners {
+        if let Some(threshold) = policy.replacement_health_percent {
+            let healthy = observation
+                .owned
+                .iter()
+                .filter(|entity| entity.kind == EntityKind::MachineGunner)
+                .filter(|entity| machine_gunner_meets_replacement_health(entity.hp, threshold))
+                .count();
+            counts.insert(EntityKind::MachineGunner, healthy);
+        }
+    }
     for building in observation.owned.iter().filter(|entity| entity.is_complete) {
         let Some(kind) = building.production_kind else {
             continue;
