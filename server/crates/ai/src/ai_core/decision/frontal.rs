@@ -186,6 +186,19 @@ fn issue_expansion_containment_wave(
     if tanks.is_empty() || scouts.is_empty() {
         return None;
     }
+    if tanks.len() >= policy.minimum_tanks_to_continue {
+        memory.containment_wave_launched = true;
+    }
+    if memory.containment_wave_launched && tanks.len() < policy.minimum_tanks_to_continue {
+        memory.containment_stationary_since = None;
+        let fallback = own_base;
+        actions::move_units(actions, tanks.iter().copied(), fallback.0, fallback.1);
+        actions::move_units(actions, scouts.iter().copied(), fallback.0, fallback.1);
+        tanks.extend(scouts);
+        tanks.sort_unstable();
+        tanks.dedup();
+        return Some(AiIntent::Stage { units: tanks });
+    }
 
     // Multiple Tanks cannot occupy the same point. A two-tile arrival radius
     // lets the formation settle and charge its stationary range instead of
@@ -205,7 +218,10 @@ fn issue_expansion_containment_wave(
         observation.map,
         policy.scout_trailing_tiles,
     )?;
-    let stationary_range_ready = if tanks_in_position {
+    let contact_threat =
+        visible_anti_armor_target_within_tiles(observation, &tanks, policy.contact_stop_tiles);
+    let should_stop = tanks_in_position || contact_threat.is_some();
+    let stationary_range_ready = if should_stop {
         let since = memory
             .containment_stationary_since
             .get_or_insert(observation.tick);
@@ -215,11 +231,11 @@ fn issue_expansion_containment_wave(
         false
     };
 
-    if tanks_in_position {
+    if should_stop {
         if stationary_range_ready {
-            if let Some(target) =
+            if let Some(target) = contact_threat.or_else(|| {
                 visible_combat_target_within_tiles(observation, &tanks, policy.tank_standoff_tiles)
-            {
+            }) {
                 actions::attack_units(actions, tanks.iter().copied(), target);
             } else {
                 actions::hold_position_units(actions, tanks.iter().copied());
@@ -233,7 +249,17 @@ fn issue_expansion_containment_wave(
         actions::attack_move_units(actions, tanks.iter().copied(), tank_point.0, tank_point.1);
     }
     let scout_point = if stationary_range_ready {
-        scout_point
+        if tanks_in_position {
+            scout_point
+        } else {
+            scout_forward_from_tanks(
+                tank_center,
+                own_base,
+                objective,
+                observation.map,
+                policy.scout_forward_tiles,
+            )?
+        }
     } else {
         trailing_point
     };
@@ -258,6 +284,17 @@ fn containment_points(
 ) -> Option<((f32, f32), (f32, f32))> {
     let toward_expansion = normalized_direction(own_base, objective)?;
     let tile_size = map.tile_size as f32;
+    let perpendicular = (-toward_expansion.1, toward_expansion.0);
+    let flank_sign = if own_base.0 + own_base.1 <= objective.0 + objective.1 {
+        1.0
+    } else {
+        -1.0
+    };
+    let approach_origin = (
+        own_base.0 + perpendicular.0 * policy.flank_tiles * tile_size * flank_sign,
+        own_base.1 + perpendicular.1 * policy.flank_tiles * tile_size * flank_sign,
+    );
+    let toward_expansion = normalized_direction(approach_origin, objective)?;
     let tank_point = clamp_to_map(
         (
             objective.0 - toward_expansion.0 * policy.tank_standoff_tiles * tile_size,
@@ -288,6 +325,24 @@ fn scout_trailing_point(
         (
             tank_center.0 - toward_expansion.0 * trailing_tiles * tile_size,
             tank_center.1 - toward_expansion.1 * trailing_tiles * tile_size,
+        ),
+        map,
+    ))
+}
+
+fn scout_forward_from_tanks(
+    tank_center: (f32, f32),
+    own_base: (f32, f32),
+    objective: (f32, f32),
+    map: AiMapSummary,
+    forward_tiles: f32,
+) -> Option<(f32, f32)> {
+    let toward_expansion = normalized_direction(own_base, objective)?;
+    let tile_size = map.tile_size as f32;
+    Some(clamp_to_map(
+        (
+            tank_center.0 + toward_expansion.0 * forward_tiles * tile_size,
+            tank_center.1 + toward_expansion.1 * forward_tiles * tile_size,
         ),
         map,
     ))
@@ -373,6 +428,40 @@ fn visible_combat_target_within_tiles(
         .map(|(id, _, _)| id)
 }
 
+fn visible_anti_armor_target_within_tiles(
+    observation: &AiObservation,
+    unit_ids: &[u32],
+    radius_tiles: f32,
+) -> Option<u32> {
+    let center = group_center(observation, unit_ids)?;
+    let max_distance = radius_tiles * observation.map.tile_size as f32;
+    let max_distance2 = max_distance * max_distance;
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| {
+            matches!(
+                enemy.kind,
+                EntityKind::Tank | EntityKind::AntiTankGun | EntityKind::Panzerfaust
+            )
+        })
+        .map(|enemy| {
+            (
+                enemy.id,
+                outbound_wave_target_priority(enemy.kind),
+                geometry::dist2(center.0, center.1, enemy.x, enemy.y),
+            )
+        })
+        .filter(|(_, _, distance2)| *distance2 <= max_distance2)
+        .min_by(|left, right| {
+            left.1
+                .cmp(&right.1)
+                .then_with(|| left.2.total_cmp(&right.2))
+                .then_with(|| left.0.cmp(&right.0))
+        })
+        .map(|(id, _, _)| id)
+}
+
 fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
     match kind {
         EntityKind::Tank | EntityKind::AntiTankGun | EntityKind::Panzerfaust => 0,
@@ -408,12 +497,17 @@ mod tests {
             tank_standoff_tiles: 13.5,
             scout_trailing_tiles: 1.5,
             scout_forward_tiles: 2.0,
+            flank_tiles: 5.0,
+            contact_stop_tiles: 18.0,
+            minimum_tanks_to_continue: 2,
         };
         let objective = (2_000.0, 1_000.0);
         let (tank, scout) = containment_points((200.0, 1_000.0), objective, map, policy).unwrap();
 
-        assert_eq!((objective.0 - tank.0) / 32.0, 13.5);
-        assert_eq!((scout.0 - tank.0) / 32.0, 2.0);
+        let tank_distance = dist2(objective.0, objective.1, tank.0, tank.1).sqrt() / 32.0;
+        let scout_distance = dist2(scout.0, scout.1, tank.0, tank.1).sqrt() / 32.0;
+        assert!((tank_distance - 13.5).abs() < 0.001);
+        assert!((scout_distance - 2.0).abs() < 0.001);
         assert!(scout.0 < objective.0);
 
         let trailing =

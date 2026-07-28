@@ -349,6 +349,55 @@ pub(super) fn stage_defensive_machine_gunner_perimeter(
     )
 }
 
+pub(super) fn stage_home_anti_tank_line(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    profile: &AiProfile,
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<u32>> {
+    let policy = profile.home_anti_tank?;
+    let units = actions::select_ready_combat_units(&observation.owned, &[EntityKind::AntiTankGun]);
+    let assignments = main_steel_defensive_line_assignments(
+        observation,
+        &units,
+        enemy_base,
+        policy.anti_tank_position_tiles,
+    )?;
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let close_enough = observation.map.tile_size as f32;
+    let mut staged = Vec::new();
+    for assignment in assignments {
+        let Some(unit) = by_id.get(&assignment.unit_id).copied() else {
+            continue;
+        };
+        let needs_move =
+            dist2(unit.x, unit.y, assignment.x, assignment.y) > close_enough * close_enough;
+        if needs_move {
+            if let Some(units) =
+                actions::move_units(actions, [assignment.unit_id], assignment.x, assignment.y)
+            {
+                staged.extend(units);
+            }
+        }
+        if let Some(units) = actions::setup_anti_tank_guns(
+            actions,
+            [assignment.unit_id],
+            enemy_base.x,
+            enemy_base.y,
+            needs_move,
+        ) {
+            staged.extend(units);
+        }
+    }
+    staged.sort_unstable();
+    staged.dedup();
+    (!staged.is_empty()).then_some(staged)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct DefensiveLineAssignment {
     unit_id: u32,

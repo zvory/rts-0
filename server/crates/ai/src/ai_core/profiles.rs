@@ -36,6 +36,7 @@ pub(crate) struct AiProfile {
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
     pub(crate) expansion_containment: Option<ExpansionContainmentPolicy>,
+    pub(crate) home_anti_tank: Option<HomeAntiTankPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
     pub(crate) fast_tank_timing: Option<FastTankTimingPolicy>,
 }
@@ -212,6 +213,17 @@ pub(crate) struct ExpansionContainmentPolicy {
     pub(crate) tank_standoff_tiles: f32,
     pub(crate) scout_trailing_tiles: f32,
     pub(crate) scout_forward_tiles: f32,
+    pub(crate) flank_tiles: f32,
+    pub(crate) contact_stop_tiles: f32,
+    pub(crate) minimum_tanks_to_continue: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct HomeAntiTankPolicy {
+    pub(crate) target_guns: usize,
+    pub(crate) anti_tank_position_tiles: f32,
+    pub(crate) machine_gunner_screen_tiles: f32,
+    pub(crate) lateral_spacing_tiles: f32,
 }
 
 impl FrontalWavePolicy {
@@ -336,6 +348,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         line_staging: true,
     },
     expansion_containment: None,
+    home_anti_tank: None,
     tech_transition: Some(TechTransitionPolicy {
         resource_float: AI_2_1_TANK_PRESSURE_FLOAT_THRESHOLD,
         required_tech_path: &TANK_TECH_PATH,

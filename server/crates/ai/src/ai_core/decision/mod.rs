@@ -38,9 +38,9 @@ use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
     defensive_panic_response, local_defense_target, local_defense_units,
     machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_main_steel_defensive_line, DefensivePanic, DefensivePanicPlan, DefensivePanicResponse,
-    ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
-    DEFENSIVE_PANIC_SUSTAINED_TICKS,
+    stage_home_anti_tank_line, stage_main_steel_defensive_line, DefensivePanic, DefensivePanicPlan,
+    DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
+    DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
@@ -131,6 +131,7 @@ pub(crate) struct AiDecisionMemory {
     pending_upgrades: BTreeSet<UpgradeKind>,
     launched_frontal_units: BTreeMap<u32, u32>,
     containment_stationary_since: Option<u32>,
+    containment_wave_launched: bool,
     turtle_opening_riflemen_ordered: usize,
     incomplete_city_centres: BTreeMap<u32, IncompleteCityCentreMemory>,
 }
@@ -148,6 +149,7 @@ impl AiDecisionMemory {
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
             containment_stationary_since: None,
+            containment_wave_launched: false,
             turtle_opening_riflemen_ordered: 0,
             incomplete_city_centres: BTreeMap::new(),
         }
@@ -212,6 +214,7 @@ impl AiDecisionMemory {
         self.pending_upgrades.clear();
         self.launched_frontal_units.clear();
         self.containment_stationary_since = None;
+        self.containment_wave_launched = false;
         self.turtle_opening_riflemen_ordered = 0;
         self.incomplete_city_centres.clear();
     }
@@ -226,6 +229,7 @@ impl AiDecisionMemory {
         self.last_attack_tick = None;
         self.launched_frontal_units.clear();
         self.containment_stationary_since = None;
+        self.containment_wave_launched = false;
     }
 
     fn launched_frontal_unit_exclusions(
@@ -635,6 +639,29 @@ where
         });
     }
 
+    if profile.home_anti_tank.is_some()
+        && memory.containment_wave_launched
+        && facts.building_count(EntityKind::Steelworks)
+            + planned_in_intents(&intents, EntityKind::Steelworks)
+            == 0
+        && !save_for_unplanned_expansion
+        && try_build_kind(
+            observation,
+            &facts,
+            &mut actions,
+            &builder_pools,
+            profile,
+            EntityKind::Steelworks,
+            build_search,
+            &mut placeable,
+        )
+        .is_some()
+    {
+        intents.push(AiIntent::Build {
+            kind: EntityKind::Steelworks,
+        });
+    }
+
     if !defensive_panic.active
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
@@ -683,6 +710,15 @@ where
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
     queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
+    if profile.home_anti_tank.is_some() && memory.containment_wave_launched {
+        queue_upgrade_if_available(
+            &mut actions,
+            &facts,
+            memory,
+            &mut intents,
+            UpgradeKind::AntiTankGunUnlock,
+        );
+    }
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
         profile,
         production_policy.unit_priorities,
@@ -703,6 +739,13 @@ where
         &facts,
         &effective_unit_priorities,
     );
+    let mut effective_unit_priorities = effective_unit_priorities;
+    if profile.home_anti_tank.is_some()
+        && memory.containment_wave_launched
+        && !effective_unit_priorities.contains(&EntityKind::AntiTankGun)
+    {
+        effective_unit_priorities.push(EntityKind::AntiTankGun);
+    }
     queue_required_unit_unlocks(
         &mut actions,
         &facts,
@@ -890,6 +933,16 @@ where
                     &defensive_machine_gunners_available,
                     enemy_base,
                 ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
+
+        if !handled_local_defense && profile.home_anti_tank.is_some() {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                if let Some(units) =
+                    stage_home_anti_tank_line(&mut actions, observation, profile, enemy_base)
+                {
                     intents.push(AiIntent::Stage { units });
                 }
             }
@@ -1221,6 +1274,9 @@ fn production_max_counts(
     }
     if let Some(timing) = profile.fast_tank_timing {
         counts.push((EntityKind::ScoutCar, timing.scout_car_target));
+    }
+    if let Some(policy) = profile.home_anti_tank {
+        counts.push((EntityKind::AntiTankGun, policy.target_guns));
     }
     counts
 }

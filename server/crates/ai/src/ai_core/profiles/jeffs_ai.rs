@@ -1,8 +1,8 @@
 use super::{
     AiProfile, AttackPolicy, BarracksCurve, BuildingPolicy, DefensiveMachineGunnerPolicy,
     ExpansionContainmentPolicy, ExpansionPolicy, ExtraFactoryPolicy, FastTankTimingPolicy,
-    FrontalWavePolicy, ProductionPolicy, Ratio, ResourceFloatThreshold, ResourcePolicy,
-    TankResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    FrontalWavePolicy, HomeAntiTankPolicy, ProductionPolicy, Ratio, ResourceFloatThreshold,
+    ResourcePolicy, TankResourcePolicy, TechTransitionPolicy, WorkerPolicy,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -92,7 +92,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     }),
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 2,
-        perimeter_distance_tiles: 5.0,
+        perimeter_distance_tiles: 6.0,
         replacement_health_percent: Some(50),
     }),
     turtle_defense: None,
@@ -107,6 +107,15 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         tank_standoff_tiles: 13.5,
         scout_trailing_tiles: 1.5,
         scout_forward_tiles: 2.0,
+        flank_tiles: 5.0,
+        contact_stop_tiles: 18.0,
+        minimum_tanks_to_continue: 2,
+    }),
+    home_anti_tank: Some(HomeAntiTankPolicy {
+        target_guns: 2,
+        anti_tank_position_tiles: 1.0,
+        machine_gunner_screen_tiles: 5.0,
+        lateral_spacing_tiles: 3.0,
     }),
     tech_transition: Some(TechTransitionPolicy {
         resource_float: ResourceFloatThreshold { steel: 0, oil: 0 },
@@ -157,6 +166,12 @@ mod tests {
         assert_eq!(transition.attack.regroup_reset_ticks, 120);
         assert_eq!(JEFFS_AI.frontal_wave.exclude_launched_ticks, Some(120));
         assert_eq!(JEFFS_AI.expansion.unwrap().defensive_unit_count, 1);
+        let containment = JEFFS_AI.expansion_containment.unwrap();
+        assert_eq!(containment.minimum_tanks_to_continue, 2);
+        assert_eq!(containment.contact_stop_tiles, 18.0);
+        let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
+        assert_eq!(home_anti_tank.target_guns, 2);
+        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 5.0);
         assert_eq!(
             transition.resource_float,
             ResourceFloatThreshold { steel: 0, oil: 0 }

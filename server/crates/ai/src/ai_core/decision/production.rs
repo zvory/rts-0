@@ -98,7 +98,9 @@ pub(super) fn build_search_for_kind(
     kind: EntityKind,
 ) -> ai_shared::BuildSearch {
     match kind {
-        EntityKind::Steelworks if profile.turtle_defense.is_some() => {
+        EntityKind::Steelworks
+            if profile.turtle_defense.is_some() || profile.home_anti_tank.is_some() =>
+        {
             build_search.min_radius = build_search
                 .min_radius
                 .min(ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS);
@@ -107,7 +109,7 @@ pub(super) fn build_search_for_kind(
                 .min(ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS)
                 .max(build_search.min_radius);
             build_search.prefer_away_from_center = false;
-            build_search.prefer_toward_center = true;
+            build_search.prefer_toward_center = profile.turtle_defense.is_some();
         }
         EntityKind::Factory if profile.fast_tank_timing.is_some() => {
             // The first Factory is on the Tank critical path. A compact site
