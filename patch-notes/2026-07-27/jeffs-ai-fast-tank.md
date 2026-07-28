@@ -6,8 +6,8 @@ _2026-07-27_
 
 ## Changes
 
-- Jeff's AI now rushes Tanks behind two nearby entrenched Machine Gunners, replacing badly damaged defenders.
-- Its first armored attack pairs two Tanks with a Scout Car for vision; upgrades, expansion, and extra production are delayed.
+- Jeff's AI now rushes Tanks behind two nearby entrenched Machine Gunners, replacing defenders below half health.
+- Its first armored attack pairs two Tanks with a Scout Car; expansion, extra production, and optional upgrades come later.
 
 ## Playtest watch
 
