@@ -138,6 +138,9 @@ pub(crate) struct AiDecisionMemory {
     home_defensive_tank_assigned_once: bool,
     enemy_natural_city_centre: Option<u32>,
     enemy_natural_destroyed: bool,
+    enemy_main_city_centre: Option<u32>,
+    enemy_main_destroyed: bool,
+    endgame_search_waypoint: usize,
     opening_first_pump_builder: Option<u32>,
     opening_first_pump_builder_followups: usize,
     turtle_opening_riflemen_ordered: usize,
@@ -163,6 +166,9 @@ impl AiDecisionMemory {
             home_defensive_tank_assigned_once: false,
             enemy_natural_city_centre: None,
             enemy_natural_destroyed: false,
+            enemy_main_city_centre: None,
+            enemy_main_destroyed: false,
+            endgame_search_waypoint: 0,
             opening_first_pump_builder: None,
             opening_first_pump_builder_followups: 0,
             turtle_opening_riflemen_ordered: 0,
@@ -235,6 +241,9 @@ impl AiDecisionMemory {
         self.home_defensive_tank_assigned_once = false;
         self.enemy_natural_city_centre = None;
         self.enemy_natural_destroyed = false;
+        self.enemy_main_city_centre = None;
+        self.enemy_main_destroyed = false;
+        self.endgame_search_waypoint = 0;
         self.opening_first_pump_builder = None;
         self.opening_first_pump_builder_followups = 0;
         self.turtle_opening_riflemen_ordered = 0;

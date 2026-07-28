@@ -1,6 +1,26 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::*;
 
+const ENDGAME_SEARCH_OFFSETS: [(f32, f32); 17] = [
+    (0.0, 0.0),
+    (8.0, 0.0),
+    (8.0, 8.0),
+    (0.0, 8.0),
+    (-8.0, 8.0),
+    (-8.0, 0.0),
+    (-8.0, -8.0),
+    (0.0, -8.0),
+    (8.0, -8.0),
+    (16.0, 0.0),
+    (16.0, 16.0),
+    (0.0, 16.0),
+    (-16.0, 16.0),
+    (-16.0, 0.0),
+    (-16.0, -16.0),
+    (0.0, -16.0),
+    (16.0, -16.0),
+];
+
 pub(super) const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -185,13 +205,29 @@ fn issue_expansion_containment_wave(
         return None;
     }
     update_enemy_natural_state(observation, natural_objective, enemy_base, &scouts, memory);
-    let objective = if memory.enemy_natural_destroyed {
+    if memory.enemy_natural_destroyed {
+        update_enemy_main_state(observation, enemy_base, &tanks, &scouts, memory);
+    }
+    let endgame_search_active = memory.enemy_main_destroyed;
+    let objective = if endgame_search_active {
+        endgame_search_point(enemy_base, observation.map, memory.endgame_search_waypoint)
+    } else if memory.enemy_natural_destroyed {
         (enemy_base.x, enemy_base.y)
     } else {
         natural_objective
     };
-    let (tank_point, scout_point) =
-        containment_points(own_base, objective, observation.map, policy)?;
+    let (tank_point, scout_point) = if endgame_search_active {
+        let scout_point = scout_forward_from_tanks(
+            objective,
+            own_base,
+            objective,
+            observation.map,
+            policy.scout_forward_tiles,
+        )?;
+        (objective, scout_point)
+    } else {
+        containment_points(own_base, objective, observation.map, policy)?
+    };
     if !memory.containment_wave_launched && tanks.len() >= policy.minimum_tanks_to_continue {
         memory
             .containment_opening_tanks
@@ -242,7 +278,7 @@ fn issue_expansion_containment_wave(
 
     if should_stop {
         if stationary_range_ready {
-            if let Some(target) = contact_threat
+            let target = contact_threat
                 .or_else(|| {
                     visible_combat_target_within_tiles(
                         observation,
@@ -254,11 +290,21 @@ fn issue_expansion_containment_wave(
                     visible_strategic_building_target_within_tiles(
                         observation,
                         &tanks,
-                        policy.tank_standoff_tiles,
+                        policy.contact_stop_tiles,
                     )
-                })
-            {
+                });
+            if let Some(target) = target {
                 actions::attack_units(actions, tanks.iter().copied(), target);
+            } else if endgame_search_active {
+                memory.endgame_search_waypoint =
+                    (memory.endgame_search_waypoint + 1) % ENDGAME_SEARCH_OFFSETS.len();
+                memory.containment_stationary_since = None;
+                let next = endgame_search_point(
+                    enemy_base,
+                    observation.map,
+                    memory.endgame_search_waypoint,
+                );
+                actions::attack_move_units(actions, tanks.iter().copied(), next.0, next.1);
             } else {
                 actions::hold_position_units(actions, tanks.iter().copied());
             }
@@ -296,6 +342,60 @@ fn issue_expansion_containment_wave(
     tanks.sort_unstable();
     tanks.dedup();
     Some(AiIntent::Attack { units: tanks })
+}
+
+fn update_enemy_main_state(
+    observation: &AiObservation,
+    enemy_base: EnemyBaseFact,
+    tanks: &[u32],
+    scouts: &[u32],
+    memory: &mut AiDecisionMemory,
+) {
+    if memory.enemy_main_destroyed {
+        return;
+    }
+    let tile_size = observation.map.tile_size as f32;
+    let main_radius2 = (8.0 * tile_size).powi(2);
+    let visible_main = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::CityCentre)
+        .filter(|enemy| dist2(enemy.x, enemy.y, enemy_base.x, enemy_base.y) <= main_radius2)
+        .min_by_key(|enemy| enemy.id);
+    if let Some(city_centre) = visible_main {
+        memory.enemy_main_city_centre = Some(city_centre.id);
+        return;
+    }
+    if memory.enemy_main_city_centre.is_none() {
+        return;
+    }
+    let confirmation_radius2 = (14.0 * tile_size).powi(2);
+    let force_confirms_site = observation
+        .owned
+        .iter()
+        .filter(|unit| tanks.contains(&unit.id) || scouts.contains(&unit.id))
+        .any(|unit| dist2(unit.x, unit.y, enemy_base.x, enemy_base.y) <= confirmation_radius2);
+    if force_confirms_site {
+        memory.enemy_main_destroyed = true;
+        memory.endgame_search_waypoint = 0;
+        memory.containment_stationary_since = None;
+    }
+}
+
+fn endgame_search_point(
+    enemy_base: EnemyBaseFact,
+    map: AiMapSummary,
+    waypoint: usize,
+) -> (f32, f32) {
+    let offset = ENDGAME_SEARCH_OFFSETS[waypoint % ENDGAME_SEARCH_OFFSETS.len()];
+    let tile_size = map.tile_size as f32;
+    clamp_to_map(
+        (
+            enemy_base.x + offset.0 * tile_size,
+            enemy_base.y + offset.1 * tile_size,
+        ),
+        map,
+    )
 }
 
 fn update_enemy_natural_state(
@@ -586,6 +686,25 @@ fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_core::observation::AiEconomy;
+
+    fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
+        AiEntitySummary {
+            id,
+            owner: if id == 1 { 1 } else { 2 },
+            kind,
+            x,
+            y,
+            hp: 300,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            production_kind: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: true,
+        }
+    }
 
     #[test]
     fn containment_uses_stationary_tank_range_and_forward_scout_vision() {
@@ -629,6 +748,67 @@ mod tests {
         assert!(
             outbound_wave_target_priority(EntityKind::Worker)
                 > outbound_wave_target_priority(EntityKind::Panzerfaust)
+        );
+    }
+
+    #[test]
+    fn main_city_centre_is_acquired_outside_nominal_standoff_radius() {
+        let tile_size = 32;
+        let tank = target_test_entity(1, EntityKind::Tank, 10.0 * 32.0, 10.0 * 32.0);
+        let city_centre = target_test_entity(2, EntityKind::CityCentre, 25.0 * 32.0, 10.0 * 32.0);
+        let observation = AiObservation {
+            player_id: 1,
+            tick: 0,
+            map: AiMapSummary {
+                width: 64,
+                height: 64,
+                tile_size,
+            },
+            economy: AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 100,
+            },
+            own_start_tile: (10, 10),
+            players: Vec::new(),
+            owned: vec![tank],
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: vec![city_centre],
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        };
+
+        assert_eq!(
+            visible_strategic_building_target_within_tiles(&observation, &[1], 13.5),
+            None
+        );
+        assert_eq!(
+            visible_strategic_building_target_within_tiles(&observation, &[1], 18.0),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn endgame_search_visits_inner_and_outer_base_rings() {
+        let map = AiMapSummary {
+            width: 100,
+            height: 100,
+            tile_size: 32,
+        };
+        let enemy_base = EnemyBaseFact {
+            player_id: 2,
+            start_tile: (50, 50),
+            x: 50.5 * 32.0,
+            y: 50.5 * 32.0,
+        };
+        assert_eq!(endgame_search_point(enemy_base, map, 0), (1616.0, 1616.0));
+        assert_eq!(endgame_search_point(enemy_base, map, 1), (1872.0, 1616.0));
+        assert_eq!(endgame_search_point(enemy_base, map, 9), (2128.0, 1616.0));
+        assert_eq!(
+            endgame_search_point(enemy_base, map, ENDGAME_SEARCH_OFFSETS.len()),
+            endgame_search_point(enemy_base, map, 0)
         );
     }
 }

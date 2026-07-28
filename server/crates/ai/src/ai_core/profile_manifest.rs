@@ -147,6 +147,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "immediate_anti_tank_setup",
                 "layered_home_anti_tank_defense",
                 "post_natural_main_advance",
+                "endgame_search_and_destroy_sweep",
                 "two_base_full_saturation",
                 "post_timing_expansion",
             ],
