@@ -574,14 +574,41 @@ fn jeff_does_not_spend_the_six_hundred_steel_reserve_on_riflemen() {
 }
 
 #[test]
-fn jeff_spends_only_steel_above_reserve_on_riflemen_and_a_second_barracks() {
-    let decision = decide_with_profile(&jeff_surplus_observation(601), &JEFFS_AI);
+fn jeff_pays_the_full_rifleman_cost_above_the_reserve() {
+    let reserve = JEFFS_AI.surplus_steel_production.unwrap().reserve;
+    let (rifle_steel, _) = rts_rules::economy::cost(EntityKind::Rifleman);
+    let decision = decide_with_profile(
+        &jeff_surplus_observation(reserve + rifle_steel - 1),
+        &JEFFS_AI,
+    );
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
+
+    let decision = decide_with_profile(&jeff_surplus_observation(reserve + rifle_steel), &JEFFS_AI);
 
     assert!(decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::Rifleman
     }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Barracks
+    }));
+}
+
+#[test]
+fn jeff_does_not_queue_riflemen_after_a_second_barracks_spends_to_the_reserve() {
+    let reserve = JEFFS_AI.surplus_steel_production.unwrap().reserve;
+    let (barracks_steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
+    let decision = decide_with_profile(
+        &jeff_surplus_observation(reserve + barracks_steel),
+        &JEFFS_AI,
+    );
+
     assert!(decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Barracks
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
     }));
 }
 

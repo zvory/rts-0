@@ -55,9 +55,10 @@ use self::policies::{
     active_required_tech_path, active_tech_transition,
 };
 use self::production::{
-    production_building_order, production_uses_building, should_build_extra_factory,
-    should_build_extra_turtle_gun_works, should_save_for_first_tech_unit,
-    should_save_for_required_tech_building, try_build_kind, unit_counts_for_priorities,
+    producer_for_unit, production_building_order, production_uses_building,
+    should_build_extra_factory, should_build_extra_turtle_gun_works,
+    should_save_for_first_tech_unit, should_save_for_required_tech_building, try_build_kind,
+    unit_counts_for_priorities,
 };
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
@@ -725,9 +726,10 @@ where
         )
     };
     let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
-    let surplus_barracks_enabled = profile
-        .surplus_steel_production
-        .is_some_and(|policy| observation.economy.steel > policy.reserve);
+    let surplus_barracks_enabled = profile.surplus_steel_production.is_some_and(|policy| {
+        let (barracks_steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
+        actions.budget().steel() >= policy.reserve.saturating_add(barracks_steel)
+    });
     if (production_uses_building(production_policy, EntityKind::Barracks)
         || surplus_barracks_enabled)
         && !delay_opening_barracks
@@ -928,7 +930,8 @@ where
     );
     let mut effective_unit_priorities = effective_unit_priorities;
     if let Some(policy) = profile.surplus_steel_production {
-        if observation.economy.steel > policy.reserve
+        let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
+        if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
             && !effective_unit_priorities.contains(&policy.unit)
         {
             effective_unit_priorities.push(policy.unit);
@@ -964,6 +967,28 @@ where
             || save_for_required_tech_building)
             && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit)
             && !can_train_pre_tank_defensive_machine_gunner(profile, &facts, building_kind);
+        let mut building_max_counts = production_max_counts.clone();
+        if let Some(policy) = profile
+            .surplus_steel_production
+            .filter(|policy| producer_for_unit(policy.unit) == Some(building_kind))
+        {
+            let current = production_unit_counts
+                .iter()
+                .find_map(|(kind, count)| (*kind == policy.unit).then_some(*count))
+                .unwrap_or(0);
+            let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
+            let affordable_above_reserve = if unit_steel == 0 {
+                0
+            } else {
+                actions.budget().steel().saturating_sub(policy.reserve) as usize
+                    / unit_steel as usize
+            };
+            building_max_counts.retain(|(kind, _)| *kind != policy.unit);
+            building_max_counts.push((
+                policy.unit,
+                current.saturating_add(affordable_above_reserve),
+            ));
+        }
         let trained_units = actions::train_units(
             &mut actions,
             TrainUnitsRequest {
@@ -974,7 +999,7 @@ where
                 max_queue_depth: production_policy.queue_depth,
                 save_for_tech,
                 current_counts: &production_unit_counts,
-                max_counts: &production_max_counts,
+                max_counts: &building_max_counts,
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
         );
