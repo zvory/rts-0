@@ -4,7 +4,7 @@ use crate::ai_core::decision::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerSignals, EconomyProposal, OilDemandSignal,
 };
 use crate::ai_core::decision::expansion::ExpansionPlan;
-use crate::ai_core::profiles::{AI_2_1, AI_TURTLE};
+use crate::ai_core::profiles::{AI_2_1, AI_TURTLE, JEFFS_AI};
 
 fn abandoned_city_centre(id: u32, tile: (u32, u32), tile_size: u32) -> AiEntitySummary {
     let (x, y) = building_center(tile, EntityKind::CityCentre, tile_size)
@@ -199,4 +199,63 @@ fn economy_manager_can_hold_oil_at_current_assignment() {
         output.plan.current_oil_workers
     );
     assert!(!output.proposes(EconomyProposal::AssignOilWorkers));
+}
+
+#[test]
+fn jeff_caps_workers_at_steel_patches_plus_one_builder_and_reuses_idle_first() {
+    let mut owned = vec![building_at(
+        1,
+        EntityKind::CityCentre,
+        Some(0),
+        8.0 * config::TILE_SIZE as f32,
+        8.0 * config::TILE_SIZE as f32,
+    )];
+    owned.push(worker(2, AiEntityState::Idle));
+    let mut observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 500,
+            supply_used: 4,
+            supply_cap: 40,
+        },
+        owned,
+    );
+    let expansion_plan = ExpansionPlan {
+        policy: JEFFS_AI.expansion,
+        should_save: false,
+        blocks_tech_path: false,
+        blockers: Vec::new(),
+    };
+
+    let facts = AiFacts::from_observation(&observation);
+    let output = propose_economy(EconomyManagerInput {
+        observation: &observation,
+        facts: &facts,
+        profile: &JEFFS_AI,
+        expansion_plan: &expansion_plan,
+        signals: EconomyManagerSignals {
+            oil_demand: OilDemandSignal::ExactWorkers(10),
+            defer_worker_training_for_tech: false,
+        },
+    });
+
+    assert_eq!(
+        output.plan.target_workers,
+        output.plan.target_steel_workers + 1
+    );
+    assert!(!output.proposes(EconomyProposal::TrainWorker));
+
+    observation.owned[1].state = AiEntityState::Gather;
+    let facts = AiFacts::from_observation(&observation);
+    let output = propose_economy(EconomyManagerInput {
+        observation: &observation,
+        facts: &facts,
+        profile: &JEFFS_AI,
+        expansion_plan: &expansion_plan,
+        signals: EconomyManagerSignals {
+            oil_demand: OilDemandSignal::ExactWorkers(10),
+            defer_worker_training_for_tech: false,
+        },
+    });
+    assert!(output.proposes(EconomyProposal::TrainWorker));
 }

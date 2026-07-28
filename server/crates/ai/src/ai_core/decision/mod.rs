@@ -12,8 +12,8 @@ use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
-    TechTransitionPolicy, WorkerPolicy,
+    AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
+    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
 };
 use crate::ai_shared;
 use crate::config;
@@ -38,9 +38,9 @@ use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
     defensive_panic_response, local_defense_target, local_defense_units,
     machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_main_steel_defensive_line, DefensivePanic,
-    DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
-    DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
+    stage_main_steel_defensive_line, DefensivePanic, DefensivePanicPlan, DefensivePanicResponse,
+    ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+    DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
@@ -130,6 +130,7 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_response: DefensivePanicResponse,
     pending_upgrades: BTreeSet<UpgradeKind>,
     launched_frontal_units: BTreeMap<u32, u32>,
+    containment_stationary_since: Option<u32>,
     turtle_opening_riflemen_ordered: usize,
     incomplete_city_centres: BTreeMap<u32, IncompleteCityCentreMemory>,
 }
@@ -146,6 +147,7 @@ impl AiDecisionMemory {
             defensive_panic_response: DefensivePanicResponse::Riflemen,
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
+            containment_stationary_since: None,
             turtle_opening_riflemen_ordered: 0,
             incomplete_city_centres: BTreeMap::new(),
         }
@@ -209,6 +211,7 @@ impl AiDecisionMemory {
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
         self.pending_upgrades.clear();
         self.launched_frontal_units.clear();
+        self.containment_stationary_since = None;
         self.turtle_opening_riflemen_ordered = 0;
         self.incomplete_city_centres.clear();
     }
@@ -222,6 +225,7 @@ impl AiDecisionMemory {
         self.next_attack_size = attack.first_attack_size;
         self.last_attack_tick = None;
         self.launched_frontal_units.clear();
+        self.containment_stationary_since = None;
     }
 
     fn launched_frontal_unit_exclusions(
@@ -455,7 +459,12 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    let mut expansion_plan = plan_expansion(observation, &facts, profile, defensive_panic.active);
+    let preserve_fast_tank_economy = profile
+        .fast_tank_timing
+        .map(|timing| timing.preserve_during_defensive_panic)
+        .unwrap_or(false);
+    let defer_economy_for_panic = defensive_panic.active && !preserve_fast_tank_economy;
+    let mut expansion_plan = plan_expansion(observation, &facts, profile, defer_economy_for_panic);
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
     let economy_manager_output = propose_economy(EconomyManagerInput {
@@ -465,7 +474,7 @@ where
         expansion_plan: &expansion_plan,
         signals: EconomyManagerSignals {
             oil_demand: oil_demand_signal(profile, memory, panic_plan),
-            defer_worker_training_for_tech: defensive_panic.active,
+            defer_worker_training_for_tech: defer_economy_for_panic,
         },
     });
 
@@ -491,7 +500,7 @@ where
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
 
     let economy_plan = economy_manager_output.plan.clone();
-    let save_worker_training_for_tech = defensive_panic.active;
+    let save_worker_training_for_tech = defer_economy_for_panic;
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker);
     if should_train_workers {
         for trained in actions::train_units(
@@ -656,8 +665,8 @@ where
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
     let tank_methamphetamines_pending = profile.fast_tank_timing.is_none()
         && production_policy
-        .unit_priorities
-        .contains(&EntityKind::Tank)
+            .unit_priorities
+            .contains(&EntityKind::Tank)
         && !facts
             .completed_upgrades()
             .contains(&UpgradeKind::Methamphetamines);
@@ -679,11 +688,8 @@ where
         production_policy.unit_priorities,
         facts.completed_upgrades(),
     );
-    let effective_unit_priorities = effective_unit_priorities_for_fast_tank_timing(
-        profile,
-        &facts,
-        &effective_unit_priorities,
-    );
+    let effective_unit_priorities =
+        effective_unit_priorities_for_fast_tank_timing(profile, &facts, &effective_unit_priorities);
     let effective_unit_priorities = effective_unit_priorities_for_turtle(
         profile,
         memory,
@@ -704,12 +710,8 @@ where
         memory,
         &mut intents,
     );
-    let production_unit_counts = unit_counts_for_priorities(
-        observation,
-        &facts,
-        profile,
-        &effective_unit_priorities,
-    );
+    let production_unit_counts =
+        unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
@@ -903,6 +905,7 @@ where
                     attack_policy,
                     &frontal_wave,
                     enemy_base,
+                    memory,
                 ) {
                     if let AiIntent::Attack { units } = &intent {
                         memory.note_attack_for(profile, attack_policy, observation.tick, units);

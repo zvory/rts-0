@@ -109,6 +109,20 @@ pub(super) fn build_search_for_kind(
             build_search.prefer_away_from_center = false;
             build_search.prefer_toward_center = true;
         }
+        EntityKind::Factory if profile.fast_tank_timing.is_some() => {
+            // The first Factory is on the Tank critical path. A compact site
+            // avoids sending its builder to the edge of the generic forward
+            // production band while retaining clearance around the main base.
+            build_search.min_radius = build_search
+                .min_radius
+                .max(ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MIN_RADIUS);
+            build_search.max_radius = build_search
+                .max_radius
+                .min(ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MAX_RADIUS)
+                .max(build_search.min_radius);
+            build_search.prefer_away_from_center = false;
+            build_search.prefer_toward_center = false;
+        }
         EntityKind::Factory | EntityKind::Steelworks => {
             build_search.max_radius = build_search
                 .max_radius
@@ -236,7 +250,7 @@ pub(super) fn unit_counts_for_priorities(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::{AI_2_1, AI_TURTLE};
+    use crate::ai_core::profiles::{AI_2_1, AI_TURTLE, JEFFS_AI};
 
     fn short_search() -> ai_shared::BuildSearch {
         ai_shared::BuildSearch {
@@ -287,6 +301,25 @@ mod tests {
         );
         assert!(!search.prefer_away_from_center);
         assert!(search.prefer_toward_center);
+    }
+
+    #[test]
+    fn fast_tank_factory_uses_compact_build_search() {
+        let search = build_search_for_kind(
+            ai_shared::BuildSearch::default(),
+            &JEFFS_AI,
+            EntityKind::Factory,
+        );
+        assert_eq!(
+            search.min_radius,
+            ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MIN_RADIUS
+        );
+        assert_eq!(
+            search.max_radius,
+            ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MAX_RADIUS
+        );
+        assert!(!search.prefer_away_from_center);
+        assert!(!search.prefer_toward_center);
     }
 
     #[test]

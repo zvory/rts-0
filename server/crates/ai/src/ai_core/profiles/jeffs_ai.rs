@@ -1,8 +1,8 @@
 use super::{
     AiProfile, AttackPolicy, BarracksCurve, BuildingPolicy, DefensiveMachineGunnerPolicy,
-    ExpansionPolicy, ExtraFactoryPolicy, FastTankTimingPolicy, FrontalWavePolicy, ProductionPolicy,
-    Ratio, ResourceFloatThreshold, ResourcePolicy, TankResourcePolicy, TechTransitionPolicy,
-    WorkerPolicy,
+    ExpansionContainmentPolicy, ExpansionPolicy, ExtraFactoryPolicy, FastTankTimingPolicy,
+    FrontalWavePolicy, ProductionPolicy, Ratio, ResourceFloatThreshold, ResourcePolicy,
+    TankResourcePolicy, TechTransitionPolicy, WorkerPolicy,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -29,6 +29,9 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: Some(40),
         extra_oil_workers: 10,
+        extra_builder_workers: 1,
+        train_workers_for_oil: false,
+        reuse_idle_before_training: true,
     },
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {
@@ -50,7 +53,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         },
     }),
     production: ProductionPolicy {
-        queue_depth: 2,
+        queue_depth: 1,
         unit_priorities: &OPENING_UNITS,
         save_for_first_tech_unit: Some(EntityKind::Tank),
         balance_unit_priorities: false,
@@ -77,12 +80,12 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         target_city_centres: 2,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Tank,
-        defensive_unit_count: 3,
+        defensive_unit_count: 1,
         pre_expansion_steel_worker_cap: 18,
         post_expansion_steel_worker_cap: Some(40),
         search_radius_tiles: 6,
-        trigger_steel: 450,
-        trigger_supply_used: 30,
+        trigger_steel: 300,
+        trigger_supply_used: 24,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
@@ -94,17 +97,22 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     }),
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
-        exclude_launched_ticks: Some(450),
+        exclude_launched_ticks: Some(120),
         line_staging: true,
     },
+    expansion_containment: Some(ExpansionContainmentPolicy {
+        // A stationary Tank ramps from 5 to 14 tiles over three seconds.
+        // Anchor just inside the fully charged range so it does not have to
+        // translate and lose that bonus when the expansion becomes visible.
+        tank_standoff_tiles: 13.5,
+        scout_trailing_tiles: 1.5,
+        scout_forward_tiles: 2.0,
+    }),
     tech_transition: Some(TechTransitionPolicy {
-        resource_float: ResourceFloatThreshold {
-            steel: 0,
-            oil: 0,
-        },
+        resource_float: ResourceFloatThreshold { steel: 0, oil: 0 },
         required_tech_path: &ARMORED_TECH_PATH,
         production: ProductionPolicy {
-            queue_depth: 3,
+            queue_depth: 1,
             unit_priorities: &ARMORED_UNITS,
             save_for_first_tech_unit: Some(EntityKind::Tank),
             balance_unit_priorities: false,
@@ -112,7 +120,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         attack: AttackPolicy {
             first_attack_size: 3,
             wave_growth: 1,
-            regroup_reset_ticks: 450,
+            regroup_reset_ticks: 120,
             reissue_cadence_ticks: 120,
             stage_distance_tiles: 8.0,
             unit_kinds: &ARMORED_UNITS,
@@ -137,11 +145,22 @@ mod tests {
         let transition = JEFFS_AI.tech_transition.expect("armored transition");
         assert_eq!(JEFFS_AI.workers.steel_worker_cap, Some(40));
         assert_eq!(JEFFS_AI.workers.extra_oil_workers, 10);
+        assert_eq!(JEFFS_AI.workers.extra_builder_workers, 1);
+        assert!(!JEFFS_AI.workers.train_workers_for_oil);
+        assert!(JEFFS_AI.workers.reuse_idle_before_training);
         assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
         assert_eq!(transition.production.unit_priorities, &ARMORED_UNITS);
+        assert_eq!(JEFFS_AI.production.queue_depth, 1);
+        assert_eq!(transition.production.queue_depth, 1);
         assert_eq!(transition.attack.first_attack_size, 3);
         assert_eq!(transition.attack.required_unit, Some(EntityKind::ScoutCar));
-        assert_eq!(transition.resource_float, ResourceFloatThreshold { steel: 0, oil: 0 });
+        assert_eq!(transition.attack.regroup_reset_ticks, 120);
+        assert_eq!(JEFFS_AI.frontal_wave.exclude_launched_ticks, Some(120));
+        assert_eq!(JEFFS_AI.expansion.unwrap().defensive_unit_count, 1);
+        assert_eq!(
+            transition.resource_float,
+            ResourceFloatThreshold { steel: 0, oil: 0 }
+        );
         let timing = JEFFS_AI.fast_tank_timing.expect("fast tank timing");
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);

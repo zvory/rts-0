@@ -83,6 +83,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         anti_tank_kinds: &TURTLE_ANTI_TANK,
     }),
     frontal_wave: FrontalWavePolicy::DEFAULT,
+    expansion_containment: None,
     tech_transition: None,
     fast_tank_timing: None,
 };

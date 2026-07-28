@@ -35,6 +35,7 @@ pub(crate) struct AiProfile {
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
+    pub(crate) expansion_containment: Option<ExpansionContainmentPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
     pub(crate) fast_tank_timing: Option<FastTankTimingPolicy>,
 }
@@ -53,6 +54,9 @@ pub(crate) struct WorkerPolicy {
     pub(crate) steel_saturation_fraction: Ratio,
     pub(crate) steel_worker_cap: Option<usize>,
     pub(crate) extra_oil_workers: usize,
+    pub(crate) extra_builder_workers: usize,
+    pub(crate) train_workers_for_oil: bool,
+    pub(crate) reuse_idle_before_training: bool,
 }
 
 impl WorkerPolicy {
@@ -203,6 +207,13 @@ pub(crate) struct FrontalWavePolicy {
     pub(crate) line_staging: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ExpansionContainmentPolicy {
+    pub(crate) tank_standoff_tiles: f32,
+    pub(crate) scout_trailing_tiles: f32,
+    pub(crate) scout_forward_tiles: f32,
+}
+
 impl FrontalWavePolicy {
     pub(crate) const DEFAULT: Self = Self {
         exclude_launched_ticks: None,
@@ -256,6 +267,9 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
         extra_oil_workers: 12,
+        extra_builder_workers: 0,
+        train_workers_for_oil: true,
+        reuse_idle_before_training: false,
     },
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {
@@ -321,6 +335,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         exclude_launched_ticks: Some(FRONTAL_COHORT_TICKS),
         line_staging: true,
     },
+    expansion_containment: None,
     tech_transition: Some(TechTransitionPolicy {
         resource_float: AI_2_1_TANK_PRESSURE_FLOAT_THRESHOLD,
         required_tech_path: &TANK_TECH_PATH,

@@ -121,7 +121,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
         ),
         JEFFS_AI_ID => (
             "Jeff's AI",
-            "Fast-Tank pressure profile with two entrenched Machine Gunners, damaged-screen replacement, and one Scout Car joining the first two Tanks for vision.",
+            "Fast-Tank containment profile with two entrenched Machine Gunners, two Tanks holding at stationary range, a forward vision Scout, and aggressive two-base saturation.",
             vec![
                 "economy_manager",
                 "two_machine_gunner_opening",
@@ -129,6 +129,9 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "immediate_tank_tech",
                 "two_tanks_before_scout",
                 "tank_scout_vision_wave",
+                "stationary_tank_expansion_containment",
+                "threat_first_targeting",
+                "two_base_full_saturation",
                 "post_timing_expansion",
             ],
         ),
