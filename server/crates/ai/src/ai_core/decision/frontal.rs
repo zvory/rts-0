@@ -164,10 +164,8 @@ fn issue_expansion_containment_wave(
     policy: ExpansionContainmentPolicy,
     memory: &mut AiDecisionMemory,
 ) -> Option<AiIntent> {
-    let objective = enemy_natural_edge(observation, enemy_base)?;
+    let natural_objective = enemy_natural_edge(observation, enemy_base)?;
     let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let (tank_point, scout_point) =
-        containment_points(own_base, objective, observation.map, policy)?;
     let tile_size = observation.map.tile_size as f32;
 
     let mut tanks = Vec::new();
@@ -186,7 +184,18 @@ fn issue_expansion_containment_wave(
     if tanks.is_empty() || scouts.is_empty() {
         return None;
     }
-    if tanks.len() >= policy.minimum_tanks_to_continue {
+    update_enemy_natural_state(observation, natural_objective, enemy_base, &scouts, memory);
+    let objective = if memory.enemy_natural_destroyed {
+        (enemy_base.x, enemy_base.y)
+    } else {
+        natural_objective
+    };
+    let (tank_point, scout_point) =
+        containment_points(own_base, objective, observation.map, policy)?;
+    if !memory.containment_wave_launched && tanks.len() >= policy.minimum_tanks_to_continue {
+        memory
+            .containment_opening_tanks
+            .extend(tanks.iter().copied());
         memory.containment_wave_launched = true;
     }
     if memory.containment_wave_launched && tanks.len() < policy.minimum_tanks_to_continue {
@@ -233,9 +242,22 @@ fn issue_expansion_containment_wave(
 
     if should_stop {
         if stationary_range_ready {
-            if let Some(target) = contact_threat.or_else(|| {
-                visible_combat_target_within_tiles(observation, &tanks, policy.tank_standoff_tiles)
-            }) {
+            if let Some(target) = contact_threat
+                .or_else(|| {
+                    visible_combat_target_within_tiles(
+                        observation,
+                        &tanks,
+                        policy.tank_standoff_tiles,
+                    )
+                })
+                .or_else(|| {
+                    visible_strategic_building_target_within_tiles(
+                        observation,
+                        &tanks,
+                        policy.tank_standoff_tiles,
+                    )
+                })
+            {
                 actions::attack_units(actions, tanks.iter().copied(), target);
             } else {
                 actions::hold_position_units(actions, tanks.iter().copied());
@@ -274,6 +296,50 @@ fn issue_expansion_containment_wave(
     tanks.sort_unstable();
     tanks.dedup();
     Some(AiIntent::Attack { units: tanks })
+}
+
+fn update_enemy_natural_state(
+    observation: &AiObservation,
+    natural: (f32, f32),
+    enemy_base: EnemyBaseFact,
+    scouts: &[u32],
+    memory: &mut AiDecisionMemory,
+) {
+    if memory.enemy_natural_destroyed {
+        return;
+    }
+    let tile_size = observation.map.tile_size as f32;
+    let natural_radius2 = (8.0 * tile_size) * (8.0 * tile_size);
+    let main_exclusion2 = (config::CC_RESOURCE_MAX_DIST_TILES * tile_size)
+        * (config::CC_RESOURCE_MAX_DIST_TILES * tile_size);
+    let visible_natural = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::CityCentre)
+        .filter(|enemy| dist2(enemy.x, enemy.y, enemy_base.x, enemy_base.y) > main_exclusion2)
+        .filter(|enemy| dist2(enemy.x, enemy.y, natural.0, natural.1) <= natural_radius2)
+        .min_by_key(|enemy| enemy.id);
+    if let Some(city_centre) = visible_natural {
+        memory.enemy_natural_city_centre = Some(city_centre.id);
+        return;
+    }
+    // At the containment anchor the Tanks sit 13.5 tiles from the resource
+    // edge and the Scout moves two tiles ahead. Allow one tile of formation
+    // separation so that the intended 11.5-tile observation point can
+    // confirm that a destroyed (or absent) natural is clear.
+    let scout_confirmation_tiles = 12.5;
+    let scout_confirms_site = observation
+        .owned
+        .iter()
+        .filter(|unit| scouts.contains(&unit.id))
+        .any(|unit| {
+            dist2(unit.x, unit.y, natural.0, natural.1)
+                <= (scout_confirmation_tiles * tile_size).powi(2)
+        });
+    if scout_confirms_site {
+        memory.enemy_natural_destroyed = true;
+        memory.containment_stationary_since = None;
+    }
 }
 
 fn containment_points(
@@ -449,6 +515,41 @@ fn visible_anti_armor_target_within_tiles(
             (
                 enemy.id,
                 outbound_wave_target_priority(enemy.kind),
+                geometry::dist2(center.0, center.1, enemy.x, enemy.y),
+            )
+        })
+        .filter(|(_, _, distance2)| *distance2 <= max_distance2)
+        .min_by(|left, right| {
+            left.1
+                .cmp(&right.1)
+                .then_with(|| left.2.total_cmp(&right.2))
+                .then_with(|| left.0.cmp(&right.0))
+        })
+        .map(|(id, _, _)| id)
+}
+
+fn visible_strategic_building_target_within_tiles(
+    observation: &AiObservation,
+    unit_ids: &[u32],
+    radius_tiles: f32,
+) -> Option<u32> {
+    let center = group_center(observation, unit_ids)?;
+    let max_distance = radius_tiles * observation.map.tile_size as f32;
+    let max_distance2 = max_distance * max_distance;
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind.is_building())
+        .map(|enemy| {
+            let priority = match enemy.kind {
+                EntityKind::CityCentre => 0,
+                EntityKind::Factory | EntityKind::Steelworks => 1,
+                EntityKind::ResearchComplex | EntityKind::TrainingCentre => 2,
+                _ => 3,
+            };
+            (
+                enemy.id,
+                priority,
                 geometry::dist2(center.0, center.1, enemy.x, enemy.y),
             )
         })

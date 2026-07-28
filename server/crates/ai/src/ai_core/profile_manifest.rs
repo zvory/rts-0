@@ -121,7 +121,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
         ),
         JEFFS_AI_ID => (
             "Jeff's AI",
-            "Fast-Tank containment profile with armored-contact range holds, batched reinforcements, a shallow flank, and layered Machine Gunner plus Anti-Tank Gun home defense.",
+            "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, deployed Anti-Tank Guns, and a post-natural advance on the enemy main.",
             vec![
                 "economy_manager",
                 "seven_worker_two_pump_opening",
@@ -136,7 +136,11 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "shallow_flank_approach",
                 "threat_first_targeting",
                 "post_launch_anti_tank_unlock",
+                "third_tank_home_anchor",
+                "gun_works_after_home_tank",
+                "immediate_anti_tank_setup",
                 "layered_home_anti_tank_defense",
+                "post_natural_main_advance",
                 "two_base_full_saturation",
                 "post_timing_expansion",
             ],

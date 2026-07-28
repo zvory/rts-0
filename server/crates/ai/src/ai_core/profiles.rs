@@ -222,6 +222,7 @@ pub(crate) struct ExpansionContainmentPolicy {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct HomeAntiTankPolicy {
+    pub(crate) defensive_tanks: usize,
     pub(crate) target_guns: usize,
     pub(crate) anti_tank_position_tiles: f32,
     pub(crate) machine_gunner_screen_tiles: f32,

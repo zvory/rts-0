@@ -254,11 +254,30 @@ pub(super) fn stage_main_steel_defensive_line(
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
 ) -> Option<Vec<u32>> {
+    stage_main_steel_defensive_line_with_spacing(
+        actions,
+        observation,
+        ready_units,
+        enemy_base,
+        distance_tiles,
+        EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
+    )
+}
+
+pub(super) fn stage_main_steel_defensive_line_with_spacing(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    distance_tiles: f32,
+    lateral_spacing_tiles: f32,
+) -> Option<Vec<u32>> {
     let assignments = main_steel_defensive_line_assignments(
         observation,
         ready_units,
         enemy_base,
         distance_tiles,
+        lateral_spacing_tiles,
     )?;
     let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
@@ -362,6 +381,7 @@ pub(super) fn stage_home_anti_tank_line(
         &units,
         enemy_base,
         policy.anti_tank_position_tiles,
+        policy.lateral_spacing_tiles,
     )?;
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
@@ -369,6 +389,17 @@ pub(super) fn stage_home_anti_tank_line(
         .map(|entity| (entity.id, entity))
         .collect();
     let close_enough = observation.map.tile_size as f32;
+    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let facing_target = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::Tank)
+        .min_by(|a, b| {
+            dist2(a.x, a.y, own_base.0, own_base.1)
+                .total_cmp(&dist2(b.x, b.y, own_base.0, own_base.1))
+        })
+        .map(|enemy| (enemy.x, enemy.y))
+        .unwrap_or((enemy_base.x, enemy_base.y));
     let mut staged = Vec::new();
     for assignment in assignments {
         let Some(unit) = by_id.get(&assignment.unit_id).copied() else {
@@ -386,8 +417,8 @@ pub(super) fn stage_home_anti_tank_line(
         if let Some(units) = actions::setup_anti_tank_guns(
             actions,
             [assignment.unit_id],
-            enemy_base.x,
-            enemy_base.y,
+            facing_target.0,
+            facing_target.1,
             needs_move,
         ) {
             staged.extend(units);
@@ -396,6 +427,52 @@ pub(super) fn stage_home_anti_tank_line(
     staged.sort_unstable();
     staged.dedup();
     (!staged.is_empty()).then_some(staged)
+}
+
+pub(super) fn home_defensive_tank_is_positioned(
+    observation: &AiObservation,
+    tank_id: u32,
+    enemy_base: EnemyBaseFact,
+    distance_tiles: f32,
+) -> bool {
+    let Some(assignment) = main_steel_defensive_line_assignments(
+        observation,
+        &[tank_id],
+        enemy_base,
+        distance_tiles,
+        EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
+    )
+    .and_then(|assignments| assignments.into_iter().next()) else {
+        return false;
+    };
+    let Some(tank) = observation.owned.iter().find(|entity| entity.id == tank_id) else {
+        return false;
+    };
+    let tolerance = observation.map.tile_size as f32;
+    dist2(tank.x, tank.y, assignment.x, assignment.y) <= tolerance * tolerance
+}
+
+pub(super) fn stage_home_defensive_tank(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    tank_id: u32,
+    enemy_base: EnemyBaseFact,
+    distance_tiles: f32,
+) -> Option<Vec<u32>> {
+    let assignment = main_steel_defensive_line_assignments(
+        observation,
+        &[tank_id],
+        enemy_base,
+        distance_tiles,
+        EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
+    )?
+    .into_iter()
+    .next()?;
+    if home_defensive_tank_is_positioned(observation, tank_id, enemy_base, distance_tiles) {
+        actions::hold_position_units(actions, [tank_id])
+    } else {
+        actions::attack_move_units(actions, [tank_id], assignment.x, assignment.y)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -410,6 +487,7 @@ pub(super) fn main_steel_defensive_line_assignments(
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
+    lateral_spacing_tiles: f32,
 ) -> Option<Vec<DefensiveLineAssignment>> {
     if ready_units.is_empty() {
         return None;
@@ -430,7 +508,7 @@ pub(super) fn main_steel_defensive_line_assignments(
         observation.map,
     );
     let perp = (-dir_y, dir_x);
-    let spacing = EXPANSION_DEFENSIVE_LINE_SPACING_TILES * tile_size;
+    let spacing = lateral_spacing_tiles.max(0.0) * tile_size;
     let mut units = ready_units.to_vec();
     units.sort_unstable();
     units.dedup();

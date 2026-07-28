@@ -112,10 +112,11 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         minimum_tanks_to_continue: 2,
     }),
     home_anti_tank: Some(HomeAntiTankPolicy {
+        defensive_tanks: 1,
         target_guns: 2,
         anti_tank_position_tiles: 1.0,
         machine_gunner_screen_tiles: 5.0,
-        lateral_spacing_tiles: 3.0,
+        lateral_spacing_tiles: 4.5,
     }),
     tech_transition: Some(TechTransitionPolicy {
         resource_float: ResourceFloatThreshold { steel: 0, oil: 0 },
@@ -172,6 +173,7 @@ mod tests {
         assert_eq!(containment.minimum_tanks_to_continue, 2);
         assert_eq!(containment.contact_stop_tiles, 18.0);
         let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
+        assert_eq!(home_anti_tank.defensive_tanks, 1);
         assert_eq!(home_anti_tank.target_guns, 2);
         assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 5.0);
         assert_eq!(

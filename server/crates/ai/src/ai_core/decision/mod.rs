@@ -36,10 +36,11 @@ mod turtle;
 
 use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
-    defensive_panic_response, local_defense_target, local_defense_units,
-    machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_home_anti_tank_line, stage_main_steel_defensive_line, DefensivePanic, DefensivePanicPlan,
-    DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
+    defensive_panic_response, home_defensive_tank_is_positioned, local_defense_target,
+    local_defense_units, machine_gunner_meets_replacement_health,
+    stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
+    stage_main_steel_defensive_line, stage_main_steel_defensive_line_with_spacing, DefensivePanic,
+    DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
     DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
 use self::economy_manager::{
@@ -132,6 +133,11 @@ pub(crate) struct AiDecisionMemory {
     launched_frontal_units: BTreeMap<u32, u32>,
     containment_stationary_since: Option<u32>,
     containment_wave_launched: bool,
+    containment_opening_tanks: BTreeSet<u32>,
+    home_defensive_tank: Option<u32>,
+    home_defensive_tank_assigned_once: bool,
+    enemy_natural_city_centre: Option<u32>,
+    enemy_natural_destroyed: bool,
     turtle_opening_riflemen_ordered: usize,
     incomplete_city_centres: BTreeMap<u32, IncompleteCityCentreMemory>,
 }
@@ -150,6 +156,11 @@ impl AiDecisionMemory {
             launched_frontal_units: BTreeMap::new(),
             containment_stationary_since: None,
             containment_wave_launched: false,
+            containment_opening_tanks: BTreeSet::new(),
+            home_defensive_tank: None,
+            home_defensive_tank_assigned_once: false,
+            enemy_natural_city_centre: None,
+            enemy_natural_destroyed: false,
             turtle_opening_riflemen_ordered: 0,
             incomplete_city_centres: BTreeMap::new(),
         }
@@ -215,6 +226,11 @@ impl AiDecisionMemory {
         self.launched_frontal_units.clear();
         self.containment_stationary_since = None;
         self.containment_wave_launched = false;
+        self.containment_opening_tanks.clear();
+        self.home_defensive_tank = None;
+        self.home_defensive_tank_assigned_once = false;
+        self.enemy_natural_city_centre = None;
+        self.enemy_natural_destroyed = false;
         self.turtle_opening_riflemen_ordered = 0;
         self.incomplete_city_centres.clear();
     }
@@ -230,6 +246,11 @@ impl AiDecisionMemory {
         self.launched_frontal_units.clear();
         self.containment_stationary_since = None;
         self.containment_wave_launched = false;
+        self.containment_opening_tanks.clear();
+        self.home_defensive_tank = None;
+        self.home_defensive_tank_assigned_once = false;
+        self.enemy_natural_city_centre = None;
+        self.enemy_natural_destroyed = false;
     }
 
     fn launched_frontal_unit_exclusions(
@@ -325,6 +346,37 @@ impl AiDecisionMemory {
         }
     }
 
+    fn sync_home_defensive_tank(&mut self, observation: &AiObservation, profile: &AiProfile) {
+        if profile.home_anti_tank.is_none() || !self.containment_wave_launched {
+            self.home_defensive_tank = None;
+            return;
+        }
+        if self.home_defensive_tank.is_some_and(|id| {
+            observation
+                .owned
+                .iter()
+                .any(|entity| entity.id == id && entity.kind == EntityKind::Tank)
+        }) {
+            return;
+        }
+        let own_base = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+        self.home_defensive_tank = observation
+            .owned
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Tank)
+            .filter(|entity| {
+                self.home_defensive_tank_assigned_once
+                    || !self.containment_opening_tanks.contains(&entity.id)
+            })
+            .min_by(|left, right| {
+                geometry::dist2(left.x, left.y, own_base.0, own_base.1)
+                    .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
+                    .then_with(|| left.id.cmp(&right.id))
+            })
+            .map(|entity| entity.id);
+        self.home_defensive_tank_assigned_once = self.home_defensive_tank.is_some();
+    }
+
     fn city_centre_is_safe_to_resume(&self, site_id: u32, tick: u32) -> bool {
         self.incomplete_city_centres
             .get(&site_id)
@@ -405,6 +457,7 @@ where
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
 
     let facts = AiFacts::from_observation(observation);
+    memory.sync_home_defensive_tank(observation, profile);
     memory.sync_turtle_opening(profile, observation);
     let budget = SpendBudget::with_committed_steel(
         observation.economy.steel,
@@ -648,8 +701,18 @@ where
         });
     }
 
+    let home_defensive_tank_ready = memory
+        .home_defensive_tank
+        .zip(facts.nearest_public_enemy_base)
+        .is_some_and(|(tank_id, enemy_base)| {
+            let distance = profile
+                .defensive_machine_gunners
+                .map(|policy| policy.perimeter_distance_tiles)
+                .unwrap_or(6.0);
+            home_defensive_tank_is_positioned(observation, tank_id, enemy_base, distance)
+        });
     if profile.home_anti_tank.is_some()
-        && memory.containment_wave_launched
+        && home_defensive_tank_ready
         && facts.building_count(EntityKind::Steelworks)
             + planned_in_intents(&intents, EntityKind::Steelworks)
             == 0
@@ -879,24 +942,48 @@ where
     let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
     let defensive_machine_gunner_units: BTreeSet<u32> =
         defensive_machine_gunners.iter().copied().collect();
+    let mut frontal_exclusions = defensive_machine_gunner_units.clone();
+    if let Some(tank_id) = memory.home_defensive_tank {
+        frontal_exclusions.insert(tank_id);
+    }
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
         profile,
-        &defensive_machine_gunner_units,
+        &frontal_exclusions,
     );
     let ready_units_count = frontal_wave.ready_units.len();
     let attack_size = frontal_wave.desired_size;
     let attack_due = frontal_wave.attack_due;
-    let local_ready_units =
+    let mut local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
+    if profile.home_anti_tank.is_some() {
+        local_ready_units.retain(|id| {
+            Some(*id) != memory.home_defensive_tank
+                && observation.owned.iter().any(|entity| {
+                    entity.id == *id
+                        && entity.kind != EntityKind::AntiTankGun
+                        && (memory.home_defensive_tank.is_none()
+                            || entity.kind != EntityKind::MachineGunner)
+                })
+        });
+    }
     if !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !defensive_machine_gunners.is_empty()
     {
         let mut handled_local_defense = false;
         let mut local_defense_assigned = BTreeSet::new();
+        if profile.home_anti_tank.is_some() {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                if let Some(units) =
+                    stage_home_anti_tank_line(&mut actions, observation, profile, enemy_base)
+                {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
         if let Some(target) = local_defense_target(observation) {
             if let Some(units) = actions::attack_units(
                 &mut actions,
@@ -935,24 +1022,57 @@ where
             && !defensive_machine_gunners_available.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(units) = stage_defensive_machine_gunner_perimeter(
-                    &mut actions,
-                    observation,
-                    profile,
-                    &defensive_machine_gunners_available,
-                    enemy_base,
-                ) {
+                let staged = if memory.home_defensive_tank.is_some() {
+                    let distance = profile
+                        .defensive_machine_gunners
+                        .map(|policy| policy.perimeter_distance_tiles)
+                        .unwrap_or(6.0)
+                        + profile
+                            .home_anti_tank
+                            .map(|policy| policy.machine_gunner_screen_tiles)
+                            .unwrap_or(0.0);
+                    stage_main_steel_defensive_line_with_spacing(
+                        &mut actions,
+                        observation,
+                        &defensive_machine_gunners_available,
+                        enemy_base,
+                        distance,
+                        profile
+                            .home_anti_tank
+                            .map(|policy| policy.lateral_spacing_tiles)
+                            .unwrap_or(4.5),
+                    )
+                } else {
+                    stage_defensive_machine_gunner_perimeter(
+                        &mut actions,
+                        observation,
+                        profile,
+                        &defensive_machine_gunners_available,
+                        enemy_base,
+                    )
+                };
+                if let Some(units) = staged {
                     intents.push(AiIntent::Stage { units });
                 }
             }
         }
 
-        if !handled_local_defense && profile.home_anti_tank.is_some() {
+        if !handled_local_defense {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(units) =
-                    stage_home_anti_tank_line(&mut actions, observation, profile, enemy_base)
-                {
-                    intents.push(AiIntent::Stage { units });
+                if let Some(tank_id) = memory.home_defensive_tank {
+                    let distance = profile
+                        .defensive_machine_gunners
+                        .map(|policy| policy.perimeter_distance_tiles)
+                        .unwrap_or(6.0);
+                    if let Some(units) = stage_home_defensive_tank(
+                        &mut actions,
+                        observation,
+                        tank_id,
+                        enemy_base,
+                        distance,
+                    ) {
+                        intents.push(AiIntent::Stage { units });
+                    }
                 }
             }
         }
