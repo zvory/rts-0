@@ -140,6 +140,8 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "post_launch_anti_tank_unlock",
                 "defensive_tank_before_anti_tank_research",
                 "third_tank_home_anchor",
+                "stationary_home_tank_range_anchor",
+                "machine_gunner_forward_shield",
                 "gun_works_after_home_tank",
                 "immediate_anti_tank_setup",
                 "layered_home_anti_tank_defense",

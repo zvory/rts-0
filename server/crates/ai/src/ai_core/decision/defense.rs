@@ -368,6 +368,47 @@ pub(super) fn stage_defensive_machine_gunner_perimeter(
     )
 }
 
+pub(super) fn stage_home_machine_gunner_screen(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    distance_tiles: f32,
+    lateral_spacing_tiles: f32,
+) -> Option<Vec<u32>> {
+    let assignments = main_steel_defensive_line_assignments(
+        observation,
+        ready_units,
+        enemy_base,
+        distance_tiles,
+        lateral_spacing_tiles,
+    )?;
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let tolerance = EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * observation.map.tile_size as f32;
+    let tolerance2 = squared(tolerance);
+    let mut staged = Vec::new();
+    for assignment in assignments {
+        let Some(unit) = by_id.get(&assignment.unit_id).copied() else {
+            continue;
+        };
+        let command = if dist2(unit.x, unit.y, assignment.x, assignment.y) <= tolerance2 {
+            actions::hold_position_units(actions, [assignment.unit_id])
+        } else {
+            actions::move_units(actions, [assignment.unit_id], assignment.x, assignment.y)
+        };
+        if let Some(units) = command {
+            staged.extend(units);
+        }
+    }
+    staged.sort_unstable();
+    staged.dedup();
+    (!staged.is_empty()).then_some(staged)
+}
+
 pub(super) fn stage_home_anti_tank_line(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -471,7 +512,7 @@ pub(super) fn stage_home_defensive_tank(
     if home_defensive_tank_is_positioned(observation, tank_id, enemy_base, distance_tiles) {
         actions::hold_position_units(actions, [tank_id])
     } else {
-        actions::attack_move_units(actions, [tank_id], assignment.x, assignment.y)
+        actions::move_units(actions, [tank_id], assignment.x, assignment.y)
     }
 }
 

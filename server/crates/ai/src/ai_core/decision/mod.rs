@@ -39,7 +39,7 @@ use self::defense::{
     defensive_panic_response, home_defensive_tank_is_positioned, local_defense_target,
     local_defense_units, machine_gunner_meets_replacement_health,
     stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
-    stage_main_steel_defensive_line, stage_main_steel_defensive_line_with_spacing, DefensivePanic,
+    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, DefensivePanic,
     DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
     DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
@@ -250,13 +250,6 @@ impl AiDecisionMemory {
         self.next_attack_size = attack.first_attack_size;
         self.last_attack_tick = None;
         self.launched_frontal_units.clear();
-        self.containment_stationary_since = None;
-        self.containment_wave_launched = false;
-        self.containment_opening_tanks.clear();
-        self.home_defensive_tank = None;
-        self.home_defensive_tank_assigned_once = false;
-        self.enemy_natural_city_centre = None;
-        self.enemy_natural_destroyed = false;
     }
 
     fn launched_frontal_unit_exclusions(
@@ -1080,10 +1073,7 @@ where
             }
         }
 
-        if !handled_local_defense
-            && !turtle_defense_active
-            && !defensive_machine_gunners_available.is_empty()
-        {
+        if !turtle_defense_active && !defensive_machine_gunners_available.is_empty() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 let staged = if memory.home_defensive_tank.is_some() {
                     let distance = profile
@@ -1094,7 +1084,7 @@ where
                             .home_anti_tank
                             .map(|policy| policy.machine_gunner_screen_tiles)
                             .unwrap_or(0.0);
-                    stage_main_steel_defensive_line_with_spacing(
+                    stage_home_machine_gunner_screen(
                         &mut actions,
                         observation,
                         &defensive_machine_gunners_available,
@@ -1120,22 +1110,20 @@ where
             }
         }
 
-        if !handled_local_defense {
-            if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(tank_id) = memory.home_defensive_tank {
-                    let distance = profile
-                        .defensive_machine_gunners
-                        .map(|policy| policy.perimeter_distance_tiles)
-                        .unwrap_or(6.0);
-                    if let Some(units) = stage_home_defensive_tank(
-                        &mut actions,
-                        observation,
-                        tank_id,
-                        enemy_base,
-                        distance,
-                    ) {
-                        intents.push(AiIntent::Stage { units });
-                    }
+        if let Some(enemy_base) = facts.nearest_public_enemy_base {
+            if let Some(tank_id) = memory.home_defensive_tank {
+                let distance = profile
+                    .defensive_machine_gunners
+                    .map(|policy| policy.perimeter_distance_tiles)
+                    .unwrap_or(6.0);
+                if let Some(units) = stage_home_defensive_tank(
+                    &mut actions,
+                    observation,
+                    tank_id,
+                    enemy_base,
+                    distance,
+                ) {
+                    intents.push(AiIntent::Stage { units });
                 }
             }
         }

@@ -392,6 +392,26 @@ fn jeff_starts_defensive_tank_before_anti_tank_research() {
     }));
 }
 
+#[test]
+fn jeff_attack_phase_switch_preserves_home_defense_assignment() {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment_wave_launched = true;
+    memory.containment_opening_tanks.extend([101, 102]);
+    memory.home_defensive_tank = Some(103);
+    memory.home_defensive_tank_assigned_once = true;
+    memory.enemy_natural_city_centre = Some(201);
+
+    let mut transitioned_attack = JEFFS_AI.attack;
+    transitioned_attack.first_attack_size += 1;
+    memory.desired_attack_size_for(&JEFFS_AI, transitioned_attack, 9_000);
+
+    assert!(memory.containment_wave_launched);
+    assert_eq!(memory.containment_opening_tanks, BTreeSet::from([101, 102]));
+    assert_eq!(memory.home_defensive_tank, Some(103));
+    assert!(memory.home_defensive_tank_assigned_once);
+    assert_eq!(memory.enemy_natural_city_centre, Some(201));
+}
+
 fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {
     with_expansion_resources(observation(
         AiEconomy {
