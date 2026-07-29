@@ -223,8 +223,19 @@ fn each_required_profile_emits_a_starting_state_command() {
     );
 
     for profile in crate::ai_core::profiles::required_profiles() {
+        let mut profile_observation = observation.clone();
+        if profile.id == crate::ai_core::profiles::JEFFS_AI_ID {
+            profile_observation
+                .owned
+                .extend((0..3).map(|i| worker(30 + i, AiEntityState::Idle)));
+            profile_observation.owned.extend([
+                building(40, EntityKind::PumpJack, None),
+                building(41, EntityKind::PumpJack, None),
+            ]);
+            profile_observation.economy.supply_used = 7;
+        }
         let decision = decide(
-            &observation,
+            &profile_observation,
             profile,
             &mut AiDecisionMemory::for_profile(profile),
         );

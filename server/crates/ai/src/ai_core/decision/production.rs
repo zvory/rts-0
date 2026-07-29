@@ -16,6 +16,9 @@ pub(super) fn should_build_extra_factory(
     let Some(policy) = profile.extra_factories else {
         return false;
     };
+    if facts.unit_count(policy.prerequisite_unit) < policy.minimum_units {
+        return false;
+    }
     if observation.economy.steel <= policy.resource_float.steel
         || observation.economy.oil <= policy.resource_float.oil
     {
@@ -93,7 +96,9 @@ pub(super) fn build_search_for_kind(
     kind: EntityKind,
 ) -> ai_shared::BuildSearch {
     match kind {
-        EntityKind::Steelworks if profile.turtle_defense.is_some() => {
+        EntityKind::Steelworks
+            if profile.turtle_defense.is_some() || profile.home_anti_tank.is_some() =>
+        {
             build_search.min_radius = build_search
                 .min_radius
                 .min(ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS);
@@ -102,7 +107,21 @@ pub(super) fn build_search_for_kind(
                 .min(ai_shared::TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS)
                 .max(build_search.min_radius);
             build_search.prefer_away_from_center = false;
-            build_search.prefer_toward_center = true;
+            build_search.prefer_toward_center = profile.turtle_defense.is_some();
+        }
+        EntityKind::Factory if profile.fast_tank_timing.is_some() => {
+            // The first Factory is on the Tank critical path. A compact site
+            // avoids sending its builder to the edge of the generic forward
+            // production band while retaining clearance around the main base.
+            build_search.min_radius = build_search
+                .min_radius
+                .max(ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MIN_RADIUS);
+            build_search.max_radius = build_search
+                .max_radius
+                .min(ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MAX_RADIUS)
+                .max(build_search.min_radius);
+            build_search.prefer_away_from_center = false;
+            build_search.prefer_toward_center = false;
         }
         EntityKind::Factory | EntityKind::Steelworks => {
             build_search.max_radius = build_search
@@ -192,6 +211,7 @@ pub(super) fn production_uses_building(production: ProductionPolicy, building: E
 pub(super) fn unit_counts_for_priorities(
     observation: &AiObservation,
     facts: &AiFacts,
+    profile: &AiProfile,
     unit_priorities: &[EntityKind],
 ) -> Vec<(EntityKind, usize)> {
     let mut counts: BTreeMap<EntityKind, usize> = unit_priorities
@@ -199,6 +219,17 @@ pub(super) fn unit_counts_for_priorities(
         .copied()
         .map(|unit| (unit, facts.unit_count(unit)))
         .collect();
+    if let Some(policy) = profile.defensive_machine_gunners {
+        if let Some(threshold) = policy.replacement_health_percent {
+            let healthy = observation
+                .owned
+                .iter()
+                .filter(|entity| entity.kind == EntityKind::MachineGunner)
+                .filter(|entity| machine_gunner_meets_replacement_health(entity.hp, threshold))
+                .count();
+            counts.insert(EntityKind::MachineGunner, healthy);
+        }
+    }
     for building in observation.owned.iter().filter(|entity| entity.is_complete) {
         let Some(kind) = building.production_kind else {
             continue;
@@ -219,7 +250,7 @@ pub(super) fn unit_counts_for_priorities(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::profiles::{AI_2_1, AI_TURTLE};
+    use crate::ai_core::profiles::{AI_2_1, AI_TURTLE, JEFFS_AI};
 
     fn short_search() -> ai_shared::BuildSearch {
         ai_shared::BuildSearch {
@@ -270,6 +301,25 @@ mod tests {
         );
         assert!(!search.prefer_away_from_center);
         assert!(search.prefer_toward_center);
+    }
+
+    #[test]
+    fn fast_tank_factory_uses_compact_build_search() {
+        let search = build_search_for_kind(
+            ai_shared::BuildSearch::default(),
+            &JEFFS_AI,
+            EntityKind::Factory,
+        );
+        assert_eq!(
+            search.min_radius,
+            ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MIN_RADIUS
+        );
+        assert_eq!(
+            search.max_radius,
+            ai_shared::FAST_TANK_FACTORY_BUILD_SEARCH_MAX_RADIUS
+        );
+        assert!(!search.prefer_away_from_center);
+        assert!(!search.prefer_toward_center);
     }
 
     #[test]

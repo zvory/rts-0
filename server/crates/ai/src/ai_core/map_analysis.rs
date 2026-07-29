@@ -184,6 +184,7 @@ pub(crate) struct AiMapAnalysis {
     height: u32,
     tile_size: u32,
     passable: Vec<bool>,
+    line_of_sight_blocked: Vec<bool>,
     clearance: Vec<u16>,
     component_by_tile: Vec<Option<u32>>,
     components: Vec<AiMapComponent>,
@@ -291,6 +292,13 @@ impl AiMapAnalysis {
         let height = start.map.height;
         let tile_size = start.map.tile_size;
         let passable = build_passability(&start.map);
+        let line_of_sight_blocked = start
+            .map
+            .terrain
+            .iter()
+            .copied()
+            .map(rts_rules::terrain::blocks_line_of_sight)
+            .collect();
         let clearance = build_clearance(width, height, &passable);
         let (component_by_tile, components) =
             build_components(width, height, &passable, &clearance);
@@ -328,6 +336,7 @@ impl AiMapAnalysis {
             height,
             tile_size,
             passable,
+            line_of_sight_blocked,
             clearance,
             component_by_tile,
             components,
@@ -354,6 +363,18 @@ impl AiMapAnalysis {
     pub(crate) fn region_id_at(&self, tile: AiTile) -> Option<u32> {
         tile_index(self.width, self.height, tile.x, tile.y)
             .and_then(|idx| self.region_by_tile.get(idx).copied().flatten())
+    }
+
+    pub(crate) fn tile_is_passable(&self, x: u32, y: u32) -> bool {
+        tile_index(self.width, self.height, x, y)
+            .and_then(|idx| self.passable.get(idx).copied())
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn tile_blocks_line_of_sight(&self, x: u32, y: u32) -> bool {
+        tile_index(self.width, self.height, x, y)
+            .and_then(|idx| self.line_of_sight_blocked.get(idx).copied())
+            .unwrap_or(true)
     }
 
     pub(crate) fn base_chokes_for_player(&self, player_id: u32, limit: usize) -> Vec<AiBaseChoke> {

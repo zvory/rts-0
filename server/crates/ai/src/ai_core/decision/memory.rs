@@ -10,6 +10,7 @@ use super::defense::{
     DefensivePanic, DefensivePanicResponse, DEFENSIVE_PANIC_GRACE_TICKS,
     DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
+use super::geometry;
 
 const CITY_CENTRE_RESUME_SAFE_TICKS: u32 = config::TICK_HZ * 3;
 
@@ -30,6 +31,22 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_response: DefensivePanicResponse,
     pub(super) pending_upgrades: BTreeSet<UpgradeKind>,
     launched_frontal_units: BTreeMap<u32, u32>,
+    pub(super) containment_stationary_since: Option<u32>,
+    pub(super) containment_wave_launched: bool,
+    pub(super) containment_opening_tanks: BTreeSet<u32>,
+    pub(super) containment_recovery_active: bool,
+    pub(super) containment_active_tanks: BTreeSet<u32>,
+    pub(super) containment_active_scout: Option<u32>,
+    pub(super) containment_repush_count: usize,
+    pub(super) home_defensive_tank: Option<u32>,
+    pub(super) home_defensive_tank_assigned_once: bool,
+    pub(super) enemy_natural_city_centre: Option<u32>,
+    pub(super) enemy_natural_destroyed: bool,
+    pub(super) enemy_main_city_centre: Option<u32>,
+    pub(super) enemy_main_destroyed: bool,
+    pub(super) endgame_search_waypoint: usize,
+    pub(super) opening_first_pump_builder: Option<u32>,
+    pub(super) opening_first_pump_builder_followups: usize,
     pub(super) turtle_opening_riflemen_ordered: usize,
     incomplete_city_centres: BTreeMap<u32, IncompleteCityCentreMemory>,
 }
@@ -46,6 +63,22 @@ impl AiDecisionMemory {
             defensive_panic_response: DefensivePanicResponse::Riflemen,
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
+            containment_stationary_since: None,
+            containment_wave_launched: false,
+            containment_opening_tanks: BTreeSet::new(),
+            containment_recovery_active: false,
+            containment_active_tanks: BTreeSet::new(),
+            containment_active_scout: None,
+            containment_repush_count: 0,
+            home_defensive_tank: None,
+            home_defensive_tank_assigned_once: false,
+            enemy_natural_city_centre: None,
+            enemy_natural_destroyed: false,
+            enemy_main_city_centre: None,
+            enemy_main_destroyed: false,
+            endgame_search_waypoint: 0,
+            opening_first_pump_builder: None,
+            opening_first_pump_builder_followups: 0,
             turtle_opening_riflemen_ordered: 0,
             incomplete_city_centres: BTreeMap::new(),
         }
@@ -114,6 +147,22 @@ impl AiDecisionMemory {
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
         self.pending_upgrades.clear();
         self.launched_frontal_units.clear();
+        self.containment_stationary_since = None;
+        self.containment_wave_launched = false;
+        self.containment_opening_tanks.clear();
+        self.containment_recovery_active = false;
+        self.containment_active_tanks.clear();
+        self.containment_active_scout = None;
+        self.containment_repush_count = 0;
+        self.home_defensive_tank = None;
+        self.home_defensive_tank_assigned_once = false;
+        self.enemy_natural_city_centre = None;
+        self.enemy_natural_destroyed = false;
+        self.enemy_main_city_centre = None;
+        self.enemy_main_destroyed = false;
+        self.endgame_search_waypoint = 0;
+        self.opening_first_pump_builder = None;
+        self.opening_first_pump_builder_followups = 0;
         self.turtle_opening_riflemen_ordered = 0;
         self.incomplete_city_centres.clear();
     }
@@ -225,6 +274,41 @@ impl AiDecisionMemory {
             .get(&site_id)
             .map(|site| tick.saturating_sub(site.last_damage_tick) >= CITY_CENTRE_RESUME_SAFE_TICKS)
             .unwrap_or(false)
+    }
+
+    pub(super) fn sync_home_defensive_tank(
+        &mut self,
+        observation: &AiObservation,
+        profile: &AiProfile,
+    ) {
+        if profile.home_anti_tank.is_none() || !self.containment_wave_launched {
+            self.home_defensive_tank = None;
+            return;
+        }
+        if self.home_defensive_tank.is_some_and(|id| {
+            observation
+                .owned
+                .iter()
+                .any(|entity| entity.id == id && entity.kind == EntityKind::Tank)
+        }) {
+            return;
+        }
+        let own_base = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+        self.home_defensive_tank = observation
+            .owned
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Tank)
+            .filter(|entity| {
+                self.home_defensive_tank_assigned_once
+                    || !self.containment_opening_tanks.contains(&entity.id)
+            })
+            .min_by(|left, right| {
+                geometry::dist2(left.x, left.y, own_base.0, own_base.1)
+                    .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
+                    .then_with(|| left.id.cmp(&right.id))
+            })
+            .map(|entity| entity.id);
+        self.home_defensive_tank_assigned_once = self.home_defensive_tank.is_some();
     }
 
     pub(super) fn note_turtle_train(&mut self, profile: &AiProfile, unit: EntityKind) {

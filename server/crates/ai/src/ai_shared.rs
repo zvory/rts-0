@@ -10,6 +10,8 @@ use rts_sim::protocol::{MapInfo, Snapshot};
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
 pub(crate) const FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS: i32 = 18;
+pub(crate) const FAST_TANK_FACTORY_BUILD_SEARCH_MIN_RADIUS: i32 = 6;
+pub(crate) const FAST_TANK_FACTORY_BUILD_SEARCH_MAX_RADIUS: i32 = 8;
 /// Turtle Gun Works only need a compact forward site: their mobile support units do not need the
 /// same far-forward construction band as vehicle production.
 pub(crate) const TURTLE_GUN_WORKS_BUILD_SEARCH_MAX_RADIUS: i32 =

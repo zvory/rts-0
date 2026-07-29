@@ -57,7 +57,12 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
     }
     plan.target_workers = plan
         .target_steel_workers
-        .saturating_add(plan.desired_oil_workers);
+        .saturating_add(input.profile.workers.extra_builder_workers)
+        .saturating_add(if input.profile.workers.train_workers_for_oil {
+            plan.desired_oil_workers
+        } else {
+            0
+        });
 
     let mut proposals = Vec::new();
     if input.expansion_plan.should_save {
@@ -65,6 +70,8 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
     }
     if !input.signals.defer_worker_training_for_tech
         && input.facts.worker_count < plan.target_workers
+        && (!input.profile.workers.reuse_idle_before_training
+            || input.facts.idle_workers.is_empty())
     {
         proposals.push(EconomyProposal::TrainWorker);
     }

@@ -64,8 +64,11 @@ pub(super) fn plan_expansion(
     if facts.complete_building_count(expansion.required_complete_building) == 0 {
         blockers.push(ExpansionBlocker::MissingRequiredBuilding);
     }
-    if facts.unit_count(expansion.defensive_unit) < expansion.defensive_unit_count {
+    if !has_expansion_defenders(facts, expansion) {
         blockers.push(ExpansionBlocker::MissingDefensiveUnits);
+    }
+    if !armored_production_reserve_met(observation, facts, profile) {
+        blockers.push(ExpansionBlocker::RequirementNotMet);
     }
     if !rts_rules::economy::build_requirement_met(
         EntityKind::CityCentre,
@@ -129,6 +132,42 @@ pub(super) fn should_save_for_expansion(
 pub(super) fn expansion_prerequisites_met(facts: &AiFacts, expansion: ExpansionPolicy) -> bool {
     facts.complete_building_count(expansion.required_complete_building) > 0
         && facts.unit_count(expansion.defensive_unit) >= expansion.defensive_unit_count
+}
+
+fn has_expansion_defenders(facts: &AiFacts, expansion: ExpansionPolicy) -> bool {
+    facts.unit_count(expansion.defensive_unit) >= expansion.defensive_unit_count
+}
+
+fn armored_production_reserve_met(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+) -> bool {
+    let Some(timing) = profile.fast_tank_timing else {
+        return true;
+    };
+    let (city_steel, city_oil) = rts_rules::economy::cost(EntityKind::CityCentre);
+    // A queued Factory unit has already paid its cost. Do not require Jeff to
+    // bank that same armored reserve a second time or continuous production
+    // would make the expansion gate unreachable.
+    let armored_unit_already_queued = facts
+        .production_buildings(EntityKind::Factory)
+        .iter()
+        .any(|factory| factory.queue_len > 0);
+    let (unit_steel, unit_oil) = if armored_unit_already_queued {
+        (0, 0)
+    } else {
+        let next_unit = if facts.unit_count(EntityKind::Tank) < timing.tanks_before_scout_car {
+            EntityKind::Tank
+        } else if facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target {
+            EntityKind::ScoutCar
+        } else {
+            EntityKind::Tank
+        };
+        rts_rules::economy::cost(next_unit)
+    };
+    observation.economy.steel >= city_steel.saturating_add(unit_steel)
+        && observation.economy.oil >= city_oil.saturating_add(unit_oil)
 }
 
 #[allow(clippy::too_many_arguments)]

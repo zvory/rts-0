@@ -95,7 +95,19 @@ fn known_kind(kind: &str) -> bool {
             | kinds::RESEARCH_COMPLEX
             | kinds::FACTORY
             | kinds::STEELWORKS
+            | kinds::PUMP_JACK
             | kinds::STEEL
             | kinds::OIL
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::known_kind;
+    use rts_sim::protocol::kinds;
+
+    #[test]
+    fn pump_jack_is_a_known_snapshot_entity() {
+        assert!(known_kind(kinds::PUMP_JACK));
+    }
 }
