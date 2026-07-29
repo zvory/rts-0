@@ -613,12 +613,14 @@ fn jeff_does_not_queue_riflemen_after_a_second_barracks_spends_to_the_reserve() 
 }
 
 #[test]
-fn jeff_reforms_three_tanks_at_home_after_the_opening_wave_is_lost() {
+fn jeff_enters_larger_repush_recovery_after_an_active_tank_is_lost() {
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     memory.containment_wave_launched = true;
     memory.containment_opening_tanks = BTreeSet::from([101, 102]);
+    memory.containment_active_tanks = BTreeSet::from([101, 102]);
+    memory.containment_active_scout = Some(203);
     memory.home_defensive_tank = Some(200);
-    let mut observation = observation(
+    let observation = observation(
         AiEconomy {
             steel: 0,
             oil: 0,
@@ -627,21 +629,21 @@ fn jeff_reforms_three_tanks_at_home_after_the_opening_wave_is_lost() {
         },
         vec![
             combat_unit(200, EntityKind::Tank),
-            combat_unit(201, EntityKind::Tank),
-            combat_unit(202, EntityKind::Tank),
             combat_unit(203, EntityKind::ScoutCar),
         ],
     );
 
-    memory.sync_containment_recovery(&observation, &JEFFS_AI, false);
+    sync_containment_recovery(&observation, &JEFFS_AI, &mut memory);
     assert!(memory.containment_recovery_active);
-
-    observation.owned.push(combat_unit(204, EntityKind::Tank));
-    memory.sync_containment_recovery(&observation, &JEFFS_AI, true);
-    assert!(memory.containment_recovery_active);
-
-    memory.sync_containment_recovery(&observation, &JEFFS_AI, false);
-    assert!(!memory.containment_recovery_active);
+    assert_eq!(memory.containment_repush_count, 1);
+    assert!(memory.containment_active_tanks.is_empty());
+    assert_eq!(
+        JEFFS_AI
+            .expansion_containment
+            .unwrap()
+            .recovery_tanks_to_continue,
+        3
+    );
 }
 
 #[test]

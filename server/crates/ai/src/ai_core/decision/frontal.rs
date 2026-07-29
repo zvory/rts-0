@@ -176,6 +176,124 @@ pub(super) fn issue_frontal_wave(
     staged.map(|units| AiIntent::Stage { units })
 }
 
+pub(super) fn sync_containment_recovery(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    memory: &mut AiDecisionMemory,
+) {
+    let Some(_) = profile.expansion_containment else {
+        memory.containment_recovery_active = false;
+        memory.containment_active_tanks.clear();
+        memory.containment_active_scout = None;
+        return;
+    };
+    if !memory.containment_wave_launched || memory.enemy_main_destroyed {
+        return;
+    }
+    if memory.containment_recovery_active || memory.containment_active_tanks.is_empty() {
+        return;
+    }
+    let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
+    let tanks_intact = memory
+        .containment_active_tanks
+        .iter()
+        .all(|tank| owned.contains(tank));
+    let scout_intact = memory
+        .containment_active_scout
+        .is_some_and(|scout| owned.contains(&scout));
+    if tanks_intact && scout_intact {
+        return;
+    }
+    memory.containment_repush_count = memory.containment_repush_count.saturating_add(1);
+    memory.containment_recovery_active = true;
+    memory.containment_active_tanks.clear();
+    memory.containment_active_scout = None;
+    memory.containment_stationary_since = None;
+}
+
+fn containment_repush_tank_count(policy: ExpansionContainmentPolicy, repush_count: usize) -> usize {
+    policy.recovery_tanks_to_continue.saturating_add(
+        repush_count
+            .saturating_sub(1)
+            .saturating_mul(policy.additional_tanks_per_repush),
+    )
+}
+
+fn containment_regroup_radius_tiles(
+    policy: ExpansionContainmentPolicy,
+    required_tanks: usize,
+) -> f32 {
+    policy.repush_regroup_radius_tiles
+        + required_tanks.saturating_sub(policy.recovery_tanks_to_continue) as f32 * 1.5
+}
+
+fn containment_regroup_point(
+    own_base: (f32, f32),
+    enemy_base: EnemyBaseFact,
+    map: AiMapSummary,
+) -> Option<(f32, f32)> {
+    let direction = normalized_direction(own_base, (enemy_base.x, enemy_base.y))?;
+    let forward_distance = map.tile_size as f32 * 8.0;
+    Some(clamp_to_map(
+        (
+            own_base.0 + direction.0 * forward_distance,
+            own_base.1 + direction.1 * forward_distance,
+        ),
+        map,
+    ))
+}
+
+fn select_nearest_units(
+    observation: &AiObservation,
+    candidates: &mut Vec<u32>,
+    point: (f32, f32),
+    count: usize,
+) {
+    let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
+    candidates.sort_by(|left, right| {
+        let left_distance = units_by_id.get(left).map_or(f32::INFINITY, |unit| {
+            dist2(unit.x, unit.y, point.0, point.1)
+        });
+        let right_distance = units_by_id.get(right).map_or(f32::INFINITY, |unit| {
+            dist2(unit.x, unit.y, point.0, point.1)
+        });
+        left_distance
+            .total_cmp(&right_distance)
+            .then_with(|| left.cmp(right))
+    });
+    candidates.truncate(count);
+}
+
+fn unit_position(observation: &AiObservation, unit_id: u32) -> Option<(f32, f32)> {
+    observation
+        .owned
+        .iter()
+        .find(|unit| unit.id == unit_id)
+        .map(|unit| (unit.x, unit.y))
+}
+
+fn compact_group_near(
+    observation: &AiObservation,
+    unit_ids: &[u32],
+    rally_point: (f32, f32),
+    radius: f32,
+) -> bool {
+    let Some(center) = group_center(observation, unit_ids) else {
+        return false;
+    };
+    let radius2 = radius * radius;
+    dist2(center.0, center.1, rally_point.0, rally_point.1) <= radius2
+        && observation
+            .owned
+            .iter()
+            .filter(|unit| unit_ids.contains(&unit.id))
+            .all(|unit| dist2(unit.x, unit.y, center.0, center.1) <= radius2)
+}
+
 fn issue_expansion_containment_wave(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -204,6 +322,60 @@ fn issue_expansion_containment_wave(
     if tanks.is_empty() || scouts.is_empty() {
         return None;
     }
+    tanks.sort_unstable();
+    scouts.sort_unstable();
+    if !memory.containment_wave_launched {
+        if tanks.len() < policy.minimum_tanks_to_continue {
+            return None;
+        }
+        tanks.truncate(policy.minimum_tanks_to_continue);
+        scouts.truncate(1);
+        memory.containment_opening_tanks = tanks.iter().copied().collect();
+        memory.containment_active_tanks = tanks.iter().copied().collect();
+        memory.containment_active_scout = scouts.first().copied();
+        memory.containment_wave_launched = true;
+    } else if memory.containment_recovery_active {
+        let required = containment_repush_tank_count(policy, memory.containment_repush_count);
+        let forward_rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
+        select_nearest_units(observation, &mut tanks, forward_rally, required);
+        select_nearest_units(observation, &mut scouts, forward_rally, 1);
+        let regroup_point = tanks
+            .first()
+            .and_then(|tank| unit_position(observation, *tank))?;
+        let regroup_radius = containment_regroup_radius_tiles(policy, required) * tile_size;
+        let mut cohort = tanks.clone();
+        cohort.extend(scouts.iter().copied());
+        let grouped_at_home = tanks.len() == required
+            && !scouts.is_empty()
+            && compact_group_near(observation, &cohort, regroup_point, regroup_radius);
+        if !grouped_at_home {
+            actions::move_units(
+                actions,
+                tanks.iter().copied(),
+                regroup_point.0,
+                regroup_point.1,
+            );
+            actions::move_units(
+                actions,
+                scouts.iter().copied(),
+                regroup_point.0,
+                regroup_point.1,
+            );
+            cohort.sort_unstable();
+            cohort.dedup();
+            return Some(AiIntent::Stage { units: cohort });
+        }
+        memory.containment_active_tanks = tanks.iter().copied().collect();
+        memory.containment_active_scout = scouts.first().copied();
+        memory.containment_recovery_active = false;
+        memory.containment_stationary_since = None;
+    } else {
+        tanks.retain(|tank| memory.containment_active_tanks.contains(tank));
+        scouts.retain(|scout| Some(*scout) == memory.containment_active_scout);
+        if tanks.is_empty() || scouts.is_empty() {
+            return None;
+        }
+    }
     update_enemy_natural_state(observation, natural_objective, enemy_base, &scouts, memory);
     if memory.enemy_natural_destroyed {
         update_enemy_main_state(observation, enemy_base, &tanks, &scouts, memory);
@@ -228,28 +400,6 @@ fn issue_expansion_containment_wave(
     } else {
         containment_points(own_base, objective, observation.map, policy)?
     };
-    if !memory.containment_wave_launched && tanks.len() >= policy.minimum_tanks_to_continue {
-        memory
-            .containment_opening_tanks
-            .extend(tanks.iter().copied());
-        memory.containment_wave_launched = true;
-    }
-    let tanks_required = if memory.containment_recovery_active {
-        policy.recovery_tanks_to_continue
-    } else {
-        policy.minimum_tanks_to_continue
-    };
-    if memory.containment_wave_launched && tanks.len() < tanks_required {
-        memory.containment_stationary_since = None;
-        let fallback = own_base;
-        actions::move_units(actions, tanks.iter().copied(), fallback.0, fallback.1);
-        actions::move_units(actions, scouts.iter().copied(), fallback.0, fallback.1);
-        tanks.extend(scouts);
-        tanks.sort_unstable();
-        tanks.dedup();
-        return Some(AiIntent::Stage { units: tanks });
-    }
-
     // Multiple Tanks cannot occupy the same point. A two-tile arrival radius
     // lets the formation settle and charge its stationary range instead of
     // repeatedly translating because of collision separation.
@@ -268,9 +418,9 @@ fn issue_expansion_containment_wave(
         observation.map,
         policy.scout_trailing_tiles,
     )?;
-    let contact_threat =
-        visible_anti_armor_target_within_tiles(observation, &tanks, policy.contact_stop_tiles);
-    let should_stop = tanks_in_position || contact_threat.is_some();
+    let contact_target =
+        visible_combat_target_within_tiles(observation, &tanks, policy.contact_stop_tiles);
+    let should_stop = tanks_in_position || contact_target.is_some();
     let stationary_range_ready = if should_stop {
         let since = memory
             .containment_stationary_since
@@ -283,7 +433,7 @@ fn issue_expansion_containment_wave(
 
     if should_stop {
         if stationary_range_ready {
-            let target = contact_threat
+            let target = contact_target
                 .or_else(|| {
                     visible_combat_target_within_tiles(
                         observation,
@@ -682,6 +832,7 @@ fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f
 mod tests {
     use super::*;
     use crate::ai_core::observation::AiEconomy;
+    use crate::ai_core::profiles::JEFFS_AI;
 
     fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         AiEntitySummary {
@@ -701,6 +852,32 @@ mod tests {
         }
     }
 
+    fn regroup_test_observation(owned: Vec<AiEntitySummary>) -> AiObservation {
+        AiObservation {
+            player_id: 1,
+            tick: 0,
+            map: AiMapSummary {
+                width: 64,
+                height: 64,
+                tile_size: 32,
+            },
+            economy: AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: owned.len() as u32,
+                supply_cap: 100,
+            },
+            own_start_tile: (10, 10),
+            players: Vec::new(),
+            owned,
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        }
+    }
+
     #[test]
     fn containment_uses_stationary_tank_range_and_forward_scout_vision() {
         let map = AiMapSummary {
@@ -716,6 +893,8 @@ mod tests {
             contact_stop_tiles: 18.0,
             minimum_tanks_to_continue: 2,
             recovery_tanks_to_continue: 3,
+            additional_tanks_per_repush: 1,
+            repush_regroup_radius_tiles: 5.0,
         };
         let objective = (2_000.0, 1_000.0);
         let (tank, scout) = containment_points((200.0, 1_000.0), objective, map, policy).unwrap();
@@ -730,6 +909,62 @@ mod tests {
             scout_trailing_point((1_000.0, 1_000.0), (200.0, 1_000.0), objective, map, 1.5)
                 .unwrap();
         assert_eq!((1_000.0 - trailing.0) / 32.0, 1.5);
+    }
+
+    #[test]
+    fn each_repush_adds_one_tank_to_the_grouped_cohort() {
+        let policy = JEFFS_AI.expansion_containment.unwrap();
+        assert_eq!(containment_repush_tank_count(policy, 1), 3);
+        assert_eq!(containment_repush_tank_count(policy, 2), 4);
+        assert_eq!(containment_repush_tank_count(policy, 3), 5);
+        assert_eq!(containment_regroup_radius_tiles(policy, 3), 5.0);
+        assert_eq!(containment_regroup_radius_tiles(policy, 4), 6.5);
+        assert_eq!(containment_regroup_radius_tiles(policy, 5), 8.0);
+    }
+
+    #[test]
+    fn repush_selects_units_nearest_the_forward_rally_point() {
+        let observation = regroup_test_observation(vec![
+            target_test_entity(1, EntityKind::Tank, 100.0, 100.0),
+            target_test_entity(2, EntityKind::Tank, 500.0, 500.0),
+            target_test_entity(3, EntityKind::Tank, 515.0, 500.0),
+            target_test_entity(4, EntityKind::Tank, 530.0, 500.0),
+        ]);
+        let mut candidates = vec![1, 2, 3, 4];
+
+        select_nearest_units(&observation, &mut candidates, (520.0, 500.0), 3);
+
+        assert_eq!(candidates, vec![3, 4, 2]);
+    }
+
+    #[test]
+    fn repush_requires_a_compact_group_near_its_rally_point() {
+        let compact = regroup_test_observation(vec![
+            target_test_entity(1, EntityKind::Tank, 490.0, 500.0),
+            target_test_entity(2, EntityKind::Tank, 510.0, 500.0),
+            target_test_entity(3, EntityKind::Tank, 500.0, 510.0),
+            target_test_entity(4, EntityKind::ScoutCar, 500.0, 490.0),
+        ]);
+        let scattered = regroup_test_observation(vec![
+            target_test_entity(1, EntityKind::Tank, 300.0, 500.0),
+            target_test_entity(2, EntityKind::Tank, 700.0, 500.0),
+            target_test_entity(3, EntityKind::Tank, 500.0, 300.0),
+            target_test_entity(4, EntityKind::ScoutCar, 500.0, 700.0),
+        ]);
+        let cohort = [1, 2, 3, 4];
+
+        assert!(compact_group_near(
+            &compact,
+            &cohort,
+            (500.0, 500.0),
+            5.0 * 32.0
+        ));
+        assert!(!compact_group_near(
+            &scattered,
+            &cohort,
+            (500.0, 500.0),
+            5.0 * 32.0
+        ));
     }
 
     #[test]

@@ -48,7 +48,7 @@ use self::economy_manager::{
     EconomyProposal, OilDemandSignal,
 };
 use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
-use self::frontal::{issue_frontal_wave, plan_frontal_wave};
+use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
 use self::geometry::footprint_top_left_for_center;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
@@ -136,6 +136,9 @@ pub(crate) struct AiDecisionMemory {
     containment_wave_launched: bool,
     containment_opening_tanks: BTreeSet<u32>,
     containment_recovery_active: bool,
+    containment_active_tanks: BTreeSet<u32>,
+    containment_active_scout: Option<u32>,
+    containment_repush_count: usize,
     home_defensive_tank: Option<u32>,
     home_defensive_tank_assigned_once: bool,
     enemy_natural_city_centre: Option<u32>,
@@ -165,6 +168,9 @@ impl AiDecisionMemory {
             containment_wave_launched: false,
             containment_opening_tanks: BTreeSet::new(),
             containment_recovery_active: false,
+            containment_active_tanks: BTreeSet::new(),
+            containment_active_scout: None,
+            containment_repush_count: 0,
             home_defensive_tank: None,
             home_defensive_tank_assigned_once: false,
             enemy_natural_city_centre: None,
@@ -241,6 +247,9 @@ impl AiDecisionMemory {
         self.containment_wave_launched = false;
         self.containment_opening_tanks.clear();
         self.containment_recovery_active = false;
+        self.containment_active_tanks.clear();
+        self.containment_active_scout = None;
+        self.containment_repush_count = 0;
         self.home_defensive_tank = None;
         self.home_defensive_tank_assigned_once = false;
         self.enemy_natural_city_centre = None;
@@ -387,50 +396,6 @@ impl AiDecisionMemory {
             })
             .map(|entity| entity.id);
         self.home_defensive_tank_assigned_once = self.home_defensive_tank.is_some();
-    }
-
-    fn sync_containment_recovery(
-        &mut self,
-        observation: &AiObservation,
-        profile: &AiProfile,
-        defensive_panic_active: bool,
-    ) {
-        let Some(policy) = profile.expansion_containment else {
-            self.containment_recovery_active = false;
-            return;
-        };
-        if !self.containment_wave_launched || self.enemy_natural_destroyed {
-            self.containment_recovery_active = false;
-            return;
-        }
-        let opening_tanks_alive = observation
-            .owned
-            .iter()
-            .filter(|entity| {
-                entity.kind == EntityKind::Tank
-                    && self.containment_opening_tanks.contains(&entity.id)
-            })
-            .count();
-        if opening_tanks_alive < policy.minimum_tanks_to_continue {
-            self.containment_recovery_active = true;
-        }
-        if !self.containment_recovery_active || defensive_panic_active {
-            return;
-        }
-        let replacement_tanks = observation
-            .owned
-            .iter()
-            .filter(|entity| {
-                entity.kind == EntityKind::Tank && Some(entity.id) != self.home_defensive_tank
-            })
-            .count();
-        let scout_ready = observation
-            .owned
-            .iter()
-            .any(|entity| entity.kind == EntityKind::ScoutCar && entity.free_for_combat);
-        if replacement_tanks >= policy.recovery_tanks_to_continue && scout_ready {
-            self.containment_recovery_active = false;
-        }
     }
 
     fn city_centre_is_safe_to_resume(&self, site_id: u32, tick: u32) -> bool {
@@ -1100,7 +1065,7 @@ where
     if let Some(tank_id) = memory.home_defensive_tank {
         frontal_exclusions.insert(tank_id);
     }
-    memory.sync_containment_recovery(observation, profile, defensive_panic.active);
+    sync_containment_recovery(observation, profile, memory);
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,

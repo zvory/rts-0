@@ -229,6 +229,8 @@ pub(crate) struct ExpansionContainmentPolicy {
     pub(crate) contact_stop_tiles: f32,
     pub(crate) minimum_tanks_to_continue: usize,
     pub(crate) recovery_tanks_to_continue: usize,
+    pub(crate) additional_tanks_per_repush: usize,
+    pub(crate) repush_regroup_radius_tiles: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

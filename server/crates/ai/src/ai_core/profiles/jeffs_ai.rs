@@ -118,6 +118,8 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         contact_stop_tiles: 18.0,
         minimum_tanks_to_continue: 2,
         recovery_tanks_to_continue: 3,
+        additional_tanks_per_repush: 1,
+        repush_regroup_radius_tiles: 5.0,
     }),
     home_anti_tank: Some(HomeAntiTankPolicy {
         defensive_tanks: 1,
@@ -181,6 +183,8 @@ mod tests {
         let containment = JEFFS_AI.expansion_containment.unwrap();
         assert_eq!(containment.minimum_tanks_to_continue, 2);
         assert_eq!(containment.recovery_tanks_to_continue, 3);
+        assert_eq!(containment.additional_tanks_per_repush, 1);
+        assert_eq!(containment.repush_regroup_radius_tiles, 5.0);
         assert_eq!(containment.contact_stop_tiles, 18.0);
         let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
         assert_eq!(home_anti_tank.defensive_tanks, 1);
