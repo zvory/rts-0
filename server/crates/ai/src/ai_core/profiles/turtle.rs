@@ -33,6 +33,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         max_pending_per_kind: 1,
     },
     extra_factories: None,
+    surplus_steel_production: None,
     production: ProductionPolicy {
         queue_depth: 3,
         unit_priorities: &TURTLE_UNITS,
@@ -83,7 +84,10 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         anti_tank_kinds: &TURTLE_ANTI_TANK,
     }),
     frontal_wave: FrontalWavePolicy::DEFAULT,
+    expansion_containment: None,
+    home_anti_tank: None,
     tech_transition: None,
+    fast_tank_timing: None,
 };
 
 #[cfg(test)]

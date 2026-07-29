@@ -12,8 +12,8 @@ use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
-    TechTransitionPolicy, WorkerPolicy,
+    AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
+    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
 };
 use crate::ai_shared;
 use crate::config;
@@ -37,8 +37,10 @@ mod turtle;
 
 use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
-    defensive_panic_response, local_defense_target, local_defense_units,
-    stage_defensive_machine_gunner_perimeter, stage_main_steel_defensive_line, DefensivePanic,
+    defensive_panic_response, home_defensive_tank_is_positioned, local_defense_target,
+    local_defense_units, machine_gunner_meets_replacement_health,
+    stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
+    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, DefensivePanic,
     DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
     DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
@@ -47,7 +49,7 @@ use self::economy_manager::{
     EconomyProposal, OilDemandSignal,
 };
 use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
-use self::frontal::{issue_frontal_wave, plan_frontal_wave};
+use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
 use self::geometry::footprint_top_left_for_center;
 pub(crate) use self::memory::AiDecisionMemory;
 use self::policies::{
@@ -55,9 +57,10 @@ use self::policies::{
     active_required_tech_path, active_tech_transition,
 };
 use self::production::{
-    production_building_order, production_uses_building, should_build_extra_factory,
-    should_build_extra_turtle_gun_works, should_save_for_first_tech_unit,
-    should_save_for_required_tech_building, try_build_kind, unit_counts_for_priorities,
+    producer_for_unit, production_building_order, production_uses_building,
+    should_build_extra_factory, should_build_extra_turtle_gun_works,
+    should_save_for_first_tech_unit, should_save_for_required_tech_building, try_build_kind,
+    unit_counts_for_priorities,
 };
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
@@ -172,6 +175,7 @@ where
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
 
     let facts = AiFacts::from_observation(observation);
+    memory.sync_home_defensive_tank(observation, profile);
     memory.sync_turtle_opening(profile, observation);
     let budget = SpendBudget::with_committed_steel(
         observation.economy.steel,
@@ -197,7 +201,10 @@ where
     } else {
         active_required_tech_path(observation, profile)
     };
-    let production_policy = if defensive_panic.active {
+    let preserve_fast_tank_timing = profile
+        .fast_tank_timing
+        .is_some_and(|timing| timing.preserve_during_defensive_panic);
+    let production_policy = if defensive_panic.active && !preserve_fast_tank_timing {
         panic_plan.map(|plan| plan.production).unwrap_or_else(|| {
             defensive_panic_plan(DefensivePanicResponse::Riflemen, &facts).production
         })
@@ -227,7 +234,17 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    let mut expansion_plan = plan_expansion(observation, &facts, profile, defensive_panic.active);
+    let delay_opening_barracks = profile.fast_tank_timing.is_some_and(|timing| {
+        facts.complete_building_count(EntityKind::Barracks) == 0
+            && (facts.worker_count < timing.workers_before_barracks
+                || facts.building_count(EntityKind::PumpJack) < timing.pump_jacks_before_barracks)
+    });
+    let preserve_fast_tank_economy = profile
+        .fast_tank_timing
+        .map(|timing| timing.preserve_during_defensive_panic)
+        .unwrap_or(false);
+    let defer_economy_for_panic = defensive_panic.active && !preserve_fast_tank_economy;
+    let mut expansion_plan = plan_expansion(observation, &facts, profile, defer_economy_for_panic);
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
     let economy_manager_output = propose_economy(EconomyManagerInput {
@@ -237,7 +254,7 @@ where
         expansion_plan: &expansion_plan,
         signals: EconomyManagerSignals {
             oil_demand: oil_demand_signal(profile, memory, panic_plan),
-            defer_worker_training_for_tech: defensive_panic.active,
+            defer_worker_training_for_tech: defer_economy_for_panic,
         },
     });
 
@@ -263,7 +280,51 @@ where
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
 
     let economy_plan = economy_manager_output.plan.clone();
-    let save_worker_training_for_tech = defensive_panic.active;
+    let mut skipped_workers = BTreeSet::new();
+    let opening_pump_followup_target = profile
+        .fast_tank_timing
+        .map(|timing| timing.first_pump_builder_additional_pump_jacks)
+        .unwrap_or(0);
+    let mut opening_pump_followups_assigned = 0;
+    if memory.opening_first_pump_builder_followups < opening_pump_followup_target
+        && facts.complete_building_count(EntityKind::PumpJack) > 0
+    {
+        if let Some(builder) = memory.opening_first_pump_builder {
+            let candidate = [builder];
+            let assigned = actions::assign_workers_to_resource(
+                &mut actions,
+                ResourceAssignmentPolicy {
+                    workers: &observation.owned,
+                    resources: &observation.resources,
+                    resource_kind: EntityKind::Oil,
+                    assignable_node_ids: &economy_plan.mineable_oil_nodes,
+                    candidate_worker_ids: Some(&candidate),
+                    skip_workers: &skipped_workers,
+                    pre_reserved_nodes: &economy_plan.occupied_nodes,
+                    idle_only: true,
+                    allow_latched_reassignment: false,
+                    max_assignments: Some(1),
+                    max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
+                    remote_worker_assignment_fallback: economy_plan
+                        .remote_worker_assignment_fallback,
+                },
+            );
+            if !assigned.is_empty() {
+                memory.opening_first_pump_builder_followups += 1;
+                opening_pump_followups_assigned = assigned.len();
+                intents.push(AiIntent::Gather {
+                    resource: EntityKind::Oil,
+                    assignments: assigned.len(),
+                });
+            }
+        }
+    }
+    if memory.opening_first_pump_builder_followups < opening_pump_followup_target {
+        if let Some(builder) = memory.opening_first_pump_builder {
+            skipped_workers.insert(builder);
+        }
+    }
+    let save_worker_training_for_tech = defer_economy_for_panic;
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker);
     if should_train_workers {
         for trained in actions::train_units(
@@ -289,6 +350,9 @@ where
     }
 
     for kind in required_tech_path {
+        if *kind == EntityKind::Barracks && delay_opening_barracks {
+            continue;
+        }
         if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
             continue;
         }
@@ -324,7 +388,13 @@ where
         )
     };
     let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
-    if production_uses_building(production_policy, EntityKind::Barracks)
+    let surplus_barracks_enabled = profile.surplus_steel_production.is_some_and(|policy| {
+        let (barracks_steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
+        actions.budget().steel() >= policy.reserve.saturating_add(barracks_steel)
+    });
+    if (production_uses_building(production_policy, EntityKind::Barracks)
+        || surplus_barracks_enabled)
+        && !delay_opening_barracks
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(&intents, EntityKind::Barracks)
             < target_barracks
@@ -398,6 +468,45 @@ where
         });
     }
 
+    let home_defensive_tank_ready = memory
+        .home_defensive_tank
+        .zip(facts.nearest_public_enemy_base)
+        .is_some_and(|(tank_id, enemy_base)| {
+            let distance = profile
+                .defensive_machine_gunners
+                .map(|policy| policy.perimeter_distance_tiles)
+                .unwrap_or(6.0);
+            home_defensive_tank_is_positioned(
+                observation,
+                tank_id,
+                enemy_base,
+                distance,
+                map_analysis,
+            )
+        });
+    if profile.home_anti_tank.is_some()
+        && home_defensive_tank_ready
+        && facts.building_count(EntityKind::Steelworks)
+            + planned_in_intents(&intents, EntityKind::Steelworks)
+            == 0
+        && !save_for_unplanned_expansion
+        && try_build_kind(
+            observation,
+            &facts,
+            &mut actions,
+            &builder_pools,
+            profile,
+            EntityKind::Steelworks,
+            build_search,
+            &mut placeable,
+        )
+        .is_some()
+    {
+        intents.push(AiIntent::Build {
+            kind: EntityKind::Steelworks,
+        });
+    }
+
     if !defensive_panic.active
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
@@ -426,9 +535,10 @@ where
     }
 
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
-    let tank_methamphetamines_pending = production_policy
-        .unit_priorities
-        .contains(&EntityKind::Tank)
+    let tank_methamphetamines_pending = profile.fast_tank_timing.is_none()
+        && production_policy
+            .unit_priorities
+            .contains(&EntityKind::Tank)
         && !facts
             .completed_upgrades()
             .contains(&UpgradeKind::Methamphetamines);
@@ -444,10 +554,29 @@ where
     if profile.turtle_defense.is_none() {
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
+    queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
+    let defensive_tank_started = memory.home_defensive_tank.is_some()
+        || (memory.containment_wave_launched
+            && observation.owned.iter().any(|entity| {
+                entity.kind == EntityKind::Factory
+                    && entity.production_kind == Some(EntityKind::Tank)
+            }));
+    if profile.home_anti_tank.is_some() && defensive_tank_started {
+        queue_upgrade_if_available(
+            &mut actions,
+            &facts,
+            memory,
+            &mut intents,
+            UpgradeKind::AntiTankGunUnlock,
+        );
+    }
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
+        profile,
         production_policy.unit_priorities,
         facts.completed_upgrades(),
     );
+    let effective_unit_priorities =
+        effective_unit_priorities_for_fast_tank_timing(profile, &facts, &effective_unit_priorities);
     let effective_unit_priorities = effective_unit_priorities_for_turtle(
         profile,
         memory,
@@ -461,15 +590,31 @@ where
         &facts,
         &effective_unit_priorities,
     );
+    let mut effective_unit_priorities = effective_unit_priorities;
+    if let Some(policy) = profile.surplus_steel_production {
+        let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
+        if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
+            && !effective_unit_priorities.contains(&policy.unit)
+        {
+            effective_unit_priorities.push(policy.unit);
+        }
+    }
+    if profile.home_anti_tank.is_some()
+        && memory.containment_wave_launched
+        && !effective_unit_priorities.contains(&EntityKind::AntiTankGun)
+    {
+        effective_unit_priorities.push(EntityKind::AntiTankGun);
+    }
     queue_required_unit_unlocks(
         &mut actions,
         &facts,
         production_policy.unit_priorities,
         memory,
         &mut intents,
+        profile,
     );
     let production_unit_counts =
-        unit_counts_for_priorities(observation, &facts, &effective_unit_priorities);
+        unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
@@ -484,6 +629,28 @@ where
             || save_for_required_tech_building)
             && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit)
             && !can_train_pre_tank_defensive_machine_gunner(profile, &facts, building_kind);
+        let mut building_max_counts = production_max_counts.clone();
+        if let Some(policy) = profile
+            .surplus_steel_production
+            .filter(|policy| producer_for_unit(policy.unit) == Some(building_kind))
+        {
+            let current = production_unit_counts
+                .iter()
+                .find_map(|(kind, count)| (*kind == policy.unit).then_some(*count))
+                .unwrap_or(0);
+            let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
+            let affordable_above_reserve = if unit_steel == 0 {
+                0
+            } else {
+                actions.budget().steel().saturating_sub(policy.reserve) as usize
+                    / unit_steel as usize
+            };
+            building_max_counts.retain(|(kind, _)| *kind != policy.unit);
+            building_max_counts.push((
+                policy.unit,
+                current.saturating_add(affordable_above_reserve),
+            ));
+        }
         let trained_units = actions::train_units(
             &mut actions,
             TrainUnitsRequest {
@@ -494,7 +661,7 @@ where
                 max_queue_depth: production_policy.queue_depth,
                 save_for_tech,
                 current_counts: &production_unit_counts,
-                max_counts: &production_max_counts,
+                max_counts: &building_max_counts,
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
         );
@@ -504,7 +671,6 @@ where
         }
     }
 
-    let skipped_workers = BTreeSet::new();
     let panic_support_oil = panic_plan.map(|plan| plan.oil_workers > 0).unwrap_or(false);
     let mut panic_oil_candidates = Vec::new();
     if panic_support_oil {
@@ -536,12 +702,19 @@ where
                 idle_only: !panic_support_oil,
                 allow_latched_reassignment: panic_support_oil,
                 max_assignments: Some(
-                    economy_plan.desired_oil_workers - economy_plan.current_oil_workers,
+                    (economy_plan.desired_oil_workers - economy_plan.current_oil_workers)
+                        .saturating_sub(opening_pump_followups_assigned),
                 ),
                 max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
                 remote_worker_assignment_fallback: economy_plan.remote_worker_assignment_fallback,
             },
         );
+        if memory.opening_first_pump_builder.is_none()
+            && facts.building_count(EntityKind::PumpJack) == 0
+        {
+            memory.opening_first_pump_builder =
+                assigned.first().map(|assignment| assignment.worker);
+        }
         if !assigned.is_empty() {
             intents.push(AiIntent::Gather {
                 resource: EntityKind::Oil,
@@ -585,24 +758,53 @@ where
     let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
     let defensive_machine_gunner_units: BTreeSet<u32> =
         defensive_machine_gunners.iter().copied().collect();
+    let mut frontal_exclusions = defensive_machine_gunner_units.clone();
+    if let Some(tank_id) = memory.home_defensive_tank {
+        frontal_exclusions.insert(tank_id);
+    }
+    sync_containment_recovery(observation, profile, memory);
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
         profile,
-        &defensive_machine_gunner_units,
+        &frontal_exclusions,
     );
     let ready_units_count = frontal_wave.ready_units.len();
     let attack_size = frontal_wave.desired_size;
     let attack_due = frontal_wave.attack_due;
-    let local_ready_units =
+    let mut local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
+    if profile.home_anti_tank.is_some() {
+        local_ready_units.retain(|id| {
+            Some(*id) != memory.home_defensive_tank
+                && observation.owned.iter().any(|entity| {
+                    entity.id == *id
+                        && entity.kind != EntityKind::AntiTankGun
+                        && (memory.home_defensive_tank.is_none()
+                            || entity.kind != EntityKind::MachineGunner)
+                })
+        });
+    }
     if !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !defensive_machine_gunners.is_empty()
     {
         let mut handled_local_defense = false;
         let mut local_defense_assigned = BTreeSet::new();
+        if profile.home_anti_tank.is_some() {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                if let Some(units) = stage_home_anti_tank_line(
+                    &mut actions,
+                    observation,
+                    profile,
+                    enemy_base,
+                    map_analysis,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
         if let Some(target) = local_defense_target(observation) {
             if let Some(units) = actions::attack_units(
                 &mut actions,
@@ -636,16 +838,56 @@ where
             }
         }
 
-        if !handled_local_defense
-            && !turtle_defense_active
-            && !defensive_machine_gunners_available.is_empty()
-        {
+        if !turtle_defense_active && !defensive_machine_gunners_available.is_empty() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(units) = stage_defensive_machine_gunner_perimeter(
+                let staged = if memory.home_defensive_tank.is_some() {
+                    let distance = profile
+                        .defensive_machine_gunners
+                        .map(|policy| policy.perimeter_distance_tiles)
+                        .unwrap_or(6.0)
+                        + profile
+                            .home_anti_tank
+                            .map(|policy| policy.machine_gunner_screen_tiles)
+                            .unwrap_or(0.0);
+                    stage_home_machine_gunner_screen(
+                        &mut actions,
+                        observation,
+                        &defensive_machine_gunners_available,
+                        enemy_base,
+                        distance,
+                        profile
+                            .home_anti_tank
+                            .map(|policy| policy.lateral_spacing_tiles)
+                            .unwrap_or(4.5),
+                    )
+                } else {
+                    stage_defensive_machine_gunner_perimeter(
+                        &mut actions,
+                        observation,
+                        profile,
+                        &defensive_machine_gunners_available,
+                        enemy_base,
+                    )
+                };
+                if let Some(units) = staged {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
+
+        if let Some(enemy_base) = facts.nearest_public_enemy_base {
+            if let Some(tank_id) = memory.home_defensive_tank {
+                let distance = profile
+                    .defensive_machine_gunners
+                    .map(|policy| policy.perimeter_distance_tiles)
+                    .unwrap_or(6.0);
+                if let Some(units) = stage_home_defensive_tank(
                     &mut actions,
                     observation,
-                    &defensive_machine_gunners_available,
+                    tank_id,
                     enemy_base,
+                    distance,
+                    map_analysis,
                 ) {
                     intents.push(AiIntent::Stage { units });
                 }
@@ -662,6 +904,7 @@ where
                     attack_policy,
                     &frontal_wave,
                     enemy_base,
+                    memory,
                 ) {
                     if let AiIntent::Attack { units } = &intent {
                         memory.note_attack_for(profile, attack_policy, observation.tick, units);
@@ -852,15 +1095,43 @@ fn unit_and_queue_count(observation: &AiObservation, kind: EntityKind) -> usize 
 }
 
 fn effective_unit_priorities_for_upgrades(
+    profile: &AiProfile,
     unit_priorities: &[EntityKind],
     completed_upgrades: &[UpgradeKind],
 ) -> Vec<EntityKind> {
+    if profile.fast_tank_timing.is_some() {
+        return unit_priorities.to_vec();
+    }
     let methamphetamines_ready = completed_upgrades.contains(&UpgradeKind::Methamphetamines);
     unit_priorities
         .iter()
         .copied()
         .filter(|unit| *unit != EntityKind::Tank || methamphetamines_ready)
         .collect()
+}
+
+fn effective_unit_priorities_for_fast_tank_timing(
+    profile: &AiProfile,
+    facts: &AiFacts,
+    unit_priorities: &[EntityKind],
+) -> Vec<EntityKind> {
+    let Some(timing) = profile.fast_tank_timing else {
+        return unit_priorities.to_vec();
+    };
+    let mut priorities: Vec<EntityKind> = unit_priorities
+        .iter()
+        .copied()
+        .filter(|unit| {
+            *unit != EntityKind::ScoutCar
+                || facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
+        })
+        .collect();
+    if facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
+        && facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target
+    {
+        priorities.sort_by_key(|unit| (*unit != EntityKind::ScoutCar) as u8);
+    }
+    priorities
 }
 
 fn effective_unit_priorities_for_turtle(
@@ -947,6 +1218,12 @@ fn production_max_counts(
             target_chokes.saturating_mul(policy.machine_gunners_per_choke),
         ));
     }
+    if let Some(timing) = profile.fast_tank_timing {
+        counts.push((EntityKind::ScoutCar, timing.scout_car_target));
+    }
+    if let Some(policy) = profile.home_anti_tank {
+        counts.push((EntityKind::AntiTankGun, policy.target_guns));
+    }
     counts
 }
 
@@ -1002,6 +1279,30 @@ fn queue_profile_upgrades(
     profile: &AiProfile,
 ) {
     for upgrade in profile.upgrade_priorities {
+        if profile.fast_tank_timing.is_some()
+            && *upgrade == UpgradeKind::TankUnlock
+            && facts.building_count(EntityKind::Factory) == 0
+        {
+            continue;
+        }
+        queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
+    }
+}
+
+fn queue_fast_tank_optional_upgrades(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
+) {
+    let Some(timing) = profile.fast_tank_timing else {
+        return;
+    };
+    if facts.unit_count(EntityKind::Tank) < timing.tanks_before_optional_upgrades {
+        return;
+    }
+    for upgrade in timing.optional_upgrades {
         queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
     }
 }
@@ -1012,11 +1313,18 @@ fn queue_required_unit_unlocks(
     unit_priorities: &[EntityKind],
     memory: &mut AiDecisionMemory,
     intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
 ) {
     for unit in unit_priorities {
         let Some(upgrade) = upgrade::required_for_unit(*unit) else {
             continue;
         };
+        if profile.fast_tank_timing.is_some()
+            && upgrade == UpgradeKind::TankUnlock
+            && facts.building_count(EntityKind::Factory) == 0
+        {
+            continue;
+        }
         queue_upgrade_if_available(actions, facts, memory, intents, upgrade);
     }
 }

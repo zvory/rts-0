@@ -27,6 +27,7 @@ pub(crate) struct AiProfile {
     pub(crate) workers: WorkerPolicy,
     pub(crate) buildings: BuildingPolicy,
     pub(crate) extra_factories: Option<ExtraFactoryPolicy>,
+    pub(crate) surplus_steel_production: Option<SurplusSteelProductionPolicy>,
     pub(crate) production: ProductionPolicy,
     pub(crate) upgrade_priorities: &'static [UpgradeKind],
     pub(crate) attack: AttackPolicy,
@@ -35,7 +36,22 @@ pub(crate) struct AiProfile {
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
+    pub(crate) expansion_containment: Option<ExpansionContainmentPolicy>,
+    pub(crate) home_anti_tank: Option<HomeAntiTankPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
+    pub(crate) fast_tank_timing: Option<FastTankTimingPolicy>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FastTankTimingPolicy {
+    pub(crate) workers_before_barracks: usize,
+    pub(crate) pump_jacks_before_barracks: usize,
+    pub(crate) first_pump_builder_additional_pump_jacks: usize,
+    pub(crate) tanks_before_scout_car: usize,
+    pub(crate) scout_car_target: usize,
+    pub(crate) tanks_before_optional_upgrades: usize,
+    pub(crate) optional_upgrades: &'static [UpgradeKind],
+    pub(crate) preserve_during_defensive_panic: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,6 +59,9 @@ pub(crate) struct WorkerPolicy {
     pub(crate) steel_saturation_fraction: Ratio,
     pub(crate) steel_worker_cap: Option<usize>,
     pub(crate) extra_oil_workers: usize,
+    pub(crate) extra_builder_workers: usize,
+    pub(crate) train_workers_for_oil: bool,
+    pub(crate) reuse_idle_before_training: bool,
 }
 
 impl WorkerPolicy {
@@ -93,7 +112,15 @@ pub(crate) struct BuildingPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ExtraFactoryPolicy {
     pub(crate) target_count: usize,
+    pub(crate) minimum_units: usize,
+    pub(crate) prerequisite_unit: EntityKind,
     pub(crate) resource_float: ResourceFloatThreshold,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SurplusSteelProductionPolicy {
+    pub(crate) reserve: u32,
+    pub(crate) unit: EntityKind,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -164,9 +191,11 @@ pub(crate) struct AttackPolicy {
     pub(crate) required_unit: Option<EntityKind>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
+    pub(crate) perimeter_distance_tiles: f32,
+    pub(crate) replacement_health_percent: Option<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -189,6 +218,28 @@ pub(crate) struct TurtleDefensePolicy {
 pub(crate) struct FrontalWavePolicy {
     pub(crate) exclude_launched_ticks: Option<u32>,
     pub(crate) line_staging: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ExpansionContainmentPolicy {
+    pub(crate) tank_standoff_tiles: f32,
+    pub(crate) scout_trailing_tiles: f32,
+    pub(crate) scout_forward_tiles: f32,
+    pub(crate) flank_tiles: f32,
+    pub(crate) contact_stop_tiles: f32,
+    pub(crate) minimum_tanks_to_continue: usize,
+    pub(crate) recovery_tanks_to_continue: usize,
+    pub(crate) additional_tanks_per_repush: usize,
+    pub(crate) repush_regroup_radius_tiles: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct HomeAntiTankPolicy {
+    pub(crate) defensive_tanks: usize,
+    pub(crate) target_guns: usize,
+    pub(crate) anti_tank_position_tiles: f32,
+    pub(crate) machine_gunner_screen_tiles: f32,
+    pub(crate) lateral_spacing_tiles: f32,
 }
 
 impl FrontalWavePolicy {
@@ -244,6 +295,9 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
         extra_oil_workers: 12,
+        extra_builder_workers: 0,
+        train_workers_for_oil: true,
+        reuse_idle_before_training: false,
     },
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {
@@ -259,8 +313,11 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
     },
     extra_factories: Some(ExtraFactoryPolicy {
         target_count: 2,
+        minimum_units: 0,
+        prerequisite_unit: EntityKind::Tank,
         resource_float: AI_2_1_SECOND_FACTORY_FLOAT_THRESHOLD,
     }),
+    surplus_steel_production: None,
     production: ProductionPolicy {
         queue_depth: 2,
         unit_priorities: &RIFLE_ONLY,
@@ -299,12 +356,18 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
+        target_count: 4,
+        perimeter_distance_tiles: 20.0,
+        replacement_health_percent: None,
+    }),
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(FRONTAL_COHORT_TICKS),
         line_staging: true,
     },
+    expansion_containment: None,
+    home_anti_tank: None,
     tech_transition: Some(TechTransitionPolicy {
         resource_float: AI_2_1_TANK_PRESSURE_FLOAT_THRESHOLD,
         required_tech_path: &TANK_TECH_PATH,
@@ -324,6 +387,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
             required_unit: None,
         },
     }),
+    fast_tank_timing: None,
 };
 
 pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
@@ -362,6 +426,8 @@ mod tests {
             AI_2_1.extra_factories,
             Some(ExtraFactoryPolicy {
                 target_count: 2,
+                minimum_units: 0,
+                prerequisite_unit: EntityKind::Tank,
                 resource_float: AI_2_1_SECOND_FACTORY_FLOAT_THRESHOLD,
             })
         );
