@@ -261,7 +261,11 @@ canary runs own a private server; the browser shard passes its existing loopback
   Each pass may select its own model through the manifest's `modelEnv`; the patch-note pass uses
   `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
   branches without runtime paths that may affect players, and qualifying branches receive one
-  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review. The specialist
+  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review. Qualifying
+  classifications use Codex repository review mode against the requested base; classifier
+  instructions travel over stdin, and the branch diff is inspected from the checkout rather than
+  embedded in a process argument. Regression coverage must keep prompt and diff content out of the
+  spawned command line so large branches remain portable across operating systems. The specialist
   patch-note pass is the sole owner of that tree: the adversarial pass is instructed not to edit
   `patch-notes/`, and a post-pass tree-and-history check fails before push if it creates, edits,
   deletes, or commits and restores a fragment.

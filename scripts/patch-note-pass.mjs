@@ -10,7 +10,6 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
 const defaultSchema = path.join(scriptDir, "patch-note-pass.schema.json");
-const MAX_DIFF_CHARS = 60000;
 const MAX_DISCORD_BULLETS = 3;
 const MAX_DISCORD_MESSAGE_CHARS = 240;
 const OVERSIZED_DISCORD_FALLBACK = "• Gameplay changed; see the full patch notes for details.";
@@ -59,7 +58,12 @@ export function parseArgs(argv) {
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, { cwd: options.cwd, encoding: "utf8", env: { ...process.env, ...(options.env || {}) } });
+  const result = spawnSync(command, args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    env: { ...process.env, ...(options.env || {}) },
+    input: options.input,
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr?.trim() || result.stdout?.trim() || `${command} exited ${result.status}`);
   return result.stdout.trim();
@@ -223,10 +227,11 @@ export function renderFragment({ branch, date, decision }) {
   return lines.join("\n");
 }
 
-function renderPrompt({ baseRef, branch, changedPaths, diff, existingFragment, fragmentPath }) {
+function renderPrompt({ baseRef, branch, changedPaths, existingFragment, fragmentPath }) {
   return `You are the player-impact and patch-note pass for an RTS pull request.
 
-Classify the complete branch diff from ${baseRef} to HEAD using this scope:
+Codex review mode gives you the complete repository diff from ${baseRef} to HEAD. Inspect that diff
+and any relevant repository files needed to classify it using this scope:
 
 ${PATCH_NOTE_SCOPE}
 
@@ -249,10 +254,27 @@ ${changedPaths.join("\n")}
 
 Existing fragment, if any:
 ${existingFragment || "<none>"}
-
-Bounded diff:
-${diff}
 `;
+}
+
+export function buildCodexArgs({ repoRoot, baseRef, schemaFile, outputFile, codexModel }) {
+  const args = [
+    "exec",
+    "--cd",
+    repoRoot,
+    "--sandbox",
+    "read-only",
+    "-c",
+    'approval_policy="never"',
+    "--ephemeral",
+    "--output-schema",
+    schemaFile,
+    "--output-last-message",
+    outputFile,
+  ];
+  if (codexModel) args.push("--model", codexModel);
+  args.push("review", "--base", baseRef, "-");
+  return args;
 }
 
 function existingFragmentPath(repoRoot, baseRef, branch, slug) {
@@ -376,10 +398,8 @@ export function execute(options) {
   if (!existing && fs.existsSync(fragmentPath)) {
     throw new Error(`refusing to overwrite base-owned patch-note fragment ${relativePath}`);
   }
-  const diff = git(options.repoRoot, ["diff", "--no-ext-diff", "--unified=3", `${options.baseRef}...HEAD`, "--", ...candidates]);
-  const boundedDiff = diff.length > MAX_DIFF_CHARS ? `${diff.slice(0, MAX_DIFF_CHARS)}\n[diff truncated]` : diff;
   const prompt = renderPrompt({
-    baseRef: options.baseRef, branch, changedPaths, diff: boundedDiff,
+    baseRef: options.baseRef, branch, changedPaths,
     existingFragment: existing ? fs.readFileSync(existing, "utf8") : "", fragmentPath: relativePath,
   });
   if (options.dryRun) {
@@ -389,12 +409,16 @@ export function execute(options) {
   }
   if (!fs.existsSync(options.schemaFile)) throw new Error(`missing patch-note schema: ${options.schemaFile}`);
   const outputFile = path.join(os.tmpdir(), `rts-patch-note-pass-${process.pid}.json`);
-  const args = ["exec", "--cd", options.repoRoot, "--sandbox", "read-only", "-c", 'approval_policy="never"', "--ephemeral", "--output-schema", options.schemaFile, "--output-last-message", outputFile];
-  if (options.codexModel) args.push("--model", options.codexModel);
-  args.push(prompt);
+  const args = buildCodexArgs({
+    repoRoot: options.repoRoot,
+    baseRef: options.baseRef,
+    schemaFile: options.schemaFile,
+    outputFile,
+    codexModel: options.codexModel,
+  });
   try {
     process.stdout.write(`patch-note-pass: classifying ${candidates.length} gameplay candidate path(s)\n`);
-    run(options.codexCommand, args, { cwd: options.repoRoot });
+    run(options.codexCommand, args, { cwd: options.repoRoot, input: prompt });
     const decision = normalizeDecision(JSON.parse(fs.readFileSync(outputFile, "utf8")));
     if (decision.decision === "write_patch_note") {
       fs.mkdirSync(path.dirname(fragmentPath), { recursive: true });

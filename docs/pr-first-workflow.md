@@ -9,8 +9,9 @@ The normal agent lifecycle is:
    Before the quality pass, the helper archives any plan newly completed by the branch and commits
    that move, so the archive lands in the final phase PR rather than as a post-merge local change.
    It then runs the ordered specialist passes in `scripts/agent-pr-passes.json`. The patch-note pass
-   uses a bounded branch diff and creates or refreshes one dated, branch-keyed fragment only for a
-   change to an active participant's experience in an ordinary live match. Spectator/observer,
+   runs Codex repository review mode against the base branch, with its classifier instructions sent
+   over stdin, and creates or refreshes one dated, branch-keyed fragment only for a change to an
+   active participant's experience in an ordinary live match. Spectator/observer,
    replay, match-history, Lab/dev, lobby/setup, and analysis-only changes are explicitly excluded,
    even when they are user-facing. Each configured pass can select its own Codex model through its
    `modelEnv` setting. The final adversarial pass runs after all specialist edits but does not own
