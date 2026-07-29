@@ -200,6 +200,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/expansion.rs",
   "server/crates/ai/src/ai_core/decision/frontal.rs",
   "server/crates/ai/src/ai_core/decision/harassment.rs",
+  // Decision memory retains existing current-roster unit checks moved verbatim from the approved
+  // decision orchestrator; faction admission and roster ownership remain elsewhere.
+  "server/crates/ai/src/ai_core/decision/memory.rs",
   "server/crates/ai/src/ai_core/decision/mod.rs",
   "server/crates/ai/src/ai_core/decision/production.rs",
   "server/crates/ai/src/ai_core/decision/proxy.rs",
