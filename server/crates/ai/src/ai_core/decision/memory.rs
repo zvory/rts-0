@@ -1,4 +1,16 @@
-use super::*;
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::ai_core::observation::AiObservation;
+use crate::ai_core::profiles::{AiProfile, AttackPolicy};
+use crate::config;
+use rts_sim::game::entity::EntityKind;
+use rts_sim::game::upgrade::UpgradeKind;
+
+use super::defense::{
+    DefensivePanic, DefensivePanicResponse, DEFENSIVE_PANIC_GRACE_TICKS,
+    DEFENSIVE_PANIC_SUSTAINED_TICKS,
+};
+use super::geometry;
 
 const CITY_CENTRE_RESUME_SAFE_TICKS: u32 = config::TICK_HZ * 3;
 
@@ -310,4 +322,20 @@ impl AiDecisionMemory {
                 .min(policy.opening_riflemen);
         }
     }
+}
+
+fn unit_and_queue_count(observation: &AiObservation, kind: EntityKind) -> usize {
+    let units = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == kind)
+        .count();
+    let queued = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.is_complete)
+        .filter(|entity| entity.production_kind == Some(kind))
+        .map(|entity| entity.production_queue_len.unwrap_or(0))
+        .sum::<usize>();
+    units.saturating_add(queued)
 }

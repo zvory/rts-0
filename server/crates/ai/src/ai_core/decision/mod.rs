@@ -40,9 +40,8 @@ use self::defense::{
     defensive_panic_response, home_defensive_tank_is_positioned, local_defense_target,
     local_defense_units, machine_gunner_meets_replacement_health,
     stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
-    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, DefensivePanic,
-    DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_GRACE_TICKS,
-    DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
+    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
+    DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
@@ -1076,22 +1075,6 @@ fn turtle_barracks_target(profile: &AiProfile, facts: &AiFacts, base_target: usi
         return base_target.min(1);
     }
     base_target.max(policy.support_barracks_target)
-}
-
-fn unit_and_queue_count(observation: &AiObservation, kind: EntityKind) -> usize {
-    let units = observation
-        .owned
-        .iter()
-        .filter(|entity| entity.kind == kind)
-        .count();
-    let queued = observation
-        .owned
-        .iter()
-        .filter(|entity| entity.is_complete)
-        .filter(|entity| entity.production_kind == Some(kind))
-        .map(|entity| entity.production_queue_len.unwrap_or(0))
-        .sum::<usize>();
-    units.saturating_add(queued)
 }
 
 fn effective_unit_priorities_for_upgrades(
