@@ -8,6 +8,7 @@ import { loadPasses, markdownSummary, parseArgs as parseRunnerArgs } from "../sc
 import {
   PATCH_NOTE_SCOPE,
   branchSlug,
+  buildCodexArgs,
   isGameplayCandidate,
   normalizeDecision,
   parseArgs as parsePatchArgs,
@@ -36,6 +37,35 @@ assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
 assert.equal(parsePatchArgs(["--delivery-ref", "abc123"]).deliveryRef, "abc123");
 assert.deepEqual(parsePatchArgs(["--delivery-path", "patch-notes/note.md"]).deliveryPaths, ["patch-notes/note.md"]);
 assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
+assert.deepEqual(
+  buildCodexArgs({
+    repoRoot: "/tmp/repo",
+    baseRef: "origin/main",
+    schemaFile: "/tmp/schema.json",
+    outputFile: "/tmp/output.json",
+    codexModel: "small-model",
+  }),
+  [
+    "exec",
+    "--cd",
+    "/tmp/repo",
+    "--sandbox",
+    "read-only",
+    "-c",
+    'approval_policy="never"',
+    "--ephemeral",
+    "--output-schema",
+    "/tmp/schema.json",
+    "--output-last-message",
+    "/tmp/output.json",
+    "--model",
+    "small-model",
+    "review",
+    "--base",
+    "origin/main",
+    "-",
+  ],
+);
 
 const normalizedPatchNoteScope = PATCH_NOTE_SCOPE.replace(/\s+/g, " ");
 assert.match(normalizedPatchNoteScope, /only when the branch changes the experience of an active participant playing an ordinary live match/);
@@ -239,8 +269,10 @@ set -euo pipefail
 output=""
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then output="$2"; shift; fi
+  printf '%s\\n' "$1" >> "${fakeCodex}.args"
   shift
 done
+cat > "${fakeCodex}.stdin"
 printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_watch":[],"reason":"The rules edit is not player-facing."}' > "$output"
 `, { mode: 0o755 });
 
@@ -252,6 +284,22 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   ]);
   const { execute } = await import("../scripts/patch-note-pass.mjs");
   execute(patchOptions);
+
+  const codexArgs = fs.readFileSync(`${fakeCodex}.args`, "utf8").trim().split("\n");
+  assert.deepEqual(
+    codexArgs.slice(-4),
+    ["review", "--base", "origin/main", "-"],
+    "patch-note classification should use repository review mode against the requested base",
+  );
+  assert.equal(
+    codexArgs.some((arg) => arg.includes("Bounded diff") || arg.includes("const RANGE")),
+    false,
+    "the classifier prompt and branch diff must not be passed as command-line arguments",
+  );
+  const codexPrompt = fs.readFileSync(`${fakeCodex}.stdin`, "utf8");
+  assert.match(codexPrompt, /complete repository diff from origin\/main to HEAD/);
+  assert.match(codexPrompt, /server\/crates\/rules\/src\/fixture\.rs/);
+  assert.doesNotMatch(codexPrompt, /const RANGE/, "the branch diff should be inspected from the repository, not embedded in stdin");
 
   assert.equal(fs.existsSync(staleFragment), false, "a no-patch-note decision should remove the branch-owned fragment");
   assert.equal(
@@ -331,6 +379,8 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
 } finally {
   fs.rmSync(lifecycleRoot, { recursive: true, force: true });
   fs.rmSync(fakeCodex, { force: true });
+  fs.rmSync(`${fakeCodex}.args`, { force: true });
+  fs.rmSync(`${fakeCodex}.stdin`, { force: true });
 }
 
 console.log("agent PR passes tests passed");
