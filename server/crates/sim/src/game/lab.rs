@@ -1376,6 +1376,7 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         | Command::Research { building, .. }
         | Command::Cancel { building, .. }
         | Command::SetRally { building, .. } => vec![*building],
+        Command::SetAutoBuildSettings { .. } => Vec::new(),
     }
 }
 

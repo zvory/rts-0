@@ -47,6 +47,7 @@ use std::collections::HashMap;
 const MAX_RALLY_STAGES: usize = 4;
 const MIN_FORMATION_POINT_DISTANCE_PX: f32 = 2.0;
 mod artillery_scatter;
+mod auto_build;
 mod cancel;
 mod command_helpers;
 mod guards;
@@ -621,6 +622,9 @@ pub(in crate::game) fn apply_commands(
                     delta,
                     command_admission.max_units_per_command,
                 );
+            }
+            command @ SimCommand::SetAutoBuildSettings { .. } => {
+                auto_build::apply(players, player, command)
             }
             SimCommand::Research { building, upgrade } => {
                 let definition = upgrade::definition(upgrade);

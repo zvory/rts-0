@@ -1,6 +1,73 @@
 use super::*;
 
 #[test]
+fn production_repeat_adjustment_protocol_round_trip() {
+    let command = SimCommand::AdjustProductionRepeat {
+        buildings: vec![3, 5, 7],
+        unit: EntityKind::ScoutCar,
+        delta: -1,
+    };
+    let protocol = command
+        .to_protocol()
+        .expect("production repeat adjustment should encode");
+    let encoded = serde_json::to_string(&protocol).expect("command should serialize");
+    assert_eq!(
+        encoded,
+        r#"{"c":"adjustProductionRepeat","buildings":[3,5,7],"unit":"scout_car","delta":-1}"#
+    );
+    assert_eq!(SimCommand::from_protocol(protocol), command);
+}
+
+#[test]
+fn auto_build_settings_protocol_round_trip() {
+    let command = SimCommand::SetAutoBuildSettings {
+        paused: true,
+        reserve_steel: 250,
+        reserve_oil: 150,
+    };
+    let protocol = command
+        .to_protocol()
+        .expect("Auto-Build settings should encode");
+    let encoded = serde_json::to_string(&protocol).expect("command should serialize");
+    assert_eq!(
+        encoded,
+        r#"{"c":"setAutoBuildSettings","paused":true,"reserveSteel":250,"reserveOil":150}"#
+    );
+    assert_eq!(SimCommand::from_protocol(protocol), command);
+}
+
+#[test]
+fn auto_build_settings_are_player_scoped_and_clamped() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::SetAutoBuildSettings {
+                paused: true,
+                reserve_steel: u32::MAX,
+                reserve_oil: 250,
+            },
+        )],
+    );
+
+    assert_eq!(
+        players[0].auto_build,
+        crate::game::AutoBuildSettings {
+            paused: true,
+            reserve_steel: 9_950,
+            reserve_oil: 250,
+        }
+    );
+    assert_eq!(players[1].auto_build, Default::default());
+}
+
+#[test]
 fn repeat_adjustments_spread_across_least_loaded_producers_with_stable_id_ties() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

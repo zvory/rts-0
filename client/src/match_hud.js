@@ -17,7 +17,7 @@ export function createMatchHud(match, rootEl) {
   );
 }
 
-/** Compose the transient, browser-local hold-Tab menu for a controllable live player. */
+/** Compose the authoritative hold-Tab Auto-Build menu for a controllable live player. */
 export function createMatchTabMenu(match, rootEl, button) {
   if (!matchTabMenuAvailable(match)) return null;
   return new TabMenu({
@@ -25,6 +25,8 @@ export function createMatchTabMenu(match, rootEl, button) {
     button,
     settings: match.settings,
     hotkeyProfiles: match.hotkeyProfiles,
+    state: match.state,
+    commandInteraction: match.commandInteraction,
     enabled: () => match.running !== false,
   });
 }

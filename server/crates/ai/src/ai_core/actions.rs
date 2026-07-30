@@ -304,6 +304,14 @@ fn command_trace_label(command: &Command) -> String {
             unit,
             delta
         ),
+        Command::SetAutoBuildSettings {
+            paused,
+            reserve_steel,
+            reserve_oil,
+        } => format!(
+            "set_auto_build_settings paused={} reserve_steel={} reserve_oil={}",
+            paused, reserve_steel, reserve_oil
+        ),
         Command::Research { building, upgrade } => {
             format!("research building={} upgrade={:?}", building, upgrade)
         }

@@ -98,6 +98,7 @@ export const CMD = Object.freeze({
   BUILD: "build",
   TRAIN: "train",
   ADJUST_PRODUCTION_REPEAT: "adjustProductionRepeat",
+  SET_AUTO_BUILD_SETTINGS: "setAutoBuildSettings",
   RESEARCH: "research",
   CANCEL: "cancel",
   STOP: "stop",
@@ -300,7 +301,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 47;
+export const COMPACT_SNAPSHOT_VERSION = 48;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",

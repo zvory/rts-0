@@ -1,4 +1,5 @@
 import { createCommandButton } from "./hud_command_dom.js";
+import { cmd } from "./protocol.js";
 import { resourceIconHtml } from "./resource_icons.js";
 
 const DEFAULT_RESERVATIONS = Object.freeze({ steel: 200, oil: 100 });
@@ -7,10 +8,7 @@ const RESERVATION_MAX = 9_950;
 const POINTER_HOLD_DELAY_MS = 200;
 
 /**
- * Browser-local prototype for the hold-Tab in-game menu.
- *
- * The state deliberately does not enter GameState or the wire protocol. Interact may emulate the
- * held key through the narrow hold/release actions so the panel can be captured deterministically.
+ * Hold-Tab controls for the player's authoritative automatic-production settings.
  */
 export class TabMenu {
   constructor({
@@ -18,6 +16,8 @@ export class TabMenu {
     button,
     settings = null,
     hotkeyProfiles = null,
+    state = null,
+    commandInteraction = null,
     enabled = () => true,
     windowLike = globalThis.window,
   } = {}) {
@@ -25,10 +25,14 @@ export class TabMenu {
     this.button = button || null;
     this.settings = settings;
     this.hotkeyProfiles = hotkeyProfiles;
+    this.state = state;
+    this.commandInteraction = commandInteraction;
     this.enabled = enabled;
     this.windowLike = windowLike;
-    this.paused = false;
-    this.reservations = { ...DEFAULT_RESERVATIONS };
+    const initial = authoritativeSettings(this.state);
+    this.paused = initial.paused;
+    this.reservations = { steel: initial.reserveSteel, oil: initial.reserveOil };
+    this.pendingClientSeq = null;
     this.heldBy = new Set();
     this.destroyed = false;
     this.pointerHoldTimer = null;
@@ -89,6 +93,7 @@ export class TabMenu {
   }
 
   status() {
+    this.syncFromState();
     const profile = this.hotkeyProfiles?.getActiveProfile?.();
     return {
       visible: this.isOpen(),
@@ -165,7 +170,7 @@ export class TabMenu {
 
   togglePause() {
     this.paused = !this.paused;
-    this.render();
+    this.commitSettings();
     return this.status();
   }
 
@@ -176,8 +181,44 @@ export class TabMenu {
       0,
       Math.min(RESERVATION_MAX, this.reservations[resource] + direction * RESERVATION_STEP),
     );
-    this.render();
+    this.commitSettings();
     return this.status();
+  }
+
+  commitSettings() {
+    const issued = this.commandInteraction?.issueCommand?.(
+      cmd.setAutoBuildSettings(
+        this.paused,
+        this.reservations.steel,
+        this.reservations.oil,
+      ),
+      { predictMovement: false },
+    );
+    if (issued?.sent && Number.isInteger(issued.clientSeq)) {
+      this.pendingClientSeq = Math.max(this.pendingClientSeq || 0, issued.clientSeq);
+    } else if (this.commandInteraction && issued !== true) {
+      this.syncFromState({ force: true });
+    }
+    this.render();
+  }
+
+  syncFromState({ force = false } = {}) {
+    if (!this.state) return;
+    const ack = Number(this.state.autoBuild?.ack);
+    if (
+      !force &&
+      Number.isInteger(this.pendingClientSeq) &&
+      (!Number.isInteger(ack) || ack < this.pendingClientSeq)
+    ) {
+      return;
+    }
+    if (Number.isInteger(this.pendingClientSeq) && Number.isInteger(ack) && ack >= this.pendingClientSeq) {
+      this.pendingClientSeq = null;
+    }
+    const next = authoritativeSettings(this.state);
+    this.paused = next.paused;
+    this.reservations.steel = next.reserveSteel;
+    this.reservations.oil = next.reserveOil;
   }
 
   interact(input = {}) {
@@ -217,8 +258,8 @@ export class TabMenu {
     const action = {
       Digit1: ["steel", -1],
       Digit2: ["steel", 1],
-      Digit3: ["oil", 1],
-      Digit4: ["oil", -1],
+      Digit3: ["oil", -1],
+      Digit4: ["oil", 1],
     }[event.code];
     if (!action) return;
     consume(event);
@@ -268,9 +309,7 @@ export class TabMenu {
     reservations.className = "tab-menu-reservations";
     reservations.append(
       this.reservationRow("steel", "Minimum Steel Reserve", "1", "2"),
-      // The requested prototype binds Oil increase to 3 and decrease to 4, so the visual minus
-      // and plus controls intentionally carry the reversed numeric order.
-      this.reservationRow("oil", "Minimum Oil Reserve", "4", "3"),
+      this.reservationRow("oil", "Minimum Oil Reserve", "3", "4"),
     );
 
     this.panel.replaceChildren(title, intro, pauseRow, reservations);
@@ -323,6 +362,7 @@ export class TabMenu {
     this.pointerId = null;
     this.pointerHoldOpened = false;
     this.suppressNextButtonClick = false;
+    this.pendingClientSeq = null;
     this.windowLike?.removeEventListener("keydown", this.onKeyDown, true);
     this.windowLike?.removeEventListener("keyup", this.onKeyUp, true);
     this.windowLike?.removeEventListener("blur", this.onBlur);
@@ -341,6 +381,19 @@ export class TabMenu {
     }
     this.panel.remove();
   }
+}
+
+function authoritativeSettings(state) {
+  const settings = state?.autoBuild;
+  return {
+    paused: settings?.paused === true,
+    reserveSteel: boundedReserve(settings?.reserveSteel, DEFAULT_RESERVATIONS.steel),
+    reserveOil: boundedReserve(settings?.reserveOil, DEFAULT_RESERVATIONS.oil),
+  };
+}
+
+function boundedReserve(value, fallback) {
+  return Number.isInteger(value) && value >= 0 && value <= RESERVATION_MAX ? value : fallback;
 }
 
 function consume(event) {

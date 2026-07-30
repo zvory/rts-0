@@ -10,6 +10,7 @@ import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import { admitControlGroupIds } from "./state_control_groups.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
+import { autoBuild as ab } from "./state_auto_build.js";
 import {
   isAllyOwner as queryIsAllyOwner,
   isEnemyOwner as queryIsEnemyOwner,
@@ -104,6 +105,7 @@ export class GameState extends VisualEffectBackedState {
     // --- derived latest state ---
     /** @type {{steel:number,oil:number,supplyUsed:number,supplyCap:number}} */
     this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+    this.autoBuild = ab();
     /** @type {Array<{id:number,steel:number,oil:number,supplyUsed:number,supplyCap:number,apm:number}>} */
     this.playerResources = [];
     /** @type {Array<object>} latest snapshot's transient events. */
@@ -333,6 +335,7 @@ export class GameState extends VisualEffectBackedState {
       supplyUsed: msg.supplyUsed | 0,
       supplyCap: msg.supplyCap | 0,
     };
+    this.autoBuild = ab(msg.autoBuild, msg.netStatus);
     this.playerResources = msg.playerResources || [];
     this.upgrades = Array.isArray(msg.upgrades) ? msg.upgrades : [];
     this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];

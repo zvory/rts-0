@@ -42,6 +42,7 @@ export function decodeCompactSnapshot(raw) {
     oil: readU32(scalars[2], "oil"),
     supplyUsed: readU32(scalars[3], "supplyUsed"),
     supplyCap: readU32(scalars[4], "supplyCap"),
+    autoBuild: decodeAutoBuildSettings(raw.ab),
     entities: readArray(raw.e, "entities", MAX_COMPACT_ENTITIES).map(decodeCompactEntity),
     resourceDeltas: readOptionalArray(
       raw.r,
@@ -75,6 +76,17 @@ export function decodeCompactSnapshot(raw) {
       readCode(code, UPGRADE_BY_CODE, `upgrade.${index}`),
     ),
     netStatus: decodeCompactNetStatus(raw.n),
+  };
+}
+
+function decodeAutoBuildSettings(record) {
+  if (record == null) return null;
+  const fields = readArray(record, "autoBuild", 3);
+  if (fields.length !== 3) throw new Error("autoBuild field count mismatch");
+  return {
+    paused: readBool(fields[0], "autoBuild.paused"),
+    reserveSteel: readU32(fields[1], "autoBuild.reserveSteel"),
+    reserveOil: readU32(fields[2], "autoBuild.reserveOil"),
   };
 }
 

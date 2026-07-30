@@ -583,6 +583,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::Deconstruct { .. }
             | WireCommand::Train { .. }
             | WireCommand::AdjustProductionRepeat { .. }
+            | WireCommand::SetAutoBuildSettings { .. }
             | WireCommand::Research { .. }
             | WireCommand::Cancel { .. }
             | WireCommand::Stop { .. }
@@ -744,6 +745,7 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         | rts_sim::game::command::SimCommand::Deconstruct { units, .. } => Some(units),
         rts_sim::game::command::SimCommand::Train { .. }
         | rts_sim::game::command::SimCommand::AdjustProductionRepeat { .. }
+        | rts_sim::game::command::SimCommand::SetAutoBuildSettings { .. }
         | rts_sim::game::command::SimCommand::Research { .. }
         | rts_sim::game::command::SimCommand::Cancel { .. }
         | rts_sim::game::command::SimCommand::SetRally { .. }
@@ -1198,6 +1200,7 @@ mod tests {
             oil: 0,
             supply_used: 0,
             supply_cap: 0,
+            auto_build: None,
             entities,
             resource_deltas: Vec::new(),
             smokes: Vec::new(),

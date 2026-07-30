@@ -334,6 +334,9 @@ pub struct Snapshot {
     pub oil: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
+    /// Authoritative settings for the player whose private resources this snapshot projects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_build: Option<AutoBuildSettingsSnapshot>,
     pub entities: Vec<EntityView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resource_deltas: Vec<ResourceDelta>,
@@ -364,6 +367,14 @@ pub struct Snapshot {
     pub player_resources: Vec<PlayerResourceSnapshot>,
     /// Per-recipient server/network diagnostics for the current match.
     pub net_status: SnapshotNetStatus,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoBuildSettingsSnapshot {
+    pub paused: bool,
+    pub reserve_steel: u32,
+    pub reserve_oil: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

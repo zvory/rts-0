@@ -210,6 +210,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
         oil: 0,
         supply_used: 1,
         supply_cap: 10,
+        auto_build: None,
         entities: vec![EntityView::new(
             1,
             1,
@@ -1197,6 +1198,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
         oil: 0,
         supply_used: 1,
         supply_cap: 10,
+        auto_build: None,
         entities: vec![
             EntityView::new(1, 1, kinds::WORKER, 10.0, 20.0, 40, 40, "idle"),
             EntityView::new(2, 0, kinds::STEEL, 30.0, 40.0, 1, 1, "idle"),
@@ -1242,6 +1244,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
         oil: 0,
         supply_used: 1,
         supply_cap: 10,
+        auto_build: None,
         entities: vec![EntityView::new(
             1,
             1,

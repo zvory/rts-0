@@ -158,7 +158,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 47;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 48;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -553,6 +553,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ("BUILD", "build"),
             ("TRAIN", "train"),
             ("ADJUST_PRODUCTION_REPEAT", "adjustProductionRepeat"),
+            ("SET_AUTO_BUILD_SETTINGS", "setAutoBuildSettings"),
             ("RESEARCH", "research"),
             ("CANCEL", "cancel"),
             ("STOP", "stop"),

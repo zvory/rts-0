@@ -10,6 +10,11 @@ use crate::game::checkpoint::CheckpointPayloadError;
 #[test]
 fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
     let mut baseline = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2001);
+    baseline.state.players[0].auto_build = AutoBuildSettings {
+        paused: true,
+        reserve_steel: 250,
+        reserve_oil: 150,
+    };
     baseline.tick();
 
     let mut restored =
@@ -19,6 +24,26 @@ fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
         &mut restored,
         "basic payload continuation after text import",
     );
+}
+
+#[test]
+fn checkpoint_payload_rejects_out_of_range_auto_build_reserve() {
+    let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2002);
+    let text = checkpoint_payload_text_for(&game, "invalid Auto-Build reserve fixture");
+    let invalid = mutate_payload(&text, |value| {
+        value["players"][0]["autoBuild"]["reserveSteel"] = serde_json::json!(9_951);
+    });
+
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &invalid,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "players.autoBuild",
+        })
+    ));
 }
 
 #[test]

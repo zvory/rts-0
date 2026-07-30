@@ -387,6 +387,7 @@ mod tests {
             oil: 25,
             supply_used: 3,
             supply_cap: 10,
+            auto_build: None,
             entities: Vec::new(),
             resource_deltas: Vec::new(),
             smokes: Vec::new(),

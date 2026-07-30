@@ -232,6 +232,11 @@ impl Game {
             oil,
             supply_used,
             supply_cap,
+            auto_build: ps.map(|player| AutoBuildSettingsSnapshot {
+                paused: player.auto_build.paused,
+                reserve_steel: player.auto_build.reserve_steel,
+                reserve_oil: player.auto_build.reserve_oil,
+            }),
             entities,
             resource_deltas,
             smokes,

@@ -362,9 +362,20 @@ try {
   await page.waitForFunction(() => !document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
   await page.keyboard.press("2");
   await page.keyboard.press("3");
+  await page.keyboard.press("4");
+  await page.keyboard.press("4");
   await page.keyboard.press("q");
   await page.evaluate(() => window.__rts.hotkeyProfiles.setActiveProfile("preset.classicRts"));
   await page.keyboard.press("a");
+  await page.waitForFunction(
+    () => {
+      const settings = window.__rts.match.state.autoBuild;
+      return settings?.paused === false &&
+        settings.reserveSteel === 250 &&
+        settings.reserveOil === 150;
+    },
+    { timeout: 2000 },
+  );
   const tabMenuPrototype = await page.evaluate(() => ({
     ...window.__rts.match.tabMenu.status(),
     repeatConsumed: !window.dispatchEvent(new KeyboardEvent("keydown", {
@@ -381,7 +392,7 @@ try {
       tabMenuPrototype.pauseHotkey === "A" &&
       tabMenuPrototype.reservations.steel === 250 &&
       tabMenuPrototype.reservations.oil === 150,
-    `TAB MENU: held Tab accepts Grid/Classic pause and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
+    `TAB MENU: held Tab sends authoritative Grid/Classic pause and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
   );
   await page.evaluate(() => {
     window.__rts.hotkeyProfiles.setActiveProfile("preset.grid");

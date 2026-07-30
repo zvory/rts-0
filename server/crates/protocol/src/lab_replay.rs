@@ -598,6 +598,7 @@ fn validate_command(
         Command::AdjustProductionRepeat { buildings, .. } => {
             validate_unit_list(buildings, unit_cap, "command.buildings", state)?;
         }
+        Command::SetAutoBuildSettings { .. } => {}
         Command::Train { building, .. }
         | Command::Research { building, .. }
         | Command::Cancel { building, .. } => {

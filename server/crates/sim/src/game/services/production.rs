@@ -76,7 +76,9 @@ pub(crate) fn production_system(
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
                 let supply_available = player.can_reserve_supply(supply);
-                if upgrade_met && supply_available && player.spend_cost(cost) {
+                let auto_build_allowed = player.can_auto_build(cost);
+                if upgrade_met && supply_available && auto_build_allowed && player.spend_cost(cost)
+                {
                     if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
                             let queued = producer.push_production(ProdItem {
@@ -769,6 +771,7 @@ mod tests {
             score: ScoreState::default(),
             upgrades: Default::default(),
             ability_cooldowns: Default::default(),
+            auto_build: Default::default(),
         }
     }
 

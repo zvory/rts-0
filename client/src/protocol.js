@@ -321,6 +321,12 @@ export const cmd = Object.freeze({
     unit,
     delta,
   }),
+  setAutoBuildSettings: (paused, reserveSteel, reserveOil) => ({
+    c: CMD.SET_AUTO_BUILD_SETTINGS,
+    paused: !!paused,
+    reserveSteel,
+    reserveOil,
+  }),
   research: (building, upgrade) => ({ c: CMD.RESEARCH, building, upgrade }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   cancelConstruction: (building) => ({ c: CMD.CANCEL, building, construction: true }),
