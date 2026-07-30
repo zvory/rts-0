@@ -689,6 +689,7 @@ export class App {
     });
     return this.rendererPreparationSlot.warm(
       () => prepareRenderer(dom.viewport, rendererBackendBundle),
+      { compatibilityKey: rendererBackendBundle?.id || "pixi" },
     );
   }
 
@@ -760,11 +761,17 @@ export class App {
     }
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
+    const matchRendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
+      spectator: payload?.spectator,
+      replay: startsReplay,
+      lab: !!labMetadata,
+    });
     const rendererPreparation = await settleRendererPreparationForStart(
       this.rendererPreparationSlot,
       {
         replay: startsReplay,
         lab: !!labMetadata,
+        compatibilityKey: matchRendererBackendBundle?.id || "pixi",
       },
     );
     if (labMetadata) {
@@ -811,11 +818,7 @@ export class App {
         initialVisionSelection,
         // ReplayViewer always constructs Pixi, and ordinary spectators remain on Pixi even when
         // this page explicitly selected the experimental Babylon live-player renderer.
-        rendererBackendBundle: rendererBackendBundleForMatch(this.rendererBackendBundle, {
-          spectator: payload?.spectator,
-          replay: startsReplay,
-          lab: !!labMetadata,
-        }),
+        rendererBackendBundle: matchRendererBackendBundle,
         rendererPreparation,
         isStartCurrent: () => generation === this.matchStartGeneration,
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),

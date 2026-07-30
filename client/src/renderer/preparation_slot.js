@@ -18,13 +18,14 @@ export class RendererPreparationSlot {
     this._setTimer = setTimer;
     this._clearTimer = clearTimer;
     this._current = null;
+    this._disposalBarrier = Promise.resolve();
   }
 
   get current() {
     return this._current;
   }
 
-  warm(createPreparation) {
+  warm(createPreparation, { compatibilityKey = null } = {}) {
     if (this._current) return this._current;
     if (typeof createPreparation !== "function") {
       throw new TypeError("Renderer preparation requires a factory.");
@@ -32,13 +33,14 @@ export class RendererPreparationSlot {
     const state = {
       acknowledged: false,
       cleanupTimer: undefined,
+      compatibilityKey,
       countdownId: null,
       disposition: "owned",
       preparation: null,
       promise: null,
     };
     this._current = state;
-    state.promise = Promise.resolve()
+    state.promise = this._disposalBarrier
       .then(() => createPreparation())
       .then((preparation) => {
         if (!preparation || typeof preparation.destroy !== "function") {
@@ -55,7 +57,17 @@ export class RendererPreparationSlot {
       .catch((error) => {
         if (this._current === state) this._current = null;
         this._clearCleanup(state);
-        if (state.disposition !== "discard") this._onFailure(error);
+        let failure = error;
+        if (state.preparation) {
+          const preparation = state.preparation;
+          state.preparation = null;
+          try {
+            preparation.destroy();
+          } catch (destroyError) {
+            failure = destroyError;
+          }
+        }
+        if (state.disposition !== "discard") this._onFailure(failure);
         return null;
       });
     return state;
@@ -76,12 +88,17 @@ export class RendererPreparationSlot {
     return true;
   }
 
-  async settleForStart({ reuse = false } = {}) {
-    const state = this._takeCurrent(reuse ? "transfer" : "discard");
-    if (!state) return null;
-    const preparation = await state.promise;
-    if (!reuse && preparation) preparation.destroy();
-    return reuse ? preparation : null;
+  async settleForStart({ reuse = false, compatibilityKey = null } = {}) {
+    const state = this._current;
+    const shouldReuse = !!state && reuse && state.compatibilityKey === compatibilityKey;
+    const takenState = this._takeCurrent(shouldReuse ? "transfer" : "discard");
+    if (!takenState) {
+      await this._disposalBarrier;
+      return null;
+    }
+    if (!shouldReuse) return this._dispose(takenState);
+    await this._disposalBarrier;
+    return takenState.promise;
   }
 
   discard() {
@@ -91,6 +108,7 @@ export class RendererPreparationSlot {
       state.preparation.destroy();
       state.preparation = null;
     }
+    void this._dispose(state);
   }
 
   releaseCountdown() {
@@ -117,6 +135,19 @@ export class RendererPreparationSlot {
     this._onCountdownReady(state.countdownId);
   }
 
+  _dispose(state) {
+    const disposal = this._disposalBarrier.then(async () => {
+      const preparation = await state.promise;
+      if (preparation && state.preparation === preparation) {
+        state.preparation = null;
+        preparation.destroy();
+      }
+      return null;
+    });
+    this._disposalBarrier = disposal.catch(() => null);
+    return disposal;
+  }
+
   _clearCleanup(state) {
     if (state.cleanupTimer === undefined) return;
     this._clearTimer?.(state.cleanupTimer);
@@ -126,10 +157,13 @@ export class RendererPreparationSlot {
 
 export function settleRendererPreparationForStart(
   slot,
-  { replay = false, lab = false } = {},
+  { replay = false, lab = false, compatibilityKey = null } = {},
 ) {
   if (!slot || typeof slot.settleForStart !== "function") {
     throw new TypeError("Match start requires a renderer preparation slot.");
   }
-  return slot.settleForStart({ reuse: !replay && !lab });
+  return slot.settleForStart({
+    reuse: !replay && !lab,
+    compatibilityKey,
+  });
 }
