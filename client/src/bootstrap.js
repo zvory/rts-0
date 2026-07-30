@@ -303,7 +303,7 @@ export function replaceReplayPermalink(matchId, {
 /** Cached DOM handles for the pinned ids in index.html (see its DOM contract). */
 export const dom = {
   app: document.getElementById("app"),
-  version: document.getElementById("version"),
+  statusBadge: document.getElementById("status-badge"),
   lobbyScreen: document.getElementById("lobby-screen"),
   labEntryScreen: document.getElementById("lab-entry-screen"),
   branchScreen: document.getElementById("branch-screen"),
