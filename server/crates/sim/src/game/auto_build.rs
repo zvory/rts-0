@@ -25,8 +25,9 @@ impl Default for AutoBuildSettings {
 
 impl PlayerState {
     pub(in crate::game) fn can_auto_build(&self, cost: ResourceCost) -> bool {
-        !self.auto_build.paused
-            && self.steel.saturating_sub(cost.steel) >= self.auto_build.reserve_steel
-            && self.oil.saturating_sub(cost.oil) >= self.auto_build.reserve_oil
+        self.is_ai
+            || (!self.auto_build.paused
+                && self.steel.saturating_sub(cost.steel) >= self.auto_build.reserve_steel
+                && self.oil.saturating_sub(cost.oil) >= self.auto_build.reserve_oil)
     }
 }
