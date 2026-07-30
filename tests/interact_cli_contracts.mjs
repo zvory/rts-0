@@ -80,7 +80,7 @@ try {
     assert.equal(result.namespace, "game", `${args.join(" ")} identifies the game namespace`);
     assert.deepEqual(
       result.commands,
-      ["open", "close", "status", "inspect", "select", "move", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "give-up", "shutdown"],
+      ["open", "close", "status", "inspect", "select", "move", "camera", "tab-menu", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "give-up", "shutdown"],
       "game help exposes bounded match observation, player controls, and region-aware media commands",
     );
   }
@@ -180,6 +180,7 @@ try {
   assert.match(gameSessionId, /^game_[a-f0-9]{32}$/, "game open returns a distinct bounded session id");
   assert.equal(gameOpened.kind, "game", "game open identifies the isolated match kind");
   assert.deepEqual(gameOpened.capabilities.orders, ["move"], "game capabilities expose move as the only gameplay order");
+  assert.deepEqual(gameOpened.capabilities.uiControls, ["tab-menu"], "game capabilities expose the browser-local hold-Tab prototype");
   assert.equal(gameOpened.capabilities.selection, true, "game capabilities advertise browser-local selection");
   assert.deepEqual(gameOpened.capabilities.media, ["screenshot", "recording"], "player capabilities omit spectator-only time-lapse capture");
   const gameInspection = callNamespace("game", "inspect", { sessionId: gameSessionId }).result;
@@ -197,6 +198,12 @@ try {
     "notControllable",
     "game move rejects non-owned units",
   );
+  const heldTabMenu = callNamespace("game", "tab-menu", { sessionId: gameSessionId, action: "hold" }).result;
+  assert.equal(heldTabMenu.result.visible, true, "game tab-menu can hold the sidebar open");
+  const raisedReserve = callNamespace("game", "tab-menu", {
+    sessionId: gameSessionId, action: "adjust", resource: "steel", delta: 1,
+  }).result;
+  assert.equal(raisedReserve.result.reservations.steel, 250, "game tab-menu adjusts browser-local prototype state");
   const gameScreenshot = callNamespace("game", "screenshot", { sessionId: gameSessionId, name: "game-ui" }).result;
   assert.equal(gameScreenshot.presentation, "normal", "game screenshots retain the UI by default");
   assert.equal(gameScreenshot.preview.available, true, "game screenshots publish a Tailnet preview");

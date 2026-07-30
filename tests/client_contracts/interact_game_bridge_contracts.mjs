@@ -73,6 +73,10 @@ const elements = new Map([
   ["idle-workers-count", node({ text: "1" })],
   ["selected-panel", node({ text: "Rifleman" })],
   ["command-card", node({ buttons: [node({ text: "Move" })] })],
+  ["tab-menu", node({ hidden: true, text: "Auto-Build Settings" })],
+  ["tab-menu-autobuild-pause", node({ text: "ⅡWorkingQ" })],
+  ["tab-menu-steel-reserve", node({ text: "▰200" })],
+  ["tab-menu-oil-reserve", node({ text: "⬤100" })],
   ["give-up-confirm", node({ hidden: true })],
   ["game-over", node({ hidden: true })],
   ["game-over-text", node({ text: "Defeat" })],
@@ -95,6 +99,7 @@ try {
   let issuedCommand = null;
   let overview = null;
   let autoSpectatorEnabled = true;
+  let tabMenuState = { visible: false, paused: false, status: "Working", reservations: { steel: 200, oil: 100 } };
   const presentationCalls = [];
   const match = {
     giveUpSent: false,
@@ -143,6 +148,25 @@ try {
     autoSpectator: {
       get enabled() { return autoSpectatorEnabled; },
     },
+    tabMenu: {
+      interact(input) {
+        if (input.action === "hold") {
+          tabMenuState.visible = true;
+          elements.get("tab-menu").hidden = false;
+        }
+        if (input.action === "release") {
+          tabMenuState.visible = false;
+          elements.get("tab-menu").hidden = true;
+        }
+        if (input.action === "toggle-pause") {
+          tabMenuState.visible = true;
+          tabMenuState.paused = !tabMenuState.paused;
+          tabMenuState.status = tabMenuState.paused ? "Paused" : "Working";
+          elements.get("tab-menu").hidden = false;
+        }
+        return structuredClone(tabMenuState);
+      },
+    },
     camera: {
       snapshot: () => ({ version: 1, focus: { x: 0, y: 0 }, framingScale: 1, boundsPolicy: "mapOverscroll" }),
       projectionSnapshot: () => ({ viewport: { widthCssPx: 1000, heightCssPx: 700 } }),
@@ -184,6 +208,11 @@ try {
   assert.deepEqual(bridge.status().selection, [10], "game status carries selection into capture provenance");
   assert.deepEqual(bridge.captureReadiness().selection, [10], "game capture readiness records the rendered selection");
   assert.deepEqual(bridge.inspect().selection, [10], "game inspection reports the current selection ids");
+  const heldMenu = await bridge.tabMenu({ action: "hold" });
+  assert.equal(heldMenu.visible, true, "game bridge can emulate holding Tab for deterministic UI capture");
+  assert.equal(heldMenu.ui.tabMenu.visible, true, "semantic UI inspection sees the held sidebar");
+  const pausedMenu = await bridge.tabMenu({ action: "toggle-pause" });
+  assert.equal(pausedMenu.status, "Paused", "game bridge exercises the prototype pause state without a gameplay command");
   await assert.rejects(
     () => bridge.select({ entityIds: [30] }),
     (error) => error?.code === "unknownEntity",

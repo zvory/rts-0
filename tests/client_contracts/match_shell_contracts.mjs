@@ -10,6 +10,7 @@ import {
   predictionReportFields,
 } from "../../client/src/match_net_reporter.js";
 import { buildMatchSettingsContext } from "../../client/src/match_settings_context.js";
+import { matchTabMenuAvailable } from "../../client/src/match_hud.js";
 import { pointerLockDiagnosticToast } from "../../client/src/match_pointer_lock_diagnostics.js";
 import {
   EVENT,
@@ -17,6 +18,30 @@ import {
   MOVEMENT_PATH_DIAGNOSTICS,
   WEAPON_KIND,
 } from "../../client/src/protocol.js";
+
+// Hold-Tab menu eligibility
+// ---------------------------------------------------------------------------
+{
+  const livePlayer = {
+    running: true,
+    state: { spectator: false },
+    capabilities: { commands: { gameplay: true } },
+    net: {},
+  };
+  assert(matchTabMenuAvailable(livePlayer), "ordinary controllable live players receive the hold-Tab menu");
+  assert(
+    !matchTabMenuAvailable({ ...livePlayer, labMetadata: { role: "operator" } }),
+    "Lab sessions retain their own controls instead of mounting the live-match menu",
+  );
+  assert(
+    !matchTabMenuAvailable({ ...livePlayer, net: { offline: true } }),
+    "offline snapshot streams do not change the canonical benchmark UI",
+  );
+  assert(
+    !matchTabMenuAvailable({ ...livePlayer, capabilities: { commands: { gameplay: false } } }),
+    "read-only sessions do not mount the live-player menu",
+  );
+}
 
 // Windows desktop runtime diagnostics
 // ---------------------------------------------------------------------------

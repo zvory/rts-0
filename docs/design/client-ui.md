@@ -91,7 +91,7 @@ src/
   branch_staging.js # replay branch staging panel
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` setup/blank selector
   interact_bridge.js # InteractBridge: launch-gated narrow local automation facade
-  interact_game_bridge.js # Isolated normal-match inspection/move/surrender automation facade
+  interact_game_bridge.js # Isolated normal-match inspection/move/surrender/tab-menu automation facade
   clean_presentation.js # app-shell reversible DOM chrome mode for Interact capture
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab setup metadata defaults, slugging, and local validation
@@ -743,7 +743,7 @@ representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of
 ```js
 export class InteractGameBridge {
   status()                            // isolated-match readiness and bounded semantic UI state
-  call(method, input)                 // status/inspect/select/move/giveUp/time/camera/presentation/captureReadiness
+  call(method, input)                 // status/inspect/select/move/giveUp/tabMenu/time/camera/presentation/captureReadiness
   destroy()
 }
 export function interactGameLaunchEnabled(locationLike?)
@@ -757,12 +757,14 @@ and never returns internal object references. Its only gameplay command is `move
 1–100 unique visible locally owned unit ids plus an in-map destination and delegates to the normal
 `Match.commandIssuer`. `giveUp` delegates to `Match.requestGiveUp` and waits for the ordinary score
 screen. It exposes no arbitrary protocol command, DOM selector, browser evaluation, attack,
-production, economy, or ability surface. Spectators cannot call move or give-up; only AI-only room
+production, economy, or ability surface. Player sessions may hold/release and exercise the
+browser-local Auto-Build tab-menu prototype for deterministic UI inspection; this sends no gameplay
+command. Spectators cannot call move, give-up, or tab-menu controls; only AI-only room
 speed control is exposed for sampled time-lapse capture. Camera `overview` disables the automatic
 spectator director and fits authoritative map bounds. Game screenshots and recordings default to
 normal presentation and accept full-viewport, live-minimap, or bounded custom regions; clean
 presentation is an explicit opt-in.
-The bridge surface version is 3. Its shared game/dev-scenario `select` method replaces browser-local
+The bridge surface version is 4. Its shared game/dev-scenario `select` method replaces browser-local
 selection with up to 400 entities from the recipient's normal fog-filtered snapshot and waits for
 two render frames. It is available to players, AI-vs-AI spectators, and dev-scenario observers,
 including an empty selection for clearing, and never changes authoritative simulation state.

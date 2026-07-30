@@ -52,6 +52,31 @@ try {
     (error) => error?.code === "invalidInput",
     "time-lapse rejects requests beyond its sampled-frame bound",
   );
+  assert.doesNotThrow(
+    () => validateCommandInput("game-tab-menu", { sessionId: gameSessionId, action: "adjust", resource: "oil", delta: -1 }),
+    "game tab-menu accepts one bounded browser-local reservation adjustment",
+  );
+  assert.throws(
+    () => validateCommandInput("game-tab-menu", { sessionId: gameSessionId, action: "adjust", resource: "oil", delta: 2 }),
+    (error) => error?.code === "invalidInput",
+    "game tab-menu rejects unbounded reservation deltas",
+  );
+  assert.doesNotThrow(
+    () => validateCommandInput("game-screenshot", { sessionId: gameSessionId, region: "tab-menu" }),
+    "game screenshots accept the semantic tab-menu crop",
+  );
+  assert.throws(
+    () => validateCommandInput("game-capture-timelapse", {
+      sessionId: gameSessionId, maxDurationMs: 1_000, sampleEveryMs: 500, region: "tab-menu",
+    }),
+    (error) => error?.code === "invalidInput",
+    "spectator-only time-lapses reject the player-only tab-menu crop",
+  );
+  assert.throws(
+    () => validateCommandInput("scenario-screenshot", { sessionId: scenarioSessionId, region: "tab-menu" }),
+    (error) => error?.code === "invalidInput",
+    "dev scenarios reject the live-player-only tab-menu crop",
+  );
   assert.throws(
     () => validateCommandInput("game-screenshot", { sessionId: gameSessionId, region: { x: 0, y: 0, width: 1, height: 100 } }),
     (error) => error?.code === "invalidInput",

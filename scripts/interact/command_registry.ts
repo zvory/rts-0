@@ -213,14 +213,21 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["active isolated match only", "waits for the authoritative score screen"],
     example: { sessionId: "<game-session-id>" },
   }),
+  "game-tab-menu": descriptor("Hold, release, or change the browser-local Auto-Build tab-menu prototype.", "{sessionId:string,action:\"hold\"|\"release\"|\"toggle-pause\"|\"adjust\",resource?:\"steel\"|\"oil\",delta?:-1|1}", {
+    sceneMutation: true,
+    variants: ["hold keeps the sidebar visible for inspection and capture", "release emulates Tab keyup", "toggle-pause changes the prototype Working/Paused state", "adjust changes one prototype reservation step"],
+    defaults: ["prototype starts Working with steel=200 and oil=100", "one reservation step=50"],
+    bounds: ["isolated player session only", "browser-local UI state only; sends no gameplay command", "adjust requires resource and delta"],
+    example: { sessionId: "<game-session-id>", action: "adjust", resource: "steel", delta: 1 },
+  }),
   "game-camera": descriptor("Set the camera or focus bounded visible entity ids.", "{sessionId:string,camera:game-camera-command}", {
     variants: ["focus {action,entities,padding?}", "overview {action,padding?} fits the whole map and disables auto-spectator camera movement", "set {action,snapshot:CameraSnapshotV1}"],
     defaults: ["focus.padding=32 for one unit, otherwise 48"],
     bounds: ["focus 1-400 unique ids", "padding 0-1024", "snapshot framingScale >0 and <=16"],
     example: { sessionId: "<game-session-id>", camera: { action: "focus", entities: [42] } },
   }),
-  "game-screenshot": descriptor("Capture a readiness-checked match PNG with UI visible by default.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,subjects?:u32[]}", {
-    variants: ["region=viewport captures the whole game screen", "region=minimap captures the minimap", "a crop is relative to the game viewport", "presentation=clean captures only the rendered battlefield", "response.preview.url is the user-delivery URL"],
+  "game-screenshot": descriptor("Capture a readiness-checked match PNG with UI visible by default.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport,region?:\"viewport\"|\"minimap\"|\"tab-menu\"|crop,subjects?:u32[]}", {
+    variants: ["region=viewport captures the whole game screen", "region=minimap captures the minimap", "region=tab-menu captures the visible hold-Tab sidebar", "a crop is relative to the game viewport", "presentation=clean captures only the rendered battlefield", "response.preview.url is the user-delivery URL"],
     defaults: ["name=game", "presentation=normal", "viewport=current", "region=viewport", "subjects=[]"],
     bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
     example: { sessionId: "<game-session-id>", name: "opening-ui", presentation: "normal" },
@@ -318,6 +325,7 @@ const NAMESPACE_RECORDS = Object.freeze({
       select: "game-select",
       move: "game-move",
       camera: "game-camera",
+      "tab-menu": "game-tab-menu",
       screenshot: "game-screenshot",
       "record-start": "game-record-start",
       "record-stop": "record-stop",

@@ -42,6 +42,7 @@ export async function openInteractDriver(options) {
     : [];
   let selection = [];
   let gamePhase = "active";
+  let tabMenu = { visible: false, paused: false, status: "Working", reservations: { steel: 200, oil: 100 } };
   let recording = null;
   let lastRecording = null;
   let lastRecordingCompletion = null;
@@ -181,6 +182,24 @@ export async function openInteractDriver(options) {
       gamePhase = "concluded";
       tick += 1;
       return { accepted: true, phase: gamePhase, snapshotTick: tick };
+    },
+    async tabMenu(input) {
+      if (options.spectate) throw Object.assign(new Error("spectator has no tab menu"), { code: "playerSeatRequired" });
+      if (input.action === "hold") tabMenu.visible = true;
+      if (input.action === "release") tabMenu.visible = false;
+      if (input.action === "toggle-pause") {
+        tabMenu.visible = true;
+        tabMenu.paused = !tabMenu.paused;
+        tabMenu.status = tabMenu.paused ? "Paused" : "Working";
+      }
+      if (input.action === "adjust") {
+        tabMenu.visible = true;
+        tabMenu.reservations[input.resource] = Math.max(
+          0,
+          tabMenu.reservations[input.resource] + input.delta * 50,
+        );
+      }
+      return structuredClone(tabMenu);
     },
     async time(control) {
       if (control.action === "step") tick += control.ticks || 1;

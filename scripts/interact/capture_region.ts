@@ -1,7 +1,7 @@
 import type { Page } from "puppeteer-core";
 
 export interface CaptureClip { x: number; y: number; width: number; height: number }
-export type CaptureRegion = "viewport" | "minimap" | CaptureClip;
+export type CaptureRegion = "viewport" | "minimap" | "tab-menu" | CaptureClip;
 
 export async function resolveCaptureRegion(page: Page, region: CaptureRegion | null = "viewport") {
   const elements = await page.evaluate(() => {
@@ -9,7 +9,7 @@ export async function resolveCaptureRegion(page: Page, region: CaptureRegion | n
       const bounds = document.getElementById(id)?.getBoundingClientRect?.();
       return bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null;
     };
-    return { viewport: rect("viewport"), minimap: rect("minimap") };
+    return { viewport: rect("viewport"), minimap: rect("minimap"), tabMenu: rect("tab-menu") };
   });
   const viewport = normalizeClip(elements?.viewport, "The game viewport is not available for capture.");
   if (region == null || region === "viewport") return { preset: "viewport", clip: viewport, viewport };
@@ -17,6 +17,11 @@ export async function resolveCaptureRegion(page: Page, region: CaptureRegion | n
     const minimap = normalizeClip(elements?.minimap, "The minimap is not available for capture.");
     assertInside(minimap, viewport, "The minimap must stay inside the game viewport.");
     return { preset: "minimap", clip: minimap, viewport };
+  }
+  if (region === "tab-menu") {
+    const tabMenu = normalizeClip(elements?.tabMenu, "The hold-Tab menu must be visible for capture.");
+    assertInside(tabMenu, viewport, "The hold-Tab menu must stay inside the game viewport.");
+    return { preset: "tab-menu", clip: tabMenu, viewport };
   }
   const relative = normalizeClip(region, "A custom capture region requires finite x/y and width/height of at least 2 pixels.");
   const clip = {
