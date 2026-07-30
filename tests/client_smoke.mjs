@@ -390,7 +390,22 @@ try {
   await page.keyboard.up("Tab");
   await page.waitForFunction(() => document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
 
-  await page.evaluate(() => window.__rts.settings.open({ focus: false }));
+  const settingsButton = await page.$("#settings-button");
+  const settingsButtonBox = await settingsButton?.boundingBox();
+  if (!settingsButtonBox) throw new Error("Settings button is unavailable for pointer hold coverage.");
+  await page.mouse.move(
+    settingsButtonBox.x + settingsButtonBox.width / 2,
+    settingsButtonBox.y + settingsButtonBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.waitForFunction(() => !document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
+  await page.mouse.up();
+  await page.waitForFunction(
+    () => document.getElementById("tab-menu")?.hidden && document.getElementById("settings-menu")?.hidden,
+    { timeout: 2000 },
+  );
+
+  await page.click("#settings-button");
   await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });
   await page.click('[data-settings-tab="hotkeys"]');
   await page.click("#hotkey-clone-profile");

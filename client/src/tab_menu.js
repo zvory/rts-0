@@ -4,6 +4,7 @@ import { resourceIconHtml } from "./resource_icons.js";
 const DEFAULT_RESERVATIONS = Object.freeze({ steel: 200, oil: 100 });
 const RESERVATION_STEP = 50;
 const RESERVATION_MAX = 9_950;
+const POINTER_HOLD_DELAY_MS = 200;
 
 /**
  * Browser-local prototype for the hold-Tab in-game menu.
@@ -17,17 +18,23 @@ export class TabMenu {
     button,
     settings = null,
     hotkeyProfiles = null,
+    enabled = () => true,
     windowLike = globalThis.window,
   } = {}) {
     this.root = root || null;
     this.button = button || null;
     this.settings = settings;
     this.hotkeyProfiles = hotkeyProfiles;
+    this.enabled = enabled;
     this.windowLike = windowLike;
     this.paused = false;
     this.reservations = { ...DEFAULT_RESERVATIONS };
     this.heldBy = new Set();
     this.destroyed = false;
+    this.pointerHoldTimer = null;
+    this.pointerId = null;
+    this.pointerHoldOpened = false;
+    this.suppressNextButtonClick = false;
 
     this.panel = document.createElement("aside");
     this.panel.id = "tab-menu";
@@ -39,13 +46,15 @@ export class TabMenu {
     this.originalButton = {
       ariaLabel: this.button?.getAttribute("aria-label"),
       title: this.button?.getAttribute("title"),
+      ariaControls: this.button?.getAttribute("aria-controls"),
+      ariaExpanded: this.button?.getAttribute("aria-expanded"),
       html: this.button?.innerHTML || "",
     };
     this.button?.parentElement?.classList.add("tab-menu-mode");
     if (this.button) {
-      this.button.setAttribute("aria-label", "Hold for in-game menu");
-      this.button.setAttribute("title", "Hold Tab for in-game menu");
-      this.button.setAttribute("aria-controls", "tab-menu");
+      this.button.setAttribute("aria-label", "Settings; hold for in-game menu");
+      this.button.setAttribute("title", "Click for Settings; hold Tab or press and hold for in-game menu");
+      this.button.setAttribute("aria-controls", "settings-menu tab-menu");
       this.button.innerHTML =
         '<span class="hamburger-icon" aria-hidden="true"><i></i><i></i><i></i></span>';
     }
@@ -54,15 +63,17 @@ export class TabMenu {
     this.onKeyUp = (event) => this.handleKeyUp(event);
     this.onBlur = () => {
       this.release("keyboard");
-      this.release("pointer");
+      this.cancelPointerHold();
     };
     this.onPointerDown = (event) => {
       if (event.button !== 0) return;
-      event.preventDefault();
-      this.hold("pointer");
+      this.beginPointerHold(event);
     };
-    this.onPointerUp = () => this.release("pointer");
+    this.onPointerUp = (event) => this.finishPointerHold(event);
+    this.onPointerCancel = (event) => this.cancelPointerHold(event);
     this.onButtonClickCapture = (event) => {
+      if (!this.suppressNextButtonClick) return;
+      this.suppressNextButtonClick = false;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
@@ -71,7 +82,7 @@ export class TabMenu {
     this.windowLike?.addEventListener("keyup", this.onKeyUp, true);
     this.windowLike?.addEventListener("blur", this.onBlur);
     this.windowLike?.addEventListener("pointerup", this.onPointerUp, true);
-    this.windowLike?.addEventListener("pointercancel", this.onPointerUp, true);
+    this.windowLike?.addEventListener("pointercancel", this.onPointerCancel, true);
     this.button?.addEventListener("pointerdown", this.onPointerDown);
     this.button?.addEventListener("click", this.onButtonClickCapture, true);
     this.render();
@@ -90,11 +101,11 @@ export class TabMenu {
   }
 
   isOpen() {
-    return !this.destroyed && !this.panel.hidden;
+    return !this.destroyed && this.enabled() && !this.panel.hidden;
   }
 
   hold(source) {
-    if (this.destroyed) return this.status();
+    if (this.destroyed || !this.enabled()) return this.status();
     this.heldBy.add(source);
     this.settings?.close?.();
     this.render();
@@ -111,6 +122,45 @@ export class TabMenu {
     this.button?.setAttribute("aria-expanded", "false");
     this.button?.classList.remove("active");
     return this.status();
+  }
+
+  beginPointerHold(event) {
+    if (this.destroyed || this.pointerHoldTimer != null || this.pointerId != null) return;
+    this.pointerId = event.pointerId ?? 0;
+    this.pointerHoldOpened = false;
+    this.suppressNextButtonClick = false;
+    this.pointerHoldTimer = this.windowLike?.setTimeout?.(() => {
+      this.pointerHoldTimer = null;
+      this.pointerHoldOpened = true;
+      this.hold("pointer");
+    }, POINTER_HOLD_DELAY_MS);
+  }
+
+  finishPointerHold(event) {
+    if (this.pointerId == null || (event?.pointerId ?? 0) !== this.pointerId) return;
+    this.clearPointerHoldTimer();
+    if (this.pointerHoldOpened) {
+      this.release("pointer");
+      this.suppressNextButtonClick =
+        event?.target === this.button || this.button?.contains?.(event?.target) === true;
+    }
+    this.pointerId = null;
+    this.pointerHoldOpened = false;
+  }
+
+  cancelPointerHold(event = null) {
+    if (event && this.pointerId != null && (event.pointerId ?? 0) !== this.pointerId) return;
+    this.clearPointerHoldTimer();
+    this.release("pointer");
+    this.pointerId = null;
+    this.pointerHoldOpened = false;
+    this.suppressNextButtonClick = false;
+  }
+
+  clearPointerHoldTimer() {
+    if (this.pointerHoldTimer == null) return;
+    this.windowLike?.clearTimeout?.(this.pointerHoldTimer);
+    this.pointerHoldTimer = null;
   }
 
   togglePause() {
@@ -148,6 +198,7 @@ export class TabMenu {
   }
 
   handleKeyDown(event) {
+    if (!this.enabled()) return;
     if (event.code === "Tab" && !isTextEntry(event.target)) {
       consume(event);
       if (!event.repeat) this.hold("keyboard");
@@ -176,8 +227,9 @@ export class TabMenu {
 
   handleKeyUp(event) {
     if (event.code !== "Tab") return;
-    consume(event);
     this.release("keyboard");
+    if (!this.enabled()) return;
+    consume(event);
   }
 
   render() {
@@ -267,11 +319,15 @@ export class TabMenu {
     this.destroyed = true;
     this.heldBy.clear();
     this.panel.hidden = true;
+    this.clearPointerHoldTimer();
+    this.pointerId = null;
+    this.pointerHoldOpened = false;
+    this.suppressNextButtonClick = false;
     this.windowLike?.removeEventListener("keydown", this.onKeyDown, true);
     this.windowLike?.removeEventListener("keyup", this.onKeyUp, true);
     this.windowLike?.removeEventListener("blur", this.onBlur);
     this.windowLike?.removeEventListener("pointerup", this.onPointerUp, true);
-    this.windowLike?.removeEventListener("pointercancel", this.onPointerUp, true);
+    this.windowLike?.removeEventListener("pointercancel", this.onPointerCancel, true);
     this.button?.removeEventListener("pointerdown", this.onPointerDown);
     this.button?.removeEventListener("click", this.onButtonClickCapture, true);
     this.button?.parentElement?.classList.remove("tab-menu-mode");
@@ -279,8 +335,8 @@ export class TabMenu {
       this.button.innerHTML = this.originalButton.html;
       restoreAttribute(this.button, "aria-label", this.originalButton.ariaLabel);
       restoreAttribute(this.button, "title", this.originalButton.title);
-      this.button.removeAttribute("aria-controls");
-      this.button.removeAttribute("aria-expanded");
+      restoreAttribute(this.button, "aria-controls", this.originalButton.ariaControls);
+      restoreAttribute(this.button, "aria-expanded", this.originalButton.ariaExpanded);
       this.button.classList.remove("active");
     }
     this.panel.remove();

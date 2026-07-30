@@ -228,3 +228,28 @@
   bottom: auto;
   max-height: min(720px, calc(100vh - 124px));
 }
+
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 1024px) {
+  #game-menu.tab-menu-mode,
+  #game-menu.tab-menu-mode[data-settings-context="match"] {
+    left: var(--mobile-debug-left);
+    right: auto;
+    top: var(--mobile-debug-top);
+    bottom: auto;
+  }
+
+  .tab-menu {
+    left: var(--mobile-debug-left);
+    top: calc(var(--mobile-debug-top) + 48px);
+    width: min(390px, calc(100vw - var(--mobile-debug-left) - var(--mobile-debug-right)));
+    max-height: calc(100vh - var(--mobile-debug-top) - var(--mobile-debug-bottom) - 48px);
+  }
+
+  #game-menu.tab-menu-mode #settings-menu {
+    left: var(--mobile-debug-left);
+    right: var(--mobile-debug-right);
+    top: calc(var(--mobile-debug-top) + 48px);
+    bottom: var(--mobile-debug-bottom);
+    max-height: none;
+  }
+}

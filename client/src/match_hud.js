@@ -25,6 +25,7 @@ export function createMatchTabMenu(match, rootEl, button) {
     button,
     settings: match.settings,
     hotkeyProfiles: match.hotkeyProfiles,
+    enabled: () => match.running !== false,
   });
 }
 
