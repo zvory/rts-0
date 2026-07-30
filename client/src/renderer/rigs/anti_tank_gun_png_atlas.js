@@ -143,8 +143,10 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
   },
   iconComposition: {
     sprites: [
-      "sprite.at.carriage.packed",
-      "sprite.at.barrelAssembly.packed",
+      "sprite.at.leftTrail.deployed",
+      "sprite.at.rightTrail.deployed",
+      "sprite.at.carriage.deployed",
+      "sprite.at.barrelAssembly.deployed",
     ],
   },
   frames: {},

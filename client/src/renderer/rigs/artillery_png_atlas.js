@@ -179,10 +179,10 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
   },
   iconComposition: {
     sprites: [
-      "sprite.art.leftTrail.packed",
-      "sprite.art.rightTrail.packed",
-      "sprite.art.carriage.packed",
-      "sprite.art.barrelAssembly.packed",
+      "sprite.art.leftTrail.deployed",
+      "sprite.art.rightTrail.deployed",
+      "sprite.art.carriage.deployed",
+      "sprite.art.barrelAssembly.deployed",
     ],
   },
   frames: {},

@@ -263,13 +263,15 @@ function composedRasterIconMarkup({
     return (
       `<g data-unit-icon-component="${component.id}" ` +
         `transform="translate(${number(component.x)} ${number(component.y)}) rotate(${number(rotation)})">` +
-        `<svg x="${number(component.localX)}" y="${number(component.localY)}" ` +
-          `width="${number(component.w)}" height="${number(component.h)}" ` +
-          `viewBox="${number(frame.x)} ${number(frame.y)} ${number(frame.w)} ${number(frame.h)}" ` +
-          `preserveAspectRatio="none" style="overflow:hidden">` +
-          `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
-            `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
-        `</svg>` +
+        `<g transform="scale(${component.scaleX} ${component.scaleY})">` +
+          `<svg x="${number(component.renderX)}" y="${number(component.renderY)}" ` +
+            `width="${number(component.w)}" height="${number(component.h)}" ` +
+            `viewBox="${number(frame.x)} ${number(frame.y)} ${number(frame.w)} ${number(frame.h)}" ` +
+            `preserveAspectRatio="none" style="overflow:hidden">` +
+            `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
+              `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
+          `</svg>` +
+        `</g>` +
       `</g>`
     );
   }).join("");
@@ -297,11 +299,21 @@ function normalizedCompositionComponent(component) {
     !frameHeight ||
     !Number.isFinite(pixelsPerUnitX) ||
     !Number.isFinite(pixelsPerUnitY) ||
-    pixelsPerUnitX <= 0 ||
-    pixelsPerUnitY <= 0
+    pixelsPerUnitX === 0 ||
+    pixelsPerUnitY === 0
   ) {
     return null;
   }
+  const scaleX = Math.sign(pixelsPerUnitX);
+  const scaleY = Math.sign(pixelsPerUnitY);
+  const w = frameWidth / Math.abs(pixelsPerUnitX);
+  const h = frameHeight / Math.abs(pixelsPerUnitY);
+  const originWorldX = -finiteNumber(frame.originX) / pixelsPerUnitX;
+  const farWorldX = (frameWidth - finiteNumber(frame.originX)) / pixelsPerUnitX;
+  const originWorldY = -finiteNumber(frame.originY) / pixelsPerUnitY;
+  const farWorldY = (frameHeight - finiteNumber(frame.originY)) / pixelsPerUnitY;
+  const localX = Math.min(originWorldX, farWorldX);
+  const localY = Math.min(originWorldY, farWorldY);
   return {
     id: component.id,
     frame: {
@@ -313,10 +325,14 @@ function normalizedCompositionComponent(component) {
     x: finiteNumber(component.x),
     y: finiteNumber(component.y),
     rotation: finiteNumber(component.rotation),
-    localX: -finiteNumber(frame.originX) / pixelsPerUnitX,
-    localY: -finiteNumber(frame.originY) / pixelsPerUnitY,
-    w: frameWidth / pixelsPerUnitX,
-    h: frameHeight / pixelsPerUnitY,
+    localX,
+    localY,
+    renderX: scaleX < 0 ? -(localX + w) : localX,
+    renderY: scaleY < 0 ? -(localY + h) : localY,
+    scaleX,
+    scaleY,
+    w,
+    h,
   };
 }
 
