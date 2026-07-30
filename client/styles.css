@@ -95,8 +95,7 @@ body {
   left: 10px;
   z-index: 30;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   min-width: 180px;
   padding: 6px 8px;
@@ -111,6 +110,10 @@ body {
   user-select: text;
 }
 
+#version:empty {
+  display: none;
+}
+
 .status-badge-content {
   display: flex;
   min-width: 0;
@@ -118,17 +121,12 @@ body {
   gap: 3px;
 }
 
-.status-badge-build,
 .status-badge-metrics,
 .status-badge-issues {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.status-badge-build {
-  color: var(--ink);
 }
 
 .status-badge-metric,
@@ -144,36 +142,6 @@ body {
 
 .status-badge-issue-ok {
   color: var(--good);
-}
-
-.status-badge-copy {
-  width: 52px;
-  min-height: 20px;
-  padding: 2px 5px;
-  border: 1px solid rgba(142, 132, 101, 0.75);
-  border-radius: 3px;
-  background: rgba(39, 37, 31, 0.92);
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0;
-  cursor: pointer;
-  pointer-events: auto;
-  user-select: none;
-}
-
-.status-badge-copy:hover,
-.status-badge-copy:focus-visible {
-  border-color: var(--accent);
-  color: var(--accent);
-  outline: none;
-}
-
-.status-badge-copy-fallback {
-  position: fixed;
-  left: -9999px;
-  top: 0;
 }
 
 #dev-links {

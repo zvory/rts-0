@@ -1386,7 +1386,7 @@ export class App {
     this.labCatalog?.setStatus("Server connection lost", { error: true });
   }
 
-  /** Fetch and display the build version in the shared top-left badge. */
+  /** Fetch the build version used by compatibility checks and exported settings. */
   async loadVersion() {
     try {
       const res = await fetch("/version", { cache: "no-store" });
@@ -1394,10 +1394,8 @@ export class App {
       const text = await res.text();
       const version = text.trim() || "unknown";
       globalThis.__RTS_BUILD__ = version;
-      this.statusBadge.setVersion(version);
     } catch {
       globalThis.__RTS_BUILD__ = "unknown";
-      this.statusBadge.setVersion("unknown");
     }
   }
 }

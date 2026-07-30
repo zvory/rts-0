@@ -73,7 +73,7 @@ src/
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
   match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
-  status_badge.js # Build/network/frame status badge with copyable diagnostics
+  status_badge.js # Compact network/frame status badge
   ai_diagnostics_panel.js # dedicated live/replay AI decision diagnostics panel
   observer_analysis_army_value.js # viewport combat-unit value calculation
   observer_analysis_overlay.js # replay/live spectator analysis overlay
