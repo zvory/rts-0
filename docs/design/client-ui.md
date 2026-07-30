@@ -339,7 +339,10 @@ Prototype raster rig workflow:
 - Support-weapon and vehicle rendering may opt into PNG atlases through `renderer/rigs/*_png_atlas.js`,
   `png_routing.js`, and `png_runtime.js`. The SVG rig remains authoritative for anchors,
   animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
-  pixels for those sampled parts. The current tank atlas is an enabled visual experiment, not final
+  pixels for those sampled parts. Command-card and selection-panel portraits use an atlas's
+  assembled reference when available; component-only atlases may declare an explicit packed
+  composition so the UI uses the same live PNG parts instead of reverting to the authored SVG
+  silhouette. The current tank atlas is an enabled visual experiment, not final
   art: it uses the pass-11 white-painted Tiger I hull/body, turret/coax, and separate main-barrel
   cells while transparent track frames suppress track rendering. The separate barrel cell maps to
   `part.barrel`, so the PNG rig keeps the original SVG cannon recoil scale instead of merging that

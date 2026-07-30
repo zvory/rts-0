@@ -79,10 +79,18 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
       tankIcon.includes('viewBox="41.025 108.9 531.975 298.2"'),
     "unit icon resolver fits the live Tank PNG reference to its opaque silhouette",
   );
+  const artilleryIcon = liveUnitIconMarkupFor(KIND.ARTILLERY);
+  const antiTankGunIcon = liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN);
   assert(
-    liveUnitIconMarkupFor(KIND.ARTILLERY).includes('class="unit-rig-icon"') &&
-      liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN).includes('class="unit-rig-icon"'),
-    "component-only support-weapon atlases fall back to complete authored unit silhouettes",
+    artilleryIcon.includes('data-unit-icon-source="png-atlas-composition"') &&
+      artilleryIcon.includes("artillery-a19-components-pass-03-alpha.png") &&
+      artilleryIcon.includes('data-unit-icon-component="sprite.art.leftTrail.packed"') &&
+      artilleryIcon.includes('data-unit-icon-component="sprite.art.barrelAssembly.packed"') &&
+      antiTankGunIcon.includes('data-unit-icon-source="png-atlas-composition"') &&
+      antiTankGunIcon.includes("anti-tank-gun-noshield-lowdetail-white-v1-alpha.png") &&
+      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.carriage.packed"') &&
+      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.barrelAssembly.packed"'),
+    "component-only support-weapon atlases compose their live PNG sprites into complete unit icons",
   );
   const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);
   assert(
