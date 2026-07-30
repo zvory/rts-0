@@ -1,8 +1,9 @@
 export class SettingsContainer {
-  constructor({ button, menu, title = "Settings" } = {}) {
+  constructor({ button, menu, title = "Settings", onOpenChange = null } = {}) {
     this.button = button || null;
     this.menu = menu || null;
     this.title = title;
+    this.onOpenChange = null;
     this.context = {};
     this.tabs = [];
     this.activeTabId = "";
@@ -15,6 +16,7 @@ export class SettingsContainer {
     this.button?.addEventListener("click", this.onButtonClick);
     window.addEventListener("keydown", this.onKeyDown, true);
     this.close();
+    this.onOpenChange = onOpenChange;
   }
 
   setContext(context = {}) {
@@ -34,19 +36,23 @@ export class SettingsContainer {
 
   open({ focus = true } = {}) {
     if (!this.menu || !this.tabs.length) return;
+    const wasOpen = this.isOpen();
     this._returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : this.button;
     this.render();
     this.menu.hidden = false;
     this.button?.setAttribute("aria-expanded", "true");
     if (focus) this.firstFocusable()?.focus();
+    if (!wasOpen) this.onOpenChange?.(true);
   }
 
   close({ restoreFocus = false } = {}) {
     if (!this.menu) return;
+    const wasOpen = this.isOpen();
     this.menu.hidden = true;
     this.button?.setAttribute("aria-expanded", "false");
     if (restoreFocus && this._returnFocus instanceof HTMLElement) this._returnFocus.focus();
     this._returnFocus = null;
+    if (wasOpen) this.onOpenChange?.(false);
   }
 
   toggle() {

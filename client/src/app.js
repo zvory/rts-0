@@ -175,6 +175,7 @@ export class App {
     this.settings = new SettingsContainer({
       button: dom.settingsButton,
       menu: dom.settingsMenu,
+      onOpenChange: (open) => this.match?.handleInteractiveMenuStateChange?.(open),
     });
     this.rendererPreparationSlot = new RendererPreparationSlot({
       onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
@@ -241,6 +242,8 @@ export class App {
     this.onExclusiveFullscreenEscape = this.onExclusiveFullscreenEscape.bind(this);
     this.onExclusiveFullscreenShellExit =
       this.onExclusiveFullscreenShellExit.bind(this);
+    this.onExclusiveFullscreenShellChange =
+      this.onExclusiveFullscreenShellChange.bind(this);
     this.onPlayerActivity = () => this.reportPlayerActivity();
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
@@ -282,6 +285,10 @@ export class App {
     window.addEventListener(
       "rts-exclusive-fullscreen-shell-exit",
       this.onExclusiveFullscreenShellExit,
+    );
+    window.addEventListener(
+      "rts-exclusive-fullscreen-shell-change",
+      this.onExclusiveFullscreenShellChange,
     );
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     for (const eventName of PLAYER_ACTIVITY_EVENTS) {
@@ -1223,9 +1230,17 @@ export class App {
   }
 
   onExclusiveFullscreenShellExit() {
-    this.exclusiveFullscreenEnabled = false;
-    writeExclusiveFullscreenEnabled(false);
-    this.match?.setExclusiveFullscreenEnabled?.(false);
+    this.applyExclusiveFullscreenShellState(false);
+  }
+
+  onExclusiveFullscreenShellChange(ev) {
+    this.applyExclusiveFullscreenShellState(ev?.detail?.enabled === true);
+  }
+
+  applyExclusiveFullscreenShellState(enabled) {
+    this.exclusiveFullscreenEnabled = !!enabled;
+    writeExclusiveFullscreenEnabled(this.exclusiveFullscreenEnabled);
+    this.match?.setExclusiveFullscreenEnabled?.(this.exclusiveFullscreenEnabled);
     this.refreshSettingsAfterPreferenceChange();
   }
 

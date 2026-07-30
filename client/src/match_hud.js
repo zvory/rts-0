@@ -26,6 +26,7 @@ export function createMatchTabMenu(match, rootEl, button) {
     settings: match.settings,
     hotkeyProfiles: match.hotkeyProfiles,
     enabled: () => match.running !== false,
+    onOpenChange: (open) => match.handleInteractiveMenuStateChange(open),
   });
 }
 

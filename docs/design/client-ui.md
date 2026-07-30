@@ -576,7 +576,7 @@ locations are separately revisioned; visible/explored grids reuse opaque snapsho
 `settings_container.js`
 ```js
 export class SettingsContainer {
-  constructor({ button, menu, title? })
+  constructor({ button, menu, title?, onOpenChange? })
   setContext({ kind, spectator, replay, actions, tabs }) // mounts context-specific tabs/actions
   setTabs(tabs)                         // [{id,label,visible,render(panel, context)}]
   open({ focus }), close({ restoreFocus }), toggle()
@@ -592,6 +592,10 @@ buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
 buildGiveUpAction({ visible, onOpen })
 buildPauseAction({ visible, disabled, label, title, onPause })
 ```
+
+`match_cursor_capture.js` owns the focused policy that pauses aggressive desktop cursor capture
+while Settings or the hold-Tab menu is interactive and schedules recapture after the last menu
+closes. `Match` remains the lifecycle owner and thin delegator.
 
 `live_pause_overlay.js`
 ```js
@@ -1030,6 +1034,10 @@ tab/action is visible. `Match` owns `LivePauseOverlay` under `#game-screen` for 
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is
 destroyed with the match.
+When Windows exclusive fullscreen has enabled native cursor capture, the injected
+`onOpenChange` callback lets `Match` release capture while Settings is open and resume it after
+close. The hold-Tab menu uses the same match-owned policy so every interactive menu remains
+clickable while fullscreen is active.
 
 `state.js`
 ```js
