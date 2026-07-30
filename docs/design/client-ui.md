@@ -30,6 +30,7 @@ src/
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
+  state_auto_build.js # authoritative Auto-Build snapshot normalization and command acknowledgement
   state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery, building-footprint sizing
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_interaction.js # shared Input/HUD/Minimap command issue-and-planned-order recording
@@ -66,6 +67,7 @@ src/
   hud_unit_commands.js # Unit tactical command descriptors
   hotkey_profiles.js # Local hotkey presets, custom profile storage, import/export
   hotkey_editor.js # Settings Hotkeys tab editor
+  tab_menu.js # hold-Tab Auto-Build controls with optimistic state through authoritative acknowledgement
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
@@ -765,8 +767,9 @@ and never returns internal object references. Its only gameplay command is `move
 `Match.commandIssuer`. `giveUp` delegates to `Match.requestGiveUp` and waits for the ordinary score
 screen. It exposes no arbitrary protocol command, DOM selector, browser evaluation, attack,
 production, economy, or ability surface. Player sessions may hold/release and exercise the
-browser-local Auto-Build tab-menu prototype for deterministic UI inspection; this sends no gameplay
-command. Spectators cannot call move, give-up, or tab-menu controls; only AI-only room
+authoritative Auto-Build tab menu for deterministic UI inspection; pause and resource-floor changes
+use the normal gameplay command path and synchronize from acknowledged snapshots. Spectators cannot
+call move, give-up, or tab-menu controls; only AI-only room
 speed control is exposed for sampled time-lapse capture. Camera `overview` disables the automatic
 spectator director and fits authoritative map bounds. Game screenshots and recordings default to
 normal presentation and accept full-viewport, live-minimap, or bounded custom regions; clean

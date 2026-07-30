@@ -79,6 +79,16 @@ impl Serialize for CompactSnapshot<'_> {
                 snapshot.supply_cap,
             ],
         )?;
+        if let Some(settings) = snapshot.auto_build {
+            map.serialize_entry(
+                "ab",
+                &(
+                    settings.paused,
+                    settings.reserve_steel,
+                    settings.reserve_oil,
+                ),
+            )?;
+        }
         if let Some(position) = snapshot.world_combat_position {
             map.serialize_entry("wc", &position)?;
         }
@@ -1239,6 +1249,7 @@ mod tests {
             oil: 0,
             supply_used: 0,
             supply_cap: 0,
+            auto_build: None,
             entities: vec![EntityView::new(
                 1,
                 1,
@@ -1269,5 +1280,41 @@ mod tests {
         assert_eq!(entity.len(), 8);
         assert!(value.get("r").is_none());
         assert!(value.get("ev").is_none());
+    }
+
+    #[test]
+    fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
+        let snapshot = Snapshot {
+            tick: 1,
+            world_combat_position: None,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            auto_build: None,
+            entities: Vec::new(),
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            ability_objects: Vec::new(),
+            trenches: Vec::new(),
+            visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            remembered_anti_tank_guns: Vec::new(),
+            events: Vec::new(),
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        };
+        let frame = crate::encode_snapshot_frame(&snapshot, crate::SnapshotCodec::CompactJson)
+            .expect("compact JSON should encode");
+        match frame {
+            crate::SnapshotFrame::Text(text) => {
+                let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(value["t"], "snapshot");
+                assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
+            }
+            crate::SnapshotFrame::Binary(_) => panic!("compact JSON baseline codec must stay text"),
+        }
     }
 }

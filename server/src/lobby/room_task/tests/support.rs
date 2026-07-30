@@ -305,6 +305,7 @@ pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
         oil: 0,
         supply_used: 1,
         supply_cap: 10,
+        auto_build: None,
         entities: Vec::new(),
         resource_deltas: Vec::new(),
         smokes: Vec::new(),

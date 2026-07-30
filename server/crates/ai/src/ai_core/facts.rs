@@ -396,6 +396,7 @@ mod tests {
             oil: 0,
             supply_used: 0,
             supply_cap: 0,
+            auto_build: None,
             entities: vec![
                 resource_view(1, EntityKind::Steel, hx + in_range, hy, 100),
                 resource_view(2, EntityKind::Steel, hx - in_range, hy, 100),

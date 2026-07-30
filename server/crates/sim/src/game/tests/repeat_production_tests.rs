@@ -44,8 +44,155 @@ fn repeat_fixture() -> (Game, u32) {
         .get_mut(barracks)
         .expect("barracks")
         .set_repeat_production(Some(EntityKind::Rifleman), true);
+    game.state.players[0].auto_build = AutoBuildSettings {
+        paused: false,
+        reserve_steel: 0,
+        reserve_oil: 0,
+    };
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     (game, barracks)
+}
+
+#[test]
+fn auto_build_settings_pause_and_preserve_resource_floors() {
+    let (mut game, barracks) = repeat_fixture();
+    let cost = rules::economy::resource_cost(EntityKind::Rifleman);
+    game.enqueue(
+        1,
+        SimCommand::SetAutoBuildSettings {
+            paused: true,
+            reserve_steel: 200,
+            reserve_oil: 100,
+        },
+    );
+    game.state.players[0]
+        .set_resources(cost.steel.saturating_add(200), cost.oil.saturating_add(100));
+
+    game.tick();
+    assert!(game
+        .state
+        .entities
+        .get(barracks)
+        .expect("barracks")
+        .prod_queue()
+        .is_empty());
+    assert!(
+        game.snapshot_for(1)
+            .auto_build
+            .expect("owner settings")
+            .paused
+    );
+
+    game.enqueue(
+        1,
+        SimCommand::SetAutoBuildSettings {
+            paused: false,
+            reserve_steel: 200,
+            reserve_oil: 100,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.state
+            .entities
+            .get(barracks)
+            .expect("barracks")
+            .prod_queue()
+            .len(),
+        1
+    );
+    assert_eq!(game.state.players[0].steel, 200);
+    assert_eq!(game.state.players[0].oil, 100);
+    assert_eq!(
+        game.snapshot_for(1).auto_build,
+        Some(crate::protocol::AutoBuildSettingsSnapshot {
+            paused: false,
+            reserve_steel: 200,
+            reserve_oil: 100,
+        })
+    );
+}
+
+#[test]
+fn auto_build_waits_when_either_resource_would_cross_its_floor() {
+    let (mut game, barracks) = repeat_fixture();
+    let cost = rules::economy::resource_cost(EntityKind::Rifleman);
+    game.state.players[0].auto_build = AutoBuildSettings::default();
+    game.state.players[0]
+        .set_resources(cost.steel.saturating_add(199), cost.oil.saturating_add(100));
+
+    game.tick();
+
+    assert!(game
+        .state
+        .entities
+        .get(barracks)
+        .expect("barracks")
+        .prod_queue()
+        .is_empty());
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (cost.steel.saturating_add(199), cost.oil.saturating_add(100))
+    );
+}
+
+#[test]
+fn auto_build_resource_floors_do_not_block_manual_training() {
+    let (mut game, barracks) = repeat_fixture();
+    let cost = rules::economy::resource_cost(EntityKind::Rifleman);
+    game.state.players[0].auto_build = AutoBuildSettings::default();
+    game.state.players[0].set_resources(cost.steel, cost.oil);
+    game.enqueue(
+        1,
+        SimCommand::Train {
+            building: barracks,
+            unit: EntityKind::Rifleman,
+        },
+    );
+
+    game.tick();
+
+    let queue = game
+        .state
+        .entities
+        .get(barracks)
+        .expect("barracks")
+        .prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert!(queue[0].paid);
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (0, 0)
+    );
+}
+
+#[test]
+fn auto_build_settings_do_not_change_ai_repeat_production() {
+    let (mut game, barracks) = repeat_fixture();
+    let cost = rules::economy::resource_cost(EntityKind::Rifleman);
+    game.state.players[0].is_ai = true;
+    game.state.players[0].auto_build = AutoBuildSettings {
+        paused: true,
+        reserve_steel: 9_950,
+        reserve_oil: 9_950,
+    };
+    game.state.players[0].set_resources(cost.steel, cost.oil);
+
+    game.tick();
+
+    let queue = game
+        .state
+        .entities
+        .get(barracks)
+        .expect("barracks")
+        .prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert!(queue[0].paid);
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (0, 0)
+    );
 }
 
 #[test]

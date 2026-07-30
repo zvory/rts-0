@@ -57,6 +57,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     t: "snapshot",
     v: COMPACT_SNAPSHOT_VERSION,
     s: [42, 100, 25, 3, 10],
+    ab: [true, 250, 150],
     n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 7, 42],
     e: [
       [
@@ -264,6 +265,12 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(decoded.upgrades[1] === UPGRADE.ARTILLERY_UNLOCK, "compact artillery upgrade decodes");
   assert(decoded.upgrades[2] === UPGRADE.PANZERFAUSTS, "compact Panzerfausts upgrade decodes");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
+  assert(
+    decoded.autoBuild?.paused === true &&
+      decoded.autoBuild.reserveSteel === 250 &&
+      decoded.autoBuild.reserveOil === 150,
+    "compact Auto-Build settings decode",
+  );
   assert(
     decoded.worldCombatPosition.join(",") === "1024,2048",
     "compact world combat position decodes",
@@ -655,6 +662,16 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       delta: -1,
     }),
     "production repeat adjustment command carries the selected producers and signed delta",
+  );
+  assert(
+    JSON.stringify(cmd.setAutoBuildSettings(true, 250, 150)) ===
+      JSON.stringify({
+        c: "setAutoBuildSettings",
+        paused: true,
+        reserveSteel: 250,
+        reserveOil: 150,
+      }),
+    "Auto-Build settings command carries pause and both resource floors",
   );
 }
 

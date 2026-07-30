@@ -213,7 +213,7 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["active isolated match only", "waits for the authoritative score screen"],
     example: { sessionId: "<game-session-id>" },
   }),
-  "game-tab-menu": descriptor("Hold, release, or change the browser-local Auto-Build tab-menu prototype.", "{sessionId:string,action:\"hold\"|\"release\"|\"toggle-pause\"|\"adjust\",resource?:\"steel\"|\"oil\",delta?:-1|1}", {
+  "game-tab-menu": descriptor("Hold, release, or change the authoritative Auto-Build tab-menu settings.", "{sessionId:string,action:\"hold\"|\"release\"|\"toggle-pause\"|\"adjust\",resource?:\"steel\"|\"oil\",delta?:-1|1}", {
     sceneMutation: true,
     variants: ["hold keeps the sidebar visible for inspection and capture", "release emulates Tab keyup", "toggle-pause changes the prototype Working/Paused state", "adjust changes one prototype reservation step"],
     defaults: ["prototype starts Working with steel=200 and oil=100", "one reservation step=50"],

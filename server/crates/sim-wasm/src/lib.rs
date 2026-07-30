@@ -298,6 +298,7 @@ impl CorePredictor {
             oil: self.oil.unwrap_or(0),
             supply_used: self.supply_used.unwrap_or(0),
             supply_cap: self.supply_cap.unwrap_or(0),
+            auto_build: None,
             entities: self
                 .owned
                 .values()
@@ -421,6 +422,7 @@ impl CorePredictor {
             | Command::Gather { .. }
             | Command::Train { .. }
             | Command::AdjustProductionRepeat { .. }
+            | Command::SetAutoBuildSettings { .. }
             | Command::Research { .. }
             | Command::Cancel { .. }
             | Command::SetRally { .. } => {
@@ -820,6 +822,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Build { .. } => "build",
         Command::Train { .. } => "train",
         Command::AdjustProductionRepeat { .. } => "adjustProductionRepeat",
+        Command::SetAutoBuildSettings { .. } => "setAutoBuildSettings",
         Command::Research { .. } => "research",
         Command::Cancel { .. } => "cancel",
         Command::Stop { .. } => "stop",
@@ -913,6 +916,7 @@ mod tests {
             oil: 0,
             supply_used: 1,
             supply_cap: 10,
+            auto_build: None,
             entities: vec![owned, hidden_shape, neutral_tank_trap],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),

@@ -493,6 +493,7 @@ impl PlayerMilestones {
             | Command::Deconstruct { .. }
             | Command::Train { .. }
             | Command::AdjustProductionRepeat { .. }
+            | Command::SetAutoBuildSettings { .. }
             | Command::Research { .. }
             | Command::Cancel { .. }
             | Command::Stop { .. }

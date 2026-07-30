@@ -150,6 +150,9 @@ fn standing_repeat_does_not_create_unpaid_queue_items() {
         .expect("barracks")
         .set_repeat_production(Some(EntityKind::Rifleman), true);
     let mut players = vec![player(1)];
+    // This test isolates repeat-queue payment semantics; reserve-floor behavior has dedicated tests.
+    players[0].auto_build.reserve_steel = 0;
+    players[0].auto_build.reserve_oil = 0;
 
     tick_production(&map, &mut entities, &mut players);
     assert!(entities

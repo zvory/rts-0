@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::config;
+use crate::game::auto_build::RESERVE_MAX as AUTO_BUILD_RESERVE_MAX;
 use crate::game::commands::PendingCommand;
 use crate::game::entity::{Entity, MAX_PRODUCTION_QUEUE, MAX_QUEUED_ORDERS};
 use crate::game::firing_reveal::FiringRevealSource;
@@ -80,6 +81,13 @@ pub(super) fn validate_players(
             player.resource_income_history_len(),
             MAX_RESOURCE_INCOME_HISTORY_PER_PLAYER,
         )?;
+        if player.auto_build.reserve_steel > AUTO_BUILD_RESERVE_MAX
+            || player.auto_build.reserve_oil > AUTO_BUILD_RESERVE_MAX
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "players.autoBuild",
+            });
+        }
         let mut income_ticks = BTreeSet::new();
         for income_tick in player.resource_income_history_ticks() {
             if income_tick > tick {
@@ -450,6 +458,7 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
         | SimCommand::HoldPosition { units, .. } => Some(units),
         SimCommand::AdjustProductionRepeat { buildings, .. } => Some(buildings),
         SimCommand::Train { .. }
+        | SimCommand::SetAutoBuildSettings { .. }
         | SimCommand::Research { .. }
         | SimCommand::Cancel { .. }
         | SimCommand::SetRally { .. }

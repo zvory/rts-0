@@ -124,6 +124,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. `pump_jack` is a contextual worker build that is valid only when its footprint overlaps a live oil node; when its builder arrives, owned and allied units on that footprint are moved to nearby clear positions before placement is revalidated, while enemy units remain blockers. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a manual unit at a production building. A legal manual request is accepted without current Steel, Oil, or supply; an unpaid front item waits at zero progress until it can pay and reserve supply. Later FIFO items do not prepay. Standing repeat production remains separate and creates no queue item until it can pay. |
 | `adjustProductionRepeat` | `buildings: u32[]`, `unit: string`, `delta: -1\|1` | Atomically adjust `unit` across the selected owned completed compatible producers. `+1` enables it on one producer that does not already repeat it, preferring the producer with the fewest standing repeat units; `-1` removes it from one producer that repeats it, preferring the producer with the most standing repeat units so another automatic order survives when possible. Stable opposite entity-id tie-breaks make repeated additions followed by removals reversible. Other delta values are ignored. When a producer's ordinary unit queue is empty, it silently retries the ordered list's current entry. Each successful automatic enqueue advances to the next enabled unit, so two active units alternate. Once inserted, a repeated unit is an ordinary FIFO item, so later manual production queues behind it. Any production cancel clears the affected producer's whole repeat list. |
+| `setAutoBuildSettings` | `paused: bool`, `reserveSteel: u32`, `reserveOil: u32` | Replace the issuing player's authoritative Auto-Build policy. The server clamps each reserve to 0–9,950. While paused, standing repeat orders do not enqueue new units. Otherwise a repeat order may spend only when the resulting stockpile stays at or above both resource floors. Already-queued and manual production remain ordinary FIFO work and are unaffected. |
 | `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. A legal manual request may wait unpaid at zero progress until its cost is available. A prerequisite must either be complete or already appear earlier in the same building's authoritative FIFO research queue. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `anti_tank_gun_unlock` (AT Guns), `artillery_unlock` (Artillery), `ballistic_tables` (Artillery Fire Control), `tank_unlock`, `mortar_autocast`, `smoke_plus`, and `scout_plane_unlock` (Scout Plane) at the R&D Complex (`research_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. `anti_tank_gun_unlock` unlocks Anti-Tank Gun training; `artillery_unlock` requires `anti_tank_gun_unlock` and unlocks Artillery training; `ballistic_tables` requires `artillery_unlock` and reduces the Artillery Fire minimum radius from 6 tiles to 3; `tank_unlock` unlocks Tank training. `smoke_plus` doubles Scout Car Smoke radius and duration. `scout_plane_unlock` unlocks the Command Car Scout Plane ability. |
 | `cancel`     | `building: u32`, `construction?: bool` | With `construction: true`, cancel an owned unfinished building for a full construction-cost refund; otherwise cancel the latest item in a completed building's production queue. The explicit construction scope prevents a delayed scaffold action from cancelling production after the building completes. Attached builders return to ordinary order handling when a construction site is canceled. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
@@ -651,6 +652,7 @@ transport decode:
   worldCombatPosition?: [f32, f32], // coarse global combat area; omitted when inactive
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
+  autoBuild?: {paused: bool, reserveSteel: u32, reserveOil: u32}, // projected player's authoritative policy
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
@@ -700,7 +702,7 @@ Combat `targetId` and `weaponFacing` for allied units are sent whenever an attac
 a visible acquired target, including autonomous acquisition while its explicit order state remains
 idle. They are omitted when the target is not visible in the recipient's team-current actionable
 fog, so allied units attacking hidden enemies do not reveal hidden target ids or target directions.
-`steel`, `oil`, supply, `upgrades`, rallies, order plans,
+`steel`, `oil`, supply, `autoBuild`, `upgrades`, rallies, order plans,
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.
 
@@ -757,7 +759,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 47. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 48. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -783,8 +785,9 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 47,
+  "v": 48,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
+  "ab": [paused, reserveSteel, reserveOil], // omitted when no real player is projected
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
@@ -910,8 +913,8 @@ normal Rifleman art. It is omitted for Riflemen and all other entities.
 `panzerfaustWindupProgress` is present only while a visible Panzerfaust is in its cancellable loaded
 shot wind-up. It is an authoritative normalized `0..1` value using that owner's actual 15-tick
 wind-up, or 12 ticks with Methamphetamines, so renderers can select wind-up frames without receiving
-private upgrade state. It is appended as an optional trailing compact entity slot in compact
-snapshot version 47.
+private upgrade state. It remains the optional trailing compact entity slot in compact snapshot
+version 48.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center and source Command Car id; enemy projections that can see the plane omit
 this state. Scout Plane

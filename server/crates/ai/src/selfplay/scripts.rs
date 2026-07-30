@@ -177,6 +177,7 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         | Command::Deconstruct { .. }
         | Command::Train { .. }
         | Command::AdjustProductionRepeat { .. }
+        | Command::SetAutoBuildSettings { .. }
         | Command::Research { .. }
         | Command::Cancel { .. }
         | Command::Stop { .. }

@@ -16,6 +16,7 @@ mod analysis;
 mod anti_tank_gun_memory;
 mod apm;
 mod artillery;
+mod auto_build;
 mod building_memory;
 mod checkpoint;
 pub mod command;
@@ -57,12 +58,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::protocol::{
-    Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
-    ResourceDelta, ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID,
+    AutoBuildSettingsSnapshot, Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart,
+    RememberedBuildingView, ResourceDelta, ResourceNode, Snapshot, StartPayload,
+    DEFAULT_FACTION_ID,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
 
+pub(crate) use auto_build::AutoBuildSettings;
 use building_memory::BuildingMemoryEntry;
 use derived_state::DerivedState;
 use entity::{BuildPhase, EntityKind, EntityStore};
@@ -153,6 +156,8 @@ pub(crate) struct PlayerState {
     pub(crate) upgrades: BTreeSet<upgrade::UpgradeKind>,
     #[serde(default)]
     pub(crate) ability_cooldowns: BTreeMap<ability::AbilityKind, u16>,
+    #[serde(default)]
+    pub(crate) auto_build: AutoBuildSettings,
 }
 
 /// Per-player score-screen counters. Values are accumulated from authoritative entity lifecycle

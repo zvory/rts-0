@@ -36,14 +36,14 @@ pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use observer_analysis::*;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
-    AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
-    EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection,
-    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
-    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
-    RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot,
-    SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
-    DEFAULT_FACTION_ID,
+    AttackReveal, AutoBuildSettingsSnapshot, CommandCapabilities, DebugPathPoint, DebugPathView,
+    DiagnosticCapabilities, EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole,
+    LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
+    ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
+    RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
+    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView,
+    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView,
+    VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 
@@ -279,6 +279,11 @@ pub enum Command {
         buildings: Vec<u32>,
         unit: String,
         delta: i8,
+    },
+    SetAutoBuildSettings {
+        paused: bool,
+        reserve_steel: u32,
+        reserve_oil: u32,
     },
     Research {
         building: u32,
@@ -1266,6 +1271,11 @@ mod tests {
             oil: 25,
             supply_used: 3,
             supply_cap: 10,
+            auto_build: Some(AutoBuildSettingsSnapshot {
+                paused: true,
+                reserve_steel: 250,
+                reserve_oil: 150,
+            }),
             entities: vec![worker, gunner, center],
             resource_deltas: vec![ResourceDelta {
                 id: 200,
@@ -1420,6 +1430,7 @@ mod tests {
         assert_eq!(value["t"], "snapshot");
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
         assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
+        assert_eq!(value["ab"], serde_json::json!([true, 250, 150]));
         assert_eq!(value["wc"], serde_json::json!([1024.0, 2048.0]));
         assert_eq!(value["e"].as_array().unwrap().len(), 3);
         assert_eq!(
@@ -1597,19 +1608,5 @@ mod tests {
             .expect("worker kind should be summarized");
         assert_eq!(worker.count, 1);
         assert!(worker.approx_bytes > 0);
-    }
-
-    #[test]
-    fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
-        let snapshot = representative_snapshot();
-        let frame = encode_snapshot_frame(&snapshot, SnapshotCodec::CompactJson).unwrap();
-        match frame {
-            SnapshotFrame::Text(text) => {
-                let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-                assert_eq!(value["t"], "snapshot");
-                assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
-            }
-            SnapshotFrame::Binary(_) => panic!("compact JSON baseline codec must stay text"),
-        }
     }
 }

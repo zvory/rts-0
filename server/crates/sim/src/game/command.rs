@@ -99,6 +99,11 @@ pub enum SimCommand {
         unit: EntityKind,
         delta: i8,
     },
+    SetAutoBuildSettings {
+        paused: bool,
+        reserve_steel: u32,
+        reserve_oil: u32,
+    },
     Research {
         building: u32,
         upgrade: UpgradeKind,
@@ -340,6 +345,15 @@ impl SimCommand {
                     reason: CommandRejection::Unit,
                 },
             },
+            protocol::Command::SetAutoBuildSettings {
+                paused,
+                reserve_steel,
+                reserve_oil,
+            } => SimCommand::SetAutoBuildSettings {
+                paused,
+                reserve_steel,
+                reserve_oil,
+            },
             protocol::Command::Research { building, upgrade } => {
                 match upgrade.parse::<UpgradeKind>() {
                     Ok(upgrade) => SimCommand::Research { building, upgrade },
@@ -542,6 +556,15 @@ impl SimCommand {
                 unit: protocol::kind_to_wire(*unit).to_string(),
                 delta: *delta,
             },
+            SimCommand::SetAutoBuildSettings {
+                paused,
+                reserve_steel,
+                reserve_oil,
+            } => protocol::Command::SetAutoBuildSettings {
+                paused: *paused,
+                reserve_steel: *reserve_steel,
+                reserve_oil: *reserve_oil,
+            },
             SimCommand::Research { building, upgrade } => protocol::Command::Research {
                 building: *building,
                 upgrade: upgrade.to_protocol_str().to_string(),
@@ -697,24 +720,6 @@ mod tests {
                 reason: CommandRejection::Unit,
             }
         );
-    }
-
-    #[test]
-    fn protocol_production_repeat_adjustment_round_trips() {
-        let command = SimCommand::AdjustProductionRepeat {
-            buildings: vec![3, 5, 7],
-            unit: EntityKind::ScoutCar,
-            delta: -1,
-        };
-        let protocol = command
-            .to_protocol()
-            .expect("production repeat adjustment should encode");
-        let encoded = serde_json::to_string(&protocol).expect("command should serialize");
-        assert_eq!(
-            encoded,
-            r#"{"c":"adjustProductionRepeat","buildings":[3,5,7],"unit":"scout_car","delta":-1}"#
-        );
-        assert_eq!(SimCommand::from_protocol(protocol), command);
     }
 
     #[test]

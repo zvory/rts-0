@@ -64,6 +64,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "map_editor_terrain_preview.js": "app-shell",
 
   "state.js": "model",
+  "state_auto_build.js": "model",
   "state_firing_reveal.js": "model",
   "state_control_groups.js": "model",
   "state_queries.js": "model",

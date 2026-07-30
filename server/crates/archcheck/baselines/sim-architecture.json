@@ -1,5 +1,5 @@
 {
-  "reason": "Tank Trap cluster orders require serialized target lists and planner coverage",
+  "reason": "Auto-Build policy adds a focused authoritative PlayerState mutation and affordability module",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1345,6 +1345,16 @@
     }
   ],
   "player_state_usages": [
+    {
+      "path": "auto_build.rs",
+      "line": 26,
+      "code": "impl PlayerState {"
+    },
+    {
+      "path": "services/commands/auto_build.rs",
+      "line": 4,
+      "code": "pub(super) fn apply(players: &mut [PlayerState], player: u32, command: SimCommand) {"
+    },
     {
       "path": "lab.rs",
       "line": 1400,
