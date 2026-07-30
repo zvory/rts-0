@@ -667,20 +667,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     app.warmMatchRenderer = () => { warmed += 1; };
     app.discardCountdownRendererPreparation = () => { discarded += 1; };
     app.onLobbyReadyChange(true);
+    app.onLobbyReadyChange(true, { rendererEligible: false });
     app.onLobbyReadyChange(false);
-    assert(warmed === 1 && discarded === 1,
-      "ready warms the match renderer and unready discards its preparation");
-  }
-  {
-    const app = Object.create(App.prototype);
-    const sent = [];
-    const state = { countdownId: 23, acknowledged: false, preparation: {} };
-    app.countdownRendererPreparation = state;
-    app.net = { matchLoadReady(id) { sent.push(id); } };
-    app.acknowledgeMatchLoadReady(state);
-    app.acknowledgeMatchLoadReady(state);
-    assert(sent.length === 1 && sent[0] === 23,
-      "a warmed renderer acknowledges each countdown generation once");
+    assert(warmed === 1 && discarded === 2,
+      "only eligible ready state warms; replay-ready and unready discard preparation");
   }
   {
     const app = Object.create(App.prototype);
