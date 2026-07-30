@@ -3,11 +3,16 @@ import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { liveRigIconSvgFor, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
+import { resolvePngSpriteTransform } from "./png_transform.js";
 
 const LIVE_FRAME_STRIPS = createLiveFrameStrips();
 const LIVE_PNG_ATLASES = createLivePngRigAtlases();
 const ICON_FRAME_ZOOM = 1.5;
 const ICON_VISIBLE_PADDING_RATIO = 0.025;
+const ICON_COMPOSITION_STATE = Object.freeze({
+  transform: Object.freeze({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }),
+  pivot: Object.freeze({ x: 0, y: 0 }),
+});
 
 /**
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
@@ -141,14 +146,26 @@ function atlasComposition(atlas) {
     const descriptor = typeof entry === "string" ? { spriteId: entry } : entry;
     const sprite = spritesById.get(descriptor?.spriteId);
     if (!sprite) return null;
+    const part = {
+      ...sprite,
+      positionOffsetX: optionalFiniteNumber(descriptor.x) ?? sprite.positionOffsetX,
+      positionOffsetY: optionalFiniteNumber(descriptor.y) ?? sprite.positionOffsetY,
+      rotationOffset: optionalFiniteNumber(descriptor.rotation) ?? sprite.rotationOffset,
+      rotationPivotX: optionalFiniteNumber(descriptor.pivotX) ?? sprite.rotationPivotX,
+      rotationPivotY: optionalFiniteNumber(descriptor.pivotY) ?? sprite.rotationPivotY,
+      rotationPivotReferenceOffset:
+        optionalFiniteNumber(descriptor.pivotReferenceRotation)
+        ?? sprite.rotationPivotReferenceOffset,
+    };
+    const transform = resolvePngSpriteTransform(ICON_COMPOSITION_STATE, sprite.frame, part);
     components.push({
       id: sprite.id,
       frame: sprite.frame,
-      x: finiteNumber(descriptor.x),
-      y: finiteNumber(descriptor.y),
-      rotation: Number.isFinite(Number(descriptor.rotation))
-        ? Number(descriptor.rotation)
-        : finiteNumber(sprite.rotationOffset),
+      x: transform.x,
+      y: transform.y,
+      rotation: transform.rotation,
+      pivotX: transform.pivotX,
+      pivotY: transform.pivotY,
     });
   }
   return components;
@@ -308,10 +325,14 @@ function normalizedCompositionComponent(component) {
   const scaleY = Math.sign(pixelsPerUnitY);
   const w = frameWidth / Math.abs(pixelsPerUnitX);
   const h = frameHeight / Math.abs(pixelsPerUnitY);
-  const originWorldX = -finiteNumber(frame.originX) / pixelsPerUnitX;
-  const farWorldX = (frameWidth - finiteNumber(frame.originX)) / pixelsPerUnitX;
-  const originWorldY = -finiteNumber(frame.originY) / pixelsPerUnitY;
-  const farWorldY = (frameHeight - finiteNumber(frame.originY)) / pixelsPerUnitY;
+  const defaultPivotX = finiteNumber(frame.originX);
+  const defaultPivotY = finiteNumber(frame.originY);
+  const pivotX = optionalFiniteNumber(component.pivotX) ?? defaultPivotX;
+  const pivotY = optionalFiniteNumber(component.pivotY) ?? defaultPivotY;
+  const originWorldX = -pivotX / pixelsPerUnitX;
+  const farWorldX = (frameWidth - pivotX) / pixelsPerUnitX;
+  const originWorldY = -pivotY / pixelsPerUnitY;
+  const farWorldY = (frameHeight - pivotY) / pixelsPerUnitY;
   const localX = Math.min(originWorldX, farWorldX);
   const localY = Math.min(originWorldY, farWorldY);
   return {
@@ -399,6 +420,12 @@ function positiveDimension(value) {
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function optionalFiniteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function number(value) {
