@@ -163,7 +163,7 @@ export class App {
      */
     this.audio = new Audio();
     void this.audio.preload(SOUND_MANIFEST);
-    this.statusBadge = new StatusBadge(dom.version);
+    this.statusBadge = new StatusBadge(dom.statusBadge);
     this.hotkeyProfiles = new HotkeyProfileService({
       catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
     });

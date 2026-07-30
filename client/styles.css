@@ -89,7 +89,7 @@ body {
   pointer-events: none;
 }
 
-#version {
+#status-badge {
   position: absolute;
   top: 8px;
   left: 10px;
@@ -110,7 +110,7 @@ body {
   user-select: text;
 }
 
-#version:empty {
+#status-badge:empty {
   display: none;
 }
 
@@ -5482,7 +5482,7 @@ input[type="text"]:focus {
 }
 
 /* Dedicated Map Editor --------------------------------------------------- */
-.map-editor-mode #app > :not(#game-screen):not(#version) {
+.map-editor-mode #app > :not(#game-screen):not(#status-badge) {
   display: none !important;
 }
 
