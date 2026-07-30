@@ -284,6 +284,21 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     optionalBoolean(value.queued, "game move.queued");
   } else if (command === "game-give-up") {
     exact(value, ["sessionId"], "game give-up");
+  } else if (command === "game-tab-menu") {
+    exact(value, ["sessionId", "action", "resource", "delta"], "game tab-menu");
+    if (!["hold", "release", "toggle-pause", "adjust"].includes(String(value.action))) {
+      invalid("game tab-menu.action", "must be hold, release, toggle-pause, or adjust");
+    }
+    if (value.action === "adjust") {
+      if (!["steel", "oil"].includes(String(value.resource))) {
+        invalid("game tab-menu.resource", "must be steel or oil for adjust");
+      }
+      if (value.delta !== -1 && value.delta !== 1) {
+        invalid("game tab-menu.delta", "must be -1 or 1 for adjust");
+      }
+    } else if (value.resource != null || value.delta != null) {
+      invalid("game tab-menu", "resource and delta are accepted only for adjust");
+    }
   } else if (command === "game-camera") {
     exact(value, ["sessionId", "camera"], "game camera");
     validateGameCamera(value.camera);
@@ -404,7 +419,7 @@ function dragPoint(value: unknown, label: string) {
 }
 
 function captureRegion(value: unknown, label: string) {
-  if (value === "viewport" || value === "minimap") return;
+  if (value === "viewport" || value === "minimap" || value === "tab-menu") return;
   record(value, label);
   exact(value, ["x", "y", "width", "height"], label);
   boundedNumber(value.x, `${label}.x`, 0, 2048);

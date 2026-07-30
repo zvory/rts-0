@@ -114,8 +114,8 @@ async function captureSampledTimelapse({
   let speedChangeAttempted = false;
   try {
     if (viewport) await page.setViewport(viewport);
-    if (region === "minimap" && presentation === "clean") {
-      throw codedError("invalidPresentation", "The minimap is hidden in clean presentation; use normal presentation for a minimap time-lapse.");
+    if ((region === "minimap" || region === "tab-menu") && presentation === "clean") {
+      throw codedError("invalidPresentation", "UI regions are hidden in clean presentation; use normal presentation for a UI time-lapse.");
     }
     await call("presentation", { mode: presentation === "clean" ? "clean" : "default" });
     await page.evaluate(() => document.fonts?.ready || Promise.resolve());

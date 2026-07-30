@@ -2510,6 +2510,13 @@ input[type="text"]:focus {
   top: auto;
   bottom: 273px;
 }
+#game-menu.tab-menu-mode,
+#game-menu.tab-menu-mode[data-settings-context="match"] {
+  left: 12px;
+  right: auto;
+  top: 68px;
+  bottom: auto;
+}
 #settings-button {
   appearance: none;
   width: 36px;
@@ -2528,6 +2535,188 @@ input[type="text"]:focus {
 #settings-button:hover {
   border-color: var(--accent);
   box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--panel-glow);
+}
+#settings-button.active {
+  border-color: var(--accent);
+  box-shadow:
+    4px 4px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 2px var(--accent),
+    0 0 12px var(--panel-glow);
+}
+.hamburger-icon {
+  width: 18px;
+  display: grid;
+  gap: 3px;
+}
+.hamburger-icon i {
+  display: block;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+/* --- Hold-Tab in-game menu prototype --- */
+.tab-menu {
+  position: absolute;
+  z-index: 19;
+  left: 12px;
+  top: 116px;
+  width: 352px;
+  padding: 14px;
+  border-radius: var(--radius);
+  pointer-events: auto;
+}
+.tab-menu-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--panel-edge);
+}
+.tab-menu-header h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+.tab-menu-held-hint {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.tab-menu-held-hint kbd {
+  display: inline-grid;
+  min-width: 30px;
+  min-height: 20px;
+  place-items: center;
+  margin-left: 3px;
+  padding: 2px 5px;
+  border: 1px solid var(--panel-edge);
+  border-bottom-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+}
+.tab-menu-intro {
+  margin: 10px 0 12px;
+  color: var(--ink-dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.tab-menu-pause-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(91, 83, 65, 0.65);
+  background: rgba(17, 17, 15, 0.42);
+}
+.tab-menu .cmd-btn {
+  min-width: 0;
+  min-height: 0;
+}
+.tab-menu-pause {
+  width: 82px;
+  height: 82px;
+}
+.tab-menu-pause.is-paused {
+  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1px rgba(199, 162, 74, 0.5);
+}
+.tab-menu-pause-copy {
+  display: grid;
+  gap: 5px;
+}
+.tab-menu-pause-copy strong {
+  color: var(--ink);
+  font-size: 14px;
+  text-transform: uppercase;
+}
+.tab-menu-pause-copy span {
+  color: var(--ink-dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.tab-menu-reservations {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+.tab-menu-reservation {
+  display: grid;
+  gap: 7px;
+}
+.tab-menu-reservation h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tab-menu-reservation h3 .res-icon {
+  width: 16px;
+  height: 16px;
+}
+.tab-menu .res-icon {
+  display: inline-grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+}
+.tab-menu .res-icon.steel {
+  color: var(--steel);
+  text-shadow: 1px 1px 0 #191710;
+}
+.tab-menu .res-icon.oil {
+  color: var(--oil);
+  text-shadow: 1px 1px 0 #5f6848;
+}
+.tab-menu-stepper {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 76px;
+  grid-auto-rows: 76px;
+  gap: 9px;
+}
+.tab-menu-step {
+  width: 76px;
+  height: 76px;
+}
+.tab-menu-step .cmd-icon {
+  font-size: 27px;
+}
+.tab-menu-reserve-value {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 0;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font-family: var(--mono);
+}
+.tab-menu-reserve-value strong {
+  overflow: hidden;
+  font-size: 24px;
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+.tab-menu-reserve-value .res-icon {
+  width: 20px;
+  height: 20px;
 }
 #settings-menu {
   position: absolute;
@@ -2548,6 +2737,13 @@ input[type="text"]:focus {
   top: 44px;
   bottom: auto;
   max-height: min(720px, calc(100vh - 80px));
+}
+#game-menu.tab-menu-mode #settings-menu {
+  left: 0;
+  right: auto;
+  top: 44px;
+  bottom: auto;
+  max-height: min(720px, calc(100vh - 124px));
 }
 .settings-header {
   display: grid;

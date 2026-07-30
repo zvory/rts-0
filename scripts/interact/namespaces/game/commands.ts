@@ -37,6 +37,13 @@ export async function executeGameCommand(
     }) };
   }
   if (command === "game-give-up") return { sessionId: session.sessionId, result: await session.driver.giveUp() };
+  if (command === "game-tab-menu") {
+    return { sessionId: session.sessionId, result: await session.driver.tabMenu({
+      action: input.action,
+      resource: input.resource,
+      delta: input.delta,
+    }) };
+  }
   throw new InteractError("unknownCommand", `Unknown game command ${command}.`);
 }
 

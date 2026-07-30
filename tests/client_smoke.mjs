@@ -358,7 +358,30 @@ try {
     `PRODUCTION PROGRESS: selected train bar advances during snapshot gap (before=${productionProgress.before}, after=${productionProgress.after}, predicted=${productionProgress.predicted})`,
   );
 
-  await page.click("#settings-button");
+  await page.keyboard.down("Tab");
+  await page.waitForFunction(() => !document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
+  await page.keyboard.press("2");
+  await page.keyboard.press("3");
+  await page.keyboard.press("q");
+  await page.evaluate(() => window.__rts.hotkeyProfiles.setActiveProfile("preset.classicRts"));
+  await page.keyboard.press("a");
+  const tabMenuPrototype = await page.evaluate(() => window.__rts.match.tabMenu.status());
+  ok(
+    tabMenuPrototype.visible &&
+      !tabMenuPrototype.paused &&
+      tabMenuPrototype.pauseHotkey === "A" &&
+      tabMenuPrototype.reservations.steel === 250 &&
+      tabMenuPrototype.reservations.oil === 150,
+    `TAB MENU: held Tab accepts Grid/Classic pause and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
+  );
+  await page.evaluate(() => {
+    window.__rts.hotkeyProfiles.setActiveProfile("preset.grid");
+    window.__rts.match.tabMenu.render();
+  });
+  await page.keyboard.up("Tab");
+  await page.waitForFunction(() => document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
+
+  await page.evaluate(() => window.__rts.settings.open({ focus: false }));
   await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });
   await page.click('[data-settings-tab="hotkeys"]');
   await page.click("#hotkey-clone-profile");

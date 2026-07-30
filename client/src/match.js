@@ -7,7 +7,7 @@ import {
 import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { FrameProfiler } from "./frame_profiler.js";
-import { createMatchHud } from "./match_hud.js";
+import { createMatchHud, createMatchTabMenu } from "./match_hud.js";
 import { ApmTracker } from "./apm_tracker.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
@@ -381,6 +381,7 @@ export class Match {
           this.controlPolicy,
         ),
     );
+    this.tabMenu = createMatchTabMenu(this, dom.gameScreen, dom.settingsButton);
 
     // Size the camera to the map and the current viewport, then restore a carried view or center on home.
     this._timeInit("match.bounds", () => {
@@ -1236,6 +1237,7 @@ export class Match {
     this.roomTimeControls?.destroy();
     this.observerDiagnostics?.destroy();
     this.livePauseOverlay?.destroy();
+    this.tabMenu?.destroy();
     this.autoSpectator?.destroy();
     this.cancelLabTool("freeze");
     this.predictionInitToken += 1;
@@ -1293,6 +1295,7 @@ export class Match {
     this.roomTimeControls?.destroy();
     this.observerDiagnostics?.destroy();
     this.livePauseOverlay?.destroy();
+    this.tabMenu?.destroy();
     this.autoSpectator?.destroy();
     this.cancelLabTool("destroy");
     this.predictionInitToken += 1;
@@ -1300,6 +1303,7 @@ export class Match {
     this.roomTimeControls = null;
     this.observerDiagnostics = null;
     this.livePauseOverlay = null;
+    this.tabMenu = null;
     this.autoSpectator = null;
     if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;

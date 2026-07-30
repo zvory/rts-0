@@ -8,7 +8,7 @@ import {
   selectedInteractEntityIds,
 } from "./interact_selection.js";
 
-export const INTERACT_GAME_BRIDGE_VERSION = 3;
+export const INTERACT_GAME_BRIDGE_VERSION = 4;
 export const INTERACT_GAME_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectKinds: 32,
@@ -145,6 +145,7 @@ export class InteractGameBridge {
       case "select": return this.select(input);
       case "move": return this.gameMutation(method, () => this.move(input));
       case "giveUp": return this.gameMutation(method, () => this.giveUp());
+      case "tabMenu": return this.gameMutation(method, () => this.tabMenu(input));
       case "time": return this.time(input);
       case "camera": return this.camera(input);
       case "presentation": return this.presentation(input);
@@ -263,6 +264,16 @@ export class InteractGameBridge {
       snapshotTick: match.state.tick,
       ui: projectUi(),
     };
+  }
+
+  async tabMenu(input = {}) {
+    const { match } = this.session({ playerSeat: true });
+    if (!match.tabMenu?.interact) {
+      throw bridgeError("tabMenuUnavailable", "The hold-Tab menu is unavailable in this session.");
+    }
+    const state = match.tabMenu.interact(input);
+    await animationFrames(2);
+    return { ...state, ui: projectUi() };
   }
 
   camera(input = {}) {
@@ -477,6 +488,7 @@ function projectRoomTime(state) {
 function projectUi() {
   const gameOver = element("game-over");
   const commandCard = element("command-card");
+  const tabMenu = element("tab-menu");
   return {
     gameVisible: visible(element("game-screen")),
     hudVisible: visible(element("hud")),
@@ -491,6 +503,12 @@ function projectUi() {
     commandCard: commandCard
       ? [...commandCard.querySelectorAll("button")].slice(0, 24).map((button) => String(button.textContent || "").trim().slice(0, 80)).filter(Boolean)
       : [],
+    tabMenu: {
+      visible: visible(tabMenu),
+      status: text("tab-menu-autobuild-pause", 80),
+      steelReserve: text("tab-menu-steel-reserve", 40),
+      oilReserve: text("tab-menu-oil-reserve", 40),
+    },
     giveUpDialogVisible: visible(element("give-up-confirm")),
     scoreScreenVisible: visible(gameOver),
     scoreTitle: text("game-over-text"),

@@ -382,6 +382,7 @@ export class InteractDriver {
   }
 
   async giveUp() { return this.call("giveUp", {}); }
+  async tabMenu(input: JsonObject) { return this.call("tabMenu", input); }
 
   async time(control: JsonObject) { return this.call("time", control); }
 
@@ -526,7 +527,7 @@ export class InteractDriver {
       if (this.recording) throw new InteractDriverError("recordingActive", "A recording is already active for this session. Stop it before starting another.");
       if (crop && region) throw new InteractDriverError("invalidRegion", "recording accepts crop or region, not both.");
       if (presentation !== "clean" && presentation !== "normal") throw new InteractDriverError("invalidPresentation", "recording presentation must be clean or normal.");
-      if (region === "minimap" && presentation === "clean") throw new InteractDriverError("invalidPresentation", "The minimap is hidden in clean presentation; use normal presentation.");
+      if ((region === "minimap" || region === "tab-menu") && presentation === "clean") throw new InteractDriverError("invalidPresentation", "UI regions are hidden in clean presentation; use normal presentation.");
       const tools = await checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
@@ -953,7 +954,7 @@ export class InteractDriver {
     try {
       if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
       await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
-      if (region === "minimap" && presentation === "clean") throw new InteractDriverError("invalidPresentation", "The minimap is hidden in clean presentation; use normal presentation.");
+      if ((region === "minimap" || region === "tab-menu") && presentation === "clean") throw new InteractDriverError("invalidPresentation", "UI regions are hidden in clean presentation; use normal presentation.");
       await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
       const readiness = await this.waitForCaptureReadiness(requestedSubjectIds);
       const resolvedRegion = await resolveCaptureRegion(this.page!, region);

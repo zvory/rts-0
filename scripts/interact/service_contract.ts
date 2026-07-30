@@ -48,7 +48,7 @@ export interface ServiceInput extends JsonObject {
   path?: string;
   maxDurationMs?: number;
   crop?: { x: number; y: number; width: number; height: number };
-  region?: "viewport" | "minimap" | { x: number; y: number; width: number; height: number };
+  region?: "viewport" | "minimap" | "tab-menu" | { x: number; y: number; width: number; height: number };
   scale?: number;
   resumeSpeed?: number | null;
   fps?: number;
@@ -61,6 +61,9 @@ export interface ServiceInput extends JsonObject {
   x?: number;
   y?: number;
   queued?: boolean;
+  action?: string;
+  resource?: string;
+  delta?: number;
 }
 
 export interface InteractSession {
