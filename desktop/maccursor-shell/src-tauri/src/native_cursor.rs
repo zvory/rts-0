@@ -842,7 +842,7 @@ unsafe extern "system" fn windows_raw_input_wnd_proc(
             .state::<crate::exclusive_fullscreen::ExclusiveFullscreen>()
             .set_enabled(&runtime.window, false);
         let _ = runtime.window.eval(
-            "window.dispatchEvent(new CustomEvent('rts-exclusive-fullscreen-shell-exit', { detail: { reason: 'escape' } }));",
+            "window.dispatchEvent(new CustomEvent('rts-exclusive-fullscreen-shell-change', { detail: { enabled: false, reason: 'escape' } })); window.dispatchEvent(new CustomEvent('rts-exclusive-fullscreen-shell-exit', { detail: { reason: 'escape' } }));",
         );
     }
     let previous: windows_sys::Win32::UI::WindowsAndMessaging::WNDPROC =

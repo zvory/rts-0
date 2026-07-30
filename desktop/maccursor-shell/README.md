@@ -66,8 +66,10 @@ and whether movement is batched. The current visible cursor is a DOM cursor
 painted directly in the native event handler (`visual: "dom-event-time"`), not
 a native overlay.
 
-Windows keeps its native backend opt-in. **Settings > Game > Use fullscreen
-mode** starts disabled. Enabling it enters a temporary Win32
+Windows keeps its native backend opt-in. Press **F11 from any screen** (including
+the startup selector, Beta, Mainline, lobby, and a running match), or use
+**Settings > Game > Use fullscreen mode**. The mode starts disabled. Enabling it
+enters a temporary Win32
 `CDS_FULLSCREEN` display mode on the window's current monitor, removes the
 window chrome without using Tauri's borderless fullscreen API, positions the
 native `HWND` over the exact monitor rectangle, marks it fullscreen through
@@ -79,7 +81,10 @@ movement, buttons, and wheel input continue through the same
 remains available while the setting is off and is not used while the Windows
 native backend is active.
 
-Escape turns **Use fullscreen mode** off. Alt-Tab remains available: losing
+F11 toggles the mode and Escape turns **Use fullscreen mode** off. Interactive
+Settings and hold-Tab menus temporarily release native cursor capture so their
+controls remain clickable, then restore match capture after the menu closes.
+Alt-Tab remains available: losing
 application activation releases Raw Input capture, cursor hiding/confinement,
 the taskbar fullscreen marker, and the temporary display mode. If the
 preference is still enabled, activating the game again restores the display
@@ -205,9 +210,12 @@ Manual check:
 5. From the lobby, use **Open Lab** and confirm the lab opens in the same
    shell window and starts the lab room.
 6. Start a one-player sandbox or AI match from either release channel.
-7. Open **Settings > Game**, confirm **Use fullscreen mode** is off, then turn
-   it on and confirm the monitor enters temporary display-mode fullscreen.
-8. Confirm the shell locks the cursor automatically in-match, then Alt-Tab away
+7. Press F11 on the startup selector, Beta, Mainline, lobby, and in-match
+   screens; confirm each press toggles temporary display-mode fullscreen. Also
+   confirm **Settings > Game > Use fullscreen mode** stays synchronized.
+8. Confirm the shell locks the cursor automatically in-match. Open Settings and
+   hold Tab, and confirm each menu releases the cursor and remains clickable.
+   Close each menu and confirm capture resumes. Then Alt-Tab away
    and back to confirm the display mode and cursor capture restore cleanly.
    Move over terrain/HUD/minimap, right-click move units, box-select, drag, and
    wheel zoom. Press Escape and confirm the cursor and display mode restore.

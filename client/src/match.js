@@ -846,6 +846,7 @@ export class Match {
   desktopCursorAutoLockCanRun() {
     if (!this.desktopCursorAutoLockEnabled) return false;
     if (!this.input || this.input.pointerLocked) return false;
+    if (this.settings?.isOpen() || this.tabMenu?.isOpen()) return false;
     const doc = globalThis.document;
     if (doc?.hidden) return false;
     if (typeof doc?.hasFocus === "function" && !doc.hasFocus()) return false;
@@ -881,6 +882,7 @@ export class Match {
     if (!this.desktopCursorAutoLockEnabled) return;
     if (this.desktopCursorAutoLockTimer != null || this.desktopCursorAutoLockInFlight) return;
     if (!this.input || this.input.pointerLocked) return;
+    if (this.settings?.isOpen() || this.tabMenu?.isOpen()) return;
     const setTimer = globalThis.window?.setTimeout || globalThis.setTimeout;
     if (typeof setTimer !== "function") {
       void this.requestDesktopCursorAutoLock(reason);
@@ -928,6 +930,21 @@ export class Match {
       this.scheduleDesktopCursorAutoLock(`retry:${reason}`, retryDelay);
     }
     return false;
+  }
+
+  handleInteractiveMenuStateChange(open) {
+    if (open) {
+      this.clearDesktopCursorAutoLockTimer();
+      if (this.input?.pointerLocked) {
+        void this.input.exitPointerLock();
+      }
+      return;
+    }
+    if (this.settings?.isOpen() || this.tabMenu?.isOpen()) return;
+    this.scheduleDesktopCursorAutoLock(
+      "interactive-menu-closed",
+      DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS,
+    );
   }
 
   togglePointerLock() {

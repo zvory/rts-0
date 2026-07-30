@@ -929,6 +929,52 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     document.addEventListener("click", redirectSameOriginTargetBlank, true);
   }}
 
+  const publishExclusiveFullscreenState = (snapshot) => {{
+    const enabled = snapshot?.requested === true;
+    try {{
+      Object.defineProperty(window, "__RTS_EXCLUSIVE_FULLSCREEN_ENABLED", {{
+        value: enabled,
+        configurable: true,
+        writable: true
+      }});
+    }} catch {{
+      try {{ window.__RTS_EXCLUSIVE_FULLSCREEN_ENABLED = enabled; }} catch {{}}
+    }}
+    window.dispatchEvent(new CustomEvent("rts-exclusive-fullscreen-shell-change", {{
+      detail: {{ enabled, snapshot }}
+    }}));
+    return snapshot;
+  }};
+  let exclusiveFullscreenShortcutPending = false;
+  const toggleExclusiveFullscreenFromShortcut = () => {{
+    if (!runtime.exclusiveFullscreenSupported || exclusiveFullscreenShortcutPending) return;
+    exclusiveFullscreenShortcutPending = true;
+    invoke("desktop_exclusive_fullscreen_diagnostics")
+      .then((snapshot) => invoke("desktop_set_exclusive_fullscreen", {{
+        enabled: snapshot?.requested !== true
+      }}))
+      .then(publishExclusiveFullscreenState)
+      .catch((err) => {{
+        const message = err && err.message ? err.message : String(err);
+        void desktopLogEvent("exclusive_fullscreen_shortcut_failed", message);
+        showDesktopShellFailure(`Fullscreen mode failed: ${{message}}`);
+      }})
+      .finally(() => {{ exclusiveFullscreenShortcutPending = false; }});
+  }};
+  window.addEventListener("keydown", (event) => {{
+    if (event.code !== "F11" || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleExclusiveFullscreenFromShortcut();
+  }}, true);
+  if (runtime.exclusiveFullscreenSupported) {{
+    void invoke("desktop_exclusive_fullscreen_diagnostics")
+      .then((snapshot) => snapshot?.requested === true
+        ? publishExclusiveFullscreenState(snapshot)
+        : snapshot)
+      .catch(() => {{}});
+  }}
+
   /* RTS_NATIVE_CURSOR_BEGIN */
   const denied = () => Promise.reject(new DOMException(
     "Pointer Lock is disabled in the macOS native-cursor shell.",
@@ -1471,6 +1517,10 @@ mod tests {
         assert!(script.contains("maccursor_start"));
         assert!(script.contains("native-windows-raw-input"));
         assert!(script.contains("__RTS_EXCLUSIVE_FULLSCREEN_ENABLED"));
+        assert!(script.contains("event.code !== \"F11\""));
+        assert!(script.contains("desktop_exclusive_fullscreen_diagnostics"));
+        assert!(script.contains("rts-exclusive-fullscreen-shell-change"));
+        assert!(script.contains("exclusive_fullscreen_shortcut_failed"));
         assert!(script.contains("if (runtime.pointerLockDisabled)"));
         assert!(script.contains(NATIVE_CURSOR_SCRIPT_BEGIN));
         assert!(script.contains(NATIVE_CURSOR_SCRIPT_END));

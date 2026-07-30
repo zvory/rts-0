@@ -1255,6 +1255,28 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(requestedLocks === 2, "focused cursor unlock re-requests desktop cursor capture");
     assert(syncedPointerUi >= 2, "desktop cursor auto-lock keeps the settings UI synchronized");
 
+    let settingsOpen = true;
+    let exitedForMenu = 0;
+    autoLockMatch.settings = { isOpen: () => settingsOpen };
+    autoLockMatch.tabMenu = { isOpen: () => false };
+    autoLockMatch.input.pointerLocked = true;
+    autoLockMatch.input.exitPointerLock = () => {
+      exitedForMenu += 1;
+      autoLockMatch.input.pointerLocked = false;
+      return Promise.resolve();
+    };
+    autoLockMatch.handleInteractiveMenuStateChange(true);
+    assert(exitedForMenu === 1, "opening an interactive menu releases fullscreen native cursor capture");
+    assert(!autoLockMatch.desktopCursorAutoLockCanRun(),
+      "desktop cursor auto-lock stays suspended while Settings is open");
+    settingsOpen = false;
+    autoLockMatch.handleInteractiveMenuStateChange(false);
+    assert(timers[0]?.ms === 120, "closing the last interactive menu schedules cursor recapture");
+    const menuCloseTimer = timers.shift();
+    autoLockMatch.clearDesktopCursorAutoLockTimer();
+    assert(clearedTimers.includes(menuCloseTimer.id),
+      "a pending post-menu recapture remains cancellable");
+
     autoLockMatch.input.pointerLocked = false;
     autoLockMatch.handleDesktopCursorAutoLockSignal();
     const pendingTimer = autoLockMatch.desktopCursorAutoLockTimer;

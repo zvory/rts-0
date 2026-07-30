@@ -184,8 +184,13 @@ function hotkeyService() {
     const shell = document.createElement("div");
     const button = document.createElement("button");
     const menu = document.createElement("div");
+    const openStates = [];
     button.parentElement = shell;
-    const settings = new SettingsContainer({ button, menu });
+    const settings = new SettingsContainer({
+      button,
+      menu,
+      onOpenChange: (open) => openStates.push(open),
+    });
     const tabs = buildSettingsTabs({ audio: {}, game: { kind: "match" } });
     const pauseButton = () => menu.children[0]?.children[1]?.children[0] || null;
 
@@ -204,6 +209,11 @@ function hotkeyService() {
     settings.open({ focus: false });
     assert(pauseButton()?.textContent === "Pause (3)", "settings: closed context refresh updates pause label before open");
     assert(pauseButton()?.disabled === false, "settings: closed context refresh enables pause before open");
+    settings.open({ focus: false });
+    settings.close();
+    settings.close();
+    assert(openStates.join(",") === "true,false",
+      "settings: open-state callback fires once per actual visibility transition");
     settings.destroy();
   });
 

@@ -19,6 +19,7 @@ export class TabMenu {
     settings = null,
     hotkeyProfiles = null,
     enabled = () => true,
+    onOpenChange = null,
     windowLike = globalThis.window,
   } = {}) {
     this.root = root || null;
@@ -26,6 +27,7 @@ export class TabMenu {
     this.settings = settings;
     this.hotkeyProfiles = hotkeyProfiles;
     this.enabled = enabled;
+    this.onOpenChange = onOpenChange;
     this.windowLike = windowLike;
     this.paused = false;
     this.reservations = { ...DEFAULT_RESERVATIONS };
@@ -106,21 +108,25 @@ export class TabMenu {
 
   hold(source) {
     if (this.destroyed || !this.enabled()) return this.status();
+    const wasOpen = this.isOpen();
     this.heldBy.add(source);
     this.settings?.close?.();
     this.render();
     this.panel.hidden = false;
     this.button?.setAttribute("aria-expanded", "true");
     this.button?.classList.add("active");
+    if (!wasOpen) this.onOpenChange?.(true);
     return this.status();
   }
 
   release(source) {
+    const wasOpen = this.isOpen();
     this.heldBy.delete(source);
     if (this.heldBy.size > 0) return this.status();
     this.panel.hidden = true;
     this.button?.setAttribute("aria-expanded", "false");
     this.button?.classList.remove("active");
+    if (wasOpen) this.onOpenChange?.(false);
     return this.status();
   }
 
