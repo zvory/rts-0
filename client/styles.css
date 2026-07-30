@@ -2561,8 +2561,11 @@ input[type="text"]:focus {
   z-index: 19;
   left: 12px;
   top: 116px;
-  width: 352px;
+  width: min(352px, calc(100vw - 24px));
+  max-height: calc(100vh - 128px);
   padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: var(--radius);
   pointer-events: auto;
 }

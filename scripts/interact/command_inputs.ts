@@ -307,7 +307,7 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     artifactToken(value.name, "game screenshot.name");
     presentation(value.presentation, "game screenshot.presentation");
     if (value.viewport != null) viewport(value.viewport, 2048, "game screenshot.viewport");
-    if (value.region != null) captureRegion(value.region, "game screenshot.region");
+    if (value.region != null) captureRegion(value.region, "game screenshot.region", { tabMenu: true });
     if (value.subjects != null) idArray(value.subjects, "game screenshot.subjects", 0, INTERACT_LIMITS.maxScreenshotSubjects);
   } else if (command === "game-record-start") {
     exact(value, ["sessionId", "name", "maxDurationMs", "viewport", "crop", "region", "scale", "presentation"], "game record-start");
@@ -315,7 +315,7 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     if (value.maxDurationMs != null) integer(value.maxDurationMs, "game record-start.maxDurationMs", 1_000, INTERACT_LIMITS.maxRecordingDurationMs);
     if (value.viewport != null) viewport(value.viewport, 2048, "game record-start.viewport");
     if (value.crop != null) recordingCrop(value.crop);
-    if (value.region != null) captureRegion(value.region, "game record-start.region");
+    if (value.region != null) captureRegion(value.region, "game record-start.region", { tabMenu: true });
     if (value.crop != null && value.region != null) invalid("game record-start", "cannot combine crop with region");
     if (value.scale != null) boundedNumber(value.scale, "game record-start.scale", 0.25, 1);
     presentation(value.presentation, "game record-start.presentation");
@@ -418,8 +418,8 @@ function dragPoint(value: unknown, label: string) {
   boundedNumber(value.y, `${label}.y`, 0, 4096);
 }
 
-function captureRegion(value: unknown, label: string) {
-  if (value === "viewport" || value === "minimap" || value === "tab-menu") return;
+function captureRegion(value: unknown, label: string, { tabMenu = false } = {}) {
+  if (value === "viewport" || value === "minimap" || (tabMenu && value === "tab-menu")) return;
   record(value, label);
   exact(value, ["x", "y", "width", "height"], label);
   boundedNumber(value.x, `${label}.x`, 0, 2048);

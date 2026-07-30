@@ -365,9 +365,18 @@ try {
   await page.keyboard.press("q");
   await page.evaluate(() => window.__rts.hotkeyProfiles.setActiveProfile("preset.classicRts"));
   await page.keyboard.press("a");
-  const tabMenuPrototype = await page.evaluate(() => window.__rts.match.tabMenu.status());
+  const tabMenuPrototype = await page.evaluate(() => ({
+    ...window.__rts.match.tabMenu.status(),
+    repeatConsumed: !window.dispatchEvent(new KeyboardEvent("keydown", {
+      code: "Tab",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })),
+  }));
   ok(
     tabMenuPrototype.visible &&
+      tabMenuPrototype.repeatConsumed &&
       !tabMenuPrototype.paused &&
       tabMenuPrototype.pauseHotkey === "A" &&
       tabMenuPrototype.reservations.steel === 250 &&

@@ -52,7 +52,10 @@ export class TabMenu {
 
     this.onKeyDown = (event) => this.handleKeyDown(event);
     this.onKeyUp = (event) => this.handleKeyUp(event);
-    this.onBlur = () => this.release("keyboard");
+    this.onBlur = () => {
+      this.release("keyboard");
+      this.release("pointer");
+    };
     this.onPointerDown = (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
@@ -87,7 +90,7 @@ export class TabMenu {
   }
 
   isOpen() {
-    return !this.panel.hidden;
+    return !this.destroyed && !this.panel.hidden;
   }
 
   hold(source) {
@@ -145,9 +148,9 @@ export class TabMenu {
   }
 
   handleKeyDown(event) {
-    if (event.code === "Tab" && !event.repeat && !isTextEntry(event.target)) {
+    if (event.code === "Tab" && !isTextEntry(event.target)) {
       consume(event);
-      this.hold("keyboard");
+      if (!event.repeat) this.hold("keyboard");
       return;
     }
     if (!this.isOpen() || event.metaKey || event.ctrlKey || event.altKey || isTextEntry(event.target)) {
@@ -262,6 +265,8 @@ export class TabMenu {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.heldBy.clear();
+    this.panel.hidden = true;
     this.windowLike?.removeEventListener("keydown", this.onKeyDown, true);
     this.windowLike?.removeEventListener("keyup", this.onKeyUp, true);
     this.windowLike?.removeEventListener("blur", this.onBlur);

@@ -66,6 +66,18 @@ try {
     "game screenshots accept the semantic tab-menu crop",
   );
   assert.throws(
+    () => validateCommandInput("game-capture-timelapse", {
+      sessionId: gameSessionId, maxDurationMs: 1_000, sampleEveryMs: 500, region: "tab-menu",
+    }),
+    (error) => error?.code === "invalidInput",
+    "spectator-only time-lapses reject the player-only tab-menu crop",
+  );
+  assert.throws(
+    () => validateCommandInput("scenario-screenshot", { sessionId: scenarioSessionId, region: "tab-menu" }),
+    (error) => error?.code === "invalidInput",
+    "dev scenarios reject the live-player-only tab-menu crop",
+  );
+  assert.throws(
     () => validateCommandInput("game-screenshot", { sessionId: gameSessionId, region: { x: 0, y: 0, width: 1, height: 100 } }),
     (error) => error?.code === "invalidInput",
     "region screenshots reject unusable custom crops",

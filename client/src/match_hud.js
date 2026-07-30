@@ -19,11 +19,22 @@ export function createMatchHud(match, rootEl) {
 
 /** Compose the transient, browser-local hold-Tab menu for a controllable live player. */
 export function createMatchTabMenu(match, rootEl, button) {
-  if (match.replayViewer || match.state.spectator) return null;
+  if (!matchTabMenuAvailable(match)) return null;
   return new TabMenu({
     root: rootEl,
     button,
     settings: match.settings,
     hotkeyProfiles: match.hotkeyProfiles,
   });
+}
+
+export function matchTabMenuAvailable(match) {
+  return !!match &&
+    match.running !== false &&
+    match.capabilities?.commands?.gameplay === true &&
+    !match.replayViewer &&
+    !match.state?.spectator &&
+    !match.labMetadata &&
+    !match.devWatch &&
+    match.net?.offline !== true;
 }
