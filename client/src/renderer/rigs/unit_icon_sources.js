@@ -3,11 +3,16 @@ import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { liveRigIconSvgFor, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
+import { resolvePngSpriteTransform } from "./png_transform.js";
 
 const LIVE_FRAME_STRIPS = createLiveFrameStrips();
 const LIVE_PNG_ATLASES = createLivePngRigAtlases();
 const ICON_FRAME_ZOOM = 1.5;
 const ICON_VISIBLE_PADDING_RATIO = 0.025;
+const ICON_COMPOSITION_STATE = Object.freeze({
+  transform: Object.freeze({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }),
+  pivot: Object.freeze({ x: 0, y: 0 }),
+});
 
 /**
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
@@ -45,6 +50,9 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
 
   const atlas = LIVE_PNG_ATLASES.get(rigKey);
   const atlasIcon = atlasPortrait(atlas, tintColor);
+  if (atlasIcon?.components) {
+    return composedRasterIconMarkup({ ...atlasIcon, teamColor: tintColor });
+  }
   if (atlasIcon) return rasterIconMarkup({ ...atlasIcon, teamColor: tintColor });
 
   return tintRigIconMarkup(liveRigIconSvgFor(kind), tintColor);
@@ -94,10 +102,21 @@ function atlasPortrait(atlas, teamColor) {
     };
   }
 
+  const composition = atlasComposition(atlas);
+  if (composition) {
+    return {
+      source: "png-atlas-composition",
+      image: atlas.image,
+      sheetWidth: atlas.grid.width,
+      sheetHeight: atlas.grid.height,
+      components: composition,
+      teamTint: true,
+    };
+  }
+
   // A component atlas is not necessarily a portrait atlas. Only use a component when it is the
   // complete unit body; selecting a barrel or carriage merely because it is large produces a
-  // misleading icon. Support weapons without an assembled reference fall back to their complete
-  // authored SVG rig.
+  // misleading icon. Component-only atlases must opt into an explicit icon composition.
   const sprite = atlas.sprites?.find?.((candidate) => candidate.id === "sprite.body");
   const baseFrame = sprite?.frame?.visibleBounds || sprite?.frame;
   const paletteFrame = sprite?.paletteFrames?.[teamColor];
@@ -113,6 +132,43 @@ function atlasPortrait(atlas, teamColor) {
     visibleFrame,
     teamTint: sprite.tintSlot !== "fixed",
   };
+}
+
+function atlasComposition(atlas) {
+  const spriteIds = atlas?.iconComposition?.sprites;
+  if (!Array.isArray(spriteIds) || spriteIds.length === 0) return null;
+  const spritesById = new Map(
+    (atlas.sprites || []).filter((sprite) => sprite?.id && sprite?.frame)
+      .map((sprite) => [sprite.id, sprite]),
+  );
+  const components = [];
+  for (const entry of spriteIds) {
+    const descriptor = typeof entry === "string" ? { spriteId: entry } : entry;
+    const sprite = spritesById.get(descriptor?.spriteId);
+    if (!sprite) return null;
+    const part = {
+      ...sprite,
+      positionOffsetX: optionalFiniteNumber(descriptor.x) ?? sprite.positionOffsetX,
+      positionOffsetY: optionalFiniteNumber(descriptor.y) ?? sprite.positionOffsetY,
+      rotationOffset: optionalFiniteNumber(descriptor.rotation) ?? sprite.rotationOffset,
+      rotationPivotX: optionalFiniteNumber(descriptor.pivotX) ?? sprite.rotationPivotX,
+      rotationPivotY: optionalFiniteNumber(descriptor.pivotY) ?? sprite.rotationPivotY,
+      rotationPivotReferenceOffset:
+        optionalFiniteNumber(descriptor.pivotReferenceRotation)
+        ?? sprite.rotationPivotReferenceOffset,
+    };
+    const transform = resolvePngSpriteTransform(ICON_COMPOSITION_STATE, sprite.frame, part);
+    components.push({
+      id: sprite.id,
+      frame: sprite.frame,
+      x: transform.x,
+      y: transform.y,
+      rotation: transform.rotation,
+      pivotX: transform.pivotX,
+      pivotY: transform.pivotY,
+    });
+  }
+  return components;
 }
 
 function translatedVisibleFrame(visibleFrame, baseFrame, selectedFrame) {
@@ -182,6 +238,154 @@ function rasterIconMarkup({
   );
 }
 
+function composedRasterIconMarkup({
+  source,
+  image,
+  sheetWidth,
+  sheetHeight,
+  components,
+  teamTint = false,
+  teamColor = "#0072b2",
+}) {
+  const safeSheetWidth = positiveDimension(sheetWidth);
+  const safeSheetHeight = positiveDimension(sheetHeight);
+  if (!image || !safeSheetWidth || !safeSheetHeight || !Array.isArray(components)) return "";
+
+  const safeComponents = components.map((component) => normalizedCompositionComponent(component))
+    .filter(Boolean);
+  if (safeComponents.length !== components.length || safeComponents.length === 0) return "";
+  const bounds = compositionBounds(safeComponents);
+  if (!bounds) return "";
+  const padX = bounds.w * ICON_VISIBLE_PADDING_RATIO;
+  const padY = bounds.h * ICON_VISIBLE_PADDING_RATIO;
+  const viewFrame = {
+    x: bounds.x - padX,
+    y: bounds.y - padY,
+    w: bounds.w + padX * 2,
+    h: bounds.h + padY * 2,
+  };
+  const tintColor = normalizeTeamColor(teamColor);
+  const tintId = `unit-icon-tint-${tintColor.slice(1).toLowerCase()}`;
+  const tintFilter = teamTint
+    ? `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
+        `<feFlood flood-color="${tintColor}" result="teamColor" />` +
+        `<feComposite in="teamColor" in2="SourceGraphic" operator="in" result="maskedTeamColor" />` +
+        `<feBlend in="SourceGraphic" in2="maskedTeamColor" mode="multiply" />` +
+      `</filter></defs>`
+    : "";
+  const groupFilter = teamTint ? ` filter="url(#${tintId})"` : "";
+  const layers = safeComponents.map((component) => {
+    const frame = component.frame;
+    const rotation = component.rotation * 180 / Math.PI;
+    return (
+      `<g data-unit-icon-component="${component.id}" ` +
+        `transform="translate(${number(component.x)} ${number(component.y)}) rotate(${number(rotation)})">` +
+        `<g transform="scale(${component.scaleX} ${component.scaleY})">` +
+          `<svg x="${number(component.renderX)}" y="${number(component.renderY)}" ` +
+            `width="${number(component.w)}" height="${number(component.h)}" ` +
+            `viewBox="${number(frame.x)} ${number(frame.y)} ${number(frame.w)} ${number(frame.h)}" ` +
+            `preserveAspectRatio="none" style="overflow:hidden">` +
+            `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
+              `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
+          `</svg>` +
+        `</g>` +
+      `</g>`
+    );
+  }).join("");
+  return (
+    `<svg class="unit-raster-icon${teamTint ? " team-tinted" : ""}" ` +
+      `data-unit-icon-source="${source}" aria-hidden="true" focusable="false" ` +
+      `width="${number(viewFrame.w)}" height="${number(viewFrame.h)}" ` +
+      `viewBox="${number(viewFrame.x)} ${number(viewFrame.y)} ${number(viewFrame.w)} ${number(viewFrame.h)}" ` +
+      `preserveAspectRatio="xMidYMid meet" style="overflow:hidden">` +
+      tintFilter +
+      `<g${groupFilter}>${layers}</g>` +
+    `</svg>`
+  );
+}
+
+function normalizedCompositionComponent(component) {
+  const frame = component?.frame;
+  const pixelsPerUnitX = Number(frame?.pixelsPerUnitX ?? frame?.pixelsPerUnit);
+  const pixelsPerUnitY = Number(frame?.pixelsPerUnitY ?? frame?.pixelsPerUnit);
+  const frameWidth = positiveDimension(frame?.w);
+  const frameHeight = positiveDimension(frame?.h);
+  if (
+    !component?.id ||
+    !frameWidth ||
+    !frameHeight ||
+    !Number.isFinite(pixelsPerUnitX) ||
+    !Number.isFinite(pixelsPerUnitY) ||
+    pixelsPerUnitX === 0 ||
+    pixelsPerUnitY === 0
+  ) {
+    return null;
+  }
+  const scaleX = Math.sign(pixelsPerUnitX);
+  const scaleY = Math.sign(pixelsPerUnitY);
+  const w = frameWidth / Math.abs(pixelsPerUnitX);
+  const h = frameHeight / Math.abs(pixelsPerUnitY);
+  const defaultPivotX = finiteNumber(frame.originX);
+  const defaultPivotY = finiteNumber(frame.originY);
+  const pivotX = optionalFiniteNumber(component.pivotX) ?? defaultPivotX;
+  const pivotY = optionalFiniteNumber(component.pivotY) ?? defaultPivotY;
+  const originWorldX = -pivotX / pixelsPerUnitX;
+  const farWorldX = (frameWidth - pivotX) / pixelsPerUnitX;
+  const originWorldY = -pivotY / pixelsPerUnitY;
+  const farWorldY = (frameHeight - pivotY) / pixelsPerUnitY;
+  const localX = Math.min(originWorldX, farWorldX);
+  const localY = Math.min(originWorldY, farWorldY);
+  return {
+    id: component.id,
+    frame: {
+      x: finiteNumber(frame.x),
+      y: finiteNumber(frame.y),
+      w: frameWidth,
+      h: frameHeight,
+    },
+    x: finiteNumber(component.x),
+    y: finiteNumber(component.y),
+    rotation: finiteNumber(component.rotation),
+    localX,
+    localY,
+    renderX: scaleX < 0 ? -(localX + w) : localX,
+    renderY: scaleY < 0 ? -(localY + h) : localY,
+    scaleX,
+    scaleY,
+    w,
+    h,
+  };
+}
+
+function compositionBounds(components) {
+  const points = [];
+  for (const component of components) {
+    const cos = Math.cos(component.rotation);
+    const sin = Math.sin(component.rotation);
+    for (const [x, y] of [
+      [component.localX, component.localY],
+      [component.localX + component.w, component.localY],
+      [component.localX + component.w, component.localY + component.h],
+      [component.localX, component.localY + component.h],
+    ]) {
+      points.push({
+        x: component.x + x * cos - y * sin,
+        y: component.y + x * sin + y * cos,
+      });
+    }
+  }
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const right = Math.max(...xs);
+  const bottom = Math.max(...ys);
+  if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top) {
+    return null;
+  }
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
 function paddedVisibleFrame(frame, visibleFrame) {
   const padX = visibleFrame.w * ICON_VISIBLE_PADDING_RATIO;
   const padY = visibleFrame.h * ICON_VISIBLE_PADDING_RATIO;
@@ -216,6 +420,12 @@ function positiveDimension(value) {
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function optionalFiniteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function number(value) {

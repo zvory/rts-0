@@ -79,10 +79,26 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
       tankIcon.includes('viewBox="41.025 108.9 531.975 298.2"'),
     "unit icon resolver fits the live Tank PNG reference to its opaque silhouette",
   );
+  const artilleryIcon = liveUnitIconMarkupFor(KIND.ARTILLERY);
+  const antiTankGunIcon = liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN);
   assert(
-    liveUnitIconMarkupFor(KIND.ARTILLERY).includes('class="unit-rig-icon"') &&
-      liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN).includes('class="unit-rig-icon"'),
-    "component-only support-weapon atlases fall back to complete authored unit silhouettes",
+    artilleryIcon.includes('data-unit-icon-source="png-atlas-composition"') &&
+      artilleryIcon.includes("artillery-a19-components-pass-03-alpha.png") &&
+      artilleryIcon.includes(
+        'data-unit-icon-component="sprite.art.leftTrail.deployed" ' +
+          'transform="translate(-21.0573 -5.0533) rotate(30.9397)"',
+      ) &&
+      artilleryIcon.includes('data-unit-icon-component="sprite.art.rightTrail.deployed"') &&
+      artilleryIcon.includes('data-unit-icon-component="sprite.art.barrelAssembly.deployed"') &&
+      antiTankGunIcon.includes('data-unit-icon-source="png-atlas-composition"') &&
+      antiTankGunIcon.includes("anti-tank-gun-noshield-lowdetail-white-v1-alpha.png") &&
+      antiTankGunIcon.includes(
+        'data-unit-icon-component="sprite.at.leftTrail.deployed" ' +
+          'transform="translate(-28.9952 -10.1935) rotate(30)"',
+      ) &&
+      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.rightTrail.deployed"') &&
+      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.barrelAssembly.deployed"'),
+    "support-weapon icons preserve deployed live PNG sprite offsets, pivots, and rotations",
   );
   const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);
   assert(

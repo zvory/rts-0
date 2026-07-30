@@ -129,6 +129,8 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
   image: "/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png?v=white-v1-br70-sat90",
   grid: {
     profile: "semantic-components",
+    width: 1254,
+    height: 1254,
     sourceSheet: "client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png",
     generatedSource: "client/assets/rigs/anti-tank-gun-noshield-lowdetail/generated/anti-tank-gun-noshield-lowdetail-white-v1-source.png",
     imageVersion: "white-v1",
@@ -138,6 +140,14 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       leftTrail: LEFT_TRAIL_FRAME,
       rightTrail: RIGHT_TRAIL_FRAME,
     },
+  },
+  iconComposition: {
+    sprites: [
+      "sprite.at.leftTrail.deployed",
+      "sprite.at.rightTrail.deployed",
+      "sprite.at.carriage.deployed",
+      "sprite.at.barrelAssembly.deployed",
+    ],
   },
   frames: {},
   sprites: [
