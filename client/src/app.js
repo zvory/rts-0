@@ -72,6 +72,10 @@ import {
 import { CleanPresentation } from "./clean_presentation.js";
 import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 import { prepareRenderer } from "./renderer/preparation.js";
+import {
+  RendererPreparationSlot,
+  settleRendererPreparationForStart,
+} from "./renderer/preparation_slot.js";
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
@@ -172,12 +176,21 @@ export class App {
       button: dom.settingsButton,
       menu: dom.settingsMenu,
     });
+    this.rendererPreparationSlot = new RendererPreparationSlot({
+      onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
+      onFailure: (error) => {
+        diagnostics.mark("app.matchRenderer.warmupFailed", {
+          message: error?.message || String(error),
+        });
+        console.error("[rts-app] match renderer warmup failed", error);
+      },
+    });
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net, this.audio, {
       ensureConnected: () => this.ensureConnected(),
       disconnectWhenIdle: () => this.disconnectIdleConnection(),
       autoRefreshLobbies: !this.requiresConnectionOnStart(),
-      onReadyChange: (ready) => this.onLobbyReadyChange(ready),
+      onReadyChange: (ready, context) => this.onLobbyReadyChange(ready, context),
     });
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
@@ -187,7 +200,6 @@ export class App {
     this.matchStartGeneration = 0;
     this.matchEndedGeneration = 0;
     this.matchStartPromise = Promise.resolve();
-    this.countdownRendererPreparation = null;
     this.labCatalog = null;
     this.labClient = null;
     this.labPanel = null;
@@ -657,92 +669,36 @@ export class App {
   onMatchCountdown(payload) {
     const countdownId = Number(payload?.countdownId);
     if (!Number.isInteger(countdownId) || countdownId <= 0 || countdownId > 0xffffffff) return;
-    const state = this.countdownRendererPreparation || this.warmMatchRenderer();
+    const state = this.rendererPreparationSlot.current || this.warmMatchRenderer();
     if (!state) return;
-    state.countdownId = countdownId;
-    state.acknowledged = false;
-    this.acknowledgeMatchLoadReady(state);
-    if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
     const durationMs = Math.max(1000, Number(payload?.durationMs) || 3000);
-    state.cleanupTimer = window.setTimeout(() => {
-      if (this.countdownRendererPreparation === state) this.discardCountdownRendererPreparation();
-    }, durationMs + 5000);
+    this.rendererPreparationSlot.armCountdown(countdownId, durationMs);
   }
 
-  onLobbyReadyChange(ready) {
-    if (ready) this.warmMatchRenderer();
+  onLobbyReadyChange(ready, { rendererEligible = true } = {}) {
+    if (ready && rendererEligible) this.warmMatchRenderer();
     else this.discardCountdownRendererPreparation();
   }
 
   warmMatchRenderer() {
-    if (this.countdownRendererPreparation) return this.countdownRendererPreparation;
+    if (this.rendererPreparationSlot.current) return this.rendererPreparationSlot.current;
     const rendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
       spectator: this.lobby?.isSpectator?.() === true,
       replay: false,
       lab: false,
     });
-    const state = {
-      countdownId: null,
-      acknowledged: false,
-      preparation: null,
-      promise: null,
-      cleanupTimer: undefined,
-    };
-    this.countdownRendererPreparation = state;
-    state.promise = prepareRenderer(dom.viewport, rendererBackendBundle).then((preparation) => {
-      if (this.countdownRendererPreparation !== state) {
-        preparation.destroy();
-        return null;
-      }
-      state.preparation = preparation;
-      this.acknowledgeMatchLoadReady(state);
-      return preparation;
-    }).catch((error) => {
-      if (this.countdownRendererPreparation === state) {
-        this.countdownRendererPreparation = null;
-        diagnostics.mark("app.matchRenderer.warmupFailed", {
-          message: error?.message || String(error),
-        });
-        console.error("[rts-app] match renderer warmup failed", error);
-      }
-      return null;
-    });
-    return state;
-  }
-
-  acknowledgeMatchLoadReady(state) {
-    if (this.countdownRendererPreparation !== state || !state.preparation
-      || !Number.isInteger(state.countdownId) || state.acknowledged) return;
-    state.acknowledged = true;
-    this.net.matchLoadReady(state.countdownId);
-  }
-
-  async takeCountdownRendererPreparation() {
-    const state = this.countdownRendererPreparation;
-    if (!state) return null;
-    const preparation = await state.promise;
-    if (this.countdownRendererPreparation !== state) return null;
-    this.countdownRendererPreparation = null;
-    if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
-    return preparation;
+    return this.rendererPreparationSlot.warm(
+      () => prepareRenderer(dom.viewport, rendererBackendBundle),
+      { compatibilityKey: rendererBackendBundle?.id || "pixi" },
+    );
   }
 
   discardCountdownRendererPreparation() {
-    const state = this.countdownRendererPreparation;
-    if (!state) return;
-    this.countdownRendererPreparation = null;
-    if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
-    if (state.preparation) state.preparation.destroy();
-    else void state.promise?.then((preparation) => preparation?.destroy?.());
+    this.rendererPreparationSlot.discard();
   }
 
   releaseCountdownRendererPreparation() {
-    const state = this.countdownRendererPreparation;
-    if (!state) return;
-    state.countdownId = null;
-    state.acknowledged = false;
-    if (state.cleanupTimer !== undefined) window.clearTimeout(state.cleanupTimer);
-    state.cleanupTimer = undefined;
+    this.rendererPreparationSlot.releaseCountdown();
   }
 
   async startMatch(payload, generation) {
@@ -805,9 +761,19 @@ export class App {
     }
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
-    const rendererPreparation = !startsReplay && !labMetadata
-      ? await this.takeCountdownRendererPreparation()
-      : null;
+    const matchRendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
+      spectator: payload?.spectator,
+      replay: startsReplay,
+      lab: !!labMetadata,
+    });
+    const rendererPreparation = await settleRendererPreparationForStart(
+      this.rendererPreparationSlot,
+      {
+        replay: startsReplay,
+        lab: !!labMetadata,
+        compatibilityKey: matchRendererBackendBundle?.id || "pixi",
+      },
+    );
     if (labMetadata) {
       this.labClient = new LabClient(this.net);
       this.labClient.setInitialState(labMetadata);
@@ -852,11 +818,7 @@ export class App {
         initialVisionSelection,
         // ReplayViewer always constructs Pixi, and ordinary spectators remain on Pixi even when
         // this page explicitly selected the experimental Babylon live-player renderer.
-        rendererBackendBundle: rendererBackendBundleForMatch(this.rendererBackendBundle, {
-          spectator: payload?.spectator,
-          replay: startsReplay,
-          lab: !!labMetadata,
-        }),
+        rendererBackendBundle: matchRendererBackendBundle,
         rendererPreparation,
         isStartCurrent: () => generation === this.matchStartGeneration,
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),

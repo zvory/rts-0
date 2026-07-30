@@ -43,12 +43,25 @@ import { textWithin } from "./dom_text.mjs";
   const changes = [];
   const lobby = Object.assign(Object.create(Lobby.prototype), {
     _ready: false,
-    _onReadyChange: (ready) => changes.push(ready),
+    _roomKind: "normal",
+    _spectator: false,
+    _onReadyChange: (ready, context) => changes.push({ ready, context }),
   });
   lobby._setReadyState(true);
   lobby._setReadyState(true);
   lobby._setReadyState(false);
-  assertDeepEqual(changes, [true, false], "lobby reports each local ready transition once");
+  assertDeepEqual(
+    changes.map((change) => change.ready),
+    [true, false],
+    "lobby reports each local ready transition once",
+  );
+  assert(changes[0].context.rendererEligible,
+    "seated normal-lobby readiness is eligible for renderer preparation");
+  lobby._roomKind = "replay";
+  lobby._spectator = true;
+  lobby._setReadyState(true);
+  assert(!changes.at(-1).context.rendererEligible,
+    "replay-viewer readiness cannot authorize renderer preparation");
 }
 
 // ---------------------------------------------------------------------------

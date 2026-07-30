@@ -627,8 +627,8 @@ export class Lobby {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     const mine = players.find((player) => player.id === myId);
     if (mine) {
-      this._setReadyState(!!mine.ready);
       this._spectator = !!mine.isSpectator;
+      this._setReadyState(!!mine.ready);
     }
     this._reflectReadyButton();
     this.rosterView.render({
@@ -724,7 +724,11 @@ export class Lobby {
     const next = !!ready;
     if (next === this._ready) return;
     this._ready = next;
-    this._onReadyChange?.(next);
+    this._onReadyChange?.(next, {
+      rendererEligible: !this._spectator && !this._isReplayLobby(),
+      roomKind: this._roomKind,
+      spectator: this._spectator,
+    });
   }
 
   // --- Status / errors -------------------------------------------------------
