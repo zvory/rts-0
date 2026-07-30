@@ -54,6 +54,10 @@ import {
 import { MatchNetReporter, predictionReportFields as buildPredictionReportFields } from "./match_net_reporter.js";
 import { buildMatchSettingsContextForMatch } from "./match_settings_context.js";
 import {
+  desktopCursorAutoLockCanRun as cursorAutoLockCanRun,
+  handleInteractiveMenuStateChange as updateInteractiveMenuCapture,
+} from "./match_cursor_capture.js";
+import {
   applyInitialUnitRanges,
   toggleDebugPaths,
   toggleUnitRanges,
@@ -844,13 +848,7 @@ export class Match {
   }
 
   desktopCursorAutoLockCanRun() {
-    if (!this.desktopCursorAutoLockEnabled) return false;
-    if (!this.input || this.input.pointerLocked) return false;
-    if (this.settings?.isOpen() || this.tabMenu?.isOpen()) return false;
-    const doc = globalThis.document;
-    if (doc?.hidden) return false;
-    if (typeof doc?.hasFocus === "function" && !doc.hasFocus()) return false;
-    return true;
+    return cursorAutoLockCanRun(this);
   }
 
   installDesktopCursorAutoLock() {
@@ -879,10 +877,8 @@ export class Match {
   }
 
   scheduleDesktopCursorAutoLock(reason, delayMs = DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS) {
-    if (!this.desktopCursorAutoLockEnabled) return;
     if (this.desktopCursorAutoLockTimer != null || this.desktopCursorAutoLockInFlight) return;
-    if (!this.input || this.input.pointerLocked) return;
-    if (this.settings?.isOpen() || this.tabMenu?.isOpen()) return;
+    if (!this.desktopCursorAutoLockCanRun()) return;
     const setTimer = globalThis.window?.setTimeout || globalThis.setTimeout;
     if (typeof setTimer !== "function") {
       void this.requestDesktopCursorAutoLock(reason);
@@ -933,18 +929,7 @@ export class Match {
   }
 
   handleInteractiveMenuStateChange(open) {
-    if (open) {
-      this.clearDesktopCursorAutoLockTimer();
-      if (this.input?.pointerLocked) {
-        void this.input.exitPointerLock();
-      }
-      return;
-    }
-    if (this.settings?.isOpen() || this.tabMenu?.isOpen()) return;
-    this.scheduleDesktopCursorAutoLock(
-      "interactive-menu-closed",
-      DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS,
-    );
+    updateInteractiveMenuCapture(this, open, DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS);
   }
 
   togglePointerLock() {

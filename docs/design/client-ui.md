@@ -590,6 +590,10 @@ buildGiveUpAction({ visible, onOpen })
 buildPauseAction({ visible, disabled, label, title, onPause })
 ```
 
+`match_cursor_capture.js` owns the focused policy that pauses aggressive desktop cursor capture
+while Settings or the hold-Tab menu is interactive and schedules recapture after the last menu
+closes. `Match` remains the lifecycle owner and thin delegator.
+
 `live_pause_overlay.js`
 ```js
 export class LivePauseOverlay {
