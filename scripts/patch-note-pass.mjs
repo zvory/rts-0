@@ -28,10 +28,11 @@ outside an active player's live-match experience are not gameplay.
 A runtime source path is only a reason to inspect the diff, not evidence of gameplay impact. If a
 branch mixes eligible and excluded work, mention only the eligible active-player gameplay effects.`;
 
-export function parseArgs(argv) {
+export function parseArgs(argv, env = process.env) {
   const options = {
     baseRef: "origin/main", codexCommand: "codex", codexModel: "", dryRun: false,
     deliverDiscord: false, deliveryPaths: [], deliveryRef: "", headBranch: "", help: false, markdownReportFile: "", repoRoot: defaultRepoRoot, schemaFile: defaultSchema,
+    userOptOut: env.RTS_PATCH_NOTES_USER_OPT_OUT?.trim() === "1",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -51,6 +52,7 @@ export function parseArgs(argv) {
     else if (arg === "--repo") options.repoRoot = path.resolve(value(arg));
     else if (arg === "--schema") options.schemaFile = path.resolve(value(arg));
     else if (arg === "--deliver-discord") options.deliverDiscord = true;
+    else if (arg === "--user-opt-out") options.userOptOut = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
@@ -315,11 +317,14 @@ function fragmentAtRef(repoRoot, ref, branch, slug, changedPaths) {
 }
 
 function markdownReport(decision, relativePath = "", removed = false) {
-  const result = decision.decision === "write_patch_note"
-    ? `Updated \`${relativePath}\`.`
-    : removed
-      ? `Removed stale fragment \`${relativePath}\`.`
-      : "No player-facing gameplay change detected.";
+  let result;
+  if (decision.decision === "write_patch_note") result = `Updated \`${relativePath}\`.`;
+  else if (decision.decision === "skipped_user_request") {
+    result = relativePath
+      ? `${removed ? "Removed" : "Would remove"} fragment \`${relativePath}\`.`
+      : "Skipped patch-note generation at the user's request.";
+  } else if (removed) result = `Removed stale fragment \`${relativePath}\`.`;
+  else result = "No player-facing gameplay change detected.";
   return [
     `Decision: ${decision.decision}`,
     "",
@@ -332,7 +337,7 @@ function markdownReport(decision, relativePath = "", removed = false) {
 
 export function execute(options) {
   if (options.help) {
-    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--deliver-discord --delivery-ref REF [--delivery-path PATH ...]] [--dry-run]\n");
+    process.stdout.write("Usage: node scripts/patch-note-pass.mjs [--base REF] [--head-branch BRANCH] [--codex-model MODEL] [--markdown-report-file FILE] [--repo DIR] [--user-opt-out] [--deliver-discord --delivery-ref REF [--delivery-path PATH ...]] [--dry-run]\n");
     return null;
   }
   if (options.deliveryPaths.length > 0 && !options.deliveryRef) throw new Error("--delivery-path requires --delivery-ref");
@@ -375,9 +380,29 @@ export function execute(options) {
     return decision;
   }
   const changedPaths = git(options.repoRoot, ["diff", "--name-only", "--no-renames", `${options.baseRef}...HEAD`]).split("\n").filter(Boolean);
-  const candidates = changedPaths.filter(isGameplayCandidate);
   const existing = existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
   const existingRelativePath = existing ? path.relative(options.repoRoot, existing) : "";
+  if (options.userOptOut) {
+    const decision = {
+      decision: "skipped_user_request",
+      title: "",
+      changes: [],
+      playtestWatch: [],
+      reason: "The user explicitly requested no patch notes for this pull request.",
+    };
+    if (existing && !options.dryRun) {
+      run("git", ["rm", "--", existingRelativePath], { cwd: options.repoRoot });
+      run("git", ["commit", "-m", "Remove gameplay patch note by request", "-m", decision.reason], { cwd: options.repoRoot });
+      process.stdout.write(`patch-note-pass: removed ${existingRelativePath} at the user's request\n`);
+    } else {
+      process.stdout.write(`patch-note-pass: skipped at the user's request${existing ? `; would remove ${existingRelativePath}` : ""}\n`);
+    }
+    if (options.markdownReportFile) {
+      fs.writeFileSync(options.markdownReportFile, markdownReport(decision, existingRelativePath, Boolean(existing) && !options.dryRun));
+    }
+    return decision;
+  }
+  const candidates = changedPaths.filter(isGameplayCandidate);
   if (candidates.length === 0) {
     const decision = { decision: "no_patch_note", title: "", changes: [], playtestWatch: [], reason: "No runtime paths with potential player impact changed." };
     if (existing && !options.dryRun) {

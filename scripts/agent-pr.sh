@@ -28,6 +28,7 @@ EXTRA_LABELS=()
 AUTO_MERGE=1
 DRY_RUN=0
 DRAFT_FLAG=0
+PATCH_NOTES_MODE="inherit"
 QUALITY_CONTEXT="adversarial-quality-pass"
 CHANGED_FILES=()
 
@@ -51,6 +52,8 @@ Options:
   --label LABEL              Extra PR label to apply. Repeatable.
   --draft                    Create the PR as a draft when opening it.
   --no-auto-merge            Do not arm auto-merge; marks the PR needs-human.
+  --skip-patch-notes         Skip patch notes for this PR at the user's request.
+  --auto-patch-notes         Restore automatic patch-note classification for this PR.
   --dry-run                  Print actions without changing GitHub state.
   -h, --help                 Show this help.
 
@@ -71,6 +74,8 @@ while [ "$#" -gt 0 ]; do
     --label) EXTRA_LABELS+=("${2:?missing --label value}"); shift ;;
     --draft) DRAFT_FLAG=1 ;;
     --no-auto-merge) AUTO_MERGE=0 ;;
+    --skip-patch-notes) PATCH_NOTES_MODE="skip-user-request" ;;
+    --auto-patch-notes) PATCH_NOTES_MODE="automatic" ;;
     --dry-run) DRY_RUN=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -99,6 +104,25 @@ case "$HEAD_BRANCH" in
     exit 2
     ;;
 esac
+
+existing_pr_json=""
+if [ "$DRY_RUN" != "1" ]; then
+  existing_pr_json="$("$GH_BIN" pr list \
+    --base "$BASE_BRANCH" \
+    --head "$HEAD_BRANCH" \
+    --state open \
+    --json number,url,body \
+    --jq '.[0] // empty')"
+fi
+if [ "$PATCH_NOTES_MODE" = "inherit" ]; then
+  PATCH_NOTES_MODE="automatic"
+  if [ -n "$existing_pr_json" ]; then
+    existing_pr_body="$(jq -r '.body // ""' <<<"$existing_pr_json")"
+    if rg -q '^Patch-Notes:[[:space:]]*skipped-user-request[[:space:]]*$' <<<"$existing_pr_body"; then
+      PATCH_NOTES_MODE="skip-user-request"
+    fi
+  fi
+fi
 
 if [ -z "$TITLE" ]; then
   TITLE="$(git log -1 --format=%s)"
@@ -230,7 +254,11 @@ run_configured_passes() {
   if [ "$DRY_RUN" = "1" ]; then
     args+=(--dry-run)
   fi
-  node scripts/agent-pr-passes.mjs "${args[@]}"
+  local patch_notes_user_opt_out=0
+  if [ "$PATCH_NOTES_MODE" = "skip-user-request" ]; then
+    patch_notes_user_opt_out=1
+  fi
+  RTS_PATCH_NOTES_USER_OPT_OUT="$patch_notes_user_opt_out" node scripts/agent-pr-passes.mjs "${args[@]}"
 }
 
 run_quality_pass() {
@@ -296,6 +324,7 @@ Agent-Owned: true
 Auto-Merge: $auto_merge_text
 Focused-Verification: $FOCUSED_VERIFICATION
 Needs-Human: $needs_human
+Patch-Notes: $PATCH_NOTES_MODE
 <!-- /rts-agent-pr -->
 
 EOF
@@ -341,16 +370,6 @@ ensure_label "automerge" "5319E7" "Auto-merge should be armed when checks pass"
 ensure_label "ci-failed" "D73A4A" "CI failed and needs an agent or human decision"
 ensure_label "needs-human" "FBCA04" "Human review or decision is required before merge"
 ensure_label "docdrift-sweep" "1D76DB" "Generated documentation drift sweep PR"
-
-existing_pr_json=""
-if [ "$DRY_RUN" != "1" ]; then
-  existing_pr_json="$("$GH_BIN" pr list \
-    --base "$BASE_BRANCH" \
-    --head "$HEAD_BRANCH" \
-    --state open \
-    --json number,url \
-    --jq '.[0] // empty')"
-fi
 
 label_args=(--add-label agent-owned)
 if [ "$AUTO_MERGE" = "1" ]; then
