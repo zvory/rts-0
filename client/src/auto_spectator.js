@@ -1,4 +1,5 @@
 import { EVENT, KIND, isBuilding, isUnit } from "./protocol.js";
+import { STATS } from "./config.js";
 
 export const AUTO_SPECTATOR_MIN_ZOOM = 0.05;
 
@@ -64,27 +65,42 @@ function sampleFromPoints(points, weight, tick) {
   return { tick, x, y, weight, points };
 }
 
-function artilleryImpactHasNearbyEntity(event, state) {
+function distanceToBuildingFootprint(point, entity, tileSize) {
+  const stats = STATS[entity?.kind];
+  const halfWidth = Number(stats?.footW) * tileSize * 0.5;
+  const halfHeight = Number(stats?.footH) * tileSize * 0.5;
+  if (!Number.isFinite(halfWidth) || halfWidth <= 0
+    || !Number.isFinite(halfHeight) || halfHeight <= 0) {
+    return distance(point, entity);
+  }
+  const dx = Math.max(0, Math.abs(point.x - entity.x) - halfWidth);
+  const dy = Math.max(0, Math.abs(point.y - entity.y) - halfHeight);
+  return Math.hypot(dx, dy);
+}
+
+function artilleryImpactHasNearbyEntity(event, state, entityViews) {
   const point = finitePoint(event);
   const tileSize = Number(state?.map?.tileSize);
   const radiusTiles = Number(event?.radiusTiles);
   if (!point || !Number.isFinite(tileSize) || tileSize <= 0
     || !Number.isFinite(radiusTiles) || radiusTiles < 0) return false;
   const radius = radiusTiles * tileSize;
-  return currentEntityViews(state).some((entity) => (
-    (isUnit(entity?.kind) || isBuilding(entity?.kind))
-    && distance(point, entity) <= radius
-  ));
+  return entityViews.some((entity) => {
+    if (isUnit(entity?.kind)) return distance(point, entity) <= radius;
+    return isBuilding(entity?.kind)
+      && distanceToBuildingFootprint(point, entity, tileSize) <= radius;
+  });
 }
 
-function eventSample(event, state, tick) {
+function eventSample(event, state, tick, entityViews) {
   if (!event || typeof event !== "object") return null;
   if (event.e === EVENT.ATTACK) return attackSample(event, state, tick);
   if (event.e === EVENT.DEATH) {
     const point = finitePoint(event);
     return point ? sampleFromPoints([point], DEATH_WEIGHT, tick) : null;
   }
-  if (event.e === EVENT.ARTILLERY_IMPACT && !artilleryImpactHasNearbyEntity(event, state)) {
+  if (event.e === EVENT.ARTILLERY_IMPACT
+    && !artilleryImpactHasNearbyEntity(event, state, entityViews)) {
     return null;
   }
   if (POSITIONED_IMPACTS.has(event.e)) {
@@ -167,8 +183,8 @@ function currentEntityViews(state) {
     : [];
 }
 
-function currentUnitViews(state) {
-  return currentEntityViews(state).filter((entity) => isUnit(entity?.kind));
+function currentUnitViews(state, entityViews = currentEntityViews(state)) {
+  return entityViews.filter((entity) => isUnit(entity?.kind));
 }
 
 function closestApproach(a, b) {
@@ -339,9 +355,13 @@ export class AutoSpectatorDirector {
     if (!Number.isFinite(tick)) return;
     if (this.latestTick != null && tick < this.latestTick) this.resetForSeek();
     this.latestTick = tick;
-    if (this.enabled) this.updateUnitTracks(tick);
-    for (const event of snapshot?.events || []) {
-      const sample = eventSample(event, this.state, tick);
+    const events = Array.isArray(snapshot?.events) ? snapshot.events : [];
+    const needsEntityViews = this.enabled
+      || events.some((event) => event?.e === EVENT.ARTILLERY_IMPACT);
+    const entityViews = needsEntityViews ? currentEntityViews(this.state) : [];
+    if (this.enabled) this.updateUnitTracks(tick, entityViews);
+    for (const event of events) {
+      const sample = eventSample(event, this.state, tick, entityViews);
       if (sample) this.samples.push(sample);
     }
     this.pruneSamples(tick);
@@ -522,9 +542,9 @@ export class AutoSpectatorDirector {
     this.lastMoveKind = "zoom";
   }
 
-  updateUnitTracks(tick) {
+  updateUnitTracks(tick, entityViews = currentEntityViews(this.state)) {
     const next = new Map();
-    for (const entity of currentUnitViews(this.state)) {
+    for (const entity of currentUnitViews(this.state, entityViews)) {
       const point = finitePoint(entity);
       const id = Number(entity?.id);
       const teamId = teamIdForOwner(this.state, entity?.owner);

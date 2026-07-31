@@ -161,6 +161,17 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
 }
 
 {
+  const { director, entities } = createHarness();
+  entities.set(1, { id: 1, owner: 1, kind: KIND.CITY_CENTRE, x: 2000, y: 2000 });
+  director.observeSnapshot({
+    tick: 1,
+    events: [{ e: EVENT.ARTILLERY_IMPACT, x: 2110, y: 2000, radiusTiles: 2 }],
+  });
+  assert.equal(director.diagnostics().sampleCount, 1,
+    "artillery impacts that reach a building footprint remain combat activity");
+}
+
+{
   const { camera, director, entities } = createHarness({ enabled: true });
   entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 700, y: 900 });
   entities.set(2, { id: 2, owner: 2, kind: KIND.TANK, x: 1100, y: 900 });
