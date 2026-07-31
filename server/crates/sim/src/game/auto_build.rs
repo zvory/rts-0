@@ -5,22 +5,12 @@ use crate::rules::economy::ResourceCost;
 
 pub(super) const RESERVE_MAX: u32 = 9_950;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutoBuildSettings {
     pub(crate) paused: bool,
     pub(crate) reserve_steel: u32,
     pub(crate) reserve_oil: u32,
-}
-
-impl Default for AutoBuildSettings {
-    fn default() -> Self {
-        Self {
-            paused: false,
-            reserve_steel: 200,
-            reserve_oil: 100,
-        }
-    }
 }
 
 impl PlayerState {

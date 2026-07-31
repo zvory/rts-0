@@ -2,7 +2,7 @@ import { createCommandButton } from "./hud_command_dom.js";
 import { cmd } from "./protocol.js";
 import { resourceIconHtml } from "./resource_icons.js";
 
-const DEFAULT_RESERVATIONS = Object.freeze({ steel: 200, oil: 100 });
+const DEFAULT_RESERVATIONS = Object.freeze({ steel: 0, oil: 0 });
 const RESERVATION_STEP = 50;
 const RESERVATION_MAX = 9_950;
 const POINTER_HOLD_DELAY_MS = 200;

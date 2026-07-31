@@ -42,7 +42,7 @@ export async function openInteractDriver(options) {
     : [];
   let selection = [];
   let gamePhase = "active";
-  let tabMenu = { visible: false, paused: false, status: "Working", reservations: { steel: 200, oil: 100 } };
+  let tabMenu = { visible: false, paused: false, status: "Working", reservations: { steel: 0, oil: 0 } };
   let recording = null;
   let lastRecording = null;
   let lastRecordingCompletion = null;
