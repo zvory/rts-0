@@ -38,3 +38,33 @@ The original pass-01 compact strip is retained as `generated/machine-gunner-pass
 The pipeline asserts that the output alpha is byte-identical, that every RGB byte outside the
 approved mask is unchanged, and that no protected weapon pixel changes. This keeps the generated
 recolor away from the gun and prevents silhouette or exterior-edge drift.
+
+## Pass 03 White Material Repaint
+
+Pass 03 expands the ImageGen-guided repaint from isolated clothing/backpack patches to the full
+tintable soldier surface, including the helmet and the visible pack/bedroll material in every carry,
+deployment, and recoil frame. The deterministic runtime rebuild still starts from the pass-01 strip:
+the 960×64 frame sheet and every alpha byte remain unchanged, and weapon pixels stay protected.
+
+## Pass 04 Registered White Color Transfer
+
+Pass 04 tested selective registered color transfer and was rejected because mixing generated
+material patches with the old compact sprite still behaved like a separate recolor layer.
+
+## Pass 05 Whole-Frame White Pipeline
+
+Pass 05 follows the Rifleman pipeline: each visible runtime pixel samples the corresponding
+accepted ImageGen frame, so the body, shading, linework, and weapon form one coherent white-source
+sprite. The old pass-01 sprite contributes only the exact 960×64 frame layout and byte-identical
+alpha channel. The client then applies the same 70% brightness target as Rifleman and Rifleman
+Panzerfaust.
+
+## Pass 07 GPU-Safe High-Resolution Runtime Strip
+
+Pass 07 samples the high-resolution source alpha and accepted ImageGen color directly into 128×128
+runtime cells instead of routing them through the old 64×64 strip. The deployed scale changes from
+0.84 to 0.42 and the movement scale changes from 0.612 to 0.306. These proportional changes keep
+the exact full-canvas world extents (`64 × 0.84 = 128 × 0.42` and
+`64 × 0.612 = 128 × 0.306`) while doubling the original linear source resolution and keeping the
+15-frame strip at 1920px, below the guaranteed 2048px GPU texture limit. Known detached crop
+fragments are removed from setup frames 7 and 8.

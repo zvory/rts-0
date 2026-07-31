@@ -11,22 +11,26 @@ const generatedDir = path.join(assetDir, "generated");
 
 const baselinePath = path.join(generatedDir, "machine-gunner-pass-01-prewhite-strip.png");
 const outputPath = path.join(assetDir, "machine-gunner-pass-01-strip.png");
-const maskPath = path.join(generatedDir, "machine-gunner-pass-02-white-recolor-mask.png");
+const maskPath = path.join(generatedDir, "machine-gunner-pass-06-high-resolution-mask.png");
+const colorGuidePath = path.join(generatedDir, "machine-gunner-pass-06-high-resolution-color-guide.png");
+const sourceFrameSize = 64;
+const runtimeFrameSize = 128;
+const runtimeResolutionScale = runtimeFrameSize / sourceFrameSize;
 
 const sheets = {
   carry: {
     original: readPng(path.join(generatedDir, "machine-gunner-pass-01-carry-alpha.png")),
-    generated: readPng(path.join(generatedDir, "machine-gunner-pass-02-white-carry-imagegen.png")),
+    generated: readPng(path.join(generatedDir, "machine-gunner-pass-03-white-carry-imagegen.png")),
     columns: 6,
   },
   deploy: {
     original: readPng(path.join(generatedDir, "machine-gunner-pass-01-deploy-alpha.png")),
-    generated: readPng(path.join(generatedDir, "machine-gunner-pass-02-white-deploy-imagegen.png")),
+    generated: readPng(path.join(generatedDir, "machine-gunner-pass-03-white-deploy-imagegen.png")),
     columns: 6,
   },
   fire: {
     original: readPng(path.join(generatedDir, "machine-gunner-pass-01-fire-recoil-alpha.png")),
-    generated: readPng(path.join(generatedDir, "machine-gunner-pass-02-white-fire-imagegen.png")),
+    generated: readPng(path.join(generatedDir, "machine-gunner-pass-03-white-fire-imagegen.png")),
     columns: 3,
   },
 };
@@ -43,18 +47,24 @@ if (baseline.width !== 960 || baseline.height !== 64) {
   throw new Error(`Unexpected baseline strip size ${baseline.width}x${baseline.height}`);
 }
 
-const output = clonePng(baseline);
-const mask = new PNG({ width: baseline.width, height: baseline.height, colorType: 6 });
+const output = new PNG({
+  width: runtimeFrameSize * frameSources.length,
+  height: runtimeFrameSize,
+  colorType: 6,
+});
+const mask = new PNG({ width: output.width, height: output.height, colorType: 6 });
+const colorGuide = new PNG({ width: output.width, height: output.height, colorType: 6 });
 
 for (let frameIndex = 0; frameIndex < frameSources.length; frameIndex += 1) {
   const source = frameSources[frameIndex];
   const sheet = sheets[source.sheet];
-  const runtimeBounds = alphaBounds(baseline, {
-    x: frameIndex * 64,
+  const compactBounds = alphaBounds(baseline, {
+    x: frameIndex * sourceFrameSize,
     y: 0,
-    width: 64,
-    height: 64,
+    width: sourceFrameSize,
+    height: sourceFrameSize,
   });
+  const runtimeBounds = scaleBounds(compactBounds, runtimeResolutionScale);
   const sourceCellWidth = sheet.original.width / sheet.columns;
   const sourceCell = {
     x: source.frame * sourceCellWidth,
@@ -63,26 +73,35 @@ for (let frameIndex = 0; frameIndex < frameSources.length; frameIndex += 1) {
     height: sheet.original.height,
   };
   const sourceBounds = alphaBounds(sheet.original, sourceCell);
+  const sampleRadius = Math.max(
+    0.5,
+    Math.min(
+      3,
+      Math.max(
+        sourceBounds.width / runtimeBounds.width,
+        sourceBounds.height / runtimeBounds.height,
+      ) / 2,
+    ),
+  );
   for (let y = runtimeBounds.y; y < runtimeBounds.y + runtimeBounds.height; y += 1) {
     for (let x = runtimeBounds.x; x < runtimeBounds.x + runtimeBounds.width; x += 1) {
-      const runtimeX = frameIndex * 64 + x;
-      if (!isInteriorOpaquePixel(baseline, runtimeX, y)) continue;
-      if (isProtectedWeaponPixel(frameIndex, x, y)) continue;
-
       const u = runtimeBounds.width <= 1 ? 0.5 : (x - runtimeBounds.x) / (runtimeBounds.width - 1);
       const v = runtimeBounds.height <= 1 ? 0.5 : (y - runtimeBounds.y) / (runtimeBounds.height - 1);
       const sourceX = sourceCell.x + sourceBounds.x + u * Math.max(0, sourceBounds.width - 1);
       const sourceY = sourceCell.y + sourceBounds.y + v * Math.max(0, sourceBounds.height - 1);
-      if (!generatedWhiteMaterialAt(sheet, sourceX, sourceY)) continue;
+      const generatedPixel = generatedPixelAt(sheet, sourceX, sourceY, sampleRadius, sourceCell);
+      if (generatedPixel.a === 0) continue;
+      const runtimeX = frameIndex * runtimeFrameSize + x;
+      const runtimeOffset = pixelOffset(output, runtimeX, y);
 
-      const runtimeOffset = pixelOffset(baseline, runtimeX, y);
-      const originalLuma = luma(
-        baseline.data[runtimeOffset],
-        baseline.data[runtimeOffset + 1],
-        baseline.data[runtimeOffset + 2],
-      );
-      if (originalLuma < 48) continue;
-
+      output.data[runtimeOffset] = generatedPixel.r;
+      output.data[runtimeOffset + 1] = generatedPixel.g;
+      output.data[runtimeOffset + 2] = generatedPixel.b;
+      output.data[runtimeOffset + 3] = generatedPixel.a;
+      colorGuide.data[runtimeOffset] = generatedPixel.r;
+      colorGuide.data[runtimeOffset + 1] = generatedPixel.g;
+      colorGuide.data[runtimeOffset + 2] = generatedPixel.b;
+      colorGuide.data[runtimeOffset + 3] = generatedPixel.a;
       mask.data[runtimeOffset] = 255;
       mask.data[runtimeOffset + 1] = 255;
       mask.data[runtimeOffset + 2] = 255;
@@ -91,151 +110,151 @@ for (let frameIndex = 0; frameIndex < frameSources.length; frameIndex += 1) {
   }
 }
 
-removeThinMaskArtifacts(mask);
+removeDetachedAlphaComponents(output, mask, colorGuide);
+
 let changedPixels = 0;
 const changedByFrame = Array(frameSources.length).fill(0);
-for (let y = 0; y < baseline.height; y += 1) {
-  for (let x = 0; x < baseline.width; x += 1) {
-    const offset = pixelOffset(baseline, x, y);
-    if (mask.data[offset + 3] === 0) continue;
-    const originalLuma = luma(
-      baseline.data[offset],
-      baseline.data[offset + 1],
-      baseline.data[offset + 2],
-    );
-    const white = Math.max(180, Math.min(242, Math.round(165 + originalLuma * 0.45)));
-    if (
-      baseline.data[offset] === white
-      && baseline.data[offset + 1] === white
-      && baseline.data[offset + 2] === white
-    ) {
-      throw new Error(`Approved recolor pixel is unchanged at ${x},${y}`);
-    }
-    output.data[offset] = white;
-    output.data[offset + 1] = white;
-    output.data[offset + 2] = white;
+for (let y = 0; y < output.height; y += 1) {
+  for (let x = 0; x < output.width; x += 1) {
+    const offset = pixelOffset(output, x, y);
+    if (output.data[offset + 3] === 0) continue;
     changedPixels += 1;
-    changedByFrame[Math.floor(x / 64)] += 1;
+    changedByFrame[Math.floor(x / runtimeFrameSize)] += 1;
   }
 }
 
-assertAlphaUnchanged(baseline, output);
-assertOnlyMaskedRgbChanged(baseline, output, mask);
-assertWeaponPixelsUnchanged(baseline, output);
-if (changedPixels < 700) {
-  throw new Error(`Recolor mask is unexpectedly small (${changedPixels} changed pixels)`);
+assertScaledFrameBounds(baseline, output);
+if (changedPixels < 50000) {
+  throw new Error(`High-resolution strip has unexpectedly little visible coverage (${changedPixels} pixels)`);
 }
-if (changedByFrame.some((count) => count < 15)) {
-  throw new Error(`At least one frame has too little recolor coverage: ${changedByFrame.join(", ")}`);
+if (changedByFrame.some((count) => count < 500)) {
+  throw new Error(`At least one frame has too little high-resolution coverage: ${changedByFrame.join(", ")}`);
 }
 
 fs.writeFileSync(outputPath, PNG.sync.write(output, { colorType: 6 }));
 fs.writeFileSync(maskPath, PNG.sync.write(mask, { colorType: 6 }));
+fs.writeFileSync(colorGuidePath, PNG.sync.write(colorGuide, { colorType: 6 }));
 console.log(JSON.stringify({
   output: path.relative(repoRoot, outputPath),
   mask: path.relative(repoRoot, maskPath),
+  colorGuide: path.relative(repoRoot, colorGuidePath),
   changedPixels,
   changedByFrame,
-  alphaBytesChanged: 0,
-  unmaskedRgbBytesChanged: 0,
+  runtimeFrameSize,
+  runtimeResolutionScale,
 }));
 
-function generatedWhiteMaterialAt(sheet, sourceX, sourceY) {
-  let accepted = 0;
-  for (const [dx, dy] of [
-    [-4, -4], [0, -4], [4, -4],
-    [-4, 0], [0, 0], [4, 0],
-    [-4, 4], [0, 4], [4, 4],
-  ]) {
-    if (generatedWhiteMaterialSample(sheet, sourceX + dx, sourceY + dy)) accepted += 1;
+function generatedPixelAt(sheet, sourceX, sourceY, radius, sourceCell) {
+  let alphaTotal = 0;
+  let weightedR = 0;
+  let weightedG = 0;
+  let weightedB = 0;
+  const offsets = [-radius, 0, radius];
+  const sampleCount = offsets.length * offsets.length;
+  for (const dy of offsets) {
+    for (const dx of offsets) {
+      const originalX = clamp(sourceX + dx, sourceCell.x, sourceCell.x + sourceCell.width - 1);
+      const originalY = clamp(sourceY + dy, sourceCell.y, sourceCell.y + sourceCell.height - 1);
+      const alpha = sampleChannel(sheet.original, originalX, originalY, 3);
+      if (alpha <= 0) continue;
+      const generatedX = originalX * (sheet.generated.width - 1) / (sheet.original.width - 1);
+      const generatedY = originalY * (sheet.generated.height - 1) / (sheet.original.height - 1);
+      weightedR += sampleChannel(sheet.generated, generatedX, generatedY, 0) * alpha;
+      weightedG += sampleChannel(sheet.generated, generatedX, generatedY, 1) * alpha;
+      weightedB += sampleChannel(sheet.generated, generatedX, generatedY, 2) * alpha;
+      alphaTotal += alpha;
+    }
   }
-  return accepted >= 7;
+  const alpha = Math.round(alphaTotal / sampleCount);
+  if (alpha === 0 || alphaTotal === 0) return { r: 0, g: 0, b: 0, a: 0 };
+  return {
+    r: Math.round(weightedR / alphaTotal),
+    g: Math.round(weightedG / alphaTotal),
+    b: Math.round(weightedB / alphaTotal),
+    a: alpha,
+  };
 }
 
-function generatedWhiteMaterialSample(sheet, sourceX, sourceY) {
-  const originalX = Math.round(sourceX);
-  const originalY = Math.round(sourceY);
-  const originalOffset = pixelOffset(sheet.original, originalX, originalY);
-  if (sheet.original.data[originalOffset + 3] < 224) return false;
-
-  const generatedX = Math.round(sourceX * (sheet.generated.width - 1) / (sheet.original.width - 1));
-  const generatedY = Math.round(sourceY * (sheet.generated.height - 1) / (sheet.original.height - 1));
-  const generatedOffset = pixelOffset(sheet.generated, generatedX, generatedY);
-  const generatedR = sheet.generated.data[generatedOffset];
-  const generatedG = sheet.generated.data[generatedOffset + 1];
-  const generatedB = sheet.generated.data[generatedOffset + 2];
-  const generatedMax = Math.max(generatedR, generatedG, generatedB);
-  const generatedMin = Math.min(generatedR, generatedG, generatedB);
-  const generatedLuma = luma(generatedR, generatedG, generatedB);
-
-  const originalR = sheet.original.data[originalOffset];
-  const originalG = sheet.original.data[originalOffset + 1];
-  const originalB = sheet.original.data[originalOffset + 2];
-  const originalLuma = luma(originalR, originalG, originalB);
-
-  return generatedLuma >= 172
-    && generatedMax - generatedMin <= 30
-    && generatedLuma - originalLuma >= 35;
+function sampleChannel(png, x, y, channel) {
+  const x0 = Math.floor(clamp(x, 0, png.width - 1));
+  const y0 = Math.floor(clamp(y, 0, png.height - 1));
+  const x1 = Math.min(png.width - 1, x0 + 1);
+  const y1 = Math.min(png.height - 1, y0 + 1);
+  const tx = x - x0;
+  const ty = y - y0;
+  const top = png.data[pixelOffset(png, x0, y0) + channel] * (1 - tx)
+    + png.data[pixelOffset(png, x1, y0) + channel] * tx;
+  const bottom = png.data[pixelOffset(png, x0, y1) + channel] * (1 - tx)
+    + png.data[pixelOffset(png, x1, y1) + channel] * tx;
+  return top * (1 - ty) + bottom * ty;
 }
 
-function removeThinMaskArtifacts(candidateMask) {
-  const originalMask = clonePng(candidateMask);
-  for (let y = 0; y < candidateMask.height; y += 1) {
-    for (let x = 0; x < candidateMask.width; x += 1) {
-      const offset = pixelOffset(candidateMask, x, y);
-      if (originalMask.data[offset + 3] === 0) continue;
-      const frameStart = Math.floor(x / 64) * 64;
-      let neighbors = 0;
-      let hasVerticalNeighbor = false;
-      for (let dy = -1; dy <= 1; dy += 1) {
-        for (let dx = -1; dx <= 1; dx += 1) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < frameStart || nx >= frameStart + 64 || ny < 0 || ny >= candidateMask.height) {
-            continue;
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function scaleBounds(bounds, scale) {
+  const x = Math.round(bounds.x * scale);
+  const y = Math.round(bounds.y * scale);
+  const right = Math.round((bounds.x + bounds.width) * scale);
+  const bottom = Math.round((bounds.y + bounds.height) * scale);
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+function removeDetachedAlphaComponents(...images) {
+  const primary = images[0];
+  for (let frame = 0; frame < frameSources.length; frame += 1) {
+    // The accepted setup sheet has two known detached left-edge crop fragments in these frames.
+    if (frame !== 7 && frame !== 8) continue;
+    const visited = new Uint8Array(runtimeFrameSize * runtimeFrameSize);
+    const components = [];
+    for (let y = 0; y < runtimeFrameSize; y += 1) {
+      for (let x = 0; x < runtimeFrameSize; x += 1) {
+        const localIndex = y * runtimeFrameSize + x;
+        const globalX = frame * runtimeFrameSize + x;
+        if (visited[localIndex] || primary.data[pixelOffset(primary, globalX, y) + 3] === 0) continue;
+        const component = [];
+        const queue = [localIndex];
+        visited[localIndex] = 1;
+        for (let cursor = 0; cursor < queue.length; cursor += 1) {
+          const current = queue[cursor];
+          const currentX = current % runtimeFrameSize;
+          const currentY = Math.floor(current / runtimeFrameSize);
+          component.push(current);
+          for (const [nextX, nextY] of [
+            [currentX - 1, currentY],
+            [currentX + 1, currentY],
+            [currentX, currentY - 1],
+            [currentX, currentY + 1],
+          ]) {
+            if (
+              nextX < 0
+              || nextX >= runtimeFrameSize
+              || nextY < 0
+              || nextY >= runtimeFrameSize
+            ) continue;
+            const next = nextY * runtimeFrameSize + nextX;
+            const nextGlobalX = frame * runtimeFrameSize + nextX;
+            if (visited[next] || primary.data[pixelOffset(primary, nextGlobalX, nextY) + 3] === 0) continue;
+            visited[next] = 1;
+            queue.push(next);
           }
-          if (originalMask.data[pixelOffset(originalMask, nx, ny) + 3] === 0) continue;
-          neighbors += 1;
-          if (dy !== 0) hasVerticalNeighbor = true;
+        }
+        components.push(component);
+      }
+    }
+    components.sort((a, b) => b.length - a.length);
+    for (const component of components.slice(1)) {
+      for (const localIndex of component) {
+        const x = frame * runtimeFrameSize + (localIndex % runtimeFrameSize);
+        const y = Math.floor(localIndex / runtimeFrameSize);
+        for (const image of images) {
+          const offset = pixelOffset(image, x, y);
+          image.data.fill(0, offset, offset + 4);
         }
       }
-      if (neighbors >= 3 && hasVerticalNeighbor) continue;
-      candidateMask.data[offset] = 0;
-      candidateMask.data[offset + 1] = 0;
-      candidateMask.data[offset + 2] = 0;
-      candidateMask.data[offset + 3] = 0;
     }
   }
-}
-
-function isProtectedWeaponPixel(frameIndex, x, y) {
-  if (frameIndex <= 6) return y >= 32 && y <= 38;
-  if (frameIndex === 7) return distanceToSegment(x, y, 16, 48, 47, 20) <= 3.5;
-  if (frameIndex === 8) return distanceToSegment(x, y, 23, 53, 43, 18) <= 3.5;
-  return x >= 28 && x <= 36 && y >= 22;
-}
-
-function distanceToSegment(x, y, x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const lengthSquared = dx * dx + dy * dy;
-  const t = lengthSquared === 0
-    ? 0
-    : Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / lengthSquared));
-  return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
-}
-
-function isInteriorOpaquePixel(png, x, y) {
-  for (let dy = -1; dy <= 1; dy += 1) {
-    for (let dx = -1; dx <= 1; dx += 1) {
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx < 0 || nx >= png.width || ny < 0 || ny >= png.height) return false;
-      if (png.data[pixelOffset(png, nx, ny) + 3] < 224) return false;
-    }
-  }
-  return true;
 }
 
 function alphaBounds(png, region) {
@@ -261,55 +280,42 @@ function alphaBounds(png, region) {
   };
 }
 
-function assertAlphaUnchanged(before, after) {
-  for (let offset = 3; offset < before.data.length; offset += 4) {
-    if (before.data[offset] !== after.data[offset]) {
-      throw new Error(`Alpha changed at pixel index ${(offset - 3) / 4}`);
+function assertScaledFrameBounds(before, after) {
+  for (let frame = 0; frame < frameSources.length; frame += 1) {
+    const compact = alphaBounds(before, {
+      x: frame * sourceFrameSize,
+      y: 0,
+      width: sourceFrameSize,
+      height: sourceFrameSize,
+    });
+    const expected = scaleBounds(compact, runtimeResolutionScale);
+    const actual = alphaBounds(after, {
+      x: frame * runtimeFrameSize,
+      y: 0,
+      width: runtimeFrameSize,
+      height: runtimeFrameSize,
+    });
+    const expectedRight = expected.x + expected.width;
+    const expectedBottom = expected.y + expected.height;
+    const actualRight = actual.x + actual.width;
+    const actualBottom = actual.y + actual.height;
+    const setupCropIsValid = (frame === 7 || frame === 8)
+      && actual.x >= expected.x
+      && actual.y >= expected.y
+      && actualRight === expectedRight
+      && actualBottom === expectedBottom
+      && actual.width >= expected.width * 0.75
+      && actual.height >= expected.height * 0.75;
+    if (!setupCropIsValid && JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(`Frame ${frame} bounds changed: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
     }
   }
-}
-
-function assertOnlyMaskedRgbChanged(before, after, approvedMask) {
-  for (let offset = 0; offset < before.data.length; offset += 4) {
-    const isMasked = approvedMask.data[offset + 3] > 0;
-    for (let channel = 0; channel < 3; channel += 1) {
-      if (!isMasked && before.data[offset + channel] !== after.data[offset + channel]) {
-        throw new Error(`Unmasked RGB changed at pixel index ${offset / 4}`);
-      }
-    }
-  }
-}
-
-function assertWeaponPixelsUnchanged(before, after) {
-  for (let frameIndex = 0; frameIndex < frameSources.length; frameIndex += 1) {
-    for (let y = 0; y < 64; y += 1) {
-      for (let x = 0; x < 64; x += 1) {
-        if (!isProtectedWeaponPixel(frameIndex, x, y)) continue;
-        const offset = pixelOffset(before, frameIndex * 64 + x, y);
-        for (let channel = 0; channel < 4; channel += 1) {
-          if (before.data[offset + channel] !== after.data[offset + channel]) {
-            throw new Error(`Protected weapon pixel changed in frame ${frameIndex} at ${x},${y}`);
-          }
-        }
-      }
-    }
-  }
-}
-
-function luma(r, g, b) {
-  return r * 0.2126 + g * 0.7152 + b * 0.0722;
 }
 
 function pixelOffset(png, x, y) {
   const boundedX = Math.max(0, Math.min(png.width - 1, x));
   const boundedY = Math.max(0, Math.min(png.height - 1, y));
   return (boundedY * png.width + boundedX) * 4;
-}
-
-function clonePng(source) {
-  const clone = new PNG({ width: source.width, height: source.height, colorType: 6 });
-  source.data.copy(clone.data);
-  return clone;
 }
 
 function readPng(filePath) {

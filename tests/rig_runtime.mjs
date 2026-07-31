@@ -1192,11 +1192,10 @@ test("frame-strip color profile applies shared and per-strip targets only when n
   };
   assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
   assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
-  assert.deepEqual(frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP), {
-    brightness: 140,
-    saturation: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.saturation,
-    hue: FRAME_STRIP_TARGET_COLOR_ADJUSTMENT.hue,
-  });
+  assert.deepEqual(
+    frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP),
+    { brightness: 70, saturation: 100, hue: 100 },
+  );
   assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
 });
 
@@ -1273,8 +1272,9 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   assert.equal(runtimeStripSize.height, runtime.frameHeight);
 
   const recoilStripSize = readPngDimensions(manifest.sourceSheets.fireRecoilStrip);
-  assert.equal(recoilStripSize.width, runtime.frameWidth * 2 * runtime.firingFrames.length);
-  assert.equal(recoilStripSize.height, runtime.frameHeight * 2);
+  const compactSourceFrameSize = 64;
+  assert.equal(recoilStripSize.width, compactSourceFrameSize * 2 * runtime.firingFrames.length);
+  assert.equal(recoilStripSize.height, compactSourceFrameSize * 2);
   assert.deepEqual(
     runtime.firingFrames,
     Array.from(

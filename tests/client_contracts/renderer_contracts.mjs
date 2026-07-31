@@ -47,7 +47,7 @@ assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 *
   );
   assert(
     liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="0 3.7 154.725 96.6"') &&
-      liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="0.525 9.975 61.95 43.05"'),
+      liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="1.025 19.95 124.95 86.1"'),
     "unit icon resolver independently fits each production PNG silhouette",
   );
   assert(
