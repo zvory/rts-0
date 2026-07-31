@@ -4,7 +4,9 @@ import { STATS } from "./config.js";
 export const AUTO_SPECTATOR_MIN_ZOOM = 0.05;
 
 const DECISION_INTERVAL_TICKS = 90;
+const QUIET_DECISION_INTERVAL_TICKS = 30;
 const ACTIVITY_WINDOW_TICKS = 90;
+const COMMAND_ACTIVITY_WINDOW_TICKS = 90;
 const CLUSTER_RADIUS_TILES = 10;
 const CURRENT_FIGHT_BONUS = 1.25;
 const DEATH_WEIGHT = 4;
@@ -18,6 +20,7 @@ const ZOOM_DEAD_ZONE_RATIO = 0.05;
 const CUT_DISTANCE_VIEWPORTS = 1;
 const MAX_PADDING_VIEWPORT_FRACTION = 0.4;
 const MAX_ACTIVITY_SAMPLES = 900;
+const MAX_COMMAND_ACTIVITY_SAMPLES = 900;
 const CONTACT_DISTANCE_TILES = 28;
 const CONTACT_CLUSTER_RADIUS_TILES = 7;
 const INTERCEPT_DISTANCE_TILES = 8;
@@ -108,6 +111,24 @@ function eventSample(event, state, tick, entityViews) {
     return point ? sampleFromPoints([point], IMPACT_WEIGHT, tick) : null;
   }
   return null;
+}
+
+function commandSignature(entity) {
+  if (!isUnit(entity?.kind) && !isBuilding(entity?.kind)) return null;
+  const stages = (value) => Array.isArray(value)
+    ? value.map((stage) => [stage?.kind, stage?.x, stage?.y])
+    : null;
+  return JSON.stringify([
+    entity.state,
+    stages(entity.orderPlan),
+    stages(entity.rallyPlan),
+    entity.prodKind,
+    entity.prodQueue,
+    entity.prodUpgrade,
+    Array.isArray(entity.prodUpgradeQueue) ? entity.prodUpgradeQueue : null,
+    Array.isArray(entity.prodRepeatKinds) ? entity.prodRepeatKinds : null,
+    entity.buildActive,
+  ]);
 }
 
 function distance(a, b) {
@@ -324,7 +345,10 @@ export class AutoSpectatorDirector {
     this.lastDecisionTick = null;
     this.currentFightCenter = null;
     this.currentContactCenter = null;
+    this.currentCommandCenter = null;
     this.unitTracks = new Map();
+    this.commandSignatures = new Map();
+    this.commandSamples = [];
     this.transition = null;
     this.lastMoveKind = null;
     this.mode = null;
@@ -341,11 +365,16 @@ export class AutoSpectatorDirector {
       this.unitTracks.clear();
       this.currentFightCenter = null;
       this.currentContactCenter = null;
+      this.currentCommandCenter = null;
+      this.commandSignatures.clear();
+      this.commandSamples = [];
       this.contactDiagnostics = null;
       this.mode = null;
       return;
     }
-    this.updateUnitTracks(this.latestTick);
+    const entityViews = currentEntityViews(this.state);
+    this.updateUnitTracks(this.latestTick, entityViews);
+    this.updateCommandActivity(this.latestTick, entityViews);
     this.lastDecisionTick = this.latestTick;
     this.decide(this.latestTick);
   }
@@ -359,16 +388,29 @@ export class AutoSpectatorDirector {
     const needsEntityViews = this.enabled
       || events.some((event) => event?.e === EVENT.ARTILLERY_IMPACT);
     const entityViews = needsEntityViews ? currentEntityViews(this.state) : [];
-    if (this.enabled) this.updateUnitTracks(tick, entityViews);
+    if (this.enabled) {
+      this.updateUnitTracks(tick, entityViews);
+      this.updateCommandActivity(tick, entityViews);
+    }
+    let newCombatActivity = false;
     for (const event of events) {
       const sample = eventSample(event, this.state, tick, entityViews);
-      if (sample) this.samples.push(sample);
+      if (sample) {
+        this.samples.push(sample);
+        newCombatActivity = true;
+      }
     }
     this.pruneSamples(tick);
     if (!this.enabled) return;
     const routineDecisionDue = this.lastDecisionTick == null
       || tick - this.lastDecisionTick >= DECISION_INTERVAL_TICKS;
-    if (routineDecisionDue || this.hasDistantFightCut()) {
+    const quietMode = this.mode == null || this.mode === "overview" || this.mode === "activity";
+    const quietDecisionDue = quietMode && (
+      this.lastDecisionTick == null
+      || tick - this.lastDecisionTick >= QUIET_DECISION_INTERVAL_TICKS
+    );
+    const combatInterrupt = quietMode && newCombatActivity;
+    if (routineDecisionDue || quietDecisionDue || combatInterrupt || this.hasDistantFightCut()) {
       this.lastDecisionTick = tick;
       this.decide(tick);
     }
@@ -393,6 +435,7 @@ export class AutoSpectatorDirector {
       this.mode = "combat";
       this.currentFightCenter = { x: fight.x, y: fight.y };
       this.currentContactCenter = null;
+      this.currentCommandCenter = null;
       this.contactDiagnostics = null;
       this.moveTo(fight.points, BATTLE_PADDING_CSS_PX, { immediate });
       return;
@@ -407,6 +450,7 @@ export class AutoSpectatorDirector {
       const tileSize = Math.max(1, Number(this.state?.map?.tileSize) || 32);
       this.mode = "contact";
       this.currentContactCenter = contact.center;
+      this.currentCommandCenter = null;
       this.contactDiagnostics = {
         distanceTiles: contact.currentDistance / tileSize,
         predictedDistanceTiles: contact.predictedDistance / tileSize,
@@ -415,8 +459,24 @@ export class AutoSpectatorDirector {
       this.moveTo(contact.points, CONTACT_PADDING_CSS_PX, { immediate });
       return;
     }
+    const activity = selectFight(
+      clusterSamples(this.commandSamples, radius),
+      this.currentCommandCenter,
+      radius,
+    );
+    if (activity) {
+      this.mode = "activity";
+      this.currentCommandCenter = { x: activity.x, y: activity.y };
+      this.contactDiagnostics = null;
+      this.moveTo(activity.points, BATTLE_PADDING_CSS_PX, {
+        immediate,
+        preserveScale: true,
+      });
+      return;
+    }
     this.mode = "overview";
     this.currentContactCenter = null;
+    this.currentCommandCenter = null;
     this.contactDiagnostics = null;
     this.widenView({ immediate });
   }
@@ -424,7 +484,12 @@ export class AutoSpectatorDirector {
   moveTo(
     points,
     paddingCssPx,
-    { immediate = false, allowCut = true, duration = PAN_DURATION_SECONDS } = {},
+    {
+      immediate = false,
+      allowCut = true,
+      duration = PAN_DURATION_SECONDS,
+      preserveScale = false,
+    } = {},
   ) {
     const from = this.camera?.snapshot?.();
     const projection = this.camera?.projectionSnapshot?.();
@@ -443,10 +508,12 @@ export class AutoSpectatorDirector {
     const minimumScale = Number(this.camera?.minZoom) || 0;
     const to = {
       ...fitted,
-      framingScale: Math.max(
-        minimumScale,
-        fitted.framingScale / ACTIVE_SHOT_WORLD_SPAN_MULTIPLIER,
-      ),
+      framingScale: preserveScale
+        ? from.framingScale
+        : Math.max(
+          minimumScale,
+          fitted.framingScale / ACTIVE_SHOT_WORLD_SPAN_MULTIPLIER,
+        ),
     };
 
     if (immediate) {
@@ -579,6 +646,26 @@ export class AutoSpectatorDirector {
     this.unitTracks = next;
   }
 
+  updateCommandActivity(tick, entityViews = currentEntityViews(this.state)) {
+    const next = new Map();
+    for (const entity of entityViews) {
+      const id = Number(entity?.id);
+      const point = finitePoint(entity);
+      const signature = commandSignature(entity);
+      if (!Number.isInteger(id) || !point || signature == null) continue;
+      const prior = this.commandSignatures.get(id);
+      if (prior != null && prior !== signature) {
+        this.commandSamples.push(sampleFromPoints(
+          [point],
+          isBuilding(entity.kind) ? 2 : 1,
+          tick,
+        ));
+      }
+      next.set(id, signature);
+    }
+    this.commandSignatures = next;
+  }
+
   handleViewportChange() {
     if (!this.enabled) return;
     this.decide(this.latestTick, { immediate: true });
@@ -590,6 +677,15 @@ export class AutoSpectatorDirector {
     if (this.samples.length > MAX_ACTIVITY_SAMPLES) {
       this.samples.splice(0, this.samples.length - MAX_ACTIVITY_SAMPLES);
     }
+    const oldestCommandTick = tick - COMMAND_ACTIVITY_WINDOW_TICKS;
+    this.commandSamples = this.commandSamples
+      .filter((sample) => sample.tick >= oldestCommandTick);
+    if (this.commandSamples.length > MAX_COMMAND_ACTIVITY_SAMPLES) {
+      this.commandSamples.splice(
+        0,
+        this.commandSamples.length - MAX_COMMAND_ACTIVITY_SAMPLES,
+      );
+    }
   }
 
   resetForSeek() {
@@ -597,7 +693,10 @@ export class AutoSpectatorDirector {
     this.lastDecisionTick = null;
     this.currentFightCenter = null;
     this.currentContactCenter = null;
+    this.currentCommandCenter = null;
     this.unitTracks.clear();
+    this.commandSignatures.clear();
+    this.commandSamples = [];
     this.transition = null;
     this.mode = null;
     this.contactDiagnostics = null;
@@ -612,6 +711,8 @@ export class AutoSpectatorDirector {
       mode: this.mode,
       currentFightCenter: this.currentFightCenter ? { ...this.currentFightCenter } : null,
       currentContactCenter: this.currentContactCenter ? { ...this.currentContactCenter } : null,
+      currentCommandCenter: this.currentCommandCenter ? { ...this.currentCommandCenter } : null,
+      commandSampleCount: this.commandSamples.length,
       contact: this.contactDiagnostics ? { ...this.contactDiagnostics } : null,
       trackedUnitCount: this.unitTracks.size,
       moveKind: this.lastMoveKind,
@@ -623,9 +724,12 @@ export class AutoSpectatorDirector {
     this.enabled = false;
     this.samples = [];
     this.unitTracks.clear();
+    this.commandSignatures.clear();
+    this.commandSamples = [];
     this.transition = null;
     this.currentFightCenter = null;
     this.currentContactCenter = null;
+    this.currentCommandCenter = null;
     this.contactDiagnostics = null;
     this.onEnabledChange = null;
   }

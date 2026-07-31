@@ -1284,13 +1284,17 @@ units: units already within 28 tiles qualify, as do movement tracks whose inferr
 comes within eight tiles over the next six simulated seconds. Nearby members of both formations are
 included in the shot, same-team pairs and scout planes are ignored, and worker-only contacts receive
 a ranking penalty. Combat and likely-contact shots show 50% more world span than their fitted
-framing. If no contact is plausible, the camera preserves its focus and widens by 6%
+framing. If no contact is plausible, quiet mode favors clusters of units and buildings whose
+authoritative state, order plan, rally, or production intent just changed. These activity reframes
+preserve the current zoom and update at most once per simulated second. With no recent command
+activity, the camera preserves its focus and widens by 6%
 per second, finishing each small widening before beginning another. The local overview never
 widens past 70% of either map dimension, so a large display cannot turn it into a whole-map shot.
-Routine decisions occur no more than once every 90 simulation ticks. A newly dominant fight beyond
-the current viewport bypasses that interval and cuts immediately; nearby reframes pan and zoom with
-a one-second smooth transition. Backward replay seeks clear future combat and motion tracking before
-the rebuilt timeline is evaluated.
+Combat and contact decisions occur no more than once every 90 simulation ticks, while persistent
+quiet mode may reconsider command activity every 30 ticks. Any combat activity interrupts quiet
+mode immediately, and a newly dominant fight beyond the current viewport also bypasses the routine
+interval. Nearby reframes pan and zoom with a one-second smooth transition. Backward replay seeks
+clear future combat, command activity, and motion tracking before the rebuilt timeline is evaluated.
 
 `renderer/index.js` (worker-owned; importing it from a main-thread production area is forbidden)
 ```js
