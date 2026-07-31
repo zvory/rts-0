@@ -2027,10 +2027,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   thinner, lower-contrast very-pale-pink stale-intel hatching, so live/stale state does not depend on
   red-green hue perception alone. Server-authoritative per-player memory clears when that player's
   team observes the remembered position empty or observes the same gun moved, packed, or destroyed.
-  Lab and replay observer switches select the requested player's independent memory store, including
-  through checkpoint-backed time travel; the browser does not accumulate or invalidate this intel.
-  Lab threat relationships follow the shared player-vision selector rather than the operator's
-  spectator identity. A Command Car's faint speed-boost aura ring is visible only while that
+  Live spectator, Lab, and replay observer switches select the requested player's independent
+  memory store, including through checkpoint-backed time travel; the browser does not accumulate or
+  invalidate this intel. Threat relationships come from the authoritative snapshot's single
+  `playerResources` owner, so a rapid view switch keeps the old fog, entities, memory, and threat
+  relationships together until the new projection arrives. All-player, multi-player, and
+  omniscient views show no player-relative enemy cones. A Command Car's faint speed-boost aura ring
+  is visible only while that
   Command Car is selected; active Breakthrough always shows the bright ring. In Lab scenario
   authoring, deployed
   Anti-Tank Gun and artillery

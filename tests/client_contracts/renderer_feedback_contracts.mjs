@@ -227,18 +227,118 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
 
   const spectatorView = buildRendererFeedbackView(
-    { ...state, spectator: true },
+    {
+      ...state,
+      spectator: true,
+      observerView: { mode: "player", playerId: 1 },
+    },
     { entities: visibleEntities },
   );
   assert(
     spectatorView.enemyAntiTankGunThreats().length === 0,
-    "spectators do not receive player-relative enemy threat cones",
+    "an eager local observer selector cannot create threat cones before its projected snapshot arrives",
+  );
+  const playerOneSpectatorView = buildRendererFeedbackView(
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 1 }],
+      observerView: { mode: "player", playerId: 1 },
+    },
+    { entities: visibleEntities },
+  );
+  assert(
+    playerOneSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301",
+    "live and replay spectators receive enemy threat cones from a single-player authoritative projection",
+  );
+  const playerOneSnapshotDuringSwitch = buildRendererFeedbackView(
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 1 }],
+      observerView: { mode: "player", playerId: 2 },
+    },
+    { entities: visibleEntities },
+  );
+  assert(
+    playerOneSnapshotDuringSwitch.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301",
+    "a pending switch keeps the prior snapshot's threat relationship until new fog and memory arrive",
+  );
+  const playerTwoSpectatorView = buildRendererFeedbackView(
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 2 }],
+      observerView: { mode: "player", playerId: 1 },
+    },
+    { entities: visibleEntities },
+  );
+  assert(
+    playerTwoSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "303,304",
+    "switching authoritative snapshots reverses enemy relationships even if local control state is stale",
+  );
+  const rememberedDuringPlayerOneView = buildRendererFeedbackView(
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 1 }],
+    },
+    {
+      entities: [],
+      rememberedEnemyAntiTankGunThreats: [{
+        id: 306,
+        owner: 2,
+        x: 320,
+        y: 256,
+        facing: 0,
+      }],
+    },
+  );
+  assert(
+    rememberedDuringPlayerOneView.enemyAntiTankGunThreats()[0]?.threatMemory === true,
+    "a single-player spectator projection renders that player's server-authored stale threat memory",
+  );
+  const sameMemoryDuringPlayerTwoView = buildRendererFeedbackView(
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 2 }],
+    },
+    {
+      entities: [],
+      rememberedEnemyAntiTankGunThreats: [{
+        id: 306,
+        owner: 2,
+        x: 320,
+        y: 256,
+        facing: 0,
+      }],
+    },
+  );
+  assert(
+    sameMemoryDuringPlayerTwoView.enemyAntiTankGunThreats().length === 0,
+    "switching to the remembered gun owner's view never renders its own gun as an enemy memory",
+  );
+  const unionSpectatorView = buildRendererFeedbackView(
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 1 }, { id: 2 }],
+    },
+    { entities: visibleEntities },
+  );
+  assert(
+    unionSpectatorView.enemyAntiTankGunThreats().length === 0,
+    "multi-player union and omniscient projections do not invent one player's enemy threat perspective",
   );
   const labSpectatorView = buildRendererFeedbackView(
-    { ...state, spectator: true },
+    {
+      ...state,
+      spectator: true,
+      playerResources: [{ id: 1 }],
+    },
     {
       entities: visibleEntities,
-      observerView: { mode: "player", playerId: 1 },
       controlPolicy: createControlPolicyProjection(createLabControlPolicy({
         metadata: { role: LAB_ROLE.OPERATOR },
       })),
@@ -246,21 +346,7 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   assert(
     labSpectatorView.enemyAntiTankGunThreats().length === 1,
-    "Lab operators can visually review the player-relative enemy threat cone",
-  );
-  const labBravoView = buildRendererFeedbackView(
-    { ...state, spectator: true },
-    {
-      entities: visibleEntities,
-      observerView: { mode: "player", playerId: 2 },
-      controlPolicy: createControlPolicyProjection(createLabControlPolicy({
-        metadata: { role: LAB_ROLE.OPERATOR },
-      })),
-    },
-  );
-  assert(
-    labBravoView.enemyAntiTankGunThreats().some((entity) => entity.id === 304),
-    "Lab Bravo vision overrides a colliding operator id and classifies Player 1's gun as enemy",
+    "Lab operators use the same authoritative player-view threat projection",
   );
 
   const staleFeedbackView = buildRendererFeedbackView(state, {
