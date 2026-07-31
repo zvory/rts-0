@@ -11,6 +11,7 @@ kill_timeout = 300
   RUST_LOG = "info"
   RTS_PERF = "spikes"
   RTS_PERF_SLOW_TICK_MS = "40"
+  RTS_GOOGLE_ANALYTICS_ID = "G-06WVK0QHVR"
 
 [http_service]
   internal_port = 8080

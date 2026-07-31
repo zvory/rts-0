@@ -137,6 +137,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "replay_camera_input.js": "input",
 
   "bootstrap.js": "platform",
+  "analytics_consent.js": "platform",
   "audio.js": "platform",
   "audio_spatial.js": "platform",
   "sound_manifest.js": "platform",

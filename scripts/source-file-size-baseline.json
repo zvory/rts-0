@@ -65,8 +65,8 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1805,
-      "reason": "Player-activity classification moved out of the oversized server shell; keep ratcheting until more connection handling is split."
+      "lines": 1718,
+      "reason": "Client index generation and analytics configuration moved out of the oversized server shell; keep ratcheting until more connection handling is split."
     },
     {
       "path": "server/src/structured_log.rs",
