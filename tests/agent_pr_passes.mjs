@@ -20,10 +20,28 @@ import {
   sendDiscordPatchNote,
 } from "../scripts/patch-note-pass.mjs";
 
+const agentPrScript = fs.readFileSync(new URL("../scripts/agent-pr.sh", import.meta.url), "utf8");
 assert.doesNotMatch(
-  fs.readFileSync(new URL("../scripts/agent-pr.sh", import.meta.url), "utf8"),
+  agentPrScript,
   /--deliver-discord/,
   "agent-pr must never deliver patch notes before merge",
+);
+assert.match(agentPrScript, /--skip-patch-notes/, "agent-pr should expose the conversational patch-note opt-out");
+assert.match(agentPrScript, /Patch-Notes: \$PATCH_NOTES_MODE/, "agent-pr should persist the patch-note mode in PR metadata");
+assert.match(
+  agentPrScript,
+  /--skip-patch-notes\) PATCH_NOTES_MODE="skipped-user-request"/,
+  "agent-pr should select the canonical patch-note opt-out state",
+);
+assert.match(
+  agentPrScript,
+  /rg -q '\^Patch-Notes:\[\[:space:\]\]\*skipped-user-request.*[\s\S]*PATCH_NOTES_MODE="skipped-user-request"/,
+  "agent-pr should inherit the canonical patch-note opt-out state",
+);
+assert.match(
+  agentPrScript,
+  /\[ "\$PATCH_NOTES_MODE" = "skipped-user-request" \]/,
+  "agent-pr should pass the canonical patch-note opt-out state to specialist passes",
 );
 assert.doesNotMatch(
   fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8"),
@@ -33,6 +51,9 @@ assert.doesNotMatch(
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).baseRef, "upstream/main");
 assert.equal(parseRunnerArgs(["--base", "upstream/main", "--dry-run"]).dryRun, true);
 assert.equal(parsePatchArgs(["--codex-model", "small-model"]).codexModel, "small-model");
+assert.equal(parsePatchArgs([], { RTS_PATCH_NOTES_USER_OPT_OUT: "1" }).userOptOut, true);
+assert.equal(parsePatchArgs([], { RTS_PATCH_NOTES_USER_OPT_OUT: "0" }).userOptOut, false);
+assert.equal(parsePatchArgs(["--user-opt-out"], {}).userOptOut, true);
 assert.equal(parsePatchArgs(["--deliver-discord"]).deliverDiscord, true);
 assert.equal(parsePatchArgs(["--delivery-ref", "abc123"]).deliveryRef, "abc123");
 assert.deepEqual(parsePatchArgs(["--delivery-path", "patch-notes/note.md"]).deliveryPaths, ["patch-notes/note.md"]);
@@ -283,6 +304,24 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
     "--repo", lifecycleRoot,
   ]);
   const { execute } = await import("../scripts/patch-note-pass.mjs");
+
+  const optOutReport = path.join(lifecycleRoot, "opt-out-report.md");
+  execute({ ...patchOptions, markdownReportFile: optOutReport, userOptOut: true });
+  assert.equal(fs.existsSync(`${fakeCodex}.args`), false, "a user opt-out must bypass Codex classification");
+  assert.equal(fs.existsSync(staleFragment), false, "a user opt-out should remove an existing branch-owned fragment");
+  assert.match(run("git", ["log", "-1", "--format=%s"], lifecycleRoot), /Remove gameplay patch note by request/);
+  assert.match(fs.readFileSync(optOutReport, "utf8"), /Decision: skipped_user_request.*Removed fragment/s);
+  fs.rmSync(optOutReport);
+  assert.equal(run("git", ["status", "--porcelain=v1"], lifecycleRoot), "");
+
+  fs.mkdirSync(path.dirname(staleFragment), { recursive: true });
+  fs.writeFileSync(
+    staleFragment,
+    "<!-- rts-patch-note:v1 -->\n<!-- branch: zvorygin/stale-note -->\n# Stale note\n",
+  );
+  run("git", ["add", "patch-notes/2026-07-20/stale-note.md"], lifecycleRoot);
+  run("git", ["commit", "-m", "Restore stale note for classification"], lifecycleRoot);
+
   execute(patchOptions);
 
   const codexArgs = fs.readFileSync(`${fakeCodex}.args`, "utf8").trim().split("\n");
