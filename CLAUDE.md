@@ -134,6 +134,11 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   `agent-pr.sh` patch-note pass is the final backstop and records qualifying changes under
   `patch-notes/YYYY-MM-DD/<branch-slug>.md` before adversarial review. That specialist pass is the
   sole owner of `patch-notes/`; adversarial review must not create, edit, or delete its fragments.
+- If the user explicitly asks to skip or omit patch notes for the current task or PR, honor that
+  request for the whole PR and pass `--skip-patch-notes` on the first `scripts/agent-pr.sh` run. The
+  helper records the choice in PR metadata and inherits it on later reruns. Do not infer an opt-out
+  merely because a change seems minor. If the user reverses the request, pass `--auto-patch-notes`
+  to restore normal classification.
 - New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
   implementation. Until the user explicitly authorizes implementation, edit only planning,
   checklist, and design documents.

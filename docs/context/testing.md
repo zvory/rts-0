@@ -48,8 +48,8 @@ Use for tests, CI/hooks, or focused verification.
   `cd server && cargo run` first for individual Node suites.
 - Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
-- `scripts/agent-pr.sh` skips Codex only for pure `.md` diffs; otherwise it formats touched Rust
-  with the pinned toolchain before the final push.
+- `agent-pr.sh` skips Codex for pure `.md` diffs; `--skip-patch-notes` skips its patch-note pass.
+  Otherwise it formats touched Rust before push.
 - Root npm supports Node 22.18+ Lab TypeScript and no-emit checks; daemon requests never install.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.
