@@ -66,7 +66,7 @@ fn worker_auto_build_ignores_unspent_oil_reserve() {
     let cost = rules::economy::resource_cost(EntityKind::Worker);
     game.state.players[0].auto_build = AutoBuildSettings::default();
     let reserve_steel = game.state.players[0].auto_build.reserve_steel;
-    game.state.players[0].set_resources(cost.steel + reserve_steel, 0);
+    game.state.players[0].set_resources(cost.steel.saturating_add(reserve_steel), 0);
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
 
     game.tick();
@@ -82,7 +82,7 @@ fn worker_auto_build_ignores_unspent_oil_reserve() {
     assert!(queue[0].paid);
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (200, 0)
+        (reserve_steel, 0)
     );
 }
 
