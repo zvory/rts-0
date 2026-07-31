@@ -27,7 +27,11 @@ impl PlayerState {
     pub(in crate::game) fn can_auto_build(&self, cost: ResourceCost) -> bool {
         self.is_ai
             || (!self.auto_build.paused
-                && self.steel.saturating_sub(cost.steel) >= self.auto_build.reserve_steel
-                && self.oil.saturating_sub(cost.oil) >= self.auto_build.reserve_oil)
+                && reserve_allows_spend(self.steel, cost.steel, self.auto_build.reserve_steel)
+                && reserve_allows_spend(self.oil, cost.oil, self.auto_build.reserve_oil))
     }
+}
+
+fn reserve_allows_spend(balance: u32, cost: u32, reserve: u32) -> bool {
+    cost == 0 || balance.saturating_sub(cost) >= reserve
 }
