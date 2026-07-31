@@ -287,10 +287,13 @@ try {
   ok(gather.assigned > 0, `assigned workers to steel (workers=${gather.workers}, nodes=${gather.nodes})`);
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("z");
-  await sleep(150);
   ok(
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker build hotkey opened the build submenu",
+  );
+  await page.waitForSelector(
+    '#command-card button[data-command-id="kriegsia.build.pump_jack"]',
+    { timeout: 5000 },
   );
   const pumpJackSlot = await page.evaluate(() => {
     const button = document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]');
