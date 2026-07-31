@@ -226,43 +226,6 @@ function nearPoint(call, point, epsilon = 0.001) {
     "enemy anti-tank threat cone never blankets the terrain with a tint",
   );
 
-  const spectatorView = buildRendererFeedbackView(
-    { ...state, spectator: true },
-    { entities: visibleEntities },
-  );
-  assert(
-    spectatorView.enemyAntiTankGunThreats().length === 0,
-    "spectators do not receive player-relative enemy threat cones",
-  );
-  const labSpectatorView = buildRendererFeedbackView(
-    { ...state, spectator: true },
-    {
-      entities: visibleEntities,
-      observerView: { mode: "player", playerId: 1 },
-      controlPolicy: createControlPolicyProjection(createLabControlPolicy({
-        metadata: { role: LAB_ROLE.OPERATOR },
-      })),
-    },
-  );
-  assert(
-    labSpectatorView.enemyAntiTankGunThreats().length === 1,
-    "Lab operators can visually review the player-relative enemy threat cone",
-  );
-  const labBravoView = buildRendererFeedbackView(
-    { ...state, spectator: true },
-    {
-      entities: visibleEntities,
-      observerView: { mode: "player", playerId: 2 },
-      controlPolicy: createControlPolicyProjection(createLabControlPolicy({
-        metadata: { role: LAB_ROLE.OPERATOR },
-      })),
-    },
-  );
-  assert(
-    labBravoView.enemyAntiTankGunThreats().some((entity) => entity.id === 304),
-    "Lab Bravo vision overrides a colliding operator id and classifies Player 1's gun as enemy",
-  );
-
   const staleFeedbackView = buildRendererFeedbackView(state, {
     entities: [],
     rememberedEnemyAntiTankGunThreats: [{

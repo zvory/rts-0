@@ -164,8 +164,11 @@ deployed enemy Anti-Tank Gun warnings cross the same boundary as detached
 `enemyAntiTankGunThreat` records, including an explicit stale-memory presentation flag, so a backend
 can render current amber-orange hatching and thinner very-pale-pink frozen hatching without consulting
 mutable gameplay state. Friendly selected field-of-fire wedges remain unhatched. These are
-presentation hints only: `SelectionSceneV1` remains the sole
-entity/ground interaction authority.
+presentation hints only: `SelectionSceneV1` remains the sole entity/ground interaction authority.
+Enemy warnings are player-relative only for a single-player observer snapshot: the feedback
+assembler resolves that perspective from the snapshot's one `playerResources` row, atomically with
+its fog, entities, and remembered warnings, rather than from eager local vision-control state.
+All-player, multi-player, and omniscient observer projections omit player-relative enemy warnings.
 
 The main thread keeps this rich `ProjectionSnapshotV1` for input, audio, minimap, and selection.
 `PresentationFrameV2` instead carries a function-free `RendererProjectionV2` with `kind`, `camera`,

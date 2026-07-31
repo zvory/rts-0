@@ -10,7 +10,7 @@ const EMPTY_ARRAY = Object.freeze([]);
  * transient effect markers stay behind one explicit boundary.
  *
  * @param {object} state GameState-compatible browser model.
- * @param {{clientIntent?:object|null, controlPolicy?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, rememberedEnemyAntiTankGunThreats?:Array<object>, observerView?:object|null, now?:number}=} options
+ * @param {{clientIntent?:object|null, controlPolicy?:object|null, previewSurface?:string|null, entities?:Array<object>, selectedEntities?:Array<object>, rememberedEnemyAntiTankGunThreats?:Array<object>, now?:number}=} options
  * @returns {object}
  */
 export function buildRendererFeedbackView(
@@ -22,7 +22,6 @@ export function buildRendererFeedbackView(
     entities = EMPTY_ARRAY,
     selectedEntities = null,
     rememberedEnemyAntiTankGunThreats = EMPTY_ARRAY,
-    observerView = null,
     now = defaultNow(),
   } = {},
 ) {
@@ -34,9 +33,7 @@ export function buildRendererFeedbackView(
   const selected = selectRenderedEntities(entities, selectedStateEntities);
   const entityLookup = buildEntityLookup(entities, selected);
   const enemyAntiTankGunThreats = visibleEnemyAntiTankGunThreats(state, entities, {
-    allowSpectator: observerView?.mode === "player",
     rememberedThreats: rememberedEnemyAntiTankGunThreats,
-    observerView,
   });
   const intent = clientIntent || null;
   const controlOwner = buildControlOwnerReadModel(state, selected, controlPolicy);
@@ -130,19 +127,15 @@ export function buildRendererFeedbackView(
 function visibleEnemyAntiTankGunThreats(
   state,
   entities,
-  { allowSpectator = false, rememberedThreats = EMPTY_ARRAY, observerView = null } = {},
+  { rememberedThreats = EMPTY_ARRAY } = {},
 ) {
   const perspectivePlayerId = resolveThreatPerspectivePlayerId({
     players: state?.players,
     playerId: state?.playerId,
-    observerView,
-    allowObserverPerspective: allowSpectator,
+    spectator: !!state?.spectator,
+    playerResources: state?.playerResources,
   });
-  if (
-    !Array.isArray(entities) ||
-    (state?.spectator && !allowSpectator) ||
-    perspectivePlayerId == null
-  ) return EMPTY_ARRAY;
+  if (!Array.isArray(entities) || perspectivePlayerId == null) return EMPTY_ARRAY;
   const liveThreats = entities.filter((entity) =>
     entity?.kind === KIND.ANTI_TANK_GUN &&
     entity?.setupState === SETUP.DEPLOYED &&
@@ -161,12 +154,18 @@ function visibleEnemyAntiTankGunThreats(
 function resolveThreatPerspectivePlayerId({
   players = EMPTY_ARRAY,
   playerId = null,
-  observerView = null,
-  allowObserverPerspective = false,
+  spectator = false,
+  playerResources = EMPTY_ARRAY,
 } = {}) {
-  if (allowObserverPerspective && observerView?.mode === "player") {
-    const observedPlayerId = normalizeOwner(observerView.playerId);
-    if (teamIdForPlayer(players, observedPlayerId) != null) return observedPlayerId;
+  if (spectator) {
+    // Observer snapshots carry playerResources only for the real owners included in that
+    // authoritative projection. Exactly one row therefore identifies a single-player view
+    // atomically with its entities, fog grids, and threat memory. Do not trust the eager local
+    // vision-control selection: it can lead or lag the matching snapshot during rapid switches.
+    const projectedPlayers = arrayOrEmpty(playerResources);
+    if (projectedPlayers.length !== 1) return null;
+    const projectedPlayerId = normalizeOwner(projectedPlayers[0]?.id);
+    return teamIdForPlayer(players, projectedPlayerId) != null ? projectedPlayerId : null;
   }
   const localPlayerId = normalizeOwner(playerId);
   if (teamIdForPlayer(players, localPlayerId) != null) return localPlayerId;
