@@ -1,8 +1,9 @@
-import { EVENT, KIND, isUnit } from "./protocol.js";
+import { EVENT, KIND, isBuilding, isUnit } from "./protocol.js";
+import { STATS } from "./config.js";
 
 export const AUTO_SPECTATOR_MIN_ZOOM = 0.05;
 
-const DECISION_INTERVAL_TICKS = 30;
+const DECISION_INTERVAL_TICKS = 90;
 const ACTIVITY_WINDOW_TICKS = 90;
 const CLUSTER_RADIUS_TILES = 10;
 const CURRENT_FIGHT_BONUS = 1.25;
@@ -28,6 +29,7 @@ const OVERVIEW_ZOOM_STEP = 0.94;
 const OVERVIEW_MIN_SCALE = 0.55;
 const OVERVIEW_MAX_MAP_FRACTION = 0.7;
 const VELOCITY_SMOOTHING = 0.35;
+const ACTIVE_SHOT_WORLD_SPAN_MULTIPLIER = 1.5;
 
 const POSITIONED_IMPACTS = new Set([
   EVENT.MORTAR_IMPACT,
@@ -63,12 +65,43 @@ function sampleFromPoints(points, weight, tick) {
   return { tick, x, y, weight, points };
 }
 
-function eventSample(event, state, tick) {
+function distanceToBuildingFootprint(point, entity, tileSize) {
+  const stats = STATS[entity?.kind];
+  const halfWidth = Number(stats?.footW) * tileSize * 0.5;
+  const halfHeight = Number(stats?.footH) * tileSize * 0.5;
+  if (!Number.isFinite(halfWidth) || halfWidth <= 0
+    || !Number.isFinite(halfHeight) || halfHeight <= 0) {
+    return distance(point, entity);
+  }
+  const dx = Math.max(0, Math.abs(point.x - entity.x) - halfWidth);
+  const dy = Math.max(0, Math.abs(point.y - entity.y) - halfHeight);
+  return Math.hypot(dx, dy);
+}
+
+function artilleryImpactHasNearbyEntity(event, state, entityViews) {
+  const point = finitePoint(event);
+  const tileSize = Number(state?.map?.tileSize);
+  const radiusTiles = Number(event?.radiusTiles);
+  if (!point || !Number.isFinite(tileSize) || tileSize <= 0
+    || !Number.isFinite(radiusTiles) || radiusTiles < 0) return false;
+  const radius = radiusTiles * tileSize;
+  return entityViews.some((entity) => {
+    if (isUnit(entity?.kind)) return distance(point, entity) <= radius;
+    return isBuilding(entity?.kind)
+      && distanceToBuildingFootprint(point, entity, tileSize) <= radius;
+  });
+}
+
+function eventSample(event, state, tick, entityViews) {
   if (!event || typeof event !== "object") return null;
   if (event.e === EVENT.ATTACK) return attackSample(event, state, tick);
   if (event.e === EVENT.DEATH) {
     const point = finitePoint(event);
     return point ? sampleFromPoints([point], DEATH_WEIGHT, tick) : null;
+  }
+  if (event.e === EVENT.ARTILLERY_IMPACT
+    && !artilleryImpactHasNearbyEntity(event, state, entityViews)) {
+    return null;
   }
   if (POSITIONED_IMPACTS.has(event.e)) {
     const point = finitePoint(event);
@@ -143,11 +176,15 @@ function teamIdForOwner(state, owner) {
   return Number.isInteger(teamId) && teamId > 0 ? teamId : ownerId;
 }
 
-function currentUnitViews(state) {
+function currentEntityViews(state) {
   const views = state?.entitiesInterpolated?.(1, { includePrediction: false });
   return Array.isArray(views)
     ? views.filter((entity) => !entity?.shotReveal && !entity?.visionOnly)
     : [];
+}
+
+function currentUnitViews(entityViews) {
+  return entityViews.filter((entity) => isUnit(entity?.kind));
 }
 
 function closestApproach(a, b) {
@@ -318,14 +355,20 @@ export class AutoSpectatorDirector {
     if (!Number.isFinite(tick)) return;
     if (this.latestTick != null && tick < this.latestTick) this.resetForSeek();
     this.latestTick = tick;
-    if (this.enabled) this.updateUnitTracks(tick);
-    for (const event of snapshot?.events || []) {
-      const sample = eventSample(event, this.state, tick);
+    const events = Array.isArray(snapshot?.events) ? snapshot.events : [];
+    const needsEntityViews = this.enabled
+      || events.some((event) => event?.e === EVENT.ARTILLERY_IMPACT);
+    const entityViews = needsEntityViews ? currentEntityViews(this.state) : [];
+    if (this.enabled) this.updateUnitTracks(tick, entityViews);
+    for (const event of events) {
+      const sample = eventSample(event, this.state, tick, entityViews);
       if (sample) this.samples.push(sample);
     }
     this.pruneSamples(tick);
     if (!this.enabled) return;
-    if (this.lastDecisionTick == null || tick - this.lastDecisionTick >= DECISION_INTERVAL_TICKS) {
+    const routineDecisionDue = this.lastDecisionTick == null
+      || tick - this.lastDecisionTick >= DECISION_INTERVAL_TICKS;
+    if (routineDecisionDue || this.hasDistantFightCut()) {
       this.lastDecisionTick = tick;
       this.decide(tick);
     }
@@ -393,10 +436,18 @@ export class AutoSpectatorDirector {
     const effectivePadding = Number.isFinite(viewportMinSpan) && viewportMinSpan > 0
       ? Math.min(paddingCssPx, viewportMinSpan * MAX_PADDING_VIEWPORT_FRACTION)
       : paddingCssPx;
-    const to = this.camera?.framingForWorldPoints?.(points, {
+    const fitted = this.camera?.framingForWorldPoints?.(points, {
       paddingCssPx: effectivePadding,
     });
-    if (!to) return;
+    if (!fitted) return;
+    const minimumScale = Number(this.camera?.minZoom) || 0;
+    const to = {
+      ...fitted,
+      framingScale: Math.max(
+        minimumScale,
+        fitted.framingScale / ACTIVE_SHOT_WORLD_SPAN_MULTIPLIER,
+      ),
+    };
 
     if (immediate) {
       this.camera.restore(to);
@@ -438,6 +489,24 @@ export class AutoSpectatorDirector {
     this.lastMoveKind = "pan";
   }
 
+  hasDistantFightCut() {
+    const from = this.camera?.snapshot?.();
+    const projection = this.camera?.projectionSnapshot?.();
+    if (!from || !projection?.viewport || this.samples.length === 0) return false;
+    const radius = Math.max(1, Number(this.state?.map?.tileSize) || 32) * CLUSTER_RADIUS_TILES;
+    const fight = selectFight(clusterSamples(this.samples, radius), this.currentFightCenter, radius);
+    if (!fight) return false;
+    if (this.currentFightCenter
+      && distance(fight, this.currentFightCenter) <= radius * 1.5) return false;
+    const distanceCss = distance(from.focus, fight) * from.framingScale;
+    const viewportSpan = Math.max(
+      Number(projection.viewport.widthCssPx) || 0,
+      Number(projection.viewport.heightCssPx) || 0,
+      1,
+    );
+    return distanceCss > viewportSpan * CUT_DISTANCE_VIEWPORTS;
+  }
+
   widenView({ immediate = false } = {}) {
     const from = this.camera?.snapshot?.();
     if (!from) return;
@@ -473,9 +542,9 @@ export class AutoSpectatorDirector {
     this.lastMoveKind = "zoom";
   }
 
-  updateUnitTracks(tick) {
+  updateUnitTracks(tick, entityViews = currentEntityViews(this.state)) {
     const next = new Map();
-    for (const entity of currentUnitViews(this.state)) {
+    for (const entity of currentUnitViews(entityViews)) {
       const point = finitePoint(entity);
       const id = Number(entity?.id);
       const teamId = teamIdForOwner(this.state, entity?.owner);

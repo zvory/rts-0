@@ -1267,7 +1267,7 @@ export class Camera {
 export class AutoSpectatorDirector {
   constructor({camera, state, enabled?})
   setEnabled(enabled)
-  observeSnapshot(snapshot)              // ingest positioned combat activity and decide at most once per simulated second
+  observeSnapshot(snapshot)              // ingest combat activity; routine decisions at most once per three simulated seconds
   update(dt)                             // advance the active smooth camera transition
   diagnostics(), destroy()
 }
@@ -1276,20 +1276,21 @@ export class AutoSpectatorDirector {
 Replay viewers and ordinary live spectators receive a floating, draggable **Spectator Controls**
 panel with one persisted, default-off `Follow active fights` switch. The control is deliberately
 kept out of the gear-menu settings. Lab sessions do not mount the director. While enabled, the
-director retains three simulated seconds of attack, death, and
-positioned-impact activity, groups samples within ten tiles, and frames the highest-weight group;
-deaths count as four attacks, impacts as two, and the current fight receives a small stickiness
-bonus. When combat activity expires, the director prefers a likely contact between opposing-team
+director retains three simulated seconds of attack, death, and positioned-impact activity, groups
+samples within ten tiles, and frames the highest-weight group; deaths count as four attacks,
+occupied impacts as two, and the current fight receives a small stickiness bonus. Empty artillery
+impacts are ignored. When combat activity expires, the director prefers a likely contact between opposing-team
 units: units already within 28 tiles qualify, as do movement tracks whose inferred closest approach
 comes within eight tiles over the next six simulated seconds. Nearby members of both formations are
 included in the shot, same-team pairs and scout planes are ignored, and worker-only contacts receive
-a ranking penalty. Combat and likely-contact shots reserve 50% more screen-space context than the
-initial director tuning. If no contact is plausible, the camera preserves its focus and widens by 6%
+a ranking penalty. Combat and likely-contact shots show 50% more world span than their fitted
+framing. If no contact is plausible, the camera preserves its focus and widens by 6%
 per second, finishing each small widening before beginning another. The local overview never
 widens past 70% of either map dimension, so a large display cannot turn it into a whole-map shot.
-Decisions occur no more than once every 30 simulation ticks. Nearby reframes pan and zoom with a
-one-second smooth transition, distant combat/contact reframes cut immediately, and backward replay
-seeks clear future combat and motion tracking before the rebuilt timeline is evaluated.
+Routine decisions occur no more than once every 90 simulation ticks. A newly dominant fight beyond
+the current viewport bypasses that interval and cuts immediately; nearby reframes pan and zoom with
+a one-second smooth transition. Backward replay seeks clear future combat and motion tracking before
+the rebuilt timeline is evaluated.
 
 `renderer/index.js` (worker-owned; importing it from a main-thread production area is forbidden)
 ```js
