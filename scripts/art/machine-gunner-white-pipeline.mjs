@@ -29,6 +29,26 @@ const frames = [
   ...Array.from({ length: 5 }, (_, index) => ({ sheet: "deploy", frame: index + 1 })),
   ...Array.from({ length: 3 }, (_, frame) => ({ sheet: "fire", frame })),
 ];
+const preparedFrames = frames.map(({ sheet: sheetName, frame }) => {
+  const sourceSheet = sheets[sheetName];
+  const sourceCell = sheetCell(sourceSheet, columns[sheetName], frame);
+  const sheet = isolatedCell(sourceSheet, sourceCell);
+  const bounds = alphaBounds(
+    sheet,
+    { x: 0, y: 0, width: sheet.width, height: sheet.height },
+    16,
+  );
+  return { sheetName, sheet, bounds };
+});
+const scalesBySheet = Object.fromEntries(Object.keys(sheets).map((sheetName) => {
+  const group = preparedFrames.filter((frame) => frame.sheetName === sheetName);
+  const maxWidth = Math.max(...group.map((frame) => frame.bounds.width));
+  const maxHeight = Math.max(...group.map((frame) => frame.bounds.height));
+  return [sheetName, Math.min(
+    (frameSize - padding * 2) / maxWidth,
+    (frameSize - padding * 2) / maxHeight,
+  )];
+}));
 
 const output = new PNG({
   width: frameSize * frames.length,
@@ -37,17 +57,9 @@ const output = new PNG({
 });
 const frameBounds = [];
 
-for (let outputFrame = 0; outputFrame < frames.length; outputFrame += 1) {
-  const { sheet: sheetName, frame } = frames[outputFrame];
-  const sourceSheet = sheets[sheetName];
-  const sourceCell = sheetCell(sourceSheet, columns[sheetName], frame);
-  const sheet = isolatedCell(sourceSheet, sourceCell);
-  const cell = { x: 0, y: 0, width: sheet.width, height: sheet.height };
-  const bounds = alphaBounds(sheet, cell, 16);
-  const scale = Math.min(
-    (frameSize - padding * 2) / bounds.width,
-    (frameSize - padding * 2) / bounds.height,
-  );
+for (let outputFrame = 0; outputFrame < preparedFrames.length; outputFrame += 1) {
+  const { sheetName, sheet, bounds } = preparedFrames[outputFrame];
+  const scale = scalesBySheet[sheetName];
   const width = Math.max(1, Math.round(bounds.width * scale));
   const height = Math.max(1, Math.round(bounds.height * scale));
   const left = outputFrame * frameSize + Math.floor((frameSize - width) / 2);
@@ -58,15 +70,9 @@ for (let outputFrame = 0; outputFrame < frames.length; outputFrame += 1) {
       const sourceX = bounds.x + (x + 0.5) / scale - 0.5;
       const sourceY = bounds.y + (y + 0.5) / scale - 0.5;
       const destination = ((top + y) * output.width + left + x) * 4;
+      const rgba = sampleRgba(sheet, sourceX, sourceY);
       for (let channel = 0; channel < 4; channel += 1) {
-        output.data[destination + channel] = Math.round(
-          sampleChannel(sheet, sourceX, sourceY, channel),
-        );
-      }
-      if (output.data[destination + 3] === 0) {
-        output.data[destination] = 0;
-        output.data[destination + 1] = 0;
-        output.data[destination + 2] = 0;
+        output.data[destination + channel] = rgba[channel];
       }
     }
   }
@@ -83,6 +89,7 @@ console.log(JSON.stringify({
   output: path.relative(repoRoot, outputPath),
   frameSize,
   frameCount: frames.length,
+  scalesBySheet,
   frameBounds: frameBounds.map(({ x, y, width, height }) => ({
     x: x % frameSize,
     y,
@@ -162,18 +169,37 @@ function alphaBounds(png, region, threshold) {
   return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
-function sampleChannel(png, x, y, channel) {
+function sampleRgba(png, x, y) {
   const x0 = clamp(Math.floor(x), 0, png.width - 1);
   const y0 = clamp(Math.floor(y), 0, png.height - 1);
   const x1 = Math.min(png.width - 1, x0 + 1);
   const y1 = Math.min(png.height - 1, y0 + 1);
   const tx = x - Math.floor(x);
   const ty = y - Math.floor(y);
-  const top = png.data[(y0 * png.width + x0) * 4 + channel] * (1 - tx)
-    + png.data[(y0 * png.width + x1) * 4 + channel] * tx;
-  const bottom = png.data[(y1 * png.width + x0) * 4 + channel] * (1 - tx)
-    + png.data[(y1 * png.width + x1) * 4 + channel] * tx;
-  return top * (1 - ty) + bottom * ty;
+  const samples = [
+    [x0, y0, (1 - tx) * (1 - ty)],
+    [x1, y0, tx * (1 - ty)],
+    [x0, y1, (1 - tx) * ty],
+    [x1, y1, tx * ty],
+  ];
+  let alpha = 0;
+  const premultiplied = [0, 0, 0];
+  for (const [sampleX, sampleY, weight] of samples) {
+    const offset = (sampleY * png.width + sampleX) * 4;
+    const weightedAlpha = png.data[offset + 3] * weight;
+    alpha += weightedAlpha;
+    for (let channel = 0; channel < 3; channel += 1) {
+      premultiplied[channel] += png.data[offset + channel] * weightedAlpha;
+    }
+  }
+  const roundedAlpha = Math.round(alpha);
+  if (roundedAlpha === 0 || alpha === 0) return [0, 0, 0, 0];
+  return [
+    Math.round(premultiplied[0] / alpha),
+    Math.round(premultiplied[1] / alpha),
+    Math.round(premultiplied[2] / alpha),
+    roundedAlpha,
+  ];
 }
 
 function clamp(value, min, max) {

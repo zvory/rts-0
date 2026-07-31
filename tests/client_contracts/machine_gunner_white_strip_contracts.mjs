@@ -20,6 +20,29 @@ assert.equal(
   MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale,
   MACHINE_GUNNER_PNG_FRAME_STRIP.movementWorldScale,
 );
+const expectedFrameBounds = [
+  { x: 6, y: 23, width: 115, height: 81 },
+  { x: 6, y: 22, width: 116, height: 84 },
+  { x: 6, y: 23, width: 116, height: 81 },
+  { x: 6, y: 22, width: 115, height: 83 },
+  { x: 7, y: 24, width: 113, height: 80 },
+  { x: 7, y: 23, width: 113, height: 82 },
+  { x: 6, y: 23, width: 115, height: 81 },
+  { x: 25, y: 24, width: 78, height: 79 },
+  { x: 29, y: 17, width: 70, height: 93 },
+  { x: 38, y: 6, width: 52, height: 115 },
+  { x: 38, y: 6, width: 52, height: 116 },
+  { x: 39, y: 6, width: 50, height: 115 },
+  { x: 39, y: 6, width: 49, height: 116 },
+  { x: 41, y: 8, width: 46, height: 111 },
+  { x: 39, y: 6, width: 49, height: 116 },
+];
+assert.deepEqual(MACHINE_GUNNER_PNG_FRAME_STRIP.iconVisibleBounds, {
+  x: expectedFrameBounds[0].x,
+  y: expectedFrameBounds[0].y,
+  w: expectedFrameBounds[0].width,
+  h: expectedFrameBounds[0].height,
+});
 assert.equal(
   MACHINE_GUNNER_PNG_FRAME_STRIP.iconVisibleBounds.h
     * MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale
@@ -33,7 +56,11 @@ for (const [pose, columns] of [["carry", 6], ["deploy", 6], ["fire", 3]]) {
   const source = readPng(path.join(generatedDir, `machine-gunner-white-${pose}-source.png`));
   const alpha = readPng(path.join(generatedDir, `machine-gunner-white-${pose}-alpha.png`));
   assert.deepEqual([alpha.width, alpha.height], [source.width, source.height]);
-  assert.equal(columns > 0, true);
+  for (let frame = 0; frame < columns; frame += 1) {
+    const left = Math.round(frame * alpha.width / columns);
+    const right = Math.round((frame + 1) * alpha.width / columns);
+    alphaBounds(alpha, left, 0, right - left, alpha.height);
+  }
 
   let magentaBorderPixels = 0;
   let borderPixels = 0;
@@ -52,6 +79,7 @@ for (const [pose, columns] of [["carry", 6], ["deploy", 6], ["fire", 3]]) {
 
 for (let frame = 0; frame < 15; frame += 1) {
   const bounds = alphaBounds(runtime, frame * 128, 0, 128, 128);
+  assert.deepEqual(bounds, expectedFrameBounds[frame], `frame ${frame} packing changed`);
   assert.equal(bounds.x >= 5 && bounds.y >= 5, true, `frame ${frame} escaped its padded cell`);
   assert.equal(bounds.x + bounds.width <= 123, true, `frame ${frame} escaped its padded cell`);
   assert.equal(bounds.y + bounds.height <= 123, true, `frame ${frame} escaped its padded cell`);

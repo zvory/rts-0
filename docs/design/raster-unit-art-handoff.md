@@ -359,9 +359,10 @@ cheap checks before any generated atlas can be enabled.
   still need another art pass, and the current runtime has no firing/recoil frame.
 - `machine-gunner-pass-01`: active experiment using the Rifleman whole-frame white-source rule.
   Carry, setup/deploy, and recoil sheets are generated on magenta, chroma-keyed once, and their
-  resulting RGBA pixels are resampled together into the 15-frame 128×128 runtime strip. No legacy
-  green art, transferred color guide, or independently authored silhouette participates in the
-  build. The client applies the shared `team-light` tint and 70% brightness target.
+  resulting RGBA pixels are alpha-filtered into the 15-frame 128×128 runtime strip. Each authored
+  pose sheet uses one packing scale so the gunner keeps a stable size while the weapon rotates. No
+  legacy green art, transferred color guide, or independently authored silhouette participates in
+  the build. The client applies the shared `team-light` tint and 70% brightness target.
 - `mortar-png-pass-01`: active experiment. Generated as a three-cell M2 4.2-inch-inspired wheeled
   mortar sheet: assembled reference, carriage/frame/wheels component, and separate tube component.
   The checked-in alpha source is routed through `mortar_team_png_atlas.js`; the carriage and tube

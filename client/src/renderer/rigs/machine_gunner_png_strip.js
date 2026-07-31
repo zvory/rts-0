@@ -17,7 +17,7 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
   iconVisibleBounds: {
     x: 6,
     y: 23,
-    w: 116,
+    w: 115,
     h: 81,
   },
   movementFrames: [0, 1, 2, 3, 4, 5],
