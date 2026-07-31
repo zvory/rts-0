@@ -1,0 +1,36 @@
+.analytics-consent {
+  position: fixed;
+  z-index: 10000;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  width: min(440px, calc(100vw - 32px));
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid rgba(208, 184, 132, 0.55);
+  border-radius: 6px;
+  background: rgba(16, 20, 24, 0.98);
+  color: #e3dccd;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.analytics-consent p {
+  margin: 0;
+}
+
+.analytics-consent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .analytics-consent {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+}

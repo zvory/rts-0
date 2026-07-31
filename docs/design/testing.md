@@ -261,7 +261,13 @@ canary runs own a private server; the browser shard passes its existing loopback
   Each pass may select its own model through the manifest's `modelEnv`; the patch-note pass uses
   `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
   branches without runtime paths that may affect players, and qualifying branches receive one
-  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review. Qualifying
+  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review. A branch may be
+  explicitly opted out when the user asks to skip patch notes for the current PR:
+  `scripts/agent-pr.sh --skip-patch-notes` bypasses Codex classification, removes an existing
+  branch-owned managed fragment, and writes `Patch-Notes: skipped-user-request` to the owned PR
+  metadata. Reruns without an explicit patch-note option inherit that PR-scoped state;
+  `--auto-patch-notes` clears it and returns to automatic classification. The agent must not infer
+  an opt-out merely from the size or perceived importance of a change. Qualifying
   classifications use Codex repository review mode against the requested base; classifier
   instructions travel over stdin, and the branch diff is inspected from the checkout rather than
   embedded in a process argument. Regression coverage must keep prompt and diff content out of the
@@ -457,7 +463,10 @@ supplied `--head` value must match the current branch before the docs-only skip 
 status. Before that final classification, it runs the ordered entries in
 `scripts/agent-pr-passes.json`; mutating passes must commit their work and leave the same branch
 clean so the adversarial review covers their final output. Pass reports are preserved in the PR
-body. When the resulting branch diff against `origin/main` contains only `.md` files, including Markdown
+body. The helper resolves a patch-note mode before running those passes: an explicit CLI choice
+wins, otherwise an open PR's `Patch-Notes: skipped-user-request` metadata is inherited, and a new
+PR defaults to automatic classification. When the resulting branch diff against `origin/main`
+contains only `.md` files, including Markdown
 files outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts
 a successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
 Any non-Markdown changed file keeps the normal adversarial quality pass requirement.

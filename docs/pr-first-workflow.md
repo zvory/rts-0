@@ -14,7 +14,12 @@ The normal agent lifecycle is:
    active participant's experience in an ordinary live match. Spectator/observer,
    replay, match-history, Lab/dev, lobby/setup, and analysis-only changes are explicitly excluded,
    even when they are user-facing. Each configured pass can select its own Codex model through its
-   `modelEnv` setting. The final adversarial pass runs after all specialist edits but does not own
+   `modelEnv` setting. When the user explicitly opts the current PR out of patch notes in
+   conversation, invoke the helper with `--skip-patch-notes`. The pass bypasses classification,
+   safely removes any branch-owned fragment generated earlier, and records
+   `Patch-Notes: skipped-user-request` in the owned PR metadata. Later helper reruns inherit that
+   PR-scoped choice; `--auto-patch-notes` restores normal classification. The final adversarial pass
+   runs after all specialist edits but does not own
    patch-note generation: every path under `patch-notes/` is protected from that pass, and the
    workflow fails before push if the pass changes one.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
@@ -61,7 +66,7 @@ compiling or running specific tests. Do not add a separate diagnostic workflow f
 - CI failed: inspect the failing check from the PR or `gh pr checks <pr>`.
   Fix the branch in its worktree, run the smallest relevant local verification,
   commit, push, and rerun `scripts/agent-pr.sh --verification "..."` so the PR
-  body records the current evidence.
+  body records the current evidence. A recorded user patch-note opt-out is inherited automatically.
 - Branch stale or conflicted: fetch `origin/main`, merge it into the PR branch,
   resolve conflicts in the same worktree, rerun focused verification, and push.
   Do not claim completion or start follow-up work until `scripts/wait-pr.sh <pr>`
