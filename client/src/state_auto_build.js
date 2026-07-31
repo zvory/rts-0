@@ -1,7 +1,7 @@
 const DEFAULT_SETTINGS = Object.freeze({
   paused: false,
-  reserveSteel: 200,
-  reserveOil: 100,
+  reserveSteel: 0,
+  reserveOil: 0,
 });
 const RESERVE_MAX = 9_950;
 

@@ -203,7 +203,7 @@ try {
   const raisedReserve = callNamespace("game", "tab-menu", {
     sessionId: gameSessionId, action: "adjust", resource: "steel", delta: 1,
   }).result;
-  assert.equal(raisedReserve.result.reservations.steel, 250, "game tab-menu adjusts Auto-Build settings");
+  assert.equal(raisedReserve.result.reservations.steel, 50, "game tab-menu adjusts Auto-Build settings");
   const gameScreenshot = callNamespace("game", "screenshot", { sessionId: gameSessionId, name: "game-ui" }).result;
   assert.equal(gameScreenshot.presentation, "normal", "game screenshots retain the UI by default");
   assert.equal(gameScreenshot.preview.available, true, "game screenshots publish a Tailnet preview");

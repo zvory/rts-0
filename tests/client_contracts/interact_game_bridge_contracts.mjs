@@ -75,8 +75,8 @@ const elements = new Map([
   ["command-card", node({ buttons: [node({ text: "Move" })] })],
   ["tab-menu", node({ hidden: true, text: "Auto-Build Settings" })],
   ["tab-menu-autobuild-pause", node({ text: "ⅡWorkingQ" })],
-  ["tab-menu-steel-reserve", node({ text: "▰200" })],
-  ["tab-menu-oil-reserve", node({ text: "⬤100" })],
+  ["tab-menu-steel-reserve", node({ text: "▰0" })],
+  ["tab-menu-oil-reserve", node({ text: "⬤0" })],
   ["give-up-confirm", node({ hidden: true })],
   ["game-over", node({ hidden: true })],
   ["game-over-text", node({ text: "Defeat" })],
@@ -99,7 +99,7 @@ try {
   let issuedCommand = null;
   let overview = null;
   let autoSpectatorEnabled = true;
-  let tabMenuState = { visible: false, paused: false, status: "Working", reservations: { steel: 200, oil: 100 } };
+  let tabMenuState = { visible: false, paused: false, status: "Working", reservations: { steel: 0, oil: 0 } };
   const presentationCalls = [];
   const match = {
     giveUpSent: false,
