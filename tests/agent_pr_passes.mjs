@@ -28,6 +28,21 @@ assert.doesNotMatch(
 );
 assert.match(agentPrScript, /--skip-patch-notes/, "agent-pr should expose the conversational patch-note opt-out");
 assert.match(agentPrScript, /Patch-Notes: \$PATCH_NOTES_MODE/, "agent-pr should persist the patch-note mode in PR metadata");
+assert.match(
+  agentPrScript,
+  /--skip-patch-notes\) PATCH_NOTES_MODE="skipped-user-request"/,
+  "agent-pr should select the canonical patch-note opt-out state",
+);
+assert.match(
+  agentPrScript,
+  /rg -q '\^Patch-Notes:\[\[:space:\]\]\*skipped-user-request.*[\s\S]*PATCH_NOTES_MODE="skipped-user-request"/,
+  "agent-pr should inherit the canonical patch-note opt-out state",
+);
+assert.match(
+  agentPrScript,
+  /\[ "\$PATCH_NOTES_MODE" = "skipped-user-request" \]/,
+  "agent-pr should pass the canonical patch-note opt-out state to specialist passes",
+);
 assert.doesNotMatch(
   fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8"),
   /--deliver-discord/,

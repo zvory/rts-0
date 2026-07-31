@@ -74,7 +74,7 @@ while [ "$#" -gt 0 ]; do
     --label) EXTRA_LABELS+=("${2:?missing --label value}"); shift ;;
     --draft) DRAFT_FLAG=1 ;;
     --no-auto-merge) AUTO_MERGE=0 ;;
-    --skip-patch-notes) PATCH_NOTES_MODE="skip-user-request" ;;
+    --skip-patch-notes) PATCH_NOTES_MODE="skipped-user-request" ;;
     --auto-patch-notes) PATCH_NOTES_MODE="automatic" ;;
     --dry-run) DRY_RUN=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -119,7 +119,7 @@ if [ "$PATCH_NOTES_MODE" = "inherit" ]; then
   if [ -n "$existing_pr_json" ]; then
     existing_pr_body="$(jq -r '.body // ""' <<<"$existing_pr_json")"
     if rg -q '^Patch-Notes:[[:space:]]*skipped-user-request[[:space:]]*$' <<<"$existing_pr_body"; then
-      PATCH_NOTES_MODE="skip-user-request"
+      PATCH_NOTES_MODE="skipped-user-request"
     fi
   fi
 fi
@@ -255,7 +255,7 @@ run_configured_passes() {
     args+=(--dry-run)
   fi
   local patch_notes_user_opt_out=0
-  if [ "$PATCH_NOTES_MODE" = "skip-user-request" ]; then
+  if [ "$PATCH_NOTES_MODE" = "skipped-user-request" ]; then
     patch_notes_user_opt_out=1
   fi
   RTS_PATCH_NOTES_USER_OPT_OUT="$patch_notes_user_opt_out" node scripts/agent-pr-passes.mjs "${args[@]}"
