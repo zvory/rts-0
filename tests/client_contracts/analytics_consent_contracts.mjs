@@ -29,7 +29,7 @@ function fakeElement(tagName) {
   };
 }
 
-function fakeDocument() {
+function fakeDocument({ referrer = "" } = {}) {
   const head = fakeElement("head");
   head.appendChild = (child) => { head.children.push(child); return child; };
   const body = fakeElement("body");
@@ -37,6 +37,7 @@ function fakeDocument() {
   return {
     head,
     body,
+    referrer,
     createElement: fakeElement,
     querySelector() { return null; },
   };
@@ -80,7 +81,9 @@ function fakeDocument() {
 }
 
 {
-  const documentObj = fakeDocument();
+  const documentObj = fakeDocument({
+    referrer: "https://bewegungskrieg.net/?rtsRoom=private-referrer#spectator",
+  });
   const storage = memoryStorage();
   const windowObj = {
     location: {
@@ -104,6 +107,7 @@ function fakeDocument() {
     documentObj.head.children[0].src,
     "https://www.googletagmanager.com/gtag/js?id=G-06WVK0QHVR",
   );
+  assert.equal(documentObj.head.children[0].referrerPolicy, "no-referrer");
   assert.equal(windowObj.dataLayer[1][0], "config");
   assert.equal(windowObj.dataLayer[1][1], "G-06WVK0QHVR");
   assert.equal(windowObj.dataLayer[1][2].allow_google_signals, false);
@@ -112,6 +116,11 @@ function fakeDocument() {
     windowObj.dataLayer[1][2].page_location,
     "https://bewegungskrieg.net/",
     "page URLs sent to Google exclude user-controlled query parameters",
+  );
+  assert.equal(
+    windowObj.dataLayer[1][2].page_referrer,
+    "https://bewegungskrieg.net/",
+    "referrer URLs sent to Google exclude user-controlled query parameters",
   );
 }
 

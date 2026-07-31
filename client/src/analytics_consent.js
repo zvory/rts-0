@@ -122,6 +122,7 @@ export class AnalyticsConsent {
 
     const script = this.document.createElement("script");
     script.async = true;
+    script.referrerPolicy = "no-referrer";
     script.src =
       `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(this.measurementId)}`;
     script.dataset.rtsGoogleAnalytics = this.measurementId;
@@ -132,6 +133,7 @@ export class AnalyticsConsent {
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
       page_location: this._pageLocationWithoutQuery(),
+      page_referrer: this._pageReferrerWithoutQuery(),
     });
   }
 
@@ -139,5 +141,17 @@ export class AnalyticsConsent {
     const location = this.window?.location;
     if (!location) return undefined;
     return `${location.origin || ""}${location.pathname || "/"}`;
+  }
+
+  _pageReferrerWithoutQuery() {
+    const value = this.document?.referrer;
+    if (!value) return "";
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+      return `${url.origin}${url.pathname || "/"}`;
+    } catch {
+      return "";
+    }
   }
 }
