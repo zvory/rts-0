@@ -287,10 +287,13 @@ try {
   ok(gather.assigned > 0, `assigned workers to steel (workers=${gather.workers}, nodes=${gather.nodes})`);
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("z");
-  await sleep(150);
   ok(
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker build hotkey opened the build submenu",
+  );
+  await page.waitForSelector(
+    '#command-card button[data-command-id="kriegsia.build.pump_jack"]',
+    { timeout: 5000 },
   );
   const pumpJackSlot = await page.evaluate(() => {
     const button = document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]');
@@ -360,6 +363,17 @@ try {
 
   await page.keyboard.down("Tab");
   await page.waitForFunction(() => !document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
+  const initialAutoBuild = await page.evaluate(() => ({
+    authoritative: window.__rts.match.state.autoBuild,
+    menu: window.__rts.match.tabMenu.status(),
+  }));
+  ok(
+    initialAutoBuild.authoritative?.reserveSteel === 0 &&
+      initialAutoBuild.authoritative?.reserveOil === 0 &&
+      initialAutoBuild.menu.reservations.steel === 0 &&
+      initialAutoBuild.menu.reservations.oil === 0,
+    `TAB MENU: new players start with zero resource floors (${JSON.stringify(initialAutoBuild)})`,
+  );
   await page.keyboard.press("2");
   await page.keyboard.press("3");
   await page.keyboard.press("4");
@@ -371,8 +385,8 @@ try {
     () => {
       const settings = window.__rts.match.state.autoBuild;
       return settings?.paused === false &&
-        settings.reserveSteel === 250 &&
-        settings.reserveOil === 150;
+        settings.reserveSteel === 50 &&
+        settings.reserveOil === 100;
     },
     { timeout: 2000 },
   );
@@ -390,8 +404,8 @@ try {
       tabMenuPrototype.repeatConsumed &&
       !tabMenuPrototype.paused &&
       tabMenuPrototype.pauseHotkey === "A" &&
-      tabMenuPrototype.reservations.steel === 250 &&
-      tabMenuPrototype.reservations.oil === 150,
+      tabMenuPrototype.reservations.steel === 50 &&
+      tabMenuPrototype.reservations.oil === 100,
     `TAB MENU: held Tab sends authoritative Grid/Classic pause and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
   );
   await page.evaluate(() => {

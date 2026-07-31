@@ -54,6 +54,51 @@ fn repeat_fixture() -> (Game, u32) {
 }
 
 #[test]
+fn auto_build_defaults_to_running_without_resource_floors() {
+    assert_eq!(
+        AutoBuildSettings::default(),
+        AutoBuildSettings {
+            paused: false,
+            reserve_steel: 0,
+            reserve_oil: 0,
+        }
+    );
+}
+
+#[test]
+fn worker_auto_build_ignores_unspent_oil_reserve() {
+    let mut game = empty_flat_game(&players());
+    let city_centre = spawn_building(&mut game, 1, EntityKind::CityCentre, (3, 3));
+    spawn_building(&mut game, 2, EntityKind::CityCentre, (50, 50));
+    game.state
+        .entities
+        .get_mut(city_centre)
+        .expect("city centre")
+        .set_repeat_production(Some(EntityKind::Worker), true);
+    let cost = rules::economy::resource_cost(EntityKind::Worker);
+    game.state.players[0].auto_build = AutoBuildSettings::default();
+    let reserve_steel = game.state.players[0].auto_build.reserve_steel;
+    game.state.players[0].set_resources(cost.steel.saturating_add(reserve_steel), 0);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+
+    game.tick();
+
+    let queue = game
+        .state
+        .entities
+        .get(city_centre)
+        .expect("city centre")
+        .prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].unit, EntityKind::Worker);
+    assert!(queue[0].paid);
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (reserve_steel, 0)
+    );
+}
+
+#[test]
 fn auto_build_settings_pause_and_preserve_resource_floors() {
     let (mut game, barracks) = repeat_fixture();
     let cost = rules::economy::resource_cost(EntityKind::Rifleman);
@@ -118,7 +163,11 @@ fn auto_build_settings_pause_and_preserve_resource_floors() {
 fn auto_build_waits_when_either_resource_would_cross_its_floor() {
     let (mut game, barracks) = repeat_fixture();
     let cost = rules::economy::resource_cost(EntityKind::Rifleman);
-    game.state.players[0].auto_build = AutoBuildSettings::default();
+    game.state.players[0].auto_build = AutoBuildSettings {
+        paused: false,
+        reserve_steel: 200,
+        reserve_oil: 100,
+    };
     game.state.players[0]
         .set_resources(cost.steel.saturating_add(199), cost.oil.saturating_add(100));
 

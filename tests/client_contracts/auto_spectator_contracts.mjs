@@ -110,16 +110,65 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
 
   const focusBeforeInterval = camera.snapshot().focus;
   director.observeSnapshot({
-    tick: 15,
-    events: [{ e: EVENT.DEATH, id: 3, x: 500, y: 500, kind: "rifleman" }],
+    tick: 60,
+    events: [{ e: EVENT.DEATH, id: 3, x: 2500, y: 1800, kind: "rifleman" }],
   });
-  assert.deepEqual(camera.snapshot().focus, focusBeforeInterval, "director does not reframe inside one decision second");
+  assert.deepEqual(camera.snapshot().focus, focusBeforeInterval,
+    "director does not routinely reframe inside one three-second decision interval");
 
-  director.observeSnapshot({ tick: 121, events: [] });
+  director.observeSnapshot({ tick: 151, events: [] });
   const standoff = camera.snapshot();
   assert.equal(director.diagnostics().mode, "contact", "expired combat falls back to nearby enemies");
   assert(Math.abs(standoff.focus.x - 2900) < 0.001, "camera stays on the opposing units after fire stops");
   assert(standoff.framingScale > 0.25, "a standoff never triggers a full-map zoom");
+}
+
+{
+  const { camera, director, entities } = createHarness({ enabled: true });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 500, y: 500 });
+  entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 600, y: 500 });
+  director.observeSnapshot({ tick: 1, events: [{ e: EVENT.ATTACK, from: 1, to: 2 }] });
+  entities.set(3, { id: 3, owner: 1, kind: KIND.RIFLEMAN, x: 3300, y: 2400 });
+  entities.set(4, { id: 4, owner: 2, kind: KIND.RIFLEMAN, x: 3400, y: 2400 });
+  director.observeSnapshot({
+    tick: 10,
+    events: [
+      { e: EVENT.ATTACK, from: 3, to: 4 },
+      { e: EVENT.ATTACK, from: 4, to: 3 },
+    ],
+  });
+  assert.equal(director.diagnostics().moveKind, "cut",
+    "a better fight beyond the viewport bypasses the routine decision interval");
+  assert(camera.snapshot().focus.x > 3000,
+    "the director immediately cuts to a newly dominant distant fight");
+}
+
+{
+  const { director, entities } = createHarness();
+  director.observeSnapshot({
+    tick: 1,
+    events: [{ e: EVENT.ARTILLERY_IMPACT, x: 2000, y: 2000, radiusTiles: 3 }],
+  });
+  assert.equal(director.diagnostics().sampleCount, 0,
+    "empty artillery impacts do not attract the spectator camera");
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 2050, y: 2000 });
+  director.observeSnapshot({
+    tick: 2,
+    events: [{ e: EVENT.ARTILLERY_IMPACT, x: 2000, y: 2000, radiusTiles: 3 }],
+  });
+  assert.equal(director.diagnostics().sampleCount, 1,
+    "artillery impacts near a unit remain spectator combat activity");
+}
+
+{
+  const { director, entities } = createHarness();
+  entities.set(1, { id: 1, owner: 1, kind: KIND.CITY_CENTRE, x: 2000, y: 2000 });
+  director.observeSnapshot({
+    tick: 1,
+    events: [{ e: EVENT.ARTILLERY_IMPACT, x: 2110, y: 2000, radiusTiles: 2 }],
+  });
+  assert.equal(director.diagnostics().sampleCount, 1,
+    "artillery impacts that reach a building footprint remain combat activity");
 }
 
 {
@@ -140,13 +189,105 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
   entities.set(2, { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 1600, y: 1000 });
   director.observeSnapshot({ tick: 0, events: [] });
   assert.equal(director.diagnostics().mode, "overview", "distant stationary enemies do not create an empty shot");
-  entities.get(1).x = 500;
-  entities.get(2).x = 1500;
-  director.observeSnapshot({ tick: 30, events: [] });
+  entities.get(1).x = 700;
+  entities.get(2).x = 1300;
+  director.observeSnapshot({ tick: 90, events: [] });
   const contact = director.diagnostics().contact;
   assert.equal(director.diagnostics().mode, "contact", "intersecting movement vectors predict contact");
   assert(contact.predictedDistanceTiles < 1, "predicted contact uses closest future separation");
   assert(contact.etaTicks > 0 && contact.etaTicks <= 180, "predicted contact stays inside the six-second horizon");
+}
+
+{
+  const { camera, director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 2800,
+    y: 2100,
+    state: "idle",
+    orderPlan: [],
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+  const quietScale = camera.snapshot().framingScale;
+  const quietFocus = camera.snapshot().focus;
+  assert.equal(director.diagnostics().commandSampleCount, 0,
+    "the first authoritative entity view establishes command baselines without camera activity");
+
+  entities.get(1).state = "move";
+  entities.get(1).orderPlan = [{ kind: "move", x: 3200, y: 2400 }];
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.deepEqual(camera.snapshot().focus, quietFocus,
+    "quiet command activity waits for the one-second decision interval");
+  director.observeSnapshot({ tick: 30, events: [] });
+  assert.equal(director.diagnostics().mode, "activity",
+    "quiet mode favors entities whose authoritative command intent changed");
+  assert(camera.snapshot().focus.x > 2500,
+    "quiet command activity focuses the command recipient rather than its destination");
+  assert.equal(camera.snapshot().framingScale, quietScale,
+    "quiet command activity preserves the existing zoom");
+
+  entities.set(2, { id: 2, owner: 1, kind: KIND.RIFLEMAN, x: 400, y: 500 });
+  entities.set(3, { id: 3, owner: 2, kind: KIND.RIFLEMAN, x: 500, y: 500 });
+  director.observeSnapshot({
+    tick: 31,
+    events: [{ e: EVENT.ATTACK, from: 2, to: 3 }],
+  });
+  assert.equal(director.diagnostics().mode, "combat",
+    "new combat interrupts a persistent quiet activity shot immediately");
+  assert(camera.snapshot().focus.x < 1000,
+    "the immediate combat interrupt can cut across the map");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    x: 1400,
+    y: 900,
+    state: "idle",
+    prodQueue: 0,
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+  entities.get(1).state = "train";
+  entities.get(1).prodQueue = 1;
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "production commands create quiet activity at the receiving building");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 1400,
+    y: 900,
+    state: "move",
+    orderPlan: [{ kind: "attack", x: 1800, y: 900 }],
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+
+  entities.get(1).state = "attack";
+  entities.get(1).orderPlan[0].x = 1850;
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 0,
+    "combat state changes and moving attack markers do not masquerade as new commands");
+
+  entities.get(1).state = "idle";
+  entities.get(1).orderPlan = [];
+  director.observeSnapshot({ tick: 2, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "an authoritative order-plan change remains quiet command activity");
+
+  entities.get(1).state = "move";
+  director.observeSnapshot({ tick: 3, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "runtime state transitions alone do not redirect the quiet camera");
 }
 
 {
@@ -210,6 +351,16 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
 
 {
   const { camera, director } = createHarness({ enabled: true });
+  const baseline = camera.framingForWorldPoints(
+    [{ x: 760, y: 460 }, { x: 840, y: 540 }],
+    { paddingCssPx: 96 },
+  );
+  director.moveTo([{ x: 760, y: 460 }, { x: 840, y: 540 }], 96, { immediate: true });
+  assert(Math.abs(camera.snapshot().framingScale - baseline.framingScale / 1.5) < 0.001,
+    "active shots show fifty percent more world span than the fitted framing");
+
+  camera.focusAt({ x: 500, y: 500 });
+  camera.setZoom(1);
   director.moveTo([{ x: 760, y: 460 }, { x: 840, y: 540 }], 96);
   assert.equal(director.diagnostics().moveKind, "pan", "nearby reframes use an eased pan");
   const start = camera.snapshot();

@@ -282,8 +282,13 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   assert(
     staleGfx.calls.some((call) =>
-      call[0] === "lineStyle" && call[1] === 0.8 && call[2] === 0xffdce5 && call[3] === 0.32),
-    "remembered anti-tank cones use thinner, lower-contrast very pale pink hatching",
+      call[0] === "lineStyle" && call[1] === 0.65 && call[2] === 0xfff1f5 && call[3] === 0.18),
+    "remembered anti-tank cones use light, translucent pale-pink hatching",
+  );
+  assert(
+    staleGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.25 && call[2] === 0xfff1f5 && call[3] === 0.58),
+    "remembered anti-tank cones carry a small pale question-mark cue",
   );
   assert(
     !staleGfx.calls.some((call) => call[0] === "beginFill"),

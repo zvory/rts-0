@@ -13,12 +13,13 @@ pub(crate) struct AutoBuildSettings {
     pub(crate) reserve_oil: u32,
 }
 
+#[allow(clippy::derivable_impls)] // New-player gameplay policy stays explicit as fields evolve.
 impl Default for AutoBuildSettings {
     fn default() -> Self {
         Self {
             paused: false,
-            reserve_steel: 200,
-            reserve_oil: 100,
+            reserve_steel: 0,
+            reserve_oil: 0,
         }
     }
 }
@@ -27,7 +28,11 @@ impl PlayerState {
     pub(in crate::game) fn can_auto_build(&self, cost: ResourceCost) -> bool {
         self.is_ai
             || (!self.auto_build.paused
-                && self.steel.saturating_sub(cost.steel) >= self.auto_build.reserve_steel
-                && self.oil.saturating_sub(cost.oil) >= self.auto_build.reserve_oil)
+                && reserve_allows_spend(self.steel, cost.steel, self.auto_build.reserve_steel)
+                && reserve_allows_spend(self.oil, cost.oil, self.auto_build.reserve_oil))
     }
+}
+
+fn reserve_allows_spend(balance: u32, cost: u32, reserve: u32) -> bool {
+    cost == 0 || balance.saturating_sub(cost) >= reserve
 }
