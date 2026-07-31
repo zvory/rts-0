@@ -6,7 +6,7 @@ _2026-07-31_
 
 ## Changes
 
-- Repeat production resource handling was fixed for zero-cost units.
+- Repeat production now works correctly for zero-cost units.
 
 ## Playtest watch
 
