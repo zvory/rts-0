@@ -36,6 +36,7 @@ await import("./client_contracts/ground_decal_asset_contracts.mjs");
 await import("./client_contracts/ground_decal_stress_contracts.mjs");
 await import("./client_contracts/client_boundary_contracts.mjs");
 await import("./client_contracts/renderer_feedback_contracts.mjs");
+await import("./client_contracts/spectator_at_cone_contracts.mjs");
 await import("./client_contracts/input_contracts.mjs");
 await import("./client_contracts/ability_hotkey_targeting_contracts.mjs");
 await import("./client_contracts/artillery_targeting_contracts.mjs");
