@@ -16,16 +16,16 @@
     "whiteCarryImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-03-white-carry-imagegen.png",
     "whiteDeployImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-03-white-deploy-imagegen.png",
     "whiteFireImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-03-white-fire-imagegen.png",
-    "whiteTransferMask": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-05-white-transfer-mask.png",
-    "whiteColorGuide": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-05-white-color-guide.png"
+    "highResolutionMask": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-06-high-resolution-mask.png",
+    "highResolutionColorGuide": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-06-high-resolution-color-guide.png"
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass05-whole-frame-white-rgba8",
-    "imageVersion": "pass05-whole-frame-white-rgba8",
+    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass06-high-resolution-rgba8",
+    "imageVersion": "pass06-high-resolution-rgba8",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
-    "frameWidth": 64,
-    "frameHeight": 64,
+    "frameWidth": 160,
+    "frameHeight": 160,
     "frameCount": 15,
     "idleFrame": 0,
     "movementFrames": [0, 1, 2, 3, 4, 5],
@@ -33,8 +33,8 @@
     "deployedFrame": 11,
     "firingFrames": [12, 13, 14],
     "fps": 12,
-    "worldScale": 0.84,
-    "movementWorldScale": 0.612,
+    "worldScale": 0.336,
+    "movementWorldScale": 0.2448,
     "movementFacingOffsetRadians": -1.5707963267948966,
     "tintSlot": "team-light",
     "bakedColorAdjustment": {
@@ -67,6 +67,8 @@
     "Frames 12-14 are a three-frame no-muzzle-flare firing recoil strip transformed from the generated recoil sheet before the production strip is downsampled to 64x64 RGBA8 cells.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation.",
     "Pass 05 follows the Rifleman whole-frame pipeline: every visible RGB pixel comes from the accepted ImageGen white carry, deploy, or recoil artwork rather than mixing a recolor layer with the old green sprite.",
-    "The pass-05 pipeline retains only the pass-01 960x64 frame geometry and alpha channel byte-for-byte, and records the exact runtime-size whole-frame color guide plus transfer mask for contract verification."
+    "The pass-05 pipeline retains only the pass-01 960x64 frame geometry and alpha channel byte-for-byte, and records the exact runtime-size whole-frame color guide plus transfer mask for contract verification.",
+    "Pass 06 rebuilds each frame directly from the high-resolution source alpha and ImageGen color at 160x160, matching Rifleman's linear runtime resolution while preserving the old MG world-space footprint through proportionally reduced draw scales.",
+    "The 2.5x runtime resolution increase changes the strip from 960x64 to 2400x160; worldScale changes from 0.84 to 0.336 and movementWorldScale changes from 0.612 to 0.2448, so both deployed and moving canvas extents remain exact."
   ]
 }

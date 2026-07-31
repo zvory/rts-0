@@ -1273,8 +1273,9 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   assert.equal(runtimeStripSize.height, runtime.frameHeight);
 
   const recoilStripSize = readPngDimensions(manifest.sourceSheets.fireRecoilStrip);
-  assert.equal(recoilStripSize.width, runtime.frameWidth * 2 * runtime.firingFrames.length);
-  assert.equal(recoilStripSize.height, runtime.frameHeight * 2);
+  const compactSourceFrameSize = 64;
+  assert.equal(recoilStripSize.width, compactSourceFrameSize * 2 * runtime.firingFrames.length);
+  assert.equal(recoilStripSize.height, compactSourceFrameSize * 2);
   assert.deepEqual(
     runtime.firingFrames,
     Array.from(
