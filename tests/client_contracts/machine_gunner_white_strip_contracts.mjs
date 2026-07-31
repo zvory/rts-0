@@ -17,15 +17,14 @@ const colorGuide = readPng(path.join(generatedDir, "machine-gunner-pass-06-high-
 
 assert.equal(compact.width, 960);
 assert.equal(compact.height, 64);
-assert.equal(runtime.width, 2400);
-assert.equal(runtime.height, 160);
+assert.equal(runtime.width, 1920);
+assert.equal(runtime.height, 128);
 assert.equal(mask.width, runtime.width);
 assert.equal(mask.height, runtime.height);
 assert.equal(colorGuide.width, runtime.width);
 assert.equal(colorGuide.height, runtime.height);
-assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth, RIFLEMAN_PNG_FRAME_STRIP.frameWidth);
-assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth, 160);
-assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameHeight, 160);
+assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth, 128);
+assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameHeight, 128);
 assertApprox(
   MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth * MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale,
   64 * 0.84,
@@ -44,7 +43,7 @@ for (let y = 0; y < runtime.height; y += 1) {
   for (let x = 0; x < runtime.width; x += 1) {
     const offset = (y * runtime.width + x) * 4;
     const visible = runtime.data[offset + 3] > 0;
-    const frame = Math.floor(x / 160);
+    const frame = Math.floor(x / 128);
     assert.equal(mask.data[offset + 3] > 0, visible, `mask visibility differs at ${x},${y}`);
     assert.equal(
       colorGuide.data[offset + 3],
@@ -67,8 +66,8 @@ for (let y = 0; y < runtime.height; y += 1) {
   }
 }
 
-assert.equal(visiblePixels, 100768, "high-resolution visible coverage stays intentional");
-assert.equal(visibleByFrame.every((count) => count >= 4000), true);
+assert.equal(visiblePixels, 64666, "high-resolution visible coverage stays intentional");
+assert.equal(visibleByFrame.every((count) => count >= 2500), true);
 assert.equal(
   colorsByFrame.every((colors) => colors.size >= 48),
   true,
@@ -77,8 +76,8 @@ assert.equal(
 
 for (let frame = 0; frame < 15; frame += 1) {
   const compactBounds = alphaBounds(compact, frame * 64, 0, 64, 64);
-  const expected = scaleBounds(compactBounds, 2.5);
-  const actual = alphaBounds(runtime, frame * 160, 0, 160, 160);
+  const expected = scaleBounds(compactBounds, 2);
+  const actual = alphaBounds(runtime, frame * 128, 0, 128, 128);
   if (frame === 7 || frame === 8) {
     assert.equal(actual.x >= expected.x, true);
     assert.equal(actual.y >= expected.y, true);

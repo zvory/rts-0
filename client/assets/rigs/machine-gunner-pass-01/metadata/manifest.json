@@ -21,11 +21,11 @@
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass06-high-resolution-rgba8",
-    "imageVersion": "pass06-high-resolution-rgba8",
+    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass07-gpu-safe-rgba8",
+    "imageVersion": "pass07-gpu-safe-rgba8",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
-    "frameWidth": 160,
-    "frameHeight": 160,
+    "frameWidth": 128,
+    "frameHeight": 128,
     "frameCount": 15,
     "idleFrame": 0,
     "movementFrames": [0, 1, 2, 3, 4, 5],
@@ -33,8 +33,8 @@
     "deployedFrame": 11,
     "firingFrames": [12, 13, 14],
     "fps": 12,
-    "worldScale": 0.336,
-    "movementWorldScale": 0.2448,
+    "worldScale": 0.42,
+    "movementWorldScale": 0.306,
     "movementFacingOffsetRadians": -1.5707963267948966,
     "tintSlot": "team-light",
     "bakedColorAdjustment": {
@@ -68,7 +68,7 @@
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation.",
     "Pass 05 follows the Rifleman whole-frame pipeline: every visible RGB pixel comes from the accepted ImageGen white carry, deploy, or recoil artwork rather than mixing a recolor layer with the old green sprite.",
     "The pass-05 pipeline retains only the pass-01 960x64 frame geometry and alpha channel byte-for-byte, and records the exact runtime-size whole-frame color guide plus transfer mask for contract verification.",
-    "Pass 06 rebuilds each frame directly from the high-resolution source alpha and ImageGen color at 160x160, matching Rifleman's linear runtime resolution while preserving the old MG world-space footprint through proportionally reduced draw scales.",
-    "The 2.5x runtime resolution increase changes the strip from 960x64 to 2400x160; worldScale changes from 0.84 to 0.336 and movementWorldScale changes from 0.612 to 0.2448, so both deployed and moving canvas extents remain exact."
+    "Pass 07 rebuilds each frame directly from the high-resolution source alpha and ImageGen color at 128x128, doubling the old MG linear runtime resolution while preserving its world-space footprint through proportionally reduced draw scales.",
+    "The 2x runtime resolution increase changes the strip from 960x64 to 1920x128, below the guaranteed 2048px GPU texture limit; worldScale changes from 0.84 to 0.42 and movementWorldScale changes from 0.612 to 0.306, so both deployed and moving canvas extents remain exact."
   ]
 }

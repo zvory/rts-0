@@ -14,7 +14,7 @@ const outputPath = path.join(assetDir, "machine-gunner-pass-01-strip.png");
 const maskPath = path.join(generatedDir, "machine-gunner-pass-06-high-resolution-mask.png");
 const colorGuidePath = path.join(generatedDir, "machine-gunner-pass-06-high-resolution-color-guide.png");
 const sourceFrameSize = 64;
-const runtimeFrameSize = 160;
+const runtimeFrameSize = 128;
 const runtimeResolutionScale = runtimeFrameSize / sourceFrameSize;
 
 const sheets = {

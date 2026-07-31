@@ -59,11 +59,12 @@ sprite. The old pass-01 sprite contributes only the exact 960×64 frame layout a
 alpha channel. The client then applies the same 70% brightness target as Rifleman and Rifleman
 Panzerfaust.
 
-## Pass 06 Rifleman-Resolution Runtime Strip
+## Pass 07 GPU-Safe High-Resolution Runtime Strip
 
-Pass 06 samples the high-resolution source alpha and accepted ImageGen color directly into 160×160
+Pass 07 samples the high-resolution source alpha and accepted ImageGen color directly into 128×128
 runtime cells instead of routing them through the old 64×64 strip. The deployed scale changes from
-0.84 to 0.336 and the movement scale changes from 0.612 to 0.2448. These proportional changes keep
-the exact full-canvas world extents (`64 × 0.84 = 160 × 0.336` and
-`64 × 0.612 = 160 × 0.2448`) while providing the same 160-pixel linear source resolution used by
-Rifleman. Known detached crop fragments are removed from setup frames 7 and 8.
+0.84 to 0.42 and the movement scale changes from 0.612 to 0.306. These proportional changes keep
+the exact full-canvas world extents (`64 × 0.84 = 128 × 0.42` and
+`64 × 0.612 = 128 × 0.306`) while doubling the original linear source resolution and keeping the
+15-frame strip at 1920px, below the guaranteed 2048px GPU texture limit. Known detached crop
+fragments are removed from setup frames 7 and 8.
