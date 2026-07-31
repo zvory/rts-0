@@ -13,6 +13,7 @@ pub(crate) struct AutoBuildSettings {
     pub(crate) reserve_oil: u32,
 }
 
+#[allow(clippy::derivable_impls)] // New-player gameplay policy stays explicit as fields evolve.
 impl Default for AutoBuildSettings {
     fn default() -> Self {
         Self {
