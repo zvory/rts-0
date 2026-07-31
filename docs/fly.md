@@ -7,6 +7,11 @@ Fly proxies HTTPS and WSS traffic to the container on port 8080.
 `RTS_PERF=spikes` and `RTS_PERF_SLOW_TICK_MS=40`. Fly logs include a `performance tick summary`
 only when a server tick takes at least 40 ms.
 
+Mainline also sets `RTS_GOOGLE_ANALYTICS_ID` to its public GA4 measurement ID. The server injects
+that ID into the client shell; the client loads Google's tag only after the visitor allows basic
+analytics. Beta and local development omit the variable and therefore show no analytics prompt or
+send any analytics traffic.
+
 ## Release channels
 
 Each release channel has one Fly app and one game Machine. Both stop when idle and start on the

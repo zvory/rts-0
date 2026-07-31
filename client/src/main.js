@@ -1,4 +1,5 @@
 import { App } from "./app.js";
+import { AnalyticsConsent } from "./analytics_consent.js";
 import {
   diagnostics,
   snapshotStreamLaunchConfig,
@@ -13,6 +14,9 @@ import {
 } from "./renderer/backend_selection.js";
 
 async function start() {
+  const analyticsConsent = new AnalyticsConsent();
+  analyticsConsent.start();
+
   let app;
   try {
     const stressTestLaunch = stressTestLaunchConfig();
