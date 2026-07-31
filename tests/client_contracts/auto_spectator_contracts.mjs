@@ -199,6 +199,98 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
 }
 
 {
+  const { camera, director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 2800,
+    y: 2100,
+    state: "idle",
+    orderPlan: [],
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+  const quietScale = camera.snapshot().framingScale;
+  const quietFocus = camera.snapshot().focus;
+  assert.equal(director.diagnostics().commandSampleCount, 0,
+    "the first authoritative entity view establishes command baselines without camera activity");
+
+  entities.get(1).state = "move";
+  entities.get(1).orderPlan = [{ kind: "move", x: 3200, y: 2400 }];
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.deepEqual(camera.snapshot().focus, quietFocus,
+    "quiet command activity waits for the one-second decision interval");
+  director.observeSnapshot({ tick: 30, events: [] });
+  assert.equal(director.diagnostics().mode, "activity",
+    "quiet mode favors entities whose authoritative command intent changed");
+  assert(camera.snapshot().focus.x > 2500,
+    "quiet command activity focuses the command recipient rather than its destination");
+  assert.equal(camera.snapshot().framingScale, quietScale,
+    "quiet command activity preserves the existing zoom");
+
+  entities.set(2, { id: 2, owner: 1, kind: KIND.RIFLEMAN, x: 400, y: 500 });
+  entities.set(3, { id: 3, owner: 2, kind: KIND.RIFLEMAN, x: 500, y: 500 });
+  director.observeSnapshot({
+    tick: 31,
+    events: [{ e: EVENT.ATTACK, from: 2, to: 3 }],
+  });
+  assert.equal(director.diagnostics().mode, "combat",
+    "new combat interrupts a persistent quiet activity shot immediately");
+  assert(camera.snapshot().focus.x < 1000,
+    "the immediate combat interrupt can cut across the map");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    x: 1400,
+    y: 900,
+    state: "idle",
+    prodQueue: 0,
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+  entities.get(1).state = "train";
+  entities.get(1).prodQueue = 1;
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "production commands create quiet activity at the receiving building");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 1400,
+    y: 900,
+    state: "move",
+    orderPlan: [{ kind: "attack", x: 1800, y: 900 }],
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+
+  entities.get(1).state = "attack";
+  entities.get(1).orderPlan[0].x = 1850;
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 0,
+    "combat state changes and moving attack markers do not masquerade as new commands");
+
+  entities.get(1).state = "idle";
+  entities.get(1).orderPlan = [];
+  director.observeSnapshot({ tick: 2, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "an authoritative order-plan change remains quiet command activity");
+
+  entities.get(1).state = "move";
+  director.observeSnapshot({ tick: 3, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "runtime state transitions alone do not redirect the quiet camera");
+}
+
+{
   const { director, entities } = createHarness({ enabled: true });
   entities.set(1, {
     id: 1,
