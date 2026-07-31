@@ -10,87 +10,69 @@ import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/riflema
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const assetDir = path.join(repoRoot, "client/assets/rigs/machine-gunner-pass-01");
 const generatedDir = path.join(assetDir, "generated");
-const compact = readPng(path.join(generatedDir, "machine-gunner-pass-01-prewhite-strip.png"));
 const runtime = readPng(path.join(assetDir, "machine-gunner-pass-01-strip.png"));
-const mask = readPng(path.join(generatedDir, "machine-gunner-pass-06-high-resolution-mask.png"));
-const colorGuide = readPng(path.join(generatedDir, "machine-gunner-pass-06-high-resolution-color-guide.png"));
 
-assert.equal(compact.width, 960);
-assert.equal(compact.height, 64);
-assert.equal(runtime.width, 1920);
-assert.equal(runtime.height, 128);
-assert.equal(mask.width, runtime.width);
-assert.equal(mask.height, runtime.height);
-assert.equal(colorGuide.width, runtime.width);
-assert.equal(colorGuide.height, runtime.height);
+assert.deepEqual([runtime.width, runtime.height], [1920, 128]);
+assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameCount, 15);
 assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth, 128);
 assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.frameHeight, 128);
-assertApprox(
-  MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth * MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale,
-  64 * 0.84,
-  "deployed world-space canvas extent changed",
-);
-assertApprox(
-  MACHINE_GUNNER_PNG_FRAME_STRIP.frameWidth * MACHINE_GUNNER_PNG_FRAME_STRIP.movementWorldScale,
-  64 * 0.612,
-  "movement world-space canvas extent changed",
-);
-
-let visiblePixels = 0;
-const visibleByFrame = Array(15).fill(0);
-const colorsByFrame = Array.from({ length: 15 }, () => new Set());
-for (let y = 0; y < runtime.height; y += 1) {
-  for (let x = 0; x < runtime.width; x += 1) {
-    const offset = (y * runtime.width + x) * 4;
-    const visible = runtime.data[offset + 3] > 0;
-    const frame = Math.floor(x / 128);
-    assert.equal(mask.data[offset + 3] > 0, visible, `mask visibility differs at ${x},${y}`);
-    assert.equal(
-      colorGuide.data[offset + 3],
-      runtime.data[offset + 3],
-      `color-guide alpha differs at ${x},${y}`,
-    );
-    if (!visible) continue;
-    for (let channel = 0; channel < 3; channel += 1) {
-      assert.equal(
-        runtime.data[offset + channel],
-        colorGuide.data[offset + channel],
-        `runtime RGB differs from its high-resolution ImageGen guide at ${x},${y}`,
-      );
-    }
-    visiblePixels += 1;
-    visibleByFrame[frame] += 1;
-    colorsByFrame[frame].add(
-      `${runtime.data[offset]},${runtime.data[offset + 1]},${runtime.data[offset + 2]}`,
-    );
-  }
-}
-
-assert.equal(visiblePixels, 64666, "high-resolution visible coverage stays intentional");
-assert.equal(visibleByFrame.every((count) => count >= 2500), true);
 assert.equal(
-  colorsByFrame.every((colors) => colors.size >= 48),
-  true,
-  "every high-resolution frame preserves a broad shaded color range",
+  MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale,
+  MACHINE_GUNNER_PNG_FRAME_STRIP.movementWorldScale,
 );
+assert.equal(
+  MACHINE_GUNNER_PNG_FRAME_STRIP.iconVisibleBounds.h
+    * MACHINE_GUNNER_PNG_FRAME_STRIP.worldScale
+    <= RIFLEMAN_PNG_FRAME_STRIP.iconVisibleBounds.h
+      * RIFLEMAN_PNG_FRAME_STRIP.worldScale * 1.35,
+  true,
+  "packed MG is disproportionately taller than Rifleman",
+);
+
+for (const [pose, columns] of [["carry", 6], ["deploy", 6], ["fire", 3]]) {
+  const source = readPng(path.join(generatedDir, `machine-gunner-white-${pose}-source.png`));
+  const alpha = readPng(path.join(generatedDir, `machine-gunner-white-${pose}-alpha.png`));
+  assert.deepEqual([alpha.width, alpha.height], [source.width, source.height]);
+  assert.equal(columns > 0, true);
+
+  let magentaBorderPixels = 0;
+  let borderPixels = 0;
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      if (x >= 8 && x < source.width - 8 && y >= 8 && y < source.height - 8) continue;
+      const offset = (y * source.width + x) * 4;
+      borderPixels += 1;
+      if (source.data[offset] > 220 && source.data[offset + 1] < 50 && source.data[offset + 2] > 190) {
+        magentaBorderPixels += 1;
+      }
+    }
+  }
+  assert.equal(magentaBorderPixels / borderPixels > 0.98, true, `${pose} source lacks a clean magenta border`);
+}
 
 for (let frame = 0; frame < 15; frame += 1) {
-  const compactBounds = alphaBounds(compact, frame * 64, 0, 64, 64);
-  const expected = scaleBounds(compactBounds, 2);
-  const actual = alphaBounds(runtime, frame * 128, 0, 128, 128);
-  if (frame === 7 || frame === 8) {
-    assert.equal(actual.x >= expected.x, true);
-    assert.equal(actual.y >= expected.y, true);
-    assert.equal(actual.x + actual.width, expected.x + expected.width);
-    assert.equal(actual.y + actual.height, expected.y + expected.height);
-    assert.equal(actual.width >= expected.width * 0.75, true);
-    assert.equal(actual.height >= expected.height * 0.75, true);
-  } else {
-    assert.deepEqual(actual, expected, `frame ${frame} world-space bounds changed`);
+  const bounds = alphaBounds(runtime, frame * 128, 0, 128, 128);
+  assert.equal(bounds.x >= 5 && bounds.y >= 5, true, `frame ${frame} escaped its padded cell`);
+  assert.equal(bounds.x + bounds.width <= 123, true, `frame ${frame} escaped its padded cell`);
+  assert.equal(bounds.y + bounds.height <= 123, true, `frame ${frame} escaped its padded cell`);
+
+  const colors = new Set();
+  for (let y = 0; y < 128; y += 1) {
+    for (let x = 0; x < 128; x += 1) {
+      const offset = (y * runtime.width + frame * 128 + x) * 4;
+      if (runtime.data[offset + 3] === 0) continue;
+      assert.equal(
+        runtime.data[offset] > 200 && runtime.data[offset + 1] < 70 && runtime.data[offset + 2] > 180,
+        false,
+        `visible magenta survived in frame ${frame}`,
+      );
+      colors.add(`${runtime.data[offset]},${runtime.data[offset + 1]},${runtime.data[offset + 2]}`);
+    }
   }
+  assert.equal(colors.size > 48, true, `frame ${frame} lost shaded color detail`);
 }
 
-console.log("machine gunner high-resolution white-strip contracts passed");
+console.log("machine gunner white-chroma strip contracts passed");
 
 function alphaBounds(png, regionX, regionY, width, height) {
   let minX = regionX + width;
@@ -107,24 +89,7 @@ function alphaBounds(png, regionX, regionY, width, height) {
     }
   }
   assert.equal(maxX >= minX && maxY >= minY, true, "frame has no visible alpha");
-  return {
-    x: minX - regionX,
-    y: minY - regionY,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1,
-  };
-}
-
-function scaleBounds(bounds, scale) {
-  const x = Math.round(bounds.x * scale);
-  const y = Math.round(bounds.y * scale);
-  const right = Math.round((bounds.x + bounds.width) * scale);
-  const bottom = Math.round((bounds.y + bounds.height) * scale);
-  return { x, y, width: right - x, height: bottom - y };
-}
-
-function assertApprox(actual, expected, message) {
-  assert.equal(Math.abs(actual - expected) < 1e-9, true, `${message}: ${actual} != ${expected}`);
+  return { x: minX - regionX, y: minY - regionY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
 function readPng(filePath) {

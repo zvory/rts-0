@@ -2,22 +2,17 @@
 
 ## Carry Sheet
 
-Edit the accepted six-frame rifleman source sheet into a machine-gunner carry sheet. Preserve the
-six-frame top-down layout, magenta background, compact overhead body, muted field-grey palette, and
-no-feet silhouette. Replace the rifle with an oversized MG42-like heavy machine gun carried flat
-across the body, barrel left/west and stock right/east. Make the backpack/bedroll bulkier.
+Edit the accepted six-frame machine-gunner carry artwork only by repainting the soldier's tintable
+material white and replacing every empty pixel with one flat `#ff00ff` chroma background. Preserve
+the six-frame layout, complete silhouette, black linework, weapon, hands, shading, and scale.
 
 ## Deploy Sheet
 
-Use one carry frame as the exact starting-pose reference. Generate six strict top-down frames where
-the same standing Machine Gunner sets up the MG without lying down or kneeling. Start from the
-carried horizontal MG pose, then rotate the weapon down/south until the long barrel points away from
-the body and the bipod is open.
+Apply the same white-material and flat-`#ff00ff` background edit to the accepted six-frame deployment
+sheet. Preserve all deployment poses and every complete arm, hand, gun, ammunition box, and tripod.
 
 ## Fire Recoil Sheet
 
-Use the fully deployed frame as the rest-pose reference. Generate a three-frame strict top-down
-sprite sheet with no muzzle flare, smoke, tracer, sparks, glow, or lighting burst: rest, subtle
-recoil peak, rest. Keep all frames anchored in the same 128x128 footprint; the production strip
-shrinks the recoil frames to 85% and shifts them 5 px north so the animation resets cleanly against
-the deployed pose.
+Apply the same white-material and flat-`#ff00ff` background edit to the accepted three-frame firing
+sheet. Preserve the aligned recoil poses with no muzzle flash, smoke, tracer, glow, crop, resize, or
+repositioning.
