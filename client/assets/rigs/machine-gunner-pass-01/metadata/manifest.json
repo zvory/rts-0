@@ -13,15 +13,16 @@
     "fireRecoilAlpha": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-alpha.png",
     "fireRecoilStrip": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-fire-recoil-strip.png",
     "preWhiteRuntimeStrip": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-01-prewhite-strip.png",
-    "whiteCarryImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-carry-imagegen.png",
-    "whiteDeployImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-deploy-imagegen.png",
-    "whiteFireImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-fire-imagegen.png",
-    "whiteRecolorMask": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-02-white-recolor-mask.png"
+    "whiteCarryImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-03-white-carry-imagegen.png",
+    "whiteDeployImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-03-white-deploy-imagegen.png",
+    "whiteFireImagegen": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-03-white-fire-imagegen.png",
+    "whiteTransferMask": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-05-white-transfer-mask.png",
+    "whiteColorGuide": "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-pass-05-white-color-guide.png"
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass02-white-clothing-rgba8",
-    "imageVersion": "pass02-white-clothing-rgba8",
+    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=pass05-whole-frame-white-rgba8",
+    "imageVersion": "pass05-whole-frame-white-rgba8",
     "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
     "frameWidth": 64,
     "frameHeight": 64,
@@ -42,8 +43,8 @@
       "hue": 100
     },
     "targetColorAdjustment": {
-      "brightness": 140,
-      "saturation": 118,
+      "brightness": 70,
+      "saturation": 100,
       "hue": 100
     },
     "packedFacing": "body",
@@ -62,10 +63,10 @@
     "Frames 0-5 come from the edited rifleman carry sheet and cycle while the Machine Gunner is moving; runtime rotates only those movement frames 90 degrees left and renders them at the smaller movementWorldScale.",
     "Frame 6 reuses a carry frame so setup starts from the same carried MG pose. The runtime strip scales frames 6-8 to 84% around the cell center to smooth the visual size transition into the deployed poses, then scales all setup frames 6-11 to 85% of that state so the setup animation matches the movement sprite scale more closely.",
     "Frames 7-11 come from the deploy-only generation and are selected over the client setup animation duration. Frames 7 and 8 have isolated left-edge crop artifacts cleared from the runtime strip.",
-    "The checked-in runtime strip keeps the raw generated color; the client applies a slightly dimmer per-unit frame-strip color target at texture load time.",
+    "The checked-in runtime strip keeps the raw generated color; the client applies the same 70% brightness frame-strip color target used by Rifleman and Rifleman Panzerfaust at texture load time.",
     "Frames 12-14 are a three-frame no-muzzle-flare firing recoil strip transformed from the generated recoil sheet before the production strip is downsampled to 64x64 RGBA8 cells.",
     "The deployed source points south/down in the sheet; runtime subtracts PI/2 from weaponFacing for setup/deployed frame-strip rotation.",
-    "Pass 02 uses built-in image generation to identify the clothing and backpack material across the carry, deploy, and recoil source sheets, then rebuilds the runtime strip through scripts/art/machine-gunner-white-pipeline.mjs.",
-    "The pass-02 pipeline restores the pass-01 alpha byte-for-byte, preserves every RGB byte outside the approved recolor mask, and protects an explicit weapon region in every frame so the gun cannot be recolored."
+    "Pass 05 follows the Rifleman whole-frame pipeline: every visible RGB pixel comes from the accepted ImageGen white carry, deploy, or recoil artwork rather than mixing a recolor layer with the old green sprite.",
+    "The pass-05 pipeline retains only the pass-01 960x64 frame geometry and alpha channel byte-for-byte, and records the exact runtime-size whole-frame color guide plus transfer mask for contract verification."
   ]
 }
