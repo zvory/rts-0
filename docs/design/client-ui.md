@@ -1285,7 +1285,8 @@ comes within eight tiles over the next six simulated seconds. Nearby members of 
 included in the shot, same-team pairs and scout planes are ignored, and worker-only contacts receive
 a ranking penalty. Combat and likely-contact shots show 50% more world span than their fitted
 framing. If no contact is plausible, quiet mode favors clusters of units and buildings whose
-authoritative state, order plan, rally, or production intent just changed. These activity reframes
+authoritative order plan, rally, or production intent just changed. Runtime state transitions and
+moving attack-marker coordinates are ignored. These activity reframes
 preserve the current zoom and update at most once per simulated second. With no recent command
 activity, the camera preserves its focus and widens by 6%
 per second, finishing each small widening before beginning another. The local overview never

@@ -116,10 +116,13 @@ function eventSample(event, state, tick, entityViews) {
 function commandSignature(entity) {
   if (!isUnit(entity?.kind) && !isBuilding(entity?.kind)) return null;
   const stages = (value) => Array.isArray(value)
-    ? value.map((stage) => [stage?.kind, stage?.x, stage?.y])
+    ? value.map((stage) => (
+      stage?.kind === "attack"
+        ? [stage.kind]
+        : [stage?.kind, stage?.x, stage?.y]
+    ))
     : null;
   return JSON.stringify([
-    entity.state,
     stages(entity.orderPlan),
     stages(entity.rallyPlan),
     entity.prodKind,
@@ -127,7 +130,6 @@ function commandSignature(entity) {
     entity.prodUpgrade,
     Array.isArray(entity.prodUpgradeQueue) ? entity.prodUpgradeQueue : null,
     Array.isArray(entity.prodRepeatKinds) ? entity.prodRepeatKinds : null,
-    entity.buildActive,
   ]);
 }
 

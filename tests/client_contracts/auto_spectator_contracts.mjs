@@ -265,6 +265,37 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
     id: 1,
     owner: 1,
     kind: KIND.RIFLEMAN,
+    x: 1400,
+    y: 900,
+    state: "move",
+    orderPlan: [{ kind: "attack", x: 1800, y: 900 }],
+  });
+  director.observeSnapshot({ tick: 0, events: [] });
+
+  entities.get(1).state = "attack";
+  entities.get(1).orderPlan[0].x = 1850;
+  director.observeSnapshot({ tick: 1, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 0,
+    "combat state changes and moving attack markers do not masquerade as new commands");
+
+  entities.get(1).state = "idle";
+  entities.get(1).orderPlan = [];
+  director.observeSnapshot({ tick: 2, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "an authoritative order-plan change remains quiet command activity");
+
+  entities.get(1).state = "move";
+  director.observeSnapshot({ tick: 3, events: [] });
+  assert.equal(director.diagnostics().commandSampleCount, 1,
+    "runtime state transitions alone do not redirect the quiet camera");
+}
+
+{
+  const { director, entities } = createHarness({ enabled: true });
+  entities.set(1, {
+    id: 1,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
     x: 600,
     y: 600,
     visionOnly: true,
