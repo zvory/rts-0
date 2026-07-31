@@ -1,13 +1,13 @@
 <!-- rts-patch-note:v1 -->
 <!-- branch: zvorygin/at-gun-memory-cones -->
-# AT gun range feedback
+# Remembered AT gun cone clarity
 
 _2026-07-31_
 
 ## Changes
 
-- AT gun range indicators now preserve remembered enemy firing cones, improving threat awareness through fog of war.
+- Remembered enemy AT gun firing cones are now lighter and more translucent, with a question mark marking uncertain intel.
 
 ## Playtest watch
 
-- Check that remembered cones are clear and disappear when expected.
+- Check that the paler cone and question mark stay legible across terrain and fog.
