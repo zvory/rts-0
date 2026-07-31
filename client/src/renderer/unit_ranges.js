@@ -24,12 +24,15 @@ const UNIT_FIELD_OF_FIRE_FILL_ALPHA = 0.07;
 const UNIT_FIELD_OF_FIRE_LINE_ALPHA = 0.36;
 const ENEMY_AT_THREAT_COLOR = 0xffb000;
 const ENEMY_AT_THREAT_DARK_COLOR = 0x3d2b00;
-const ENEMY_AT_MEMORY_COLOR = 0xffdce5;
-const ENEMY_AT_MEMORY_DARK_COLOR = 0x65424c;
+const ENEMY_AT_MEMORY_COLOR = 0xfff1f5;
+const ENEMY_AT_MEMORY_DARK_COLOR = 0x8b7279;
 const ENEMY_AT_THREAT_HATCH_SPACING_PX = 60;
 const ENEMY_AT_THREAT_HATCH_ANGLE = Math.PI / 4;
 const ENEMY_AT_THREAT_ARC_STEP_PX = 42;
 const ENEMY_AT_THREAT_OUTLINE_WIDTH = 1.95;
+const ENEMY_AT_MEMORY_MARK_DISTANCE_RATIO = 0.48;
+const ENEMY_AT_MEMORY_MARK_WIDTH_PX = 12;
+const ENEMY_AT_MEMORY_MARK_HEIGHT_PX = 20;
 
 export function _drawSelectedMortarRanges(state) {
   return _drawSelectedUnitRanges.call(this, state);
@@ -95,11 +98,11 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
     const remembered = entity?.threatMemory === true;
     const color = remembered ? ENEMY_AT_MEMORY_COLOR : ENEMY_AT_THREAT_COLOR;
     const darkColor = remembered ? ENEMY_AT_MEMORY_DARK_COLOR : ENEMY_AT_THREAT_DARK_COLOR;
-    const darkAlpha = remembered ? 0.1 : 0.26;
-    const hatchAlpha = remembered ? 0.32 : 0.78;
-    const hatchWidth = remembered ? 0.8 : 1.3;
-    const keylineWidth = remembered ? 1.8 : 2.8;
-    const outlineAlpha = remembered ? 0.26 : 0.68;
+    const darkAlpha = remembered ? 0.05 : 0.26;
+    const hatchAlpha = remembered ? 0.18 : 0.78;
+    const hatchWidth = remembered ? 0.65 : 1.3;
+    const keylineWidth = remembered ? 1.35 : 2.8;
+    const outlineAlpha = remembered ? 0.14 : 0.68;
     // Luminance and stroke weight distinguish live threats from stale intel even
     // without red/green hue perception. The dark keyline remains legible on snow.
     gfxStrokePaths(g, paths, keylineWidth, darkColor, darkAlpha);
@@ -117,7 +120,36 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
       0,
       ENEMY_AT_THREAT_OUTLINE_WIDTH,
     );
+    if (remembered) {
+      drawRememberedThreatMarker(g, entity.x, entity.y, weapon.maxRadius, facing);
+    }
   }
+}
+
+function drawRememberedThreatMarker(g, x, y, radius, facing) {
+  const cx = x + Math.cos(facing) * radius * ENEMY_AT_MEMORY_MARK_DISTANCE_RATIO;
+  const cy = y + Math.sin(facing) * radius * ENEMY_AT_MEMORY_MARK_DISTANCE_RATIO;
+  const halfWidth = ENEMY_AT_MEMORY_MARK_WIDTH_PX / 2;
+  const halfHeight = ENEMY_AT_MEMORY_MARK_HEIGHT_PX / 2;
+  const questionMark = [
+    [
+      [cx - halfWidth, cy - halfHeight * 0.45],
+      [cx - halfWidth, cy - halfHeight * 0.72],
+      [cx - halfWidth * 0.45, cy - halfHeight],
+      [cx + halfWidth * 0.35, cy - halfHeight],
+      [cx + halfWidth, cy - halfHeight * 0.55],
+      [cx + halfWidth, cy - halfHeight * 0.18],
+      [cx + halfWidth * 0.3, cy + halfHeight * 0.12],
+      [cx, cy + halfHeight * 0.35],
+      [cx, cy + halfHeight * 0.55],
+    ],
+    [
+      [cx, cy + halfHeight * 0.82],
+      [cx, cy + halfHeight],
+    ],
+  ];
+  gfxStrokePaths(g, questionMark, 2.8, ENEMY_AT_MEMORY_DARK_COLOR, 0.16);
+  gfxStrokePaths(g, questionMark, 1.25, ENEMY_AT_MEMORY_COLOR, 0.58);
 }
 
 function hatchedWedgePaths(cx, cy, radius, facing, arc, spacing, hatchAngle) {
