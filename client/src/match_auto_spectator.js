@@ -16,6 +16,7 @@ export function createMatchAutoSpectator(match, payload, options = {}, controlsR
 
 class MatchAutoSpectator {
   constructor(match, options, controlsRoot) {
+    match.state.showAllUnitRangesEnabled = false;
     this.director = new AutoSpectatorDirector({
       camera: match.camera,
       state: match.state,
@@ -24,8 +25,15 @@ class MatchAutoSpectator {
     });
     this.panel = new SpectatorControlsPanel({
       root: controlsRoot,
-      state: () => ({ available: true, enabled: this.director.enabled }),
+      state: () => ({
+        available: true,
+        enabled: this.director.enabled,
+        rangesEnabled: !!match.state.showAllUnitRangesEnabled,
+      }),
       onToggle: (enabled) => this.setEnabled(enabled),
+      onRangesToggle: (enabled) => {
+        match.state.showAllUnitRangesEnabled = !!enabled;
+      },
     });
   }
 

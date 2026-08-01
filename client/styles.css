@@ -3768,6 +3768,10 @@ input[type="text"]:focus {
   justify-content: space-between;
   gap: 12px;
 }
+.spectator-controls-rows {
+  display: grid;
+  gap: 6px;
+}
 .spectator-controls-label {
   color: var(--ink);
   font-size: 12px;

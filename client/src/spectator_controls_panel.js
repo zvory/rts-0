@@ -8,19 +8,23 @@ import { createImmediateTouchButtonActivation } from "./panel_touch_activation.j
 const STORAGE_KEY = "rts.spectatorControls.panel.v1";
 const STORAGE_SCHEMA_VERSION = 1;
 const PANEL_WIDTH = 292;
-const PANEL_HEIGHT = 92;
+const PANEL_HEIGHT = 132;
 const PANEL_MARGIN = 12;
 const PANEL_TOP = 58;
 
 export class SpectatorControlsPanel {
-  constructor({ root, state, onToggle } = {}) {
+  constructor({ root, state, onToggle, onRangesToggle } = {}) {
     this.host = root || null;
     this.state = typeof state === "function" ? state : () => ({});
     this.onToggle = onToggle;
+    this.onRangesToggle = onRangesToggle;
     this.root = null;
     this.toggle = null;
+    this.rangesToggle = null;
     this.toggleActivation = createImmediateTouchButtonActivation(() => this.toggleEnabled());
+    this.rangesToggleActivation = createImmediateTouchButtonActivation(() => this.toggleRanges());
     this.toggleListeners = [];
+    this.rangesToggleListeners = [];
     this.positioner = null;
     this.mount();
   }
@@ -50,6 +54,8 @@ export class SpectatorControlsPanel {
     title.textContent = "Spectator Controls";
     dragHandle.append(grip, title);
 
+    const rows = document.createElement("div");
+    rows.className = "spectator-controls-rows";
     const row = document.createElement("div");
     row.className = "spectator-controls-row";
 
@@ -67,12 +73,31 @@ export class SpectatorControlsPanel {
     toggle.title = "Automatically frame active battles and widen the view when combat is quiet.";
 
     row.append(label, toggle);
-    root.append(dragHandle, row);
+
+    const rangesRow = document.createElement("div");
+    rangesRow.className = "spectator-controls-row";
+    const rangesLabel = document.createElement("span");
+    rangesLabel.id = "spectator-controls-ranges-label";
+    rangesLabel.className = "spectator-controls-label";
+    rangesLabel.textContent = "Range indicators";
+    const rangesToggle = document.createElement("button");
+    rangesToggle.id = "spectator-range-toggle";
+    rangesToggle.type = "button";
+    rangesToggle.className = "spectator-controls-toggle";
+    rangesToggle.setAttribute("role", "switch");
+    rangesToggle.setAttribute("aria-labelledby", rangesLabel.id);
+    rangesToggle.title = "Show firing-range indicators for every visible player's units.";
+    rangesRow.append(rangesLabel, rangesToggle);
+
+    rows.append(row, rangesRow);
+    root.append(dragHandle, rows);
     this.host.appendChild(root);
     this.root = root;
     this.toggle = toggle;
+    this.rangesToggle = rangesToggle;
 
     this.bindToggle(toggle);
+    this.bindRangesToggle(rangesToggle);
     this.positioner = new FloatingPanelPositioner({
       root,
       defaultPosition: defaultPanelPosition(),
@@ -99,10 +124,29 @@ export class SpectatorControlsPanel {
     this.toggleListeners = listeners;
   }
 
+  bindRangesToggle(toggle) {
+    const listeners = [
+      ["pointerdown", this.rangesToggleActivation.pointerdown],
+      ["pointerup", this.rangesToggleActivation.pointerup],
+      ["pointercancel", this.rangesToggleActivation.pointercancel],
+      ["pointerleave", this.rangesToggleActivation.pointerleave],
+      ["click", this.rangesToggleActivation.click],
+    ];
+    for (const [type, handler] of listeners) toggle.addEventListener(type, handler);
+    this.rangesToggleListeners = listeners;
+  }
+
   toggleEnabled() {
     const current = this.state() || {};
     if (current.available === false) return;
     this.onToggle?.(!current.enabled);
+    this.sync();
+  }
+
+  toggleRanges() {
+    const current = this.state() || {};
+    if (current.available === false) return;
+    this.onRangesToggle?.(!current.rangesEnabled);
     this.sync();
   }
 
@@ -113,6 +157,12 @@ export class SpectatorControlsPanel {
     this.toggle.disabled = current.available === false;
     this.toggle.setAttribute("aria-checked", String(enabled));
     this.toggle.textContent = enabled ? "On" : "Off";
+    if (this.rangesToggle) {
+      const rangesEnabled = !!current.rangesEnabled;
+      this.rangesToggle.disabled = current.available === false;
+      this.rangesToggle.setAttribute("aria-checked", String(rangesEnabled));
+      this.rangesToggle.textContent = rangesEnabled ? "On" : "Off";
+    }
   }
 
   handleViewportChange() {
@@ -122,13 +172,19 @@ export class SpectatorControlsPanel {
   destroy() {
     this.positioner?.destroy();
     this.toggleActivation.reset();
+    this.rangesToggleActivation.reset();
     for (const [type, handler] of this.toggleListeners) {
       this.toggle?.removeEventListener?.(type, handler);
     }
     this.toggleListeners = [];
+    for (const [type, handler] of this.rangesToggleListeners) {
+      this.rangesToggle?.removeEventListener?.(type, handler);
+    }
+    this.rangesToggleListeners = [];
     this.root?.remove?.();
     this.positioner = null;
     this.toggle = null;
+    this.rangesToggle = null;
     this.root = null;
   }
 

@@ -165,6 +165,9 @@ deployed enemy Anti-Tank Gun warnings cross the same boundary as detached
 can render current amber-orange hatching and thinner very-pale-pink frozen hatching without consulting
 mutable gameplay state. Friendly selected field-of-fire wedges remain unhatched. These are
 presentation hints only: `SelectionSceneV1` remains the sole entity/ground interaction authority.
+The detached feedback context also carries the observer-only all-unit-range preference. When it is
+enabled, Pixi draws the existing range profile for every currently visible, non-reveal unit record,
+independent of selection or owner; remembered intel and transient shot reveals never gain ranges.
 Enemy warnings are player-relative only for a single-player observer snapshot: the feedback
 assembler resolves that perspective from the snapshot's one `playerResources` row, atomically with
 its fog, entities, and remembered warnings, rather than from eager local vision-control state.

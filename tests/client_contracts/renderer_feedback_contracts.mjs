@@ -645,7 +645,9 @@ function nearPoint(call, point, epsilon = 0.001) {
   assert(commandFeedbackNow === 1500, "feedback view samples live feedback at the requested frame time");
   assert(feedbackView.liveCommandFeedback(999) === feedbackView.commandFeedback, "feedback view returns stable command feedback for the frame");
   assert(feedbackView.selectedEntities() === selected, "feedback view exposes stable selected entities for the frame");
+  assert(feedbackView.unitRangeEntities() === selected, "feedback view exposes stable visible entities for spectator ranges");
   assert(feedbackView.showUnitRangesEnabled, "feedback view exposes unit range preference as on by default");
+  assert(!feedbackView.showAllUnitRangesEnabled, "feedback view keeps all-player spectator ranges off by default");
   assert(!feedbackView.showSelectedFieldOfFireEnabled, "feedback view leaves selected field-of-fire inspection off outside lab");
   assert(selectedReads === 1, "feedback view snapshots selected entities once per frame");
   assert(feedbackView.entityById(7) === selected[0], "feedback view exposes renderer entity lookup");
@@ -938,6 +940,27 @@ function nearPoint(call, point, epsilon = 0.001) {
     },
   );
   assert(workerRangeGfx.calls.length === 0, "selected workers never draw unit range indicators");
+
+  const spectatorRangeGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: spectatorRangeGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 99,
+      showUnitRangesEnabled: false,
+      showAllUnitRangesEnabled: true,
+      selectedEntities: () => [],
+      unitRangeEntities: () => [
+        { id: 101, owner: 1, kind: KIND.TANK, x: 128, y: 96, weaponRangePx: 224 },
+        { id: 102, owner: 2, kind: KIND.TANK, x: 512, y: 96, weaponRangePx: 224 },
+      ],
+    },
+  );
+  assert(
+    spectatorRangeGfx.calls.filter((call) =>
+      call[0] === "lineStyle" && call[1] === 1 && call[2] === 0x8eb7ff && call[3] === 0.68
+    ).length === 2,
+    "spectator all-range mode draws visible units for every player without requiring selection or ownership",
+  );
 
   const disabledRangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
