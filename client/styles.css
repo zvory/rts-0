@@ -114,57 +114,6 @@ body {
   display: none;
 }
 
-#discord-invite-badge {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  z-index: 30;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 8px 13px;
-  border: 1px solid #8594f6;
-  border-radius: var(--radius);
-  background: #5865f2;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
-  color: #fff;
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  text-decoration: none;
-  transform: translateX(-50%);
-  transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.04s ease;
-}
-
-#discord-invite-badge svg {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  fill: currentColor;
-}
-
-#discord-invite-badge:hover {
-  background: #4752c4;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-}
-
-#discord-invite-badge:active {
-  transform: translate(-50%, 1px);
-}
-
-#discord-invite-badge:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
-}
-
-/* The badge belongs to the pre-game shell, including the Lobby and Lab catalog,
-   and disappears whenever a match, replay, Lab room, or map editor owns the game screen. */
-#app:has(> #game-screen:not([hidden])) > #discord-invite-badge {
-  display: none;
-}
-
 .status-badge-content {
   display: flex;
   min-width: 0;
