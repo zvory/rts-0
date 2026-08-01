@@ -52,6 +52,22 @@ try {
   await page.goto(TEST_URL, { waitUntil: "networkidle2", timeout: 15000 });
   await page.waitForSelector("#lobby-screen", { visible: true, timeout: 5000 });
   ok(true, "lobby screen visible on load");
+  const discordBadge = await page.evaluate(() => {
+    const badge = document.getElementById("discord-invite-badge");
+    return {
+      visible: !!badge && getComputedStyle(badge).display !== "none",
+      href: badge?.href || "",
+      target: badge?.target || "",
+      label: badge?.getAttribute("aria-label") || "",
+    };
+  });
+  ok(
+    discordBadge.visible &&
+      discordBadge.href === "https://discord.gg/v4jR3JbH" &&
+      discordBadge.target === "_blank" &&
+      /Join the Bewegungskrieg Discord server/.test(discordBadge.label),
+    "pre-game shell exposes the Discord invite badge",
+  );
   ok(await page.evaluate(() => !window.PIXI), "main thread does not load the Pixi runtime");
   ok(await page.evaluate(() => !!document.querySelector("#lobby-browser")),
     "pre-join lobby browser is visible on first paint");
@@ -111,6 +127,10 @@ try {
   await page.click("#lobby-start");
   await page.waitForFunction(() => { const g = document.getElementById("game-screen"); return g && !g.hidden; }, { timeout: 6000 });
   ok(true, "game screen shown after start");
+  ok(
+    await page.evaluate(() => getComputedStyle(document.getElementById("discord-invite-badge")).display === "none"),
+    "Discord invite badge stays out of the game screen",
+  );
 
   await page.waitForSelector("#viewport canvas", { timeout: 5000 });
   await page.waitForFunction(() => window.__rtsRenderWorkerStats?.backendInfo?.backend === "webgl", { timeout: 5000 });
