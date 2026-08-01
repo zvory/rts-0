@@ -60,11 +60,19 @@ async fn run(
             reliable_closed = true;
         }
 
+        // Room-time state may be coalesced, but it is still ordered after reliable control-plane
+        // messages queued before it (notably Start and RoomTimeSeekStarted). Take the state first:
+        // observing it establishes that its preceding reliable send has already happened. Then
+        // re-check the FIFO because that send may have landed after `reliable_batch_len` was read.
         if let Some(state) = room_time_state.take() {
-            let (keep_writing, _) =
-                send_server_message(player_id, sink, ServerMessage::RoomTimeState(state)).await;
-            if !keep_writing {
-                break 'write_loop;
+            if reliable_rx.is_empty() {
+                let (keep_writing, _) =
+                    send_server_message(player_id, sink, ServerMessage::RoomTimeState(state)).await;
+                if !keep_writing {
+                    break 'write_loop;
+                }
+            } else {
+                room_time_state.defer(state);
             }
         }
 

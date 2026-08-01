@@ -571,6 +571,17 @@ impl LatestRoomTimeStateSlot {
         self.lock_pending().take()
     }
 
+    /// Return a state that was taken before discovering an ordering barrier. Preserve a newer
+    /// state if the room task published one in the meantime.
+    pub fn defer(&self, state: RoomTimeState) {
+        let mut pending = self.lock_pending();
+        if pending.is_none() {
+            *pending = Some(state);
+        }
+        drop(pending);
+        self.notify.notify_one();
+    }
+
     fn store(&self, state: RoomTimeState) -> bool {
         let mut pending = self.lock_pending();
         let replaced = pending.is_some();
@@ -1352,6 +1363,54 @@ mod tests {
         let latest = writer.room_time_state.take().expect("room-time state");
         assert_eq!(latest.current_tick, 11);
         assert!(writer.room_time_state.take().is_none());
+    }
+
+    #[test]
+    fn deferred_room_time_state_never_replaces_a_newer_publication() {
+        let (sink, writer) = ConnectionSink::new();
+        sink.try_send_room_time_state(room_time_state(10));
+        let deferred = writer.room_time_state.take().expect("deferred state");
+
+        sink.try_send_room_time_state(room_time_state(12));
+        writer.room_time_state.defer(deferred);
+
+        assert_eq!(
+            writer
+                .room_time_state
+                .take()
+                .expect("latest room-time state")
+                .current_tick,
+            12
+        );
+    }
+
+    #[test]
+    fn room_time_state_defers_behind_a_preceding_reliable_barrier() {
+        let (sink, mut writer) = ConnectionSink::new();
+        sink.try_send_reliable(ServerMessage::RoomTimeSeekStarted {
+            controller_id: 7,
+            from_tick: 10,
+            target_tick: 20,
+        })
+        .expect("seek-start barrier");
+        sink.try_send_room_time_state(room_time_state(20));
+
+        let deferred = writer.room_time_state.take().expect("room-time state");
+        assert!(!writer.reliable_rx.is_empty());
+        writer.room_time_state.defer(deferred);
+
+        assert!(matches!(
+            writer.reliable_rx.try_recv(),
+            Ok(ServerMessage::RoomTimeSeekStarted { .. })
+        ));
+        assert_eq!(
+            writer
+                .room_time_state
+                .take()
+                .expect("state after reliable barrier")
+                .current_tick,
+            20
+        );
     }
 
     #[test]
