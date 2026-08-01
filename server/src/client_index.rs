@@ -49,7 +49,10 @@ fn build_from_html(
         &format!("{import_map}<script type=\"module\""),
     );
 
-    html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
+    html.replace(
+        "src=\"/src/main.js\"",
+        &format!("src=\"/src/main.js?v={version}\""),
+    )
         .replace(".css\"", &format!(".css?v={version}\""))
         .replace(
             "/manifest.webmanifest\"",
@@ -127,10 +130,14 @@ mod tests {
         assert!(html.contains("\"/src/main.js\": \"/src/main.js?v=test-version\""));
         assert!(html
             .contains("\"/src/renderer/terrain.js\": \"/src/renderer/terrain.js?v=test-version\""));
-        assert!(html.contains("./src/main.js?v=test-version\""));
-        assert!(html.contains("./live_pause.css?v=test-version\""));
+        assert!(html.contains("/src/main.js?v=test-version\""));
+        assert!(html.contains("/live_pause.css?v=test-version\""));
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
         assert!(html.contains("name=\"rts-google-analytics-id\" content=\"\""));
+        assert!(
+            !html.contains("href=\"./") && !html.contains("src=\"./"),
+            "SPA shell assets must resolve from the site root on nested routes"
+        );
     }
 
     #[test]
