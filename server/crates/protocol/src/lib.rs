@@ -116,7 +116,10 @@ pub enum ClientMessage {
         id: Option<u32>,
     },
     /// Send room chat; the room validates and routes its authoritative audience.
-    ChatSend { channel: ChatChannel, text: ChatText },
+    ChatSend {
+        channel: ChatChannel,
+        text: ChatText,
+    },
     /// Issue a gameplay command (ignored unless in-game).
     Command {
         #[serde(rename = "clientSeq")]

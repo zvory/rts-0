@@ -17,7 +17,9 @@ impl TryFrom<String> for ChatText {
 
     fn try_from(text: String) -> Result<Self, Self::Error> {
         if text.len() > MAX_CHAT_INPUT_BYTES {
-            return Err(format!("chat text exceeds {MAX_CHAT_INPUT_BYTES} UTF-8 bytes"));
+            return Err(format!(
+                "chat text exceeds {MAX_CHAT_INPUT_BYTES} UTF-8 bytes"
+            ));
         }
         Ok(Self(text))
     }
