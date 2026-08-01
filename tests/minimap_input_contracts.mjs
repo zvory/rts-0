@@ -10,7 +10,7 @@ import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
 } from "../client/src/config.js";
-import { ABILITY, cmd, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN, UPGRADE } from "../client/src/protocol.js";
+import { ABILITY, cmd, EVENT, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN, UPGRADE } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -1559,6 +1559,20 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   flashing = minimap._underAttackFlashEntityIds(entities, 750);
   assert(flashing.has(11), "attack alert resumes white after 600 ms even after the unit moves");
+  entities[0].owner = 2;
+  flashing = minimap._underAttackFlashEntityIds(entities, 850);
+  assert(!flashing.has(11), "attack alert stops strobing an entity that is no longer locally owned");
+  entities[0].owner = 1;
+
+  minimap._pings.length = 0;
+  minimap.state.events = [{ e: EVENT.DEATH, id: 99, x: 40, y: 60, kind: KIND.RIFLEMAN }];
+  minimap.ping(40, 60, "alert", true);
+  minimap._pings[0].startedAt = 100;
+  flashing = minimap._underAttackFlashEntityIds(entities, 250);
+  assert(!flashing.has(11), "a lethal attack does not transfer its strobe to a nearby survivor");
+  minimap.state.events = [];
+  flashing = minimap._underAttackFlashEntityIds(entities, 750);
+  assert(flashing.size === 0, "a lethal attack remains resolved without a replacement target");
 
   minimap._pings.length = 0;
   minimap.ping(160, 160, "alert", true);

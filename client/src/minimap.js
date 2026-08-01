@@ -10,6 +10,7 @@
 import { cmd } from "./protocol.js";
 import {
   ABILITY,
+  EVENT,
   KIND,
   ORDER_STAGE,
   PASSABLE,
@@ -731,15 +732,19 @@ export class Minimap {
   _underAttackFlashEntityIds(entities, now) {
     const flashing = new Set();
     if (!Array.isArray(entities)) return flashing;
+    const entitiesById = new Map(entities.map((entity) => [entity?.id, entity]));
 
     for (const ping of this._pings) {
       const age = now - ping.startedAt;
       if (!ping.isUnderAttack || age < 0 || age >= UNDER_ATTACK_PING_MS) continue;
-      if (ping.targetEntityId == null) {
-        ping.targetEntityId = this._nearestUnderAttackEntityId(entities, ping.x, ping.y);
+      if (!Object.prototype.hasOwnProperty.call(ping, "targetEntityId")) {
+        ping.targetEntityId = this._underAttackDeathAt(ping.x, ping.y)
+          ? null
+          : this._nearestUnderAttackEntityId(entities, ping.x, ping.y);
       }
+      const target = entitiesById.get(ping.targetEntityId);
       if (
-        ping.targetEntityId != null &&
+        this._isUnderAttackTargetEntity(target) &&
         Math.floor(age / UNDER_ATTACK_STROBE_PHASE_MS) % 2 === 0
       ) {
         flashing.add(ping.targetEntityId);
@@ -755,14 +760,7 @@ export class Minimap {
     let nearestDistance2 = maxDistance2;
 
     for (const entity of entities) {
-      if (
-        entity?.id == null ||
-        entity.visionOnly ||
-        !ownOwner(this.state, entity.owner, this.controlPolicy) ||
-        (!isUnit(entity.kind) && !isBuilding(entity.kind))
-      ) {
-        continue;
-      }
+      if (!this._isUnderAttackTargetEntity(entity)) continue;
       const dx = Number(entity.x) - x;
       const dy = Number(entity.y) - y;
       const distance2 = dx * dx + dy * dy;
@@ -771,6 +769,21 @@ export class Minimap {
       nearestDistance2 = distance2;
     }
     return nearestId;
+  }
+
+  _isUnderAttackTargetEntity(entity) {
+    return entity?.id != null &&
+      !entity.visionOnly &&
+      ownOwner(this.state, entity.owner, this.controlPolicy) &&
+      (isUnit(entity.kind) || isBuilding(entity.kind));
+  }
+
+  _underAttackDeathAt(x, y) {
+    return (this.state.events || []).some((event) =>
+      event?.e === EVENT.DEATH &&
+      Math.abs(Number(event.x) - x) <= 0.01 &&
+      Math.abs(Number(event.y) - y) <= 0.01
+    );
   }
 
   _isPlayerOwnedMinimapEntity(e) {
