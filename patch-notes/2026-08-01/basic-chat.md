@@ -6,8 +6,8 @@ _2026-08-01_
 
 ## Changes
 
-- Players can now chat with each other during live matches.
+- Players can now use all-chat and private team chat during live matches.
 
 ## Playtest watch
 
-- Message delivery, readability, and interference with match controls.
+- Chat readability and conflicts with match controls.
