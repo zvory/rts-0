@@ -1,7 +1,7 @@
 {
   "version": 4,
   "name": "Schone Tage",
-  "description": "",
+  "description": "Two-player custom map with central waterways and expansion routes.",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "terrain": [
     "#########~~~~~~~~~~~...............#######...~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~...#######...............~~~~~~~~~~~#########",
