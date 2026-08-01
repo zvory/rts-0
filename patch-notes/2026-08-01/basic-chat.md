@@ -6,7 +6,7 @@ _2026-08-01_
 
 ## Changes
 
-- Players can now use all-chat and private team chat during live matches.
+- Players can now use all-chat and team-only chat during live matches.
 
 ## Playtest watch
 
