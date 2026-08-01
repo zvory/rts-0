@@ -312,7 +312,9 @@ impl ReplaySession {
     }
 
     pub(super) fn effective_speed(&self) -> f32 {
-        if self.is_seeking() {
+        // A running seek is bounded fast-forward, but pause is a real seek control: it must stop
+        // reconstruction until a later nonzero speed command resumes the same active job.
+        if self.is_seeking() && !self.is_paused() {
             Self::MAX_SPEED
         } else {
             self.speed

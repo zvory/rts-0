@@ -278,10 +278,9 @@ impl RoomTask {
             (Phase::ReplayViewer(session), Some(RoomTimeSource::ReplayPlayback)) => {
                 Some(RoomTimeClock {
                     speed: session.effective_speed(),
-                    // Seeking is reconstruction work, not replay playback. It must keep the room
-                    // actor scheduled even when playback is paused; the stored paused state takes
-                    // effect again as soon as reconstruction reaches its target.
-                    paused: session.is_paused() && !session.is_seeking(),
+                    // Pause applies to the active seek too, so the actor stops reconstruction
+                    // until the viewer explicitly resumes it.
+                    paused: session.is_paused(),
                 })
             }
             (_, Some(RoomTimeSource::DevScenario)) => Some(RoomTimeClock {
