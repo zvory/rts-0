@@ -39,7 +39,7 @@ src/
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
   auto_spectator_settings.js # persisted opt-in preference for automatic spectator framing
-  spectator_controls_panel.js # floating live-spectator/replay camera controls
+  spectator_controls_panel.js # floating live-spectator/replay camera and all-unit range controls
   match_auto_spectator.js # Match availability, camera-limit, and director-construction wiring
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers

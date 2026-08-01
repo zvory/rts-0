@@ -25,22 +25,31 @@ try {
   withFakeOverlayDocument(() => {
     const host = document.createElement("div");
     let enabled = false;
+    let rangesEnabled = false;
     const panel = new SpectatorControlsPanel({
       root: host,
-      state: () => ({ available: true, enabled }),
+      state: () => ({ available: true, enabled, rangesEnabled }),
       onToggle: (next) => { enabled = next; },
+      onRangesToggle: (next) => { rangesEnabled = next; },
     });
 
     const root = host.querySelector(".spectator-controls-panel");
     const title = host.querySelector(".spectator-controls-title");
     const toggle = host.querySelector("#auto-spectator-toggle");
+    const rangesToggle = host.querySelector("#spectator-range-toggle");
     assert(root && title?.textContent === "Spectator Controls", "spectator controls mount as a dedicated floating panel");
     assert(toggle?.textContent === "Off", "spectator fight-following defaults off");
     assert(toggle?.getAttribute("aria-checked") === "false", "spectator fight-following exposes switch state");
+    assert(rangesToggle?.textContent === "Off", "all-player range indicators default off");
 
     toggle.listeners.click({ pointerType: "mouse", detail: 1 });
     assert(enabled && toggle.textContent === "On", "spectator panel toggles automatic fight-following on");
     assert(toggle.getAttribute("aria-checked") === "true", "spectator panel synchronizes the enabled switch state");
+    rangesToggle.listeners.click({ pointerType: "mouse", detail: 1 });
+    assert(rangesEnabled && rangesToggle.textContent === "On",
+      "spectator panel toggles range indicators for every visible player's units");
+    assert(rangesToggle.getAttribute("aria-checked") === "true",
+      "spectator panel synchronizes the all-player range switch state");
     assert(listeners.has("resize"), "spectator panel constrains its floating position on resize");
 
     panel.destroy();
@@ -58,6 +67,7 @@ try {
       state: {
         map: { width: 64, height: 64, tileSize: 32 },
         players: [],
+        showAllUnitRangesEnabled: false,
         entitiesInterpolated: () => [],
       },
     };
@@ -70,6 +80,9 @@ try {
     host.querySelector("#auto-spectator-toggle").listeners.click({ pointerType: "mouse", detail: 1 });
     assert(autoSpectator.enabled && persistedEnabled,
       "match auto spectator keeps its director, panel, and persisted preference synchronized");
+    host.querySelector("#spectator-range-toggle").listeners.click({ pointerType: "mouse", detail: 1 });
+    assert(match.state.showAllUnitRangesEnabled,
+      "match spectator controls enable ranges for every visible player's units");
     autoSpectator.destroy();
     assert(host.children.length === 0, "match auto spectator tears down its injected controls");
 

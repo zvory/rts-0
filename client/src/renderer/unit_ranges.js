@@ -41,19 +41,24 @@ export function _drawSelectedMortarRanges(state) {
 export function _drawSelectedUnitRanges(state) {
   if (!state) return;
   drawEnemyAntiTankGunThreats(this._feedbackGfx, state, (this._map && this._map.tileSize) || 32);
-  if (typeof state.selectedEntities !== "function") return;
+  const drawEveryVisibleRange = !!state.showAllUnitRangesEnabled;
+  const rangeEntities = drawEveryVisibleRange
+    ? state.unitRangeEntities?.()
+    : state.selectedEntities?.();
+  if (!Array.isArray(rangeEntities)) return;
   const drawAllRanges = !!state.showUnitRangesEnabled;
   const drawSelectedFieldOfFire = !!state.showSelectedFieldOfFireEnabled;
-  if (!drawAllRanges && !drawSelectedFieldOfFire) return;
+  if (!drawEveryVisibleRange && !drawAllRanges && !drawSelectedFieldOfFire) return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
 
-  for (const e of state.selectedEntities()) {
+  for (const e of rangeEntities) {
     if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
-    if (!feedbackOwner(state, e.owner) || !isUnit(e.kind)) continue;
+    if ((!drawEveryVisibleRange && !feedbackOwner(state, e.owner)) || !isUnit(e.kind)) continue;
+    if (e.visionOnly || e.shotReveal || e.aboveFogReveal) continue;
     const profile = selectedUnitRangeProfile(e, tileSize);
     if (!profile) continue;
-    if (!drawAllRanges && profile.kind !== "fieldOfFire") continue;
+    if (!drawEveryVisibleRange && !drawAllRanges && profile.kind !== "fieldOfFire") continue;
     if (profile.kind === "fieldOfFire") {
       drawFacingWedge(
         g,
