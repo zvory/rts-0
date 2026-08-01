@@ -278,8 +278,17 @@ export class RoomTimeControls {
     if (!this.roomTimePending) return;
     this.roomTimeTimedOutAction = this.roomTimePending;
     this.clearRoomTimePending();
+    this.restoreAuthoritativeSeekPresentation();
     this.roomTimeNotice = "Room time unavailable or unchanged — check connection or permissions.";
     this.updateRoomTimeStatus();
+  }
+
+  restoreAuthoritativeSeekPresentation() {
+    const seek = this.roomTimeState?.seek;
+    this.roomTimeSeekPending = Number.isFinite(seek?.targetTick);
+    this.roomTimeSeekFromTick = Number.isFinite(seek?.fromTick) ? seek.fromTick : null;
+    this.roomTimeSeekTargetTick = this.roomTimeSeekPending ? seek.targetTick : null;
+    this.syncRoomTimePendingPresentation();
   }
 
   clearRoomTimePending() {

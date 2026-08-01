@@ -456,6 +456,42 @@ assert(
     replayControls.querySelectorAll(".room-time-timeline-mark").length === 2,
   "intermediate seek state advances the normal timeline and publishes newly created keyframes",
 );
+replayUi.requestRoomTimeAction(
+  { kind: "seek", mode: "absolute", baselineTick: 35, expectedTick: 700 },
+  () => true,
+);
+replayUi.applyRoomTimeState({
+  currentTick: 35,
+  durationTicks: 1_000,
+  speed: 2,
+  paused: false,
+  controllerId: 41,
+  seek: { id: 3, controllerId: 41, fromTick: 120, targetTick: 30 },
+});
+replayUi.expireRoomTimePending();
+assert(
+  replayUi.roomTimeSeekPending === true && replayUi.roomTimeSeekTargetTick === 30,
+  "a rejected replacement seek timeout restores the active authoritative seek presentation",
+);
+replayUi.applyRoomTimeState({
+  currentTick: 30,
+  durationTicks: 1_000,
+  speed: 2,
+  paused: false,
+  controllerId: 41,
+});
+replayUi.requestRoomTimeAction(
+  { kind: "seek", mode: "absolute", baselineTick: 30, expectedTick: 700 },
+  () => true,
+);
+replayUi.expireRoomTimePending();
+assert(
+  replayUi.roomTimeSeekPending === false &&
+    replayUi.roomTimeSeekFromTick === null &&
+    replayUi.roomTimeSeekTargetTick === null &&
+    replayControls["aria-busy"] === "false",
+  "an unconfirmed seek timeout clears speculative seek presentation when authority has no active seek",
+);
 delete replayNet.playerId;
 speed2._listeners.get("click")({});
 replayUi.expireRoomTimePending();
