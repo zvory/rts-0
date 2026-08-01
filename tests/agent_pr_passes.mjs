@@ -222,20 +222,35 @@ try {
   const deliveryOptions = {
     branch: "zvorygin/at-gun-range",
     decision,
-    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/hook" },
-    post: (_url, message) => delivered.push(message),
+    env: {
+      RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/hook",
+      RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: "https://example.invalid/other-hook",
+    },
+    post: (url, message) => delivered.push({ message, url }),
     repoRoot: tempRoot,
   };
   assert.equal(sendDiscordPatchNote(deliveryOptions).status, "sent");
-  assert.deepEqual(delivered, ["• Deployed anti-tank-gun range increased from 20 to 40 tiles."]);
+  assert.deepEqual(delivered, [
+    {
+      message: "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
+      url: "https://example.invalid/hook",
+    },
+    {
+      message: "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
+      url: "https://example.invalid/other-hook",
+    },
+  ]);
   assert.equal(sendDiscordPatchNote(deliveryOptions).status, "unchanged");
-  assert.equal(delivered.length, 1, "unchanged patch notes should not be sent twice");
+  assert.equal(delivered.length, 2, "unchanged patch notes should not be sent twice");
   const movedDelivery = {
     ...deliveryOptions,
-    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/another-hook" },
+    env: {
+      ...deliveryOptions.env,
+      RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: "https://example.invalid/replacement-hook",
+    },
   };
   assert.equal(sendDiscordPatchNote(movedDelivery).status, "sent");
-  assert.equal(delivered.length, 2, "a new Discord destination should receive the current patch note");
+  assert.equal(delivered.length, 4, "changing either destination should redeliver the current patch note to both");
 
   fs.writeFileSync(config, JSON.stringify({ version: 2, passes: [] }));
   assert.throws(() => loadPasses(config), /version 1/);

@@ -19,6 +19,7 @@ assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}
 assert.match(workflow, /persist-credentials: false/);
 assert.match(workflow, /statuses: write/);
 assert.match(workflow, /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: \$\{\{ secrets\.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL \}\}/);
+assert.match(workflow, /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: \$\{\{ secrets\.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY \}\}/);
 assert.match(workflow, /\[ "\$REQUESTED_PR_NUMBER" != "0" \]/, "an omitted numeric dispatch input must reconcile recent merges");
 assert.doesNotMatch(workflow, /\bcodex\b|\bopenai\b/i, "delivery workflow must never invoke an LLM");
 
@@ -96,16 +97,38 @@ for (const args of [["--pr"], ["--pr", ""], ["--pr", "nope"], ["--pr", "0"], ["-
     api,
     pull: mergedPull(),
     webhookUrl: "https://discord.invalid/hook",
-    postDiscord: async ({ message }) => delivered.push(message),
+    secondaryWebhookUrl: "https://discord.invalid/other-hook",
+    postDiscord: async ({ message, webhookUrl: destination }) => delivered.push({ destination, message }),
   });
   assert.equal(result.status, "sent");
-  assert.deepEqual(delivered, ["• Enemy arcs are now visible."]);
+  assert.deepEqual(delivered, [
+    { destination: "https://discord.invalid/hook", message: "• Enemy arcs are now visible." },
+    { destination: "https://discord.invalid/other-hook", message: "• Enemy arcs are now visible." },
+  ]);
   const statusCall = calls.find((call) => call.pathname === "/statuses/head-17");
   assert.deepEqual(statusCall?.options?.body, {
     state: "success",
     context: DELIVERY_STATUS_CONTEXT,
-    description: "Gameplay patch note sent to Discord",
+    description: "Gameplay patch note sent to both Discord webhooks",
   });
+}
+
+{
+  const { api, calls } = fixtureApi();
+  await assert.rejects(
+    deliverMergedPullRequest({
+      api,
+      pull: mergedPull(),
+      webhookUrl: "https://discord.invalid/hook",
+      postDiscord: async () => {},
+    }),
+    /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY is required/,
+  );
+  assert.equal(
+    calls.some((call) => call.pathname === "/statuses/head-17"),
+    false,
+    "delivery must not be recorded until both destinations are configured and succeed",
+  );
 }
 
 {

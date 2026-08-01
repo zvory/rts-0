@@ -167,6 +167,7 @@ export async function deliverMergedPullRequest({
   postDiscord = (options) => postDiscordWithRetry(options),
   pull,
   webhookUrl,
+  secondaryWebhookUrl,
 } = {}) {
   if (!pull?.merged_at) return { status: "not-merged", number: pull?.number };
   const headSha = required(pull?.head?.sha, "pull request head SHA");
@@ -181,8 +182,12 @@ export async function deliverMergedPullRequest({
   const changes = parseFragmentChanges(fragment.text);
   if (changes.length === 0) throw new Error(`${fragment.filename} has no change bullets to deliver`);
   const message = renderDiscordMessage({ changes });
-  await postDiscord({ message, webhookUrl });
-  await recordDelivery(api, headSha, "Gameplay patch note sent to Discord");
+  const destinations = [
+    required(webhookUrl, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"),
+    required(secondaryWebhookUrl, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY"),
+  ];
+  await Promise.all(destinations.map((destination) => postDiscord({ message, webhookUrl: destination })));
+  await recordDelivery(api, headSha, "Gameplay patch note sent to both Discord webhooks");
   return { status: "sent", number: pull.number, path: fragment.filename };
 }
 
@@ -228,6 +233,7 @@ export async function run({
   explicitNumber = 0,
   log = console.log,
   postDiscord,
+  secondaryWebhookUrl,
   webhookUrl,
 } = {}) {
   const isTargetedRun = explicitNumber > 0 || Boolean(eventPullRequest(eventPath));
@@ -236,7 +242,7 @@ export async function run({
   const failures = [];
   for (const pull of pulls) {
     try {
-      const result = await deliverMergedPullRequest({ api, postDiscord, pull, webhookUrl });
+      const result = await deliverMergedPullRequest({ api, postDiscord, pull, secondaryWebhookUrl, webhookUrl });
       results.push(result);
       log(`patch-note-delivery: PR #${pull.number} ${result.status}${result.path ? ` (${result.path})` : ""}`);
     } catch (error) {
@@ -260,6 +266,7 @@ async function main() {
   await run({
     api,
     explicitNumber: pullNumber,
+    secondaryWebhookUrl: process.env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY,
     webhookUrl: process.env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL,
   });
 }
