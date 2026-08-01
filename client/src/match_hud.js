@@ -18,11 +18,10 @@ export function createMatchHud(match, rootEl) {
 }
 
 /** Compose the authoritative hold-Tab Auto-Build menu for a controllable live player. */
-export function createMatchTabMenu(match, rootEl, button) {
+export function createMatchTabMenu(match, rootEl) {
   if (!matchTabMenuAvailable(match)) return null;
   return new TabMenu({
     root: rootEl,
-    button,
     settings: match.settings,
     hotkeyProfiles: match.hotkeyProfiles,
     state: match.state,

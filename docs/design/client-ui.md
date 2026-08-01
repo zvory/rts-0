@@ -1054,7 +1054,9 @@ The long-lived `SettingsContainer` is constructed by `App` with `#settings-butto
 spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids
 inside the settings mount point are `#pointer-lock-toggle`, `#debug-path-toggle`, and
 `#give-up-open` plus live-match action `#live-pause-open`; they may not exist until their owning
-tab/action is visible. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
+tab/action is visible. Live controllable matches mount a separate `#tab-menu-button` hamburger and
+`#tab-menu` Auto-Build panel under `#game-screen`; the hamburger never replaces, moves, or aliases
+the Settings gear. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
 `livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is

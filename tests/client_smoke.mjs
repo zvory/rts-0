@@ -435,12 +435,12 @@ try {
   await page.keyboard.up("Tab");
   await page.waitForFunction(() => document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
 
-  const settingsButton = await page.$("#settings-button");
-  const settingsButtonBox = await settingsButton?.boundingBox();
-  if (!settingsButtonBox) throw new Error("Settings button is unavailable for pointer hold coverage.");
+  const tabMenuButton = await page.$("#tab-menu-button");
+  const tabMenuButtonBox = await tabMenuButton?.boundingBox();
+  if (!tabMenuButtonBox) throw new Error("Auto-Build menu button is unavailable for pointer hold coverage.");
   await page.mouse.move(
-    settingsButtonBox.x + settingsButtonBox.width / 2,
-    settingsButtonBox.y + settingsButtonBox.height / 2,
+    tabMenuButtonBox.x + tabMenuButtonBox.width / 2,
+    tabMenuButtonBox.y + tabMenuButtonBox.height / 2,
   );
   await page.mouse.down();
   await page.waitForFunction(() => !document.getElementById("tab-menu")?.hidden, { timeout: 2000 });
@@ -448,6 +448,29 @@ try {
   await page.waitForFunction(
     () => document.getElementById("tab-menu")?.hidden && document.getElementById("settings-menu")?.hidden,
     { timeout: 2000 },
+  );
+
+  const separatedMenuControls = await page.evaluate(() => {
+    const hamburger = document.getElementById("tab-menu-button");
+    const settings = document.getElementById("settings-button");
+    const hamburgerBox = hamburger?.getBoundingClientRect();
+    const settingsBox = settings?.getBoundingClientRect();
+    return {
+      hamburgerLabel: hamburger?.getAttribute("aria-label"),
+      settingsLabel: settings?.getAttribute("aria-label"),
+      settingsText: settings?.textContent,
+      hamburgerLeft: hamburgerBox?.left,
+      settingsLeft: settingsBox?.left,
+      settingsTop: settingsBox?.top,
+    };
+  });
+  ok(
+    separatedMenuControls.hamburgerLabel === "Hold for Auto-Build menu" &&
+      separatedMenuControls.settingsLabel === "Settings" &&
+      separatedMenuControls.settingsText === "⚙" &&
+      separatedMenuControls.hamburgerLeft < separatedMenuControls.settingsLeft &&
+      separatedMenuControls.settingsTop > 100,
+    `MENU CONTROLS: Auto-Build hamburger and bottom-right Settings gear stay distinct (${JSON.stringify(separatedMenuControls)})`,
   );
 
   await page.click("#settings-button");
