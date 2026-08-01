@@ -38,10 +38,10 @@ Use when adding, removing, or changing any field on a client↔server message, s
   uses `mapName`.
 - Lab start metadata carries room/role identity, compatibility vision, initial camera, dirty state,
   and operation count.
-- Start `capabilities` declares room-time, vision-selection, and command affordances; never infer
-  them from replay/dev/Lab modes. Privileged viewers choose all-player union, omniscient, or
-  player views per connection, independent of command authority. Lab timeline controls use
-  neutral room-time messages rather than `LabClientOp`.
+- Start `capabilities` declares room-time, vision, and command affordances; never infer them from
+  room modes. Privileged viewers select union, omniscient, or player vision per connection.
+- Replay seeks reset timeline-derived client state in place and expose sampled incremental
+  progress through coalescing `roomTimeState.seek`; they do not rebuild `Match`.
 - Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
   to render the shared controls; do not reconstruct it from legacy Lab metadata.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables

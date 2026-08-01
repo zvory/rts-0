@@ -27,6 +27,7 @@ import {
 } from "./state_queries.js";
 import { VisualEffectBackedState, VisualEffectBuffers } from "./state_visual_effects.js";
 import { markActionableFiringReveal } from "./state_firing_reveal.js";
+import { resetAuthoritativeRuntime } from "./state_runtime_reset.js";
 
 const TWO_PI = Math.PI * 2;
 const PREDICTION_SMOOTH_MS = 120;
@@ -171,36 +172,19 @@ export class GameState extends VisualEffectBackedState {
   resetForLabMap({ map, players, tick = 0 }) {
     if (!this.updateForLabMap({ map, players, tick })) return false;
 
-    this._prev = null;
-    this._cur = null;
-    this._prevRecvTime = 0;
-    this._curRecvTime = 0;
-    this._prevById = new Map();
-    this._curById = new Map();
-    this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
-    this.playerResources = [];
-    this.events = [];
-    this.upgrades = [];
-    this.selection.clear();
-    this.selectionBudgetOverflow = null;
-    this.controlGroups = Array.from({ length: 10 }, () => []);
-    this.smokes = [];
-    this.abilityObjects = [];
-    this.trenches = [];
-    this.rememberedBuildings = [];
-    this.rememberedAntiTankGuns = [];
-    this.visibleTiles = [];
-    this.exploredTiles = [];
-    this.groundDecals = new GroundDecalBuffer();
-    this.visualEffects = new VisualEffectBuffers();
-    this.predictedById.clear();
-    this.predictionCorrectionById.clear();
-    this.predictionDiagnostics = null;
-    this.optimisticProduction = [];
-    this.optimisticProductionByBuilding.clear();
-    this.optimisticRallyByBuilding.clear();
-    this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
+    resetAuthoritativeRuntime(this);
     return true;
+  }
+
+  /** Clear timeline-derived state before an authoritative replay seek begins streaming again. */
+  resetForReplaySeek() {
+    const initialResources = (this.startInfo?.map?.resources || []).map((node, index) =>
+      normalizeResource(node, index),
+    );
+    this.map = { ...this.map, resources: initialResources };
+    this.resourceById = new Map();
+    for (const node of initialResources) this.resourceById.set(node.id, node);
+    resetAuthoritativeRuntime(this);
   }
 
   /** Replace authoritative static map data while preserving the live entity/snapshot buffers. */

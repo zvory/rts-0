@@ -224,7 +224,7 @@ impl RoomTask {
             if *shutdown_rx.borrow_and_update() {
                 return;
             }
-            let mut speed_changed = false;
+            let old_speed = self.current_speed_multiplier();
             tokio::select! {
                 // Bias is irrelevant for correctness: events are timestamped only by arrival
                 // order, and a tick handles whatever has been applied so far.
@@ -241,15 +241,13 @@ impl RoomTask {
                 maybe_event = event_rx.recv() => {
                     match maybe_event {
                         Some(event) => {
-                            let old_speed = self.current_speed_multiplier();
                             self.handle_event(event);
-                            speed_changed = self.current_speed_multiplier() != old_speed;
                         }
                         None => return, // registry dropped; shut the room down.
                     }
                 }
             }
-            if speed_changed {
+            if self.current_speed_multiplier() != old_speed {
                 ticker = self.make_ticker();
             }
         }
@@ -279,7 +277,7 @@ impl RoomTask {
         let room_time = match (&self.phase, policy.clock.room_time_source()) {
             (Phase::ReplayViewer(session), Some(RoomTimeSource::ReplayPlayback)) => {
                 Some(RoomTimeClock {
-                    speed: session.speed(),
+                    speed: session.effective_speed(),
                     paused: session.is_paused(),
                 })
             }

@@ -2,7 +2,8 @@ use super::reconstruction::contain_reconstruction;
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
 use crate::protocol::{
-    Event, ReplayBranchSeat, ReplayStartMetadata, RoomTimeState, VisionSelectionRequest,
+    Event, ReplayBranchSeat, ReplayStartMetadata, RoomTimeSeekState, RoomTimeState,
+    VisionSelectionRequest,
 };
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
@@ -61,6 +62,8 @@ pub(super) struct ReplaySession {
     speed: f32,
     last_controller_id: Option<u32>,
     last_seek_at: Option<StdInstant>,
+    next_seek_id: u32,
+    active_seek: Option<ActiveReplaySeek>,
 }
 
 pub(super) struct ReplayKeyframe {
@@ -69,11 +72,29 @@ pub(super) struct ReplayKeyframe {
     pub(super) next_command: usize,
 }
 
+#[cfg(test)]
 struct ReplayReconstructionCandidate {
     game: Box<Game>,
     next_command: usize,
     keyframes: Vec<ReplayKeyframe>,
     keyframe_tick: u32,
+}
+
+struct ActiveReplaySeek {
+    id: u32,
+    controller_id: u32,
+    from_tick: u32,
+    target_tick: u32,
+    started_at: StdInstant,
+    last_publish_at: StdInstant,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct ReplaySeekAdvance {
+    pub(super) progressed: bool,
+    pub(super) completed: bool,
+    pub(super) keyframe_recorded: bool,
+    pub(super) publish_progress: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -128,6 +149,8 @@ impl ReplaySession {
             speed: Self::DEFAULT_SPEED,
             last_controller_id: None,
             last_seek_at: None,
+            next_seek_id: 0,
+            active_seek: None,
         })
     }
 
@@ -271,9 +294,32 @@ impl ReplaySession {
             paused: self.speed == Self::PAUSED_SPEED,
             ended: self.current_tick() >= self.duration_ticks,
             controller_id: self.last_controller_id,
+            seek: self.active_seek.as_ref().map(|seek| RoomTimeSeekState {
+                id: seek.id,
+                controller_id: seek.controller_id,
+                from_tick: seek.from_tick,
+                target_tick: seek.target_tick,
+            }),
         }
     }
 
+    pub(super) fn is_seeking(&self) -> bool {
+        self.active_seek.is_some()
+    }
+
+    pub(super) fn cancel_seek(&mut self) {
+        self.active_seek = None;
+    }
+
+    pub(super) fn effective_speed(&self) -> f32 {
+        if self.is_seeking() && !self.is_paused() {
+            Self::MAX_SPEED
+        } else {
+            self.speed
+        }
+    }
+
+    #[cfg(test)]
     pub(super) fn speed(&self) -> f32 {
         self.speed
     }
@@ -382,6 +428,104 @@ impl ReplaySession {
         }
     }
 
+    /// Restore the nearest retained keyframe and begin an incremental authoritative fast-forward.
+    /// The room task owns the session throughout and advances it in bounded slices.
+    pub(super) fn begin_seek(
+        &mut self,
+        controller_id: u32,
+        plan: ReplaySeekPlan,
+    ) -> Result<u32, String> {
+        debug_assert_eq!(self.current_tick(), plan.from_tick);
+        let (keyframe_tick, game, next_command) = contain_reconstruction("replay seek", || {
+            self.keyframes
+                .iter()
+                .rev()
+                .find(|keyframe| keyframe.tick <= plan.target_tick)
+                .map(|keyframe| {
+                    (
+                        keyframe.tick,
+                        keyframe.game.clone_for_replay_keyframe(),
+                        keyframe.next_command,
+                    )
+                })
+                .ok_or_else(|| "replay has no valid keyframe".to_string())
+        })
+        .map_err(|failure| failure.to_string())?;
+
+        *self.game = game;
+        self.next_command = next_command;
+        self.last_seek_at = Some(StdInstant::now());
+        self.last_controller_id = Some(controller_id);
+        self.next_seek_id = self.next_seek_id.wrapping_add(1).max(1);
+        let now = StdInstant::now();
+        self.active_seek = (keyframe_tick < plan.target_tick).then_some(ActiveReplaySeek {
+            id: self.next_seek_id,
+            controller_id,
+            from_tick: plan.from_tick,
+            target_tick: plan.target_tick,
+            started_at: now,
+            last_publish_at: now,
+        });
+        Ok(keyframe_tick)
+    }
+
+    /// Advance an active replay seek without monopolizing the room actor. Intermediate transient
+    /// events are intentionally discarded; each published seek sample is a complete snapshot.
+    pub(super) fn advance_seek_slice(
+        &mut self,
+        max_ticks: u32,
+        wall_budget: Duration,
+        publish_interval: Duration,
+    ) -> Result<ReplaySeekAdvance, String> {
+        let Some(target_tick) = self.active_seek.as_ref().map(|seek| seek.target_tick) else {
+            return Ok(ReplaySeekAdvance::default());
+        };
+        let slice_started = StdInstant::now();
+        let keyframes_before = self.keyframes.len();
+        let mut advanced = 0u32;
+        while self.current_tick() < target_tick && advanced < max_ticks {
+            self.enqueue_for_current_tick()?;
+            let _ = self.tick(None);
+            self.record_keyframe_if_due();
+            advanced = advanced.saturating_add(1);
+            if advanced > 0 && slice_started.elapsed() >= wall_budget {
+                break;
+            }
+        }
+
+        let completed = self.current_tick() >= target_tick;
+        let keyframe_recorded = self.keyframes.len() > keyframes_before;
+        let now = StdInstant::now();
+        let publish_progress = self.active_seek.as_ref().is_some_and(|seek| {
+            completed
+                || keyframe_recorded
+                || now.duration_since(seek.last_publish_at) >= publish_interval
+        });
+        if publish_progress {
+            if let Some(seek) = self.active_seek.as_mut() {
+                seek.last_publish_at = now;
+            }
+        }
+        if completed {
+            if let Some(seek) = self.active_seek.take() {
+                crate::log_info!(
+                    controller_id = seek.controller_id,
+                    from_tick = seek.from_tick,
+                    to_tick = seek.target_tick,
+                    seek_ms = seek.started_at.elapsed().as_millis(),
+                    keyframe_count = self.keyframes.len(),
+                    "incremental replay seek completed"
+                );
+            }
+        }
+        Ok(ReplaySeekAdvance {
+            progressed: advanced > 0,
+            completed,
+            keyframe_recorded,
+            publish_progress,
+        })
+    }
+
     #[cfg(test)]
     pub(super) fn seek_back(
         &mut self,
@@ -391,7 +535,7 @@ impl ReplaySession {
         ticks_back: u32,
     ) -> Result<u32, String> {
         let plan = self.plan_seek_back(ticks_back)?;
-        self.apply_seek(room, viewer_count, controller_id, plan)
+        self.apply_seek_for_test(room, viewer_count, controller_id, plan)
     }
 
     #[cfg(test)]
@@ -403,7 +547,7 @@ impl ReplaySession {
         target_tick: u32,
     ) -> Result<u32, String> {
         let plan = self.plan_seek_to(target_tick)?;
-        self.apply_seek(room, viewer_count, controller_id, plan)
+        self.apply_seek_for_test(room, viewer_count, controller_id, plan)
     }
 
     pub(super) fn plan_seek_back(&self, ticks_back: u32) -> Result<ReplaySeekPlan, String> {
@@ -423,51 +567,25 @@ impl ReplaySession {
         })
     }
 
-    pub(super) fn apply_seek(
+    #[cfg(test)]
+    fn apply_seek_for_test(
         &mut self,
         room: &str,
         viewer_count: usize,
         controller_id: u32,
         plan: ReplaySeekPlan,
     ) -> Result<u32, String> {
-        // Replay reconstruction is synchronous CPU work. In the production multi-thread runtime,
-        // mark this section as blocking so Tokio can hand this worker's async tasks (especially
-        // connection writers carrying RoomTimeSeekStarted) to a replacement worker. The fallback
-        // keeps ordinary unit tests and any current-thread runtime usable.
-        if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
-            handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
-        }) {
-            return tokio::task::block_in_place(|| {
-                self.apply_seek_blocking(room, viewer_count, controller_id, plan)
-            });
-        }
-        self.apply_seek_blocking(room, viewer_count, controller_id, plan)
-    }
-
-    fn apply_seek_blocking(
-        &mut self,
-        room: &str,
-        viewer_count: usize,
-        controller_id: u32,
-        plan: ReplaySeekPlan,
-    ) -> Result<u32, String> {
-        debug_assert_eq!(self.current_tick(), plan.from_tick);
         let seek_start = StdInstant::now();
-        let candidate =
-            contain_reconstruction("replay seek", || self.reconstruct_to(plan.target_tick))
-                .map_err(|failure| failure.to_string())?;
-        let keyframe_tick = candidate.keyframe_tick;
-        self.game = candidate.game;
-        self.next_command = candidate.next_command;
-        self.keyframes = candidate.keyframes;
-        self.last_seek_at = Some(StdInstant::now());
-        self.last_controller_id = Some(controller_id);
+        let keyframe_tick = self.begin_seek(controller_id, plan)?;
+        while self.is_seeking() {
+            self.advance_seek_slice(u32::MAX, Duration::MAX, Duration::ZERO)?;
+        }
         crate::log_info!(
             room = %room,
             controller_id,
             viewer_count,
             from_tick = plan.from_tick,
-            to_tick = plan.target_tick,
+            to_tick = self.current_tick(),
             keyframe_tick,
             duration_ticks = self.duration_ticks,
             command_count = self.artifact.command_log.len(),
@@ -475,7 +593,7 @@ impl ReplaySession {
             rebuild_ms = seek_start.elapsed().as_millis(),
             "replay seek rebuilt"
         );
-        Ok(plan.target_tick)
+        Ok(self.current_tick())
     }
 
     #[cfg(test)]
@@ -488,6 +606,7 @@ impl ReplaySession {
         Ok(keyframe_tick)
     }
 
+    #[cfg(test)]
     fn reconstruct_to(&self, target_tick: u32) -> Result<ReplayReconstructionCandidate, String> {
         self.reconstruct_to_inner(target_tick, |_| Ok(()))
     }
@@ -503,6 +622,7 @@ impl ReplaySession {
         self.reconstruct_to_inner(target_tick, after_candidate_reconstruction)
     }
 
+    #[cfg(test)]
     fn reconstruct_to_inner(
         &self,
         target_tick: u32,
@@ -789,6 +909,56 @@ mod tests {
                 expected.snapshot_for(player.id)
             );
         }
+    }
+
+    #[test]
+    fn incremental_seek_reports_progress_records_keyframes_and_completes_exactly() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = 2_001;
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        replay.set_speed(42, 3.0);
+
+        let plan = replay.plan_seek_to(2_001).unwrap();
+        let restored = replay.begin_seek(42, plan).unwrap();
+
+        assert_eq!(restored, 0);
+        assert_eq!(replay.current_tick(), 0);
+        assert_eq!(replay.effective_speed(), ReplaySession::MAX_SPEED);
+        let initial = replay.state();
+        assert_eq!(
+            initial.seek.as_ref().map(|seek| seek.target_tick),
+            Some(2_001)
+        );
+        assert_eq!(initial.seek.as_ref().map(|seek| seek.from_tick), Some(0));
+
+        let first = replay
+            .advance_seek_slice(1, Duration::MAX, Duration::ZERO)
+            .unwrap();
+        assert!(first.progressed);
+        assert!(!first.completed);
+        assert!(first.publish_progress);
+        assert_eq!(replay.current_tick(), 1);
+        assert!(replay.state().seek.is_some());
+
+        let keyframe = replay
+            .advance_seek_slice(1_999, Duration::MAX, Duration::ZERO)
+            .unwrap();
+        assert!(keyframe.progressed);
+        assert!(!keyframe.completed);
+        assert!(keyframe.keyframe_recorded);
+        assert_eq!(replay.current_tick(), 2_000);
+        assert_eq!(replay.state().keyframe_ticks, vec![0, 2_000]);
+
+        let completed = replay
+            .advance_seek_slice(1, Duration::MAX, Duration::ZERO)
+            .unwrap();
+        assert!(completed.progressed);
+        assert!(completed.completed);
+        assert!(completed.publish_progress);
+        assert_eq!(replay.current_tick(), 2_001);
+        assert!(replay.state().seek.is_none());
+        assert_eq!(replay.effective_speed(), 3.0);
     }
 
     #[test]

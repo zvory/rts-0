@@ -28,12 +28,17 @@ async fn run(
     sink: &mut SplitSink<WebSocket, Message>,
     writer_rx: ConnectionWriter,
 ) {
-    let (mut reliable_rx, snapshots, observer_analysis, mut writer_stats) = writer_rx.into_parts();
+    let (mut reliable_rx, room_time_state, snapshots, observer_analysis, mut writer_stats) =
+        writer_rx.into_parts();
     let mut reliable_closed = false;
 
     'write_loop: loop {
         let snapshot_waiting = snapshots.has_pending();
-        while !reliable_closed {
+        // Drain only the reliable messages that were queued at the start of this pass. This keeps
+        // FIFO messages ahead of latest-only state without allowing a continuously refilled
+        // reliable queue to starve room-time state or snapshots forever.
+        let reliable_batch_len = reliable_rx.len();
+        for _ in 0..reliable_batch_len {
             match reliable_rx.try_recv() {
                 Ok(msg) => {
                     writer_stats.note_reliable_for_snapshot(snapshot_waiting, &snapshots);
@@ -49,6 +54,17 @@ async fn run(
                     reliable_closed = true;
                     break;
                 }
+            }
+        }
+        if reliable_rx.is_closed() && reliable_rx.is_empty() {
+            reliable_closed = true;
+        }
+
+        if let Some(state) = room_time_state.take() {
+            let (keep_writing, _) =
+                send_server_message(player_id, sink, ServerMessage::RoomTimeState(state)).await;
+            if !keep_writing {
+                break 'write_loop;
             }
         }
 
@@ -95,6 +111,7 @@ async fn run(
                 }
             }
             _ = snapshots.notified() => {}
+            _ = room_time_state.notified() => {}
             _ = observer_analysis.notified() => {}
         }
     }

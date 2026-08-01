@@ -75,9 +75,12 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   out-of-order commands, and commands after the artifact duration. Accepted replay seeks are
   rate-limited to one every 500 ms per replay room. Long seeks are allowed because long games are a
   normal replay-analysis case; accepted seeks restore the nearest recorded replay keyframe at or
-  before the target tick and fast-forward from there. Replay setup and accepted seeks log
-  build/rebuild duration, viewer/player counts, duration, and command counts so long artifacts and
-  expensive controls are visible in server logs.
+  before the target tick and fast-forward from there in bounded room-owned slices. The room yields
+  between slices, samples full snapshots/progress instead of emitting every reconstructed tick, and
+  coalesces room-time progress on its own latest-only connection lane. This bounds control latency
+  and outbound growth while retaining pause, vision, leave, and replacement-seek responsiveness.
+  Replay setup and accepted seeks log build/seek duration, viewer/player counts, duration, and
+  command counts so long artifacts and expensive controls are visible in server logs.
 - **Authoring is non-persistent**: lab setup validation exports and validates the current
   authoritative `Game` in memory, then returns a bounded JSON preview to the requesting operator.
   The map editor stores drafts in browser storage or exports JSON locally. Public HTTP and
