@@ -6,6 +6,10 @@ use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
 use rts_sim::game::replay::ChatLogEntry;
 
 const MAX_CHAT_CHARS: usize = 200;
+// Chat shares the larger Lab-capable WebSocket frame allowance. Bound the amount of player text
+// inspected on the room task as well as the delivered result, so a whitespace-heavy frame cannot
+// monopolize the authoritative room loop.
+const MAX_CHAT_INPUT_CHARS: usize = MAX_CHAT_CHARS * 4;
 pub(super) const MAX_REPLAY_CHAT_ENTRIES: usize = 10_000;
 const CHAT_RATE_WINDOW: Duration = Duration::from_secs(10);
 const CHAT_RATE_BURST: usize = 5;
@@ -15,7 +19,7 @@ pub(super) fn sanitize_chat_text(text: String) -> String {
     let mut char_count = 0;
     let mut pending_space = false;
 
-    for ch in text.chars() {
+    for ch in text.chars().take(MAX_CHAT_INPUT_CHARS) {
         if ch.is_whitespace() {
             pending_space = !sanitized.is_empty();
             continue;
@@ -194,7 +198,7 @@ mod tests {
         );
         assert_eq!(
             sanitize_chat_text(format!("ok {}ignored", " \n\t".repeat(100_000))),
-            "ok ignored"
+            "ok"
         );
         assert!(sanitize_chat_text(" \n\t ".to_string()).is_empty());
     }
