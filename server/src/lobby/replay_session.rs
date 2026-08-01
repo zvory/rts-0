@@ -221,6 +221,11 @@ impl ReplaySession {
         }
         previous_tick = start_tick;
         for (index, entry) in artifact.chat_log.iter().enumerate() {
+            if entry.channel != crate::protocol::ChatChannel::All {
+                return Err(format!(
+                    "replay chat {index} is private team chat and cannot be replayed"
+                ));
+            }
             if entry.tick < start_tick {
                 return Err(format!(
                     "replay chat {index} tick {} is before start tick {}",
@@ -1089,6 +1094,31 @@ mod tests {
         };
         assert!(
             err.contains("replay chat 0 tick") && err.contains("exceeds duration"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_rejects_private_team_chat() {
+        use crate::protocol::ChatChannel;
+        use rts_sim::game::replay::ChatLogEntry;
+
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 2);
+        artifact.chat_log.push(ChatLogEntry {
+            tick: 1,
+            sender_id: players[0].id,
+            sender_name: players[0].name.clone(),
+            channel: ChatChannel::Team,
+            text: "private plan".to_string(),
+        });
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("private replay chat should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("private team chat"),
             "unexpected artifact reject: {err}"
         );
     }
