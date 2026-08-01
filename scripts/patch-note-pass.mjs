@@ -248,7 +248,8 @@ such as "Tank retreats improved" or "Formation system simplified" is acceptable.
 internal implementation details or unchanged values. Use exact old/new values only when they are
 essential to understanding the player-facing change and still fit comfortably. Add concise
 playtest-watch bullets only where useful. Do not speculate. The outer helper will render your JSON
-into ${fragmentPath}; do not edit files or run commands.
+into ${fragmentPath}. Do not edit files or run state-changing commands; use read-only repository
+inspection only.
 
 Branch: ${branch}
 Changed paths:

@@ -334,6 +334,8 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   );
   const codexPrompt = fs.readFileSync(`${fakeCodex}.stdin`, "utf8");
   assert.match(codexPrompt, /complete repository diff from origin\/main to HEAD/);
+  assert.match(codexPrompt, /use read-only repository\s+inspection only/);
+  assert.doesNotMatch(codexPrompt, /do not edit files or run commands/);
   assert.match(codexPrompt, /server\/crates\/rules\/src\/fixture\.rs/);
   assert.doesNotMatch(codexPrompt, /const RANGE/, "the branch diff should be inspected from the repository, not embedded in stdin");
 
