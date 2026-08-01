@@ -259,7 +259,7 @@ ${existingFragment || "<none>"}
 `;
 }
 
-export function buildCodexArgs({ repoRoot, baseRef, schemaFile, outputFile, codexModel }) {
+export function buildCodexArgs({ repoRoot, schemaFile, outputFile, codexModel, prompt }) {
   const args = [
     "exec",
     "--cd",
@@ -275,7 +275,7 @@ export function buildCodexArgs({ repoRoot, baseRef, schemaFile, outputFile, code
     outputFile,
   ];
   if (codexModel) args.push("--model", codexModel);
-  args.push("review", "--base", baseRef, "-");
+  args.push(prompt);
   return args;
 }
 
@@ -436,14 +436,14 @@ export function execute(options) {
   const outputFile = path.join(os.tmpdir(), `rts-patch-note-pass-${process.pid}.json`);
   const args = buildCodexArgs({
     repoRoot: options.repoRoot,
-    baseRef: options.baseRef,
     schemaFile: options.schemaFile,
     outputFile,
     codexModel: options.codexModel,
+    prompt,
   });
   try {
     process.stdout.write(`patch-note-pass: classifying ${candidates.length} gameplay candidate path(s)\n`);
-    run(options.codexCommand, args, { cwd: options.repoRoot, input: prompt });
+    run(options.codexCommand, args, { cwd: options.repoRoot });
     const decision = normalizeDecision(JSON.parse(fs.readFileSync(outputFile, "utf8")));
     if (decision.decision === "write_patch_note") {
       fs.mkdirSync(path.dirname(fragmentPath), { recursive: true });

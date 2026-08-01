@@ -61,10 +61,10 @@ assert.equal(branchSlug("zvorygin/at-gun/range"), "at-gun-range");
 assert.deepEqual(
   buildCodexArgs({
     repoRoot: "/tmp/repo",
-    baseRef: "origin/main",
     schemaFile: "/tmp/schema.json",
     outputFile: "/tmp/output.json",
     codexModel: "small-model",
+    prompt: "Classify the diff.",
   }),
   [
     "exec",
@@ -81,10 +81,7 @@ assert.deepEqual(
     "/tmp/output.json",
     "--model",
     "small-model",
-    "review",
-    "--base",
-    "origin/main",
-    "-",
+    "Classify the diff.",
   ],
 );
 
@@ -325,20 +322,16 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   execute(patchOptions);
 
   const codexArgs = fs.readFileSync(`${fakeCodex}.args`, "utf8").trim().split("\n");
-  assert.deepEqual(
-    codexArgs.slice(-4),
-    ["review", "--base", "origin/main", "-"],
-    "patch-note classification should use repository review mode against the requested base",
-  );
   assert.equal(
-    codexArgs.some((arg) => arg.includes("Bounded diff") || arg.includes("const RANGE")),
-    false,
-    "the classifier prompt and branch diff must not be passed as command-line arguments",
+    codexArgs.some((arg) => arg.includes("complete repository diff from origin/main to HEAD")),
+    true,
+    "patch-note classification should ask Codex to inspect the requested base diff",
   );
+  assert.equal(codexArgs.some((arg) => arg.includes("const RANGE")), false,
+    "the branch diff should be inspected from the repository, not embedded in the prompt");
   const codexPrompt = fs.readFileSync(`${fakeCodex}.stdin`, "utf8");
-  assert.match(codexPrompt, /complete repository diff from origin\/main to HEAD/);
-  assert.match(codexPrompt, /server\/crates\/rules\/src\/fixture\.rs/);
-  assert.doesNotMatch(codexPrompt, /const RANGE/, "the branch diff should be inspected from the repository, not embedded in stdin");
+  assert.equal(codexPrompt, "", "current Codex exec receives the classifier prompt as an argument");
+  assert.equal(codexArgs.includes("server/crates/rules/src/fixture.rs"), true);
 
   assert.equal(fs.existsSync(staleFragment), false, "a no-patch-note decision should remove the branch-owned fragment");
   assert.equal(
