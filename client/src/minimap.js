@@ -43,14 +43,16 @@ import {
   resourceRallyTargetAt,
   supportWeaponSetupPreviewEntity,
 } from "./minimap_targeting.js";
+import {
+  MINIMAP_BORDER_PULSE_MS,
+  drawMinimapPings,
+  resolveUnderAttackTargetId,
+  underAttackFlashEntityIds,
+} from "./minimap_alerts.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
-const DEFAULT_PING_MS = 900;
-const UNDER_ATTACK_PING_MS = 1100;
-const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
-const ALERT_PING_INNER_RIM_INSET_PX = 2;
-const BORDER_PULSE_MS = 700;
+const UNDER_ATTACK_STROBE_COLOR = "#ffffff";
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const IMPASSABLE_FOG_SCALE = 0.56;
 const ARTILLERY_MINIMAP_MARKER_MS = 2200;
@@ -352,13 +354,14 @@ export class Minimap {
     if (!this._ensureTransform()) return;
 
     const entities = this._minimapEntities(frameViews);
+    const now = performance.now();
+    const attackFlashIds = this._underAttackFlashEntityIds(entities, now);
     this._drawTerrainLayer();
-    this._drawEntities(entities, { deferForegroundPlayer: true });
+    this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
     this._drawFog();
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
-    this._drawEntities(entities, { foregroundPlayerOnly: true });
-    const now = performance.now();
+    this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
     this._drawArtilleryFiringMarkers(now);
     this._drawViewport();
     this._drawPings(now);
@@ -376,7 +379,19 @@ export class Minimap {
       this.pulseBorder();
       return;
     }
-    this._pings.push({ x, y, severity, isUnderAttack, startedAt: performance.now() });
+    const ping = { x, y, severity, isUnderAttack, startedAt: performance.now() };
+    if (isUnderAttack) {
+      const entities = this.state.entitiesInterpolated?.(1) || [];
+      ping.targetEntityId = resolveUnderAttackTargetId({
+        entities,
+        events: this.state.events,
+        x,
+        y,
+        tileSize: this._renderMap()?.tileSize,
+        isOwnOwner: (owner) => ownOwner(this.state, owner, this.controlPolicy),
+      });
+    }
+    this._pings.push(ping);
   }
 
   /** Add a globally visible short-lived artillery firing marker. */
@@ -394,7 +409,7 @@ export class Minimap {
 
   /** Pulse the minimap border when an alert has no resolvable world position. */
   pulseBorder() {
-    this._borderPulseUntil = Math.max(this._borderPulseUntil, performance.now() + BORDER_PULSE_MS);
+    this._borderPulseUntil = Math.max(this._borderPulseUntil, performance.now() + MINIMAP_BORDER_PULSE_MS);
   }
 
   /** Fill one minimap cell per tile with its terrain color. */
@@ -708,7 +723,10 @@ export class Minimap {
   }
 
   /** Draw colored blips for visible entities. Foreground player blips draw last over resources. */
-  _drawEntities(entities, { deferForegroundPlayer = false, foregroundPlayerOnly = false } = {}) {
+  _drawEntities(
+    entities,
+    { deferForegroundPlayer = false, foregroundPlayerOnly = false, attackFlashIds = null } = {},
+  ) {
     const ctx = this.ctx;
     if (!Array.isArray(entities)) return;
     for (const e of entities) {
@@ -716,9 +734,18 @@ export class Minimap {
       const foregroundPlayer = this._isForegroundPlayerMinimapEntity(e);
       if (foregroundPlayerOnly && !foregroundPlayer) continue;
       if (deferForegroundPlayer && foregroundPlayer) continue;
-      const color = this._blipColor(e);
+      const color = attackFlashIds?.has(e.id) ? UNDER_ATTACK_STROBE_COLOR : this._blipColor(e);
       this._drawEntityBlip(ctx, e, color, playerOwned);
     }
+  }
+
+  _underAttackFlashEntityIds(entities, now) {
+    return underAttackFlashEntityIds({
+      pings: this._pings,
+      entities,
+      now,
+      isOwnOwner: (owner) => ownOwner(this.state, owner, this.controlPolicy),
+    });
   }
 
   _isPlayerOwnedMinimapEntity(e) {
@@ -865,42 +892,14 @@ export class Minimap {
   _drawPings(now) {
     const ctx = this.ctx;
     if (!ctx) return;
-    this._pings = this._pings.filter(
-      (ping) => now - ping.startedAt < this._pingDurationMs(ping),
-    );
-    for (const ping of this._pings) {
-      const t = (now - ping.startedAt) / this._pingDurationMs(ping);
-      const p = this._worldToCanvas(ping.x, ping.y);
-      const radius = 4 + 15 * t;
-      ctx.save();
-      ctx.globalAlpha = 1 - t;
-      ctx.strokeStyle = ping.severity === "warn" ? "#ffd166" : "#ff4d4d";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      if (ping.isUnderAttack) {
-        ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(1, radius - ALERT_PING_INNER_RIM_INSET_PX), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    if (now < this._borderPulseUntil) {
-      const t = 1 - (this._borderPulseUntil - now) / BORDER_PULSE_MS;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, 1 - t);
-      ctx.strokeStyle = "#ff4d4d";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(1.5, 1.5, this.size - 3, this.size - 3);
-      ctx.restore();
-    }
-  }
-
-  _pingDurationMs(ping) {
-    return ping.isUnderAttack ? UNDER_ATTACK_PING_MS : DEFAULT_PING_MS;
+    this._pings = drawMinimapPings({
+      ctx,
+      pings: this._pings,
+      now,
+      worldToCanvas: (x, y) => this._worldToCanvas(x, y),
+      borderPulseUntil: this._borderPulseUntil,
+      size: this.size,
+    });
   }
 
   _drawArtilleryFiringMarkers(now) {
