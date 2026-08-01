@@ -2,15 +2,15 @@ use std::time::{Duration, Instant as StdInstant};
 
 use super::types::Phase;
 use super::RoomTask;
-use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
+use crate::lobby::replay_session::MAX_CHAT_LOG_ENTRIES;
+use crate::protocol::{
+    ChatChannel, ChatScope, ServerMessage, MAX_CHAT_CHARS, MAX_CHAT_INPUT_CHARS,
+};
 use rts_sim::game::replay::ChatLogEntry;
 
-const MAX_CHAT_CHARS: usize = 200;
 // Chat shares the larger Lab-capable WebSocket frame allowance. Bound the amount of player text
 // inspected on the room task as well as the delivered result, so a whitespace-heavy frame cannot
 // monopolize the authoritative room loop.
-const MAX_CHAT_INPUT_CHARS: usize = MAX_CHAT_CHARS * 4;
-pub(super) const MAX_REPLAY_CHAT_ENTRIES: usize = 10_000;
 const CHAT_RATE_WINDOW: Duration = Duration::from_secs(10);
 const CHAT_RATE_BURST: usize = 5;
 
@@ -96,7 +96,7 @@ impl RoomTask {
                 };
                 let recipients = self.chat_recipients(channel, sender_team);
                 self.send_chat_to(recipients, &delivery);
-                if self.match_chat_log.len() < MAX_REPLAY_CHAT_ENTRIES {
+                if self.match_chat_log.len() < MAX_CHAT_LOG_ENTRIES {
                     self.match_chat_log.push(ChatLogEntry {
                         tick,
                         sender_id: player_id,

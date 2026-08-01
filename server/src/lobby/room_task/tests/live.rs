@@ -123,7 +123,7 @@ fn lobby_and_spectator_chat_are_forced_to_all_chat() {
 
 #[test]
 fn replay_capture_cap_does_not_disable_live_chat() {
-    use crate::lobby::room_task::chat::MAX_REPLAY_CHAT_ENTRIES;
+    use crate::lobby::replay_session::MAX_CHAT_LOG_ENTRIES;
     use crate::protocol::{ChatChannel, ChatScope};
     use rts_sim::game::replay::ChatLogEntry;
 
@@ -147,7 +147,7 @@ fn replay_capture_cap_does_not_disable_live_chat() {
             channel: ChatChannel::All,
             text: "earlier".to_string(),
         };
-        MAX_REPLAY_CHAT_ENTRIES
+        MAX_CHAT_LOG_ENTRIES
     ];
     task.on_chat_send(1, ChatChannel::All, "still live".to_string());
 
@@ -159,7 +159,7 @@ fn replay_capture_cap_does_not_disable_live_chat() {
             ..
         }) if text == "still live"
     ));
-    assert_eq!(task.match_chat_log.len(), MAX_REPLAY_CHAT_ENTRIES);
+    assert_eq!(task.match_chat_log.len(), MAX_CHAT_LOG_ENTRIES);
 }
 
 #[test]

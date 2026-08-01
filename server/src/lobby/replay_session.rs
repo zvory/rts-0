@@ -11,6 +11,8 @@ use rts_sim::game::Game;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
 
+pub(super) const MAX_CHAT_LOG_ENTRIES: usize = 10_000;
+
 pub(super) fn validate_vision_selection_request(
     vision: &VisionSelectionRequest,
     valid_player_ids: &[u32],
@@ -91,8 +93,6 @@ impl ReplaySession {
     pub(super) const MAX_SPEED: f32 = 8.0;
     pub(super) const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
     const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
-    const MAX_CHAT_LOG_ENTRIES: usize = 10_000;
-    const MAX_CHAT_TEXT_CHARS: usize = 200;
     const MAX_CHAT_NAME_CHARS: usize = 24;
     const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
     const KEYFRAME_INTERVAL_TICKS: u32 = 2_000;
@@ -170,11 +170,11 @@ impl ReplaySession {
                 Self::MAX_COMMAND_LOG_ENTRIES
             ));
         }
-        if artifact.chat_log.len() > Self::MAX_CHAT_LOG_ENTRIES {
+        if artifact.chat_log.len() > MAX_CHAT_LOG_ENTRIES {
             return Err(format!(
                 "replay chat log has {} entries; maximum is {}",
                 artifact.chat_log.len(),
-                Self::MAX_CHAT_LOG_ENTRIES
+                MAX_CHAT_LOG_ENTRIES
             ));
         }
         Ok(())
@@ -242,7 +242,7 @@ impl ReplaySession {
             if entry.sender_name.is_empty()
                 || entry.sender_name.chars().count() > Self::MAX_CHAT_NAME_CHARS
                 || entry.text.is_empty()
-                || entry.text.chars().count() > Self::MAX_CHAT_TEXT_CHARS
+                || entry.text.chars().count() > crate::protocol::MAX_CHAT_CHARS
             {
                 return Err(format!("replay chat {index} has invalid bounded text"));
             }

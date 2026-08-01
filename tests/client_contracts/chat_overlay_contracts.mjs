@@ -53,6 +53,14 @@ assert(
   defaultGameChatChannel([{ id: 1, teamId: 1 }, { id: 2, teamId: 1 }], 99, true) === "all",
   "spectators default to all chat",
 );
+assert(
+  defaultGameChatChannel([
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 1, isAi: true },
+    { id: 3, teamId: 2 },
+  ], 1) === "all",
+  "an AI-only teammate does not select an undeliverable team-chat default",
+);
 
 {
   const handlers = new Map();

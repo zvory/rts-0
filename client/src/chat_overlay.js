@@ -14,7 +14,9 @@ export function defaultGameChatChannel(players, playerId, spectator = false) {
   if (!local) return "all";
   const localTeam = normalizedTeamId(local);
   return (players || []).some((player) =>
-    Number(player?.id) !== Number(playerId) && normalizedTeamId(player) === localTeam,
+    player?.isAi !== true
+      && Number(player?.id) !== Number(playerId)
+      && normalizedTeamId(player) === localTeam,
   ) ? "team" : "all";
 }
 
