@@ -731,8 +731,7 @@ export class Minimap {
 
   _underAttackFlashEntityIds(entities, now) {
     const flashing = new Set();
-    if (!Array.isArray(entities)) return flashing;
-    const entitiesById = new Map(entities.map((entity) => [entity?.id, entity]));
+    if (!Array.isArray(entities) || this._pings.length === 0) return flashing;
 
     for (const ping of this._pings) {
       const age = now - ping.startedAt;
@@ -742,7 +741,7 @@ export class Minimap {
           ? null
           : this._nearestUnderAttackEntityId(entities, ping.x, ping.y);
       }
-      const target = entitiesById.get(ping.targetEntityId);
+      const target = entities.find((entity) => entity?.id === ping.targetEntityId);
       if (
         this._isUnderAttackTargetEntity(target) &&
         Math.floor(age / UNDER_ATTACK_STROBE_PHASE_MS) % 2 === 0
