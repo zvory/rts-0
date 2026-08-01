@@ -12,7 +12,7 @@ use super::super::projection::{
     observer_view_from_selection, scope_observer_analysis, ObserverAnalysisAudience,
     ProjectionPolicy, RecipientRole,
 };
-use super::super::reconstruction::contain_reconstruction;
+use super::super::replay_seek;
 use super::super::replay_session::{
     validate_vision_selection_request, ReplaySeekPlan, ReplaySession,
 };
@@ -24,10 +24,6 @@ use super::types::{LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickCont
 use super::RoomTask;
 use crate::protocol::{RoomTimeState, ServerMessage, StartPayload, VisionSelectionRequest};
 use rts_sim::game::Game;
-
-const REPLAY_SEEK_SLICE_MAX_TICKS: u32 = 128;
-const REPLAY_SEEK_SLICE_BUDGET: Duration = Duration::from_millis(12);
-const REPLAY_SEEK_PUBLISH_INTERVAL: Duration = Duration::from_millis(100);
 
 impl RoomTask {
     pub(super) fn prompt_for_replay_join(
@@ -340,29 +336,7 @@ impl RoomTask {
 
         if session.is_seeking() {
             let game_tick_start = StdInstant::now();
-            let advance = if tokio::runtime::Handle::try_current().is_ok_and(|handle| {
-                handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
-            }) {
-                tokio::task::block_in_place(|| {
-                    contain_reconstruction("incremental replay seek", || {
-                        session.advance_seek_slice(
-                            REPLAY_SEEK_SLICE_MAX_TICKS,
-                            REPLAY_SEEK_SLICE_BUDGET,
-                            REPLAY_SEEK_PUBLISH_INTERVAL,
-                        )
-                    })
-                    .map_err(|failure| failure.to_string())
-                })
-            } else {
-                contain_reconstruction("incremental replay seek", || {
-                    session.advance_seek_slice(
-                        REPLAY_SEEK_SLICE_MAX_TICKS,
-                        REPLAY_SEEK_SLICE_BUDGET,
-                        REPLAY_SEEK_PUBLISH_INTERVAL,
-                    )
-                })
-                .map_err(|failure| failure.to_string())
-            };
+            let advance = replay_seek::advance_slice(&mut session);
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("game_tick", game_tick_start.elapsed());
             }
