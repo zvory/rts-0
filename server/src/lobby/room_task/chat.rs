@@ -95,10 +95,7 @@ impl RoomTask {
                 };
                 let recipients = self.chat_recipients(channel, sender_team);
                 self.send_chat_to(recipients, &delivery);
-                // Replay rooms are spectator-only and have no authenticated team membership to
-                // authorize private history. Keep team chat ephemeral instead of widening its
-                // audience after the match.
-                if channel == ChatChannel::All && self.match_chat_log.len() < MAX_CHAT_LOG_ENTRIES {
+                if self.match_chat_log.len() < MAX_CHAT_LOG_ENTRIES {
                     self.match_chat_log.push(ChatLogEntry {
                         tick,
                         sender_id: player_id,

@@ -38,7 +38,7 @@ fn paused_replay_viewer_does_not_advance_on_scheduled_tick() {
 }
 
 #[test]
-fn live_chat_routes_team_privately_and_captures_only_all_chat_for_replay() {
+fn live_chat_routes_team_privately_and_is_captured_for_replay() {
     use crate::protocol::{ChatChannel, ChatScope};
 
     let mut task = RoomTask::new(
@@ -81,11 +81,7 @@ fn live_chat_routes_team_privately_and_captures_only_all_chat_for_replay() {
     }
     assert!(next_chat(&mut writer_enemy).is_none());
     assert!(next_chat(&mut writer_spectator).is_none());
-    assert!(task.match_chat_log.is_empty());
-
-    task.on_chat_send(1, ChatChannel::All, "advance together".to_string());
     assert_eq!(task.match_chat_log.len(), 1);
-    assert_eq!(task.match_chat_log[0].channel, ChatChannel::All);
 
     let Phase::InGame(game) = &task.phase else {
         panic!("expected live game");
