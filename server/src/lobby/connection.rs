@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(dead_code))]
 
+use super::room_time_state_slot::LatestRoomTimeStateSlot;
 use super::*;
 use crate::protocol::{ObserverAnalysisPayload, RoomTimeState, SnapshotPayloadDiagnostics};
 use std::collections::{BTreeMap, VecDeque};
@@ -33,11 +34,6 @@ pub struct ConnectionWriter {
 
 pub struct LatestSnapshotSlot {
     pending: StdMutex<Option<PendingSnapshot>>,
-    notify: Notify,
-}
-
-pub struct LatestRoomTimeStateSlot {
-    pending: StdMutex<Option<RoomTimeState>>,
     notify: Notify,
 }
 
@@ -552,43 +548,6 @@ impl LatestSnapshotSlot {
 
     fn clear(&self) {
         self.lock_pending().take();
-    }
-
-    pub async fn notified(&self) {
-        self.notify.notified().await;
-    }
-}
-
-impl LatestRoomTimeStateSlot {
-    fn lock_pending(&self) -> std::sync::MutexGuard<'_, Option<RoomTimeState>> {
-        match self.pending.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
-
-    pub fn take(&self) -> Option<RoomTimeState> {
-        self.lock_pending().take()
-    }
-
-    /// Return a state that was taken before discovering an ordering barrier. Preserve a newer
-    /// state if the room task published one in the meantime.
-    pub fn defer(&self, state: RoomTimeState) {
-        let mut pending = self.lock_pending();
-        if pending.is_none() {
-            *pending = Some(state);
-        }
-        drop(pending);
-        self.notify.notify_one();
-    }
-
-    fn store(&self, state: RoomTimeState) -> bool {
-        let mut pending = self.lock_pending();
-        let replaced = pending.is_some();
-        *pending = Some(state);
-        drop(pending);
-        self.notify.notify_one();
-        replaced
     }
 
     pub async fn notified(&self) {

@@ -62,6 +62,7 @@ mod replay_seek;
 mod replay_session;
 mod replay_validation;
 mod room_task;
+mod room_time_state_slot;
 mod session_policy;
 mod snapshot_fanout;
 mod snapshots;
