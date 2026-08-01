@@ -122,6 +122,47 @@ fn lobby_and_spectator_chat_are_forced_to_all_chat() {
 }
 
 #[test]
+fn replay_capture_cap_does_not_disable_live_chat() {
+    use crate::lobby::room_task::chat::MAX_REPLAY_CHAT_ENTRIES;
+    use crate::protocol::{ChatChannel, ChatScope};
+    use rts_sim::game::replay::ChatLogEntry;
+
+    let mut task = RoomTask::new(
+        "live-chat-cap-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.selected_map = "Chokes".to_string();
+    let mut writer = add_test_room_player(&mut task, 1, true);
+    task.start_match();
+    while writer.reliable_rx.try_recv().is_ok() {}
+
+    task.match_chat_log = vec![
+        ChatLogEntry {
+            tick: 0,
+            sender_id: 1,
+            sender_name: "Player 1".to_string(),
+            channel: ChatChannel::All,
+            text: "earlier".to_string(),
+        };
+        MAX_REPLAY_CHAT_ENTRIES
+    ];
+    task.on_chat_send(1, ChatChannel::All, "still live".to_string());
+
+    assert!(matches!(
+        next_chat(&mut writer),
+        Some(ServerMessage::Chat {
+            scope: ChatScope::Game,
+            ref text,
+            ..
+        }) if text == "still live"
+    ));
+    assert_eq!(task.match_chat_log.len(), MAX_REPLAY_CHAT_ENTRIES);
+}
+
+#[test]
 fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
     let mut task = RoomTask::new(
         "live-spectator-analysis-test".to_string(),

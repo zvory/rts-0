@@ -6,17 +6,38 @@ use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
 use rts_sim::game::replay::ChatLogEntry;
 
 const MAX_CHAT_CHARS: usize = 200;
-const MAX_REPLAY_CHAT_ENTRIES: usize = 10_000;
+pub(super) const MAX_REPLAY_CHAT_ENTRIES: usize = 10_000;
 const CHAT_RATE_WINDOW: Duration = Duration::from_secs(10);
 const CHAT_RATE_BURST: usize = 5;
 
 pub(super) fn sanitize_chat_text(text: String) -> String {
-    text.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(MAX_CHAT_CHARS)
-        .collect()
+    let mut sanitized = String::with_capacity(text.len().min(MAX_CHAT_CHARS));
+    let mut char_count = 0;
+    let mut pending_space = false;
+
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            pending_space = !sanitized.is_empty();
+            continue;
+        }
+        if pending_space {
+            // Do not spend the final slot on whitespace: the bounded result stays trimmed even
+            // when truncation lands between words.
+            if char_count + 1 >= MAX_CHAT_CHARS {
+                break;
+            }
+            sanitized.push(' ');
+            char_count += 1;
+            pending_space = false;
+        }
+        sanitized.push(ch);
+        char_count += 1;
+        if char_count == MAX_CHAT_CHARS {
+            break;
+        }
+    }
+
+    sanitized
 }
 
 impl RoomTask {
@@ -49,9 +70,6 @@ impl RoomTask {
             }
             Phase::ReplayViewer(_) => {}
             Phase::InGame(game) => {
-                if self.match_chat_log.len() >= MAX_REPLAY_CHAT_ENTRIES {
-                    return;
-                }
                 let sender_seat = self
                     .live_seat_id_for_connection(player_id)
                     .unwrap_or(player_id);
@@ -74,13 +92,15 @@ impl RoomTask {
                 };
                 let recipients = self.chat_recipients(channel, sender_team);
                 self.send_chat_to(recipients, &delivery);
-                self.match_chat_log.push(ChatLogEntry {
-                    tick,
-                    sender_id: player_id,
-                    sender_name,
-                    channel,
-                    text,
-                });
+                if self.match_chat_log.len() < MAX_REPLAY_CHAT_ENTRIES {
+                    self.match_chat_log.push(ChatLogEntry {
+                        tick,
+                        sender_id: player_id,
+                        sender_name,
+                        channel,
+                        text,
+                    });
+                }
             }
         }
     }
@@ -167,6 +187,14 @@ mod tests {
         assert_eq!(
             sanitize_chat_text("x".repeat(250)).chars().count(),
             MAX_CHAT_CHARS
+        );
+        assert_eq!(
+            sanitize_chat_text(format!("{} y", "x".repeat(MAX_CHAT_CHARS - 1))),
+            "x".repeat(MAX_CHAT_CHARS - 1)
+        );
+        assert_eq!(
+            sanitize_chat_text(format!("ok {}ignored", " \n\t".repeat(100_000))),
+            "ok ignored"
         );
         assert!(sanitize_chat_text(" \n\t ".to_string()).is_empty());
     }
