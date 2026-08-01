@@ -157,13 +157,13 @@ export class RendererPreparationSlot {
 
 export function settleRendererPreparationForStart(
   slot,
-  { replay = false, lab = false, compatibilityKey = null } = {},
+  { lab = false, compatibilityKey = null } = {},
 ) {
   if (!slot || typeof slot.settleForStart !== "function") {
     throw new TypeError("Match start requires a renderer preparation slot.");
   }
   return slot.settleForStart({
-    reuse: !replay && !lab,
+    reuse: !lab,
     compatibilityKey,
   });
 }

@@ -191,7 +191,7 @@ export class App {
       ensureConnected: () => this.ensureConnected(),
       disconnectWhenIdle: () => this.disconnectIdleConnection(),
       autoRefreshLobbies: !this.requiresConnectionOnStart(),
-      onReadyChange: (ready, context) => this.onLobbyReadyChange(ready, context),
+      onJoined: () => this.warmMatchRenderer(),
     });
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
@@ -515,7 +515,6 @@ export class App {
         return;
       case "ready":
         this.lobby?.setStatus("Ready check...");
-        this.onLobbyReadyChange(!!action.ready);
         this.net.ready(!!action.ready);
         return;
       case "start":
@@ -630,6 +629,7 @@ export class App {
   onClose() {
     this.stopHeartbeat();
     this.socketOpen = false;
+    this.rendererPreparationSlot?.discard?.();
     if (this.intentionalIdleDisconnect) {
       this.intentionalIdleDisconnect = false;
       return;
@@ -682,12 +682,11 @@ export class App {
     this.rendererPreparationSlot.armCountdown(countdownId, durationMs);
   }
 
-  onLobbyReadyChange(ready, { rendererEligible = true } = {}) {
-    if (ready && rendererEligible) this.warmMatchRenderer();
-    else this.discardCountdownRendererPreparation();
-  }
-
   warmMatchRenderer() {
+    // Lab starts intentionally construct their renderer from Lab metadata and cannot adopt a
+    // lobby preparation. Starting one here would make Lab wait for an unusable renderer to finish
+    // initializing and tear down before it can construct the real renderer.
+    if (this.labLaunch || this.labCatalogLaunch || this.labHandoffLaunch) return null;
     if (this.rendererPreparationSlot.current) return this.rendererPreparationSlot.current;
     const rendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
       spectator: this.lobby?.isSpectator?.() === true,
@@ -698,10 +697,6 @@ export class App {
       () => prepareRenderer(dom.viewport, rendererBackendBundle),
       { compatibilityKey: rendererBackendBundle?.id || "pixi" },
     );
-  }
-
-  discardCountdownRendererPreparation() {
-    this.rendererPreparationSlot.discard();
   }
 
   releaseCountdownRendererPreparation() {
@@ -776,7 +771,6 @@ export class App {
     const rendererPreparation = await settleRendererPreparationForStart(
       this.rendererPreparationSlot,
       {
-        replay: startsReplay,
         lab: !!labMetadata,
         compatibilityKey: matchRendererBackendBundle?.id || "pixi",
       },

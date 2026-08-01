@@ -663,14 +663,17 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   {
     const app = Object.create(App.prototype);
     let warmed = 0;
-    let discarded = 0;
-    app.warmMatchRenderer = () => { warmed += 1; };
-    app.discardCountdownRendererPreparation = () => { discarded += 1; };
-    app.onLobbyReadyChange(true);
-    app.onLobbyReadyChange(true, { rendererEligible: false });
-    app.onLobbyReadyChange(false);
-    assert(warmed === 1 && discarded === 2,
-      "only eligible ready state warms; replay-ready and unready discard preparation");
+    app.labLaunch = { room: "lab:test" };
+    app.labCatalogLaunch = null;
+    app.labHandoffLaunch = null;
+    app.rendererPreparationSlot = {
+      current: null,
+      warm() {
+        warmed += 1;
+      },
+    };
+    assert(app.warmMatchRenderer() === null && warmed === 0,
+      "Lab lobby entry skips renderer preparation that its start cannot reuse");
   }
   {
     const app = Object.create(App.prototype);
