@@ -10,4 +10,4 @@ _2026-08-01_
 
 ## Playtest watch
 
-- Message delivery, readability, and whether chat interferes with match controls.
+- Message delivery, readability, and interference with match controls.
