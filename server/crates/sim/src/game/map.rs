@@ -385,6 +385,7 @@ mod tests {
 
     mod base_limits;
     mod four_player;
+    mod schone_tage;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {
