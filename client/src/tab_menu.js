@@ -13,7 +13,6 @@ const POINTER_HOLD_DELAY_MS = 200;
 export class TabMenu {
   constructor({
     root,
-    button,
     settings = null,
     hotkeyProfiles = null,
     state = null,
@@ -23,7 +22,6 @@ export class TabMenu {
     windowLike = globalThis.window,
   } = {}) {
     this.root = root || null;
-    this.button = button || null;
     this.settings = settings;
     this.hotkeyProfiles = hotkeyProfiles;
     this.state = state;
@@ -42,28 +40,23 @@ export class TabMenu {
     this.pointerHoldOpened = false;
     this.suppressNextButtonClick = false;
 
+    this.button = document.createElement("button");
+    this.button.id = "tab-menu-button";
+    this.button.type = "button";
+    this.button.className = "tab-menu-button";
+    this.button.setAttribute("aria-label", "Hold for Auto-Build menu");
+    this.button.setAttribute("title", "Hold Tab or press and hold for Auto-Build menu");
+    this.button.setAttribute("aria-controls", "tab-menu");
+    this.button.setAttribute("aria-expanded", "false");
+    this.button.innerHTML =
+      '<span class="hamburger-icon" aria-hidden="true"><i></i><i></i><i></i></span>';
+
     this.panel = document.createElement("aside");
     this.panel.id = "tab-menu";
     this.panel.className = "hud-panel tab-menu";
     this.panel.setAttribute("aria-labelledby", "tab-menu-title");
     this.panel.hidden = true;
-    this.root?.appendChild(this.panel);
-
-    this.originalButton = {
-      ariaLabel: this.button?.getAttribute("aria-label"),
-      title: this.button?.getAttribute("title"),
-      ariaControls: this.button?.getAttribute("aria-controls"),
-      ariaExpanded: this.button?.getAttribute("aria-expanded"),
-      html: this.button?.innerHTML || "",
-    };
-    this.button?.parentElement?.classList.add("tab-menu-mode");
-    if (this.button) {
-      this.button.setAttribute("aria-label", "Settings; hold for in-game menu");
-      this.button.setAttribute("title", "Click for Settings; hold Tab or press and hold for in-game menu");
-      this.button.setAttribute("aria-controls", "settings-menu tab-menu");
-      this.button.innerHTML =
-        '<span class="hamburger-icon" aria-hidden="true"><i></i><i></i><i></i></span>';
-    }
+    this.root?.append(this.button, this.panel);
 
     this.onKeyDown = (event) => this.handleKeyDown(event);
     this.onKeyUp = (event) => this.handleKeyUp(event);
@@ -376,15 +369,7 @@ export class TabMenu {
     this.windowLike?.removeEventListener("pointercancel", this.onPointerCancel, true);
     this.button?.removeEventListener("pointerdown", this.onPointerDown);
     this.button?.removeEventListener("click", this.onButtonClickCapture, true);
-    this.button?.parentElement?.classList.remove("tab-menu-mode");
-    if (this.button) {
-      this.button.innerHTML = this.originalButton.html;
-      restoreAttribute(this.button, "aria-label", this.originalButton.ariaLabel);
-      restoreAttribute(this.button, "title", this.originalButton.title);
-      restoreAttribute(this.button, "aria-controls", this.originalButton.ariaControls);
-      restoreAttribute(this.button, "aria-expanded", this.originalButton.ariaExpanded);
-      this.button.classList.remove("active");
-    }
+    this.button.remove();
     this.panel.remove();
   }
 }
@@ -410,9 +395,4 @@ function consume(event) {
 function isTextEntry(target) {
   return target instanceof HTMLElement &&
     (target.matches("input, textarea, select") || target.isContentEditable);
-}
-
-function restoreAttribute(element, name, value) {
-  if (value == null) element.removeAttribute(name);
-  else element.setAttribute(name, value);
 }

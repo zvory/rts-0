@@ -346,7 +346,7 @@ export class Match {
           this.controlPolicy,
         ),
     );
-    this.tabMenu = createMatchTabMenu(this, dom.gameScreen, dom.settingsButton);
+    this.tabMenu = createMatchTabMenu(this, dom.gameScreen);
 
     // Size the camera to the map and the current viewport, then restore a carried view or center on home.
     this._timeInit("match.bounds", () => {
