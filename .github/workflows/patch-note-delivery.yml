@@ -45,6 +45,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: ${{ secrets.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL }}
+          RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: ${{ secrets.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY }}
           REQUESTED_PR_NUMBER: ${{ inputs.pr_number }}
         shell: bash
         run: |

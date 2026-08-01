@@ -219,20 +219,60 @@ try {
   const deliveryOptions = {
     branch: "zvorygin/at-gun-range",
     decision,
-    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/hook" },
-    post: (_url, message) => delivered.push(message),
+    env: {
+      RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/hook",
+      RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: "https://example.invalid/other-hook",
+    },
+    post: (url, message) => delivered.push({ message, url }),
     repoRoot: tempRoot,
   };
   assert.equal(sendDiscordPatchNote(deliveryOptions).status, "sent");
-  assert.deepEqual(delivered, ["• Deployed anti-tank-gun range increased from 20 to 40 tiles."]);
+  assert.deepEqual(delivered, [
+    {
+      message: "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
+      url: "https://example.invalid/hook",
+    },
+    {
+      message: "• Deployed anti-tank-gun range increased from 20 to 40 tiles.",
+      url: "https://example.invalid/other-hook",
+    },
+  ]);
   assert.equal(sendDiscordPatchNote(deliveryOptions).status, "unchanged");
-  assert.equal(delivered.length, 1, "unchanged patch notes should not be sent twice");
+  assert.equal(delivered.length, 2, "unchanged patch notes should not be sent twice");
   const movedDelivery = {
     ...deliveryOptions,
-    env: { RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://example.invalid/another-hook" },
+    env: {
+      ...deliveryOptions.env,
+      RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: "https://example.invalid/replacement-hook",
+    },
   };
   assert.equal(sendDiscordPatchNote(movedDelivery).status, "sent");
-  assert.equal(delivered.length, 2, "a new Discord destination should receive the current patch note");
+  assert.equal(delivered.length, 3, "changing one destination should deliver only to the replacement webhook");
+  assert.equal(delivered.at(-1).url, "https://example.invalid/replacement-hook");
+
+  const partialRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-patch-note-partial-"));
+  run("git", ["init", "-b", "main"], partialRoot);
+  let secondaryAttempts = 0;
+  const partialOptions = {
+    ...deliveryOptions,
+    branch: "zvorygin/partial-delivery",
+    post: (url) => {
+      if (url.endsWith("other-hook")) {
+        secondaryAttempts += 1;
+        if (secondaryAttempts === 1) throw new Error("secondary unavailable");
+      }
+      delivered.push({ message: "partial", url });
+    },
+    repoRoot: partialRoot,
+  };
+  assert.throws(() => sendDiscordPatchNote(partialOptions), /secondary unavailable/);
+  assert.equal(sendDiscordPatchNote(partialOptions).status, "sent");
+  assert.equal(
+    delivered.filter(({ url }) => url === "https://example.invalid/hook").length,
+    2,
+    "retrying a partial failure must not resend to the primary webhook",
+  );
+  fs.rmSync(partialRoot, { recursive: true });
 
   fs.writeFileSync(config, JSON.stringify({ version: 2, passes: [] }));
   assert.throws(() => loadPasses(config), /version 1/);
