@@ -1554,7 +1554,11 @@ Allocation rules:
 
 - Point orders (`move`, `attackMove`) apply to every selected owned unit that can receive orders.
 - Target/resource orders apply to every selected compatible owned unit after the target has passed
-  issue-time validation. Occupied resource nodes are still valid gather targets; when a gatherer
+  issue-time validation. Every live steel node is a valid gather target regardless of current
+  mining-anchor coverage. A gatherer travels to the patch and waits there, retaining its active
+  gather order without claiming the mining slot, until an owned completed City Centre or Zamok is
+  in range; losing that coverage while harvesting returns the gatherer to the same waiting state.
+  Occupied resource nodes are still valid gather targets; when a gatherer
   arrives and the patch is already occupied, the economy service redirects it to the nearest
   unoccupied same-resource node within ten tiles, or moves it to nearby open grass if none exists.
   Build and Tank Trap deconstruct orders allocate one compatible selected worker per click after the

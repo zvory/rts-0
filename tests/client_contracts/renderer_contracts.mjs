@@ -1,9 +1,9 @@
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
-import { KIND, TERRAIN } from "../../client/src/protocol.js";
+import { KIND, STATE, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
-import { rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
+import { createRigRenderContext, rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
 import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
@@ -31,6 +31,10 @@ function restoreGlobal(name, value) {
 
 assert(rigContainerScale({ visualScale: 0.75, occupiedTrench: true }) === 0.75 * 0.85,
   "rig presentation scale composes with occupied-trench scale");
+assert(
+  createRigRenderContext({ kind: KIND.WORKER, state: STATE.GATHER }).busy === true,
+  "traveling and anchor-waiting gatherers keep the yellow busy indicator without a mining latch",
+);
 
 {
   const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);

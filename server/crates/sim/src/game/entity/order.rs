@@ -576,6 +576,8 @@ impl ArtilleryPointFireOrder {
 pub enum GatherPhase {
     /// Walking out to the resource node.
     ToNode,
+    /// Standing at the node until an owned completed mining anchor makes harvesting legal.
+    WaitingForAnchor,
     /// Standing on the node, accumulating harvest ticks.
     Harvesting,
     /// Walking back to the home City Centre with a load.
