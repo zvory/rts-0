@@ -47,6 +47,21 @@ pub use rts_contract::{
 };
 pub use server_message::ServerMessage;
 
+/// Audience selected for one chat message. The room remains authoritative for recipient routing.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ChatChannel {
+    All,
+    Team,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ChatScope {
+    Lobby,
+    Game,
+}
+
 // ---------------------------------------------------------------------------
 // Client -> Server
 // ---------------------------------------------------------------------------
@@ -114,6 +129,9 @@ pub enum ClientMessage {
         #[serde(default)]
         id: Option<u32>,
     },
+    /// Send a bounded room chat message. Lobby chat is always all-chat; live matches validate and
+    /// route the requested audience against the sender's authoritative seat/team.
+    ChatSend { channel: ChatChannel, text: String },
     /// Issue a gameplay command (ignored unless in-game).
     Command {
         #[serde(rename = "clientSeq")]

@@ -79,6 +79,7 @@ import {
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
+import { ChatOverlay } from "./chat_overlay.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -176,6 +177,14 @@ export class App {
       button: dom.settingsButton,
       menu: dom.settingsMenu,
       onOpenChange: (open) => this.match?.handleInteractiveMenuStateChange?.(open),
+    });
+    this.chat = new ChatOverlay({
+      net: this.net,
+      root: dom.chatOverlay,
+      messages: dom.chatMessages,
+      composer: dom.chatComposer,
+      channelLabel: dom.chatChannel,
+      input: dom.chatInput,
     });
     this.rendererPreparationSlot = new RendererPreparationSlot({
       onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
@@ -478,6 +487,7 @@ export class App {
   }
 
   onLobbyForMatchLaunch(payload) {
+    this.chat?.setLobbyContext(payload);
     if (!this.matchLaunch || this.matchLaunchDone || this.matchLaunchFailed) return;
     const action = nextMatchLaunchAction(this.matchLaunch, payload, this.net.playerId);
     this.applyMatchLaunchAction(action);
@@ -604,6 +614,7 @@ export class App {
   }
 
   onRoomTimeSeekStarted(m) {
+    this.chat?.clearMessages();
     const notice = formatReplaySeekNotice(m);
     if (!notice) return;
     this.replaySeekNotice = notice;
@@ -629,6 +640,7 @@ export class App {
   onClose() {
     this.stopHeartbeat();
     this.socketOpen = false;
+    this.chat?.disable();
     this.rendererPreparationSlot?.discard?.();
     if (this.intentionalIdleDisconnect) {
       this.intentionalIdleDisconnect = false;
@@ -660,6 +672,9 @@ export class App {
    * @param {object} payload §2.3 start payload
    */
   onStart(payload) {
+    this.chat?.setGameContext(payload, {
+      onOpenChange: (open) => this.match?.handleInteractiveMenuStateChange?.(open),
+    });
     const generation = ++this.matchStartGeneration;
     const startPromise = this.startMatch(payload, generation);
     this.matchStartPromise = startPromise;
@@ -1045,6 +1060,7 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
+    this.chat?.disable();
     // Renderer creation is asynchronous. Make any in-flight start stale before changing
     // screens so it can only destroy its completed Match, never attach it to the lobby.
     this.invalidatePendingMatchStart();

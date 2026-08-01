@@ -362,6 +362,7 @@ impl RoomTask {
                 }
             };
             session.record_keyframe_if_due();
+            let replay_chat = session.take_chat_through_current_tick();
             let recipients = self.order.clone();
             self.fanout_replay_snapshots_to(
                 &session,
@@ -371,6 +372,7 @@ impl RoomTask {
                 perf.as_mut(),
             );
             self.broadcast_observer_analysis_for(&session, context.projection_policy);
+            self.broadcast_replay_chat(replay_chat);
         } else {
             self.broadcast_room_time_state_for(&session);
             self.broadcast_observer_analysis_for(&session, context.projection_policy);
@@ -660,7 +662,8 @@ impl RoomTask {
         self.phase = Phase::ReplayViewer(session);
     }
 
-    pub(super) fn transition_to_replay_viewer(&mut self, session: ReplaySession) {
+    pub(super) fn transition_to_replay_viewer(&mut self, mut session: ReplaySession) {
+        let initial_chat = session.take_chat_through_current_tick();
         self.phase = Phase::ReplayViewer(Box::new(session));
         self.reset_after_live_match_for_room_phase();
         let recipients = self.order.clone();
@@ -669,6 +672,7 @@ impl RoomTask {
             self.send_room_time_state_to(id);
             self.send_observer_analysis_to(id);
         }
+        self.broadcast_replay_chat(initial_chat);
         crate::log_info!(
             room = %self.room,
             viewer_count = self.players.len(),

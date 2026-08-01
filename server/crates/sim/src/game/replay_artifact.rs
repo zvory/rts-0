@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{Game, PlayerInit, PlayerStartingLoadout};
-use crate::protocol::{Command, PlayerScore};
+use crate::protocol::{ChatChannel, Command, PlayerScore};
 
 pub(in crate::game) const REPLAY_ARTIFACT_SCHEMA_VERSION_V3: u32 = 3;
 pub const REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION: u32 = REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
@@ -17,6 +17,17 @@ pub struct CommandLogEntry {
     pub tick: u32,
     pub player_id: u32,
     pub command: Command,
+}
+
+/// One accepted in-game chat message, stamped for presentation during replay playback.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatLogEntry {
+    pub tick: u32,
+    pub sender_id: u32,
+    pub sender_name: String,
+    pub channel: ChatChannel,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -44,6 +55,8 @@ pub struct ReplayArtifactV1 {
     pub(in crate::game) start_state: Option<ReplayStartStateV1>,
     pub duration_ticks: u32,
     pub command_log: Vec<CommandLogEntry>,
+    #[serde(default)]
+    pub chat_log: Vec<ChatLogEntry>,
     pub winner_id: Option<u32>,
     #[serde(default)]
     pub winner_team_id: Option<u32>,
@@ -199,6 +212,7 @@ impl ReplayStartComposition {
                 .filter(|entry| entry.tick > self.start_tick)
                 .cloned()
                 .collect(),
+            chat_log: Vec::new(),
             winner_id,
             winner_team_id: winner_id.and_then(|id| game.team_of_player(id)),
             final_scores,

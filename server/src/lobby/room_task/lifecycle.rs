@@ -374,6 +374,7 @@ impl RoomTask {
         self.reset_live_pause_state();
         self.reset_room_time_state();
         self.replay_start = None;
+        self.match_chat_log.clear();
         self.lab_driver = None;
     }
 
@@ -404,7 +405,9 @@ impl RoomTask {
             );
             return None;
         };
-        Some(start.finalize(game, winner_id, scores))
+        let mut artifact = start.finalize(game, winner_id, scores);
+        artifact.chat_log = self.match_chat_log.clone();
+        Some(artifact)
     }
 
     pub(super) fn record_live_match_started(
@@ -429,6 +432,8 @@ impl RoomTask {
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
+        self.match_chat_log.clear();
+        self.recent_chat_times.clear();
         self.observer_views.clear();
         self.reset_live_pause_state();
         self.reset_room_time_state();
@@ -457,6 +462,8 @@ impl RoomTask {
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
+        self.match_chat_log.clear();
+        self.recent_chat_times.clear();
         self.reset_live_pause_state();
         self.lab_session = None;
         self.lab_timeline = None;

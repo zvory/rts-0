@@ -16,6 +16,7 @@ pub(crate) fn is_player_activity(message: &ClientMessage) -> bool {
         | ClientMessage::SetAiProfile { .. }
         | ClientMessage::RemoveAi { .. }
         | ClientMessage::SetSpectator { .. }
+        | ClientMessage::ChatSend { .. }
         | ClientMessage::Command { .. }
         | ClientMessage::GiveUp
         | ClientMessage::PauseGame

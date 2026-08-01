@@ -243,6 +243,21 @@
         </div>
       </section>
 
+      <!-- Shared lobby/game chat: direct viewport text with a single-line composer. -->
+      <div id="chat-overlay" class="chat-overlay" data-scope="lobby" hidden>
+        <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
+        <div id="chat-composer" class="chat-composer" hidden>
+          <span id="chat-channel" class="chat-channel">[ALL]</span>
+          <input
+            id="chat-input"
+            type="text"
+            maxlength="200"
+            autocomplete="off"
+            aria-label="Chat message"
+          />
+        </div>
+      </div>
+
       <!-- Transient notice toast -->
       <div id="game-menu" data-settings-context="lobby">
         <button id="settings-button" type="button" aria-label="Settings" title="Settings">⚙</button>

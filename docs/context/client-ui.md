@@ -11,9 +11,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - [../client-performance-optimization-lessons.md](../client-performance-optimization-lessons.md) —
   measured wins, rejected experiments, live rig counts, and recurring analytical mistakes
 
-## Code map
+## Map
 - `app-shell`: `main.js`, `app.js`, `match*.js`, launch/Interact bridges, diagnostics,
-  replay/spectator/Lab wiring, policies, room-time controls, and capabilities.
+  replay/spectator/Lab wiring, policies, room-time controls, chat, and capabilities.
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`,
   `command_interaction.js`, command composition/budget, prediction, and display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.

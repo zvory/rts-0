@@ -1,6 +1,12 @@
 ## 7. Hardening (input is untrusted)
 The server treats every client as potentially hostile. Scout Planes are exposed through normal fog-safe projection and omitted when hidden from that player. Their private orbit state is sent only to the owner or full-world projections. Authoritative aerial fog stamping grants owner/team vision through terrain and building blockers while still respecting smoke. Every valid active plane independently contributes vision; Command Car cooldown, resource spending, command-list limits, and sortie lifetime bound normal launches without a player-global or source-global active-plane cap. Limits live next to the code:
 - **Net-report diagnostic cap** (`server/crates/protocol/src/lib.rs`): client-supplied command lifecycle exemplars are capped during deserialization to the logged top-N contract.
+- **Chat bounds and authority** (`room_task/chat.rs`, `replay_session.rs`): the server collapses
+  whitespace, caps accepted text at 200 Unicode scalar values, drops empty messages, and admits at
+  most five messages per sender per rolling ten seconds. It derives names, teams, phase, replay
+  tick, and recipients from room state rather than client fields. Live replay capture is capped at
+  10,000 entries, and replay validation repeats entry count, tick ordering/range, name, and text
+  bounds before playback.
 - **WebSocket and lab scenario import caps** (`main.rs`, `lab_scenarios.rs`): WebSocket text-frame
   limits accommodate valid checkpoint-backed scenario round trips, while lab scenario import JSON
   is capped at 4 MiB alongside the embedded checkpoint-payload boundary. Oversized frames are

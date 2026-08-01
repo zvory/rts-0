@@ -32,16 +32,16 @@ Use when adding, removing, or changing any field on a client↔server message, s
 ## Current lobby fields to remember
 - `setName { name }` updates the sender's sanitized name during the lobby
   phase; countdown and in-game requests are ignored.
+- `chatSend` is server-routed; lobby chat is ephemeral and game chat is replayed from `chatLog[]`.
 - `selectMap { map }` is the host-only map selector command.
 - `lobby` carries `map` (selected stable map name) and `maps[]`
   (`{name, description, minPlayers, maxPlayers}` catalog rows). Replay start metadata separately
   uses `mapName`.
 - Lab start metadata carries room/role identity, compatibility vision, initial camera, dirty state,
   and operation count.
-- Start `capabilities` declares room-time, vision-selection, and command affordances; never infer
-  them from replay/dev/Lab modes. Privileged viewers choose all-player union, omniscient, or
-  player views per connection, independent of command authority. Lab timeline controls use
-  neutral room-time messages rather than `LabClientOp`.
+- Start `capabilities` declares room-time, vision, and command affordances; never infer them from
+  room mode. Privileged viewers choose their view independently of command authority. Lab timeline
+  controls use neutral room-time messages rather than `LabClientOp`.
 - Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
   to render the shared controls; do not reconstruct it from legacy Lab metadata.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
@@ -51,9 +51,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   countdown skipping for rooms with one or zero active humans is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (canonical AI profile id), and
   `isSpectator`; spectators are lobby members but not active match players.
-- Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`; legacy setup
-  JSON is rejected. `validateScenario` previews catalog/path/payload/map bounds without mutating
-  the room or accepting client-controlled server paths.
+- Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`.
+  `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
 - `/api/map-handoffs` validates map data, caps records at 64, expires them after two minutes, and
   consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.

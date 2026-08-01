@@ -432,6 +432,12 @@ pub enum RoomEvent {
         target: u32,
         spectator: bool,
     },
+    /// A connected human submitted bounded room chat.
+    ChatSend {
+        player_id: u32,
+        channel: crate::protocol::ChatChannel,
+        text: String,
+    },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command {
         player_id: u32,

@@ -1,6 +1,21 @@
 use super::*;
 
 #[test]
+fn chat_send_deserializes_with_typed_channel() {
+    let msg: ClientMessage = serde_json::from_str(
+        r#"{"t":"chatSend","channel":"team","text":"Hold here"}"#,
+    )
+    .unwrap();
+    assert!(matches!(
+        msg,
+        ClientMessage::ChatSend {
+            channel: ChatChannel::Team,
+            ref text,
+        } if text == "Hold here"
+    ));
+}
+
+#[test]
 fn set_name_deserializes() {
     let msg: ClientMessage = serde_json::from_str(r#"{"t":"setName","name":"Renamed"}"#).unwrap();
     assert!(matches!(msg, ClientMessage::SetName { name } if name == "Renamed"));

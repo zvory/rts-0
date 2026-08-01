@@ -20,6 +20,7 @@ use rts_sim::game::ObserverView;
 use tokio::time::Instant as TokioInstant;
 
 mod branch;
+mod chat;
 mod dev;
 mod helpers;
 mod lab;
@@ -105,6 +106,11 @@ pub(super) struct RoomTask {
     /// Recipient-specific room-owned notices appended to the next live snapshot for each
     /// connection id. Used when the notice is about room membership rather than sim events.
     pending_recipient_notices: HashMap<u32, Vec<Event>>,
+    /// Accepted live-match chat copied into the replay artifact at finalization. Lobby chat is
+    /// deliberately never retained here.
+    match_chat_log: Vec<rts_sim::game::replay::ChatLogEntry>,
+    /// Short rolling windows used to bound chat spam per connected human.
+    recent_chat_times: HashMap<u32, std::collections::VecDeque<std::time::Instant>>,
     /// Per-connection observer perspective. This is read-only projection state and never an
     /// issuer/command capability.
     observer_views: HashMap<u32, ObserverView>,
@@ -175,6 +181,8 @@ impl RoomTask {
             slow_tick_count: 0,
             pending_client_command_acks: Vec::new(),
             pending_recipient_notices: HashMap::new(),
+            match_chat_log: Vec::new(),
+            recent_chat_times: HashMap::new(),
             observer_views: HashMap::new(),
             match_history_writer,
             match_history_local_only,
@@ -412,6 +420,11 @@ impl RoomTask {
                 target,
                 spectator,
             } => self.on_set_spectator(player_id, target, spectator),
+            RoomEvent::ChatSend {
+                player_id,
+                channel,
+                text,
+            } => self.on_chat_send(player_id, channel, text),
             RoomEvent::Command {
                 player_id,
                 client_seq,

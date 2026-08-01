@@ -133,6 +133,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "settings_container.js": "ui",
   "settings_panels.js": "ui",
   "tab_menu.js": "ui",
+  "chat_overlay.js": "ui",
   "scoreboard.js": "ui",
 
   "replay_camera_input.js": "input",

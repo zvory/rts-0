@@ -1401,6 +1401,18 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::ChatSend { channel, text } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ChatSend {
+                    player_id,
+                    channel,
+                    text,
+                },
+            )
+            .await;
+        }
         ClientMessage::Command { client_seq, cmd } => {
             lobby::send_command_room_event(
                 player_id,
