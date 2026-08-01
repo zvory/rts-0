@@ -51,11 +51,7 @@ fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
     );
     game.tick();
 
-    let worker_entity = game
-        .state
-        .entities
-        .get(worker)
-        .expect("worker survives");
+    let worker_entity = game.state.entities.get(worker).expect("worker survives");
     assert!(
         matches!(worker_entity.order(), Order::Gather(_)),
         "worker should retain gather intent for a live patch outside City Centre mining range"
@@ -437,13 +433,7 @@ fn active_mining_waits_and_resumes_when_nearby_cc_is_rebuilt() {
 
     game.state
         .entities
-        .spawn_building(
-            1,
-            EntityKind::CityCentre,
-            cc_pos.0,
-            cc_pos.1,
-            true,
-        )
+        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
         .expect("replacement City Centre");
     game.tick();
 

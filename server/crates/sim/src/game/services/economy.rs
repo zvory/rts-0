@@ -66,9 +66,7 @@ pub(crate) fn gather_system(
             GatherPhase::ToNode | GatherPhase::WaitingForAnchor | GatherPhase::ToHome => {
                 gather_to_node(map, entities, occ, coordinator, id, node)
             }
-            GatherPhase::Harvesting => {
-                gather_harvesting(entities, players, id, node, tick)
-            }
+            GatherPhase::Harvesting => gather_harvesting(entities, players, id, node, tick),
         }
     }
     for payout in pump_jack::tick(entities, teams) {

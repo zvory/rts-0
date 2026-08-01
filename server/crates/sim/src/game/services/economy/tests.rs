@@ -118,7 +118,9 @@ fn gatherer_waits_at_patch_until_completed_anchor_exists() {
     );
 
     assert_eq!(
-        entities.get(worker).and_then(|worker| worker.gather_phase()),
+        entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
         Some(GatherPhase::WaitingForAnchor),
         "worker at an uncovered patch should keep a waiting gather order"
     );
@@ -136,7 +138,9 @@ fn gatherer_waits_at_patch_until_completed_anchor_exists() {
     );
 
     assert_eq!(
-        entities.get(worker).and_then(|worker| worker.gather_phase()),
+        entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
         Some(GatherPhase::Harvesting),
         "worker should harvest as soon as anchor coverage becomes valid"
     );
