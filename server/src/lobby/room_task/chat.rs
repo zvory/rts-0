@@ -95,6 +95,8 @@ impl RoomTask {
                 };
                 let recipients = self.chat_recipients(channel, sender_team);
                 self.send_chat_to(recipients, &delivery);
+                // The completed replay is intentionally a full post-match historical record:
+                // both all-chat and formerly private team-chat become visible to replay viewers.
                 if self.match_chat_log.len() < MAX_CHAT_LOG_ENTRIES {
                     self.match_chat_log.push(ChatLogEntry {
                         tick,

@@ -222,7 +222,7 @@ export class App {
         : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
-    /** @type {string} active replay-seek toast, cleared by the rebuilt replay start. */
+    /** @type {string} active replay-seek toast, cleared by authoritative seek completion. */
     this.replaySeekNotice = "";
     /** @type {number|undefined} heartbeat interval id while connected. */
     this.heartbeatTimer = undefined;
@@ -239,6 +239,7 @@ export class App {
     this.onGameOver = this.onGameOver.bind(this);
     this.onShutdownWarning = this.onShutdownWarning.bind(this);
     this.onRoomTimeSeekStarted = this.onRoomTimeSeekStarted.bind(this);
+    this.onRoomTimeState = this.onRoomTimeState.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
     this.onCloseScorePanel = this.onCloseScorePanel.bind(this);
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
@@ -284,6 +285,7 @@ export class App {
     this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
     this.net.on(S.ROOM_TIME_SEEK_STARTED, this.onRoomTimeSeekStarted);
+    this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
     this.net.on(S.BRANCH_STAGING, this.onBranchStagingForChat);
     this.net.on("open", this.onOpen);
@@ -623,8 +625,15 @@ export class App {
     this.chat?.clearMessages();
     const notice = formatReplaySeekNotice(m);
     if (!notice) return;
+    this.match?.prepareReplaySeek?.(m);
     this.replaySeekNotice = notice;
     this.showToast(notice, null);
+  }
+
+  onRoomTimeState(state) {
+    if (!this.replaySeekNotice || state?.seek) return;
+    this.hideToast(this.replaySeekNotice);
+    this.replaySeekNotice = "";
   }
 
   /**

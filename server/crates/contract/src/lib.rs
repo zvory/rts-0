@@ -254,6 +254,15 @@ pub struct ReplayStartMetadata {
     pub duration_ticks: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomTimeSeekState {
+    pub id: u32,
+    pub controller_id: u32,
+    pub from_tick: u32,
+    pub target_tick: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RoomTimeState {
@@ -265,6 +274,8 @@ pub struct RoomTimeState {
     pub ended: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub controller_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seek: Option<RoomTimeSeekState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

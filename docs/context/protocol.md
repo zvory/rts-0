@@ -19,8 +19,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
 
 ## Code map
 - `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport
-- `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol, including
-  start/snapshot contract records and `DEFAULT_FACTION_ID`
+- `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `server/crates/sim/src/protocol.rs` — sim-facing adapter for typed kind conversion
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
@@ -37,15 +36,15 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `lobby` carries `map` (selected stable map name) and `maps[]`
   (`{name, description, minPlayers, maxPlayers}` catalog rows). Replay start metadata separately
   uses `mapName`.
-- Lab start metadata carries room/role identity, compatibility vision, initial camera, dirty state,
-  and operation count.
+- Lab start metadata carries room/role identity, vision, camera, dirty state, and operation count.
 - Start `capabilities` declares room-time, vision, and command affordances; never infer them from
-  room mode. Privileged viewers choose their view independently of command authority. Lab timeline
-  controls use neutral room-time messages rather than `LabClientOp`.
+  room modes. Privileged viewers select union, omniscient, or player vision per connection.
+- Lab timeline controls use neutral room-time messages rather than `LabClientOp`.
+- Replay seeks reset timeline-derived client state in place and expose sampled incremental
+  progress through coalescing `roomTimeState.seek`; they do not rebuild `Match`.
 - Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
   to render the shared controls; do not reconstruct it from legacy Lab metadata.
-- Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
-  movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
+- Start payloads carry recipient-scoped `diagnostics`; do not infer them from room mode names.
 - Resolved AI matches send `observationReady` (replay/log lookup).
 - The active protocol has no quickstart/debug lobby command or start-payload flag. Normal live
   countdown skipping for rooms with one or zero active humans is not a debug preset.

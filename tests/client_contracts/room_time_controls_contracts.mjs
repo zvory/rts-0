@@ -277,6 +277,8 @@ assert(replayControls.querySelector(".room-time-panel-body")?.querySelector(".se
 assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
 assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
 const initialVisionButtons = replayControls.querySelectorAll(".vision-btn");
+assert(initialVisionButtons.every((button) => !button.disabled),
+  "vision selection stays available while clock controls await authoritative state");
 assert(
   !initialVisionButtons[0].classList.contains("active") &&
     initialVisionButtons[1].classList.contains("active") &&
@@ -419,7 +421,7 @@ assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
 assert(
   replayControls.dataset.roomTimePending === "true" &&
-    replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking 30"),
+    replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking to 30"),
   "a stale non-confirming authoritative update does not reject a pending seek",
 );
 replayUi.applyRoomTimeState({ currentTick: 34, durationTicks: 1_000, speed: 2, paused: false, controllerId: 99 });
@@ -429,8 +431,66 @@ assert(
 );
 replayUi.applyRoomTimeState({ currentTick: 35, durationTicks: 1_000, speed: 2, paused: false, controllerId: 41 });
 assert(
-  replayControls.dataset.roomTimePending === "false",
-  "an authoritative rewind clears pending even when server progress makes the exact client prediction stale",
+  replayControls.dataset.roomTimePending === "true",
+  "an intermediate cursor that merely moved toward the target does not falsely confirm seek completion",
+);
+replayUi.applyRoomTimeState({
+  currentTick: 35,
+  durationTicks: 1_000,
+  keyframeTicks: [0, 20],
+  speed: 2,
+  paused: false,
+  controllerId: 41,
+  seek: { id: 3, controllerId: 41, fromTick: 120, targetTick: 30 },
+});
+assert(
+  replayControls.dataset.roomTimePending === "true" &&
+    replayControls["aria-busy"] === "true" &&
+    replayUi.roomTimePendingTimer === null &&
+    !speed2.disabled &&
+    !replayControls.querySelectorAll(".vision-btn")[0].disabled,
+  "authoritative seek progress remains pending without timing out or blocking pause, seek, or vision controls",
+);
+assert(
+  replayControls.querySelector(".room-time-timeline-progress").style["--room-time-progress"] === "3.5000000000000004%" &&
+    replayControls.querySelectorAll(".room-time-timeline-mark").length === 2,
+  "intermediate seek state advances the normal timeline and publishes newly created keyframes",
+);
+replayUi.requestRoomTimeAction(
+  { kind: "seek", mode: "absolute", baselineTick: 35, expectedTick: 700 },
+  () => true,
+);
+replayUi.applyRoomTimeState({
+  currentTick: 35,
+  durationTicks: 1_000,
+  speed: 2,
+  paused: false,
+  controllerId: 41,
+  seek: { id: 3, controllerId: 41, fromTick: 120, targetTick: 30 },
+});
+replayUi.expireRoomTimePending();
+assert(
+  replayUi.roomTimeSeekPending === true && replayUi.roomTimeSeekTargetTick === 30,
+  "a rejected replacement seek timeout restores the active authoritative seek presentation",
+);
+replayUi.applyRoomTimeState({
+  currentTick: 30,
+  durationTicks: 1_000,
+  speed: 2,
+  paused: false,
+  controllerId: 41,
+});
+replayUi.requestRoomTimeAction(
+  { kind: "seek", mode: "absolute", baselineTick: 30, expectedTick: 700 },
+  () => true,
+);
+replayUi.expireRoomTimePending();
+assert(
+  replayUi.roomTimeSeekPending === false &&
+    replayUi.roomTimeSeekFromTick === null &&
+    replayUi.roomTimeSeekTargetTick === null &&
+    replayControls["aria-busy"] === "false",
+  "an unconfirmed seek timeout clears speculative seek presentation when authority has no active seek",
 );
 delete replayNet.playerId;
 speed2._listeners.get("click")({});
@@ -565,7 +625,7 @@ timelineTrack._listeners.get("pointerup")({
 assert(replayNet.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
 assert(timelineHover.hidden === true, "replay timeline click dismisses the hover preview");
 assert(
-  replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking 500"),
+  replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking to 500"),
   "replay timeline shows a pending seek indicator",
 );
 replayUi.destroy();

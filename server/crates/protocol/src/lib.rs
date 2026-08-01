@@ -42,9 +42,9 @@ pub use rts_contract::{
     LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
     ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
     RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
-    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView,
-    VisibilityCapabilities, DEFAULT_FACTION_ID,
+    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState,
+    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 

@@ -28,10 +28,10 @@ pub enum ServerMessage {
     Start(StartPayload),
     /// Per-player, fog-filtered world state.
     Snapshot(Snapshot),
-    /// Shared room-controlled time cursor/state. Sent reliably outside snapshot cadence.
+    /// Shared room-controlled time cursor/state. Sent latest-only outside snapshot cadence.
     RoomTimeState(RoomTimeState),
-    /// An accepted replay seek is about to rebuild shared room time. Broadcast before the
-    /// synchronous rebuild so every viewer can present immediate progress feedback.
+    /// An accepted replay seek is about to reset and incrementally advance shared room time.
+    /// Broadcast first so every viewer can present immediate progress feedback.
     RoomTimeSeekStarted {
         controller_id: u32,
         from_tick: u32,

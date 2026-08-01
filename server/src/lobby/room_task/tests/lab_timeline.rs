@@ -221,16 +221,14 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
                         && payload.capabilities.room_time.timeline
             )
         }));
-        assert!(messages.iter().any(|msg| {
-            matches!(
-                msg,
-                ServerMessage::RoomTimeState(state)
-                    if state.current_tick == 0
-                        && state.duration_ticks == 1
-                        && state.keyframe_ticks.as_slice() == [0]
-                        && state.controller_id == Some(100)
-            )
-        }));
+        let state = writer
+            .room_time_state
+            .take()
+            .expect("Lab seek room-time state");
+        assert_eq!(state.current_tick, 0);
+        assert_eq!(state.duration_ticks, 1);
+        assert_eq!(state.keyframe_ticks.as_slice(), [0]);
+        assert_eq!(state.controller_id, Some(100));
         assert!(messages.iter().any(|msg| {
             matches!(
                 msg,
@@ -365,15 +363,12 @@ fn lab_seek_replays_issue_as_commands_through_rebuild() {
 
     assert_eq!(in_game_tick(&task), 12);
     assert_eq!(lab_entity_position(&task, worker), moved_position);
-    let messages: Vec<_> =
-        std::iter::from_fn(|| operator_writer.reliable_rx.try_recv().ok()).collect();
-    assert!(messages.iter().any(|msg| {
-        matches!(
-            msg,
-            ServerMessage::RoomTimeState(state)
-                if state.current_tick == 12 && state.controller_id == Some(99)
-        )
-    }));
+    let state = operator_writer
+        .room_time_state
+        .take()
+        .expect("Lab seek room-time state");
+    assert_eq!(state.current_tick, 12);
+    assert_eq!(state.controller_id, Some(99));
     assert!(operator_writer.snapshots.take().is_some());
 }
 
@@ -690,15 +685,13 @@ fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
                 if result.ok && result.request_id == 72 && result.op == "setPlayerResources"
         )
     }));
-    assert!(messages.iter().any(|msg| {
-        matches!(
-            msg,
-            ServerMessage::RoomTimeState(state)
-                if state.current_tick == 0
-                    && state.duration_ticks == 0
-                    && state.keyframe_ticks.as_slice() == [0]
-        )
-    }));
+    let state = operator_writer
+        .room_time_state
+        .take()
+        .expect("truncated Lab room-time state");
+    assert_eq!(state.current_tick, 0);
+    assert_eq!(state.duration_ticks, 0);
+    assert_eq!(state.keyframe_ticks.as_slice(), [0]);
 }
 
 #[test]
@@ -1040,15 +1033,13 @@ fn lab_timeline_resets_on_scenario_import() {
             ServerMessage::LabState(state) if state.dirty && state.operation_count == 3
         )
     }));
-    assert!(messages.iter().any(|msg| {
-        matches!(
-            msg,
-            ServerMessage::RoomTimeState(state)
-                if state.current_tick == 0
-                    && state.duration_ticks == 0
-                    && state.keyframe_ticks.as_slice() == [0]
-        )
-    }));
+    let state = writer
+        .room_time_state
+        .take()
+        .expect("imported scenario room-time state");
+    assert_eq!(state.current_tick, 0);
+    assert_eq!(state.duration_ticks, 0);
+    assert_eq!(state.keyframe_ticks.as_slice(), [0]);
     let timeline = task.lab_timeline.as_ref().expect("lab timeline");
     assert!(timeline.entries().is_empty());
     assert!(timeline.replay_entries().is_empty());

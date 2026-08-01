@@ -89,7 +89,7 @@ lobby/config dump replaces the source scrape.
 | `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room-time capability profile allows speed control. `0` pauses replay playback, speed-only live-game rooms, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
 | `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted in replay and lab rooms. |
-| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Lab rooms use room-local keyframes and recorded accepted lab operations/issue-as commands the same way, then re-send lab `start`, `roomTimeState`, `labState`, and a fresh snapshot. Replay and lab keyframes are recorded every 2,000 ticks while their authoritative time advances. |
+| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, and incrementally fast-forward in bounded room-owned slices. They sample full fog-scoped snapshots plus `roomTimeState` while progressing instead of rebuilding the client or sending every simulated tick. Lab rooms use room-local keyframes and recorded accepted lab operations/issue-as commands, then re-send lab `start`, `roomTimeState`, `labState`, and a fresh snapshot. Replay and lab keyframes are recorded every 2,000 ticks while their authoritative time advances. |
 | `setVisionSelection` | `selection: VisionSelectionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
 | `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations and issue-as commands are room-local; `setVision` changes only the requesting operator's projection. Accepted lab requests append to the lab operation log with the requesting connection id. |
 | `requestBranchFromTick` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `branchFromTickCreated` to all current viewers. |
@@ -384,7 +384,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
-| `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek begins rebuilding. Rejected and rate-limited seeks do not emit it. |
+| `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek resets timeline-derived presentation and begins incremental fast-forward. Rejected and rate-limited seeks do not emit it. |
 | `livePauseState` | `Live match pause state` (see 2.6). |
 | `observerAnalysis` | `Observer analysis state` (see 2.7). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
@@ -1203,8 +1203,8 @@ mode/event policy if the new data does not fit an existing row.
 
 ### 2.6 Room time state and vision selection
 
-`roomTimeState` is a reliable server message that carries the shared room-controlled time
-cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
+`roomTimeState` is a full, coalescing latest-only server message that carries the shared
+room-controlled time cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
 rooms also send it after pause/resume and one-tick step controls so clients can confirm the
 authoritative room-time speed and tick. Clients keep a pending room-time command across stale
 authoritative frames and clear or recover its timeout notice when a later state confirms the
@@ -1219,9 +1219,21 @@ seeks, and future-history truncation:
   speed: f32,
   paused: bool,
   ended: bool,
-  controllerId?: u32
+  controllerId?: u32,
+  seek?: {
+    id: u32,
+    controllerId: u32,
+    fromTick: u32,
+    targetTick: u32
+  }
 }
 ```
+When `seek` is present, `currentTick` is the authoritative incremental reconstruction cursor and
+the latest sampled snapshot represents that tick. The seek completes when a later state omits
+`seek` at the clamped target. The seek id is monotonic within the replay session so clients can
+distinguish replacement work from stale progress. `speed` and `paused` remain the selected replay
+clock state; pausing suspends incremental fast-forward and resuming continues it.
+
 `keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay and lab
 clients may display them as seek marks, but a seek target is not limited to these ticks; the server
 restores the nearest recorded keyframe at or before the requested tick and fast-forwards from there.
@@ -1232,10 +1244,15 @@ Lab rooms expose recorded baseline and periodic keyframe ticks through the same 
 room-local keyframes and recorded entries; seek requests outside retained history are rejected with
 `error` instead of rebuilding from discarded state.
 
-Before an accepted replay seek starts its synchronous rebuild, the room broadcasts
+Before an accepted replay seek resets to its reconstruction keyframe, the room broadcasts
 `roomTimeSeekStarted` with the authoritative current and clamped target ticks. Every replay viewer,
-including the controller, presents the direction and tick distance as seconds so a temporarily
-frozen replay is visibly busy until the rebuilt `start`/`roomTimeState` sequence arrives.
+including the controller, clears timeline-derived client presentation in place and presents the
+direction and tick distance as seconds. The room then emits an immediate authoritative state and
+full snapshot, advances as fast as bounded CPU slices allow, and publishes sampled state/snapshots
+at a reduced wall-clock cadence. Ordinary room events run between slices, so pause/resume, vision,
+leave, and later admitted seek commands remain responsive. Intermediate transient events are not
+replayed to viewers; each sample is a complete authoritative world state. Recorded 2,000-tick
+keyframes appear through the growing `keyframeTicks` list.
 
 `livePauseState` is a reliable server message that carries the authoritative live-match pause
 state. Normal live and branch-live match recipients receive it after `start` and after accepted or
@@ -1663,7 +1680,8 @@ Observer analysis follows each viewer's observer selection. Narrowed views conta
 player rows and omit unscoped `mapAnalysis`; omniscient views retain all player rows and map layers.
 It is observer-only data for analysis overlays, not an active-player information surface.
 Replay playback recomputes the payload from the current authoritative replay `Game` state after
-normal playback ticks and after `ReplaySession::rebuild_to()` restores a keyframe and fast-forwards
-to the target tick. Analysis state is not serialized separately in `ReplayKeyframe`.
+normal playback ticks and at sampled progress points while an incremental seek advances from its
+restored keyframe to the target tick. Analysis state is not serialized separately in
+`ReplayKeyframe`.
 
 ---

@@ -201,42 +201,29 @@ fn room_task_tick_control_preserves_current_intervals_by_mode() {
 }
 
 #[test]
-fn replay_start_payload_capabilities_survive_initial_and_seek_resends() {
+fn replay_start_payload_advertises_replay_controls() {
     let initial = replay_start_payload_after("replay-start-caps-initial", |task| {
         task.send_replay_start_to(99)
     });
-    let relative = replay_start_payload_after("replay-start-caps-relative", |task| {
-        task.on_seek_room_time(99, 1)
-    });
-    let absolute = replay_start_payload_after("replay-start-caps-absolute", |task| {
-        task.on_seek_room_time_to(99, 1)
-    });
 
-    for payload in [&initial, &relative, &absolute] {
-        assert_eq!(payload.player_id, 99);
-        assert!(payload.spectator);
-        assert!(payload.replay.is_some());
-        assert!(payload.capabilities.room_time.available);
-        assert!(payload.capabilities.room_time.set_speed);
-        assert!(payload.capabilities.room_time.pause);
-        assert!(payload.capabilities.room_time.seek_relative);
-        assert!(payload.capabilities.room_time.seek_absolute);
-        assert!(payload.capabilities.room_time.timeline);
-        assert!(payload.capabilities.visibility.vision_selection);
-        assert!(payload.capabilities.actions.branch_from_tick);
-        assert!(!payload.capabilities.commands.gameplay);
-        assert!(!payload.capabilities.match_controls.pause);
-        assert!(payload.diagnostics.observer_analysis);
-        assert_eq!(
-            payload.diagnostics.movement_paths,
-            MovementPathDiagnosticScope::None
-        );
-    }
-
-    assert_eq!(relative.capabilities, initial.capabilities);
-    assert_eq!(absolute.capabilities, initial.capabilities);
-    assert_eq!(relative.diagnostics, initial.diagnostics);
-    assert_eq!(absolute.diagnostics, initial.diagnostics);
+    assert_eq!(initial.player_id, 99);
+    assert!(initial.spectator);
+    assert!(initial.replay.is_some());
+    assert!(initial.capabilities.room_time.available);
+    assert!(initial.capabilities.room_time.set_speed);
+    assert!(initial.capabilities.room_time.pause);
+    assert!(initial.capabilities.room_time.seek_relative);
+    assert!(initial.capabilities.room_time.seek_absolute);
+    assert!(initial.capabilities.room_time.timeline);
+    assert!(initial.capabilities.visibility.vision_selection);
+    assert!(initial.capabilities.actions.branch_from_tick);
+    assert!(!initial.capabilities.commands.gameplay);
+    assert!(!initial.capabilities.match_controls.pause);
+    assert!(initial.diagnostics.observer_analysis);
+    assert_eq!(
+        initial.diagnostics.movement_paths,
+        MovementPathDiagnosticScope::None
+    );
 }
 
 #[test]
@@ -261,16 +248,22 @@ fn replay_room_rejects_rapid_seek_without_resetting_viewers() {
     task.on_seek_room_time(99, 1);
     let first_seek_messages: Vec<_> =
         std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    assert!(first_seek_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::Start(payload)
-            if payload.capabilities.room_time.seek_relative
-                && payload.capabilities.room_time.seek_absolute
-                && payload.capabilities.visibility.vision_selection
-    )));
     assert!(first_seek_messages
         .iter()
-        .any(|msg| matches!(msg, ServerMessage::RoomTimeState(_))));
+        .any(|msg| matches!(msg, ServerMessage::RoomTimeSeekStarted { .. })));
+    assert!(!first_seek_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    let first_state = writer
+        .room_time_state
+        .take()
+        .expect("accepted seek should publish reset room time");
+    assert_eq!(first_state.current_tick, 0);
+    assert_eq!(
+        first_state.seek.as_ref().map(|seek| seek.target_tick),
+        Some(2)
+    );
+    assert_eq!(writer.snapshots.take().expect("reset snapshot").tick, 0);
 
     task.on_seek_room_time(99, 1);
     let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
@@ -283,11 +276,56 @@ fn replay_room_rejects_rapid_seek_without_resetting_viewers() {
     assert!(!messages
         .iter()
         .any(|msg| matches!(msg, ServerMessage::RoomTimeSeekStarted { .. })));
+    let recovered = writer
+        .room_time_state
+        .take()
+        .expect("rejected seek should republish authoritative state");
+    assert_eq!(recovered.current_tick, 0);
+    assert_eq!(
+        recovered.seek.as_ref().map(|seek| seek.target_tick),
+        Some(2)
+    );
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
 }
 
 #[test]
-fn replay_seek_started_reaches_every_viewer_before_rebuild_results() {
+fn replay_branch_request_rejects_an_intermediate_seek_tick() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 4);
+    let mut replay = ReplaySession::new(artifact).unwrap();
+    for _ in 0..3 {
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+    }
+    let mut task = RoomTask::new(
+        "replay-seek-branch-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let _writer = add_test_room_player(&mut task, 99, true);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_seek_room_time_to(99, 2);
+
+    let err = match task.on_request_branch_from_tick(99) {
+        Ok(_) => panic!("branching during an incremental seek should be rejected"),
+        Err(err) => err,
+    };
+    assert!(
+        err.contains("seek is in progress"),
+        "unexpected error: {err}"
+    );
+    let Phase::ReplayViewer(session) = &task.phase else {
+        panic!("branch rejection should preserve replay playback");
+    };
+    assert!(session.is_seeking());
+    assert_eq!(session.current_tick(), 0);
+}
+
+#[test]
+fn replay_seek_started_reaches_every_viewer_before_incremental_results() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 4);
     let mut replay = ReplaySession::new(artifact).unwrap();
@@ -321,13 +359,27 @@ fn replay_seek_started_reaches_every_viewer_before_rebuild_results() {
             ),
             "{label} should receive seek progress before rebuilt replay messages: {messages:?}"
         );
-        assert!(messages
+        assert!(!messages
             .iter()
             .any(|msg| matches!(msg, ServerMessage::Start(_))));
-        assert!(messages.iter().any(|msg| matches!(
-            msg,
-            ServerMessage::RoomTimeState(state) if state.current_tick == 1
-        )));
+        let reset = writer
+            .room_time_state
+            .take()
+            .unwrap_or_else(|| panic!("{label} should receive reset room time"));
+        assert_eq!(reset.current_tick, 0);
+        assert_eq!(reset.seek.as_ref().map(|seek| seek.target_tick), Some(1));
+        assert_eq!(writer.snapshots.take().expect("reset snapshot").tick, 0);
+    }
+
+    task.on_tick(TokioInstant::now());
+    for writer in [&controller, &viewer] {
+        let completed = writer
+            .room_time_state
+            .take()
+            .expect("seek completion should publish room time");
+        assert_eq!(completed.current_tick, 1);
+        assert!(completed.seek.is_none());
+        assert_eq!(writer.snapshots.take().expect("completed snapshot").tick, 1);
     }
 }
 
@@ -363,14 +415,14 @@ fn replay_join_and_seek_emit_authoritative_analysis() {
 
     task.on_seek_room_time_to(99, 1);
     let seek_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    assert!(seek_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::Start(payload)
-            if payload.capabilities.room_time.seek_relative
-                && payload.capabilities.room_time.seek_absolute
-                && payload.capabilities.visibility.vision_selection
-    )));
-    let seek_analysis = take_observer_analysis(&writer, "replay seek");
+    assert!(!seek_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    let reset_analysis = take_observer_analysis(&writer, "replay seek reset");
+    assert_eq!(reset_analysis.tick, 0);
+
+    task.on_tick(TokioInstant::now());
+    let seek_analysis = take_observer_analysis(&writer, "replay seek completion");
     assert_eq!(seek_analysis.tick, 1);
     assert_eq!(seek_analysis.players.len(), 2);
 }
@@ -550,7 +602,7 @@ fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
 }
 
 #[test]
-fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
+fn paused_replay_seek_publishes_reset_and_resumes_incrementally() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 4);
     let mut replay = ReplaySession::new(artifact).unwrap();
@@ -590,8 +642,9 @@ fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
         panic!("replay phase should remain active after seek");
     };
     let expected = session.game.snapshot_for_spectator(&[players[0].id]);
-    assert_eq!(session.current_tick(), 1);
-    assert_eq!(snapshot.tick, 1);
+    assert_eq!(session.current_tick(), 0);
+    assert!(session.is_seeking());
+    assert_eq!(snapshot.tick, 0);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert_eq!(
         snapshot
@@ -616,14 +669,45 @@ fn replay_seek_while_paused_sends_snapshot_without_waiting_for_unpause() {
         "paused seek should preserve the viewer's selected replay perspective"
     );
     let seek_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    assert!(seek_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::Start(payload) if payload.replay.is_some()
-    )));
-    assert!(seek_messages.iter().any(|msg| matches!(
-        msg,
-        ServerMessage::RoomTimeState(state) if state.current_tick == 1 && state.paused
-    )));
+    assert!(!seek_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    let reset_state = writer
+        .room_time_state
+        .take()
+        .expect("paused seek should publish reset state");
+    assert_eq!(reset_state.current_tick, 0);
+    assert!(reset_state.paused);
+    assert_eq!(
+        reset_state.seek.as_ref().map(|seek| seek.target_tick),
+        Some(1)
+    );
+
+    task.on_tick(TokioInstant::now());
+    let Phase::ReplayViewer(session) = &task.phase else {
+        panic!("paused replay should remain active");
+    };
+    assert_eq!(
+        session.current_tick(),
+        0,
+        "pause must suspend seek progress"
+    );
+    assert!(session.is_seeking());
+
+    task.on_set_room_time_speed(100, 2.0);
+    let resumed = writer
+        .room_time_state
+        .take()
+        .expect("resume should publish authoritative speed");
+    assert_eq!(resumed.speed, 2.0);
+    assert!(resumed.seek.is_some());
+    task.on_tick(TokioInstant::now());
+    let completed = writer
+        .room_time_state
+        .take()
+        .expect("resumed seek should publish completion");
+    assert_eq!(completed.current_tick, 1);
+    assert!(completed.seek.is_none());
 }
 
 #[test]
@@ -772,10 +856,7 @@ fn persisted_replay_room_host_start_begins_replay_viewer() {
                 && payload.replay.is_some()
                 && payload.diagnostics.observer_analysis
     ));
-    assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(_)
-    ));
+    assert!(writer.room_time_state.take().is_some());
     let start_analysis = take_observer_analysis(&writer, "confirmed replay start");
     assert_eq!(start_analysis.tick, 0);
     assert_eq!(start_analysis.players.len(), players.len());
@@ -911,10 +992,7 @@ fn saved_artifact_replay_join_uses_replay_viewer_runtime() {
                 && payload.replay.is_some()
                 && payload.diagnostics.observer_analysis
     ));
-    assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(_)
-    ));
+    assert!(writer.room_time_state.take().is_some());
 
     let _ = std::fs::remove_dir_all(artifact_dir);
 }
@@ -973,8 +1051,8 @@ fn confirmed_late_replay_join_receives_current_ended_state_immediately() {
         ServerMessage::Start(payload) if payload.spectator && payload.replay.is_some()
     ));
     assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(state) if state.current_tick == end_tick && state.ended
+        writer.room_time_state.take(),
+        Some(state) if state.current_tick == end_tick && state.ended
     ));
     let snapshot = writer
         .snapshots

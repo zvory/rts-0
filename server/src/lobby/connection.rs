@@ -1,16 +1,18 @@
 #![cfg_attr(test, allow(dead_code))]
 
+use super::room_time_state_slot::LatestRoomTimeStateSlot;
 use super::*;
-use crate::protocol::{ObserverAnalysisPayload, SnapshotPayloadDiagnostics};
+use crate::protocol::{ObserverAnalysisPayload, RoomTimeState, SnapshotPayloadDiagnostics};
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Instant as StdInstant;
 
 /// Outbound connection handle shared with the room task. Reliable messages keep FIFO ordering;
-/// snapshots and observer analysis use separate latest-only slots because older unsent live-state
-/// messages are superseded by newer full-state messages.
+/// room-time state, snapshots, and observer analysis use separate latest-only slots because older
+/// unsent state messages are superseded by newer authoritative state.
 #[derive(Clone)]
 pub struct ConnectionSink {
     reliable_tx: mpsc::Sender<ServerMessage>,
+    room_time_state: Arc<LatestRoomTimeStateSlot>,
     snapshots: Arc<LatestSnapshotSlot>,
     observer_analysis: Arc<LatestObserverAnalysisSlot>,
     stats: Arc<ConnectionReportCounters>,
@@ -24,6 +26,7 @@ impl std::fmt::Debug for ConnectionSink {
 
 pub struct ConnectionWriter {
     pub reliable_rx: mpsc::Receiver<ServerMessage>,
+    pub room_time_state: Arc<LatestRoomTimeStateSlot>,
     pub snapshots: Arc<LatestSnapshotSlot>,
     pub observer_analysis: Arc<LatestObserverAnalysisSlot>,
     stats: Arc<ConnectionReportCounters>,
@@ -310,12 +313,14 @@ impl ConnectionWriter {
         self,
     ) -> (
         mpsc::Receiver<ServerMessage>,
+        Arc<LatestRoomTimeStateSlot>,
         Arc<LatestSnapshotSlot>,
         Arc<LatestObserverAnalysisSlot>,
         ConnectionWriterStats,
     ) {
         (
             self.reliable_rx,
+            self.room_time_state,
             self.snapshots,
             self.observer_analysis,
             ConnectionWriterStats::new(self.stats),
@@ -327,6 +332,10 @@ impl ConnectionSink {
     pub fn new() -> (Self, ConnectionWriter) {
         let (reliable_tx, reliable_rx) = mpsc::channel(PLAYER_RELIABLE_CHANNEL_CAP);
         let stats = Arc::new(ConnectionReportCounters::default());
+        let room_time_state = Arc::new(LatestRoomTimeStateSlot {
+            pending: StdMutex::new(None),
+            notify: Notify::new(),
+        });
         let snapshots = Arc::new(LatestSnapshotSlot {
             pending: StdMutex::new(None),
             notify: Notify::new(),
@@ -338,12 +347,14 @@ impl ConnectionSink {
         (
             ConnectionSink {
                 reliable_tx,
+                room_time_state: room_time_state.clone(),
                 snapshots: snapshots.clone(),
                 observer_analysis: observer_analysis.clone(),
                 stats: stats.clone(),
             },
             ConnectionWriter {
                 reliable_rx,
+                room_time_state,
                 snapshots,
                 observer_analysis,
                 stats,
@@ -355,6 +366,13 @@ impl ConnectionSink {
         &self,
         msg: ServerMessage,
     ) -> Result<(), mpsc::error::SendError<ServerMessage>> {
+        if let ServerMessage::RoomTimeState(state) = msg {
+            if self.reliable_tx.is_closed() {
+                return Err(mpsc::error::SendError(ServerMessage::RoomTimeState(state)));
+            }
+            self.room_time_state.store(state);
+            return Ok(());
+        }
         let receipt = command_receipt_accepted(&msg);
         match self.reliable_tx.send(msg).await {
             Ok(()) => {
@@ -370,6 +388,15 @@ impl ConnectionSink {
         &self,
         msg: ServerMessage,
     ) -> Result<(), mpsc::error::TrySendError<ServerMessage>> {
+        if let ServerMessage::RoomTimeState(state) = msg {
+            if self.reliable_tx.is_closed() {
+                return Err(mpsc::error::TrySendError::Closed(
+                    ServerMessage::RoomTimeState(state),
+                ));
+            }
+            self.room_time_state.store(state);
+            return Ok(());
+        }
         let receipt = command_receipt_accepted(&msg);
         match self.reliable_tx.try_send(msg) {
             Ok(()) => {
@@ -412,6 +439,17 @@ impl ConnectionSink {
                 .snapshot_slot_stored
                 .fetch_add(1, Ordering::Relaxed);
             SnapshotSendStatus::Stored
+        }
+    }
+
+    pub(crate) fn try_send_room_time_state(&self, state: RoomTimeState) -> LatestOnlySendStatus {
+        if self.reliable_tx.is_closed() {
+            return LatestOnlySendStatus::Closed;
+        }
+        if self.room_time_state.store(state) {
+            LatestOnlySendStatus::Replaced
+        } else {
+            LatestOnlySendStatus::Stored
         }
     }
 
@@ -1081,7 +1119,7 @@ fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
 }
 
 /// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
-/// FIFO; snapshots and observer analysis use replaceable latest-only slots.
+/// FIFO; room-time state, snapshots, and observer analysis use replaceable latest-only slots.
 pub(super) fn send_or_log(
     room: &str,
     player_id: u32,
@@ -1100,6 +1138,18 @@ pub(super) fn send_or_log(
                 Some(SnapshotSendStatus::Closed)
             }
         },
+        ServerMessage::RoomTimeState(state) => {
+            match tx.try_send_room_time_state(state) {
+                LatestOnlySendStatus::Stored => {}
+                LatestOnlySendStatus::Replaced => {
+                    crate::log_debug!(room = %room, player_id, "coalesced pending room-time state");
+                }
+                LatestOnlySendStatus::Closed => {
+                    crate::log_debug!(room = %room, player_id, "room-time state sink closed; client gone");
+                }
+            }
+            None
+        }
         ServerMessage::ObserverAnalysis(payload) => {
             match tx.try_send_observer_analysis(payload) {
                 LatestOnlySendStatus::Stored => {}
@@ -1141,6 +1191,19 @@ mod tests {
             tick,
             players: Vec::new(),
             map_analysis: None,
+        }
+    }
+
+    fn room_time_state(tick: u32) -> RoomTimeState {
+        RoomTimeState {
+            current_tick: tick,
+            duration_ticks: 1_000,
+            keyframe_ticks: vec![0],
+            speed: 2.0,
+            paused: false,
+            ended: false,
+            controller_id: None,
+            seek: None,
         }
     }
 
@@ -1244,6 +1307,118 @@ mod tests {
     }
 
     #[test]
+    fn room_time_state_uses_latest_only_slot() {
+        let (sink, writer) = ConnectionSink::new();
+
+        assert_eq!(
+            sink.try_send_room_time_state(room_time_state(10)),
+            LatestOnlySendStatus::Stored
+        );
+        assert_eq!(
+            sink.try_send_room_time_state(room_time_state(11)),
+            LatestOnlySendStatus::Replaced
+        );
+
+        let latest = writer.room_time_state.take().expect("room-time state");
+        assert_eq!(latest.current_tick, 11);
+        assert!(writer.room_time_state.take().is_none());
+    }
+
+    #[test]
+    fn deferred_room_time_state_never_replaces_a_newer_publication() {
+        let (sink, writer) = ConnectionSink::new();
+        sink.try_send_room_time_state(room_time_state(10));
+        let deferred = writer.room_time_state.take().expect("deferred state");
+
+        sink.try_send_room_time_state(room_time_state(12));
+        writer.room_time_state.defer(deferred);
+
+        assert_eq!(
+            writer
+                .room_time_state
+                .take()
+                .expect("latest room-time state")
+                .current_tick,
+            12
+        );
+    }
+
+    #[test]
+    fn room_time_state_defers_behind_a_preceding_reliable_barrier() {
+        let (sink, mut writer) = ConnectionSink::new();
+        sink.try_send_reliable(ServerMessage::RoomTimeSeekStarted {
+            controller_id: 7,
+            from_tick: 10,
+            target_tick: 20,
+        })
+        .expect("seek-start barrier");
+        sink.try_send_room_time_state(room_time_state(20));
+
+        let deferred = writer.room_time_state.take().expect("room-time state");
+        assert!(!writer.reliable_rx.is_empty());
+        writer.room_time_state.defer(deferred);
+
+        assert!(matches!(
+            writer.reliable_rx.try_recv(),
+            Ok(ServerMessage::RoomTimeSeekStarted { .. })
+        ));
+        assert_eq!(
+            writer
+                .room_time_state
+                .take()
+                .expect("state after reliable barrier")
+                .current_tick,
+            20
+        );
+    }
+
+    #[test]
+    fn send_or_log_routes_room_time_state_outside_full_reliable_fifo() {
+        let (sink, writer) = ConnectionSink::new();
+        for index in 0..PLAYER_RELIABLE_CHANNEL_CAP {
+            sink.try_send_reliable(ServerMessage::Error {
+                msg: format!("queued-{index}"),
+            })
+            .expect("fill reliable queue");
+        }
+
+        send_or_log(
+            "test-room",
+            7,
+            &sink,
+            ServerMessage::RoomTimeState(room_time_state(20)),
+        );
+        send_or_log(
+            "test-room",
+            7,
+            &sink,
+            ServerMessage::RoomTimeState(room_time_state(21)),
+        );
+
+        assert_eq!(writer.reliable_rx.len(), PLAYER_RELIABLE_CHANNEL_CAP);
+        let latest = writer.room_time_state.take().expect("room-time state");
+        assert_eq!(latest.current_tick, 21);
+    }
+
+    #[test]
+    fn reliable_api_routes_room_time_state_to_latest_only_slot() {
+        let (sink, mut writer) = ConnectionSink::new();
+
+        sink.try_send_reliable(ServerMessage::RoomTimeState(room_time_state(40)))
+            .expect("route room-time state");
+
+        assert!(writer.reliable_rx.try_recv().is_err());
+        assert_eq!(
+            writer
+                .room_time_state
+                .take()
+                .expect("room-time state")
+                .current_tick,
+            40
+        );
+    }
+
+    #[test]
     fn send_or_log_routes_observer_analysis_outside_reliable_fifo() {
         let (sink, mut writer) = ConnectionSink::new();
 
@@ -1266,7 +1441,7 @@ mod tests {
     }
 
     #[test]
-    fn clearing_pending_snapshot_also_clears_observer_analysis() {
+    fn clearing_pending_snapshot_preserves_room_time_and_clears_snapshot_state() {
         let (sink, writer) = ConnectionSink::new();
 
         assert_eq!(
@@ -1298,10 +1473,22 @@ mod tests {
             sink.try_send_observer_analysis(observer_analysis_payload(30)),
             LatestOnlySendStatus::Stored
         );
+        assert_eq!(
+            sink.try_send_room_time_state(room_time_state(30)),
+            LatestOnlySendStatus::Stored
+        );
 
         sink.clear_pending_snapshot();
 
         assert!(writer.snapshots.take().is_none());
+        assert_eq!(
+            writer
+                .room_time_state
+                .take()
+                .expect("room-time state remains pending")
+                .current_tick,
+            30
+        );
         assert!(writer.observer_analysis.take().is_none());
     }
 }

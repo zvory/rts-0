@@ -30,6 +30,7 @@ src/
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
+  state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
   state_auto_build.js # authoritative Auto-Build snapshot normalization and command acknowledgement
   state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery, building-footprint sizing
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
@@ -118,6 +119,7 @@ src/
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
+  match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
   match_live_pause.js # live pause state actions and prediction visual suspension
@@ -475,8 +477,8 @@ export class ObserverAnalysisOverlay {
 }
 ```
 `App` owns one observer analysis preference object and passes it through replay and live spectator
-`Match` rebuilds so selected tab, visible state, and collapsed state survive replay
-seek-triggered `start` messages and spectator rematches. Preferences are stored under
+`Match` lifetimes so selected tab, visible state, and collapsed state survive in-place replay seeks
+and spectator rematches. Preferences are stored under
 `rts.observerAnalysisOverlay`; clients still read the old `rts.replayAnalysisOverlay` key for
 compatibility. Its titlebar is draggable, keyboard-nudgeable, viewport-clamped, and retains its
 desktop placement through replay seeks and spectator rematches; `Home` restores the default
@@ -636,9 +638,17 @@ speed-only room-time profile, so the same component renders no seek, step, or ti
 for those rooms. Replay fog-perspective controls and the replay-branch button remain gated by
 replay-specific visibility/action capabilities, not by lab or URL identity.
 
-The app shell listens for reliable `roomTimeSeekStarted` broadcasts throughout replay playback and
-shows every viewer, including the controller, a `Seeking forward/backward X seconds…` toast before
-the synchronous replay rebuild can stall visible snapshots.
+The app shell listens for reliable `roomTimeSeekStarted` broadcasts throughout replay playback,
+clears replay timeline-derived state in place without reconstructing `Match` or its renderer, and
+shows every viewer a `Seeking forward/backward X seconds…` toast. Authoritative
+`roomTimeState.seek` metadata owns the continuing progress lifecycle; sampled snapshots advance the
+existing timeline and growing keyframe marks until a state at the target omits `seek`.
+
+Async `Match.create` startup uses semantic latest-only inbox slots for snapshots, room-time state,
+live-pause state, and observer analysis, plus a bounded ordered command-receipt queue. High-rate
+snapshot or observer-analysis traffic therefore cannot evict one-shot control authority while the
+renderer initializes. Room-time pending/awaiting state disables only clock actions; replay vision
+selection remains independent and usable.
 
 The shared control surface is the `dom.roomTimeControls` root (`#room-time-controls`). Static
 pause/step controls use `.room-time-pause-btn` and `.room-time-step-btn`; generated room-time status
@@ -2187,7 +2197,7 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_combat_audio.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `match_combat_audio.js`,
   `match_notice_presenter.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,
@@ -2199,7 +2209,7 @@ Current areas:
   `floating_panel_positioner.js`, `replay_controls.js`, `replay_seek_notice.js`,
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
-- `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
+- `model`: `state.js`, `state_runtime_reset.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.

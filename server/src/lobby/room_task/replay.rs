@@ -12,6 +12,7 @@ use super::super::projection::{
     observer_view_from_selection, scope_observer_analysis, ObserverAnalysisAudience,
     ProjectionPolicy, RecipientRole,
 };
+use super::super::replay_seek;
 use super::super::replay_session::{
     validate_vision_selection_request, ReplaySeekPlan, ReplaySession,
 };
@@ -304,6 +305,7 @@ impl RoomTask {
             paused: self.room_time_paused,
             ended: false,
             controller_id,
+            seek: None,
         }
     }
 
@@ -332,7 +334,45 @@ impl RoomTask {
         };
         let mut perf = rts_sim::perf::TickPerf::maybe_new();
 
-        if session.has_remaining_ticks() {
+        if session.is_seeking() {
+            let game_tick_start = StdInstant::now();
+            let advance = replay_seek::advance_slice(&mut session);
+            if let Some(perf) = perf.as_mut() {
+                perf.record_phase("game_tick", game_tick_start.elapsed());
+            }
+            match advance {
+                Ok(advance) if advance.publish_progress => {
+                    let recipients = self.order.clone();
+                    self.clear_pending_snapshots_for(recipients.iter().copied());
+                    self.broadcast_room_time_state_for(&session);
+                    self.fanout_replay_snapshots_to(
+                        &session,
+                        recipients,
+                        HashMap::new(),
+                        context,
+                        perf.as_mut(),
+                    );
+                    self.broadcast_observer_analysis_for(&session, context.projection_policy);
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    crate::log_warn!(room = %self.room, error = %err, "incremental replay seek failed");
+                    session.cancel_seek();
+                    self.send_dev_error(&err);
+                    let recipients = self.order.clone();
+                    self.clear_pending_snapshots_for(recipients.iter().copied());
+                    self.broadcast_room_time_state_for(&session);
+                    self.fanout_replay_snapshots_to(
+                        &session,
+                        recipients,
+                        HashMap::new(),
+                        context,
+                        perf.as_mut(),
+                    );
+                    self.broadcast_observer_analysis_for(&session, context.projection_policy);
+                }
+            }
+        } else if session.has_remaining_ticks() {
             if let Err(err) = session.enqueue_for_current_tick() {
                 crate::log_warn!(room = %self.room, error = %err, "replay command enqueue failed");
                 self.send_dev_error(&err);
@@ -537,6 +577,9 @@ impl RoomTask {
         let Phase::ReplayViewer(session) = &self.phase else {
             return Err("Cannot branch replay outside replay playback.".to_string());
         };
+        if session.is_seeking() {
+            return Err("Cannot branch replay while a seek is in progress.".to_string());
+        }
         session.branch_seed()
     }
 
@@ -600,7 +643,6 @@ impl RoomTask {
             tick_start: StdInstant::now(),
             projection_policy: self.projection_policy_for_phase(SessionPhase::ReplayViewer),
         };
-        let start_stamp = self.replay_start_payload_stamp();
         let mut session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::ReplayViewer(session) => session,
             other => {
@@ -609,39 +651,19 @@ impl RoomTask {
             }
         };
 
-        let viewer_count = self.players.len();
         let seek_result = plan_seek(&session).and_then(|plan| {
             self.broadcast(&ServerMessage::RoomTimeSeekStarted {
                 controller_id: player_id,
                 from_tick: plan.from_tick,
                 target_tick: plan.target_tick,
             });
-            session.apply_seek(&self.room, viewer_count, player_id, plan)
+            session.begin_seek(player_id, plan)
         });
         match seek_result {
             Ok(_) => {
-                let starts = self
-                    .order
-                    .iter()
-                    .filter_map(|viewer_id| {
-                        self.players.get(viewer_id).map(|player| {
-                            let start =
-                                self.replay_start_payload_for(&session, *viewer_id, start_stamp);
-                            (*viewer_id, player.msg_tx.clone(), start)
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                let recipients = starts
-                    .iter()
-                    .map(|(viewer_id, _, _)| *viewer_id)
-                    .collect::<Vec<_>>();
-                let state = session.state();
-
+                let recipients = self.order.clone();
                 self.clear_pending_snapshots_for(recipients.iter().copied());
-                for (viewer_id, msg_tx, start) in starts {
-                    send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
-                }
-                self.broadcast(&ServerMessage::RoomTimeState(state));
+                self.broadcast_room_time_state_for(&session);
                 self.fanout_replay_snapshots_to(
                     &session,
                     recipients,
@@ -656,6 +678,19 @@ impl RoomTask {
             Err(err) => {
                 crate::log_warn!(room = %self.room, error = %err, "replay seek failed");
                 self.send_dev_error(&err);
+                self.broadcast_room_time_state_for(&session);
+                let recipients = self.order.clone();
+                self.clear_pending_snapshots_for(recipients.iter().copied());
+                self.fanout_replay_snapshots_to(
+                    &session,
+                    recipients,
+                    HashMap::new(),
+                    context,
+                    None,
+                );
+                if send_analysis {
+                    self.broadcast_observer_analysis_for(&session, context.projection_policy);
+                }
             }
         }
 
