@@ -81,9 +81,6 @@ assert.deepEqual(
     "/tmp/output.json",
     "--model",
     "small-model",
-    "review",
-    "--base",
-    "origin/main",
     "-",
   ],
 );
@@ -326,9 +323,9 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
 
   const codexArgs = fs.readFileSync(`${fakeCodex}.args`, "utf8").trim().split("\n");
   assert.deepEqual(
-    codexArgs.slice(-4),
-    ["review", "--base", "origin/main", "-"],
-    "patch-note classification should use repository review mode against the requested base",
+    codexArgs.slice(-1),
+    ["-"],
+    "patch-note classification should use prompt-driven read-only execution compatible with custom instructions",
   );
   assert.equal(
     codexArgs.some((arg) => arg.includes("Bounded diff") || arg.includes("const RANGE")),
@@ -337,6 +334,8 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
   );
   const codexPrompt = fs.readFileSync(`${fakeCodex}.stdin`, "utf8");
   assert.match(codexPrompt, /complete repository diff from origin\/main to HEAD/);
+  assert.match(codexPrompt, /use read-only repository\s+inspection only/);
+  assert.doesNotMatch(codexPrompt, /do not edit files or run commands/);
   assert.match(codexPrompt, /server\/crates\/rules\/src\/fixture\.rs/);
   assert.doesNotMatch(codexPrompt, /const RANGE/, "the branch diff should be inspected from the repository, not embedded in stdin");
 

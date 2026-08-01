@@ -414,7 +414,7 @@ function rotateLocalOffset(offset, rotation) {
 function isBusy(entity) {
   return (
     (entity.kind === KIND.WORKER || entity.kind === KIND.GOLEM) &&
-    (entity.latchedNode || entity.state === STATE.BUILD)
+    (entity.state === STATE.GATHER || entity.state === STATE.BUILD)
   );
 }
 

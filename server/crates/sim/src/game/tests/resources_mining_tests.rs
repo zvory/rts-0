@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn gather_command_ignores_nodes_without_nearby_completed_cc() {
+fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -51,15 +51,15 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
     );
     game.tick();
 
-    let worker_order = game
-        .state
-        .entities
-        .get(worker)
-        .expect("worker survives")
-        .order();
+    let worker_entity = game.state.entities.get(worker).expect("worker survives");
     assert!(
-        !matches!(worker_order, Order::Gather(_)),
-        "worker should ignore gather commands for patches outside City Centre mining range"
+        matches!(worker_entity.order(), Order::Gather(_)),
+        "worker should retain gather intent for a live patch outside City Centre mining range"
+    );
+    assert_eq!(
+        worker_entity.gather_phase(),
+        Some(GatherPhase::ToNode),
+        "worker should start traveling instead of rejecting the gather order"
     );
 }
 
@@ -315,7 +315,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
 }
 
 #[test]
-fn active_mining_stops_when_nearby_cc_is_removed() {
+fn active_mining_waits_and_resumes_when_nearby_cc_is_rebuilt() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -380,23 +380,38 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
         "worker should reach and latch the starting patch before the City Centre is removed"
     );
 
-    let cc = game
+    let (cc, cc_pos) = game
         .state
         .entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
-        .map(|e| e.id)
+        .map(|e| (e.id, (e.pos_x, e.pos_y)))
         .expect("starting City Centre");
     game.state.entities.remove(cc);
     let steel_before = game.state.players.iter().find(|p| p.id == 1).unwrap().steel;
 
     game.tick();
-    assert!(
-        matches!(
-            game.state.entities.get(worker).map(|e| e.order()),
-            Some(Order::Move(_))
-        ),
-        "worker should scatter away when its mining City Centre disappears"
+    assert_eq!(
+        game.state
+            .entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
+        Some(GatherPhase::WaitingForAnchor),
+        "worker should retain its gather order and wait at the patch when coverage disappears"
+    );
+    assert_eq!(
+        game.state.entities.node_slot_holder(node),
+        None,
+        "an anchor-waiting worker must release the patch mining slot"
+    );
+    assert_eq!(
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .find(|entity| entity.id == worker)
+            .and_then(|entity| entity.latched_node),
+        None,
+        "anchor-waiting workers must not project a mining latch/X over the steel patch"
     );
 
     for _ in 0..(config::HARVEST_TICKS + 5) {
@@ -409,11 +424,31 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
         "mining should not continue without a City Centre"
     );
     assert!(
-        !matches!(
+        matches!(
             game.state.entities.get(worker).map(|e| e.order()),
             Some(Order::Gather(_))
         ),
-        "worker should not resume gathering without City Centre coverage"
+        "worker should keep waiting without City Centre coverage"
+    );
+
+    game.state
+        .entities
+        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
+        .expect("replacement City Centre");
+    game.tick();
+
+    assert_eq!(
+        game.state
+            .entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
+        Some(GatherPhase::Harvesting),
+        "waiting worker should begin mining when completed anchor coverage returns"
+    );
+    assert_eq!(
+        game.state.entities.node_slot_holder(node),
+        Some(worker),
+        "resumed worker should claim the mining slot only after coverage is valid"
     );
 }
 

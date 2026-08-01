@@ -86,6 +86,68 @@ fn entering_harvesting_clears_pending_queued_orders() {
 }
 
 #[test]
+fn gatherer_waits_at_patch_until_completed_anchor_exists() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let node_pos = map.tile_center(12, 12);
+    let node = entities
+        .spawn_node(EntityKind::Steel, node_pos.0, node_pos.1)
+        .expect("steel node should spawn");
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, node_pos.0, node_pos.1)
+        .expect("worker should spawn");
+    entities
+        .get_mut(worker)
+        .expect("worker should exist")
+        .set_order(Order::gather(node));
+
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = Vec::new();
+
+    gather_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &mut coordinator,
+        &team_relations(&[]),
+        1,
+    );
+
+    assert_eq!(
+        entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
+        Some(GatherPhase::WaitingForAnchor),
+        "worker at an uncovered patch should keep a waiting gather order"
+    );
+    assert_eq!(entities.node_slot_holder(node), None);
+
+    spawn_completed_mining_anchor(&mut entities, 1, node_pos.0, node_pos.1);
+    gather_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &mut coordinator,
+        &team_relations(&[]),
+        2,
+    );
+
+    assert_eq!(
+        entities
+            .get(worker)
+            .and_then(|worker| worker.gather_phase()),
+        Some(GatherPhase::Harvesting),
+        "worker should harvest as soon as anchor coverage becomes valid"
+    );
+    assert_eq!(entities.node_slot_holder(node), Some(worker));
+}
+
+#[test]
 fn worker_direct_oil_gather_order_is_idled() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

@@ -607,10 +607,7 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
     if !is_gatherer {
         return false;
     }
-    if !world_query::steel_node_is_mineable_by_player(entities, owner, node) {
-        return false;
-    }
-    if matches!(entities.node_slot_holder(node), Some(holder) if holder != worker) {
+    if !world_query::live_steel_node(entities, node) {
         return false;
     }
     true
@@ -882,13 +879,10 @@ mod tests {
     }
 
     #[test]
-    fn idle_worker_promotes_queued_gather_on_valid_node() {
+    fn idle_worker_promotes_queued_gather_without_mining_anchor() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
-        let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
-        entities
-            .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
-            .expect("city centre should spawn");
+        let (cx, cy) = map.tile_center(12, 12);
         let node = entities
             .spawn_node(EntityKind::Steel, cx + 64.0, cy)
             .expect("steel node should spawn");

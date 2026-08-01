@@ -232,8 +232,8 @@ export function renderFragment({ branch, date, decision }) {
 function renderPrompt({ baseRef, branch, changedPaths, existingFragment, fragmentPath }) {
   return `You are the player-impact and patch-note pass for an RTS pull request.
 
-Codex review mode gives you the complete repository diff from ${baseRef} to HEAD. Inspect that diff
-and any relevant repository files needed to classify it using this scope:
+Inspect the complete repository diff from ${baseRef} to HEAD with read-only git commands, plus any
+relevant repository files needed to classify it using this scope:
 
 ${PATCH_NOTE_SCOPE}
 
@@ -248,7 +248,8 @@ such as "Tank retreats improved" or "Formation system simplified" is acceptable.
 internal implementation details or unchanged values. Use exact old/new values only when they are
 essential to understanding the player-facing change and still fit comfortably. Add concise
 playtest-watch bullets only where useful. Do not speculate. The outer helper will render your JSON
-into ${fragmentPath}; do not edit files or run commands.
+into ${fragmentPath}. Do not edit files or run state-changing commands; use read-only repository
+inspection only.
 
 Branch: ${branch}
 Changed paths:
@@ -259,7 +260,7 @@ ${existingFragment || "<none>"}
 `;
 }
 
-export function buildCodexArgs({ repoRoot, baseRef, schemaFile, outputFile, codexModel }) {
+export function buildCodexArgs({ repoRoot, schemaFile, outputFile, codexModel }) {
   const args = [
     "exec",
     "--cd",
@@ -275,7 +276,10 @@ export function buildCodexArgs({ repoRoot, baseRef, schemaFile, outputFile, code
     outputFile,
   ];
   if (codexModel) args.push("--model", codexModel);
-  args.push("review", "--base", baseRef, "-");
+  // Current Codex CLI review mode rejects a custom prompt combined with --base. Plain exec keeps
+  // the classifier prompt and schema contract while the prompt directs the read-only agent to
+  // inspect the exact base...HEAD diff itself.
+  args.push("-");
   return args;
 }
 
