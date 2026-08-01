@@ -354,7 +354,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 35`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 30 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
-  `ARTILLERY_AMMO_COST_STEEL = 10`. It moves at 1.6 px/tick, slightly faster than the
+  `ARTILLERY_AMMO_COST_STEEL = 5`. It moves at 1.6 px/tick, slightly faster than the
   Anti-Tank Gun's 1.52 px/tick speed.
   Unified Fire uses a player-selected radius clamped between
   `ARTILLERY_MIN_FIRE_RADIUS_TILES = 6` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
