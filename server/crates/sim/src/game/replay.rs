@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::replay_artifact::REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
 pub use super::replay_artifact::{
     is_supported_replay_artifact_schema, ChatLogEntry, CommandLogEntry, ReplayArtifactV1,
-    ReplayStartComposition,
-    ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
+    ReplayStartComposition, ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
 use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;

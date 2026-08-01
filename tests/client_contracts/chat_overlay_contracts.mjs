@@ -122,6 +122,12 @@ assert(
     "chat is rendered as literal text rather than HTML",
   );
 
+  chat.setLobbyContext({ room: "branch-room" });
+  assert(
+    !root.hidden && chat.scope === "lobby" && !chat.readOnly,
+    "branch-staging room state can restore writable lobby chat after replay playback",
+  );
+
   chat.setGameContext({ replay: {}, playerId: 99, spectator: true, players: [] });
   windowListeners.keydown(key("Enter"));
   assert(composer.hidden, "replay chat is presentation-only");

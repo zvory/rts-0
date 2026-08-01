@@ -2,10 +2,8 @@ use super::*;
 
 #[test]
 fn chat_send_deserializes_with_typed_channel() {
-    let msg: ClientMessage = serde_json::from_str(
-        r#"{"t":"chatSend","channel":"team","text":"Hold here"}"#,
-    )
-    .unwrap();
+    let msg: ClientMessage =
+        serde_json::from_str(r#"{"t":"chatSend","channel":"team","text":"Hold here"}"#).unwrap();
     assert!(matches!(
         msg,
         ClientMessage::ChatSend {

@@ -245,6 +245,7 @@ export class App {
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
     this.onLobbyForMatchLaunch = this.onLobbyForMatchLaunch.bind(this);
+    this.onBranchStagingForChat = this.onBranchStagingForChat.bind(this);
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
@@ -284,6 +285,7 @@ export class App {
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
     this.net.on(S.ROOM_TIME_SEEK_STARTED, this.onRoomTimeSeekStarted);
     this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
+    this.net.on(S.BRANCH_STAGING, this.onBranchStagingForChat);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
@@ -491,6 +493,10 @@ export class App {
     if (!this.matchLaunch || this.matchLaunchDone || this.matchLaunchFailed) return;
     const action = nextMatchLaunchAction(this.matchLaunch, payload, this.net.playerId);
     this.applyMatchLaunchAction(action);
+  }
+
+  onBranchStagingForChat(payload) {
+    this.chat?.setLobbyContext(payload);
   }
 
   applyMatchLaunchAction(action) {
