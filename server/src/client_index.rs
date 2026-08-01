@@ -53,11 +53,11 @@ fn build_from_html(
         "src=\"/src/main.js\"",
         &format!("src=\"/src/main.js?v={version}\""),
     )
-        .replace(".css\"", &format!(".css?v={version}\""))
-        .replace(
-            "/manifest.webmanifest\"",
-            &format!("/manifest.webmanifest?v={version}\""),
-        )
+    .replace(".css\"", &format!(".css?v={version}\""))
+    .replace(
+        "/manifest.webmanifest\"",
+        &format!("/manifest.webmanifest?v={version}\""),
+    )
 }
 
 fn configured_google_analytics_id() -> Option<String> {
@@ -130,9 +130,9 @@ mod tests {
         assert!(html.contains("\"/src/main.js\": \"/src/main.js?v=test-version\""));
         assert!(html
             .contains("\"/src/renderer/terrain.js\": \"/src/renderer/terrain.js?v=test-version\""));
-        assert!(html.contains("/src/main.js?v=test-version\""));
-        assert!(html.contains("/live_pause.css?v=test-version\""));
-        assert!(html.contains("/manifest.webmanifest?v=test-version\""));
+        assert!(html.contains("src=\"/src/main.js?v=test-version\""));
+        assert!(html.contains("href=\"/live_pause.css?v=test-version\""));
+        assert!(html.contains("href=\"/manifest.webmanifest?v=test-version\""));
         assert!(html.contains("name=\"rts-google-analytics-id\" content=\"\""));
         assert!(
             !html.contains("href=\"./") && !html.contains("src=\"./"),
