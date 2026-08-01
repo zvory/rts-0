@@ -12,6 +12,7 @@ use super::super::projection::{
     observer_view_from_selection, scope_observer_analysis, ObserverAnalysisAudience,
     ProjectionPolicy, RecipientRole,
 };
+use super::super::reconstruction::contain_reconstruction;
 use super::super::replay_session::{
     validate_vision_selection_request, ReplaySeekPlan, ReplaySession,
 };
@@ -343,18 +344,24 @@ impl RoomTask {
                 handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
             }) {
                 tokio::task::block_in_place(|| {
+                    contain_reconstruction("incremental replay seek", || {
+                        session.advance_seek_slice(
+                            REPLAY_SEEK_SLICE_MAX_TICKS,
+                            REPLAY_SEEK_SLICE_BUDGET,
+                            REPLAY_SEEK_PUBLISH_INTERVAL,
+                        )
+                    })
+                    .map_err(|failure| failure.to_string())
+                })
+            } else {
+                contain_reconstruction("incremental replay seek", || {
                     session.advance_seek_slice(
                         REPLAY_SEEK_SLICE_MAX_TICKS,
                         REPLAY_SEEK_SLICE_BUDGET,
                         REPLAY_SEEK_PUBLISH_INTERVAL,
                     )
                 })
-            } else {
-                session.advance_seek_slice(
-                    REPLAY_SEEK_SLICE_MAX_TICKS,
-                    REPLAY_SEEK_SLICE_BUDGET,
-                    REPLAY_SEEK_PUBLISH_INTERVAL,
-                )
+                .map_err(|failure| failure.to_string())
             };
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("game_tick", game_tick_start.elapsed());

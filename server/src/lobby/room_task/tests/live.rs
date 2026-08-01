@@ -532,12 +532,9 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
         .collect();
     assert_eq!(ai_names, vec!["AI 2.1 1", "AI 2.1 2"]);
 
-    let state = messages
-        .iter()
-        .find_map(|msg| match msg {
-            ServerMessage::RoomTimeState(state) => Some(state),
-            _ => None,
-        })
+    let state = writer
+        .room_time_state
+        .take()
         .expect("AI-only live room-time state");
     assert_eq!(state.current_tick, 0);
     assert_eq!(state.duration_ticks, 0);

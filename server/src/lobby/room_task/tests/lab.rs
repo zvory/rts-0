@@ -899,21 +899,17 @@ fn lab_start_payload_advertises_room_time_controls() {
     assert!(!payload.capabilities.commands.gameplay);
     assert!(!payload.capabilities.match_controls.pause);
 
-    let states: Vec<_> = messages
-        .iter()
-        .filter_map(|msg| match msg {
-            ServerMessage::RoomTimeState(state) => Some(state),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(states.len(), 1);
-    assert_eq!(states[0].current_tick, 0);
-    assert_eq!(states[0].duration_ticks, 0);
-    assert_eq!(states[0].keyframe_ticks.as_slice(), &[0]);
-    assert_eq!(states[0].speed, 1.0);
-    assert!(!states[0].paused);
-    assert!(!states[0].ended);
-    assert_eq!(states[0].controller_id, None);
+    let state = writer
+        .room_time_state
+        .take()
+        .expect("initial Lab room-time state");
+    assert_eq!(state.current_tick, 0);
+    assert_eq!(state.duration_ticks, 0);
+    assert_eq!(state.keyframe_ticks.as_slice(), &[0]);
+    assert_eq!(state.speed, 1.0);
+    assert!(!state.paused);
+    assert!(!state.ended);
+    assert_eq!(state.controller_id, None);
 }
 
 #[test]

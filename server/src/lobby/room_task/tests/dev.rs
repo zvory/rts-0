@@ -75,9 +75,8 @@ fn paused_dev_scenario_steps_one_tick_at_a_time() {
 
     task.on_set_room_time_speed(99, 0.0);
     assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(state)
-            if state.paused && state.speed == 0.0 && state.current_tick == 0
+        writer.room_time_state.take(),
+        Some(state) if state.paused && state.speed == 0.0 && state.current_tick == 0
     ));
     task.on_tick(TokioInstant::now());
     assert_eq!(
@@ -101,23 +100,20 @@ fn paused_dev_scenario_steps_one_tick_at_a_time() {
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert_eq!(snapshot.net_status.prediction_version, 0);
     assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(state)
-            if state.paused && state.speed == 0.0 && state.current_tick == 1
+        writer.room_time_state.take(),
+        Some(state) if state.paused && state.speed == 0.0 && state.current_tick == 1
     ));
     task.on_step_room_time(99);
     assert_eq!(in_game_tick(&task), 2);
     assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(state)
-            if state.paused && state.speed == 0.0 && state.current_tick == 2
+        writer.room_time_state.take(),
+        Some(state) if state.paused && state.speed == 0.0 && state.current_tick == 2
     ));
 
     task.on_set_room_time_speed(99, 1.0);
     assert!(matches!(
-        writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::RoomTimeState(state)
-            if !state.paused && state.speed == 1.0 && state.current_tick == 2
+        writer.room_time_state.take(),
+        Some(state) if !state.paused && state.speed == 1.0 && state.current_tick == 2
     ));
     task.on_tick(TokioInstant::now());
     assert_eq!(

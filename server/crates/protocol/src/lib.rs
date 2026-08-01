@@ -42,8 +42,8 @@ pub use rts_contract::{
     ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
     RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
     ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState,
-    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView,
-    VisibilityCapabilities, DEFAULT_FACTION_ID,
+    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 
