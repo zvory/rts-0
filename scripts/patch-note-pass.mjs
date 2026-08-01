@@ -128,16 +128,23 @@ function gitCommonDir(repoRoot) {
   return path.resolve(repoRoot, commonDir);
 }
 
-export function resolveDiscordWebhookUrl(repoRoot, env = process.env) {
-  const configured = env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL?.trim();
+function resolveDiscordWebhookUrl(repoRoot, name, env = process.env) {
+  const configured = env[name]?.trim();
   if (configured) return configured;
   const primaryCheckout = path.dirname(gitCommonDir(repoRoot));
   for (const candidate of [path.join(repoRoot, ".env"), path.join(primaryCheckout, ".env")]) {
     if (!fs.existsSync(candidate)) continue;
-    const value = parseEnvValue(fs.readFileSync(candidate, "utf8"), "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL").trim();
+    const value = parseEnvValue(fs.readFileSync(candidate, "utf8"), name).trim();
     if (value) return value;
   }
   return "";
+}
+
+export function resolveDiscordWebhookUrls(repoRoot, env = process.env) {
+  return [
+    resolveDiscordWebhookUrl(repoRoot, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL", env),
+    resolveDiscordWebhookUrl(repoRoot, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY", env),
+  ];
 }
 
 function postDiscordMessage(webhookUrl, message) {
@@ -152,22 +159,24 @@ function postDiscordMessage(webhookUrl, message) {
 }
 
 export function sendDiscordPatchNote({ branch, decision, env = process.env, post = postDiscordMessage, repoRoot }) {
-  const webhookUrl = resolveDiscordWebhookUrl(repoRoot, env);
-  if (!webhookUrl) return { status: "not-configured" };
+  const webhookUrls = resolveDiscordWebhookUrls(repoRoot, env);
+  if (webhookUrls.some((webhookUrl) => !webhookUrl)) return { status: "not-configured" };
   const message = renderDiscordMessage(decision);
   if (!message) return { status: "empty" };
-  // A new destination must receive the current note even when another webhook already did.
-  // Hashing the URL keeps the secret out of the state file.
-  const digest = crypto.createHash("sha256").update(webhookUrl).update("\0").update(message).digest("hex");
   const stateDir = path.join(gitCommonDir(repoRoot), "rts-patch-notes-discord");
-  const statePath = path.join(stateDir, `${branchSlug(branch)}.sha256`);
-  if (fs.existsSync(statePath) && fs.readFileSync(statePath, "utf8").trim() === digest) {
-    return { status: "unchanged", message };
+  let sent = 0;
+  for (const [index, webhookUrl] of webhookUrls.entries()) {
+    // Track each destination independently so retrying a partial failure cannot duplicate the
+    // note at a webhook that already accepted it. Hashing keeps the secret out of the state file.
+    const statePath = path.join(stateDir, `${branchSlug(branch)}-${index + 1}.sha256`);
+    const digest = crypto.createHash("sha256").update(webhookUrl).update("\0").update(message).digest("hex");
+    if (fs.existsSync(statePath) && fs.readFileSync(statePath, "utf8").trim() === digest) continue;
+    post(webhookUrl, message);
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(statePath, `${digest}\n`, { mode: 0o600 });
+    sent += 1;
   }
-  post(webhookUrl, message);
-  fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(statePath, `${digest}\n`, { mode: 0o600 });
-  return { status: "sent", message };
+  return { status: sent > 0 ? "sent" : "unchanged", message };
 }
 
 export function branchSlug(branch) {

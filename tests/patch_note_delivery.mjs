@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import {
+  DESTINATION_STATUS_CONTEXTS,
   DELIVERY_STATUS_CONTEXT,
   deliverMergedPullRequest,
   parseCliArgs,
@@ -19,6 +20,7 @@ assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}
 assert.match(workflow, /persist-credentials: false/);
 assert.match(workflow, /statuses: write/);
 assert.match(workflow, /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: \$\{\{ secrets\.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL \}\}/);
+assert.match(workflow, /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: \$\{\{ secrets\.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY \}\}/);
 assert.match(workflow, /\[ "\$REQUESTED_PR_NUMBER" != "0" \]/, "an omitted numeric dispatch input must reconcile recent merges");
 assert.doesNotMatch(workflow, /\bcodex\b|\bopenai\b/i, "delivery workflow must never invoke an LLM");
 
@@ -96,16 +98,64 @@ for (const args of [["--pr"], ["--pr", ""], ["--pr", "nope"], ["--pr", "0"], ["-
     api,
     pull: mergedPull(),
     webhookUrl: "https://discord.invalid/hook",
-    postDiscord: async ({ message }) => delivered.push(message),
+    secondaryWebhookUrl: "https://discord.invalid/other-hook",
+    postDiscord: async ({ message, webhookUrl: destination }) => delivered.push({ destination, message }),
   });
   assert.equal(result.status, "sent");
-  assert.deepEqual(delivered, ["• Enemy arcs are now visible."]);
-  const statusCall = calls.find((call) => call.pathname === "/statuses/head-17");
+  assert.deepEqual(delivered, [
+    { destination: "https://discord.invalid/hook", message: "• Enemy arcs are now visible." },
+    { destination: "https://discord.invalid/other-hook", message: "• Enemy arcs are now visible." },
+  ]);
+  const destinationStatuses = calls
+    .filter((call) => call.pathname === "/statuses/head-17")
+    .map((call) => call.options.body.context);
+  assert.deepEqual(destinationStatuses, [...DESTINATION_STATUS_CONTEXTS, DELIVERY_STATUS_CONTEXT]);
+  const statusCall = calls.find((call) =>
+    call.pathname === "/statuses/head-17" && call.options.body.context === DELIVERY_STATUS_CONTEXT);
   assert.deepEqual(statusCall?.options?.body, {
     state: "success",
     context: DELIVERY_STATUS_CONTEXT,
-    description: "Gameplay patch note sent to Discord",
+    description: "Gameplay patch note sent to both Discord webhooks",
   });
+}
+
+{
+  const { api, calls } = fixtureApi({
+    statuses: [{ context: DESTINATION_STATUS_CONTEXTS[0], state: "success" }],
+  });
+  const delivered = [];
+  const result = await deliverMergedPullRequest({
+    api,
+    pull: mergedPull(),
+    webhookUrl: "https://discord.invalid/hook",
+    secondaryWebhookUrl: "https://discord.invalid/other-hook",
+    postDiscord: async ({ webhookUrl }) => delivered.push(webhookUrl),
+  });
+  assert.equal(result.status, "sent");
+  assert.deepEqual(delivered, ["https://discord.invalid/other-hook"]);
+  assert.deepEqual(
+    calls.filter((call) => call.pathname === "/statuses/head-17").map((call) => call.options.body.context),
+    [DESTINATION_STATUS_CONTEXTS[1], DELIVERY_STATUS_CONTEXT],
+    "reconciliation must resume at the destination that has not accepted the note",
+  );
+}
+
+{
+  const { api, calls } = fixtureApi();
+  await assert.rejects(
+    deliverMergedPullRequest({
+      api,
+      pull: mergedPull(),
+      webhookUrl: "https://discord.invalid/hook",
+      postDiscord: async () => {},
+    }),
+    /RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY is required/,
+  );
+  assert.equal(
+    calls.some((call) => call.pathname === "/statuses/head-17"),
+    false,
+    "delivery must not be recorded until both destinations are configured and succeed",
+  );
 }
 
 {

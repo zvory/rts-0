@@ -13,6 +13,10 @@ import {
 } from "./patch-note-pass.mjs";
 
 export const DELIVERY_STATUS_CONTEXT = "patch-note-delivery";
+export const DESTINATION_STATUS_CONTEXTS = [
+  `${DELIVERY_STATUS_CONTEXT}-primary`,
+  `${DELIVERY_STATUS_CONTEXT}-secondary`,
+];
 const DEFAULT_RECONCILIATION_LIMIT = 50;
 const DISCORD_ATTEMPTS = 4;
 
@@ -144,19 +148,19 @@ async function managedFragmentForPull(api, pull) {
   return matches[0] || null;
 }
 
-async function deliveryAlreadyRecorded(api, headSha) {
+async function recordedDeliveryContexts(api, headSha) {
   const combined = await api(`/commits/${encodeURIComponent(headSha)}/status?per_page=100`);
-  return Array.isArray(combined?.statuses) && combined.statuses.some(
-    (status) => status?.context === DELIVERY_STATUS_CONTEXT && status?.state === "success",
-  );
+  return new Set((Array.isArray(combined?.statuses) ? combined.statuses : [])
+    .filter((status) => status?.state === "success")
+    .map((status) => status?.context));
 }
 
-async function recordDelivery(api, headSha, description) {
+async function recordDelivery(api, headSha, description, context = DELIVERY_STATUS_CONTEXT) {
   await api(`/statuses/${encodeURIComponent(headSha)}`, {
     method: "POST",
     body: {
       state: "success",
-      context: DELIVERY_STATUS_CONTEXT,
+      context,
       description: String(description).slice(0, 140),
     },
   });
@@ -167,10 +171,12 @@ export async function deliverMergedPullRequest({
   postDiscord = (options) => postDiscordWithRetry(options),
   pull,
   webhookUrl,
+  secondaryWebhookUrl,
 } = {}) {
   if (!pull?.merged_at) return { status: "not-merged", number: pull?.number };
   const headSha = required(pull?.head?.sha, "pull request head SHA");
-  if (await deliveryAlreadyRecorded(api, headSha)) {
+  const recordedContexts = await recordedDeliveryContexts(api, headSha);
+  if (recordedContexts.has(DELIVERY_STATUS_CONTEXT)) {
     return { status: "already-recorded", number: pull.number };
   }
   const fragment = await managedFragmentForPull(api, pull);
@@ -181,8 +187,24 @@ export async function deliverMergedPullRequest({
   const changes = parseFragmentChanges(fragment.text);
   if (changes.length === 0) throw new Error(`${fragment.filename} has no change bullets to deliver`);
   const message = renderDiscordMessage({ changes });
-  await postDiscord({ message, webhookUrl });
-  await recordDelivery(api, headSha, "Gameplay patch note sent to Discord");
+  const destinations = [
+    {
+      context: DESTINATION_STATUS_CONTEXTS[0],
+      label: "primary Discord webhook",
+      url: required(webhookUrl, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"),
+    },
+    {
+      context: DESTINATION_STATUS_CONTEXTS[1],
+      label: "secondary Discord webhook",
+      url: required(secondaryWebhookUrl, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY"),
+    },
+  ];
+  for (const destination of destinations) {
+    if (recordedContexts.has(destination.context)) continue;
+    await postDiscord({ message, webhookUrl: destination.url });
+    await recordDelivery(api, headSha, `Gameplay patch note sent to ${destination.label}`, destination.context);
+  }
+  await recordDelivery(api, headSha, "Gameplay patch note sent to both Discord webhooks");
   return { status: "sent", number: pull.number, path: fragment.filename };
 }
 
@@ -228,6 +250,7 @@ export async function run({
   explicitNumber = 0,
   log = console.log,
   postDiscord,
+  secondaryWebhookUrl,
   webhookUrl,
 } = {}) {
   const isTargetedRun = explicitNumber > 0 || Boolean(eventPullRequest(eventPath));
@@ -236,7 +259,7 @@ export async function run({
   const failures = [];
   for (const pull of pulls) {
     try {
-      const result = await deliverMergedPullRequest({ api, postDiscord, pull, webhookUrl });
+      const result = await deliverMergedPullRequest({ api, postDiscord, pull, secondaryWebhookUrl, webhookUrl });
       results.push(result);
       log(`patch-note-delivery: PR #${pull.number} ${result.status}${result.path ? ` (${result.path})` : ""}`);
     } catch (error) {
@@ -260,6 +283,7 @@ async function main() {
   await run({
     api,
     explicitNumber: pullNumber,
+    secondaryWebhookUrl: process.env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY,
     webhookUrl: process.env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL,
   });
 }
