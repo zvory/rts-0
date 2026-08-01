@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::services::movement::pivot_drive::{
     vehicle_body_turn_rate, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
-    BASELINE_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK,
+    PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK,
 };
 
 #[test]
@@ -41,7 +41,7 @@ fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
 fn artillery_body_keeps_baseline_pivot_drive_turn_rate() {
     assert_eq!(
         vehicle_body_turn_rate(EntityKind::Artillery),
-        BASELINE_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK
+        PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK
     );
 }
 
@@ -53,6 +53,6 @@ fn tank_body_turns_twenty_five_percent_faster_than_baseline() {
     );
     assert_eq!(
         TANK_BODY_TURN_RATE_RAD_PER_TICK,
-        BASELINE_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK * 1.25
+        PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK * 1.25
     );
 }

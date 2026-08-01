@@ -352,8 +352,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Tanks turn their hulls at `TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.04375`, 25% faster than the
-  `0.035` baseline retained by Scout Cars, Command Cars, and Artillery. Tank turret traverse remains
-  independently governed by `TANK_TURRET_TURN_RATE_RAD_PER_TICK = 0.070`.
+  `0.035` pivot-drive rate retained by Artillery. Scout Cars and Command Cars continue to use their
+  curvature-based car movement. Tank turret traverse remains independently governed by
+  `TANK_TURRET_TURN_RATE_RAD_PER_TICK = 0.070`.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 35`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 30 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
