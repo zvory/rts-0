@@ -63,11 +63,11 @@ pub(crate) fn gather_system(
             .and_then(|e| e.gather_phase())
             .unwrap_or(GatherPhase::ToNode);
         match phase {
-            GatherPhase::ToNode | GatherPhase::ToHome => {
+            GatherPhase::ToNode | GatherPhase::WaitingForAnchor | GatherPhase::ToHome => {
                 gather_to_node(map, entities, occ, coordinator, id, node)
             }
             GatherPhase::Harvesting => {
-                gather_harvesting(map, entities, players, coordinator, id, node, tick)
+                gather_harvesting(entities, players, id, node, tick)
             }
         }
     }
@@ -104,11 +104,6 @@ fn gather_to_node(
         None => return,
     };
 
-    if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
-        idle_gatherer(entities, id);
-        return;
-    }
-
     let interact = match (entities.get(id), entities.get(node)) {
         (Some(worker), Some(node)) => {
             worker.radius() + node.radius() + config::TILE_SIZE as f32 * 0.1
@@ -117,6 +112,10 @@ fn gather_to_node(
     };
 
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
+        if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
+            wait_gatherer_for_anchor(entities, id, node_pos, wx, wy);
+            return;
+        }
         let can_mine = !matches!(entities.node_slot_holder(node), Some(m) if m != id);
         if let Some(e) = entities.get_mut(id) {
             e.clear_path();
@@ -135,8 +134,29 @@ fn gather_to_node(
         if can_mine && !entities.claim_miner(node, id) {
             idle_gatherer(entities, id);
         }
-    } else if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
-        coordinator.request_gather_path(entities, id, (node_pos.0, node_pos.1));
+    } else {
+        if let Some(e) = entities.get_mut(id) {
+            e.mark_gather_phase(GatherPhase::ToNode);
+        }
+        if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
+            coordinator.request_gather_path(entities, id, (node_pos.0, node_pos.1));
+        }
+    }
+}
+
+fn wait_gatherer_for_anchor(
+    entities: &mut EntityStore,
+    id: u32,
+    node_pos: (f32, f32),
+    worker_x: f32,
+    worker_y: f32,
+) {
+    entities.release_miner(id);
+    if let Some(e) = entities.get_mut(id) {
+        e.clear_path();
+        e.set_target_id(None);
+        e.set_facing((node_pos.1 - worker_y).atan2(node_pos.0 - worker_x));
+        e.mark_gather_phase(GatherPhase::WaitingForAnchor);
     }
 }
 
@@ -266,10 +286,8 @@ fn nearest_open_non_resource_passable_tile(
 }
 
 fn gather_harvesting(
-    map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    coordinator: &mut MoveCoordinator<'_>,
     id: u32,
     node: u32,
     tick: u32,
@@ -279,7 +297,14 @@ fn gather_harvesting(
         None => return,
     };
     if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
-        scatter_gatherer_from_node(map, entities, coordinator, id, node);
+        let node_pos = entities.get(node).map(|node| (node.pos_x, node.pos_y));
+        let worker_pos = entities.get(id).map(|worker| (worker.pos_x, worker.pos_y));
+        match (node_pos, worker_pos) {
+            (Some(node_pos), Some((worker_x, worker_y))) => {
+                wait_gatherer_for_anchor(entities, id, node_pos, worker_x, worker_y);
+            }
+            _ => idle_gatherer(entities, id),
+        }
         return;
     }
 
@@ -369,40 +394,6 @@ fn idle_gatherer(entities: &mut EntityStore, id: u32) {
     if let Some(e) = entities.get_mut(id) {
         e.clear_active_order();
     }
-}
-
-fn scatter_gatherer_from_node(
-    map: &Map,
-    entities: &mut EntityStore,
-    coordinator: &mut MoveCoordinator<'_>,
-    id: u32,
-    node: u32,
-) {
-    let Some((owner, wx, wy)) = entities.get(id).map(|e| (e.owner, e.pos_x, e.pos_y)) else {
-        return;
-    };
-    let Some((nx, ny)) = entities.get(node).map(|e| (e.pos_x, e.pos_y)) else {
-        idle_gatherer(entities, id);
-        return;
-    };
-
-    let dx = wx - nx;
-    let dy = wy - ny;
-    let len = (dx * dx + dy * dy).sqrt();
-    let (ux, uy) = if len > 0.001 {
-        (dx / len, dy / len)
-    } else {
-        let angle = (id as f32 * 2.399_963_1).rem_euclid(std::f32::consts::TAU);
-        (angle.cos(), angle.sin())
-    };
-    let step = config::TILE_SIZE as f32;
-    let max = (map.world_size_px() - 1.0).max(0.0);
-    let goal = (
-        (wx + ux * step).clamp(0.0, max),
-        (wy + uy * step).clamp(0.0, max),
-    );
-
-    coordinator.order_group_move(entities, owner, &[id], goal, false);
 }
 
 #[cfg(test)]

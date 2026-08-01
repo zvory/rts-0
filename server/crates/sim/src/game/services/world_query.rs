@@ -121,17 +121,13 @@ fn resource_has_completed_mining_anchor(
         .unwrap_or(false)
 }
 
-/// Whether `node` is a live steel patch that `player` can currently mine through a completed
-/// home-base mining anchor. Direct gather commands, queued gather promotion, and production
-/// gather rallies share this policy so they cannot disagree about an actionable target.
-pub(crate) fn steel_node_is_mineable_by_player(
-    entities: &EntityStore,
-    player: u32,
-    node: u32,
-) -> bool {
+/// Whether `node` is a live steel patch that can retain a direct gather intent.
+///
+/// Mining-anchor coverage is deliberately an execution-time condition: gatherers may travel to
+/// and wait at any live steel patch until an owned completed anchor makes harvesting legal.
+pub(crate) fn live_steel_node(entities: &EntityStore, node: u32) -> bool {
     matches!(entities.get(node), Some(resource)
         if resource.kind == EntityKind::Steel && resource.remaining().unwrap_or(0) > 0)
-        && resource_has_completed_mining_cc(entities, player, node)
 }
 
 fn nearest_completed_mining_anchor(
