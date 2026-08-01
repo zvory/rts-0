@@ -385,6 +385,7 @@ mod tests {
 
     mod base_limits;
     mod four_player;
+    mod schone_tage;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {
@@ -416,7 +417,6 @@ mod tests {
         assert!(names.contains(&"1v1"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         assert!(names.contains(&"4 Player Map"), "got: {names:?}");
-        assert!(names.contains(&"Schone Tage"), "got: {names:?}");
         // Every entry must have a non-empty description.
         for entry in &available {
             assert!(
@@ -507,17 +507,6 @@ mod tests {
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.base_sites.len(), 16);
         }
-
-        let schone_tage = Map::load("Schone Tage", 2, 0x1234_5678)
-            .expect("Schone Tage should load for two active players");
-        assert_eq!(schone_tage.size, 126);
-        assert_eq!(schone_tage.base_sites.len(), 9);
-        let schone_tage_starts: HashSet<_> = schone_tage.starts.into_iter().collect();
-        assert_eq!(schone_tage_starts, HashSet::from([(8, 27), (117, 27)]));
-        assert!(
-            Map::load("Schone Tage", 3, 0x1234_5678).is_err(),
-            "Schone Tage should not expose a third start location"
-        );
     }
 
     #[test]
